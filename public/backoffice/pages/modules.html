@@ -124,7 +124,7 @@
     const joinLines = (value) => Array.isArray(value) ? value.join('\n') : '';
     const badge = (value) => { const tone = { ativo: 'success', publicado: 'success', rascunho: 'secondary', pausado: 'warning', arquivado: 'danger' }[String(value || '').toLowerCase()] || 'secondary'; return `<span class="fs-badge fs-badge-width-80 fs-badge-soft-${tone}">${esc(value || '-')}</span>`; };
     const statusLabel = (module) => module.status === 'ativo' ? 'ativo' : 'arquivado';
-    const publicationLabel = (module) => module.publication_state === 'publicado' ? 'Publicado' : module.publication_state === 'pausado' ? 'pausado' : 'rascunho';
+    const publicationLabel = (module) => { if (module.status !== 'ativo') module.status = 'arquivado'; return module.publication_state === 'publicado' ? 'Publicado' : module.publication_state === 'pausado' ? 'pausado' : 'rascunho'; };
     const message = (text, tone = 'danger') => { const element = root.querySelector('#modules-message'); element.textContent = text || ''; element.dataset.tone = tone; element.hidden = !text; };
     const allModules = () => (state.catalog.products || []).flatMap((product) => (product.modules || []).map((module) => ({ ...module, product_name: product.name, product_code: product.code, linked_plans: (product.plans || []).filter((plan) => (plan.modules || []).some((item) => item.id === module.id)) })));
     const options = (selected = '') => `<option value="">Selecione um produto</option>${(state.catalog.products || []).map((product) => `<option value="${esc(product.id)}" ${product.id === selected ? 'selected' : ''}>${esc(product.name)}</option>`).join('')}`;
