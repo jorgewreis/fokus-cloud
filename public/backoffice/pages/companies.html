@@ -149,12 +149,6 @@
     const drawer = document.querySelector("#company-drawer");
     const form = document.querySelector("#company-form");
     const createTrigger = document.querySelector("#company-create");
-    const drawerParent = drawer.parentNode;
-    const drawerAnchor = drawer.nextSibling;
-    const portalDrawer = () => { if (drawer.parentNode !== document.body) document.body.appendChild(drawer); };
-    const restoreDrawer = () => { if (drawer.parentNode !== document.body) return; if (drawerParent.isConnected) drawerParent.insertBefore(drawer, drawerAnchor); else drawer.remove(); };
-    createTrigger.addEventListener("fs:show", portalDrawer);
-    createTrigger.addEventListener("fs:hidden", restoreDrawer);
     const offcanvas = window.FokusStyles?.Offcanvas?.getOrCreateInstance(createTrigger);
     let currentCompany = null;
     const B = "/backoffice/assets/icons/";

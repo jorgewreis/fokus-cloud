@@ -35,10 +35,6 @@
     const drawer = document.querySelector('#product-drawer');
     if (!page || !drawer) return;
 
-    // Keep the drawer outside the shell stacking context for every action,
-    // including view and edit buttons.
-    if (drawer.parentElement !== document.body) document.body.appendChild(drawer);
-
     const syncProductCardFooter = () => {
         const headerSummary = page.querySelector('#product-table-summary');
         if (!headerSummary) return;
@@ -110,22 +106,5 @@
     };
     new MutationObserver(applyBadgeTones).observe(page, { childList: true, subtree: true });
     applyBadgeTones();
-})();
-</script>
-<script>
-(() => {
-    const page = document.querySelector('.admin-products-page');
-    const portalDrawer = () => {
-        const drawer = document.querySelector('#product-drawer');
-        if (drawer && drawer.parentElement !== document.body) {
-            document.body.appendChild(drawer);
-        }
-    };
-
-    page?.addEventListener('click', (event) => {
-        if (event.target.closest('#product-new')) {
-            portalDrawer();
-        }
-    }, true);
 })();
 </script>
