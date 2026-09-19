@@ -41,16 +41,18 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: ca
 .admin-products-page .fs-table-records tbody tr { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1.5fr) minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1.5fr); justify-content: initial; }
 .admin-modules-page .fs-table-records thead tr,
 .admin-modules-page .fs-table-records tbody tr { display: flex !important; width: 100% !important; justify-content: initial !important; }
+.admin-modules-page .fs-table-records thead tr,
+.admin-modules-page .fs-table-records tbody tr { display: grid !important; grid-template-columns: 17.8% 23.2% 19.5% 17.3% 14% 8.2% !important; }
 .admin-products-page .fs-table-records thead th,
 .admin-products-page .fs-table-records tbody td,
 .admin-modules-page .fs-table-records thead th,
 .admin-modules-page .fs-table-records tbody td { box-sizing: border-box; min-width: 0 !important; }
-.admin-modules-page .fs-table-records tr > :nth-child(1) { width: 17.8% !important; flex: 0 0 17.8% !important; }
-.admin-modules-page .fs-table-records tr > :nth-child(2) { width: 23.2% !important; flex: 0 0 23.2% !important; }
-.admin-modules-page .fs-table-records tr > :nth-child(3) { width: 19.5% !important; flex: 0 0 19.5% !important; }
-.admin-modules-page .fs-table-records tr > :nth-child(4) { width: 17.3% !important; flex: 0 0 17.3% !important; }
-.admin-modules-page .fs-table-records tr > :nth-child(5) { width: 14% !important; flex: 0 0 14% !important; }
-.admin-modules-page .fs-table-records tr > :nth-child(6) { width: 8.2% !important; flex: 0 0 8.2% !important; }
+.admin-modules-page .fs-table-records tr > :nth-child(1) { width: auto !important; }
+.admin-modules-page .fs-table-records tr > :nth-child(2) { width: auto !important; }
+.admin-modules-page .fs-table-records tr > :nth-child(3) { width: auto !important; }
+.admin-modules-page .fs-table-records tr > :nth-child(4) { width: auto !important; }
+.admin-modules-page .fs-table-records tr > :nth-child(5) { width: auto !important; }
+.admin-modules-page .fs-table-records tr > :nth-child(6) { width: auto !important; }
 .admin-products-page .fs-table-records tbody td[colspan],
 .admin-modules-page .fs-table-records tbody td[colspan] { grid-column: 1 / -1; }
 .admin-products-page .fs-card-footer { align-items: center; padding: 12px 20px; }
@@ -62,7 +64,7 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: ca
 :is(.admin-products-page, .admin-modules-page) [data-action="view"]::before { background-image: url("/backoffice/assets/icons/Folder-File--Streamline-Ultimate.png"); }
 :is(.admin-products-page, .admin-modules-page) [data-action="edit"]::before { background-image: url("/backoffice/assets/icons/Common-File-Edit--Streamline-Ultimate.png"); }
 :is(.admin-products-page, .admin-modules-page) [data-action="pause"]::before { background-image: url("/backoffice/assets/icons/Common-File-Subtract--Streamline-Ultimate.png"); }
-:is(.admin-products-page, .admin-modules-page) [data-action="activate"]::before { background-image: url("/backoffice/assets/icons/Common-File-Quill--Streamline-Ultimate.png"); }
+:is(.admin-products-page, .admin-modules-page) [data-action="activate"]::before { background-image: url("/backoffice/assets/icons/Zip-File-Download--Streamline-Ultimate.png"); }
 :is(.admin-products-page, .admin-modules-page) [data-action="archive"]::before { background-image: url("/backoffice/assets/icons/Zip-File-Upload--Streamline-Ultimate.png"); }
 :is(.admin-products-page, .admin-modules-page) [data-action="delete"]::before { background-image: url("/backoffice/assets/icons/Common-File-Remove--Streamline-Ultimate.png"); }
 .backoffice-records-page .fs-card-body dl { display: flex; flex-direction: column; gap: 10px; margin: 0; }
