@@ -396,6 +396,19 @@ class CatalogAdminTest extends TestCase
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_product_activated']);
     }
 
+    public function test_module_can_be_republished_after_pause(): void
+    {
+        $admin = $this->admin();
+        $moduleId = DB::table('modules')->where('code', 'processos-advocacia')->value('id');
+
+        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/modules/{$moduleId}/pause", ['reason' => 'Pausa homologada.'])->assertOk();
+        $this->assertDatabaseHas('modules', ['id' => $moduleId, 'status' => 'pausado', 'publication_state' => 'pausado']);
+
+        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/modules/{$moduleId}/activate", ['reason' => 'Republicação homologada.'])->assertOk();
+        $this->assertDatabaseHas('modules', ['id' => $moduleId, 'status' => 'ativo', 'publication_state' => 'publicado']);
+        $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_module_activated', 'entity_id' => $moduleId]);
+    }
+
     public function test_product_deletion_is_allowed_only_without_catalog_dependencies(): void
     {
         $admin = $this->admin();

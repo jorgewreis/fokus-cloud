@@ -353,6 +353,19 @@ class CatalogManager
         return [(array) $current, (array) DB::table($table)->where('id', $id)->first()];
     }
 
+    public function activateModule(string $id): array
+    {
+        $current = DB::table('modules')->where('id', $id)->first();
+        abort_unless($current, 404, 'Módulo não encontrado.');
+        DB::table('modules')->where('id', $id)->update([
+            'status' => 'ativo',
+            'publication_state' => 'publicado',
+            'updated_at' => now(),
+        ]);
+
+        return [(array) $current, (array) DB::table('modules')->where('id', $id)->first()];
+    }
+
     public function deleteCatalogItem(string $type, string $id): array
     {
         $table = match ($type) {
