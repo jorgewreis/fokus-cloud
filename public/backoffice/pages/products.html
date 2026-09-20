@@ -13,6 +13,18 @@
 </script>
 <script>
 (() => {
+    const page = document.querySelector('.admin-products-page');
+    const submit = page?.querySelector('#product-form-submit');
+    if (!page || !submit) return;
+    page.addEventListener('click', (event) => {
+        const control = event.target.closest('#product-new, [data-action="edit"]');
+        if (!control) return;
+        submit.textContent = control.matches('[data-action="edit"]') ? 'Salvar alterações' : 'Cadastrar produto';
+    }, true);
+})();
+</script>
+<script>
+(() => {
     const form = document.querySelector('#product-form');
     if (!form) return;
     const status = form.elements.status;

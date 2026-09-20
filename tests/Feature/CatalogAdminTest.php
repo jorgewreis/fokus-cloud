@@ -401,10 +401,10 @@ class CatalogAdminTest extends TestCase
         $admin = $this->admin();
         $moduleId = DB::table('modules')->where('code', 'processos-advocacia')->value('id');
 
-        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/modules/{$moduleId}/pause", ['reason' => 'Pausa homologada.'])->assertOk();
+        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/modules/{$moduleId}/pause")->assertOk();
         $this->assertDatabaseHas('modules', ['id' => $moduleId, 'status' => 'pausado', 'publication_state' => 'pausado']);
 
-        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/modules/{$moduleId}/activate", ['reason' => 'Republicação homologada.'])->assertOk();
+        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/modules/{$moduleId}/activate")->assertOk();
         $this->assertDatabaseHas('modules', ['id' => $moduleId, 'status' => 'ativo', 'publication_state' => 'publicado']);
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_module_activated', 'entity_id' => $moduleId]);
     }

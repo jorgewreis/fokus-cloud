@@ -213,3 +213,4 @@ VALIDAÇÃO FINAL E ENTREGA
   faça commit e push, acompanhe o workflow até o sucesso e só então informe
   a conclusão. Diferencie claramente evidência estática, teste local,
   workflow, deploy e validação visual pública.
+- Ações de pausar e reativar/republicar módulo são ações diretas e não devem exigir justificativa; arquivar e excluir continuam usando confirmação e justificativa quando o contrato funcional exigir.

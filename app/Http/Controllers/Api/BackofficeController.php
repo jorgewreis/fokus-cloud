@@ -744,19 +744,19 @@ class BackofficeController extends Controller
 
     public function pauseCatalogItem(Request $request, string $type, string $id, CatalogManager $catalog, PlatformAudit $audit)
     {
-        $data = $request->validate(['reason' => ['required', 'string', 'max:1000']]);
+        $data = $request->validate(['reason' => [$type === 'modules' ? 'nullable' : 'required', 'string', 'max:1000']]);
         [$before, $after] = $catalog->pauseOrArchive($type, $id, 'pausado');
-        $audit->record($request->user()->id, 'backoffice.catalog_item_paused', $type, $id, reason: $data['reason'], before: $before, after: $after, request: $request);
+        $audit->record($request->user()->id, 'backoffice.catalog_item_paused', $type, $id, reason: $data['reason'] ?? null, before: $before, after: $after, request: $request);
 
         return response()->json(['message' => 'Item pausado.']);
     }
 
     public function activateCatalogItem(Request $request, string $type, string $id, CatalogManager $catalog, PlatformAudit $audit)
     {
-        $data = $request->validate(['reason' => ['required', 'string', 'max:1000']]);
+        $data = $request->validate(['reason' => ['nullable', 'string', 'max:1000']]);
         abort_unless($type === 'modules', 404, 'Item de catálogo não encontrado.');
         [$before, $after] = $catalog->activateModule($id);
-        $audit->record($request->user()->id, 'backoffice.catalog_module_activated', 'module', $id, reason: $data['reason'], before: $before, after: $after, request: $request);
+        $audit->record($request->user()->id, 'backoffice.catalog_module_activated', 'module', $id, reason: $data['reason'] ?? null, before: $before, after: $after, request: $request);
 
         return response()->json(['message' => 'Módulo republicado.']);
     }
