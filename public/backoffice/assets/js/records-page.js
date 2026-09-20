@@ -1,5 +1,11 @@
 /* Shared Backoffice records composition. Portals drawers before the overlay opens. */
 (() => {
+    const removeOrphanedDrawers = (container) => {
+        document.querySelectorAll('body > .backoffice-records-drawer').forEach((drawer) => {
+            if (!container?.contains(drawer)) drawer.remove();
+        });
+    };
+
     const portalDrawerFromTrigger = (trigger) => {
         const selector = trigger?.getAttribute('data-fs-target');
         const drawer = selector ? document.querySelector(selector) : null;
@@ -18,6 +24,7 @@
     }, true);
 
     window.initBackofficeRecordsPage = (container = document) => {
+        removeOrphanedDrawers(container);
         container.querySelectorAll?.('.backoffice-records-drawer').forEach((drawer) => {
             drawer.querySelectorAll('[id$="-view-panel"]').forEach((panel) => {
                 panel.classList.add('backoffice-records-view-panel');
