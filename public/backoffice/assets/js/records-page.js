@@ -3,6 +3,11 @@
     const portalDrawerFromTrigger = (trigger) => {
         const selector = trigger?.getAttribute('data-fs-target');
         const drawer = selector ? document.querySelector(selector) : null;
+        if (drawer?.classList.contains('backoffice-records-drawer')) {
+            drawer.querySelectorAll('[id$="-view-panel"]').forEach((panel) => {
+                panel.classList.add('backoffice-records-view-panel');
+            });
+        }
         if (drawer?.classList.contains('backoffice-records-drawer') && drawer.parentElement !== document.body) {
             document.body.appendChild(drawer);
         }
@@ -14,6 +19,9 @@
 
     window.initBackofficeRecordsPage = (container = document) => {
         container.querySelectorAll?.('.backoffice-records-drawer').forEach((drawer) => {
+            drawer.querySelectorAll('[id$="-view-panel"]').forEach((panel) => {
+                panel.classList.add('backoffice-records-view-panel');
+            });
             if (drawer.parentElement === document.body) return;
             const trigger = container.querySelector?.(`[data-fs-target="#${drawer.id}"]`);
             if (trigger) portalDrawerFromTrigger(trigger);

@@ -143,6 +143,30 @@ FORMULÁRIOS, DRAWERS E CONSENTIMENTO
 - O drawer deve possuir rolagem vertical, largura de 480px, header, body e
   footer coerentes, e nunca esconder Cancelar, Salvar, Cadastrar ou ações de
   status.
+- Crie uma matriz de comparação para Novo, Editar e Ver detalhes contendo,
+  no mínimo: largura, padding do shell, padding do header/body/footer, gaps,
+  margens, família/peso/tamanho/altura de linha, cores de texto e superfície,
+  bordas, radius, sombras, dimensões dos controles e comportamento responsivo.
+  Nenhum estado pode ser aceito por parecer semelhante ao outro.
+- O painel de detalhes deve usar a mesma composição compartilhada dos demais
+  registros: cards, cabeçalho do card, corpo, `dl`, `dt` e `dd`. Normalize
+  explicitamente a tipografia dos títulos dos cards, pois `fs-card-title`
+  pode herdar a tipografia de display do contexto da página. O estado de
+  consulta não pode cair em Bebas Neue, padding zero ou espaçamento de
+  formulário por omissão.
+- Contratos de drawer e painel de detalhes devem ser selecionados por uma
+  classe/atributo semântico compartilhado, ou por uma composição universal do
+  shell. Nunca use `#company-view-panel`, `#product-view-panel`,
+  `.admin-*-page` ou outro seletor de consumidor para corrigir uma anatomia
+  comum. Se uma correção vale para duas páginas, ela deve valer para qualquer
+  página que adote o contrato, inclusive páginas futuras.
+- Antes de criar um override, inspecione a origem e a ordem das folhas, as
+  camadas CSS e os estilos calculados do elemento renderizado. Remova o
+  override específico equivalente depois de promover a regra compartilhada;
+  não mantenha correções duplicadas que possam divergir novamente.
+- Compare ao menos um caso real de texto curto, texto longo, badge, lista
+  vazia e conteúdo que exige rolagem. Confirme que `h3`/`h4`, labels, valores,
+  listas e mensagens têm hierarquia, contraste e espaçamento deliberados.
 - Consentimento obrigatório pertence ao cadastro externo. Cadastros internos
   realizados por superadmin não devem exibir os checkboxes de Termos e
   Política quando essa regra já estiver definida pelo produto.
@@ -177,6 +201,14 @@ VALIDAÇÃO FINAL E ENTREGA
 - Abra cada drawer pela ação Ver detalhes, Editar e Novo registro e confirme
   no DOM renderizado que o drawer é filho direto de `body`, que o backdrop e
   o painel estão em camadas distintas e que o painel permanece clicável.
+- Para cada um dos três estados, registre os estilos calculados e compare-os
+  diretamente com Empresas e Produtos; confira especialmente `font-family`,
+  `font-size`, `line-height`, `color`, `background-color`, `padding`,
+  `margin`, `gap`, `width`, `overflow` e a posição real dos botões. A presença
+  de classes ou a igualdade do HTML não prova equivalência visual.
+- Faça uma busca final por seletores de página ou IDs de consumidor dentro do
+  CSS do drawer. O resultado esperado é zero para regras de anatomia comum;
+  exceções devem ser justificadas no próprio plano de entrega.
 - Execute testes automatizados e validações estáticas, atualize cache-busting,
   faça commit e push, acompanhe o workflow até o sucesso e só então informe
   a conclusão. Diferencie claramente evidência estática, teste local,

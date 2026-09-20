@@ -422,50 +422,75 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: ca
     margin-bottom: 20px;
 }
 
-.create-drawer #company-view-panel .fs-card-header {
+.create-drawer .backoffice-records-view-panel .fs-card-header {
     padding: 0;
 }
 
-.create-drawer #company-view-panel .fs-card-header .fs-card-title {
+.create-drawer .backoffice-records-view-panel .fs-card-header .fs-card-title {
     padding: 10px;
     font-family: "Google Sans", sans-serif;
     font-size: 1rem;
     font-weight: 600;
+    line-height: 1.25;
+    color: var(--color-text, #252525);
 }
 
-.create-drawer #company-view-panel .fs-card-body {
+.create-drawer .backoffice-records-view-panel .fs-card-body {
     padding: 10px;
 }
 
-.create-drawer #company-view-panel .fs-card-body dl {
+.create-drawer .backoffice-records-view-panel .fs-card-body dl {
     display: flex;
     flex-direction: column;
     gap: 10px;
     margin: 0;
 }
 
-.create-drawer #product-view-panel .fs-card-header {
+.create-drawer .backoffice-records-view-panel {
+    box-sizing: border-box;
+    min-height: 0;
+    gap: 24px;
     padding: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
-.create-drawer #product-view-panel .fs-card-header .fs-card-title {
-    padding: 10px;
-    font-family: "Google Sans", sans-serif;
-    font-size: 1rem;
-    font-weight: 600;
+.create-drawer .backoffice-records-view-panel .fs-card {
+    flex: 0 0 auto;
+    width: 100%;
 }
 
-.create-drawer #product-view-panel .fs-card-body {
-    padding: 10px;
-}
-
-.create-drawer #product-view-panel .fs-card-body dl {
+.create-drawer .backoffice-records-view-panel .fs-card-body dl > div {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    margin: 0;
+    gap: 2px;
 }
 
-.create-drawer #company-view-panel .fs-badge {
+.create-drawer .backoffice-records-view-panel .fs-card-body dt,
+.create-drawer .backoffice-records-view-panel .fs-card-body .fs-form-label {
+    margin: 0;
+    color: var(--color-muted, #58758a);
+    font: 400 .725rem/1.35 "Google Sans", sans-serif;
+}
+
+.create-drawer .backoffice-records-view-panel .fs-card-body dd {
+    margin: 0;
+    color: var(--color-text, #252525);
+    font: 400 .8rem/1.35 "Google Sans", sans-serif;
+    overflow-wrap: anywhere;
+}
+
+.create-drawer .backoffice-records-view-panel .fs-card-body h4 {
+    margin: 12px 0 4px;
+    color: var(--color-text, #252525);
+    font: 600 .8rem/1.25 "Google Sans", sans-serif;
+}
+
+.create-drawer .backoffice-records-view-panel .fs-card-body h4:first-child { margin-top: 0; }
+.create-drawer .backoffice-records-view-panel .fs-card-body ul { margin: 0 0 8px; padding-inline-start: 18px; }
+.create-drawer .backoffice-records-view-panel .fs-card-body p { margin: 0; }
+.create-drawer .backoffice-records-view-panel .fs-badge { align-self: flex-start; }
+
+.create-drawer .backoffice-records-view-panel .fs-badge {
     padding: 2px 8px !important;
 }
