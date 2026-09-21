@@ -25,13 +25,13 @@
             const product = (catalog.products || []).find((item) => item.id === control.dataset.id);
             if (!product) return;
             form.hidden = false;
-            root.querySelector('#product-view-panel').hidden = true;
-            root.querySelector('#product-drawer-title').textContent = 'EDITAR PRODUTO';
-            root.querySelector('#product-form-submit').textContent = 'Salvar alterações';
+            document.querySelector('#product-view-panel').hidden = true;
+            document.querySelector('#product-drawer-title').textContent = 'EDITAR PRODUTO';
+            document.querySelector('#product-form-submit').textContent = 'Salvar alterações';
             ['code', 'name', 'status', 'display_order', 'technical_description', 'commercial_content'].forEach((key) => {
                 form.elements.namedItem(key).value = product[key] ?? (key === 'status' ? 'ativo' : key === 'display_order' ? '1' : '');
             });
-            window.FokusStyles?.Offcanvas?.getOrCreateInstance(root.querySelector('#product-new'))?.show();
+            window.FokusStyles?.Offcanvas?.getOrCreateInstance(document.querySelector('#product-new'))?.show();
         } catch (error) {
             const message = root.querySelector('#products-message');
             message.textContent = error.message || 'Não foi possível abrir a edição do produto.';
