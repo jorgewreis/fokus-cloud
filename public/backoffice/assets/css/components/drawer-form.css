@@ -52,6 +52,23 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: ca
 .admin-products-page #product-table-footer-summary { color: #58758a; font: 400 .8rem/1.35 "Google Sans", sans-serif; }
 .admin-products-page #product-pagination { margin-left: auto; }
 .admin-products-page #product-pagination .fs-pagination { margin: 0; }
+.fs-confirmation-dialog .fs-modal-dialog { width: min(480px, calc(100vw - 32px)); }
+.fs-confirmation-dialog .fs-modal-content { overflow: hidden; }
+.fs-confirmation-dialog .fs-modal-header { align-items: flex-start; gap: 16px; padding: 20px; }
+.fs-confirmation-dialog-heading { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; }
+.fs-confirmation-dialog-kicker { color: var(--color-secondary, #ff6000); font-family: "Bebas Neue", sans-serif; font-size: .875rem; font-weight: 400; letter-spacing: 1.5px; line-height: 1; }
+.fs-confirmation-dialog .fs-modal-title { margin: 4px 0 0; color: var(--color-text, #252525); font-family: "Bebas Neue", sans-serif; font-size: 1.5rem; font-weight: 500; letter-spacing: 1px; line-height: 1.05; }
+.fs-confirmation-dialog-description { margin: 8px 0 0; color: var(--color-muted, #58758a); font: 400 .8rem/1.4 "Google Sans", sans-serif; }
+.fs-confirmation-dialog-form { display: flex; flex-direction: column; min-height: 0; }
+.fs-confirmation-dialog .fs-confirmation-dialog-body { display: flex; flex-direction: column; gap: 12px; padding: 20px; overflow: visible; }
+.fs-confirmation-dialog-field { display: flex; flex-direction: column; gap: 6px; width: 100%; margin: 0; color: var(--color-muted, #58758a); font: 400 .75rem/1.2 "Google Sans", sans-serif; }
+.fs-confirmation-dialog-field .fs-form-select { box-sizing: border-box; flex: 0 0 38px; width: 100%; min-height: 38px; height: 38px; margin: 0; }
+.fs-confirmation-dialog-field .fs-form-text { min-height: 0; margin: 0; padding: 0; }
+.fs-confirmation-dialog .fs-modal-footer { gap: 10px; padding: 16px 20px; }
+.fs-confirmation-dialog .fs-modal-footer .fs-btn { min-width: 120px; }
+.fs-confirmation-dialog .fs-modal-footer .fs-btn-outline-primary { color: var(--fs-alert-primary-text); border: var(--fs-border-width, 1px) solid var(--fs-color-primary); background-color: transparent; }
+.fs-confirmation-dialog .fs-modal-footer .fs-btn-danger { color: var(--fs-color-on-danger); border: var(--fs-border-width, 1px) solid var(--fs-color-danger); background-color: var(--fs-color-danger); }
+@media (max-width: 520px) { .fs-confirmation-dialog .fs-modal-footer { flex-direction: column-reverse; } .fs-confirmation-dialog .fs-modal-footer .fs-btn { width: 100%; min-width: 0; } }
 .backoffice-records-page .fs-card-body dl { display: flex; flex-direction: column; gap: 10px; margin: 0; }
 .backoffice-records-page .fs-card-body dl > div { display: flex; flex-direction: column; gap: 2px; }
 @media (max-width: 680px) { .backoffice-records-page { padding: 24px 16px 36px; } .backoffice-records-page > .fs-page-layout { padding: 0 0 20px; } }

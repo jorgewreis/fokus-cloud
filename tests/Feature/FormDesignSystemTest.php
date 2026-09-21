@@ -99,26 +99,51 @@ class FormDesignSystemTest extends TestCase
     public function test_module_actions_use_publication_semantics_and_assets(): void
     {
         $modules = file_get_contents(base_path('public/backoffice/pages/modules.html'));
+        $products = file_get_contents(base_path('public/backoffice/pages/products.html'));
         $drawerStyles = file_get_contents(base_path('public/backoffice/assets/css/components/drawer-form.css'));
         $sharedStyles = file_get_contents(base_path('public/assets/css/shared/fokus.css'));
 
         $this->assertStringContainsString("action('publish'", $modules);
         $this->assertStringContainsString("action('activate'", $modules);
         $this->assertStringContainsString("action('pause'", $modules);
+        $this->assertStringContainsString("action('inactivate'", $modules);
         $this->assertStringContainsString('Pausar publicação', $modules);
         $this->assertStringContainsString('Republicar módulo', $modules);
-        $this->assertStringContainsString('Browser-Hand--Streamline-Ultimate.png', $modules);
+        $this->assertStringContainsString('File-Code-2--Streamline-Ultimate.png', $modules);
+        $this->assertStringContainsString('File-Code-Subtract--Streamline-Ultimate.png', $modules);
+        $this->assertStringContainsString('File-Code-Remove--Streamline-Ultimate.png', $modules);
         $this->assertStringContainsString('Common-File-Check--Streamline-Ultimate.png', $modules);
-        $this->assertStringContainsString('App-Window-Disable--Streamline-Ultimate.png', $modules);
+        $this->assertStringContainsString('Common-File-Subtract--Streamline-Ultimate.png', $modules);
+        $this->assertStringContainsString('Common-File-Remove--Streamline-Ultimate.png', $modules);
+        $this->assertStringNotContainsString('Browser-Hand--Streamline-Ultimate.png', $modules);
+        $this->assertStringNotContainsString('App-Window-Disable--Streamline-Ultimate.png', $modules);
         $this->assertStringNotContainsString('Zip-File-Download--Streamline-Ultimate.png', $modules);
+        $this->assertStringNotContainsString('Zip-File-Upload--Streamline-Ultimate.png', $modules);
         $this->assertStringContainsString('const moduleActions = (module)', $modules);
         $this->assertStringNotContainsString('normalizeModuleActions', $modules);
         $this->assertStringNotContainsString('MutationObserver', $modules);
         $this->assertStringContainsString('fs-table-action', $modules);
+        $this->assertStringContainsString('fs-confirmation-dialog-form', $modules);
+        $this->assertStringContainsString('fs-confirmation-dialog-body', $modules);
+        $this->assertStringContainsString('fs-confirmation-dialog-field', $modules);
+        $this->assertStringNotContainsString('fs-form-col fs-form-label" for="module-dialog-reason"', $modules);
+        $this->assertStringContainsString('.fs-confirmation-dialog-field .fs-form-select', $drawerStyles);
+        $this->assertStringContainsString('flex: 0 0 38px;', $drawerStyles);
+        $this->assertStringContainsString('.fs-confirmation-dialog .fs-modal-footer .fs-btn-danger', $drawerStyles);
         $this->assertStringContainsString('.fs-table-action::before { display: none !important; content: none !important; }', $sharedStyles);
         $this->assertStringContainsString('.fs-table-action > img', $sharedStyles);
         $this->assertStringContainsString('visibility: visible !important;', $sharedStyles);
         $this->assertStringNotContainsString('data-action]::before', $drawerStyles);
+
+        foreach (['File-Code-2--Streamline-Ultimate.png', 'File-Code-Subtract--Streamline-Ultimate.png', 'File-Code-Remove--Streamline-Ultimate.png', 'Common-File-Check--Streamline-Ultimate.png', 'Common-File-Subtract--Streamline-Ultimate.png', 'Common-File-Remove--Streamline-Ultimate.png'] as $icon) {
+            $this->assertFileExists(base_path("public/backoffice/assets/icons/{$icon}"), $icon);
+        }
+
+        $this->assertStringContainsString('Common-File-Subtract--Streamline-Ultimate.png', $products);
+        $this->assertStringContainsString('Common-File-Remove--Streamline-Ultimate.png', $products);
+        $this->assertStringContainsString('Common-File-Check--Streamline-Ultimate.png', $products);
+        $this->assertStringNotContainsString('Button-Pause-1--Streamline-Ultimate.png', $products);
+        $this->assertStringNotContainsString('Power-Button-1--Streamline-Ultimate.png', $products);
     }
 
     public function test_all_backoffice_table_action_icons_use_the_shared_contract(): void

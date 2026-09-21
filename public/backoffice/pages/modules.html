@@ -53,13 +53,13 @@
     </section>
 
     <button id="module-destructive-trigger" type="button" data-fs="modal" data-fs-target="#module-destructive-dialog" hidden aria-hidden="true"></button>
-    <div id="module-destructive-dialog" class="fs-modal" tabindex="-1" aria-describedby="module-dialog-description">
+    <div id="module-destructive-dialog" class="fs-modal fs-confirmation-dialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="module-dialog-title" aria-describedby="module-dialog-description">
         <div class="fs-modal-dialog"><div class="fs-modal-content">
-            <div class="fs-modal-header"><h2 class="fs-modal-title fs-u-fs-h4" id="module-dialog-title">Confirmar ação</h2><button class="fs-btn-close" type="button" data-fs-dismiss="modal" aria-label="Fechar"></button></div>
-            <form class="fs-form fs-modal-body fs-u-d-flex fs-u-flex-column fs-u-gap-3" id="module-destructive-form">
-                <p id="module-dialog-description">Informe o motivo para registrar esta ação.</p>
-                <label class="fs-form-col fs-form-label" for="module-dialog-reason"><span>Motivo obrigatório</span>
-                    <select class="fs-form-select" id="module-dialog-reason" name="reason" required aria-describedby="module-dialog-description">
+            <div class="fs-modal-header"><div class="fs-confirmation-dialog-heading"><span class="fs-confirmation-dialog-kicker">CATÁLOGO</span><h2 class="fs-modal-title" id="module-dialog-title">Confirmar ação</h2><p class="fs-confirmation-dialog-description" id="module-dialog-description">Informe o motivo para registrar esta ação.</p></div><button class="fs-btn-close" type="button" data-fs-dismiss="modal" aria-label="Fechar"></button></div>
+            <form class="fs-form fs-confirmation-dialog-form" id="module-destructive-form">
+                <div class="fs-modal-body fs-confirmation-dialog-body">
+                    <label class="fs-form-label fs-confirmation-dialog-field" for="module-dialog-reason"><span>Motivo obrigatório</span>
+                    <select class="fs-form-select" id="module-dialog-reason" name="reason" required aria-describedby="module-dialog-description module-dialog-reason-help">
                         <option value="">Selecione um motivo</option>
                         <option value="Módulo duplicado ou cadastrado incorretamente.">Módulo duplicado ou cadastrado incorretamente</option>
                         <option value="Módulo substituído por outra funcionalidade.">Módulo substituído por outra funcionalidade</option>
@@ -67,8 +67,9 @@
                         <option value="Encerramento da oferta comercial do módulo.">Encerramento da oferta comercial do módulo</option>
                         <option value="Outro motivo administrativo.">Outro motivo administrativo</option>
                     </select>
-                </label>
-                <div class="fs-modal-footer"><button class="fs-btn fs-btn-outline-primary" type="button" data-fs-dismiss="modal">Cancelar</button><button class="fs-btn fs-btn-danger" type="submit" id="module-dialog-submit">Confirmar</button></div>
+                    <small class="fs-form-text" id="module-dialog-reason-help">Selecione o motivo que será registrado na auditoria.</small></label>
+                </div>
+                <div class="fs-modal-footer"><button class="fs-btn fs-btn-outline-primary fs-width-300" type="button" data-fs-dismiss="modal">Cancelar</button><button class="fs-btn fs-btn-danger fs-width-400" type="submit" id="module-dialog-submit">Confirmar</button></div>
             </form>
         </div></div>
     </div>
@@ -123,6 +124,7 @@
     const offcanvas = window.FokusStyles?.Offcanvas?.getOrCreateInstance(trigger);
     const destructive = window.FokusStyles?.Modal?.getOrCreateInstance(root.querySelector('#module-destructive-trigger'));
     const canPublish = window.__backofficePermissions?.has('platform.catalog.publish') === true;
+    const canManage = window.__backofficePermissions?.has('platform.catalog.manage') === true;
     const state = { catalog: { products: [] }, modules: [], page: 1, editing: null, mode: 'create', pending: null };
     const pageSize = 12;
     const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
@@ -136,9 +138,40 @@
     const message = (text, tone = 'danger') => { const element = root.querySelector('#modules-message'); if (!element) return; element.textContent = text || ''; element.dataset.tone = tone; element.hidden = !text; };
     const allModules = () => (state.catalog.products || []).flatMap((product) => (product.modules || []).map((module) => ({ ...module, product_name: product.name, product_code: product.code, linked_plans: (product.plans || []).filter((plan) => (plan.modules || []).some((item) => item.id === module.id)) })));
     const options = (selected = '') => `<option value="">Selecione um produto</option>${(state.catalog.products || []).map((product) => `<option value="${esc(product.id)}" ${product.id === selected ? 'selected' : ''}>${esc(product.name)}</option>`).join('')}`;
-    const iconVersion = '20260921-table-actions-v25';
+    const iconVersion = '20260921-module-dialog-v26';
     const action = (type, module, label, icon, danger = false) => `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action${danger ? ' fs-btn-danger' : ''}" type="button" data-action="${type}" data-id="${esc(module.id)}" aria-label="${label}" title="${label}"><img src="/backoffice/assets/icons/${icon}?v=${iconVersion}" alt="" width="20" height="20" decoding="async"></button>`;
-    const moduleActions = (module) => { const publication = String(module.publication_state || 'rascunho').toLowerCase(); const status = String(module.status || '').toLowerCase(); const isActive = status === 'ativo'; const isArchived = status === 'arquivado' || publication === 'arquivado'; const isReactivatable = status === 'inativo' || status === 'pausado'; const actions = [action('view', module, 'Ver detalhes do módulo', 'Folder-File--Streamline-Ultimate.png'), action('edit', module, 'Editar módulo', 'Common-File-Edit--Streamline-Ultimate.png')]; if (!canPublish) return actions; if (isArchived) { actions.push(action('delete', module, 'Excluir módulo', 'Common-File-Remove--Streamline-Ultimate.png', true)); return actions; } if (isActive && publication === 'publicado') { actions.push(action('pause', module, 'Pausar publicação', 'App-Window-Disable--Streamline-Ultimate.png')); return actions; } if (isActive && (publication === 'rascunho' || publication === 'pausado')) { actions.push(action('publish', module, publication === 'rascunho' ? 'Publicar módulo' : 'Republicar módulo', 'Browser-Hand--Streamline-Ultimate.png')); if (publication === 'rascunho') actions.push(action('archive', module, 'Arquivar módulo', 'Zip-File-Upload--Streamline-Ultimate.png')); return actions; } if (isReactivatable && publication === 'pausado') { actions.push(action('activate', module, 'Reativar módulo', 'Common-File-Check--Streamline-Ultimate.png')); actions.push(action('archive', module, 'Arquivar módulo', 'Zip-File-Upload--Streamline-Ultimate.png')); } return actions; };
+    const moduleActions = (module) => {
+        const publication = String(module.publication_state || 'rascunho').toLowerCase();
+        const status = String(module.status || '').toLowerCase();
+        const isActive = status === 'ativo';
+        const isArchived = status === 'arquivado' || publication === 'arquivado';
+        const isReactivatable = status === 'inativo' || status === 'pausado';
+        const actions = [action('view', module, 'Ver detalhes do módulo', 'Folder-File--Streamline-Ultimate.png'), action('edit', module, 'Editar módulo', 'Common-File-Edit--Streamline-Ultimate.png')];
+
+        if (isArchived) {
+            if (canPublish) actions.push(action('delete', module, 'Excluir módulo', 'Common-File-Remove--Streamline-Ultimate.png', true));
+            return actions;
+        }
+
+        if (isActive && publication === 'publicado') {
+            if (canPublish) actions.push(action('pause', module, 'Pausar publicação', 'File-Code-Subtract--Streamline-Ultimate.png'));
+            return actions;
+        }
+
+        if (isActive && (publication === 'rascunho' || publication === 'pausado')) {
+            if (canPublish) actions.push(action('publish', module, publication === 'rascunho' ? 'Publicar módulo' : 'Republicar módulo', 'File-Code-2--Streamline-Ultimate.png'));
+            if (canManage) actions.push(action('inactivate', module, 'Inativar módulo', 'Common-File-Subtract--Streamline-Ultimate.png'));
+            if (canPublish && publication === 'rascunho') actions.push(action('archive', module, 'Arquivar módulo', 'File-Code-Remove--Streamline-Ultimate.png'));
+            return actions;
+        }
+
+        if (isReactivatable && publication === 'pausado') {
+            if (canPublish) actions.push(action('activate', module, 'Reativar módulo', 'Common-File-Check--Streamline-Ultimate.png'));
+            if (canPublish) actions.push(action('archive', module, 'Arquivar módulo', 'File-Code-Remove--Streamline-Ultimate.png'));
+        }
+
+        return actions;
+    };
     const filtered = () => { const query = root.querySelector('#module-query').value.trim().toLowerCase(); const product = root.querySelector('#module-product-filter').value; const status = root.querySelector('#module-status-filter').value; return state.modules.filter((module) => (!query || [module.name, module.code, module.module_code, module.context_code, module.variant_code, module.product_name].some((value) => String(value || '').toLowerCase().includes(query))) && (!product || module.product_id === product) && (!status || module.status === status)); };
     const renderPagination = (page, totalPages, total, records) => { const from = total ? ((page - 1) * pageSize) + 1 : 0; const to = total ? Math.min(page * pageSize, total) : 0; const pages = Array.from({ length: totalPages }, (_, index) => index + 1).map((number) => `<li class="fs-page-item${number === page ? ' is-active' : ''}"${number === page ? ' aria-current="page"' : ''}><button class="fs-page-link" type="button" data-module-page="${number}" aria-label="Página ${number}"${number === page ? ' aria-current="page"' : ''}>${number}</button></li>`).join(''); root.querySelector('#module-table-summary').textContent = `${total} registros encontrados`; root.querySelector('#module-table-footer-summary').textContent = `Mostrando página ${page} de ${totalPages} com ${records} registros, de um total de ${totalPages} páginas.`; root.querySelector('#module-pagination').innerHTML = `<ul class="fs-pagination fs-pagination-compact"><li class="fs-page-item"><button class="fs-page-link" type="button" data-module-page="${page - 1}" aria-label="Página anterior" ${page === 1 ? 'disabled' : ''}>‹</button></li>${pages}<li class="fs-page-item"><button class="fs-page-link" type="button" data-module-page="${page + 1}" aria-label="Próxima página" ${page === totalPages ? 'disabled' : ''}>›</button></li></ul>`; return { from, to }; };
     const render = () => { const rows = filtered(); const totalPages = Math.max(1, Math.ceil(rows.length / pageSize)); state.page = Math.min(Math.max(state.page, 1), totalPages); const start = (state.page - 1) * pageSize; const visible = rows.slice(start, start + pageSize); root.querySelector('#module-list').innerHTML = visible.length ? visible.map((module) => { const publication = String(module.publication_state || 'rascunho').toLowerCase(); const status = String(module.status || '').toLowerCase(); const publicationText = publicationLabel(module); const isActive = status === 'ativo'; const isArchived = status === 'arquivado' || publication === 'arquivado'; const isDraft = publication === 'rascunho'; const isPaused = status === 'inativo' || status === 'pausado' || publication === 'pausado'; const context = [module.segment_code, module.context_code, module.variant_code].filter(Boolean).join(' / ') || 'Contexto não informado'; const actions = moduleActions(module); return `<tr><td class="fs-width-600" data-label="Produto"><strong>${esc(module.product_name)}</strong><small class="fs-u-d-block fs-u-fs-sm">${esc(context)}</small></td><td class="fs-width-600" data-label="Módulo e funcionalidade"><strong>${esc(module.name)}</strong><small class="fs-u-d-block fs-u-fs-sm">${esc((module.capabilities || []).slice(0, 2).join(', ') || 'Sem funcionalidades descritas')}</small></td><td class="fs-width-300" data-label="Preço mensal">${money(module.monthly_price)}</td><td class="fs-width-300" data-label="Status">${badge(statusLabel(module))}</td><td class="fs-width-300" data-label="Publicação">${badge(publicationText)}</td><td class="fs-width-400" data-label="Ações"><div class="fs-u-d-flex fs-u-gap-2">${actions.join('')}</div></td></tr>`; }).join('') : '<tr><td colspan="6">Nenhum módulo encontrado com os filtros informados.</td></tr>'; renderPagination(state.page, totalPages, rows.length, visible.length); window.refreshFokusDataTables?.(root); };
@@ -153,12 +186,13 @@
     const openView = (module) => { state.editing = null; state.mode = 'view'; showDetails(module); drawerKicker.textContent = 'CONSULTA'; drawerTitle.textContent = 'DETALHES DO MÓDULO'; drawerDescription.textContent = 'Consulte os dados, capacidades e vínculos do módulo.'; offcanvas?.show(); };
     const load = async () => { try { state.catalog = await api.request('/backoffice/catalog'); state.modules = allModules(); root.querySelector('#module-product-filter').innerHTML = `<option value="">Todos os produtos</option>${(state.catalog.products || []).map((product) => `<option value="${esc(product.id)}">${esc(product.name)}</option>`).join('')}`; resetForm(); render(); message(''); } catch (error) { message(error.message || 'Não foi possível carregar os módulos.'); } };
     const changePublication = async (type, module) => { const endpoint = type === 'publish' ? 'publish' : type === 'activate' ? 'activate' : 'pause'; const path = `/backoffice/catalog/modules/${module.id}/${endpoint}`; try { await api.request(path, { method: 'POST' }); await load(); message(type === 'pause' ? 'Publicação pausada.' : type === 'activate' ? 'Módulo reativado.' : 'Módulo publicado.', 'success'); } catch (error) { message(error.message || 'Não foi possível alterar a publicação do módulo.'); } };
+    const inactivateModule = async (module) => { try { await api.request(`/backoffice/catalog/modules/${module.id}`, { method: 'PATCH', body: { status: 'inativo' } }); await load(); message('Módulo inativado.', 'success'); } catch (error) { message(error.message || 'Não foi possível inativar o módulo.'); } };
     const openDestructive = (type, module) => { state.pending = { type, module }; const labels = { archive: 'arquivar', delete: 'excluir' }; root.querySelector('#module-dialog-title').textContent = `Confirmar ${labels[type]} módulo`; root.querySelector('#module-dialog-description').textContent = type === 'delete' ? 'A exclusão só será concluída se o módulo estiver arquivado e sem vínculos.' : 'O motivo será registrado na auditoria do catálogo.'; root.querySelector('#module-dialog-submit').textContent = type === 'delete' ? 'Confirmar exclusão' : `Confirmar ${labels[type]}`; destructive?.show(); window.setTimeout(() => root.querySelector('#module-dialog-reason').focus(), 0); };
     trigger.addEventListener('click', (event) => { event.preventDefault(); openCreate(); });
     drawerClose.addEventListener('click', () => offcanvas?.hide());
     formCancel.addEventListener('click', () => offcanvas?.hide());
     root.querySelector('#module-filter-form').addEventListener('submit', (event) => { event.preventDefault(); state.page = 1; render(); });
-    root.querySelector('#module-list').addEventListener('click', (event) => { const control = event.target.closest('[data-action]'); if (!control) return; event.preventDefault(); event.stopPropagation(); const module = state.modules.find((item) => String(item.id) === String(control.dataset.id)); if (!module) return; const type = control.dataset.action; if (type === 'view') openView(module); else if (type === 'edit') openEdit(module); else if (type === 'pause' || type === 'publish' || type === 'activate') changePublication(type, module); else openDestructive(type, module); });
+    root.querySelector('#module-list').addEventListener('click', (event) => { const control = event.target.closest('[data-action]'); if (!control) return; event.preventDefault(); event.stopPropagation(); const module = state.modules.find((item) => String(item.id) === String(control.dataset.id)); if (!module) return; const type = control.dataset.action; if (type === 'view') openView(module); else if (type === 'edit') openEdit(module); else if (type === 'pause' || type === 'publish' || type === 'activate') changePublication(type, module); else if (type === 'inactivate') inactivateModule(module); else openDestructive(type, module); });
     root.querySelector('#module-pagination').addEventListener('click', (event) => { const control = event.target.closest('[data-module-page]'); if (control && !control.disabled) { state.page = Number(control.dataset.modulePage); render(); } });
     form.addEventListener('submit', async (event) => { event.preventDefault(); if (window.FokusForm && !FokusForm.validate(form)) return; FokusForm?.setLoading(form, true); try { const payload = Object.fromEntries(new FormData(form)); payload.monthly_price = window.FokusCurrency?.parse(payload.monthly_price) ?? 0; payload.display_order = Number(payload.display_order || 0); payload.featured = payload.featured === '1'; payload.price_is_estimate = payload.price_is_estimate === '1'; payload.available_standalone = payload.available_standalone === '1'; payload.default_capacity = payload.default_capacity ? Number(payload.default_capacity) : null; payload.capacity_options = splitLines(payload.capacity_options).map(Number).filter((value) => Number.isInteger(value) && value > 0); payload.capabilities = splitLines(payload.capabilities); payload.dependencies = splitLines(payload.dependencies); payload.incompatibilities = splitLines(payload.incompatibilities); await api.request(state.editing ? `/backoffice/catalog/modules/${state.editing}` : '/backoffice/catalog/modules', { method: state.editing ? 'PATCH' : 'POST', body: payload }); offcanvas?.hide(); await load(); message('Módulo salvo com sucesso.', 'success'); } catch (error) { FokusForm?.mapServerErrors(form, error.errors); message(error.message || 'Não foi possível salvar o módulo.'); } finally { FokusForm?.setLoading(form, false); } });
     root.querySelector('#module-destructive-form').addEventListener('submit', async (event) => { event.preventDefault(); if (!state.pending || (window.FokusForm && !FokusForm.validate(event.currentTarget))) return; const { type, module } = state.pending; const reason = new FormData(event.currentTarget).get('reason'); const paths = { archive: `/backoffice/catalog/modules/${module.id}/archive`, delete: `/backoffice/catalog/modules/${module.id}` }; try { await api.request(paths[type], { method: type === 'delete' ? 'DELETE' : 'POST', body: { reason } }); destructive?.hide(); event.currentTarget.reset(); state.pending = null; await load(); message(type === 'delete' ? 'Módulo excluído.' : 'Módulo arquivado.', 'success'); } catch (error) { message(error.message || 'Não foi possível concluir a ação.'); } });
