@@ -104,7 +104,7 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringContainsString("action('publish'", $modules);
         $this->assertStringContainsString("action('pause'", $modules);
         $this->assertStringContainsString('Pausar publicação', $modules);
-        $this->assertStringContainsString('Browser-Hand--Streamline-Ultimate.png', $modules);
+        $this->assertStringContainsString('Common-File-Check--Streamline-Ultimate.png', $modules);
         $this->assertStringContainsString('App-Window-Disable--Streamline-Ultimate.png', $modules);
         $this->assertStringNotContainsString("action('activate'", $modules);
         $this->assertStringNotContainsString('Zip-File-Download--Streamline-Ultimate.png', $modules);
