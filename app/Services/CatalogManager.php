@@ -8,16 +8,7 @@ use Illuminate\Support\Str;
 
 class CatalogManager
 {
-    public const CONTRACT_VERSION = '0.0.3';
-
-    public const USAGE = [
-        'expedicoes' => ['label' => 'Expedicoes', 'summary' => 'expedicoes', 'options' => [2500, 5000, 10000, 20000, 50000], 'step' => 2],
-        'partes' => ['label' => 'Partes', 'summary' => 'partes', 'options' => [5000, 10000, 20000, 50000, 100000], 'step' => 4],
-        'pessoas' => ['label' => 'Pessoas', 'summary' => 'pessoas', 'options' => [50, 250, 1000, 5000, 10000], 'step' => 4],
-        'empreendimentos' => ['label' => 'Empreendimentos', 'summary' => 'empreendimentos', 'options' => [20, 50, 100, 500, 1000], 'step' => 4],
-        'imoveis' => ['label' => 'Imoveis', 'summary' => 'imoveis', 'options' => [200, 500, 1000, 5000, 10000], 'step' => 4],
-        'relatorios' => ['label' => 'Relatorios', 'summary' => 'relatorios', 'options' => [500, 1000, 2000, 5000, 10000], 'step' => 4],
-    ];
+    public const CONTRACT_VERSION = '0.1.0';
 
     public function adminCatalog(): array
     {
@@ -27,6 +18,7 @@ class CatalogManager
 
         return [
             'contract_version' => self::CONTRACT_VERSION,
+            'options' => $this->catalogOptions(),
             'products' => $products->map(fn (object $product): array => [
                 ...$this->productPayload($product),
                 'published_version' => (int) $product->published_catalog_version,
@@ -34,6 +26,36 @@ class CatalogManager
                 'plans' => $plans->where('product_id', $product->id)->values()->all(),
             ])->values()->all(),
             'publications' => $this->adminPublications(),
+        ];
+    }
+
+    public function catalogOptions(?string $productCode = null): array
+    {
+        $products = DB::table('products')->when($productCode, fn ($query) => $query->where('code', $productCode))->get(['id', 'code', 'name']);
+        $families = [];
+        $capabilities = [];
+        foreach ($products as $product) {
+            $families[$product->code] = collect(config('catalog.families.'.$product->code, []))->map(fn (array $item): array => ['code' => $item['code'], 'label' => $item['label'], 'custom' => false])->values()->all();
+            $customFamilies = DB::table('catalog_custom_module_families')->where('product_id', $product->id)->orderBy('name')->get(['code', 'name']);
+            $families[$product->code] = [...$families[$product->code], ...$customFamilies->map(fn (object $item): array => ['code' => $item->code, 'label' => $item->name, 'custom' => true])->all()];
+            $capabilities[$product->code] = [];
+            foreach (config('catalog.families.'.$product->code, []) as $familyItem) {
+                $family = $familyItem['code'];
+                $capabilities[$product->code][$family] = collect(config('catalog.capabilities.'.$family, []))->map(fn (array $item): array => ['code' => $item['code'], 'label' => $item['label'], 'optional' => (bool) ($item['optional'] ?? false), 'custom' => false])->values()->all();
+            }
+            $customCapabilities = DB::table('catalog_custom_capabilities')->where('product_id', $product->id)->orderBy('name')->get(['module_code', 'code', 'name']);
+            foreach ($customCapabilities->groupBy('module_code') as $family => $items) {
+                $capabilities[$product->code][$family] = [...($capabilities[$product->code][$family] ?? []), ...$items->map(fn (object $item): array => ['code' => $item->code, 'label' => $item->name, 'optional' => false, 'custom' => true])->all()];
+            }
+        }
+
+        return [
+            'products' => $products->map(fn (object $product): array => ['id' => $product->id, 'code' => $product->code, 'name' => $product->name])->values()->all(),
+            'segments' => config('catalog.segments'),
+            'contexts' => config('catalog.contexts'),
+            'families' => $families,
+            'capabilities' => $capabilities,
+            'personalization_types' => config('catalog.personalization_types', []),
         ];
     }
 
@@ -93,9 +115,6 @@ class CatalogManager
                 'module.module_code',
                 'module.name',
                 'module.monthly_price',
-                'module.segment_code',
-                'module.context_code',
-                'module.variant_code',
                 'module.status',
                 'module.publication_state',
                 'module.price_is_estimate',
@@ -105,6 +124,7 @@ class CatalogManager
         return $plans->map(function (object $plan) use ($planModules): array {
             $monthlyAmount = $this->planMonthlyAmount($plan);
             $lineName = $this->lineName($plan->product_name, $plan->segment);
+            $personalizationDefaults = $this->planPersonalizationDefaults($plan->id);
 
             return [
                 'id' => $plan->id,
@@ -130,6 +150,7 @@ class CatalogManager
                     'monthly_amount' => (float) $module->monthly_price,
                     'price_is_estimate' => (bool) $module->price_is_estimate,
                 ])->values()->all(),
+                'personalization_defaults' => $personalizationDefaults,
             ];
         });
     }
@@ -217,14 +238,28 @@ class CatalogManager
     public function createModule(array $data): string
     {
         $id = PrefixedUlid::make('MOD');
-        $publicationState = $this->modulePublicationStateForStatus($data['status'] ?? null, 'rascunho');
-        DB::table('modules')->insert($this->moduleWritePayload($data, [
-            'id' => $id,
-            'code' => Str::slug($data['code']),
-            'publication_state' => $publicationState,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]));
+        $product = DB::table('products')->where('id', $data['product_id'] ?? null)->first();
+        abort_unless($product, 422, 'Produto inválido.');
+        $familyCode = $this->resolveFamilyCode($product, $data);
+        $code = $this->generateModuleCode($product, $familyCode, $data['context_code'] ?? null);
+        $displayOrder = ((int) DB::table('modules')->where('product_id', $product->id)->max('display_order')) + 1;
+
+        DB::transaction(function () use ($id, $data, $product, $familyCode, $code, $displayOrder): void {
+            DB::table('modules')->insert($this->moduleWritePayload($data, [
+                'id' => $id,
+                'product_id' => $product->id,
+                'code' => $code,
+                'module_code' => $familyCode,
+                'status' => 'rascunho',
+                'publication_state' => 'rascunho',
+                'display_order' => $displayOrder,
+                'featured' => false,
+                'available_standalone' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]));
+            $this->syncModuleRelations($id, $data, $product);
+        });
 
         return $id;
     }
@@ -233,11 +268,18 @@ class CatalogManager
     {
         $current = DB::table('modules')->where('id', $moduleId)->first();
         abort_unless($current, 404, 'Funcionalidade não encontrada.');
-        $extra = ['updated_at' => now()];
-        if (array_key_exists('status', $data)) {
-            $extra['publication_state'] = $this->modulePublicationStateForStatus($data['status'], $current->publication_state ?? 'rascunho');
-        }
-        DB::table('modules')->where('id', $moduleId)->update($this->moduleWritePayload($data, $extra));
+        $product = DB::table('products')->where('id', $current->product_id)->first();
+        abort_unless($product, 422, 'Produto inválido.');
+        abort_if(array_key_exists('code', $data), 422, 'O código público é imutável.');
+        $familyCode = array_key_exists('module_code', $data) ? $this->resolveFamilyCode($product, $data) : $current->module_code;
+        $payload = $this->moduleWritePayload($data, ['updated_at' => now(), 'module_code' => $familyCode]);
+        unset($payload['product_id'], $payload['code'], $payload['status'], $payload['publication_state']);
+        DB::transaction(function () use ($moduleId, $data, $product, $payload): void {
+            DB::table('modules')->where('id', $moduleId)->update($payload);
+            if (array_key_exists('module_code', $data) || array_key_exists('capability_codes', $data) || array_key_exists('segments', $data) || array_key_exists('dependency_ids', $data) || array_key_exists('incompatibility_ids', $data) || array_key_exists('personalizations', $data)) {
+                $this->syncModuleRelations($moduleId, $data, $product);
+            }
+        });
         return [(array) $current, (array) DB::table('modules')->where('id', $moduleId)->first()];
     }
 
@@ -253,7 +295,7 @@ class CatalogManager
         ]));
 
         if (! empty($data['module_ids'])) {
-            $this->syncPlanModules($id, $data['module_ids']);
+            $this->syncPlanModules($id, $data['module_ids'], $data['personalization_defaults'] ?? []);
         }
 
         return $id;
@@ -264,11 +306,11 @@ class CatalogManager
         DB::table('plans')->where('id', $planId)->update($this->planWritePayload($data, ['updated_at' => now()]));
 
         if (array_key_exists('module_ids', $data)) {
-            $this->syncPlanModules($planId, $data['module_ids'] ?? []);
+            $this->syncPlanModules($planId, $data['module_ids'] ?? [], $data['personalization_defaults'] ?? []);
         }
     }
 
-    public function syncPlanModules(string $planId, array $moduleIds): void
+    public function syncPlanModules(string $planId, array $moduleIds, array $personalizationDefaults = []): void
     {
         $plan = DB::table('plans')->where('id', $planId)->first();
         abort_unless($plan, 404, 'Plano não encontrado.');
@@ -280,10 +322,15 @@ class CatalogManager
         abort_unless($modules->count() === count($moduleIds), 422, 'Funcionalidade inválida.');
         abort_if($modules->pluck('product_id')->unique()->count() !== 1 || $modules->first()->product_id !== $plan->product_id, 422, 'Todas as funcionalidades devem pertencer ao sistema do plano.');
 
-        DB::transaction(function () use ($planId, $moduleIds): void {
+        $defaultRows = $this->validatedPlanPersonalizationDefaults($plan, $modules, $personalizationDefaults);
+        DB::transaction(function () use ($planId, $moduleIds, $defaultRows): void {
             DB::table('plan_modules')->where('plan_id', $planId)->delete();
+            DB::table('plan_personalization_defaults')->where('plan_id', $planId)->delete();
             foreach ($moduleIds as $moduleId) {
                 DB::table('plan_modules')->insert(['plan_id' => $planId, 'module_id' => $moduleId, 'created_at' => now(), 'updated_at' => now()]);
+            }
+            foreach ($defaultRows as $row) {
+                DB::table('plan_personalization_defaults')->insert([...$row, 'created_at' => now(), 'updated_at' => now()]);
             }
         });
     }
@@ -384,15 +431,6 @@ class CatalogManager
         ]);
 
         return [(array) $current, (array) DB::table('modules')->where('id', $id)->first()];
-    }
-
-    private function modulePublicationStateForStatus(?string $status, string $currentPublicationState): string
-    {
-        return match ($status) {
-            'inativo', 'pausado' => 'pausado',
-            'arquivado' => 'arquivado',
-            default => $currentPublicationState,
-        };
     }
 
     public function deleteCatalogItem(string $type, string $id): array
@@ -516,15 +554,12 @@ class CatalogManager
                 abort_unless($moduleByCode->has($moduleCode), 422, 'Plano publicado contém funcionalidade indisponível.');
             }
 
-            $technicalCodes = collect($plan['modules'])->pluck('module_code')->filter()->values();
-            abort_if($technicalCodes->count() !== $technicalCodes->unique()->count(), 422, 'Plano publicado contém variantes incompatíveis do mesmo módulo.');
-
             foreach ($plan['modules'] as $module) {
-                foreach ($this->jsonArray($module['dependencies'] ?? null) as $dependency) {
-                    abort_unless($technicalCodes->contains($dependency) || in_array($dependency, $moduleCodes, true), 422, 'Plano publicado não atende dependências de funcionalidade.');
+                foreach (collect($module['dependencies'] ?? [])->pluck('code')->all() as $dependency) {
+                    abort_unless(in_array($dependency, $moduleCodes, true), 422, 'Plano publicado não atende dependências de funcionalidade.');
                 }
-                foreach ($this->jsonArray($module['incompatibilities'] ?? null) as $incompatibility) {
-                    abort_if($technicalCodes->contains($incompatibility) || in_array($incompatibility, $moduleCodes, true), 422, 'Plano publicado contém funcionalidades incompatíveis.');
+                foreach (collect($module['incompatibilities'] ?? [])->pluck('code')->all() as $incompatibility) {
+                    abort_if(in_array($incompatibility, $moduleCodes, true), 422, 'Plano publicado contém funcionalidades incompatíveis.');
                 }
             }
         });
@@ -540,7 +575,7 @@ class CatalogManager
                 ...$this->modulePayload($module),
                 'description' => (string) ($module->commercial_content ?: $module->technical_description),
                 'monthly_amount' => (float) $module->monthly_price,
-                'usage' => $this->usageFor($module),
+                'personalizations' => $this->modulePayload($module)['personalizations'],
             ])->values()->all(),
             'plans' => $plans->map(fn (array $plan): array => [
                 'id' => $plan['id'],
@@ -553,6 +588,7 @@ class CatalogManager
                 'monthly_amount' => (float) $plan['monthly_amount'],
                 'annual_amount' => (float) $plan['annual_amount'],
                 'module_codes' => collect($plan['modules'])->pluck('code')->values()->all(),
+                'personalization_defaults' => $plan['personalization_defaults'] ?? [],
             ])->values()->all(),
         ];
     }
@@ -603,6 +639,35 @@ class CatalogManager
 
     private function modulePayload(object $module): array
     {
+        $moduleId = $module->id;
+        $segments = DB::table('module_segments')->where('module_id', $moduleId)->orderBy('segment_code')->pluck('segment_code')->values()->all();
+        $capabilityItems = DB::table('module_capabilities')->where('module_id', $moduleId)->orderBy('optional')->orderBy('name')->get()->map(fn (object $capability): array => [
+            'code' => $capability->code,
+            'name' => $capability->name,
+            'optional' => (bool) $capability->optional,
+        ])->values()->all();
+        $dependencies = DB::table('module_dependencies as relation')->join('modules as dependency', 'dependency.id', '=', 'relation.dependency_module_id')->where('relation.module_id', $moduleId)->orderBy('dependency.name')->get(['dependency.id', 'dependency.code', 'dependency.name'])->map(fn (object $item): array => (array) $item)->values()->all();
+        $incompatibilities = DB::table('module_incompatibilities as relation')->join('modules as incompatible', 'incompatible.id', '=', 'relation.incompatible_module_id')->where('relation.module_id', $moduleId)->orderBy('incompatible.name')->get(['incompatible.id', 'incompatible.code', 'incompatible.name'])->map(fn (object $item): array => (array) $item)->values()->all();
+        $personalizations = DB::table('module_personalizations')->where('module_id', $moduleId)->orderBy('display_order')->orderBy('type_code')->get()->map(function (object $personalization): array {
+            $type = collect(config('catalog.personalization_types', []))->firstWhere('code', $personalization->type_code) ?: [];
+            return [
+                'id' => $personalization->id,
+                'type_code' => $personalization->type_code,
+                'type_label' => $type['label'] ?? $personalization->type_code,
+                'unit' => $personalization->unit,
+                'required' => (bool) $personalization->required,
+                'active' => (bool) $personalization->active,
+                'display_order' => (int) $personalization->display_order,
+                'tiers' => DB::table('module_personalization_tiers')->where('personalization_id', $personalization->id)->orderBy('display_order')->orderBy('value')->get()->map(fn (object $tier): array => [
+                    'id' => $tier->id,
+                    'value' => (int) $tier->value,
+                    'additional_monthly_amount' => (float) $tier->additional_monthly_amount,
+                    'active' => (bool) $tier->active,
+                    'display_order' => (int) $tier->display_order,
+                ])->values()->all(),
+            ];
+        })->values()->all();
+
         return [
             'id' => $module->id,
             'product_id' => $module->product_id ?? null,
@@ -612,19 +677,21 @@ class CatalogManager
             'technical_description' => $module->technical_description ?? null,
             'commercial_content' => $module->commercial_content ?? null,
             'monthly_price' => (float) ($module->monthly_price ?? 0),
-            'segment_code' => $module->segment_code ?? null,
+            'segments' => $segments,
+            'segment_codes' => $segments,
             'context_code' => $module->context_code ?? null,
-            'variant_code' => $module->variant_code ?? null,
-            'capabilities' => $this->jsonArray($module->capabilities ?? null),
-            'dependencies' => $this->jsonArray($module->dependencies ?? null),
-            'incompatibilities' => $this->jsonArray($module->incompatibilities ?? null),
-            'status' => $module->status,
+            'capabilities' => collect($capabilityItems)->pluck('name')->values()->all(),
+            'capability_codes' => collect($capabilityItems)->pluck('code')->values()->all(),
+            'capability_items' => $capabilityItems,
+            'dependencies' => $dependencies,
+            'dependency_ids' => collect($dependencies)->pluck('id')->values()->all(),
+            'incompatibilities' => $incompatibilities,
+            'incompatibility_ids' => collect($incompatibilities)->pluck('id')->values()->all(),
+            'personalizations' => $personalizations,
+            'status' => $module->status ?? 'rascunho',
             'publication_state' => $module->publication_state ?? 'rascunho',
             'display_order' => (int) ($module->display_order ?? 0),
             'featured' => (bool) ($module->featured ?? false),
-            'capacity_unit' => $module->capacity_unit ?? null,
-            'default_capacity' => isset($module->default_capacity) ? (int) $module->default_capacity : null,
-            'capacity_options' => $this->jsonArray($module->capacity_options ?? null),
             'available_standalone' => (bool) ($module->available_standalone ?? false),
             'price_is_estimate' => (bool) ($module->price_is_estimate ?? false),
         ];
@@ -684,23 +751,177 @@ class CatalogManager
                 'technical_description' => $data['technical_description'] ?? null,
                 'commercial_content' => $data['commercial_content'] ?? null,
                 'monthly_price' => array_key_exists('monthly_price', $data) ? (float) $data['monthly_price'] : null,
-                'segment_code' => $data['segment_code'] ?? null,
                 'context_code' => $data['context_code'] ?? null,
-                'variant_code' => $data['variant_code'] ?? null,
-                'capabilities' => array_key_exists('capabilities', $data) ? json_encode($data['capabilities'] ?? []) : null,
-                'dependencies' => array_key_exists('dependencies', $data) ? json_encode($data['dependencies'] ?? []) : null,
-                'incompatibilities' => array_key_exists('incompatibilities', $data) ? json_encode($data['incompatibilities'] ?? []) : null,
                 'status' => $data['status'] ?? null,
                 'publication_state' => $data['publication_state'] ?? null,
                 'display_order' => isset($data['display_order']) ? (int) $data['display_order'] : null,
                 'featured' => array_key_exists('featured', $data) ? (bool) $data['featured'] : null,
-                'capacity_unit' => $data['capacity_unit'] ?? null,
-                'default_capacity' => isset($data['default_capacity']) ? (int) $data['default_capacity'] : null,
-                'capacity_options' => array_key_exists('capacity_options', $data) ? json_encode($data['capacity_options'] ?? []) : null,
                 'available_standalone' => array_key_exists('available_standalone', $data) ? (bool) $data['available_standalone'] : null,
                 'price_is_estimate' => array_key_exists('price_is_estimate', $data) ? (bool) $data['price_is_estimate'] : null,
             ], fn ($value): bool => $value !== null),
         ];
+    }
+
+    private function resolveFamilyCode(object $product, array $data): string
+    {
+        $requested = Str::slug((string) ($data['module_code'] ?? ''));
+        if ($requested === 'outro') {
+            $name = trim((string) ($data['module_code_custom_name'] ?? ''));
+            abort_if($name === '', 422, 'Informe o nome da nova família técnica.');
+            $requested = Str::slug($name);
+            abort_if($requested === '', 422, 'Nome de família técnica inválido.');
+            $existing = DB::table('catalog_custom_module_families')->where('product_id', $product->id)->where('code', $requested)->first();
+            if (! $existing) {
+                DB::table('catalog_custom_module_families')->insert([
+                    'id' => PrefixedUlid::make('FAM'),
+                    'product_id' => $product->id,
+                    'code' => $requested,
+                    'name' => $name,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
+        $allowed = collect(config('catalog.families.'.$product->code, []))->pluck('code')->all();
+        $allowed = [...$allowed, ...DB::table('catalog_custom_module_families')->where('product_id', $product->id)->pluck('code')->all()];
+        abort_unless(in_array($requested, $allowed, true), 422, 'Família técnica inválida para este produto.');
+        return $requested;
+    }
+
+    private function generateModuleCode(object $product, string $familyCode, ?string $contextCode): string
+    {
+        $base = Str::slug($product->code.'-'.$familyCode.'-'.($contextCode ?: 'geral'));
+        $code = $base;
+        if (DB::table('modules')->where('code', $code)->exists()) {
+            do {
+                $code = $base.'-'.Str::lower(Str::random(6));
+            } while (DB::table('modules')->where('code', $code)->exists());
+        }
+        return $code;
+    }
+
+    private function syncModuleRelations(string $moduleId, array $data, object $product): void
+    {
+        $module = DB::table('modules')->where('id', $moduleId)->first();
+        abort_unless($module, 404, 'Módulo não encontrado.');
+        $existingSegments = DB::table('module_segments')->where('module_id', $moduleId)->pluck('segment_code')->all();
+        $segments = array_values(array_unique(array_filter(array_key_exists('segments', $data) ? ($data['segments'] ?? []) : $existingSegments)));
+        $allowedSegments = collect(config('catalog.segments.'.$product->code, []))->pluck('code')->all();
+        abort_if(array_diff($segments, $allowedSegments) !== [], 422, 'Segmento inválido para este produto.');
+        if (array_key_exists('context_code', $data) && $data['context_code']) {
+            $contexts = collect($segments)->flatMap(fn (string $segment): array => config('catalog.contexts.'.$product->code.'.'.$segment, []))->pluck('code')->all();
+            abort_if(! in_array($data['context_code'], $contexts, true), 422, 'Contexto inválido para o segmento selecionado.');
+        }
+
+        $existingCapabilities = DB::table('module_capabilities')->where('module_id', $moduleId)->pluck('code')->all();
+        $capabilityCodes = array_values(array_unique(array_filter(array_key_exists('capability_codes', $data) ? ($data['capability_codes'] ?? []) : $existingCapabilities)));
+        $family = $module->module_code;
+        $allowedCapabilities = collect(config('catalog.capabilities.'.$family, []))->keyBy('code');
+        $customCapabilities = DB::table('catalog_custom_capabilities')->where('product_id', $product->id)->where('module_code', $family)->get(['code', 'name'])->keyBy('code');
+        foreach ($capabilityCodes as $customCode) {
+            if (! Str::startsWith($customCode, 'custom_')) continue;
+            if (! $customCapabilities->has($customCode)) {
+                $customName = Str::headline(Str::after($customCode, 'custom_'));
+                DB::table('catalog_custom_capabilities')->insert(['id' => PrefixedUlid::make('CAP'), 'product_id' => $product->id, 'module_code' => $family, 'code' => $customCode, 'name' => $customName, 'created_at' => now(), 'updated_at' => now()]);
+                $customCapabilities->put($customCode, (object) ['code' => $customCode, 'name' => $customName]);
+            }
+        }
+        foreach (($data['capability_custom_names'] ?? []) as $customName) {
+            $customName = trim((string) $customName);
+            if ($customName === '') continue;
+            $customCode = Str::slug($customName);
+            if (! $customCapabilities->has($customCode)) {
+                DB::table('catalog_custom_capabilities')->insert(['id' => PrefixedUlid::make('CAP'), 'product_id' => $product->id, 'module_code' => $family, 'code' => $customCode, 'name' => $customName, 'created_at' => now(), 'updated_at' => now()]);
+            }
+            $capabilityCodes[] = $customCode;
+        }
+        $capabilityCodes = array_values(array_unique($capabilityCodes));
+        foreach ($capabilityCodes as $code) abort_if(! $allowedCapabilities->has($code) && ! $customCapabilities->has($code) && ! DB::table('catalog_custom_capabilities')->where('product_id', $product->id)->where('module_code', $family)->where('code', $code)->exists(), 422, 'Funcionalidade inválida para a família técnica.');
+
+        $existingDependencies = DB::table('module_dependencies')->where('module_id', $moduleId)->pluck('dependency_module_id')->all();
+        $existingIncompatibilities = DB::table('module_incompatibilities')->where('module_id', $moduleId)->pluck('incompatible_module_id')->all();
+        $dependencyIds = array_values(array_unique(array_filter(array_key_exists('dependency_ids', $data) ? ($data['dependency_ids'] ?? []) : $existingDependencies)));
+        $incompatibilityIds = array_values(array_unique(array_filter(array_key_exists('incompatibility_ids', $data) ? ($data['incompatibility_ids'] ?? []) : $existingIncompatibilities)));
+        $related = DB::table('modules')->whereIn('id', [...$dependencyIds, ...$incompatibilityIds])->get(['id', 'product_id']);
+        abort_if($related->count() !== count(array_unique([...$dependencyIds, ...$incompatibilityIds])), 422, 'Dependência ou incompatibilidade inválida.');
+        abort_if($related->contains(fn (object $item): bool => $item->product_id !== $product->id), 422, 'Os vínculos devem pertencer ao mesmo produto.');
+        abort_if(in_array($moduleId, [...$dependencyIds, ...$incompatibilityIds], true), 422, 'Um módulo não pode apontar para si mesmo.');
+        abort_if(array_intersect($dependencyIds, $incompatibilityIds) !== [], 422, 'Dependência e incompatibilidade não podem apontar para o mesmo módulo.');
+        $this->assertDependencyGraph($moduleId, $dependencyIds);
+
+        DB::table('module_segments')->where('module_id', $moduleId)->delete();
+        DB::table('module_capabilities')->where('module_id', $moduleId)->delete();
+        DB::table('module_dependencies')->where('module_id', $moduleId)->delete();
+        DB::table('module_incompatibilities')->where('module_id', $moduleId)->delete();
+        foreach ($segments as $segment) DB::table('module_segments')->insert(['module_id' => $moduleId, 'segment_code' => $segment, 'created_at' => now(), 'updated_at' => now()]);
+        foreach ($capabilityCodes as $index => $code) {
+            $configured = $allowedCapabilities->get($code);
+            $custom = $customCapabilities->get($code) ?: DB::table('catalog_custom_capabilities')->where('product_id', $product->id)->where('module_code', $family)->where('code', $code)->first();
+            DB::table('module_capabilities')->insert(['id' => PrefixedUlid::make('MCF'), 'module_id' => $moduleId, 'code' => $code, 'name' => $configured['label'] ?? ($custom->name ?? $code), 'optional' => (bool) ($configured['optional'] ?? false), 'created_at' => now(), 'updated_at' => now()]);
+        }
+        foreach ($dependencyIds as $dependencyId) DB::table('module_dependencies')->insert(['module_id' => $moduleId, 'dependency_module_id' => $dependencyId, 'created_at' => now(), 'updated_at' => now()]);
+        foreach ($incompatibilityIds as $incompatibilityId) DB::table('module_incompatibilities')->insert(['module_id' => $moduleId, 'incompatible_module_id' => $incompatibilityId, 'created_at' => now(), 'updated_at' => now()]);
+        if (array_key_exists('personalizations', $data)) $this->syncPersonalizations($moduleId, $data['personalizations'] ?? []);
+    }
+
+    private function syncPersonalizations(string $moduleId, array $personalizations): void
+    {
+        $types = collect(config('catalog.personalization_types', []))->keyBy('code');
+        $seen = [];
+        DB::table('module_personalization_tiers')->whereIn('personalization_id', DB::table('module_personalizations')->where('module_id', $moduleId)->pluck('id'))->delete();
+        DB::table('module_personalizations')->where('module_id', $moduleId)->delete();
+        foreach (array_values($personalizations) as $order => $item) {
+            $typeCode = (string) ($item['type_code'] ?? '');
+            abort_if(! $types->has($typeCode) || in_array($typeCode, $seen, true), 422, 'Tipo de personalização inválido ou duplicado.');
+            $seen[] = $typeCode;
+            $type = $types->get($typeCode);
+            $personalizationId = PrefixedUlid::make('PSN');
+            DB::table('module_personalizations')->insert(['id' => $personalizationId, 'module_id' => $moduleId, 'type_code' => $typeCode, 'unit' => $type['unit'], 'required' => (bool) ($item['required'] ?? true), 'active' => (bool) ($item['active'] ?? true), 'display_order' => $order + 1, 'created_at' => now(), 'updated_at' => now()]);
+            $tierValues = [];
+            foreach (array_values($item['tiers'] ?? []) as $tierOrder => $tier) {
+                $value = (int) ($tier['value'] ?? 0);
+                abort_if($value < 1 || in_array($value, $tierValues, true), 422, 'Faixa de personalização inválida ou duplicada.');
+                $tierValues[] = $value;
+                DB::table('module_personalization_tiers')->insert(['id' => PrefixedUlid::make('PST'), 'personalization_id' => $personalizationId, 'value' => $value, 'additional_monthly_amount' => max(0, (float) ($tier['additional_monthly_amount'] ?? 0)), 'active' => (bool) ($tier['active'] ?? true), 'display_order' => $tierOrder + 1, 'created_at' => now(), 'updated_at' => now()]);
+            }
+            abort_if($tierValues === [], 422, 'Toda personalização precisa de ao menos uma faixa.');
+            abort_if((bool) ($item['required'] ?? true) && ! collect($item['tiers'])->contains(fn (array $tier): bool => (bool) ($tier['active'] ?? true)), 422, 'Personalização obrigatória precisa de uma faixa ativa.');
+        }
+    }
+
+    private function assertDependencyGraph(string $moduleId, array $newDependencies): void
+    {
+        $edges = DB::table('module_dependencies')->get(['module_id', 'dependency_module_id'])->groupBy('module_id')->map(fn ($items): array => $items->pluck('dependency_module_id')->all())->all();
+        $edges[$moduleId] = $newDependencies;
+        $visit = function (string $node, array $path) use (&$visit, $edges): void {
+            abort_if(in_array($node, $path, true), 422, 'As dependências formam um ciclo.');
+            foreach ($edges[$node] ?? [] as $next) $visit($next, [...$path, $node]);
+        };
+        foreach (array_keys($edges) as $node) $visit($node, []);
+    }
+
+    private function validatedPlanPersonalizationDefaults(object $plan, Collection $modules, array $defaults): array
+    {
+        $moduleIds = $modules->pluck('id')->all();
+        $personalizations = DB::table('module_personalizations')->whereIn('module_id', $moduleIds)->get();
+        $byId = $personalizations->keyBy('id');
+        $rows = [];
+        foreach ($defaults as $default) {
+            $personalizationId = $default['personalization_id'] ?? null;
+            $tierId = $default['tier_id'] ?? null;
+            $personalization = $byId->get($personalizationId);
+            abort_unless($personalization, 422, 'Personalização padrão inválida para o plano.');
+            $tier = DB::table('module_personalization_tiers')->where('id', $tierId)->where('personalization_id', $personalizationId)->where('active', true)->first();
+            abort_unless($tier, 422, 'Faixa padrão inválida para a personalização.');
+            $rows[] = ['plan_id' => $plan->id, 'personalization_id' => $personalizationId, 'tier_id' => $tierId];
+        }
+        foreach ($personalizations->where('required', true) as $personalization) abort_if(! collect($rows)->contains('personalization_id', $personalization->id), 422, 'Personalização obrigatória precisa de uma faixa-padrão no plano.');
+        return $rows;
+    }
+
+    private function planPersonalizationDefaults(string $planId): array
+    {
+        return DB::table('plan_personalization_defaults as default_value')->join('module_personalizations as personalization', 'personalization.id', '=', 'default_value.personalization_id')->join('module_personalization_tiers as tier', 'tier.id', '=', 'default_value.tier_id')->where('default_value.plan_id', $planId)->get(['personalization.id as personalization_id', 'personalization.type_code', 'personalization.required', 'tier.id as tier_id', 'tier.value', 'tier.additional_monthly_amount'])->map(fn (object $item): array => (array) $item)->values()->all();
     }
 
     private function planWritePayload(array $data, array $extra): array
@@ -725,9 +946,10 @@ class CatalogManager
 
     private function planMonthlyAmount(object $plan): float
     {
-        return $plan->configured_monthly_amount === null
+        $base = $plan->configured_monthly_amount === null
             ? CatalogPricing::suggestedMonthly((float) $plan->module_monthly_amount)
             : (float) $plan->configured_monthly_amount;
+        return round($base + collect($this->planPersonalizationDefaults($plan->id))->sum(fn (array $default): float => (float) ($default['additional_monthly_amount'] ?? 0)), 2);
     }
 
     private function lineName(string $productName, ?string $segment): string
@@ -743,30 +965,4 @@ class CatalogManager
         };
     }
 
-    private function usageFor(object $module): ?array
-    {
-        if ($module->capacity_options) {
-            $options = $this->jsonArray($module->capacity_options);
-
-            return $options ? [
-                'label' => $module->capacity_unit ?: $module->name,
-                'summary' => $module->capacity_unit ?: 'itens',
-                'options' => $options,
-                'step' => 0,
-            ] : null;
-        }
-
-        return self::USAGE[$module->module_code ?: $module->code] ?? self::USAGE[$module->code] ?? null;
-    }
-
-    private function jsonArray(mixed $value): array
-    {
-        if (is_array($value)) {
-            return $value;
-        }
-
-        $decoded = $value ? json_decode((string) $value, true) : [];
-
-        return is_array($decoded) ? $decoded : [];
-    }
 }

@@ -605,7 +605,6 @@ class BackofficeController extends Controller
         }
         $data = $this->validateModule($request);
         abort_unless(DB::table('products')->where('id', $data['product_id'])->exists(), 422, 'Sistema não encontrado.');
-        abort_if(DB::table('modules')->where('product_id', $data['product_id'])->where('code', Str::slug($data['code']))->exists(), 422, 'Já existe uma funcionalidade com este código no sistema.');
 
         $id = $catalog->createModule($data);
         $audit->record($request->user()->id, 'backoffice.catalog_module_created', 'module', $id, reason: 'Criação de funcionalidade comercial', after: $data, request: $request);
@@ -621,10 +620,7 @@ class BackofficeController extends Controller
         $data = $this->validateModule($request, true);
         $current = DB::table('modules')->where('id', $module)->first();
         abort_unless($current, 404, 'Funcionalidade não encontrada.');
-        $productId = $data['product_id'] ?? $current->product_id;
-        if (isset($data['code'])) {
-            abort_if(DB::table('modules')->where('product_id', $productId)->where('code', Str::slug($data['code']))->where('id', '!=', $module)->exists(), 422, 'Já existe uma funcionalidade com este código no sistema.');
-        }
+        abort_if(array_key_exists('code', $data), 422, 'O código público é automático e imutável.');
 
         [, $after] = $catalog->updateModule($module, $data);
         $audit->record($request->user()->id, 'backoffice.catalog_module_updated', 'module', $module, reason: 'Atualização de funcionalidade comercial', before: (array) $current, after: $after, request: $request);
@@ -655,6 +651,9 @@ class BackofficeController extends Controller
             'featured' => ['nullable', 'boolean'],
             'module_ids' => ['nullable', 'array'],
             'module_ids.*' => ['string', 'size:30'],
+            'personalization_defaults' => ['nullable', 'array'],
+            'personalization_defaults.*.personalization_id' => ['required', 'string', 'size:30'],
+            'personalization_defaults.*.tier_id' => ['required', 'string', 'size:30'],
         ]);
         $data = $this->resolvePlanProductData($data);
         abort_if(DB::table('plans')->where('product_id', $data['product_id'])->where('code', Str::slug($data['code']))->exists(), 422, 'Já existe um plano com este código no sistema selecionado.');
@@ -688,6 +687,9 @@ class BackofficeController extends Controller
             'featured' => ['nullable', 'boolean'],
             'module_ids' => ['nullable', 'array'],
             'module_ids.*' => ['string', 'size:30'],
+            'personalization_defaults' => ['nullable', 'array'],
+            'personalization_defaults.*.personalization_id' => ['required', 'string', 'size:30'],
+            'personalization_defaults.*.tier_id' => ['required', 'string', 'size:30'],
         ]);
         $current = DB::table('plans')->where('id', $plan)->first();
         abort_unless($current, 404, 'Plano não encontrado.');
@@ -707,9 +709,12 @@ class BackofficeController extends Controller
         $data = $request->validate([
             'module_ids' => ['required', 'array', 'min:1'],
             'module_ids.*' => ['required', 'string', 'size:30'],
+            'personalization_defaults' => ['nullable', 'array'],
+            'personalization_defaults.*.personalization_id' => ['required', 'string', 'size:30'],
+            'personalization_defaults.*.tier_id' => ['required', 'string', 'size:30'],
         ]);
         $current = DB::table('plan_modules')->where('plan_id', $plan)->pluck('module_id')->all();
-        $catalog->syncPlanModules($plan, $data['module_ids']);
+        $catalog->syncPlanModules($plan, $data['module_ids'], $data['personalization_defaults'] ?? []);
         $audit->record($request->user()->id, 'backoffice.plan_modules_updated', 'plan', $plan, reason: 'Atualização da composição do plano', before: ['module_ids' => $current], after: $data, request: $request);
 
         return response()->json(['message' => 'Composição atualizada.']);
@@ -838,26 +843,34 @@ class BackofficeController extends Controller
 
         return $request->validate([
             'product_id' => [$required, 'string', 'size:30'],
-            'code' => [$required, 'string', 'max:64'],
-            'module_code' => ['nullable', 'string', 'max:64'],
+            'module_code' => [$required, 'string', 'max:64'],
+            'module_code_custom_name' => ['nullable', 'string', 'max:120'],
             'name' => [$required, 'string', 'max:120'],
             'technical_description' => ['nullable', 'string', 'max:2000'],
             'commercial_content' => ['nullable', 'string', 'max:20000'],
             'monthly_price' => [$required, 'numeric', 'min:0'],
-            'segment_code' => ['nullable', 'string', 'max:32'],
+            'segments' => [$required, 'array', 'min:1'],
+            'segments.*' => ['string', 'max:32'],
             'context_code' => ['nullable', 'string', 'max:64'],
-            'variant_code' => ['nullable', 'string', 'max:64'],
-            'capabilities' => ['nullable', 'array'],
-            'dependencies' => ['nullable', 'array'],
-            'incompatibilities' => ['nullable', 'array'],
-            'status' => ['nullable', Rule::in(['ativo', 'inativo', 'rascunho', 'pausado', 'arquivado'])],
-            'display_order' => ['nullable', 'integer', 'min:0'],
-            'featured' => ['nullable', 'boolean'],
-            'capacity_unit' => ['nullable', 'string', 'max:64'],
-            'default_capacity' => ['nullable', 'integer', 'min:1'],
-            'capacity_options' => ['nullable', 'array'],
-            'capacity_options.*' => ['integer', 'min:1'],
-            'available_standalone' => ['nullable', 'boolean'],
+            'capability_codes' => ['nullable', 'array'],
+            'capability_codes.*' => ['string', 'max:100'],
+            'capability_custom_names' => ['nullable', 'array'],
+            'capability_custom_names.*' => ['string', 'max:180'],
+            'dependency_ids' => ['nullable', 'array', 'max:30'],
+            'dependency_ids.*' => ['string', 'size:30'],
+            'incompatibility_ids' => ['nullable', 'array', 'max:30'],
+            'incompatibility_ids.*' => ['string', 'size:30'],
+            'personalizations' => ['nullable', 'array', 'max:20'],
+            'personalizations.*.type_code' => ['required', 'string', 'max:64'],
+            'personalizations.*.required' => ['required', 'boolean'],
+            'personalizations.*.active' => ['required', 'boolean'],
+            'personalizations.*.tiers' => ['required', 'array', 'min:1', 'max:20'],
+            'personalizations.*.tiers.*.value' => ['required', 'integer', 'min:1'],
+            'personalizations.*.tiers.*.additional_monthly_amount' => ['required', 'numeric', 'min:0'],
+            'personalizations.*.tiers.*.active' => ['required', 'boolean'],
+            'display_order' => [$partial ? 'nullable' : 'prohibited', 'integer', 'min:0'],
+            'featured' => [$partial ? 'nullable' : 'prohibited', 'boolean'],
+            'available_standalone' => [$partial ? 'nullable' : 'prohibited', 'boolean'],
             'price_is_estimate' => ['nullable', 'boolean'],
         ]);
     }

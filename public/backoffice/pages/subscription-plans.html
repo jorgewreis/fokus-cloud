@@ -87,6 +87,7 @@
                 <div class="fs-form-col fs-col-3"><label class="fs-form-label" for="plan-featured">Destaque</label><select class="fs-form-select" id="plan-featured" name="featured"><option value="0">Não</option><option value="1">Sim</option></select></div>
             </div>
             <div class="fs-form-col"><label class="fs-form-label">Composição</label><div class="fs-card fs-u-p-3" id="plan-module-options"></div></div>
+            <div class="fs-form-col"><label class="fs-form-label">Personalizações padrão <small class="fs-u-color-secondary">Opcional: apenas personalizações dos módulos selecionados.</small></label><div class="fs-card fs-u-p-3" id="plan-personalization-defaults"><p class="fs-u-color-secondary">Selecione os módulos para configurar faixas-padrão.</p></div></div>
             <div class="fs-u-d-flex fs-u-flex-wrap fs-u-justify-content-end fs-u-gap-2"><button class="fs-btn fs-btn-primary" type="submit">Salvar plano</button><button class="fs-btn fs-btn-outline-primary" type="reset">Novo plano</button></div>
         </form>
         <div class="fs-table-responsive fs-datatable" data-fs="datatable" data-fs-page-size="1000"><table class="fs-table" aria-label="Planos do catálogo"><thead><tr><th>Código</th><th>Plano</th><th>Produto</th><th>Mensal</th><th>Módulos</th><th>Status</th><th>Publicação</th><th>Ações</th></tr></thead><tbody id="plan-list"><tr><td colspan="8">Carregando...</td></tr></tbody></table></div>
@@ -204,6 +205,8 @@
             const productId = document.querySelector("#plan-product").value;
             const modules = allModules().filter((module) => module.product_id === productId);
             document.querySelector("#plan-module-options").innerHTML = modules.length ? modules.map((module) => `<label class="fs-check"><input class="fs-check-input plan-module-checkbox" type="checkbox" name="module_ids" value="${escapeHtml(module.id)}" ${selected.includes(module.id) ? "checked" : ""}><span class="fs-check-label">${escapeHtml(module.name)} - ${money(module.monthly_amount || module.monthly_price)}</span></label>`).join("") : '<p class="fs-u-fs-md fs-u-color-secondary">Cadastre funcionalidades ativas para compor planos.</p>';
+            const defaults = modules.filter((module) => selected.includes(module.id)).flatMap((module) => (module.personalizations || []).filter((item) => item.active && item.required).map((item) => ({ ...item, module_name: module.name })));
+            document.querySelector("#plan-personalization-defaults").innerHTML = defaults.length ? defaults.map((item) => `<label class="fs-form-label">${escapeHtml(item.module_name)} · ${escapeHtml(item.type_label || item.type_code)}<select class="fs-form-select plan-personalization-default" data-personalization-id="${escapeHtml(item.id)}"><option value="">Selecione a faixa padrão</option>${(item.tiers || []).filter((tier) => tier.active).map((tier) => `<option value="${escapeHtml(tier.id)}">${tier.value} · ${money(tier.additional_monthly_amount)}/mês</option>`).join("")}</select></label>`).join("") : '<p class="fs-u-color-secondary">Selecione os módulos para configurar faixas-padrão.</p>';
         }
 
         function render() {
@@ -251,6 +254,7 @@
             render();
         });
         document.querySelector("#plan-product").addEventListener("change", () => renderPlanModuleOptions());
+        document.querySelector("#plan-module-options").addEventListener("change", () => renderPlanModuleOptions([...document.querySelectorAll('.plan-module-checkbox:checked')].map((input) => input.value)));
 
         document.querySelector("#product-form").addEventListener("submit", async (event) => {
             event.preventDefault();
@@ -318,6 +322,7 @@
                 payload.display_order = Number(payload.display_order || 0);
                 payload.featured = payload.featured === "1";
                 payload.module_ids = moduleIds;
+                payload.personalization_defaults = [...form.querySelectorAll(".plan-personalization-default")].filter((select) => select.value).map((select) => ({ personalization_id: select.dataset.personalizationId, tier_id: select.value }));
                 const id = state.editing.plan;
                 await api.request(id ? `/backoffice/catalog/plans/${id}` : "/backoffice/catalog/plans", { method: id ? "PATCH" : "POST", body: payload });
                 form.reset();

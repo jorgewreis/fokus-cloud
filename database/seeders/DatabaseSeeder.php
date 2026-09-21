@@ -11,6 +11,10 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        if (app()->environment('production')) {
+            return;
+        }
+
         foreach (['admin' => 'Administrador', 'gestor' => 'Gestor', 'usuario' => 'Usuário'] as $code => $name) {
             $this->upsertCatalog('roles', ['code' => $code], ['name' => $name], 'PFL');
         }
@@ -76,21 +80,15 @@ class DatabaseSeeder extends Seeder
             $productId = DB::table('products')->where('code', $productCode)->value('id');
             foreach ($items as $code => $definition) {
                 if ($productCode === 'law') {
-                    [$name, $moduleCode, $price, $segment, $context, $variant, $estimate] = $definition;
+                    [$name, $moduleCode, $price, $segment, $context, $legacyFamily, $estimate] = $definition;
                 } else {
                     [$name, $price, $segment, $moduleCode, $estimate] = $definition;
                     $context = null;
-                    $variant = null;
                 }
                 $this->upsertCatalog('modules', ['product_id' => $productId, 'code' => $code], ['name' => $name, 'monthly_price' => $price], 'MOD');
                 DB::table('modules')->where('product_id', $productId)->where('code', $code)->update([
                     'module_code' => $moduleCode,
-                    'segment_code' => $segment,
                     'context_code' => $context,
-                    'variant_code' => $variant,
-                    'capabilities' => json_encode($productCode === 'law' ? $this->lawCapabilities($moduleCode, $segment, $context) : []),
-                    'dependencies' => json_encode($productCode === 'law' ? ($moduleCode === 'contatos' ? [] : ($moduleCode === 'audiencias_externo' ? ['audiencias'] : ($moduleCode === 'audiencias' ? ['processos', 'contatos'] : ['contatos']))) : []),
-                    'incompatibilities' => json_encode([]),
                     'technical_description' => "Funcionalidade {$name} vinculada ao catálogo {$productCode}.",
                     'commercial_content' => $name,
                     'status' => 'ativo',
@@ -100,6 +98,17 @@ class DatabaseSeeder extends Seeder
                     'price_is_estimate' => $estimate,
                     'updated_at' => now(),
                 ]);
+                $moduleId = DB::table('modules')->where('product_id', $productId)->where('code', $code)->value('id');
+                DB::table('module_segments')->where('module_id', $moduleId)->delete();
+                foreach (array_filter(array_map('trim', explode(',', (string) $segment))) as $segmentCode) {
+                    if (collect(config('catalog.segments.'.$productCode, []))->pluck('code')->contains($segmentCode)) {
+                        DB::table('module_segments')->insert(['module_id' => $moduleId, 'segment_code' => $segmentCode, 'created_at' => now(), 'updated_at' => now()]);
+                    }
+                }
+                DB::table('module_capabilities')->where('module_id', $moduleId)->delete();
+                foreach (config('catalog.capabilities.'.$moduleCode, []) as $capability) {
+                    DB::table('module_capabilities')->insert(['id' => PrefixedUlid::make('MCF'), 'module_id' => $moduleId, 'code' => $capability['code'], 'name' => $capability['label'], 'optional' => (bool) ($capability['optional'] ?? false), 'created_at' => now(), 'updated_at' => now()]);
+                }
             }
         }
 

@@ -56,7 +56,9 @@ class SubscriptionController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.module_code' => ['required', 'string', 'max:64'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:1000'],
-            'items.*.usage_limit' => ['nullable', 'integer', 'min:1'],
+            'items.*.personalizations' => ['nullable', 'array'],
+            'items.*.personalizations.*.type_code' => ['required', 'string', 'max:64'],
+            'items.*.personalizations.*.tier_value' => ['required', 'integer', 'min:1'],
             'cycle' => ['required', Rule::in(['monthly', 'annual'])],
             'selection_mode' => ['required', Rule::in(['modules', 'plan'])],
             'plan_code' => ['nullable', 'string', 'max:64'],
@@ -387,34 +389,55 @@ class SubscriptionController extends Controller
 
         $modules = DB::table('modules')->where('product_id', $product->id)->whereIn('code', $codes)->get()->keyBy('code');
         abort_unless($modules->count() === count($codes), 422, 'Módulo inválido para este produto.');
-        $technicalCodes = $modules->pluck('module_code')->filter()->values()->all();
-        abort_if(count($technicalCodes) !== count(array_unique($technicalCodes)), 422, 'Escolha apenas uma variante de cada módulo.');
-        $lawSegments = $modules->pluck('segment_code')->filter()->unique()->values();
-        abort_if($product->code === 'law' && $lawSegments->count() > 1, 422, 'As variantes selecionadas pertencem a segmentos incompatíveis.');
         $monthly = 0.0;
         $items = [];
         foreach ($data['items'] as $requested) {
             $module = $modules[$requested['module_code']];
             $publishedModule = $publishedModules[$requested['module_code']];
-            $usage = $publishedModule['usage'] ?? null;
-            $usageLimit = $requested['usage_limit'] ?? ($usage['options'][0] ?? null);
-            if ($usage) {
-                abort_unless(in_array($usageLimit, $usage['options'], true), 422, 'Limite de utilização inválido.');
-            } else {
-                abort_if(isset($requested['usage_limit']), 422, 'Este módulo não possui limite configurável.');
-            }
-            $unit = (float) $publishedModule['monthly_amount'] + ($usage ? array_search($usageLimit, $usage['options'], true) * ($usage['step'] ?? 0) : 0);
+            [$customizationAmount, $selections, $personalizationDelta] = $this->quotePersonalizations($publishedModule, $requested['personalizations'] ?? [], $publishedPlan['personalization_defaults'] ?? []);
+            $unit = (float) $publishedModule['monthly_amount'] + $customizationAmount;
             $monthly += $unit * $requested['quantity'];
-            $items[] = ['module' => $module, 'quantity' => $requested['quantity'], 'unit_price' => $data['cycle'] === 'annual' ? $unit * 10 : $unit, 'conditions' => ['cycle' => $data['cycle'], 'usage_limit' => $usageLimit, 'selection_mode' => $data['selection_mode'], 'plan_code' => $data['plan_code'] ?? null, 'module_code' => $module->module_code, 'segment_code' => $module->segment_code, 'context_code' => $module->context_code, 'variant_code' => $module->variant_code]];
+            $items[] = ['module' => $module, 'quantity' => $requested['quantity'], 'unit_price' => $data['cycle'] === 'annual' ? $unit * 10 : $unit, 'conditions' => ['cycle' => $data['cycle'], 'personalizations' => $selections, 'personalization_delta' => $personalizationDelta, 'selection_mode' => $data['selection_mode'], 'plan_code' => $data['plan_code'] ?? null, 'module_code' => $module->module_code, 'context_code' => $module->context_code]];
         }
         if ($data['selection_mode'] === 'plan') {
-            $monthly = (float) $publishedPlan['monthly_amount'];
+            $planMonthly = (float) $publishedPlan['monthly_amount'];
+            $monthly = $planMonthly + collect($items)->sum(fn (array $item): float => (float) ($item['conditions']['personalization_delta'] ?? 0));
             foreach ($items as &$item) {
                 $item['unit_price'] *= 0.9;
             }
         }
         $amount = $data['cycle'] === 'annual' ? CatalogPricing::annualFromMonthly($monthly) : round($monthly, 2);
         return ['items' => $items, 'amount' => $amount];
+    }
+
+    private function quotePersonalizations(array $module, array $requested, array $planDefaults): array
+    {
+        $requestedByType = collect($requested)->keyBy('type_code');
+        $defaultsById = collect($planDefaults)->keyBy('personalization_id');
+        $total = 0.0;
+        $delta = 0.0;
+        $selections = [];
+        foreach ($module['personalizations'] ?? [] as $personalization) {
+            $activeTiers = collect($personalization['tiers'] ?? [])->where('active', true)->sortBy('value')->values();
+            if ($activeTiers->isEmpty() || ! $personalization['active']) continue;
+            $planDefault = $defaultsById->get($personalization['id']);
+            $defaultTier = $planDefault ? $activeTiers->firstWhere('id', $planDefault['tier_id']) : ($personalization['required'] ? $activeTiers->first() : null);
+            $requestedTier = $requestedByType->get($personalization['type_code']);
+            if ($personalization['required']) abort_unless($defaultTier, 422, 'Personalização obrigatória sem faixa padrão disponível.');
+            if ($requestedTier) {
+                $tier = $activeTiers->firstWhere('value', (int) $requestedTier['tier_value']);
+                abort_unless($tier, 422, 'Faixa de personalização inválida.');
+                if ($defaultTier) abort_if((int) $tier['value'] < (int) $defaultTier['value'], 422, 'A faixa selecionada não pode ser inferior à faixa padrão do plano.');
+                $total += (float) $tier['additional_monthly_amount'];
+                if ($defaultTier) $delta += (float) $tier['additional_monthly_amount'] - (float) $defaultTier['additional_monthly_amount'];
+                $selections[] = ['personalization_id' => $personalization['id'], 'type_code' => $personalization['type_code'], 'tier_id' => $tier['id'], 'value' => (int) $tier['value'], 'additional_monthly_amount' => (float) $tier['additional_monthly_amount']];
+            } elseif ($personalization['required']) {
+                $total += (float) $defaultTier['additional_monthly_amount'];
+                $selections[] = ['personalization_id' => $personalization['id'], 'type_code' => $personalization['type_code'], 'tier_id' => $defaultTier['id'], 'value' => (int) $defaultTier['value'], 'additional_monthly_amount' => (float) $defaultTier['additional_monthly_amount']];
+            }
+        }
+        foreach ($requestedByType as $typeCode => $selection) abort_unless(collect($module['personalizations'] ?? [])->pluck('type_code')->contains($typeCode), 422, 'Personalização inválida para este módulo.');
+        return [$total, $selections, $delta];
     }
 
     private function voucherFor(string $code, string $productId, string $companyId, array $moduleCodes): ?object

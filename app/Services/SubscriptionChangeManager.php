@@ -259,9 +259,9 @@ class SubscriptionChangeManager
                 'conditions' => [
                     'plan_code' => $plan->code,
                     'module_code' => $module['module_code'] ?? null,
-                    'segment_code' => $module['segment_code'] ?? null,
+                    'segments' => $module['segments'] ?? [],
                     'context_code' => $module['context_code'] ?? null,
-                    'variant_code' => $module['variant_code'] ?? null,
+                    'personalizations' => $module['personalizations'] ?? [],
                 ],
             ];
         })->values()->all();

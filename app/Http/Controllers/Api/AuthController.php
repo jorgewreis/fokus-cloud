@@ -32,6 +32,7 @@ class AuthController extends Controller
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->leftJoin('subscription_items as item', 'item.subscription_id', '=', 'subscription.id')
             ->leftJoin('modules as module', 'module.id', '=', 'item.module_id')
+            ->leftJoin('module_segments as module_segment', 'module_segment.module_id', '=', 'module.id')
             ->where('membership.user_id', $user->id)
             ->where('membership.status', 'ativo')
             ->whereNull('membership.deleted_at')
@@ -39,7 +40,7 @@ class AuthController extends Controller
             ->whereNull('company.deleted_at')
             ->where('subscription.status', 'ativa')
             ->where('product.code', 'law')
-            ->select('company.id as company_id', 'company.legal_name as company_name', 'role.code as profile_code', 'role.name as profile_name', 'module.segment_code')
+            ->select('company.id as company_id', 'company.legal_name as company_name', 'role.code as profile_code', 'role.name as profile_name', 'module_segment.segment_code')
             ->orderBy('company.legal_name')
             ->get() : collect();
 
