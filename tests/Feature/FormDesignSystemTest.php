@@ -149,6 +149,8 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringContainsString('status === \'ativo\'', $products);
         $this->assertStringContainsString('product-view-panel', $products);
         $this->assertStringContainsString('resetDrawerState', $products);
+        $this->assertStringContainsString("form.elements.namedItem('code').disabled = true", $products);
+        $this->assertStringContainsString('data-sidebar-item="products"', file_get_contents(base_path('public/backoffice/index.html')));
         $this->assertStringNotContainsString('product-confirm-dialog', $products);
         $this->assertStringNotContainsString("action('deactivate'", $products);
         $this->assertStringNotContainsString('/deactivate', $products);

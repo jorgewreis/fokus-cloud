@@ -94,6 +94,7 @@
                         <button
                             class="sidebar-button sidebar-group-toggle"
                             type="button"
+                            data-sidebar-item="products"
                             aria-expanded="true"
                             aria-controls="catalog-subnav"
                         >
@@ -696,6 +697,7 @@
                 const expanded = catalogToggle.getAttribute("aria-expanded") === "true";
                 catalogToggle.setAttribute("aria-expanded", String(!expanded));
                 catalogSubnav.hidden = expanded;
+                loadSidebarPage("products");
             });
 
             async function hydrateAdmin() {
