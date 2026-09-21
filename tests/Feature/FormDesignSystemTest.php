@@ -144,10 +144,15 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringContainsString('Common-File-Check--Streamline-Ultimate.png', $products);
         $this->assertStringNotContainsString('Button-Pause-1--Streamline-Ultimate.png', $products);
         $this->assertStringNotContainsString('Power-Button-1--Streamline-Ultimate.png', $products);
-        $this->assertStringContainsString('fs-confirmation-dialog-form', $products);
-        $this->assertStringContainsString('id="product-confirm-dialog"', $products);
-        $this->assertStringContainsString("action('deactivate'", $products);
-        $this->assertStringContainsString('/deactivate', $products);
+        $this->assertStringContainsString("action('pause'", $products);
+        $this->assertStringContainsString('/pause', $products);
+        $this->assertStringContainsString('status === \'ativo\'', $products);
+        $this->assertStringContainsString('product-view-panel', $products);
+        $this->assertStringContainsString('resetDrawerState', $products);
+        $this->assertStringNotContainsString('product-confirm-dialog', $products);
+        $this->assertStringNotContainsString("action('deactivate'", $products);
+        $this->assertStringNotContainsString('/deactivate', $products);
+        $this->assertStringNotContainsString('name="status"', $products);
         $this->assertStringNotContainsString('publication_state', $products);
     }
 
@@ -234,7 +239,7 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringContainsString('fs-badge', $companies);
         $this->assertStringContainsString('fs-offcanvas', $companies);
         $this->assertStringContainsString('backoffice-records-page', $products);
-        $this->assertStringContainsString('product-confirm-dialog', $products);
+        $this->assertStringNotContainsString('product-confirm-dialog', $products);
         $this->assertStringNotContainsString('window.confirm', $products);
         $this->assertStringContainsString('card-body', $subscriptions);
         $this->assertStringContainsString('cancelamento_imediato', $subscriptions);

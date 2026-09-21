@@ -105,7 +105,7 @@
                             <img class="sidebar-group-chevron" src="/backoffice/assets/icons/Arrow-Down-1--Streamline-Ultimate.png?v=20260916-catalog-arrow-v2" alt="" aria-hidden="true" />
                         </button>
                         <div class="sidebar-subnav" id="catalog-subnav" role="group" aria-label="Seções do catálogo">
-                            <button class="sidebar-button sidebar-subnav-button" type="button" data-sidebar-item="products">
+                            <button class="sidebar-button sidebar-subnav-button" type="button" data-sidebar-item="products" data-platform-role="superadministrador">
                                 <span class="sidebar-button-label text-subtitle-sm">Produtos</span>
                             </button>
                             <button class="sidebar-button sidebar-subnav-button" type="button" disabled title="Em breve">
@@ -580,6 +580,9 @@
             };
 
             async function loadSidebarPage(pageName) {
+                if (pageName === "products" && window.__backofficeAdmin?.role !== "superadministrador") {
+                    pageName = "companies";
+                }
                 document.querySelectorAll("link[data-page-css]").forEach((stylesheet) => stylesheet.remove());
                 pageContent.innerHTML =
                     '<div class="text-body fs-u-color-secondary">Carregando...</div>';
@@ -700,14 +703,20 @@
                     const response = await FokusApi.request(
                         "/backoffice/auth/me",
                     );
-                    document
+                        document
                         .querySelectorAll("[data-platform-permission]")
                         .forEach((element) => {
                             element.hidden = !(
                                 response?.admin?.permissions || []
-                            ).includes(element.dataset.platformPermission);
+                                ).includes(element.dataset.platformPermission);
+                        });
+                    document
+                        .querySelectorAll('[data-platform-role]')
+                        .forEach((element) => {
+                            element.hidden = response?.admin?.role !== element.dataset.platformRole;
                         });
                     window.__backofficePermissions = new Set(response?.admin?.permissions || []);
+                    window.__backofficeAdmin = response.admin;
                     return response.admin;
                 } catch (error) {
                     location.replace("/?acesso=administrativo");

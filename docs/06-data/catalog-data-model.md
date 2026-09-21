@@ -11,10 +11,10 @@ Campos principais:
 - `id`: identificador prefixed ULID;
 - `code`: codigo tecnico unico;
 - `name`: nome exibido;
-- `active`: indicador atual de atividade;
-- `status`: estado operacional;
+- `active`: indicador sincronizado com o status (`ativo` = `true`, `pausado` = `false`);
+- `status`: único estado operacional do produto, limitado a `ativo` ou `pausado`;
 - `published_catalog_version`: ultima versao técnica do catálogo, mantida para
-  preservar o snapshot público; não representa publicação do produto;
+  preservar o snapshot técnico do catálogo; não representa publicação do produto;
 - descricoes tecnica e comercial;
 - ordem de exibicao unica entre produtos, com reordenacao automatica em caso
   de colisao;
@@ -80,6 +80,8 @@ O backend deve validar:
 - ao menos uma funcionalidade em plano publicavel;
 - precos nao negativos;
 - codigos unicos;
+- acesso e alterações de produtos exclusivamente por superadministrador;
+- criação sempre pausada e transições somente pelas ações de tabela;
 - dependencias e incompatibilidades;
 - exclusao fisica somente quando nao houver vinculos.
 
@@ -96,7 +98,7 @@ regra aprovada.
 O Marco 3 adiciona ou normaliza:
 
 - descricao tecnica e conteudo comercial;
-- status comercial e estado de publicacao;
+- status operacional `ativo` ou `pausado`;
 - ordem de exibicao e destaque;
 - linha comercial do Lead;
 - precos e descontos por ciclo;

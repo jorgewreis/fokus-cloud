@@ -166,7 +166,8 @@ class CatalogManager
             DB::table('products')->insert($this->productWritePayload([...$data, 'display_order' => $displayOrder], [
                 'id' => $id,
                 'code' => Str::slug($data['code']),
-                'active' => ($data['status'] ?? 'ativo') === 'ativo',
+                'status' => 'pausado',
+                'active' => false,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]));
@@ -178,9 +179,6 @@ class CatalogManager
     public function updateProduct(string $productId, array $data): void
     {
         $extra = ['updated_at' => now()];
-        if (array_key_exists('status', $data)) {
-            $extra['active'] = $data['status'] === 'ativo';
-        }
 
         DB::transaction(function () use ($productId, $data, $extra): void {
             $payload = $this->productWritePayload($data, $extra);
@@ -213,13 +211,13 @@ class CatalogManager
         return [(array) $current, (array) DB::table('products')->where('id', $productId)->first()];
     }
 
-    public function deactivateProduct(string $productId): array
+    public function pauseProduct(string $productId): array
     {
         $current = DB::table('products')->where('id', $productId)->first();
         abort_unless($current, 404, 'Produto não encontrado.');
 
         DB::table('products')->where('id', $productId)->update([
-            'status' => 'inativo',
+            'status' => 'pausado',
             'active' => false,
             'updated_at' => now(),
         ]);
@@ -231,6 +229,7 @@ class CatalogManager
     {
         $current = DB::table('products')->where('id', $productId)->first();
         abort_unless($current, 404, 'Produto não encontrado.');
+        abort_if($current->status !== 'pausado', 422, 'Somente produtos pausados podem ser excluídos.');
 
         $dependencies = collect([
             DB::table('modules')->where('product_id', $productId)->exists() ? 'módulos' : null,
@@ -239,7 +238,7 @@ class CatalogManager
             DB::table('subscriptions')->where('product_id', $productId)->exists() ? 'assinaturas' : null,
             DB::table('vouchers')->where('product_id', $productId)->exists() ? 'vouchers' : null,
         ])->filter()->values();
-        abort_if($dependencies->isNotEmpty(), 422, 'Não é possível excluir este produto porque existem vínculos: '.$dependencies->implode(', ').'. Arquive-o para preservar o histórico.');
+        abort_if($dependencies->isNotEmpty(), 422, 'Não é possível excluir este produto porque existem vínculos: '.$dependencies->implode(', ').'.');
 
         DB::table('products')->where('id', $productId)->delete();
 
@@ -635,7 +634,7 @@ class CatalogManager
             'name' => $product->name,
             'technical_description' => $product->technical_description ?? null,
             'commercial_content' => $product->commercial_content ?? null,
-            'status' => $product->status ?? (($product->active ?? true) ? 'ativo' : 'inativo'),
+            'status' => $product->status ?? (($product->active ?? true) ? 'ativo' : 'pausado'),
             'display_order' => (int) ($product->display_order ?? 0),
             'active' => (bool) ($product->active ?? true),
         ];
@@ -710,7 +709,6 @@ class CatalogManager
                 'name' => isset($data['name']) ? trim((string) $data['name']) : null,
                 'technical_description' => $data['technical_description'] ?? null,
                 'commercial_content' => $data['commercial_content'] ?? null,
-                'status' => $data['status'] ?? null,
                 'display_order' => isset($data['display_order']) ? (int) $data['display_order'] : null,
             ], fn ($value): bool => $value !== null),
         ];

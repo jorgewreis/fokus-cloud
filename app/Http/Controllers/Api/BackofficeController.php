@@ -551,6 +551,11 @@ class BackofficeController extends Controller
         return response()->json($catalog->adminCatalog());
     }
 
+    public function products(Request $request, CatalogManager $catalog)
+    {
+        return response()->json($catalog->adminCatalog());
+    }
+
     public function plans(Request $request, CatalogManager $catalog)
     {
         return response()->json($catalog->managementPlans()->values());
@@ -563,7 +568,6 @@ class BackofficeController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'technical_description' => ['nullable', 'string', 'max:2000'],
             'commercial_content' => ['nullable', 'string', 'max:20000'],
-            'status' => ['nullable', Rule::in(['ativo', 'inativo'])],
             'display_order' => ['nullable', 'integer', 'min:1'],
         ]);
         abort_if(DB::table('products')->where('code', Str::slug($data['code']))->exists(), 422, 'Já existe um sistema com este código.');
@@ -581,7 +585,6 @@ class BackofficeController extends Controller
             'name' => ['nullable', 'string', 'max:120'],
             'technical_description' => ['nullable', 'string', 'max:2000'],
             'commercial_content' => ['nullable', 'string', 'max:20000'],
-            'status' => ['nullable', Rule::in(['ativo', 'inativo'])],
             'display_order' => ['nullable', 'integer', 'min:1'],
         ]);
         $current = DB::table('products')->where('id', $product)->first();
@@ -781,29 +784,26 @@ class BackofficeController extends Controller
         return response()->json(['message' => 'Item arquivado.']);
     }
 
-    public function deactivateProduct(Request $request, string $product, CatalogManager $catalog, PlatformAudit $audit)
+    public function pauseProduct(Request $request, string $product, CatalogManager $catalog, PlatformAudit $audit)
     {
-        $data = $request->validate(['reason' => ['required', 'string', 'max:1000']]);
-        [$before, $after] = $catalog->deactivateProduct($product);
-        $audit->record($request->user()->id, 'backoffice.catalog_product_deactivated', 'product', $product, reason: $data['reason'], before: $before, after: $after, request: $request);
+        [$before, $after] = $catalog->pauseProduct($product);
+        $audit->record($request->user()->id, 'backoffice.catalog_product_paused', 'product', $product, reason: 'Pausa direta pela tabela de produtos.', before: $before, after: $after, request: $request);
 
-        return response()->json(['message' => 'Produto desativado.']);
+        return response()->json(['message' => 'Produto pausado.']);
     }
 
     public function activateProduct(Request $request, string $product, CatalogManager $catalog, PlatformAudit $audit)
     {
-        $data = $request->validate(['reason' => ['required', 'string', 'max:1000']]);
         [$before, $after] = $catalog->activateProduct($product);
-        $audit->record($request->user()->id, 'backoffice.catalog_product_activated', 'product', $product, reason: $data['reason'], before: $before, after: $after, request: $request);
+        $audit->record($request->user()->id, 'backoffice.catalog_product_activated', 'product', $product, reason: 'Ativação direta pela tabela de produtos.', before: $before, after: $after, request: $request);
 
         return response()->json(['message' => 'Produto ativado.']);
     }
 
     public function deleteProduct(Request $request, string $product, CatalogManager $catalog, PlatformAudit $audit)
     {
-        $data = $request->validate(['reason' => ['required', 'string', 'max:1000']]);
         $before = $catalog->deleteProduct($product);
-        $audit->record($request->user()->id, 'backoffice.catalog_product_deleted', 'product', $product, reason: $data['reason'], before: $before, request: $request);
+        $audit->record($request->user()->id, 'backoffice.catalog_product_deleted', 'product', $product, reason: 'Exclusão direta pela tabela de produtos.', before: $before, request: $request);
 
         return response()->json(['message' => 'Produto excluído.']);
     }

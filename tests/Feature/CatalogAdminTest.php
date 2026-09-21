@@ -22,10 +22,14 @@ class CatalogAdminTest extends TestCase
         Mail::fake();
     }
 
-    public function test_commercial_admin_can_create_an_active_product_but_cannot_generate_catalog_versions(): void
+    public function test_only_superadmin_can_create_a_paused_product_and_cannot_generate_catalog_versions_as_commercial(): void
     {
-        $admin = $this->admin('administrador_comercial');
+        $commercial = $this->admin('administrador_comercial');
+        $this->actingAs($commercial, 'platform')->postJson('/api/backoffice/catalog/products', [
+            'code' => 'academy', 'name' => 'Fokus Cloud Academy',
+        ])->assertForbidden();
 
+        $admin = $this->admin();
         $this->actingAs($admin, 'platform')->postJson('/api/backoffice/catalog/products', [
             'code' => 'academy',
             'name' => 'Fokus Cloud Academy',
@@ -35,10 +39,11 @@ class CatalogAdminTest extends TestCase
         $productId = DB::table('products')->where('code', 'academy')->value('id');
         $this->assertDatabaseHas('products', [
             'id' => $productId,
-            'status' => 'ativo',
+            'status' => 'pausado',
+            'active' => false,
         ]);
 
-        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/{$productId}/publish", [
+        $this->actingAs($commercial, 'platform')->postJson("/api/backoffice/catalog/{$productId}/publish", [
             'reason' => 'Tentativa comercial.',
         ])->assertForbidden();
     }
@@ -377,36 +382,35 @@ class CatalogAdminTest extends TestCase
         $this->assertDatabaseHas('modules', ['id' => $linkedModuleId]);
     }
 
-    public function test_product_activation_lifecycle_is_audited_and_requires_publish_permission(): void
+    public function test_product_activation_lifecycle_is_audited_and_restricted_to_superadmin(): void
     {
         $commercial = $this->admin('administrador_comercial');
         $super = $this->admin();
-        $productId = $this->actingAs($commercial, 'platform')->postJson('/api/backoffice/catalog/products', [
+        $productId = $this->actingAs($super, 'platform')->postJson('/api/backoffice/catalog/products', [
             'code' => 'produto-ciclo',
             'name' => 'Produto de ciclo',
             'status' => 'ativo',
         ])->assertCreated()->json('id');
 
-        $this->actingAs($commercial, 'platform')->postJson("/api/backoffice/catalog/products/{$productId}/deactivate", ['reason' => 'Sem permissão.'])->assertForbidden();
-        $this->actingAs($super, 'platform')->postJson("/api/backoffice/catalog/products/{$productId}/deactivate", ['reason' => 'Desativação homologada.'])->assertOk();
-        $this->assertDatabaseHas('products', ['id' => $productId, 'status' => 'inativo', 'active' => false]);
+        $this->actingAs($commercial, 'platform')->postJson("/api/backoffice/catalog/products/{$productId}/pause")->assertForbidden();
+        $this->actingAs($super, 'platform')->postJson("/api/backoffice/catalog/products/{$productId}/activate")->assertOk();
+        $this->assertDatabaseHas('products', ['id' => $productId, 'status' => 'ativo', 'active' => true]);
+        $this->actingAs($super, 'platform')->postJson("/api/backoffice/catalog/products/{$productId}/pause")->assertOk();
+        $this->assertDatabaseHas('products', ['id' => $productId, 'status' => 'pausado', 'active' => false]);
 
-        $this->actingAs($super, 'platform')->postJson("/api/backoffice/catalog/products/{$productId}/activate", ['reason' => 'Reativação homologada.'])->assertOk();
-        $this->assertDatabaseHas('products', ['id' => $productId, 'status' => 'ativo']);
-        $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_product_deactivated']);
+        $this->actingAs($super, 'platform')->postJson("/api/backoffice/catalog/products/{$productId}/activate")->assertOk();
+        $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_product_paused']);
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_product_activated']);
     }
 
-    public function test_inactive_product_blocks_the_public_catalog_without_changing_its_technical_snapshot(): void
+    public function test_paused_product_blocks_the_public_catalog_without_changing_its_technical_snapshot(): void
     {
         $admin = $this->admin();
         $productId = DB::table('products')->where('code', 'law')->value('id');
 
-        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/products/{$productId}/deactivate", [
-            'reason' => 'Indisponibilidade temporária.',
-        ])->assertOk();
+        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/products/{$productId}/pause")->assertOk();
 
-        $this->assertDatabaseHas('products', ['id' => $productId, 'status' => 'inativo', 'active' => false]);
+        $this->assertDatabaseHas('products', ['id' => $productId, 'status' => 'pausado', 'active' => false]);
         $this->getJson('/api/catalog/law')->assertUnprocessable();
         $this->assertDatabaseHas('catalog_publications', ['product_id' => $productId, 'version' => 1]);
     }
@@ -436,11 +440,12 @@ class CatalogAdminTest extends TestCase
             'name' => 'Produto para exclusão',
         ])->assertCreated()->json('id');
 
-        $this->actingAs($admin, 'platform')->deleteJson("/api/backoffice/catalog/products/{$productId}", ['reason' => 'Limpeza homologada.'])->assertOk();
+        $this->actingAs($admin, 'platform')->deleteJson("/api/backoffice/catalog/products/{$productId}")->assertOk();
         $this->assertDatabaseMissing('products', ['id' => $productId]);
 
         $lawId = DB::table('products')->where('code', 'law')->value('id');
-        $this->actingAs($admin, 'platform')->deleteJson("/api/backoffice/catalog/products/{$lawId}", ['reason' => 'Tentativa inválida.'])
+        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/products/{$lawId}/pause")->assertOk();
+        $this->actingAs($admin, 'platform')->deleteJson("/api/backoffice/catalog/products/{$lawId}")
             ->assertUnprocessable()
             ->assertJsonPath('message', fn ($message) => str_contains($message, 'vínculos'));
     }
