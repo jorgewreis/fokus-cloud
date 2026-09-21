@@ -53,10 +53,8 @@ class FormDesignSystemTest extends TestCase
 
         $this->assertMatchesRegularExpression('/const pageVersion = "20\\d{6}-[a-z0-9-]+";/', $panel);
         $this->assertStringContainsString('(() => {', $panel);
-        $this->assertStringContainsString('20260921-catalog-model-v29', $panel);
-        $this->assertStringContainsString('records-page.js?v=20260920-records-overlay-v3', $panel);
+        $this->assertStringContainsString('20260921-catalog-model-v30', file_get_contents(base_path('public/backoffice/pages/modules.html')));
         $this->assertStringContainsString('window.initBackofficeRecordsPage?.(root)', file_get_contents(base_path('public/backoffice/pages/modules.html')));
-        $this->assertStringContainsString('module?.[name]', file_get_contents(base_path('public/backoffice/pages/modules.html')));
         $this->assertStringContainsString("document.addEventListener('fs:show'", file_get_contents(base_path('public/backoffice/assets/js/records-page.js')));
         $this->assertStringContainsString('] || "companies",', $panel);
         $this->assertStringContainsString('data-sidebar-item="companies"', $panel);
@@ -109,10 +107,7 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringContainsString("action('publish'", $modules);
         $this->assertStringContainsString("action('activate'", $modules);
         $this->assertStringContainsString("action('pause'", $modules);
-        $this->assertStringContainsString("action('inactivate'", $modules);
-        $this->assertStringContainsString("action('activate', module, 'Ativar módulo'", $modules);
         $this->assertStringContainsString('Pausar publicação', $modules);
-        $this->assertStringContainsString('Republicar módulo', $modules);
         $this->assertStringContainsString('File-Code-2--Streamline-Ultimate.png', $modules);
         $this->assertStringContainsString('File-Code-Subtract--Streamline-Ultimate.png', $modules);
         $this->assertStringContainsString('File-Code-Remove--Streamline-Ultimate.png', $modules);

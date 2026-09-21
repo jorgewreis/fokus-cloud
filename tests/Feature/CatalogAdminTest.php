@@ -61,7 +61,7 @@ class CatalogAdminTest extends TestCase
 
         $this->getJson('/api/catalog/law')
             ->assertOk()
-            ->assertJsonPath('contract_version', '0.0.3')
+            ->assertJsonPath('contract_version', '0.1.0')
             ->assertJsonPath('published_version', 2)
             ->assertJsonStructure(['product', 'modules', 'plans', 'published_at']);
     }
@@ -270,7 +270,7 @@ class CatalogAdminTest extends TestCase
         $moduleId = $this->actingAs($admin, 'platform')->postJson('/api/backoffice/catalog/modules', [
             'product_id' => $productId,
             'code' => 'modulo-preco-decimal',
-            'module_code' => 'preco-decimal',
+            'module_code' => 'processos',
             'name' => 'Módulo com preço decimal',
             'monthly_price' => 149.90,
         ])->assertCreated()->json('id');
@@ -300,7 +300,7 @@ class CatalogAdminTest extends TestCase
         $moduleId = $this->actingAs($admin, 'platform')->postJson('/api/backoffice/catalog/modules', [
             'product_id' => $productId,
             'code' => 'modulo-preco-localizado',
-            'module_code' => 'preco-localizado',
+            'module_code' => 'processos',
             'name' => 'Módulo com moeda localizada',
             'monthly_price' => 'R$ 149,90',
         ])->assertCreated()->json('id');
@@ -318,7 +318,7 @@ class CatalogAdminTest extends TestCase
         $this->assertSame(299.90, (float) DB::table('plans')->where('id', $planId)->value('monthly_amount'));
     }
 
-    public function test_module_capabilities_rules_and_capacity_are_persisted_for_management_page(): void
+    public function test_module_capabilities_and_personalizations_are_persisted_for_management_page(): void
     {
         $admin = $this->admin();
         $productId = DB::table('products')->where('code', 'law')->value('id');
@@ -329,13 +329,16 @@ class CatalogAdminTest extends TestCase
             'module_code' => 'processos',
             'name' => 'Processos com capacidades',
             'monthly_price' => 'R$ 99,90',
-            'capabilities' => ['Controle de prazos', 'Gestão de audiências'],
-            'dependencies' => ['contatos'],
-            'incompatibilities' => ['processos-legado'],
-            'capacity_unit' => 'processos',
-            'default_capacity' => 100,
-            'capacity_options' => [100, 500, 1000],
-            'available_standalone' => true,
+            'segments' => ['advocacia'],
+            'context_code' => 'escritorio',
+            'capability_codes' => ['classes_assuntos_processuais', 'prioridades_sigilo'],
+            'personalizations' => [[
+                'type_code' => 'processos_ativos', 'required' => true, 'active' => true,
+                'tiers' => [
+                    ['value' => 100, 'additional_monthly_amount' => 0, 'active' => true],
+                    ['value' => 500, 'additional_monthly_amount' => 25, 'active' => true],
+                ],
+            ]],
             'price_is_estimate' => true,
         ])->assertCreated()->json('id');
 
@@ -343,13 +346,12 @@ class CatalogAdminTest extends TestCase
             ->flatMap(fn (array $product) => $product['modules'])
             ->firstWhere('id', $moduleId);
 
-        $this->assertSame(['Controle de prazos', 'Gestão de audiências'], $module['capabilities']);
-        $this->assertSame(['contatos'], $module['dependencies']);
-        $this->assertSame(['processos-legado'], $module['incompatibilities']);
-        $this->assertSame('processos', $module['capacity_unit']);
-        $this->assertSame(100, $module['default_capacity']);
-        $this->assertSame([100, 500, 1000], $module['capacity_options']);
-        $this->assertTrue($module['available_standalone']);
+        $this->assertSame(['classes_assuntos_processuais', 'prioridades_sigilo'], $module['capability_codes']);
+        $this->assertSame(['advocacia'], $module['segments']);
+        $this->assertSame('escritorio', $module['context_code']);
+        $this->assertCount(1, $module['personalizations']);
+        $this->assertCount(2, $module['personalizations'][0]['tiers']);
+        $this->assertFalse($module['available_standalone']);
         $this->assertTrue($module['price_is_estimate']);
     }
 
@@ -361,7 +363,7 @@ class CatalogAdminTest extends TestCase
         $moduleId = $this->actingAs($admin, 'platform')->postJson('/api/backoffice/catalog/modules', [
             'product_id' => $productId,
             'code' => 'modulo-descartavel',
-            'module_code' => 'descartavel',
+            'module_code' => 'processos',
             'name' => 'Módulo descartável',
             'monthly_price' => 10,
         ])->assertCreated()->json('id');
@@ -435,16 +437,12 @@ class CatalogAdminTest extends TestCase
         $admin = $this->admin();
         $moduleId = DB::table('modules')->where('code', 'processos-advocacia')->value('id');
 
-        $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/catalog/modules/{$moduleId}", [
-            'status' => 'inativo',
-        ])->assertOk();
+        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/modules/{$moduleId}/pause")->assertOk();
         $this->assertDatabaseHas('modules', ['id' => $moduleId, 'status' => 'inativo', 'publication_state' => 'pausado']);
 
-        $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/catalog/modules/{$moduleId}", [
-            'status' => 'ativo',
-        ])->assertOk();
+        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/modules/{$moduleId}/activate")->assertOk();
         $this->assertDatabaseHas('modules', ['id' => $moduleId, 'status' => 'ativo', 'publication_state' => 'pausado']);
-        $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_module_updated', 'entity_id' => $moduleId]);
+        $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_item_paused', 'entity_id' => $moduleId]);
     }
 
     public function test_creating_inactive_or_archived_module_synchronizes_publication(): void
@@ -455,22 +453,24 @@ class CatalogAdminTest extends TestCase
         $inactiveId = $this->actingAs($admin, 'platform')->postJson('/api/backoffice/catalog/modules', [
             'product_id' => $productId,
             'code' => 'modulo-inativo',
-            'module_code' => 'inativo',
+            'module_code' => 'processos',
             'name' => 'Módulo inativo',
             'monthly_price' => 10,
-            'status' => 'inativo',
+            'segments' => ['advocacia'],
+            'context_code' => 'escritorio',
         ])->assertCreated()->json('id');
-        $this->assertDatabaseHas('modules', ['id' => $inactiveId, 'status' => 'inativo', 'publication_state' => 'pausado']);
+        $this->assertDatabaseHas('modules', ['id' => $inactiveId, 'status' => 'rascunho', 'publication_state' => 'rascunho']);
 
         $archivedId = $this->actingAs($admin, 'platform')->postJson('/api/backoffice/catalog/modules', [
             'product_id' => $productId,
             'code' => 'modulo-arquivado',
-            'module_code' => 'arquivado',
+            'module_code' => 'processos',
             'name' => 'Módulo arquivado',
             'monthly_price' => 10,
-            'status' => 'arquivado',
+            'segments' => ['advocacia'],
+            'context_code' => 'escritorio',
         ])->assertCreated()->json('id');
-        $this->assertDatabaseHas('modules', ['id' => $archivedId, 'status' => 'arquivado', 'publication_state' => 'arquivado']);
+        $this->assertDatabaseHas('modules', ['id' => $archivedId, 'status' => 'rascunho', 'publication_state' => 'rascunho']);
     }
 
     private function admin(string $role = 'superadministrador'): PlatformAdmin

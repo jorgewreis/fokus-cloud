@@ -849,7 +849,7 @@ class BackofficeController extends Controller
             'technical_description' => ['nullable', 'string', 'max:2000'],
             'commercial_content' => ['nullable', 'string', 'max:20000'],
             'monthly_price' => [$required, 'numeric', 'min:0'],
-            'segments' => [$required, 'array', 'min:1'],
+            'segments' => ['nullable', 'array', 'min:1'],
             'segments.*' => ['string', 'max:32'],
             'context_code' => ['nullable', 'string', 'max:64'],
             'capability_codes' => ['nullable', 'array'],

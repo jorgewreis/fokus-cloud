@@ -78,7 +78,7 @@ class AuthenticationAndIsolationTest extends TestCase
         DB::table('users')->where('id', $user->id)->update(['status' => 'ativa', 'email_verified_at' => now()]);
         DB::table('companies')->where('id', $companyId)->update(['status' => 'ativa']);
         $product = DB::table('products')->where('code', 'law')->firstOrFail();
-        $module = DB::table('modules')->where('product_id', $product->id)->where('segment_code', 'advocacia')->firstOrFail();
+        $module = DB::table('modules as module')->join('module_segments as segment', 'segment.module_id', '=', 'module.id')->where('module.product_id', $product->id)->where('segment.segment_code', 'advocacia')->firstOrFail(['module.*']);
         $subscriptionId = PrefixedUlid::make('ASS');
         DB::table('subscriptions')->insert([
             'id' => $subscriptionId, 'company_id' => $companyId, 'product_id' => $product->id, 'status' => 'ativa',
