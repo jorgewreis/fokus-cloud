@@ -34,11 +34,12 @@ class CatalogManager
         $families = [];
         $capabilities = [];
         foreach ($products as $product) {
-            $families[$product->code] = collect(config('catalog.families.'.$product->code, []))->map(fn (array $item): array => ['code' => $item['code'], 'label' => $item['label'], 'custom' => false])->values()->all();
+            $catalogProductCode = $this->catalogProductCode($product->code);
+            $families[$product->code] = collect(config('catalog.families.'.$catalogProductCode, []))->map(fn (array $item): array => ['code' => $item['code'], 'label' => $item['label'], 'custom' => false])->values()->all();
             $customFamilies = DB::table('catalog_custom_module_families')->where('product_id', $product->id)->orderBy('name')->get(['code', 'name']);
             $families[$product->code] = [...$families[$product->code], ...$customFamilies->map(fn (object $item): array => ['code' => $item->code, 'label' => $item->name, 'custom' => true])->all()];
             $capabilities[$product->code] = [];
-            foreach (config('catalog.families.'.$product->code, []) as $familyItem) {
+            foreach (config('catalog.families.'.$catalogProductCode, []) as $familyItem) {
                 $family = $familyItem['code'];
                 $capabilities[$product->code][$family] = collect(config('catalog.capabilities.'.$family, []))->map(fn (array $item): array => ['code' => $item['code'], 'label' => $item['label'], 'optional' => (bool) ($item['optional'] ?? false), 'custom' => false])->values()->all();
             }
@@ -47,11 +48,20 @@ class CatalogManager
                 $capabilities[$product->code][$family] = [...($capabilities[$product->code][$family] ?? []), ...$items->map(fn (object $item): array => ['code' => $item->code, 'label' => $item->name, 'optional' => false, 'custom' => true])->all()];
             }
         }
+        $segments = config('catalog.segments');
+        $contexts = config('catalog.contexts');
+        foreach ($products as $product) {
+            $catalogProductCode = $this->catalogProductCode($product->code);
+            if ($catalogProductCode !== $product->code) {
+                $segments[$product->code] = $segments[$catalogProductCode] ?? [];
+                $contexts[$product->code] = $contexts[$catalogProductCode] ?? [];
+            }
+        }
 
         return [
             'products' => $products->map(fn (object $product): array => ['id' => $product->id, 'code' => $product->code, 'name' => $product->name])->values()->all(),
-            'segments' => config('catalog.segments'),
-            'contexts' => config('catalog.contexts'),
+            'segments' => $segments,
+            'contexts' => $contexts,
             'families' => $families,
             'capabilities' => $capabilities,
             'personalization_types' => config('catalog.personalization_types', []),
@@ -762,6 +772,15 @@ class CatalogManager
         ];
     }
 
+    private function catalogProductCode(string $productCode): string
+    {
+        return match ($productCode) {
+            'fokus-law' => 'law',
+            'fokus-lead' => 'lead',
+            default => $productCode,
+        };
+    }
+
     private function resolveFamilyCode(object $product, array $data): string
     {
         $requested = Str::slug((string) ($data['module_code'] ?? ''));
@@ -782,7 +801,7 @@ class CatalogManager
                 ]);
             }
         }
-        $allowed = collect(config('catalog.families.'.$product->code, []))->pluck('code')->all();
+        $allowed = collect(config('catalog.families.'.$this->catalogProductCode($product->code), []))->pluck('code')->all();
         $allowed = [...$allowed, ...DB::table('catalog_custom_module_families')->where('product_id', $product->id)->pluck('code')->all()];
         abort_unless(in_array($requested, $allowed, true), 422, 'Família técnica inválida para este produto.');
         return $requested;
@@ -806,10 +825,11 @@ class CatalogManager
         abort_unless($module, 404, 'Módulo não encontrado.');
         $existingSegments = DB::table('module_segments')->where('module_id', $moduleId)->pluck('segment_code')->all();
         $segments = array_values(array_unique(array_filter(array_key_exists('segments', $data) ? ($data['segments'] ?? []) : $existingSegments)));
-        $allowedSegments = collect(config('catalog.segments.'.$product->code, []))->pluck('code')->all();
+        $catalogProductCode = $this->catalogProductCode($product->code);
+        $allowedSegments = collect(config('catalog.segments.'.$catalogProductCode, []))->pluck('code')->all();
         abort_if(array_diff($segments, $allowedSegments) !== [], 422, 'Segmento inválido para este produto.');
         if (array_key_exists('context_code', $data) && $data['context_code']) {
-            $contexts = collect($segments)->flatMap(fn (string $segment): array => config('catalog.contexts.'.$product->code.'.'.$segment, []))->pluck('code')->all();
+            $contexts = collect($segments)->flatMap(fn (string $segment): array => config('catalog.contexts.'.$catalogProductCode.'.'.$segment, []))->pluck('code')->all();
             abort_if(! in_array($data['context_code'], $contexts, true), 422, 'Contexto inválido para o segmento selecionado.');
         }
 

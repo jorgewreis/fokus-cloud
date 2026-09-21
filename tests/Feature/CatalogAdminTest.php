@@ -48,6 +48,27 @@ class CatalogAdminTest extends TestCase
         ])->assertForbidden();
     }
 
+    public function test_catalog_options_follow_the_current_product_code_aliases(): void
+    {
+        DB::table('products')->where('code', 'law')->update(['code' => 'fokus-law']);
+        $admin = $this->admin();
+
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/catalog')
+            ->assertOk()
+            ->assertJsonPath('options.families.fokus-law.0.code', 'processos')
+            ->assertJsonPath('options.segments.fokus-law.0.code', 'advocacia')
+            ->assertJsonPath('options.contexts.fokus-law.advocacia.0.code', 'escritorio');
+
+        $this->actingAs($admin, 'platform')->postJson('/api/backoffice/catalog/modules', [
+            'product_id' => DB::table('products')->where('code', 'fokus-law')->value('id'),
+            'module_code' => 'processos',
+            'name' => 'Módulo com código de produto atual',
+            'monthly_price' => 10,
+            'segments' => ['advocacia'],
+            'context_code' => 'escritorio',
+        ])->assertCreated();
+    }
+
     public function test_superadmin_publishes_a_versioned_public_catalog_snapshot(): void
     {
         $admin = $this->admin();
