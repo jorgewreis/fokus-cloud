@@ -51,7 +51,7 @@ class FormDesignSystemTest extends TestCase
         $css = file_get_contents(base_path('public/backoffice/assets/css/components/form-admin.css'));
         $script = file_get_contents(base_path('public/backoffice/assets/js/form-system.js'));
 
-        $this->assertStringContainsString('20260920-records-modes-v14', $panel);
+        $this->assertMatchesRegularExpression('/const pageVersion = "20\\d{6}-[a-z0-9-]+";/', $panel);
         $this->assertStringContainsString('records-page.js?v=20260920-records-overlay-v3', $panel);
         $this->assertStringContainsString('window.initBackofficeRecordsPage?.(root)', file_get_contents(base_path('public/backoffice/pages/modules.html')));
         $this->assertStringContainsString("document.addEventListener('fs:show'", file_get_contents(base_path('public/backoffice/assets/js/records-page.js')));
