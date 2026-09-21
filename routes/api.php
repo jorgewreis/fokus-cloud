@@ -78,9 +78,8 @@ Route::middleware(EnsurePlatformAdmin::class)->prefix('backoffice')->group(funct
     Route::get('/catalog', [BackofficeController::class, 'catalog'])->middleware(EnsurePlatformPermission::class.':platform.catalog.manage');
     Route::post('/catalog/products', [BackofficeController::class, 'createProduct'])->middleware(EnsurePlatformPermission::class.':platform.catalog.manage');
     Route::patch('/catalog/products/{product}', [BackofficeController::class, 'updateProduct'])->middleware(EnsurePlatformPermission::class.':platform.catalog.manage');
-    Route::post('/catalog/products/{product}/pause', [BackofficeController::class, 'pauseProduct'])->middleware(EnsurePlatformPermission::class.':platform.catalog.publish');
+    Route::post('/catalog/products/{product}/deactivate', [BackofficeController::class, 'deactivateProduct'])->middleware(EnsurePlatformPermission::class.':platform.catalog.publish');
     Route::post('/catalog/products/{product}/activate', [BackofficeController::class, 'activateProduct'])->middleware(EnsurePlatformPermission::class.':platform.catalog.publish');
-    Route::post('/catalog/products/{product}/archive', [BackofficeController::class, 'archiveProduct'])->middleware(EnsurePlatformPermission::class.':platform.catalog.publish');
     Route::delete('/catalog/products/{product}', [BackofficeController::class, 'deleteProduct'])->middleware(EnsurePlatformPermission::class.':platform.catalog.publish');
     Route::post('/catalog/modules', [BackofficeController::class, 'createModule'])->middleware(EnsurePlatformPermission::class.':platform.catalog.manage');
     Route::patch('/catalog/modules/{module}', [BackofficeController::class, 'updateModule'])->middleware(EnsurePlatformPermission::class.':platform.catalog.manage');

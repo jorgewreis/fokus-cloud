@@ -22,7 +22,7 @@ class CatalogAdminTest extends TestCase
         Mail::fake();
     }
 
-    public function test_commercial_admin_can_create_drafts_but_cannot_publish_catalog(): void
+    public function test_commercial_admin_can_create_an_active_product_but_cannot_generate_catalog_versions(): void
     {
         $admin = $this->admin('administrador_comercial');
 
@@ -35,7 +35,7 @@ class CatalogAdminTest extends TestCase
         $productId = DB::table('products')->where('code', 'academy')->value('id');
         $this->assertDatabaseHas('products', [
             'id' => $productId,
-            'publication_state' => 'rascunho',
+            'status' => 'ativo',
         ]);
 
         $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/{$productId}/publish", [
@@ -227,7 +227,6 @@ class CatalogAdminTest extends TestCase
         $this->assertDatabaseHas('products', [
             'id' => $productId,
             'published_catalog_version' => 1,
-            'publication_state' => 'publicado',
         ]);
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_publication_deleted']);
 
@@ -378,7 +377,7 @@ class CatalogAdminTest extends TestCase
         $this->assertDatabaseHas('modules', ['id' => $linkedModuleId]);
     }
 
-    public function test_product_lifecycle_is_audited_and_requires_publish_permission(): void
+    public function test_product_activation_lifecycle_is_audited_and_requires_publish_permission(): void
     {
         $commercial = $this->admin('administrador_comercial');
         $super = $this->admin();
@@ -388,14 +387,28 @@ class CatalogAdminTest extends TestCase
             'status' => 'ativo',
         ])->assertCreated()->json('id');
 
-        $this->actingAs($commercial, 'platform')->postJson("/api/backoffice/catalog/products/{$productId}/pause", ['reason' => 'Sem permissão.'])->assertForbidden();
-        $this->actingAs($super, 'platform')->postJson("/api/backoffice/catalog/products/{$productId}/pause", ['reason' => 'Pausa homologada.'])->assertOk();
-        $this->assertDatabaseHas('products', ['id' => $productId, 'status' => 'pausado', 'publication_state' => 'pausado']);
+        $this->actingAs($commercial, 'platform')->postJson("/api/backoffice/catalog/products/{$productId}/deactivate", ['reason' => 'Sem permissão.'])->assertForbidden();
+        $this->actingAs($super, 'platform')->postJson("/api/backoffice/catalog/products/{$productId}/deactivate", ['reason' => 'Desativação homologada.'])->assertOk();
+        $this->assertDatabaseHas('products', ['id' => $productId, 'status' => 'inativo', 'active' => false]);
 
         $this->actingAs($super, 'platform')->postJson("/api/backoffice/catalog/products/{$productId}/activate", ['reason' => 'Reativação homologada.'])->assertOk();
         $this->assertDatabaseHas('products', ['id' => $productId, 'status' => 'ativo']);
-        $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_product_paused']);
+        $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_product_deactivated']);
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_product_activated']);
+    }
+
+    public function test_inactive_product_blocks_the_public_catalog_without_changing_its_technical_snapshot(): void
+    {
+        $admin = $this->admin();
+        $productId = DB::table('products')->where('code', 'law')->value('id');
+
+        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/products/{$productId}/deactivate", [
+            'reason' => 'Indisponibilidade temporária.',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('products', ['id' => $productId, 'status' => 'inativo', 'active' => false]);
+        $this->getJson('/api/catalog/law')->assertUnprocessable();
+        $this->assertDatabaseHas('catalog_publications', ['product_id' => $productId, 'version' => 1]);
     }
 
     public function test_module_reactivation_preserves_pause_until_explicit_publication(): void

@@ -21,7 +21,6 @@ class CatalogManager
             'options' => $this->catalogOptions(),
             'products' => $products->map(fn (object $product): array => [
                 ...$this->productPayload($product),
-                'published_version' => (int) $product->published_catalog_version,
                 'modules' => $modules->where('product_id', $product->id)->values()->map(fn (object $module): array => $this->modulePayload($module))->all(),
                 'plans' => $plans->where('product_id', $product->id)->values()->all(),
             ])->values()->all(),
@@ -168,7 +167,6 @@ class CatalogManager
                 'id' => $id,
                 'code' => Str::slug($data['code']),
                 'active' => ($data['status'] ?? 'ativo') === 'ativo',
-                'publication_state' => 'rascunho',
                 'created_at' => now(),
                 'updated_at' => now(),
             ]));
@@ -209,7 +207,20 @@ class CatalogManager
         DB::table('products')->where('id', $productId)->update([
             'status' => 'ativo',
             'active' => true,
-            'publication_state' => $current->publication_state === 'arquivado' ? 'rascunho' : $current->publication_state,
+            'updated_at' => now(),
+        ]);
+
+        return [(array) $current, (array) DB::table('products')->where('id', $productId)->first()];
+    }
+
+    public function deactivateProduct(string $productId): array
+    {
+        $current = DB::table('products')->where('id', $productId)->first();
+        abort_unless($current, 404, 'Produto não encontrado.');
+
+        DB::table('products')->where('id', $productId)->update([
+            'status' => 'inativo',
+            'active' => false,
             'updated_at' => now(),
         ]);
 
@@ -353,7 +364,7 @@ class CatalogManager
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
-            DB::table('products')->where('id', $productId)->update(['publication_state' => 'publicado', 'published_catalog_version' => $version, 'updated_at' => now()]);
+            DB::table('products')->where('id', $productId)->update(['published_catalog_version' => $version, 'updated_at' => now()]);
             DB::table('modules')->where('product_id', $productId)->where('status', 'ativo')->update(['publication_state' => 'publicado', 'updated_at' => now()]);
             DB::table('plans')->where('product_id', $productId)->where('status', 'ativo')->update(['publication_state' => 'publicado', 'updated_at' => now()]);
         });
@@ -365,6 +376,7 @@ class CatalogManager
     {
         $product = DB::table('products')->where('code', $productCode)->first();
         abort_unless($product, 404, 'Produto não encontrado.');
+        abort_unless($product->status === 'ativo' && $product->active, 422, 'Produto indisponível para novas contratações.');
 
         $publication = DB::table('catalog_publications')
             ->where('product_id', $product->id)
@@ -384,7 +396,6 @@ class CatalogManager
     public function pauseOrArchive(string $type, string $id, string $state): array
     {
         $table = match ($type) {
-            'products' => 'products',
             'modules' => 'modules',
             'plans' => 'plans',
             default => abort(404, 'Item de catálogo não encontrado.'),
@@ -393,15 +404,12 @@ class CatalogManager
         $current = DB::table($table)->where('id', $id)->first();
         abort_unless($current, 404, 'Item de catálogo não encontrado.');
 
-        $status = $table === 'products'
-            ? ($state === 'arquivado' ? 'inativo' : 'pausado')
-            : ($table === 'plans'
-                ? 'inativo'
-                : ($state === 'arquivado' ? 'arquivado' : 'inativo'));
+        $status = $table === 'plans'
+            ? 'inativo'
+            : ($state === 'arquivado' ? 'arquivado' : 'inativo');
         DB::table($table)->where('id', $id)->update([
             'status' => $status,
             'publication_state' => $state,
-            ...($table === 'products' ? ['active' => false] : []),
             'updated_at' => now(),
         ]);
 
@@ -471,7 +479,6 @@ class CatalogManager
 
             DB::table('products')->where('id', $publication->product_id)->update([
                 'published_catalog_version' => $latestVersion,
-                'publication_state' => $latestVersion > 0 ? 'publicado' : 'rascunho',
                 'updated_at' => now(),
             ]);
             if ($latestVersion === 0) {
@@ -525,8 +532,7 @@ class CatalogManager
     {
         $product = DB::table('products')->where('id', $productId)->first();
         abort_unless($product, 404, 'Produto não encontrado.');
-        abort_if($product->status !== 'ativo' || ! $product->active, 422, 'O sistema precisa estar ativo para publicação.');
-        abort_if($product->publication_state === 'arquivado', 422, 'Sistema arquivado não pode ser publicado.');
+        abort_if($product->status !== 'ativo' || ! $product->active, 422, 'O produto precisa estar ativo para gerar a versão técnica do catálogo.');
 
         $modules = DB::table('modules')
             ->where('product_id', $productId)
@@ -630,9 +636,7 @@ class CatalogManager
             'technical_description' => $product->technical_description ?? null,
             'commercial_content' => $product->commercial_content ?? null,
             'status' => $product->status ?? (($product->active ?? true) ? 'ativo' : 'inativo'),
-            'publication_state' => $product->publication_state ?? 'rascunho',
             'display_order' => (int) ($product->display_order ?? 0),
-            'featured' => (bool) ($product->featured ?? false),
             'active' => (bool) ($product->active ?? true),
         ];
     }
@@ -707,9 +711,7 @@ class CatalogManager
                 'technical_description' => $data['technical_description'] ?? null,
                 'commercial_content' => $data['commercial_content'] ?? null,
                 'status' => $data['status'] ?? null,
-                'publication_state' => $data['publication_state'] ?? null,
                 'display_order' => isset($data['display_order']) ? (int) $data['display_order'] : null,
-                'featured' => array_key_exists('featured', $data) ? (bool) $data['featured'] : null,
             ], fn ($value): bool => $value !== null),
         ];
     }

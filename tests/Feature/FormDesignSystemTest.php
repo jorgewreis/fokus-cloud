@@ -145,10 +145,10 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringNotContainsString('Button-Pause-1--Streamline-Ultimate.png', $products);
         $this->assertStringNotContainsString('Power-Button-1--Streamline-Ultimate.png', $products);
         $this->assertStringContainsString('fs-confirmation-dialog-form', $products);
-        $this->assertStringContainsString('product-destructive-reason-help', $products);
-        $this->assertStringContainsString("else if(q.dataset.action==='activate')open(z,'edit',q.dataset.action)", $products);
-        $this->assertStringContainsString("q.operation==='pause'?'pause':'archive'", $products);
-        $this->assertStringContainsString("msg(q.operation==='pause'?'Produto pausado.'", $products);
+        $this->assertStringContainsString('id="product-confirm-dialog"', $products);
+        $this->assertStringContainsString("action('deactivate'", $products);
+        $this->assertStringContainsString('/deactivate', $products);
+        $this->assertStringNotContainsString('publication_state', $products);
     }
 
     public function test_all_backoffice_table_action_icons_use_the_shared_contract(): void
@@ -234,7 +234,7 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringContainsString('fs-badge', $companies);
         $this->assertStringContainsString('fs-offcanvas', $companies);
         $this->assertStringContainsString('backoffice-records-page', $products);
-        $this->assertStringContainsString('product-destructive-dialog', $products);
+        $this->assertStringContainsString('product-confirm-dialog', $products);
         $this->assertStringNotContainsString('window.confirm', $products);
         $this->assertStringContainsString('card-body', $subscriptions);
         $this->assertStringContainsString('cancelamento_imediato', $subscriptions);

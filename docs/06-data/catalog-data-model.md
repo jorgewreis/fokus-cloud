@@ -13,11 +13,11 @@ Campos principais:
 - `name`: nome exibido;
 - `active`: indicador atual de atividade;
 - `status`: estado operacional;
-- `publication_state`: estado de publicacao;
-- `published_catalog_version`: ultima versao publicada;
+- `published_catalog_version`: ultima versao técnica do catálogo, mantida para
+  preservar o snapshot público; não representa publicação do produto;
 - descricoes tecnica e comercial;
 - ordem de exibicao unica entre produtos, com reordenacao automatica em caso
-  de colisao, e destaque;
+  de colisao;
 - `created_at` e `updated_at`.
 
 ### `plans`
@@ -61,13 +61,13 @@ As chaves estrangeiras garantem que a relacao exista e que a exclusao de um plan
 
 ### `catalog_publications`
 
-Representa a versao publicada por produto.
+Representa um snapshot técnico do catálogo por produto.
 
 - `product_id` referencia o sistema;
 - `version` e sequencial dentro do produto;
 - `snapshot` guarda produto, funcionalidades, planos, precos e composicoes;
-- `published_by_platform_admin_id` identifica o superadministrador quando a
-  publicacao for manual;
+- `published_by_platform_admin_id` identifica o administrador responsável por
+  gerar a versão técnica;
 - `reason` registra a justificativa;
 - `published_at` registra a data efetiva.
 

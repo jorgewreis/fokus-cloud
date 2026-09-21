@@ -25,7 +25,6 @@ class DatabaseSeeder extends Seeder
                 'technical_description' => "Sistema comercial {$name} com catálogo administrável pelo Backoffice.",
                 'commercial_content' => "Oferta pública {$name}.",
                 'status' => 'ativo',
-                'publication_state' => 'rascunho',
                 'display_order' => $code === 'law' ? 1 : 2,
                 'updated_at' => now(),
             ]);

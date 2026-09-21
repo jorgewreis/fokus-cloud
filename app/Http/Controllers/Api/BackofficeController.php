@@ -565,7 +565,6 @@ class BackofficeController extends Controller
             'commercial_content' => ['nullable', 'string', 'max:20000'],
             'status' => ['nullable', Rule::in(['ativo', 'inativo'])],
             'display_order' => ['nullable', 'integer', 'min:1'],
-            'featured' => ['nullable', 'boolean'],
         ]);
         abort_if(DB::table('products')->where('code', Str::slug($data['code']))->exists(), 422, 'Já existe um sistema com este código.');
 
@@ -584,7 +583,6 @@ class BackofficeController extends Controller
             'commercial_content' => ['nullable', 'string', 'max:20000'],
             'status' => ['nullable', Rule::in(['ativo', 'inativo'])],
             'display_order' => ['nullable', 'integer', 'min:1'],
-            'featured' => ['nullable', 'boolean'],
         ]);
         $current = DB::table('products')->where('id', $product)->first();
         abort_unless($current, 404, 'Sistema não encontrado.');
@@ -783,13 +781,13 @@ class BackofficeController extends Controller
         return response()->json(['message' => 'Item arquivado.']);
     }
 
-    public function pauseProduct(Request $request, string $product, CatalogManager $catalog, PlatformAudit $audit)
+    public function deactivateProduct(Request $request, string $product, CatalogManager $catalog, PlatformAudit $audit)
     {
         $data = $request->validate(['reason' => ['required', 'string', 'max:1000']]);
-        [$before, $after] = $catalog->pauseOrArchive('products', $product, 'pausado');
-        $audit->record($request->user()->id, 'backoffice.catalog_product_paused', 'product', $product, reason: $data['reason'], before: $before, after: $after, request: $request);
+        [$before, $after] = $catalog->deactivateProduct($product);
+        $audit->record($request->user()->id, 'backoffice.catalog_product_deactivated', 'product', $product, reason: $data['reason'], before: $before, after: $after, request: $request);
 
-        return response()->json(['message' => 'Produto pausado.']);
+        return response()->json(['message' => 'Produto desativado.']);
     }
 
     public function activateProduct(Request $request, string $product, CatalogManager $catalog, PlatformAudit $audit)
@@ -799,15 +797,6 @@ class BackofficeController extends Controller
         $audit->record($request->user()->id, 'backoffice.catalog_product_activated', 'product', $product, reason: $data['reason'], before: $before, after: $after, request: $request);
 
         return response()->json(['message' => 'Produto ativado.']);
-    }
-
-    public function archiveProduct(Request $request, string $product, CatalogManager $catalog, PlatformAudit $audit)
-    {
-        $data = $request->validate(['reason' => ['required', 'string', 'max:1000']]);
-        [$before, $after] = $catalog->pauseOrArchive('products', $product, 'arquivado');
-        $audit->record($request->user()->id, 'backoffice.catalog_product_archived', 'product', $product, reason: $data['reason'], before: $before, after: $after, request: $request);
-
-        return response()->json(['message' => 'Produto arquivado.']);
     }
 
     public function deleteProduct(Request $request, string $product, CatalogManager $catalog, PlatformAudit $audit)
