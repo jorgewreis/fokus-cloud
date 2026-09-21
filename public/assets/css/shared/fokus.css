@@ -17784,16 +17784,16 @@ body { font-family: "Google Sans", sans-serif; }
     background: transparent;
     box-shadow: none;
 }
-.fs-table-action::before { display: none; content: none; }
+.fs-table-action::before { display: none !important; content: none !important; }
 .fs-btn-icon-plain img,
 .fs-table-action > img {
-    display: block;
-    width: 20px;
-    height: 20px;
-    max-width: none;
-    max-height: none;
-    object-fit: contain;
-    visibility: visible;
+    display: block !important;
+    width: 20px !important;
+    height: 20px !important;
+    max-width: none !important;
+    max-height: none !important;
+    object-fit: contain !important;
+    visibility: visible !important;
 }
 .fs-pagination-compact { gap: 5px; justify-content: flex-end; }
 .fs-pagination-compact .fs-page-link {

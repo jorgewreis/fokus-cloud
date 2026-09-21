@@ -103,15 +103,21 @@ class FormDesignSystemTest extends TestCase
         $sharedStyles = file_get_contents(base_path('public/assets/css/shared/fokus.css'));
 
         $this->assertStringContainsString("action('publish'", $modules);
+        $this->assertStringContainsString("action('activate'", $modules);
         $this->assertStringContainsString("action('pause'", $modules);
         $this->assertStringContainsString('Pausar publicação', $modules);
+        $this->assertStringContainsString('Republicar módulo', $modules);
+        $this->assertStringContainsString('Browser-Hand--Streamline-Ultimate.png', $modules);
         $this->assertStringContainsString('Common-File-Check--Streamline-Ultimate.png', $modules);
         $this->assertStringContainsString('App-Window-Disable--Streamline-Ultimate.png', $modules);
-        $this->assertStringNotContainsString("action('activate'", $modules);
         $this->assertStringNotContainsString('Zip-File-Download--Streamline-Ultimate.png', $modules);
+        $this->assertStringContainsString('const moduleActions = (module)', $modules);
+        $this->assertStringNotContainsString('normalizeModuleActions', $modules);
+        $this->assertStringNotContainsString('MutationObserver', $modules);
         $this->assertStringContainsString('fs-table-action', $modules);
-        $this->assertStringContainsString('.fs-table-action::before { display: none; content: none; }', $sharedStyles);
+        $this->assertStringContainsString('.fs-table-action::before { display: none !important; content: none !important; }', $sharedStyles);
         $this->assertStringContainsString('.fs-table-action > img', $sharedStyles);
+        $this->assertStringContainsString('visibility: visible !important;', $sharedStyles);
         $this->assertStringNotContainsString('data-action]::before', $drawerStyles);
     }
 
