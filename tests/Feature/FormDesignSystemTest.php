@@ -96,6 +96,22 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringNotContainsString('prompt(', $catalog.$vouchers);
     }
 
+    public function test_module_actions_use_publication_semantics_and_assets(): void
+    {
+        $modules = file_get_contents(base_path('public/backoffice/pages/modules.html'));
+        $drawerStyles = file_get_contents(base_path('public/backoffice/assets/css/components/drawer-form.css'));
+
+        $this->assertStringContainsString("action('publish'", $modules);
+        $this->assertStringContainsString("action('pause'", $modules);
+        $this->assertStringContainsString('Pausar publicação', $modules);
+        $this->assertStringContainsString('Browser-Hand--Streamline-Ultimate.png', $modules);
+        $this->assertStringContainsString('App-Window-Disable--Streamline-Ultimate.png', $modules);
+        $this->assertStringNotContainsString("action('activate'", $modules);
+        $this->assertStringNotContainsString('Zip-File-Download--Streamline-Ultimate.png', $modules);
+        $this->assertStringContainsString('data-action="publish"', $drawerStyles);
+        $this->assertStringContainsString('App-Window-Disable--Streamline-Ultimate.png', $drawerStyles);
+    }
+
     public function test_catalog_uses_masked_currency_controls_and_compact_plan_checkboxes(): void
     {
         $catalog = file_get_contents(base_path('public/backoffice/pages/subscription-plans.html'));
