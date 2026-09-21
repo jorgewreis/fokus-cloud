@@ -396,7 +396,7 @@ class CatalogAdminTest extends TestCase
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_product_activated']);
     }
 
-    public function test_module_can_be_republished_after_pause(): void
+    public function test_module_reactivation_preserves_pause_until_explicit_publication(): void
     {
         $admin = $this->admin();
         $moduleId = DB::table('modules')->where('code', 'processos-advocacia')->value('id');
@@ -405,8 +405,12 @@ class CatalogAdminTest extends TestCase
         $this->assertDatabaseHas('modules', ['id' => $moduleId, 'status' => 'inativo', 'publication_state' => 'pausado']);
 
         $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/modules/{$moduleId}/activate")->assertOk();
-        $this->assertDatabaseHas('modules', ['id' => $moduleId, 'status' => 'ativo', 'publication_state' => 'publicado']);
+        $this->assertDatabaseHas('modules', ['id' => $moduleId, 'status' => 'ativo', 'publication_state' => 'pausado']);
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_module_activated', 'entity_id' => $moduleId]);
+
+        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/modules/{$moduleId}/publish")->assertOk();
+        $this->assertDatabaseHas('modules', ['id' => $moduleId, 'status' => 'ativo', 'publication_state' => 'publicado']);
+        $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_module_published', 'entity_id' => $moduleId]);
     }
 
     public function test_product_deletion_is_allowed_only_without_catalog_dependencies(): void
