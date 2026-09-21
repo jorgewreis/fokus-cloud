@@ -247,12 +247,13 @@
         </div>
 
         <script>
+        (() => {
             const pageContent = document.querySelector("#page-content");
             const sidebarButtons = document.querySelectorAll(
                 "[data-sidebar-item]",
             );
             const pagePath = "./pages";
-            const pageVersion = "20260921-product-dialog-v28";
+            const pageVersion = "20260921-catalog-model-v29";
             const routePageMap = {
                 painel: "platform-dashboard-final",
                 empresas: "companies",
@@ -727,6 +728,7 @@
                     ] || "companies",
                 );
             })();
+        })();
         </script>
         </template>
         <script>

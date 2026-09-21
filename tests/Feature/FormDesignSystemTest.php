@@ -52,8 +52,11 @@ class FormDesignSystemTest extends TestCase
         $script = file_get_contents(base_path('public/backoffice/assets/js/form-system.js'));
 
         $this->assertMatchesRegularExpression('/const pageVersion = "20\\d{6}-[a-z0-9-]+";/', $panel);
+        $this->assertStringContainsString('(() => {', $panel);
+        $this->assertStringContainsString('20260921-catalog-model-v29', $panel);
         $this->assertStringContainsString('records-page.js?v=20260920-records-overlay-v3', $panel);
         $this->assertStringContainsString('window.initBackofficeRecordsPage?.(root)', file_get_contents(base_path('public/backoffice/pages/modules.html')));
+        $this->assertStringContainsString('module?.[name]', file_get_contents(base_path('public/backoffice/pages/modules.html')));
         $this->assertStringContainsString("document.addEventListener('fs:show'", file_get_contents(base_path('public/backoffice/assets/js/records-page.js')));
         $this->assertStringContainsString('] || "companies",', $panel);
         $this->assertStringContainsString('data-sidebar-item="companies"', $panel);
@@ -127,6 +130,8 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringContainsString('fs-confirmation-dialog-form', $modules);
         $this->assertStringContainsString('fs-confirmation-dialog-body', $modules);
         $this->assertStringContainsString('fs-confirmation-dialog-field', $modules);
+        $this->assertStringContainsString('Opções de capacidade', $modules);
+        $this->assertStringContainsString('Contratação avulsa', $modules);
         $this->assertStringNotContainsString('fs-form-col fs-form-label" for="module-dialog-reason"', $modules);
         $this->assertStringContainsString('.fs-confirmation-dialog-field .fs-form-select', $drawerStyles);
         $this->assertStringContainsString('flex: 0 0 38px;', $drawerStyles);
