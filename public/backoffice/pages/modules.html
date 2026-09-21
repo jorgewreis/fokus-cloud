@@ -30,6 +30,17 @@
     const panel = root.querySelector('#module-personalizations-drawer');
     const open = root.querySelector('#module-personalizations-open');
     const close = root.querySelector('#module-personalizations-close');
+    let personalizationsOffcanvas = null;
+    if (panel && open && window.FokusStyles?.Offcanvas) {
+        const proxy = document.createElement('button');
+        proxy.type = 'button';
+        proxy.hidden = true;
+        proxy.setAttribute('data-fs-target', '#module-personalizations-drawer');
+        document.body.append(proxy);
+        personalizationsOffcanvas = window.FokusStyles.Offcanvas.getOrCreateInstance(proxy);
+        open.addEventListener('click', () => personalizationsOffcanvas?.show());
+        close?.addEventListener('click', () => personalizationsOffcanvas?.hide());
+    }
     const family = root.querySelector('#module-code-technical');
     const segments = root.querySelector('#module-segments');
     const context = root.querySelector('#module-context');
