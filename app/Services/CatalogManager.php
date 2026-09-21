@@ -350,7 +350,7 @@ class CatalogManager
             ? ($state === 'arquivado' ? 'inativo' : 'pausado')
             : ($table === 'plans'
                 ? 'inativo'
-                : ($state === 'arquivado' ? 'arquivado' : 'pausado'));
+                : ($state === 'arquivado' ? 'arquivado' : 'inativo'));
         DB::table($table)->where('id', $id)->update([
             'status' => $status,
             'publication_state' => $state,

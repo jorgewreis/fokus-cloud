@@ -16,7 +16,11 @@ return new class extends Migration
         DB::table('modules')
             ->whereIn('status', ['inativo', 'pausado'])
             ->whereIn('publication_state', ['publicado', 'rascunho'])
-            ->update(['publication_state' => 'pausado', 'updated_at' => now()]);
+            ->update(['status' => 'inativo', 'publication_state' => 'pausado', 'updated_at' => now()]);
+
+        DB::table('modules')
+            ->where('status', 'pausado')
+            ->update(['status' => 'inativo', 'publication_state' => 'pausado', 'updated_at' => now()]);
 
         DB::table('modules')
             ->where('status', 'arquivado')

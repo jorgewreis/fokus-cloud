@@ -402,7 +402,7 @@ class CatalogAdminTest extends TestCase
         $moduleId = DB::table('modules')->where('code', 'processos-advocacia')->value('id');
 
         $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/modules/{$moduleId}/pause")->assertOk();
-        $this->assertDatabaseHas('modules', ['id' => $moduleId, 'status' => 'pausado', 'publication_state' => 'pausado']);
+        $this->assertDatabaseHas('modules', ['id' => $moduleId, 'status' => 'inativo', 'publication_state' => 'pausado']);
 
         $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/modules/{$moduleId}/activate")->assertOk();
         $this->assertDatabaseHas('modules', ['id' => $moduleId, 'status' => 'ativo', 'publication_state' => 'publicado']);
