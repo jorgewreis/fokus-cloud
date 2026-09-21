@@ -626,8 +626,8 @@ class BackofficeController extends Controller
             abort_if(DB::table('modules')->where('product_id', $productId)->where('code', Str::slug($data['code']))->where('id', '!=', $module)->exists(), 422, 'Já existe uma funcionalidade com este código no sistema.');
         }
 
-        $catalog->updateModule($module, $data);
-        $audit->record($request->user()->id, 'backoffice.catalog_module_updated', 'module', $module, reason: 'Atualização de funcionalidade comercial', before: (array) $current, after: $data, request: $request);
+        [, $after] = $catalog->updateModule($module, $data);
+        $audit->record($request->user()->id, 'backoffice.catalog_module_updated', 'module', $module, reason: 'Atualização de funcionalidade comercial', before: (array) $current, after: $after, request: $request);
 
         return response()->json(['message' => 'Funcionalidade atualizada.']);
     }
@@ -842,7 +842,7 @@ class BackofficeController extends Controller
             'capabilities' => ['nullable', 'array'],
             'dependencies' => ['nullable', 'array'],
             'incompatibilities' => ['nullable', 'array'],
-            'status' => ['nullable', Rule::in(['ativo', 'rascunho', 'pausado', 'arquivado'])],
+            'status' => ['nullable', Rule::in(['ativo', 'inativo', 'rascunho', 'pausado', 'arquivado'])],
             'display_order' => ['nullable', 'integer', 'min:0'],
             'featured' => ['nullable', 'boolean'],
             'capacity_unit' => ['nullable', 'string', 'max:64'],

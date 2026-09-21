@@ -217,10 +217,11 @@ class CatalogManager
     public function createModule(array $data): string
     {
         $id = PrefixedUlid::make('MOD');
+        $publicationState = $this->modulePublicationStateForStatus($data['status'] ?? null, 'rascunho');
         DB::table('modules')->insert($this->moduleWritePayload($data, [
             'id' => $id,
             'code' => Str::slug($data['code']),
-            'publication_state' => 'rascunho',
+            'publication_state' => $publicationState,
             'created_at' => now(),
             'updated_at' => now(),
         ]));
@@ -228,9 +229,16 @@ class CatalogManager
         return $id;
     }
 
-    public function updateModule(string $moduleId, array $data): void
+    public function updateModule(string $moduleId, array $data): array
     {
-        DB::table('modules')->where('id', $moduleId)->update($this->moduleWritePayload($data, ['updated_at' => now()]));
+        $current = DB::table('modules')->where('id', $moduleId)->first();
+        abort_unless($current, 404, 'Funcionalidade não encontrada.');
+        $extra = ['updated_at' => now()];
+        if (array_key_exists('status', $data)) {
+            $extra['publication_state'] = $this->modulePublicationStateForStatus($data['status'], $current->publication_state ?? 'rascunho');
+        }
+        DB::table('modules')->where('id', $moduleId)->update($this->moduleWritePayload($data, $extra));
+        return [(array) $current, (array) DB::table('modules')->where('id', $moduleId)->first()];
     }
 
     public function createPlan(array $data): string
@@ -364,6 +372,15 @@ class CatalogManager
         ]);
 
         return [(array) $current, (array) DB::table('modules')->where('id', $id)->first()];
+    }
+
+    private function modulePublicationStateForStatus(?string $status, string $currentPublicationState): string
+    {
+        return match ($status) {
+            'inativo', 'pausado' => 'pausado',
+            'arquivado' => 'arquivado',
+            default => $currentPublicationState,
+        };
     }
 
     public function deleteCatalogItem(string $type, string $id): array

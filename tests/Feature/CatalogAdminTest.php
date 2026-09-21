@@ -426,6 +426,49 @@ class CatalogAdminTest extends TestCase
             ->assertJsonPath('message', fn ($message) => str_contains($message, 'vínculos'));
     }
 
+    public function test_module_status_edit_synchronizes_publication_without_auto_publishing(): void
+    {
+        $admin = $this->admin();
+        $moduleId = DB::table('modules')->where('code', 'processos-advocacia')->value('id');
+
+        $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/catalog/modules/{$moduleId}", [
+            'status' => 'inativo',
+        ])->assertOk();
+        $this->assertDatabaseHas('modules', ['id' => $moduleId, 'status' => 'inativo', 'publication_state' => 'pausado']);
+
+        $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/catalog/modules/{$moduleId}", [
+            'status' => 'ativo',
+        ])->assertOk();
+        $this->assertDatabaseHas('modules', ['id' => $moduleId, 'status' => 'ativo', 'publication_state' => 'pausado']);
+        $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_module_updated', 'entity_id' => $moduleId]);
+    }
+
+    public function test_creating_inactive_or_archived_module_synchronizes_publication(): void
+    {
+        $admin = $this->admin();
+        $productId = DB::table('products')->where('code', 'law')->value('id');
+
+        $inactiveId = $this->actingAs($admin, 'platform')->postJson('/api/backoffice/catalog/modules', [
+            'product_id' => $productId,
+            'code' => 'modulo-inativo',
+            'module_code' => 'inativo',
+            'name' => 'Módulo inativo',
+            'monthly_price' => 10,
+            'status' => 'inativo',
+        ])->assertCreated()->json('id');
+        $this->assertDatabaseHas('modules', ['id' => $inactiveId, 'status' => 'inativo', 'publication_state' => 'pausado']);
+
+        $archivedId = $this->actingAs($admin, 'platform')->postJson('/api/backoffice/catalog/modules', [
+            'product_id' => $productId,
+            'code' => 'modulo-arquivado',
+            'module_code' => 'arquivado',
+            'name' => 'Módulo arquivado',
+            'monthly_price' => 10,
+            'status' => 'arquivado',
+        ])->assertCreated()->json('id');
+        $this->assertDatabaseHas('modules', ['id' => $archivedId, 'status' => 'arquivado', 'publication_state' => 'arquivado']);
+    }
+
     private function admin(string $role = 'superadministrador'): PlatformAdmin
     {
         return PlatformAdmin::create([
