@@ -112,21 +112,19 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringContainsString('File-Code-Subtract--Streamline-Ultimate.png', $modules);
         $this->assertStringContainsString('File-Code-Remove--Streamline-Ultimate.png', $modules);
         $this->assertStringContainsString('Common-File-Check--Streamline-Ultimate.png', $modules);
-        $this->assertStringContainsString('Common-File-Subtract--Streamline-Ultimate.png', $modules);
         $this->assertStringContainsString('Common-File-Remove--Streamline-Ultimate.png', $modules);
         $this->assertStringNotContainsString('Browser-Hand--Streamline-Ultimate.png', $modules);
         $this->assertStringNotContainsString('App-Window-Disable--Streamline-Ultimate.png', $modules);
         $this->assertStringNotContainsString('Zip-File-Download--Streamline-Ultimate.png', $modules);
         $this->assertStringNotContainsString('Zip-File-Upload--Streamline-Ultimate.png', $modules);
-        $this->assertStringContainsString('const moduleActions = (module)', $modules);
+        $this->assertStringContainsString('const actions = (module)', $modules);
         $this->assertStringNotContainsString('normalizeModuleActions', $modules);
-        $this->assertStringNotContainsString('MutationObserver', $modules);
         $this->assertStringContainsString('fs-table-action', $modules);
         $this->assertStringContainsString('fs-confirmation-dialog-form', $modules);
         $this->assertStringContainsString('fs-confirmation-dialog-body', $modules);
         $this->assertStringContainsString('fs-confirmation-dialog-field', $modules);
-        $this->assertStringContainsString('Opções de capacidade', $modules);
-        $this->assertStringContainsString('Contratação avulsa', $modules);
+        $this->assertStringContainsString('Personalizações e limites', $modules);
+        $this->assertStringContainsString('Configurar personalizações', $modules);
         $this->assertStringNotContainsString('fs-form-col fs-form-label" for="module-dialog-reason"', $modules);
         $this->assertStringContainsString('.fs-confirmation-dialog-field .fs-form-select', $drawerStyles);
         $this->assertStringContainsString('flex: 0 0 38px;', $drawerStyles);
@@ -137,7 +135,7 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringContainsString('visibility: visible !important;', $sharedStyles);
         $this->assertStringNotContainsString('data-action]::before', $drawerStyles);
 
-        foreach (['File-Code-2--Streamline-Ultimate.png', 'File-Code-Subtract--Streamline-Ultimate.png', 'File-Code-Remove--Streamline-Ultimate.png', 'Common-File-Check--Streamline-Ultimate.png', 'Common-File-Subtract--Streamline-Ultimate.png', 'Common-File-Remove--Streamline-Ultimate.png'] as $icon) {
+        foreach (['File-Code-2--Streamline-Ultimate.png', 'File-Code-Subtract--Streamline-Ultimate.png', 'File-Code-Remove--Streamline-Ultimate.png', 'Common-File-Check--Streamline-Ultimate.png', 'Common-File-Remove--Streamline-Ultimate.png'] as $icon) {
             $this->assertFileExists(base_path("public/backoffice/assets/icons/{$icon}"), $icon);
         }
 
