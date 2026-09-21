@@ -584,8 +584,8 @@
                 const actionButton = currentStatus === "expirada"
                     ? ""
                     : voucher.status === "suspensa"
-                        ? `<button class="fs-btn fs-btn-icon" type="button" data-voucher-action="reactivate" data-voucher-id="${escapeHtml(voucher.id)}" title="Reativar voucher" aria-label="Reativar voucher"><img src="${iconBasePath}${voucherAddIcon}" alt=""></button>`
-                        : `<button class="fs-btn fs-btn-icon" type="button" data-voucher-action="pause" data-voucher-id="${escapeHtml(voucher.id)}" title="Pausar voucher" aria-label="Pausar voucher"><img src="${iconBasePath}${voucherMinusIcon}" alt=""></button>`;
+                        ? `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action" type="button" data-voucher-action="reactivate" data-voucher-id="${escapeHtml(voucher.id)}" title="Reativar voucher" aria-label="Reativar voucher"><img src="${iconBasePath}${voucherAddIcon}" alt=""></button>`
+                        : `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action" type="button" data-voucher-action="pause" data-voucher-id="${escapeHtml(voucher.id)}" title="Pausar voucher" aria-label="Pausar voucher"><img src="${iconBasePath}${voucherMinusIcon}" alt=""></button>`;
 
                 return `<tr>
                     <td>${escapeHtml(voucher.code)}</td>
@@ -596,9 +596,9 @@
                     <td>${escapeHtml(validity)}</td>
                     <td><span class="fs-badge ${statusClass}">${statusLabel}</span></td>
                     <td class="fs-u-d-flex fs-u-gap-2">
-                        ${Number(voucher.redemptions_count || 0) === 0 && voucher.status !== "encerrada" ? `<button class="fs-btn fs-btn-icon" type="button" data-voucher-action="edit" data-voucher-id="${escapeHtml(voucher.id)}" title="Editar voucher" aria-label="Editar voucher"><img src="${iconBasePath}${voucherEditIcon}" alt=""></button>` : ""}
+                        ${Number(voucher.redemptions_count || 0) === 0 && voucher.status !== "encerrada" ? `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action" type="button" data-voucher-action="edit" data-voucher-id="${escapeHtml(voucher.id)}" title="Editar voucher" aria-label="Editar voucher"><img src="${iconBasePath}${voucherEditIcon}" alt=""></button>` : ""}
                         ${actionButton}
-                        ${voucher.status !== "encerrada" ? `<button class="fs-btn fs-btn-icon ${Number(voucher.redemptions_count || 0) === 0 ?"fs-btn-danger" : ""}" type="button" data-voucher-action="remove-or-archive" data-voucher-id="${escapeHtml(voucher.id)}" title="${Number(voucher.redemptions_count || 0) === 0 ? "Excluir voucher" : "Arquivar voucher"}" aria-label="${Number(voucher.redemptions_count || 0) === 0 ? "Excluir voucher" : "Arquivar voucher"}"><img src="${iconBasePath}${Number(voucher.redemptions_count || 0) === 0 ? voucherRemoveIcon : voucherMinusIcon}" alt=""></button>` : ""}
+                        ${voucher.status !== "encerrada" ? `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action ${Number(voucher.redemptions_count || 0) === 0 ?"fs-btn-danger" : ""}" type="button" data-voucher-action="remove-or-archive" data-voucher-id="${escapeHtml(voucher.id)}" title="${Number(voucher.redemptions_count || 0) === 0 ? "Excluir voucher" : "Arquivar voucher"}" aria-label="${Number(voucher.redemptions_count || 0) === 0 ? "Excluir voucher" : "Arquivar voucher"}"><img src="${iconBasePath}${Number(voucher.redemptions_count || 0) === 0 ? voucherRemoveIcon : voucherMinusIcon}" alt=""></button>` : ""}
                     </td>
                 </tr>`;
             }).join(""); window.refreshFokusDataTables?.(document.querySelector(".vouchers-page"));

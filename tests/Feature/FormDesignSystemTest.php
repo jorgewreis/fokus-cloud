@@ -100,6 +100,7 @@ class FormDesignSystemTest extends TestCase
     {
         $modules = file_get_contents(base_path('public/backoffice/pages/modules.html'));
         $drawerStyles = file_get_contents(base_path('public/backoffice/assets/css/components/drawer-form.css'));
+        $sharedStyles = file_get_contents(base_path('public/assets/css/shared/fokus.css'));
 
         $this->assertStringContainsString("action('publish'", $modules);
         $this->assertStringContainsString("action('pause'", $modules);
@@ -108,10 +109,29 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringContainsString('App-Window-Disable--Streamline-Ultimate.png', $modules);
         $this->assertStringNotContainsString("action('activate'", $modules);
         $this->assertStringNotContainsString('Zip-File-Download--Streamline-Ultimate.png', $modules);
-        $this->assertStringContainsString('data-action="publish"', $drawerStyles);
-        $this->assertStringContainsString('App-Window-Disable--Streamline-Ultimate.png', $drawerStyles);
-        $this->assertStringContainsString('.admin-modules-page [data-action]::before { display: none !important; content: none !important; }', $drawerStyles);
-        $this->assertStringContainsString('.admin-modules-page [data-action] img { display: block !important;', $drawerStyles);
+        $this->assertStringContainsString('fs-table-action', $modules);
+        $this->assertStringContainsString('.fs-table-action::before { display: none; content: none; }', $sharedStyles);
+        $this->assertStringContainsString('.fs-table-action > img', $sharedStyles);
+        $this->assertStringNotContainsString('data-action]::before', $drawerStyles);
+    }
+
+    public function test_all_backoffice_table_action_icons_use_the_shared_contract(): void
+    {
+        $sharedStyles = file_get_contents(base_path('public/assets/css/shared/fokus.css'));
+
+        foreach (glob(base_path('public/backoffice/pages/*.html')) as $page) {
+            preg_match_all('/class="([^"]*\\bfs-btn-icon\\b[^"]*)"/', file_get_contents($page), $matches);
+
+            foreach ($matches[1] as $classes) {
+                $this->assertStringContainsString('fs-btn-icon-plain', $classes, basename($page));
+                $this->assertStringContainsString('fs-table-action', $classes, basename($page));
+            }
+        }
+
+        $this->assertStringContainsString('.fs-table-action,', $sharedStyles);
+        $this->assertStringContainsString('flex: 0 0 24px;', $sharedStyles);
+        $this->assertStringContainsString('width: 20px;', $sharedStyles);
+        $this->assertStringContainsString('height: 20px;', $sharedStyles);
     }
 
     public function test_catalog_uses_masked_currency_controls_and_compact_plan_checkboxes(): void

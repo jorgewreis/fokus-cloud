@@ -42,7 +42,7 @@
             const iconBasePath = "/backoffice/assets/icons/";
             const escapeHtml = (value) => String(value || "").replace(/[&<>"']/g, (character) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"})[character]);
             const message = (text, tone = "info") => { notice.hidden = false; notice.dataset.tone = tone; notice.textContent = text; };
-            const actionButton = (action, id, label, icon, danger = false) => `<button class="fs-btn fs-btn-icon${danger ?" fs-btn-danger" : ""}" type="button" data-action="${action}" data-id="${escapeHtml(id)}" title="${label}" aria-label="${label}"><img src="${iconBasePath}${icon}" alt=""></button>`;
+            const actionButton = (action, id, label, icon, danger = false) => `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action${danger ?" fs-btn-danger" : ""}" type="button" data-action="${action}" data-id="${escapeHtml(id)}" title="${label}" aria-label="${label}"><img src="${iconBasePath}${icon}" alt=""></button>`;
             const statusBadge = (status) => { const tone = { ativo: "success", bloqueado: "warning", bloqueio_temporario: "warning", desativado: "secondary" }[status] || "secondary"; return `<span class="fs-badge fs-badge-soft-${tone}">${escapeHtml(status)}</span>`; };
             async function load() {
                 try {

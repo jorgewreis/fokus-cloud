@@ -125,7 +125,7 @@
         const iconBasePath = "/backoffice/assets/icons/";
         const editIcon = "Shopping-Basket-Edit--Streamline-Ultimate.png";
         const removeIcon = "Shopping-Basket-Subtract--Streamline-Ultimate.png";
-        const actionButton = (type, action, id, label, icon, danger = false) => `<button class="fs-btn fs-btn-icon${danger ?" fs-btn-danger" : ""}" type="button" data-catalog-type="${type}" data-catalog-action="${action}" data-catalog-id="${escapeHtml(id)}" title="${label}" aria-label="${label}"><img src="${iconBasePath}${icon}" alt=""></button>`;
+        const actionButton = (type, action, id, label, icon, danger = false) => `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action${danger ?" fs-btn-danger" : ""}" type="button" data-catalog-type="${type}" data-catalog-action="${action}" data-catalog-id="${escapeHtml(id)}" title="${label}" aria-label="${label}"><img src="${iconBasePath}${icon}" alt=""></button>`;
 
         function showMessage(text, tone = "info") {
             message.textContent = text || "";
