@@ -59,9 +59,9 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: ca
 :is(.admin-products-page, .admin-modules-page) [data-action="pause"]::before { background-image: url("/backoffice/assets/icons/App-Window-Disable--Streamline-Ultimate.png"); }
 .admin-products-page [data-action="activate"]::before { background-image: url("/backoffice/assets/icons/Zip-File-Download--Streamline-Ultimate.png"); }
 :is(.admin-products-page, .admin-modules-page) [data-action="publish"]::before { background-image: url("/backoffice/assets/icons/Common-File-Check--Streamline-Ultimate.png"); }
-.admin-modules-page [data-action="publish"] img { display: block !important; visibility: visible !important; opacity: 1 !important; width: 22px !important; height: 22px !important; }
-.admin-modules-page [data-action="publish"]::before { display: none !important; content: none !important; }
-.admin-modules-page [data-action="publish"] { display: inline-flex !important; flex: 0 0 28px !important; width: 28px !important; min-width: 28px !important; height: 28px !important; min-height: 28px !important; align-items: center !important; justify-content: center !important; overflow: visible !important; }
+.admin-modules-page .module-publish-action img { display: block !important; visibility: visible !important; opacity: 1 !important; width: 22px !important; height: 22px !important; }
+.admin-modules-page .module-publish-action::before { display: none !important; content: none !important; }
+.admin-modules-page .module-publish-action { display: inline-flex !important; flex: 0 0 28px !important; width: 28px !important; min-width: 28px !important; height: 28px !important; min-height: 28px !important; align-items: center !important; justify-content: center !important; overflow: visible !important; }
 :is(.admin-products-page, .admin-modules-page) [data-action="archive"]::before { background-image: url("/backoffice/assets/icons/Zip-File-Upload--Streamline-Ultimate.png"); }
 :is(.admin-products-page, .admin-modules-page) [data-action="delete"]::before { background-image: url("/backoffice/assets/icons/Common-File-Remove--Streamline-Ultimate.png"); }
 .backoffice-records-page .fs-card-body dl { display: flex; flex-direction: column; gap: 10px; margin: 0; }
