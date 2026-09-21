@@ -146,6 +146,11 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringContainsString('Common-File-Check--Streamline-Ultimate.png', $products);
         $this->assertStringNotContainsString('Button-Pause-1--Streamline-Ultimate.png', $products);
         $this->assertStringNotContainsString('Power-Button-1--Streamline-Ultimate.png', $products);
+        $this->assertStringContainsString('fs-confirmation-dialog-form', $products);
+        $this->assertStringContainsString('product-destructive-reason-help', $products);
+        $this->assertStringContainsString("else if(q.dataset.action==='activate')open(z,'edit',q.dataset.action)", $products);
+        $this->assertStringContainsString("q.operation==='pause'?'pause':'archive'", $products);
+        $this->assertStringContainsString("msg(q.operation==='pause'?'Produto pausado.'", $products);
     }
 
     public function test_all_backoffice_table_action_icons_use_the_shared_contract(): void
