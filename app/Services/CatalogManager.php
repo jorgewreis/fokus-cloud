@@ -367,6 +367,18 @@ class CatalogManager
         abort_unless($current, 404, 'Módulo não encontrado.');
         DB::table('modules')->where('id', $id)->update([
             'status' => 'ativo',
+            'updated_at' => now(),
+        ]);
+
+        return [(array) $current, (array) DB::table('modules')->where('id', $id)->first()];
+    }
+
+    public function publishModule(string $id): array
+    {
+        $current = DB::table('modules')->where('id', $id)->first();
+        abort_unless($current, 404, 'Módulo não encontrado.');
+        abort_unless($current->status === 'ativo', 422, 'Somente módulos ativos podem ser publicados.');
+        DB::table('modules')->where('id', $id)->update([
             'publication_state' => 'publicado',
             'updated_at' => now(),
         ]);

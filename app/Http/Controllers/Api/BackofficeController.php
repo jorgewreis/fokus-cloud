@@ -758,7 +758,15 @@ class BackofficeController extends Controller
         [$before, $after] = $catalog->activateModule($id);
         $audit->record($request->user()->id, 'backoffice.catalog_module_activated', 'module', $id, reason: $data['reason'] ?? null, before: $before, after: $after, request: $request);
 
-        return response()->json(['message' => 'Módulo republicado.']);
+        return response()->json(['message' => 'Módulo reativado.']);
+    }
+
+    public function publishModule(Request $request, string $module, CatalogManager $catalog, PlatformAudit $audit)
+    {
+        [$before, $after] = $catalog->publishModule($module);
+        $audit->record($request->user()->id, 'backoffice.catalog_module_published', 'module', $module, before: $before, after: $after, request: $request);
+
+        return response()->json(['message' => 'Módulo publicado.']);
     }
 
     public function archiveCatalogItem(Request $request, string $type, string $id, CatalogManager $catalog, PlatformAudit $audit)
