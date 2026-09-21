@@ -55,11 +55,18 @@
     <button id="module-destructive-trigger" type="button" data-fs="modal" data-fs-target="#module-destructive-dialog" hidden aria-hidden="true"></button>
     <div id="module-destructive-dialog" class="fs-modal" tabindex="-1" aria-describedby="module-dialog-description">
         <div class="fs-modal-dialog"><div class="fs-modal-content">
-            <div class="fs-modal-header"><h2 class="fs-modal-title" id="module-dialog-title">Confirmar ação</h2><button class="fs-btn-close" type="button" data-fs-dismiss="modal" aria-label="Fechar"></button></div>
+            <div class="fs-modal-header"><h2 class="fs-modal-title fs-u-fs-h4" id="module-dialog-title">Confirmar ação</h2><button class="fs-btn-close" type="button" data-fs-dismiss="modal" aria-label="Fechar"></button></div>
             <form class="fs-form fs-modal-body fs-u-d-flex fs-u-flex-column fs-u-gap-3" id="module-destructive-form">
                 <p id="module-dialog-description">Informe o motivo para registrar esta ação.</p>
-                <label class="fs-form-label" for="module-dialog-reason">Motivo obrigatório
-                    <textarea class="fs-form-control" id="module-dialog-reason" name="reason" maxlength="1000" required aria-describedby="module-dialog-description"></textarea>
+                <label class="fs-form-col fs-form-label" for="module-dialog-reason"><span>Motivo obrigatório</span>
+                    <select class="fs-form-select" id="module-dialog-reason" name="reason" required aria-describedby="module-dialog-description">
+                        <option value="">Selecione um motivo</option>
+                        <option value="Módulo duplicado ou cadastrado incorretamente.">Módulo duplicado ou cadastrado incorretamente</option>
+                        <option value="Módulo substituído por outra funcionalidade.">Módulo substituído por outra funcionalidade</option>
+                        <option value="Módulo não faz mais parte do produto.">Módulo não faz mais parte do produto</option>
+                        <option value="Encerramento da oferta comercial do módulo.">Encerramento da oferta comercial do módulo</option>
+                        <option value="Outro motivo administrativo.">Outro motivo administrativo</option>
+                    </select>
                 </label>
                 <div class="fs-modal-footer"><button class="fs-btn fs-btn-outline-primary" type="button" data-fs-dismiss="modal">Cancelar</button><button class="fs-btn fs-btn-danger" type="submit" id="module-dialog-submit">Confirmar</button></div>
             </form>
