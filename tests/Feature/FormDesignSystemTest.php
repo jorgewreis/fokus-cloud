@@ -110,8 +110,7 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringNotContainsString('Zip-File-Download--Streamline-Ultimate.png', $modules);
         $this->assertStringContainsString('data-action="publish"', $drawerStyles);
         $this->assertStringContainsString('App-Window-Disable--Streamline-Ultimate.png', $drawerStyles);
-        $this->assertStringContainsString('.admin-modules-page .module-publish-action img { display: block !important;', $drawerStyles);
-        $this->assertStringContainsString('.admin-modules-page .module-publish-action::before { display: block !important; content: "" !important;', $drawerStyles);
+        $this->assertStringContainsString('.admin-modules-page [data-action="publish"]::before { background-image:', $drawerStyles);
     }
 
     public function test_catalog_uses_masked_currency_controls_and_compact_plan_checkboxes(): void
