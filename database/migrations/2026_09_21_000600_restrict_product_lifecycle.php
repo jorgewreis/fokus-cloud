@@ -16,7 +16,11 @@ return new class extends Migration
         if (DB::getDriverName() !== 'sqlite') {
             DB::statement("ALTER TABLE products MODIFY status ENUM('ativo', 'pausado') NOT NULL DEFAULT 'pausado'");
         }
-        DB::statement("UPDATE products SET active = IF(status = 'ativo', 1, 0)");
+        DB::table('products')->select(['id', 'status'])->get()->each(function (object $product): void {
+            DB::table('products')->where('id', $product->id)->update([
+                'active' => $product->status === 'ativo',
+            ]);
+        });
     }
 
     public function down(): void
