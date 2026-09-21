@@ -8,7 +8,7 @@
 @import url("layout/layout.css?v=20260916-fokus-styles-migration-v3");
 
 /* LOAD REUSABLE COMPONENTS */
-@import url("components/components.css?v=20260921-module-dialog-v26");
+@import url("components/components.css?v=20260921-module-dialog-v27");
 
 /* LOAD UTILITY CLASSES */
 @import url("utilities/utilities.css?v=20260916-fokus-styles-migration-v3");

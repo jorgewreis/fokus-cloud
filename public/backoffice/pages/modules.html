@@ -138,12 +138,13 @@
     const message = (text, tone = 'danger') => { const element = root.querySelector('#modules-message'); if (!element) return; element.textContent = text || ''; element.dataset.tone = tone; element.hidden = !text; };
     const allModules = () => (state.catalog.products || []).flatMap((product) => (product.modules || []).map((module) => ({ ...module, product_name: product.name, product_code: product.code, linked_plans: (product.plans || []).filter((plan) => (plan.modules || []).some((item) => item.id === module.id)) })));
     const options = (selected = '') => `<option value="">Selecione um produto</option>${(state.catalog.products || []).map((product) => `<option value="${esc(product.id)}" ${product.id === selected ? 'selected' : ''}>${esc(product.name)}</option>`).join('')}`;
-    const iconVersion = '20260921-module-dialog-v26';
+    const iconVersion = '20260921-module-dialog-v27';
     const action = (type, module, label, icon, danger = false) => `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action${danger ? ' fs-btn-danger' : ''}" type="button" data-action="${type}" data-id="${esc(module.id)}" aria-label="${label}" title="${label}"><img src="/backoffice/assets/icons/${icon}?v=${iconVersion}" alt="" width="20" height="20" decoding="async"></button>`;
     const moduleActions = (module) => {
         const publication = String(module.publication_state || 'rascunho').toLowerCase();
         const status = String(module.status || '').toLowerCase();
         const isActive = status === 'ativo';
+        const isDraftStatus = status === 'rascunho';
         const isArchived = status === 'arquivado' || publication === 'arquivado';
         const isReactivatable = status === 'inativo' || status === 'pausado';
         const actions = [action('view', module, 'Ver detalhes do módulo', 'Folder-File--Streamline-Ultimate.png'), action('edit', module, 'Editar módulo', 'Common-File-Edit--Streamline-Ultimate.png')];
@@ -155,6 +156,12 @@
 
         if (isActive && publication === 'publicado') {
             if (canPublish) actions.push(action('pause', module, 'Pausar publicação', 'File-Code-Subtract--Streamline-Ultimate.png'));
+            return actions;
+        }
+
+        if (isDraftStatus && publication === 'rascunho') {
+            if (canPublish) actions.push(action('activate', module, 'Ativar módulo', 'Common-File-Check--Streamline-Ultimate.png'));
+            if (canPublish) actions.push(action('archive', module, 'Arquivar módulo', 'File-Code-Remove--Streamline-Ultimate.png'));
             return actions;
         }
 

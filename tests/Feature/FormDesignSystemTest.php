@@ -107,6 +107,7 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringContainsString("action('activate'", $modules);
         $this->assertStringContainsString("action('pause'", $modules);
         $this->assertStringContainsString("action('inactivate'", $modules);
+        $this->assertStringContainsString("action('activate', module, 'Ativar módulo'", $modules);
         $this->assertStringContainsString('Pausar publicação', $modules);
         $this->assertStringContainsString('Republicar módulo', $modules);
         $this->assertStringContainsString('File-Code-2--Streamline-Ultimate.png', $modules);
@@ -130,6 +131,7 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringContainsString('.fs-confirmation-dialog-field .fs-form-select', $drawerStyles);
         $this->assertStringContainsString('flex: 0 0 38px;', $drawerStyles);
         $this->assertStringContainsString('.fs-confirmation-dialog .fs-modal-footer .fs-btn-danger', $drawerStyles);
+        $this->assertStringContainsString('background: var(--fs-color-danger) !important;', $drawerStyles);
         $this->assertStringContainsString('.fs-table-action::before { display: none !important; content: none !important; }', $sharedStyles);
         $this->assertStringContainsString('.fs-table-action > img', $sharedStyles);
         $this->assertStringContainsString('visibility: visible !important;', $sharedStyles);
