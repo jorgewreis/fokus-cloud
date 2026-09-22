@@ -699,9 +699,12 @@
                 event.preventDefault();
                 event.stopPropagation();
                 const expanded = catalogToggle.getAttribute("aria-expanded") === "true";
-                catalogToggle.setAttribute("aria-expanded", String(!expanded));
+                const nextExpanded = !expanded;
+                catalogToggle.setAttribute("aria-expanded", String(nextExpanded));
                 catalogSubnav.hidden = expanded;
-                loadSidebarPage("products");
+                if (nextExpanded) {
+                    loadSidebarPage("products");
+                }
             });
 
             async function hydrateAdmin() {
