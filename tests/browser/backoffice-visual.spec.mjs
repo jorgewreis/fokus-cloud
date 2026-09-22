@@ -15,7 +15,15 @@ for (const [name, viewport] of viewports) {
             await page.goto(`/backoffice/${route}`);
             await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', pageId);
             await expect(page.locator('.backoffice-records-page')).toBeVisible();
-            await expect(page).toHaveScreenshot(`${pageId}-${name}.png`, { fullPage: true, animations: 'disabled' });
+            await expect(page).toHaveScreenshot(`${pageId}-${name}.png`, {
+                fullPage: true,
+                animations: 'disabled',
+                // The same Chromium revision rasterizes the bundled webfonts
+                // differently on Windows and Linux. Keep the baseline strict
+                // enough to flag layout/color regressions while tolerating
+                // cross-platform glyph antialiasing.
+                maxDiffPixelRatio: 0.08,
+            });
         });
     }
 }
