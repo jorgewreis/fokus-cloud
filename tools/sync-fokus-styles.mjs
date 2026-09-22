@@ -111,10 +111,23 @@ html[data-role="admin"] {
 .backoffice-records-drawer .fs-offcanvas-body {
     min-width: 0;
 }
+.backoffice-records-drawer.fs-offcanvas-end,
+body > .backoffice-records-drawer.fs-offcanvas-end {
+    width: 450px;
+    max-width: calc(100vw - 16px);
+}
 .backoffice-records-drawer .fs-offcanvas-body.fs-form {
     display: flex;
     flex-direction: column;
     gap: var(--fs-backoffice-panel-space);
+}
+.backoffice-records-drawer .fs-card-panel {
+    flex: 0 0 auto;
+    min-width: 0;
+}
+.backoffice-records-drawer .fs-card-panel > .fs-card-body {
+    min-width: 0;
+    overflow: visible;
 }
 .backoffice-records-drawer .fs-form-label {
     display: flex;
@@ -138,6 +151,15 @@ html[data-role="admin"] {
 .backoffice-records-view-panel dd {
     margin: var(--fs-space-1, 4px) 0 0;
     overflow-wrap: anywhere;
+}
+html[data-role="admin"] .fs-alert {
+    display: flex;
+    flex-direction: column;
+    margin: 10px !important;
+    padding: 10px 20px !important;
+}
+html[data-role="admin"] .fs-alert[hidden] {
+    display: none !important;
 }
 [data-backoffice-overlay="personalizations"] #personalizations-list > .fs-card {
     padding: 15px;

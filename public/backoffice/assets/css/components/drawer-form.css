@@ -29,7 +29,7 @@
 .backoffice-records-page > .fs-page-layout { width: 100%; padding: 0 30px 20px; }
 .backoffice-records-page > .backoffice-page-card { width: calc(100% - 20px); margin: 10px; }
 .backoffice-records-drawer.fs-offcanvas-end,
-body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: calc(100vw - 16px); z-index: 2001 !important; }
+body > .backoffice-records-drawer.fs-offcanvas-end { width: 450px; max-width: calc(100vw - 16px); z-index: 2001 !important; }
 .fs-offcanvas-backdrop { z-index: 2000 !important; }
 .backoffice-records-drawer .fs-invalid-feedback { margin: 5px; padding: 2px 10px; }
 .backoffice-records-page .fs-page-layout > .fs-btn-primary { color: var(--fs-color-on-primary); border-color: var(--fs-color-primary); background-color: var(--fs-color-primary); }

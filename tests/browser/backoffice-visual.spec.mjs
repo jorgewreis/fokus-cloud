@@ -37,3 +37,41 @@ test('navegação cancela a página anterior e mantém somente um drawer portale
     await expect(page.locator('body > #product-drawer')).toHaveCount(0);
     await expect(page.locator('body > #company-drawer')).toHaveCount(1);
 });
+
+test('drawer de empresas preserva largura, cards e alertas do contrato visual', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/backoffice/empresas');
+    await page.locator('#company-create').click();
+    await expect(page.locator('#company-drawer')).toBeVisible();
+
+    const drawerContract = await page.locator('#company-drawer').evaluate((drawer) => {
+        const cards = [...drawer.querySelectorAll('#company-form > .fs-card-panel')];
+        return {
+            width: getComputedStyle(drawer).width,
+            cardsFitContent: cards.every((card) => {
+                const body = card.querySelector(':scope > .fs-card-body');
+                return body && body.getBoundingClientRect().bottom <= card.getBoundingClientRect().bottom + 1;
+            }),
+        };
+    });
+
+    expect(drawerContract).toEqual({ width: '450px', cardsFitContent: true });
+
+    const alertContract = await page.locator('#company-message').evaluate((alert) => {
+        alert.hidden = false;
+        const style = getComputedStyle(alert);
+        return {
+            display: style.display,
+            flexDirection: style.flexDirection,
+            margin: style.margin,
+            padding: style.padding,
+        };
+    });
+
+    expect(alertContract).toEqual({
+        display: 'flex',
+        flexDirection: 'column',
+        margin: '10px',
+        padding: '10px 20px',
+    });
+});
