@@ -502,6 +502,10 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: ca
     overflow-y: auto;
 }
 
+.create-drawer .backoffice-records-view-panel[hidden] {
+    display: none !important;
+}
+
 .create-drawer .backoffice-records-view-panel .fs-card {
     flex: 0 0 auto;
     width: 100%;
