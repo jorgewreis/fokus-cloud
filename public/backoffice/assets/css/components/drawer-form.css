@@ -220,7 +220,7 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: ca
     padding: 12px 15px !important;
 }
 
-.admin-modules-page #module-personalizations-open {
+#module-personalizations-open {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -231,8 +231,9 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: ca
     background-color: transparent;
 }
 
-.admin-modules-page #module-personalizations-open:hover,
-.admin-modules-page #module-personalizations-open:active {
+#module-personalizations-open:hover,
+#module-personalizations-open:focus-visible,
+#module-personalizations-open:active {
     color: var(--fs-color-on-primary);
     background-color: var(--fs-color-primary);
 }

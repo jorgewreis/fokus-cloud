@@ -49,6 +49,12 @@ window.FokusApprovedCatalogOptions = {
 </script>
 <script>
 (() => {
+    const page = document.querySelector('.admin-modules-page');
+    if (page && !page.dataset.offcanvasQueryFallback) {
+        const queryInPage = page.querySelector.bind(page);
+        page.querySelector = (selector) => queryInPage(selector) || document.querySelector(selector);
+        page.dataset.offcanvasQueryFallback = 'true';
+    }
     document.querySelectorAll('#module-segments, #module-dependencies, #module-incompatibilities').forEach((select) => {
         select.size = 1;
     });
