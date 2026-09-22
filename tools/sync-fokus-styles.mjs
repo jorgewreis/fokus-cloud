@@ -571,6 +571,7 @@ body { font-family: "Google Sans", sans-serif; }
     border-radius: var(--fs-radius-sm, 6px);
     color: var(--fs-color-text, #102a43);
     background: var(--fs-color-surface, #fff);
+    font-family: "Google Sans", sans-serif;
 }
 .fs-pagination-compact .fs-page-item.is-active .fs-page-link {
     border: 1px solid var(--fs-color-primary, #2563eb);
