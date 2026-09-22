@@ -264,6 +264,14 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: ca
     background-color: var(--fs-color-primary);
 }
 
+#module-personalizations-drawer #personalizations-list .fs-card.fs-u-mb-3 {
+    padding: 15px;
+}
+
+#module-personalizations-drawer #personalizations-list .fs-form-label {
+    margin-bottom: 10px;
+}
+
 .create-drawer .painel-form .form-line { margin-bottom: 10px; }
 .create-drawer .painel-form .fs-width-400 { width: 180px !important; }
 .create-drawer .painel-form .fs-width-600 { width: 300px !important; }

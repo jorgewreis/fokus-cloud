@@ -19,7 +19,7 @@
         <!-- IMPORT CSS -->
         <link
             rel="stylesheet"
-            href="/backoffice/assets/css/main.css?v=20260922-module-personalizations-v11"
+            href="/backoffice/assets/css/main.css?v=20260922-module-personalizations-v12"
         />
         <link
             rel="stylesheet"
@@ -27,7 +27,7 @@
         />
         <link
             rel="stylesheet"
-            href="/backoffice/assets/css/pages/admin-dashboard.css?v=20260922-sidebar-subnav-v4"
+            href="/backoffice/assets/css/pages/admin-dashboard.css?v=20260922-sidebar-subnav-v5"
         />
         <link
             rel="stylesheet"
@@ -255,7 +255,7 @@
                 "[data-sidebar-item]",
             );
             const pagePath = "./pages";
-            const pageVersion = "20260922-module-personalizations-v63";
+            const pageVersion = "20260922-module-personalizations-v64";
             const routePageMap = {
                 painel: "platform-dashboard-final",
                 empresas: "companies",
@@ -678,6 +678,9 @@
             };
 
             sidebarButtons.forEach((button) => {
+                if (button.classList.contains("sidebar-group-toggle")) {
+                    return;
+                }
                 button.addEventListener("click", (event) => {
                     event.stopPropagation();
                     loadSidebarPage(button.dataset.sidebarItem);
