@@ -178,6 +178,7 @@ class CatalogManager
                 'created_at' => now(),
                 'updated_at' => now(),
             ]));
+            $this->normalizeProductDisplayOrders();
         });
 
         return $id;
@@ -212,6 +213,7 @@ class CatalogManager
             }
 
             DB::table('products')->where('id', $productId)->update($payload);
+            $this->normalizeProductDisplayOrders();
         });
     }
 
@@ -740,6 +742,22 @@ class CatalogManager
     private function temporaryProductDisplayOrder(): int
     {
         return $this->nextProductDisplayOrder() + 1000;
+    }
+
+    private function normalizeProductDisplayOrders(): void
+    {
+        $products = DB::table('products')->orderBy('display_order')->orderBy('id')->get(['id']);
+        $temporaryBase = $this->nextProductDisplayOrder() + $products->count() + 1000;
+
+        $products->each(fn (object $product, int $index) => DB::table('products')->where('id', $product->id)->update([
+            'display_order' => $temporaryBase + $index,
+            'updated_at' => now(),
+        ]));
+
+        $products->each(fn (object $product, int $index) => DB::table('products')->where('id', $product->id)->update([
+            'display_order' => $index + 1,
+            'updated_at' => now(),
+        ]));
     }
 
     private function shiftProductOrdersFrom(int $displayOrder, ?string $exceptProductId = null): void

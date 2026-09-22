@@ -172,6 +172,28 @@ class CatalogAdminTest extends TestCase
         $this->assertSame($productCount + 1, DB::table('products')->where('code', 'academy')->value('display_order'));
     }
 
+    public function test_product_reordering_keeps_a_unique_continuous_sequence(): void
+    {
+        $admin = $this->admin();
+        $this->actingAs($admin, 'platform')->postJson('/api/backoffice/catalog/products', [
+            'code' => 'academy',
+            'name' => 'Fokus Cloud Academy',
+        ])->assertCreated();
+
+        $products = DB::table('products')->orderBy('display_order')->get(['id', 'code']);
+        $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/catalog/products/{$products->last()->id}", [
+            'display_order' => 1,
+        ])->assertOk();
+        $this->assertSame(range(1, $products->count()), DB::table('products')->orderBy('display_order')->pluck('display_order')->map(fn ($order) => (int) $order)->all());
+        $this->assertSame('academy', DB::table('products')->orderBy('display_order')->value('code'));
+
+        $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/catalog/products/{$products->last()->id}", [
+            'display_order' => $products->count(),
+        ])->assertOk();
+        $this->assertSame(range(1, $products->count()), DB::table('products')->orderBy('display_order')->pluck('display_order')->map(fn ($order) => (int) $order)->all());
+        $this->assertSame('academy', DB::table('products')->orderByDesc('display_order')->value('code'));
+    }
+
     public function test_superadmin_can_pause_public_items_but_commercial_admin_cannot(): void
     {
         $commercial = $this->admin('administrador_comercial');
