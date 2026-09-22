@@ -216,7 +216,7 @@ class FormDesignSystemTest extends TestCase
     public function test_company_and_subscription_pages_follow_live_backoffice_components(): void
     {
         $pages = [
-            'public/backoffice/pages/companies.html' => 'admin-company-page',
+            'public/backoffice/pages/companies.html' => 'backoffice-companies-page',
             'public/backoffice/pages/subscriptions.html' => 'subscription-page',
             'public/backoffice/pages/pagamentos.html' => 'pagamentos-page',
         ];
