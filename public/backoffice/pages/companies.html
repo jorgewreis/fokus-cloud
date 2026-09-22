@@ -1,7 +1,7 @@
-<link data-page-css="companies" rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260922-backoffice-contract-v1" />
-<link data-page-css="companies" rel="stylesheet" href="/backoffice/assets/css/pages/companies.css?v=20260922-backoffice-contract-v1" />
+<link data-page-css="companies" rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260922-backoffice-contract-v2" />
+<link data-page-css="companies" rel="stylesheet" href="/backoffice/assets/css/pages/companies.css?v=20260922-backoffice-contract-v2" />
 
-<main class="admin-company-page backoffice-records-page container-page fs-container-fluid fs-u-d-flex fs-u-flex-column" aria-labelledby="companies-page-title">
+<main class="backoffice-companies-page backoffice-records-page container-page fs-container-fluid" aria-labelledby="companies-page-title">
     <header class="fs-page-layout">
         <div class="fs-page-header-display">
             <span>Admin</span>
@@ -70,7 +70,7 @@
                         <option value="encerrada">Encerradas</option>
                     </select>
                 </label>
-                <button class="fs-btn fs-btn-outline-primary fs-width-300" type="submit">Filtrar</button>
+                <button class="fs-btn fs-btn-outline-primary fs-width-300 fs-form-action" type="submit">Filtrar</button>
         </form>
     </section>
 
@@ -84,7 +84,7 @@
         </div>
         <div class="fs-card-body fs-u-p-0">
             <div class="fs-table-responsive fs-datatable" data-fs="datatable" data-fs-page-size="1000">
-                <table class="fs-table fs-table-records fs-table-hover card-table" aria-label="Empresas cadastradas">
+                <table class="fs-table fs-table-records fs-table-hover" aria-label="Empresas cadastradas">
                     <thead>
                 <tr><th class="fs-width-600" scope="col">Empresa</th><th class="fs-width-400" scope="col">Documento</th><th class="fs-width-300" scope="col">Status</th><th class="fs-width-200" scope="col">Assinaturas</th><th class="fs-width-600" scope="col">Administrador</th><th class="fs-width-400" scope="col">Ações</th></tr>
                     </thead>
@@ -101,35 +101,41 @@
         </div>
     </section>
 
-    <aside class="fs-offcanvas fs-offcanvas-end create-drawer backoffice-records-drawer" id="company-drawer" aria-labelledby="company-drawer-title" tabindex="-1">
-        <div class="fs-offcanvas-header painel-header">
-            <div class="painel-header-title">
-                <span class="painel-header-section" id="company-drawer-kicker">EMPRESAS</span>
-                <h2 class="painel-header-text" id="company-drawer-title">NOVA EMPRESA</h2>
-                <span class="painel-header-description" id="company-drawer-description">Cadastre os dados da empresa e do administrador responsável.</span>
+    <aside class="fs-offcanvas fs-offcanvas-end backoffice-records-drawer" id="company-drawer" aria-labelledby="company-drawer-title" tabindex="-1">
+        <div class="fs-offcanvas-header">
+            <div class="fs-u-d-flex fs-u-flex-column fs-u-gap-1">
+                <span class="fs-u-fs-xs fs-u-color-secondary" id="company-drawer-kicker">EMPRESAS</span>
+                <h2 class="fs-offcanvas-title" id="company-drawer-title">Nova empresa</h2>
+                <p class="fs-u-m-0 fs-u-fs-sm fs-u-color-secondary" id="company-drawer-description">Cadastre os dados da empresa e do administrador responsável.</p>
             </div>
-            <div class="painel-header-button">
-                <button class="drawer-close" id="company-drawer-close" type="button" data-fs-dismiss="offcanvas" aria-label="Fechar painel">×</button>
-            </div>
+            <button class="fs-btn-close" id="company-drawer-close" type="button" data-fs-dismiss="offcanvas" aria-label="Fechar painel"></button>
         </div>
-        <form id="company-form" class="fs-offcanvas-body painel-form" novalidate>
+        <form id="company-form" class="fs-offcanvas-body fs-form" novalidate>
             <input type="hidden" id="company-version" name="version" />
-            <section class="form-section" aria-labelledby="company-legal-title">
-                <h3 class="section-title" id="company-legal-title">Dados da empresa</h3>
-                <span class="section-description">Identificação legal do cadastro.</span>
-                <label class="form-label form-line" for="company-document-type"><span class="label">Tipo de documento</span><select class="form-select fs-width-400" id="company-document-type" name="document_type"><option value="cnpj">CNPJ</option><option value="cpf">CPF</option></select></label>
-                <label class="form-label form-line" for="company-document-number"><span class="label">Documento</span><input class="input-label fs-width-400" id="company-document-number" name="document_number" inputmode="text" placeholder="00.000.000/0000-00" autocomplete="off" required /><small id="company-document-error" class="fs-invalid-feedback" role="alert" aria-live="polite"></small></label>
-                <label class="form-label form-line" for="company-legal-name"><span class="label" id="company-name-label">Razão social</span><input class="input-label" id="company-legal-name" name="legal_name" placeholder="Nome jurídico da empresa" required maxlength="255" /></label>
+            <section class="fs-card fs-card-panel" aria-labelledby="company-legal-title">
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="company-legal-title">Dados da empresa</h3><p class="fs-card-subtitle">Identificação legal do cadastro.</p></div></div>
+                <div class="fs-card-body">
+                    <div class="fs-form-row">
+                        <div class="fs-form-col"><label class="fs-form-label" for="company-document-type">Tipo de documento<select class="fs-form-select fs-width-400" id="company-document-type" name="document_type"><option value="cnpj">CNPJ</option><option value="cpf">CPF</option></select></label></div>
+                        <div class="fs-form-col"><label class="fs-form-label" for="company-document-number">Documento<input class="fs-form-control fs-width-400" id="company-document-number" name="document_number" inputmode="text" placeholder="00.000.000/0000-00" autocomplete="off" required /><small id="company-document-error" class="fs-invalid-feedback" role="alert" aria-live="polite"></small></label></div>
+                    </div>
+                    <label class="fs-form-label" for="company-legal-name"><span id="company-name-label">Razão social</span><input class="fs-form-control" id="company-legal-name" name="legal_name" placeholder="Nome jurídico da empresa" required maxlength="255" /></label>
+                </div>
             </section>
-            <section class="form-section form-line-duo" aria-labelledby="company-admin-title">
-                <h3 class="section-title" id="company-admin-title">Administrador responsável</h3>
-                <span class="section-description">Dados de acesso e contato principal.</span>
-                <label class="form-label form-line" for="company-admin-name"><span class="label">Nome completo</span><input class="input-label" id="company-admin-name" name="name" placeholder="Nome do administrador" required maxlength="255" /></label>
-                <label class="form-label form-line" for="company-admin-cpf"><span class="label">CPF</span><input class="input-label" id="company-admin-cpf" name="cpf" inputmode="numeric" placeholder="000.000.000-00" autocomplete="off" required /><small id="company-admin-cpf-error" class="fs-invalid-feedback" role="alert" aria-live="polite"></small></label>
-                <label class="form-label form-line" for="company-admin-email"><span class="label">E-mail profissional</span><input class="input-label fs-width-600" id="company-admin-email" name="email" type="email" placeholder="nome@empresa.com" required maxlength="255" /></label>
-                <label class="form-label form-line" id="company-password-field" for="company-admin-password"><span class="label">Senha inicial</span><input class="input-label fs-width-400" id="company-admin-password" name="password" type="password" minlength="12" placeholder="Mínimo de 12 caracteres" autocomplete="new-password" /><small class="form-text">Utilize mais de 12 caracteres</small></label>
+            <section class="fs-card fs-card-panel" aria-labelledby="company-admin-title">
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="company-admin-title">Administrador responsável</h3><p class="fs-card-subtitle">Dados de acesso e contato principal.</p></div></div>
+                <div class="fs-card-body">
+                    <div class="fs-form-row">
+                        <div class="fs-form-col"><label class="fs-form-label" for="company-admin-name">Nome completo<input class="fs-form-control" id="company-admin-name" name="name" placeholder="Nome do administrador" required maxlength="255" /></label></div>
+                        <div class="fs-form-col"><label class="fs-form-label" for="company-admin-cpf">CPF<input class="fs-form-control" id="company-admin-cpf" name="cpf" inputmode="numeric" placeholder="000.000.000-00" autocomplete="off" required /><small id="company-admin-cpf-error" class="fs-invalid-feedback" role="alert" aria-live="polite"></small></label></div>
+                    </div>
+                    <div class="fs-form-row">
+                        <div class="fs-form-col"><label class="fs-form-label" for="company-admin-email">E-mail profissional<input class="fs-form-control fs-width-600" id="company-admin-email" name="email" type="email" placeholder="nome@empresa.com" required maxlength="255" /></label></div>
+                        <div class="fs-form-col"><label class="fs-form-label" id="company-password-field" for="company-admin-password">Senha inicial<input class="fs-form-control fs-width-400" id="company-admin-password" name="password" type="password" minlength="12" placeholder="Mínimo de 12 caracteres" autocomplete="new-password" /><small class="fs-form-help">Utilize mais de 12 caracteres</small></label></div>
+                    </div>
+                </div>
             </section>
-            <div class="fs-offcanvas-footer drawer-actions"><button class="fs-btn fs-btn-outline-primary fs-width-300" id="company-form-cancel" type="button">Cancelar</button><button class="fs-btn fs-btn-primary fs-width-400" type="submit" id="company-form-submit">Cadastrar empresa</button></div>
+            <div class="fs-offcanvas-footer"><button class="fs-btn fs-btn-outline-primary fs-width-300" id="company-form-cancel" type="button">Cancelar</button><button class="fs-btn fs-btn-primary fs-width-400" type="submit" id="company-form-submit">Cadastrar empresa</button></div>
         </form>
         <section class="fs-offcanvas-body fs-u-d-flex fs-u-flex-column fs-u-gap-4 backoffice-records-view-panel" id="company-view-panel" aria-label="Dados da empresa" hidden>
             <div class="fs-card"><div class="fs-card-header"><h3 class="fs-card-title">Dados da empresa</h3></div><div class="fs-card-body"><dl><div><dt class="fs-form-label">Empresa</dt><dd id="company-view-name">-</dd></div><div><dt class="fs-form-label">Documento</dt><dd id="company-view-document">-</dd></div><div><dt class="fs-form-label">Status</dt><dd id="company-view-status">-</dd></div></dl></div></div>
@@ -187,10 +193,9 @@
     document.querySelector("#company-admin-cpf").addEventListener("input", (event) => { event.target.value = documents.formatCpf(event.target.value); });
     document.querySelector("#company-admin-cpf").addEventListener("blur", (event) => validateDocument(event.target, "cpf", "#company-admin-cpf-error"));
     pagination.addEventListener("click", (event) => { const button = event.target.closest("[data-company-page]"); if (!button) return; state.page = Number(button.dataset.companyPage); load(); });
-    list.addEventListener("click", async (event) => { const button = event.target.closest("[data-company-action]"); if (!button) return; const id = button.dataset.companyId; const type = button.dataset.companyAction; if (type === "details" || type === "edit") { const company = await loadCompany(id); if (company) openDrawer(company, type === "details" ? "view" : "edit"); return; } const labels = { deactivate: "desativar", activate: "reativar", remove: "remover" }; if (!window.confirm(`Deseja ${labels[type]} esta empresa?`)) return; try { const endpoint = type === "remove" ? `/backoffice/companies/${id}` : `/backoffice/companies/${id}/${type}`; await api.request(endpoint, { method: type === "remove" ? "DELETE" : "POST" }); showMessage(type === "remove" ? "Empresa removida da listagem." : type === "activate" ? "Empresa reativada." : "Empresa desativada.", "success"); await load(); } catch (error) { showMessage(error.message || "Não foi possível concluir a ação."); } });
+    list.addEventListener("click", async (event) => { const button = event.target.closest("[data-company-action]"); if (!button) return; const id = button.dataset.companyId; const type = button.dataset.companyAction; if (type === "details" || type === "edit") { const company = await loadCompany(id); if (company) { openDrawer(company, type === "details" ? "view" : "edit"); normalizeDrawer(); } return; } const labels = { deactivate: "desativar", activate: "reativar", remove: "remover" }; if (!window.confirm(`Deseja ${labels[type]} esta empresa?`)) return; try { const endpoint = type === "remove" ? `/backoffice/companies/${id}` : `/backoffice/companies/${id}/${type}`; await api.request(endpoint, { method: type === "remove" ? "DELETE" : "POST" }); showMessage(type === "remove" ? "Empresa removida da listagem." : type === "activate" ? "Empresa reativada." : "Empresa desativada.", "success"); await load(); } catch (error) { showMessage(error.message || "Não foi possível concluir a ação."); } });
     document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !drawer.hidden) closeDrawer(); });
     const normalizeDrawer = () => { if (drawer.hidden) return; const mode = drawer.dataset.mode; const typeField = document.querySelector("#company-document-type"); const documentField = document.querySelector("#company-document-number"); const submitButton = document.querySelector("#company-form-submit"); submitButton.textContent = mode === "edit" ? "Salvar alterações" : "Cadastrar empresa"; if (mode === "edit") { document.querySelector("#company-drawer-title").textContent = "Editar dados da empresa"; document.querySelector("#company-drawer-description").textContent = "Altere somente os dados cadastrais e do administrador permitidos."; typeField.disabled = true; documentField.disabled = true; documentField.value = formatDocument(documentField.value, typeField.value); } if (mode === "view") { const viewDocument = document.querySelector("#company-view-document"); const viewAdminCpf = document.querySelector("#company-view-admin-cpf"); const viewType = documents.compact(viewDocument.textContent).length === 11 ? "cpf" : typeField.value; viewDocument.textContent = formatDocument(viewDocument.textContent, viewType); viewAdminCpf.textContent = formatDocument(viewAdminCpf.textContent, "cpf"); } };
-    list.addEventListener("click", async (event) => { const button = event.target.closest("[data-company-action]"); if (!button || !["details", "edit"].includes(button.dataset.companyAction)) return; event.stopPropagation(); const company = await loadCompany(button.dataset.companyId); if (company) { openDrawer(company, button.dataset.companyAction === "details" ? "view" : "edit"); normalizeDrawer(); } }, true);
     load();
 })();
 </script>
@@ -203,7 +208,7 @@
         const value = `${match[1]} registros encontrados`;
         if (summary.textContent !== value) summary.textContent = value;
     };
-    new MutationObserver(normalize).observe(document.querySelector('.admin-company-page'), { childList: true, subtree: true, characterData: true });
+    new MutationObserver(normalize).observe(document.querySelector('.backoffice-companies-page'), { childList: true, subtree: true, characterData: true });
     normalize();
 })();
 </script>

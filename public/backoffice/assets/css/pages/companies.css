@@ -1,45 +1,45 @@
 /* Empresas only composes the shared Backoffice record contract. */
-.admin-company-page {
+.backoffice-companies-page {
     box-sizing: border-box;
     width: min(100% - 40px, 1480px);
     margin: 0 auto;
     padding: var(--fs-space-4, 24px) 0 var(--fs-space-6, 60px);
 }
 
-.admin-company-page > .fs-page-layout {
+.backoffice-companies-page > .fs-page-layout {
     width: 100%;
     padding: 0 var(--fs-space-4, 24px) var(--fs-space-3, 16px);
 }
 
-.admin-company-page > section.fs-card-panel {
+.backoffice-companies-page > section.fs-card-panel {
     width: calc(100% - var(--fs-space-3, 16px));
     margin-inline: auto;
 }
 
-.admin-company-page > .fs-row {
+.backoffice-companies-page > .fs-row {
     display: flex;
     flex-wrap: wrap;
     gap: var(--fs-space-3, 16px);
     margin-bottom: var(--fs-space-4, 24px);
 }
 
-.admin-company-page > .fs-row > .fs-card {
+.backoffice-companies-page > .fs-row > .fs-card {
     flex: 1 1 calc(25% - var(--fs-space-3, 16px));
     min-width: 0;
     min-height: 132px;
 }
 
-.admin-company-page > .fs-row .fs-card-body {
+.backoffice-companies-page > .fs-row .fs-card-body {
     justify-content: space-between;
     min-height: 132px;
 }
 
 @media (max-width: 1100px) {
-    .admin-company-page > .fs-row > .fs-card { flex-basis: calc(50% - var(--fs-space-2, 8px)); }
+    .backoffice-companies-page > .fs-row > .fs-card { flex-basis: calc(50% - var(--fs-space-2, 8px)); }
 }
 
 @media (max-width: 680px) {
-    .admin-company-page { width: 100%; padding: var(--fs-space-4, 24px) var(--fs-space-3, 16px) var(--fs-space-5, 32px); }
-    .admin-company-page > .fs-page-layout { padding-inline: 0; }
-    .admin-company-page > .fs-row > .fs-card { flex-basis: 100%; }
+    .backoffice-companies-page { width: 100%; padding: var(--fs-space-4, 24px) var(--fs-space-3, 16px) var(--fs-space-5, 32px); }
+    .backoffice-companies-page > .fs-page-layout { padding-inline: 0; }
+    .backoffice-companies-page > .fs-row > .fs-card { flex-basis: 100%; }
 }
