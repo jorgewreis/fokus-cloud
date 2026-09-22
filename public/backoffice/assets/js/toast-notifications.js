@@ -40,7 +40,7 @@
     };
 
     const bridge = (node) => {
-        if (!(node instanceof HTMLElement) || !node.matches(".fs-alert[role='status']")) return;
+        if (!(node instanceof HTMLElement) || !node.matches(".fs-alert[role='status'][id$='-message']")) return;
         const message = node.textContent.trim();
         if (!message) {
             delete node.dataset.fokusToastFingerprint;
@@ -54,7 +54,7 @@
         node.hidden = true;
     };
 
-    const bridgeAll = () => document.querySelectorAll(".fs-alert[role='status']").forEach(bridge);
+    const bridgeAll = () => document.querySelectorAll(".fs-alert[role='status'][id$='-message']").forEach(bridge);
     window.FokusToast = { show };
 
     document.addEventListener("DOMContentLoaded", () => {
