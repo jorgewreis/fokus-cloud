@@ -1,5 +1,5 @@
 /* LOAD BASE FOUNDATION */
-@import url("base/base.css?v=20260916-fokus-styles-migration-v3");
+@import url("base/base.css?v=20260922-backoffice-layer-reset-v1");
 
 /* LOAD THEME TOKENS */
 @import url("themes/themes.css?v=20260916-fokus-styles-migration-v3");

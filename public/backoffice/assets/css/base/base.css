@@ -2,7 +2,7 @@
 @import url("../../../../assets/css/shared/main.css?v=20260917-page-header-v13");
 
 /* NORMALIZE BROWSER DEFAULTS */
-@import url("reset.css?v=20260917-fokus-styles-companies-v1");
+@import url("reset.css?v=20260922-backoffice-layer-reset-v1");
 
 /* DEFINE COLOR TOKENS */
 @import url("colors.css?v=20260916-fokus-styles-migration-v3");

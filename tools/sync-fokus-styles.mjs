@@ -85,6 +85,17 @@ html[data-role="admin"] textarea {
     box-sizing: border-box;
     min-height: 38px;
 }
+.backoffice-records-page .fs-btn-outline-secondary {
+    color: var(--fs-alert-secondary-text, #334155);
+    border: var(--fs-border-width, 1px) solid var(--fs-color-secondary, #64748b);
+    background-color: transparent;
+}
+.backoffice-records-page .fs-btn-outline-secondary:hover,
+.backoffice-records-page .fs-btn-outline-secondary:active {
+    color: var(--fs-color-on-secondary, #ffffff);
+    border-color: var(--fs-color-secondary, #64748b);
+    background-color: var(--fs-color-secondary, #64748b);
+}
 .backoffice-records-page .fs-filter-form .fs-input-group-subtle {
     width: auto;
 }

@@ -2,6 +2,7 @@
 /* Reset CSS - Base styles to normalize browser differences
 	 Inspired by modern resets (Meyer, Normalize) with sensible defaults */
 
+@layer reset {
 /* Box sizing and root defaults */
 :root {
 	-webkit-font-smoothing: antialiased;
@@ -84,3 +85,4 @@ table {
 }
 
 /* End of reset */
+}

@@ -51,6 +51,7 @@ test('drawer de empresas preserva largura, cards e alertas do contrato visual', 
         const controls = [...drawer.querySelectorAll('#company-form input:not([type="hidden"]), #company-form select')];
         return {
             width: getComputedStyle(drawer).width,
+            bodyPadding: getComputedStyle(drawer.querySelector(':scope > .fs-offcanvas-body')).padding,
             cardsFitContent: cards.every((card) => {
                 const body = card.querySelector(':scope > .fs-card-body');
                 return body && body.getBoundingClientRect().bottom <= card.getBoundingClientRect().bottom + 1;
@@ -74,6 +75,7 @@ test('drawer de empresas preserva largura, cards e alertas do contrato visual', 
 
     expect(drawerContract).toEqual({
         width: '450px',
+        bodyPadding: '20px',
         cardsFitContent: true,
         cardBodySpacing: true,
         rowSpacing: true,
@@ -102,6 +104,42 @@ test('drawer de empresas preserva largura, cards e alertas do contrato visual', 
         margin: '10px',
         padding: '10px 20px',
     });
+});
+
+test('controles compartilhados preservam a cascata do Fokus Styles', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/backoffice/produtos');
+    await expect(page.locator('#product-pagination .fs-page-item.is-active .fs-page-link')).toHaveCount(1);
+
+    const beforeHover = await page.evaluate(() => {
+        const filter = document.querySelector('#product-filter-form .fs-btn-outline-secondary');
+        const activePage = document.querySelector('#product-pagination .fs-page-item.is-active .fs-page-link');
+        const input = document.querySelector('#product-search');
+        const select = document.querySelector('#product-status-filter');
+        return {
+            filterBorder: getComputedStyle(filter).border,
+            activeBorder: getComputedStyle(activePage).border,
+            activeBackground: getComputedStyle(activePage).backgroundColor,
+            inputPadding: getComputedStyle(input).padding,
+            selectPadding: getComputedStyle(select).padding,
+        };
+    });
+    expect(beforeHover.filterBorder).toMatch(/^1px solid (rgb|oklch)/);
+    expect(beforeHover.activeBorder).toMatch(/^1px solid (rgb|oklch)/);
+    expect(beforeHover.activeBackground).toMatch(/^(rgb|oklch)/);
+    expect(beforeHover.inputPadding).toBe('0px 12px');
+    expect(beforeHover.selectPadding).toBe('0px 12px');
+
+    await page.locator('#product-filter-form .fs-btn-outline-secondary').hover();
+    await page.waitForTimeout(200);
+    const hoverContract = await page.locator('#product-filter-form .fs-btn-outline-secondary').evaluate((button) => ({
+        hovered: button.matches(':hover'),
+        background: getComputedStyle(button).backgroundColor,
+        color: getComputedStyle(button).color,
+    }));
+    expect(hoverContract.hovered).toBe(true);
+    expect(hoverContract.color).toBe('rgb(255, 255, 255)');
+    expect(hoverContract.background).toMatch(/^(rgb|oklch)/);
 });
 
 test('produtos replica o contrato visual e mantém create, edit e view independentes', async ({ page }) => {

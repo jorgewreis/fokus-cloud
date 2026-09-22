@@ -53,7 +53,7 @@ class FormDesignSystemTest extends TestCase
 
         $this->assertMatchesRegularExpression('/const pageVersion = "20\\d{6}-[a-z0-9-]+";/', $panel);
         $this->assertStringContainsString('(() => {', $panel);
-        $this->assertStringContainsString('20260922-backoffice-contract-v13', file_get_contents(base_path('public/backoffice/pages/modules.html')));
+        $this->assertStringContainsString('20260922-backoffice-contract-v14', file_get_contents(base_path('public/backoffice/pages/modules.html')));
         $this->assertStringContainsString('module: "/backoffice/assets/js/modules-page.js"', file_get_contents(base_path('public/backoffice/assets/js/backoffice-router.js')));
         $this->assertStringContainsString("document.addEventListener('fs:show'", file_get_contents(base_path('public/backoffice/assets/js/records-page.js')));
         $this->assertStringContainsString('BackofficeRouter.create', $panel);
@@ -194,6 +194,14 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringContainsString('flex: 0 0 24px;', $sharedStyles);
         $this->assertStringContainsString('width: 20px;', $sharedStyles);
         $this->assertStringContainsString('height: 20px;', $sharedStyles);
+    }
+
+    public function test_backoffice_reset_stays_in_the_lowest_cascade_layer(): void
+    {
+        $reset = file_get_contents(base_path('public/backoffice/assets/css/base/reset.css'));
+
+        $this->assertStringContainsString('@layer reset {', $reset);
+        $this->assertStringContainsString('*, *::before, *::after', $reset);
     }
 
     public function test_catalog_uses_masked_currency_controls_and_compact_plan_checkboxes(): void
