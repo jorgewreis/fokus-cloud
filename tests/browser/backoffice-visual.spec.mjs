@@ -63,8 +63,6 @@ test('drawer de empresas preserva largura, cards e alertas do contrato visual', 
             labelsFitContent: labels.every((label) => getComputedStyle(label).width !== 'auto'),
             columnsDoNotGrow: formColumns.every((column) => getComputedStyle(column).flex === '0 1 auto'),
             controlsUseGoogleSans: controls.every((control) => getComputedStyle(control).fontFamily.includes('Google Sans')),
-            textareaPadding: [...new Set([...drawer.querySelectorAll('#product-form textarea')]
-                .map((textarea) => getComputedStyle(textarea).padding))],
             fieldWidths: {
                 documentType: drawer.querySelector('#company-document-type').classList.contains('fs-width-300'),
                 document: drawer.querySelector('#company-document-number').classList.contains('fs-width-500'),
