@@ -1067,6 +1067,7 @@ html[data-role="admin"] .sidebar-group-toggle[aria-expanded="false"] .sidebar-gr
 html[data-role="admin"] .sidebar-subnav {
     display: flex;
     flex-direction: column;
+    width: 85%;
     gap: 3px;
     margin-left: 41px;
     padding-left: 8px;
@@ -3687,9 +3688,9 @@ html[data-role="admin"] .fs-sidebar > .sidebar-nav::-webkit-scrollbar-thumb {
    sublink buttons only. */
 html[data-role="admin"] .fs-sidebar .sidebar-subnav-button {
     box-sizing: border-box;
-    width: calc(100% - 70px) !important;
-    height: 36px !important;
-    min-height: 36px !important;
+    width: calc(100% - 25px) !important;
+    height: 30px !important;
+    min-height: 30px !important;
     padding: 0 15px !important;
     overflow: hidden;
 }
