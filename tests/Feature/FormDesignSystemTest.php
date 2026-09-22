@@ -193,7 +193,7 @@ class FormDesignSystemTest extends TestCase
     {
         $catalog = file_get_contents(base_path('public/backoffice/pages/subscription-plans.html'));
 
-        foreach (['product-pagination', 'module-pagination', 'plan-pagination', 'publication-pagination', 'data-catalog-page', 'pageSize = 20'] as $fragment) {
+        foreach (['product-pagination', 'module-pagination', 'plan-pagination', 'publication-pagination', 'data-catalog-page', 'pageSize = 15'] as $fragment) {
             $this->assertStringContainsString($fragment, $catalog, $fragment);
         }
     }

@@ -20,7 +20,7 @@ createServer(async (request, response) => {
     if (url.pathname === '/api/csrf-token') return json(response, { token: 'visual-test-token' });
     if (url.pathname === '/api/backoffice/auth/me') return json(response, { admin });
     if (url.pathname === '/api/backoffice/dashboard') return json(response, { user: admin, alerts: [] });
-    if (url.pathname === '/api/backoffice/companies') return json(response, { data: [], meta: { total: 0, current_page: 1, per_page: 25, last_page: 1 }, summary: {} });
+    if (url.pathname === '/api/backoffice/companies') return json(response, { data: [], meta: { total: 0, current_page: 1, per_page: 15, last_page: 1 }, summary: {} });
     if (url.pathname === '/api/backoffice/catalog/products') return json(response, { products });
     if (url.pathname === '/api/backoffice/catalog') return json(response, { products: [{ ...products[0], modules }], options: { module_codes: [{ code: 'processos', label: 'Processos' }], personalization_types: [{ code: 'usuarios', label: 'Usuários' }] } });
     if (url.pathname.startsWith('/api/backoffice/')) return json(response, {});
