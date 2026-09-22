@@ -63,6 +63,12 @@ test('drawer de empresas preserva largura, cards e alertas do contrato visual', 
             labelsFitContent: labels.every((label) => getComputedStyle(label).width !== 'auto'),
             columnsDoNotGrow: formColumns.every((column) => getComputedStyle(column).flex === '0 1 auto'),
             controlsUseGoogleSans: controls.every((control) => getComputedStyle(control).fontFamily.includes('Google Sans')),
+            fieldWidths: {
+                documentType: drawer.querySelector('#company-document-type').classList.contains('fs-width-300'),
+                document: drawer.querySelector('#company-document-number').classList.contains('fs-width-500'),
+                legalName: drawer.querySelector('#company-legal-name').classList.contains('fs-width-600'),
+                adminName: drawer.querySelector('#company-admin-name').classList.contains('fs-width-600'),
+            },
         };
     });
 
@@ -76,6 +82,7 @@ test('drawer de empresas preserva largura, cards e alertas do contrato visual', 
         labelsFitContent: true,
         columnsDoNotGrow: true,
         controlsUseGoogleSans: true,
+        fieldWidths: { documentType: true, document: true, legalName: true, adminName: true },
     });
 
     const alertContract = await page.locator('#company-message').evaluate((alert) => {
@@ -117,6 +124,11 @@ test('produtos replica o contrato visual e mantém create, edit e view independe
             cardBodySpacing: [...drawer.querySelectorAll('#product-form .fs-card-panel > .fs-card-body')]
                 .every((body) => body.matches('.fs-u-mx-2.fs-u-mt-2.fs-u-mb-3')),
             controlsUseGoogleSans: controls.every((control) => getComputedStyle(control).fontFamily.includes('Google Sans')),
+            fieldWidths: {
+                code: drawer.querySelector('#product-code').classList.contains('fs-width-600'),
+                technicalDescription: drawer.querySelector('#product-technical-description').classList.contains('fs-width-600'),
+                commercialDescription: drawer.querySelector('#product-commercial-content').classList.contains('fs-width-600'),
+            },
         };
     });
     expect(createContract).toEqual({
@@ -126,6 +138,7 @@ test('produtos replica o contrato visual e mantém create, edit e view independe
         labelsHaveSpacing: true,
         cardBodySpacing: true,
         controlsUseGoogleSans: true,
+        fieldWidths: { code: true, technicalDescription: true, commercialDescription: true },
     });
 
     await page.locator('#product-drawer-close').click();
