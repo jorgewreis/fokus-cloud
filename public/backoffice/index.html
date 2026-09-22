@@ -492,7 +492,7 @@
             });
             mobileSidebarToggle.addEventListener("click", (event) => {
                 event.preventDefault();
-                event.stopPropagation();
+                event.stopImmediatePropagation();
 
                 if (isSidebarResponsive() && window.innerWidth <= 700) {
                     if (sidebar.classList.contains("expanded")) {
