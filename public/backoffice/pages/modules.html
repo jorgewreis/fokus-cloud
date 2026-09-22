@@ -58,6 +58,11 @@ window.FokusApprovedCatalogOptions = {
     document.querySelectorAll('#module-personalizations-drawer').forEach((drawer) => {
         if (!page?.contains(drawer)) drawer.remove();
     });
+    const moduleDrawer = document.querySelector('#module-drawer');
+    const personalizationDrawer = document.querySelector('#module-personalizations-drawer');
+    if (moduleDrawer && personalizationDrawer && !moduleDrawer.contains(personalizationDrawer)) {
+        moduleDrawer.appendChild(personalizationDrawer);
+    }
     document.querySelectorAll('#module-segments, #module-dependencies, #module-incompatibilities').forEach((select) => {
         select.size = 1;
     });
