@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="pt-BR">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Ativar acesso | Fokus Cloud</title><link rel="stylesheet" href="/backoffice/assets/css/main.css?v=20260916-fokus-styles-migration-v1"><link rel="stylesheet" href="/backoffice/assets/css/components/form-admin.css?v=20260916-fokus-styles-auth-shell"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Ativar acesso | Fokus Cloud</title><link rel="stylesheet" href="/backoffice/assets/css/main.css?v=20260922-backoffice-toast-v1"><link rel="stylesheet" href="/backoffice/assets/css/components/form-admin.css?v=20260916-fokus-styles-auth-shell"></head>
 <body class="auth-shell" data-theme="light" data-role="admin">
   <main class="auth-panel">
     <header class="fs-stack stack-sm"><h1 class="text-heading-2">Ativar acesso interno</h1><p class="text-body fs-u-color-secondary">Defina uma senha segura para concluir seu convite.</p></header>
@@ -12,12 +12,13 @@
     <div class="fs-alert" id="message" role="alert" aria-live="polite" aria-atomic="true"></div>
   </main>
   <script src="/assets/js/api-client.js"></script>
-  <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script><script src="/backoffice/assets/js/form-system.js?v=20260916-fokus-styles-migration-v1"></script>
+  <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script><script src="/backoffice/assets/js/toast-notifications.js?v=20260922-backoffice-toast-v1"></script><script src="/backoffice/assets/js/form-system.js?v=20260916-fokus-styles-migration-v1"></script>
   <script>
     const form = document.querySelector("#activation");
     const message = document.querySelector("#message");
     const token = new URLSearchParams(location.search).get("token");
-    form.addEventListener("submit", async (event) => { event.preventDefault(); if (!FokusForm.validate(form)) return; FokusForm.setLoading(form, true); try { const data = await FokusApi.request("/backoffice/auth/activate-invitation", { method: "POST", body: { ...Object.fromEntries(new FormData(form)), token } }); message.dataset.tone = "success"; message.textContent = data.message; setTimeout(() => location.replace("/?acesso=administrativo"), 1200); } catch (error) { message.dataset.tone = "danger"; message.textContent = error.message || "Nao foi possivel ativar a conta."; } finally { FokusForm.setLoading(form, false); } });
+    const notify = (text, tone) => { window.FokusToast?.show(text, tone); message.hidden = true; };
+    form.addEventListener("submit", async (event) => { event.preventDefault(); if (!FokusForm.validate(form)) return; FokusForm.setLoading(form, true); try { const data = await FokusApi.request("/backoffice/auth/activate-invitation", { method: "POST", body: { ...Object.fromEntries(new FormData(form)), token } }); notify(data.message, "success"); setTimeout(() => location.replace("/?acesso=administrativo"), 1200); } catch (error) { notify(error.message || "Nao foi possivel ativar a conta.", "danger"); } finally { FokusForm.setLoading(form, false); } });
   </script>
 </body>
 </html>
