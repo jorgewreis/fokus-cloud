@@ -46,16 +46,37 @@ test('drawer de empresas preserva largura, cards e alertas do contrato visual', 
 
     const drawerContract = await page.locator('#company-drawer').evaluate((drawer) => {
         const cards = [...drawer.querySelectorAll('#company-form > .fs-card-panel')];
+        const labels = [...drawer.querySelectorAll('#company-form label.fs-form-label')];
+        const formColumns = [...drawer.querySelectorAll('#company-form .fs-form-col')];
+        const controls = [...drawer.querySelectorAll('#company-form input:not([type="hidden"]), #company-form select')];
         return {
             width: getComputedStyle(drawer).width,
             cardsFitContent: cards.every((card) => {
                 const body = card.querySelector(':scope > .fs-card-body');
                 return body && body.getBoundingClientRect().bottom <= card.getBoundingClientRect().bottom + 1;
             }),
+            cardBodySpacing: cards.every((card) => card.querySelector(':scope > .fs-card-body.fs-u-mx-2.fs-u-mt-2.fs-u-mb-3')),
+            rowSpacing: [...drawer.querySelectorAll('#company-form .fs-card-body > .fs-form-row')]
+                .every((row) => row.classList.contains('fs-u-mb-2')),
+            labelsHaveSpans: labels.every((label) => label.firstElementChild?.matches('span.fs-u-ml-2')),
+            labelsHaveSpacing: labels.every((label) => label.classList.contains('fs-u-mt-3')),
+            labelsFitContent: labels.every((label) => getComputedStyle(label).width !== 'auto'),
+            columnsDoNotGrow: formColumns.every((column) => getComputedStyle(column).flex === '0 1 auto'),
+            controlsUseGoogleSans: controls.every((control) => getComputedStyle(control).fontFamily.includes('Google Sans')),
         };
     });
 
-    expect(drawerContract).toEqual({ width: '450px', cardsFitContent: true });
+    expect(drawerContract).toEqual({
+        width: '450px',
+        cardsFitContent: true,
+        cardBodySpacing: true,
+        rowSpacing: true,
+        labelsHaveSpans: true,
+        labelsHaveSpacing: true,
+        labelsFitContent: true,
+        columnsDoNotGrow: true,
+        controlsUseGoogleSans: true,
+    });
 
     const alertContract = await page.locator('#company-message').evaluate((alert) => {
         alert.hidden = false;

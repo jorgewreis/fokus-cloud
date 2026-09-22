@@ -72,6 +72,10 @@ html[data-role="admin"] {
 .backoffice-records-page textarea.fs-form-control {
     font-family: var(--fs-font-family, "Google Sans", sans-serif);
 }
+html[data-role="admin"] input,
+html[data-role="admin"] select {
+    font-family: var(--fs-font-family, "Google Sans", sans-serif);
+}
 .backoffice-records-page .fs-form-control,
 .backoffice-records-page .fs-form-select {
     box-sizing: border-box;
@@ -129,11 +133,14 @@ body > .backoffice-records-drawer.fs-offcanvas-end {
     min-width: 0;
     overflow: visible;
 }
+.backoffice-records-drawer .fs-form-col {
+    flex: initial;
+}
 .backoffice-records-drawer .fs-form-label {
     display: flex;
     flex-direction: column;
     gap: var(--fs-space-1, 4px);
-    width: 100%;
+    width: fit-content;
 }
 .backoffice-records-drawer .fs-offcanvas-footer {
     display: flex;
