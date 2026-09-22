@@ -102,13 +102,27 @@ window.FokusApprovedCatalogOptions = {
         const value = family.value;
         setTimeout(() => { family.value = value; root.querySelector('#module-code-custom-wrap').hidden = value !== 'outro'; }, 0);
     }, true);
-    segments?.addEventListener('change', () => {
-        const values = [...segments.selectedOptions].map((option) => option.value);
-        const contextValue = context.value;
-        setTimeout(() => {
-            [...segments.options].forEach((option) => { option.selected = values.includes(option.value); });
-            context.value = contextValue;
-        }, 0);
+    segments?.addEventListener('change', (event) => {
+        // The general form refresh rebuilds all selectors with empty values.
+        // Handle this dependency here so the family already selected is preserved.
+        event.stopImmediatePropagation();
+
+        const contextsBySegment = {
+            advocacia: [{ code: 'escritorio', label: 'Escritório' }],
+            setor_publico: [
+                { code: 'judiciario', label: 'Judiciário' },
+                { code: 'orgao_publico', label: 'Órgão público' },
+            ],
+            one: [{ code: 'corretor_independente', label: 'Corretor independente' }],
+            team: [{ code: 'imobiliaria_equipe', label: 'Imobiliária/equipe' }],
+        };
+        const previousValue = context.value;
+        const items = [...segments.selectedOptions]
+            .flatMap((option) => contextsBySegment[option.value] || []);
+
+        context.innerHTML = '<option value="">Selecione um contexto</option>'
+            + items.map((item) => `<option value="${item.code}">${item.label}</option>`).join('');
+        context.value = items.some((item) => item.code === previousValue) ? previousValue : '';
     }, true);
     capabilities?.addEventListener('change', () => {
         const values = [...capabilities.selectedOptions].map((option) => option.value);
