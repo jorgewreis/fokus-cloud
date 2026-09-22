@@ -1,0 +1,22 @@
+/* Planos usa a mesma composição de registros de Empresas, Produtos e Módulos. */
+.backoffice-plans-page { box-sizing: border-box; width: min(100% - 40px, 1480px); margin: 0 auto; padding: var(--fs-space-4, 24px) 0 var(--fs-space-6, 60px); }
+.backoffice-plans-page > .fs-page-layout { width: 100%; padding: 0 var(--fs-space-4, 24px) var(--fs-space-3, 16px); }
+.backoffice-plans-page > section.fs-card-panel { width: calc(100% - var(--fs-space-3, 16px)); margin-inline: auto; }
+.backoffice-plans-page .fs-table-records { min-width: 1560px; }
+.backoffice-plans-page .fs-form-output { display: block; min-height: 40px; padding: 10px 15px; color: var(--fs-color-text, #1f2937); font-family: var(--fs-font-family-sans, 'Google Sans', sans-serif); font-weight: 600; }
+.backoffice-plans-page .fs-check { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--fs-color-border, #e5e7eb); }
+.backoffice-plans-page .fs-check:last-child { border-bottom: 0; }
+.backoffice-plans-page .plan-module-meta { display: flex; flex-direction: column; gap: 3px; }
+.backoffice-plans-page .plan-module-meta small { color: var(--fs-color-text-secondary, #6b7280); }
+.backoffice-plans-page .plan-personalization-row { display: grid; grid-template-columns: minmax(0, 1fr) 180px; gap: 12px; align-items: end; padding: 12px 0; border-bottom: 1px solid var(--fs-color-border, #e5e7eb); }
+.backoffice-plans-page .plan-personalization-row:last-child { border-bottom: 0; }
+.backoffice-plans-page .fs-detail-list { display: grid; gap: 12px; margin: 0; }
+.backoffice-plans-page .fs-detail-list > div { display: grid; grid-template-columns: minmax(130px, 0.45fr) minmax(0, 1fr); gap: 12px; }
+.backoffice-plans-page .fs-detail-list dt { color: var(--fs-color-text-secondary, #6b7280); font-weight: 600; }
+.backoffice-plans-page .fs-detail-list dd { margin: 0; }
+@media (max-width: 680px) {
+    .backoffice-plans-page { width: 100%; padding: var(--fs-space-4, 24px) var(--fs-space-3, 16px) var(--fs-space-5, 32px); }
+    .backoffice-plans-page > .fs-page-layout { padding-inline: 0; }
+    .backoffice-plans-page > section.fs-card-panel { width: 100%; }
+    .backoffice-plans-page .plan-personalization-row { grid-template-columns: 1fr; }
+}

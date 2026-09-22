@@ -89,6 +89,8 @@ class CatalogManager
                 'plan.featured',
                 'product.name',
                 'product.code',
+                'product.status',
+                'product.published_catalog_version',
             )
             ->select(
                 'plan.id',
@@ -105,6 +107,8 @@ class CatalogManager
                 'plan.featured',
                 'product.name as product_name',
                 'product.code as product_code',
+                'product.status as product_status',
+                'product.published_catalog_version as product_publication_version',
                 DB::raw('round(coalesce(sum(module.monthly_price), 0), 2) as module_monthly_amount'),
                 DB::raw('count(module.id) as modules_count'),
             )
@@ -130,15 +134,24 @@ class CatalogManager
             ])
             ->groupBy('plan_id');
 
-        return $plans->map(function (object $plan) use ($planModules): array {
+        $subscriptionRows = DB::table('subscriptions')->get(['company_id', 'status', 'commercial_snapshot']);
+        $voucherCounts = DB::table('vouchers')->select('plan_id', DB::raw('count(*) as aggregate'))->whereNotNull('plan_id')->groupBy('plan_id')->pluck('aggregate', 'plan_id');
+
+        return $plans->map(function (object $plan) use ($planModules, $subscriptionRows, $voucherCounts): array {
             $monthlyAmount = $this->planMonthlyAmount($plan);
             $lineName = $this->lineName($plan->product_name, $plan->segment);
             $personalizationDefaults = $this->planPersonalizationDefaults($plan->id);
+            $linkedSubscriptions = $subscriptionRows->filter(function (object $subscription) use ($plan): bool {
+                $snapshot = json_decode((string) $subscription->commercial_snapshot, true) ?: [];
+                return (string) ($snapshot['plan_id'] ?? '') === (string) $plan->id;
+            });
 
             return [
                 'id' => $plan->id,
                 'product_id' => $plan->product_id,
                 'product_code' => $plan->product_code,
+                'product_status' => $plan->product_status,
+                'product_publication_version' => (int) ($plan->product_publication_version ?? 0),
                 'code' => $plan->code,
                 'name' => $plan->name,
                 'base_name' => $plan->name,
@@ -154,6 +167,11 @@ class CatalogManager
                 'monthly_amount' => $monthlyAmount,
                 'annual_amount' => CatalogPricing::annualFromMonthly($monthlyAmount),
                 'modules_count' => (int) $plan->modules_count,
+                'subscription_count' => $linkedSubscriptions->count(),
+                'active_subscription_count' => $linkedSubscriptions->whereIn('status', ['ativa', 'aguardando_pagamento', 'inadimplente', 'suspensa', 'cancelamento_agendado'])->count(),
+                'closed_subscription_count' => $linkedSubscriptions->where('status', 'encerrada')->count(),
+                'company_count' => $linkedSubscriptions->pluck('company_id')->unique()->count(),
+                'voucher_count' => (int) ($voucherCounts[$plan->id] ?? 0),
                 'modules' => ($planModules[$plan->id] ?? collect())->map(fn (object $module): array => [
                     ...$this->modulePayload($module),
                     'monthly_amount' => (float) $module->monthly_price,

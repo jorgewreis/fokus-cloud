@@ -81,12 +81,13 @@ class FormDesignSystemTest extends TestCase
     public function test_catalog_and_voucher_actions_use_accessible_dialogs_and_shared_icons(): void
     {
         $catalog = file_get_contents(base_path('public/backoffice/pages/subscription-plans.html'));
+        $catalogScript = file_get_contents(base_path('public/backoffice/assets/js/subscription-plans-page.js'));
         $vouchers = file_get_contents(base_path('public/backoffice/pages/vouchers.html'));
 
-        $this->assertStringContainsString('id="catalog-destructive-dialog"', $catalog);
+        $this->assertStringContainsString('id="plan-destructive-dialog"', $catalog);
         $this->assertStringContainsString('id="voucher-destructive-dialog"', $vouchers);
-        $this->assertStringContainsString('Shopping-Basket-Edit--Streamline-Ultimate.png', $catalog);
-        $this->assertStringContainsString('Shopping-Basket-Subtract--Streamline-Ultimate.png', $catalog);
+        $this->assertStringContainsString('Common-File-Edit--Streamline-Ultimate.png', $catalogScript);
+        $this->assertStringContainsString('Common-File-Remove--Streamline-Ultimate.png', $catalogScript);
         foreach (['Tags-Add--Streamline-Ultimate.png', 'Ticket-Exchange--Streamline-Ultimate.png', 'Tags-Minus--Streamline-Ultimate.png', 'Tags-Remove--Streamline-Ultimate.png'] as $icon) {
             $this->assertStringContainsString($icon, $vouchers, $icon);
         }
@@ -207,22 +208,46 @@ class FormDesignSystemTest extends TestCase
     public function test_catalog_uses_masked_currency_controls_and_compact_plan_checkboxes(): void
     {
         $catalog = file_get_contents(base_path('public/backoffice/pages/subscription-plans.html'));
+        $catalogScript = file_get_contents(base_path('public/backoffice/assets/js/subscription-plans-page.js'));
         $css = file_get_contents(base_path('public/backoffice/assets/css/components/form-admin.css'));
         $pageCss = file_get_contents(base_path('public/backoffice/assets/css/pages/mockup.css'));
 
-        $this->assertSame(2, substr_count($catalog, 'data-currency-input'));
-        $this->assertStringContainsString('plan-module-checkbox', $catalog);
+        $this->assertSame(1, substr_count($catalog, 'data-currency-input'));
+        $this->assertStringContainsString('data-currency-input', $catalog);
+        $this->assertStringContainsString('plan-module-checkbox', $catalogScript);
         $this->assertStringContainsString('fs-input-group-text', $catalog);
-        $this->assertStringContainsString('fs-check-label', $catalog);
+        $this->assertStringContainsString('fs-check', $catalogScript);
     }
 
     public function test_catalog_tables_expose_reusable_pagination_controls(): void
     {
         $catalog = file_get_contents(base_path('public/backoffice/pages/subscription-plans.html'));
 
-        foreach (['product-pagination', 'module-pagination', 'plan-pagination', 'publication-pagination', 'data-catalog-page', 'pageSize = 15'] as $fragment) {
+        foreach (['plan-pagination', 'data-fs-page-size="15"'] as $fragment) {
             $this->assertStringContainsString($fragment, $catalog, $fragment);
         }
+        $this->assertStringContainsString('data-plan-page', file_get_contents(base_path('public/backoffice/assets/js/subscription-plans-page.js')));
+        $this->assertStringContainsString('const pageSize = 15', file_get_contents(base_path('public/backoffice/assets/js/subscription-plans-page.js')));
+    }
+
+    public function test_subscription_plans_are_a_dedicated_modular_records_page(): void
+    {
+        $page = file_get_contents(base_path('public/backoffice/pages/subscription-plans.html'));
+        $script = file_get_contents(base_path('public/backoffice/assets/js/subscription-plans-page.js'));
+        $router = file_get_contents(base_path('public/backoffice/assets/js/backoffice-router.js'));
+
+        foreach (['backoffice-plans-page', 'backoffice-records-page', 'fs-card-panel', 'fs-table-records', 'fs-offcanvas', 'plan-drawer', 'plan-composition-drawer'] as $fragment) {
+            $this->assertStringContainsString($fragment, $page, $fragment);
+        }
+        foreach (['export async function mount', 'openCreate', 'openEdit', 'openView', 'createRecordsDrawer', 'module_ids', 'personalization_defaults'] as $fragment) {
+            $this->assertStringContainsString($fragment, $script, $fragment);
+        }
+        $this->assertStringContainsString('module: "/backoffice/assets/js/subscription-plans-page.js"', $router);
+        $this->assertStringNotContainsString('<script', $page);
+        $this->assertStringNotContainsString('data-catalog-tab', $page);
+        $this->assertStringNotContainsString('product-pagination', $page);
+        $this->assertStringNotContainsString('module-pagination', $page);
+        $this->assertStringNotContainsString('publication-pagination', $page);
     }
 
     public function test_modules_page_uses_catalog_components_and_accessible_drawers(): void

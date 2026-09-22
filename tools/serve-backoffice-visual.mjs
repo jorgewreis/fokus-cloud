@@ -9,6 +9,7 @@ const types = { '.css': 'text/css', '.html': 'text/html', '.js': 'application/ja
 const admin = { id: 'PAD_VISUAL', name: 'Administração Fokus', role: 'superadministrador', permissions: ['platform.security.manage'] };
 const products = [{ id: 'PRD_LAW', name: 'Fokus Law', code: 'law', status: 'ativo', plans: [{ id: 'PLN_1', name: 'Essencial' }] }];
 const modules = [{ id: 'MOD_1', product_id: 'PRD_LAW', product_name: 'Fokus Law', name: 'Gestão de processos', code: 'processos', module_code: 'processos', status: 'ativo', publication_state: 'publicado', monthly_price: 29.9, segments: ['advocacia'], capabilities: ['Controle de prazos'], capability_codes: ['prazos'], dependencies: [], incompatibilities: [], linked_plans: [], personalizations: [] }];
+const plans = [{ id: 'PLN_1', product_id: 'PRD_LAW', product_code: 'law', product_name: 'Fokus Law', product_status: 'ativo', product_publication_version: 3, code: 'law-essencial', name: 'Essencial', full_name: 'Fokus Law - Essencial', segment: 'advocacia', status: 'ativo', publication_state: 'publicado', featured: true, monthly_amount: 29.9, annual_amount: 299, modules_count: 1, modules: [{ ...modules[0], monthly_amount: 29.9 }], personalization_defaults: [], subscription_count: 2, company_count: 2, voucher_count: 1 }];
 
 const json = (response, payload, status = 200) => {
     response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
@@ -23,6 +24,7 @@ createServer(async (request, response) => {
     if (url.pathname === '/api/backoffice/companies') return json(response, { data: [], meta: { total: 0, current_page: 1, per_page: 15, last_page: 1 }, summary: {} });
     if (url.pathname === '/api/backoffice/catalog/products') return json(response, { products });
     if (url.pathname === '/api/backoffice/catalog') return json(response, { products: [{ ...products[0], modules }], options: { module_codes: [{ code: 'processos', label: 'Processos' }], personalization_types: [{ code: 'usuarios', label: 'Usuários' }] } });
+    if (url.pathname === '/api/backoffice/plans') return json(response, plans);
     if (url.pathname.startsWith('/api/backoffice/')) return json(response, {});
 
     const relative = url.pathname === '/backoffice/' || /^\/backoffice\/(?!assets\/|pages\/)/.test(url.pathname)

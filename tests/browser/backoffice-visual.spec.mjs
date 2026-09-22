@@ -253,3 +253,45 @@ test('módulos replica o contrato visual, personalizações e estados do drawer'
     await expect(page.locator('#module-view-panel')).toBeVisible();
     await expect(page.locator('#module-view-panel')).toContainText('Gestão de processos');
 });
+
+test('planos replica o contrato visual, composição e estados do drawer', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/backoffice/planos');
+    await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'subscription-plans');
+    await expect(page.locator('#plan-list tr')).toHaveCount(1);
+    await expect(page.locator('#plan-pagination')).toContainText('1 planos');
+
+    await page.locator('#plan-new').click();
+    await expect(page.locator('#plan-drawer')).toBeVisible();
+    await expect(page.locator('#plan-drawer')).toHaveAttribute('data-mode', 'create');
+    const createContract = await page.locator('#plan-drawer').evaluate((drawer) => ({
+        width: getComputedStyle(drawer).width,
+        cards: drawer.querySelectorAll('#plan-form > .fs-card.fs-card-panel').length,
+        controlsUseGoogleSans: [...drawer.querySelectorAll('input, select, textarea')].every((control) => getComputedStyle(control).fontFamily.includes('Google Sans')),
+        textareaPadding: [...new Set([...drawer.querySelectorAll('textarea')].map((textarea) => getComputedStyle(textarea).padding))],
+        primaryButton: drawer.querySelector('#plan-form-submit')?.classList.contains('fs-btn-primary'),
+    }));
+    expect(createContract).toEqual({ width: '450px', cards: 3, controlsUseGoogleSans: true, textareaPadding: ['10px 15px'], primaryButton: true });
+
+    await page.locator('#plan-product').selectOption('PRD_LAW');
+    await page.locator('#plan-composition-open').click();
+    await expect(page.locator('#plan-composition-drawer')).toBeVisible();
+    await expect(page.locator('#plan-module-options')).toContainText('Gestão de processos');
+    await page.locator('#plan-module-options input[type="checkbox"]').evaluate((input) => { input.checked = true; input.dispatchEvent(new Event('change', { bubbles: true })); });
+    await page.locator('#plan-composition-save').click();
+    await expect(page.locator('#plan-composition-drawer')).toBeHidden();
+    await expect(page.locator('#plan-composition-summary')).toContainText('1 funcionalidade');
+
+    await page.locator('#plan-drawer-close').click();
+    await page.getByRole('button', { name: 'Editar plano' }).click();
+    await expect(page.locator('#plan-drawer')).toHaveAttribute('data-mode', 'edit');
+    await expect(page.locator('#plan-form-submit')).toHaveText('Salvar alterações');
+    await expect(page.locator('#plan-code')).toBeDisabled();
+
+    await page.locator('#plan-drawer-close').click();
+    await page.getByRole('button', { name: 'Ver detalhes do plano' }).click();
+    await expect(page.locator('#plan-drawer')).toHaveAttribute('data-mode', 'view');
+    await expect(page.locator('#plan-form')).toBeHidden();
+    await expect(page.locator('#plan-view-panel')).toBeVisible();
+    await expect(page.locator('#plan-view-panel')).toContainText('2');
+});
