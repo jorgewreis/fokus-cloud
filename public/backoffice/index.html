@@ -492,7 +492,7 @@
             });
             mobileSidebarToggle.addEventListener("click", (event) => {
                 event.preventDefault();
-                event.stopImmediatePropagation();
+                event.stopPropagation();
 
                 if (isSidebarResponsive() && window.innerWidth <= 700) {
                     if (sidebar.classList.contains("expanded")) {
@@ -697,7 +697,7 @@
             const catalogSubnav = catalogGroup?.querySelector(".sidebar-subnav");
             catalogToggle?.addEventListener("click", (event) => {
                 event.preventDefault();
-                event.stopPropagation();
+                event.stopImmediatePropagation();
                 const expanded = catalogToggle.getAttribute("aria-expanded") === "true";
                 const nextExpanded = !expanded;
                 catalogToggle.setAttribute("aria-expanded", String(nextExpanded));
