@@ -55,8 +55,9 @@ window.FokusApprovedCatalogOptions = {
         page.querySelector = (selector) => queryInPage(selector) || document.querySelector(selector);
         page.dataset.offcanvasQueryFallback = 'true';
     }
-    const personalizationDrawers = [...document.querySelectorAll('#module-personalizations-drawer')];
-    personalizationDrawers.slice(0, -1).forEach((drawer) => drawer.remove());
+    document.querySelectorAll('#module-personalizations-drawer').forEach((drawer) => {
+        if (!page?.contains(drawer)) drawer.remove();
+    });
     document.querySelectorAll('#module-segments, #module-dependencies, #module-incompatibilities').forEach((select) => {
         select.size = 1;
     });
