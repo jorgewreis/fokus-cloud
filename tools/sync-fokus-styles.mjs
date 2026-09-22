@@ -61,7 +61,7 @@ html[data-role="admin"] {
 }
 .backoffice-records-page .fs-filter-form .fs-form-label {
     display: flex;
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     flex-direction: column;
     min-width: min(100%, 180px);
     gap: var(--fs-space-1, 4px);
@@ -75,8 +75,15 @@ html[data-role="admin"] {
 .backoffice-records-page .fs-form-control,
 .backoffice-records-page .fs-form-select {
     box-sizing: border-box;
-    width: 100%;
+    width: auto;
+    max-width: 100%;
     min-height: 38px;
+}
+.backoffice-records-page .fs-filter-form .fs-input-group-subtle {
+    width: auto;
+}
+.backoffice-records-page .fs-filter-form .fs-input-group-subtle > .fs-form-control {
+    flex: 0 0 auto;
 }
 .backoffice-records-page textarea.fs-form-control {
     min-height: 96px;
@@ -218,10 +225,10 @@ const sharedPageHeaderPolicy = `
 }
 .fs-btn-primary {
     height: 38px;
-    border: 1px solid var(--fs-color-text, #102a43);
-    border-radius: 4px;
-    background: var(--fs-color-text, #102a43);
-    color: #fff;
+    border: 1px solid var(--fs-color-primary, #2563eb);
+    border-radius: var(--fs-radius-sm, 6px);
+    background: var(--fs-color-primary, #2563eb);
+    color: var(--fs-color-on-primary, #fff);
 }
 
 /* Compatibility aliases retained while older backoffice pages are migrated. */
@@ -551,22 +558,26 @@ body { font-family: "Google Sans", sans-serif; }
     box-shadow: none;
 }
 .fs-btn-icon-plain img { width: 20px; height: 20px; object-fit: contain; }
-.fs-pagination-compact { gap: 5px; justify-content: flex-end; }
+.fs-pagination-compact {
+    gap: var(--fs-space-1, 4px);
+    justify-content: flex-end;
+    font-family: var(--fs-font-family, "Google Sans", sans-serif);
+}
 .fs-pagination-compact .fs-page-link {
     width: 30px;
     min-width: 30px;
     height: 30px;
     min-height: 30px;
     padding: 0;
-    border-color: #cbcbcb;
-    border-radius: 6px;
-    color: #909090;
-    background: #fff;
+    border-color: var(--fs-color-border-default, var(--fs-color-border, #cbd9dc));
+    border-radius: var(--fs-radius-sm, 6px);
+    color: var(--fs-color-text, #102a43);
+    background: var(--fs-color-surface, #fff);
 }
 .fs-pagination-compact .fs-page-item.is-active .fs-page-link {
-    border: 1px solid #1E293B;
-    color: #e9e9e9;
-    background: #1E293B;
+    border: 1px solid var(--fs-color-primary, #2563eb);
+    color: var(--fs-color-on-primary, #fff);
+    background: var(--fs-color-primary, #2563eb);
     font-weight: 600;
     pointer-events: none;
 }
