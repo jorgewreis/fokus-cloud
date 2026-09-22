@@ -9,6 +9,7 @@
     const portalDrawerFromTrigger = (trigger) => {
         const selector = trigger?.getAttribute('data-fs-target');
         const drawer = selector ? document.querySelector(selector) : null;
+        if (drawer?.dataset.fsPortal === 'false') return;
         if (drawer?.classList.contains('backoffice-records-drawer')) {
             drawer.querySelectorAll('[id$="-view-panel"]').forEach((panel) => {
                 panel.classList.add('backoffice-records-view-panel');
@@ -26,6 +27,7 @@
     window.initBackofficeRecordsPage = (container = document) => {
         removeOrphanedDrawers(container);
         container.querySelectorAll?.('.backoffice-records-drawer').forEach((drawer) => {
+            if (drawer.dataset.fsPortal === 'false') return;
             drawer.querySelectorAll('[id$="-view-panel"]').forEach((panel) => {
                 panel.classList.add('backoffice-records-view-panel');
             });
