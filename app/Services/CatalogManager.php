@@ -167,12 +167,9 @@ class CatalogManager
     public function createProduct(array $data): string
     {
         $id = PrefixedUlid::make('PRD');
-        $displayOrder = array_key_exists('display_order', $data)
-            ? (int) $data['display_order']
-            : $this->nextProductDisplayOrder();
+        $displayOrder = $this->nextProductDisplayOrder();
 
         DB::transaction(function () use ($data, $id, $displayOrder): void {
-            $this->shiftProductOrdersFrom($displayOrder);
             DB::table('products')->insert($this->productWritePayload([...$data, 'display_order' => $displayOrder], [
                 'id' => $id,
                 'code' => Str::slug($data['code']),
@@ -197,9 +194,20 @@ class CatalogManager
                 $currentOrder = (int) DB::table('products')->where('id', $productId)->value('display_order');
                 $nextOrder = (int) $data['display_order'];
 
-                if ($currentOrder !== $nextOrder) {
+                if ($currentOrder < $nextOrder) {
                     DB::table('products')->where('id', $productId)->update(['display_order' => $this->temporaryProductDisplayOrder(), 'updated_at' => now()]);
-                    $this->shiftProductOrdersFrom($nextOrder, $productId);
+                    DB::table('products')
+                        ->whereBetween('display_order', [$currentOrder + 1, $nextOrder])
+                        ->orderBy('display_order')
+                        ->get(['id', 'display_order'])
+                        ->each(fn (object $item) => DB::table('products')->where('id', $item->id)->update(['display_order' => (int) $item->display_order - 1, 'updated_at' => now()]));
+                } elseif ($currentOrder > $nextOrder) {
+                    DB::table('products')->where('id', $productId)->update(['display_order' => $this->temporaryProductDisplayOrder(), 'updated_at' => now()]);
+                    DB::table('products')
+                        ->whereBetween('display_order', [$nextOrder, $currentOrder - 1])
+                        ->orderByDesc('display_order')
+                        ->get(['id', 'display_order'])
+                        ->each(fn (object $item) => DB::table('products')->where('id', $item->id)->update(['display_order' => (int) $item->display_order + 1, 'updated_at' => now()]));
                 }
             }
 

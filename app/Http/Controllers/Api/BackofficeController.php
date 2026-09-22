@@ -568,7 +568,7 @@ class BackofficeController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'technical_description' => ['nullable', 'string', 'max:2000'],
             'commercial_content' => ['nullable', 'string', 'max:20000'],
-            'display_order' => ['nullable', 'integer', 'min:1'],
+            'display_order' => ['prohibited'],
         ]);
         abort_if(DB::table('products')->where('code', Str::slug($data['code']))->exists(), 422, 'Já existe um sistema com este código.');
 
@@ -580,15 +580,16 @@ class BackofficeController extends Controller
 
     public function updateProduct(Request $request, string $product, CatalogManager $catalog, PlatformAudit $audit)
     {
+        $current = DB::table('products')->where('id', $product)->first();
+        abort_unless($current, 404, 'Sistema não encontrado.');
+        $productCount = DB::table('products')->count();
         $data = $request->validate([
             'code' => ['nullable', 'string', 'max:64'],
             'name' => ['nullable', 'string', 'max:120'],
             'technical_description' => ['nullable', 'string', 'max:2000'],
             'commercial_content' => ['nullable', 'string', 'max:20000'],
-            'display_order' => ['nullable', 'integer', 'min:1'],
+            'display_order' => ['nullable', 'integer', 'min:1', 'max:'.$productCount],
         ]);
-        $current = DB::table('products')->where('id', $product)->first();
-        abort_unless($current, 404, 'Sistema não encontrado.');
         if (isset($data['code'])) {
             abort_if(DB::table('products')->where('code', Str::slug($data['code']))->where('id', '!=', $product)->exists(), 422, 'Já existe um sistema com este código.');
         }
