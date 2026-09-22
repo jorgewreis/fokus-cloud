@@ -75,8 +75,6 @@ html[data-role="admin"] {
 .backoffice-records-page .fs-form-control,
 .backoffice-records-page .fs-form-select {
     box-sizing: border-box;
-    width: auto;
-    max-width: 100%;
     min-height: 38px;
 }
 .backoffice-records-page .fs-filter-form .fs-input-group-subtle {
@@ -561,7 +559,7 @@ body { font-family: "Google Sans", sans-serif; }
 .fs-pagination-compact {
     gap: var(--fs-space-1, 4px);
     justify-content: flex-end;
-    font-family: var(--fs-font-family, "Google Sans", sans-serif);
+    font-family: "Google Sans", sans-serif;
 }
 .fs-pagination-compact .fs-page-link {
     width: 30px;
