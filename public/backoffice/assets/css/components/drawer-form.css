@@ -51,7 +51,7 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: ca
 .admin-modules-page .fs-table-records thead tr > :nth-child(3), .admin-modules-page .fs-table-records tbody tr > :nth-child(3), .admin-modules-page .fs-table-records thead tr > :nth-child(4), .admin-modules-page .fs-table-records tbody tr > :nth-child(4), .admin-modules-page .fs-table-records thead tr > :nth-child(5), .admin-modules-page .fs-table-records tbody tr > :nth-child(5) { flex: 0 0 120px; }
 .admin-modules-page .fs-table-records thead tr > :nth-child(6), .admin-modules-page .fs-table-records tbody tr > :nth-child(6) { flex: 0 0 180px; }
 .admin-modules-page .fs-table-records tbody td[colspan] { flex: 1 1 100%; }
-.admin-modules-page .fs-table-records .module-capability-list { width: 100%; overflow: visible; text-overflow: clip; white-space: normal; line-height: 1.35; }
+.admin-modules-page .fs-table-records .module-capability-list { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.35; }
 .admin-products-page .fs-table-records tbody td[colspan],
 .admin-modules-page .fs-table-records tbody td[colspan] { grid-column: 1 / -1; }
 .admin-products-page .fs-card-footer { align-items: center; padding: 12px 20px; }
