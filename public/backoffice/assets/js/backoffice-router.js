@@ -6,11 +6,11 @@
  * portalled overlays and release listeners before the next page is mounted.
  */
 (() => {
-    const ASSET_VERSION = "20260922-backoffice-contract-v2";
+    const ASSET_VERSION = "20260922-backoffice-contract-v3";
 
     const pages = {
         "platform-dashboard-final": { route: "painel", fragment: "platform-dashboard-final" },
-        companies: { route: "empresas", fragment: "companies" },
+        companies: { route: "empresas", fragment: "companies", module: "/backoffice/assets/js/companies-page.js" },
         "subscription-plans": { route: "planos", fragment: "subscription-plans", role: "superadministrador" },
         products: { route: "produtos", fragment: "products", role: "superadministrador" },
         modules: { route: "modulos", fragment: "modules", role: "superadministrador" },
