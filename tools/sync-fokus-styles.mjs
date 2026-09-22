@@ -73,7 +73,8 @@ html[data-role="admin"] {
     font-family: var(--fs-font-family, "Google Sans", sans-serif);
 }
 html[data-role="admin"] input,
-html[data-role="admin"] select {
+html[data-role="admin"] select,
+html[data-role="admin"] textarea {
     font-family: var(--fs-font-family, "Google Sans", sans-serif);
 }
 .backoffice-records-page .fs-form-control,
