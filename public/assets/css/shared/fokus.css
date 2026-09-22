@@ -17854,6 +17854,17 @@ html[data-role="admin"] {
 .backoffice-records-drawer .fs-offcanvas-body {
     min-width: 0;
 }
+.backoffice-records-drawer .fs-offcanvas-body.fs-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fs-backoffice-panel-space);
+}
+.backoffice-records-drawer .fs-form-label {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fs-space-1, 4px);
+    width: 100%;
+}
 .backoffice-records-drawer .fs-offcanvas-footer {
     display: flex;
     flex-wrap: wrap;
