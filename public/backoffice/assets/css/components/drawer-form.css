@@ -208,13 +208,13 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: ca
 .create-drawer .painel-form :is(.input-label, .fs-form-control):disabled,
 .create-drawer .painel-form :is(.form-select, .fs-form-select):disabled { background: var(--color-surface-light, #edf7f7); color: var(--color-muted, #58758a); }
 
-.admin-products-page #product-drawer .painel-form textarea.input-label {
+#product-drawer .painel-form textarea.input-label {
     height: 70px !important;
     min-height: 70px !important;
     padding: 12px 15px !important;
 }
 
-.admin-modules-page #module-drawer .painel-form textarea.fs-form-control {
+#module-drawer .painel-form textarea.fs-form-control {
     height: 70px !important;
     min-height: 70px !important;
     padding: 12px 15px !important;
