@@ -244,6 +244,26 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: ca
     background-color: var(--fs-color-primary);
 }
 
+#module-personalizations-drawer #personalization-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 0 16px;
+    color: var(--fs-alert-primary-text);
+    border: var(--fs-border-width, 1px) solid var(--fs-color-primary);
+    border-radius: var(--fs-border-radius, 4px);
+    background-color: transparent;
+    font: 500 .8rem/1 "Google Sans", sans-serif;
+}
+
+#module-personalizations-drawer #personalization-add:hover,
+#module-personalizations-drawer #personalization-add:focus-visible,
+#module-personalizations-drawer #personalization-add:active {
+    color: var(--fs-color-on-primary);
+    background-color: var(--fs-color-primary);
+}
+
 .create-drawer .painel-form .form-line { margin-bottom: 10px; }
 .create-drawer .painel-form .fs-width-400 { width: 180px !important; }
 .create-drawer .painel-form .fs-width-600 { width: 300px !important; }
