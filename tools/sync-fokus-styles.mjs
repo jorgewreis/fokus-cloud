@@ -567,18 +567,19 @@ body { font-family: "Google Sans", sans-serif; }
     height: 30px;
     min-height: 30px;
     padding: 0;
-    border-color: var(--fs-color-border-default, var(--fs-color-border, #cbd9dc));
     border-radius: var(--fs-radius-sm, 6px);
-    color: var(--fs-color-text, #102a43);
-    background: var(--fs-color-surface, #fff);
     font-family: "Google Sans", sans-serif;
 }
 .fs-pagination-compact .fs-page-item.is-active .fs-page-link {
-    border: 1px solid var(--fs-color-primary, #2563eb);
-    color: var(--fs-color-on-primary, #fff);
-    background: var(--fs-color-primary, #2563eb);
-    font-weight: 600;
     pointer-events: none;
+}
+.backoffice-records-page .fs-btn-primary:hover,
+.fs-pagination-compact .fs-page-link:hover {
+    filter: brightness(1.2);
+}
+.backoffice-records-page .fs-btn-primary:active,
+.fs-pagination-compact .fs-page-link:active {
+    filter: brightness(1.4);
 }
 @media (max-width: 680px) {
     .fs-page-layout { flex-direction: column; align-items: flex-start; }
