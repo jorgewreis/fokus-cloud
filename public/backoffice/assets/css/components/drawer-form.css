@@ -152,7 +152,7 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: ca
     flex-direction: column;
     gap: 0;
     min-height: 0;
-    padding: 0;
+    padding: 10px;
     overflow-x: hidden;
     overflow-y: auto;
 }
@@ -212,6 +212,29 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: ca
     height: 70px;
     min-height: 70px;
     padding: 12px 15px;
+}
+
+.admin-modules-page #module-drawer .painel-form textarea.fs-form-control {
+    height: 70px;
+    min-height: 70px;
+    padding: 12px 15px;
+}
+
+.admin-modules-page #module-personalizations-open {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 0 16px;
+    color: var(--fs-alert-primary-text);
+    border: var(--fs-border-width, 1px) solid var(--fs-color-primary);
+    background-color: transparent;
+}
+
+.admin-modules-page #module-personalizations-open:hover,
+.admin-modules-page #module-personalizations-open:active {
+    color: var(--fs-color-on-primary);
+    background-color: var(--fs-color-primary);
 }
 
 .create-drawer .painel-form .form-line { margin-bottom: 10px; }

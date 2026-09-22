@@ -49,6 +49,13 @@ window.FokusApprovedCatalogOptions = {
 </script>
 <script>
 (() => {
+    document.querySelectorAll('#module-segments, #module-dependencies, #module-incompatibilities').forEach((select) => {
+        select.size = 1;
+    });
+})();
+</script>
+<script>
+(() => {
     setTimeout(() => {
         const family = document.getElementById('module-code-technical');
         const segments = document.getElementById('module-segments');
