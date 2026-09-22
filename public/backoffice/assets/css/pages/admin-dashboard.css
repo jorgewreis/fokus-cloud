@@ -3688,7 +3688,7 @@ html[data-role="admin"] .fs-sidebar > .sidebar-nav::-webkit-scrollbar-thumb {
    sublink buttons only. */
 html[data-role="admin"] .fs-sidebar .sidebar-subnav-button {
     box-sizing: border-box;
-    width: calc(100% - 25px) !important;
+    width: calc(100% - 35px) !important;
     height: 30px !important;
     min-height: 30px !important;
     padding: 0 15px !important;
