@@ -63,6 +63,8 @@ test('drawer de empresas preserva largura, cards e alertas do contrato visual', 
             labelsFitContent: labels.every((label) => getComputedStyle(label).width !== 'auto'),
             columnsDoNotGrow: formColumns.every((column) => getComputedStyle(column).flex === '0 1 auto'),
             controlsUseGoogleSans: controls.every((control) => getComputedStyle(control).fontFamily.includes('Google Sans')),
+            textareaPadding: [...new Set([...drawer.querySelectorAll('#product-form textarea')]
+                .map((textarea) => getComputedStyle(textarea).padding))],
             fieldWidths: {
                 documentType: drawer.querySelector('#company-document-type').classList.contains('fs-width-300'),
                 document: drawer.querySelector('#company-document-number').classList.contains('fs-width-500'),
@@ -116,6 +118,7 @@ test('produtos replica o contrato visual e mantém create, edit e view independe
     const createContract = await page.locator('#product-drawer').evaluate((drawer) => {
         const labels = [...drawer.querySelectorAll('#product-form label.fs-form-label')].filter((label) => !label.hidden);
         const controls = [...drawer.querySelectorAll('#product-form input, #product-form select, #product-form textarea')].filter((control) => !control.disabled);
+        const textareas = [...drawer.querySelectorAll('#product-form textarea')];
         return {
             width: getComputedStyle(drawer).width,
             cards: drawer.querySelectorAll('#product-form > .fs-card.fs-card-panel').length,
@@ -124,6 +127,7 @@ test('produtos replica o contrato visual e mantém create, edit e view independe
             cardBodySpacing: [...drawer.querySelectorAll('#product-form .fs-card-panel > .fs-card-body')]
                 .every((body) => body.matches('.fs-u-mx-2.fs-u-mt-2.fs-u-mb-3')),
             controlsUseGoogleSans: controls.every((control) => getComputedStyle(control).fontFamily.includes('Google Sans')),
+            textareaPadding: [...new Set(textareas.map((textarea) => `${getComputedStyle(textarea).paddingTop} ${getComputedStyle(textarea).paddingRight}`))],
             fieldWidths: {
                 code: drawer.querySelector('#product-code').classList.contains('fs-width-600'),
                 technicalDescription: drawer.querySelector('#product-technical-description').classList.contains('fs-width-600'),
@@ -138,6 +142,7 @@ test('produtos replica o contrato visual e mantém create, edit e view independe
         labelsHaveSpacing: true,
         cardBodySpacing: true,
         controlsUseGoogleSans: true,
+        textareaPadding: ['10px 15px'],
         fieldWidths: { code: true, technicalDescription: true, commercialDescription: true },
     });
 
@@ -155,4 +160,60 @@ test('produtos replica o contrato visual e mantém create, edit e view independe
     await expect(page.locator('#product-form')).toBeHidden();
     await expect(page.locator('#product-view-panel')).toBeVisible();
     await expect(page.locator('#product-view-name')).toHaveText('Fokus Law');
+});
+
+test('módulos replica o contrato visual, personalizações e estados do drawer', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/backoffice/modulos');
+    await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'modules');
+    await expect(page.locator('#module-list tr')).toHaveCount(1);
+
+    await page.locator('#module-new').click();
+    await expect(page.locator('#module-drawer')).toBeVisible();
+    await expect(page.locator('#module-drawer')).toHaveAttribute('data-mode', 'create');
+    const createContract = await page.locator('#module-drawer').evaluate((drawer) => {
+        const labels = [...drawer.querySelectorAll('#module-form label.fs-form-label')].filter((label) => !label.hidden);
+        const textareas = [...drawer.querySelectorAll('#module-form textarea')];
+        return {
+            width: getComputedStyle(drawer).width,
+            cards: drawer.querySelectorAll('#module-form > .fs-card.fs-card-panel').length,
+            labelsHaveSpans: labels.every((label) => label.firstElementChild?.matches('span.fs-u-ml-2')),
+            cardBodySpacing: [...drawer.querySelectorAll('#module-form .fs-card-panel > .fs-card-body')]
+                .every((body) => body.matches('.fs-u-mx-2.fs-u-mt-2.fs-u-mb-3')),
+            compactMultiSelects: [...drawer.querySelectorAll('#module-form select[multiple]')]
+                .every((select) => select.getAttribute('size') === '1'),
+            textareaPadding: [...new Set(textareas.map((textarea) => getComputedStyle(textarea).padding))],
+            textareaFonts: [...new Set(textareas.map((textarea) => getComputedStyle(textarea).fontFamily))],
+        };
+    });
+    expect(createContract).toEqual({
+        width: '450px',
+        cards: 4,
+        labelsHaveSpans: true,
+        cardBodySpacing: true,
+        compactMultiSelects: true,
+        textareaPadding: ['10px 15px'],
+        textareaFonts: ['"Google Sans", sans-serif'],
+    });
+
+    await page.locator('#module-personalizations-open').click();
+    await expect(page.locator('#module-personalizations-drawer')).toBeVisible();
+    await page.locator('#personalization-add').click();
+    await expect(page.locator('#personalizations-list > .fs-card')).toHaveCount(1);
+    await page.locator('#personalizations-save').click();
+    await expect(page.locator('#module-personalizations-drawer')).toBeHidden();
+
+    await page.locator('#module-drawer-close').click();
+    await page.getByRole('button', { name: 'Editar módulo' }).click();
+    await expect(page.locator('#module-drawer')).toHaveAttribute('data-mode', 'edit');
+    await expect(page.locator('#module-drawer-title')).toHaveText('Editar dados do módulo');
+    await expect(page.locator('#module-form-submit')).toHaveText('Salvar alterações');
+    await expect(page.locator('#module-edit-controls')).toBeVisible();
+
+    await page.locator('#module-drawer-close').click();
+    await page.getByRole('button', { name: 'Ver detalhes do módulo' }).click();
+    await expect(page.locator('#module-drawer')).toHaveAttribute('data-mode', 'view');
+    await expect(page.locator('#module-form')).toBeHidden();
+    await expect(page.locator('#module-view-panel')).toBeVisible();
+    await expect(page.locator('#module-view-panel')).toContainText('Gestão de processos');
 });

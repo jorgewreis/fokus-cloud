@@ -53,8 +53,8 @@ class FormDesignSystemTest extends TestCase
 
         $this->assertMatchesRegularExpression('/const pageVersion = "20\\d{6}-[a-z0-9-]+";/', $panel);
         $this->assertStringContainsString('(() => {', $panel);
-        $this->assertStringContainsString('20260921-catalog-model-v30', file_get_contents(base_path('public/backoffice/pages/modules.html')));
-        $this->assertStringContainsString('window.initBackofficeRecordsPage?.(root)', file_get_contents(base_path('public/backoffice/pages/modules.html')));
+        $this->assertStringContainsString('20260922-backoffice-contract-v13', file_get_contents(base_path('public/backoffice/pages/modules.html')));
+        $this->assertStringContainsString('module: "/backoffice/assets/js/modules-page.js"', file_get_contents(base_path('public/backoffice/assets/js/backoffice-router.js')));
         $this->assertStringContainsString("document.addEventListener('fs:show'", file_get_contents(base_path('public/backoffice/assets/js/records-page.js')));
         $this->assertStringContainsString('BackofficeRouter.create', $panel);
         $this->assertStringContainsString('data-sidebar-item="companies"', $panel);
@@ -99,16 +99,18 @@ class FormDesignSystemTest extends TestCase
 
     public function test_module_actions_use_publication_semantics_and_assets(): void
     {
-        $modules = file_get_contents(base_path('public/backoffice/pages/modules.html'));
+        $modulePage = file_get_contents(base_path('public/backoffice/pages/modules.html'));
+        $moduleScript = file_get_contents(base_path('public/backoffice/assets/js/modules-page.js'));
+        $modules = $modulePage.$moduleScript;
         $productPage = file_get_contents(base_path('public/backoffice/pages/products.html'));
         $productModule = file_get_contents(base_path('public/backoffice/assets/js/products-page.js'));
         $products = $productPage.$productModule;
         $drawerStyles = file_get_contents(base_path('public/backoffice/assets/css/components/drawer-form.css'));
         $sharedStyles = file_get_contents(base_path('public/assets/css/shared/fokus.css'));
 
-        $this->assertStringContainsString("action('publish'", $modules);
-        $this->assertStringContainsString("action('activate'", $modules);
-        $this->assertStringContainsString("action('pause'", $modules);
+        $this->assertStringContainsString('action("publish"', $modules);
+        $this->assertStringContainsString('action("activate"', $modules);
+        $this->assertStringContainsString('action("pause"', $modules);
         $this->assertStringContainsString('Pausar publicação', $modules);
         $this->assertStringContainsString('File-Code-2--Streamline-Ultimate.png', $modules);
         $this->assertStringContainsString('File-Code-Subtract--Streamline-Ultimate.png', $modules);
@@ -202,12 +204,18 @@ class FormDesignSystemTest extends TestCase
 
     public function test_modules_page_uses_catalog_components_and_accessible_drawers(): void
     {
-        $modules = file_get_contents(base_path('public/backoffice/pages/modules.html'));
+        $modulePage = file_get_contents(base_path('public/backoffice/pages/modules.html'));
+        $modules = $modulePage.file_get_contents(base_path('public/backoffice/assets/js/modules-page.js'));
         $panel = file_get_contents(base_path('public/backoffice/index.html'));
 
         foreach (['fs-container-fluid', 'fs-card-panel', 'fs-table-responsive', 'fs-table-records', 'fs-pagination', 'fs-offcanvas', 'fs-modal', 'fs-form-control', 'aria-describedby'] as $fragment) {
             $this->assertStringContainsString($fragment, $modules, $fragment);
         }
+
+        $this->assertStringNotContainsString('<script', $modulePage);
+        $this->assertStringNotContainsString('class="form-label', $modulePage);
+        $this->assertStringNotContainsString('class="input-label', $modulePage);
+        $this->assertStringNotContainsString('class="create-drawer', $modulePage);
 
         $this->assertStringContainsString('data-sidebar-item="modules"', $panel);
         $this->assertStringContainsString('modulos: "modules"', $panel);
@@ -220,6 +228,7 @@ class FormDesignSystemTest extends TestCase
         $pages = [
             'public/backoffice/pages/companies.html' => 'backoffice-companies-page',
             'public/backoffice/pages/products.html' => 'backoffice-products-page',
+            'public/backoffice/pages/modules.html' => 'backoffice-modules-page',
             'public/backoffice/pages/subscriptions.html' => 'subscription-page',
             'public/backoffice/pages/pagamentos.html' => 'pagamentos-page',
         ];

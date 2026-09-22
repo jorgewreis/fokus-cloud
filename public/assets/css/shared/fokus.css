@@ -17831,6 +17831,9 @@ html[data-role="admin"] select,
 html[data-role="admin"] textarea {
     font-family: var(--fs-font-family, "Google Sans", sans-serif);
 }
+html[data-role="admin"] textarea {
+    padding: 10px 15px !important;
+}
 .backoffice-records-page .fs-form-control,
 .backoffice-records-page .fs-form-select {
     box-sizing: border-box;

@@ -1,182 +1,138 @@
-<link data-page-css="modules" rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260921-catalog-model-v30" />
-<main class="admin-modules-page backoffice-records-page fs-container-fluid fs-u-d-flex fs-u-flex-column" aria-labelledby="modules-page-title">
-    <header class="fs-page-layout"><div class="fs-page-header-display"><span>Catálogo</span><h1 id="modules-page-title">MODULOS</h1><p>Gerencie os componentes comerciais, suas funcionalidades e personalizações.</p></div><button class="fs-btn fs-btn-primary fs-width-300" id="module-new" type="button" data-fs="offcanvas" data-fs-target="#module-drawer">Novo módulo</button></header>
+<link data-page-css="modules" rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260922-backoffice-contract-v13" />
+<link data-page-css="modules" rel="stylesheet" href="/backoffice/assets/css/pages/modules.css?v=20260922-backoffice-contract-v13" />
+
+<main class="backoffice-modules-page backoffice-records-page container-page fs-container-fluid" aria-labelledby="modules-page-title">
+    <header class="fs-page-layout">
+        <div class="fs-page-header-display">
+            <span>Catálogo</span>
+            <h1 id="modules-page-title">Módulos</h1>
+            <p>Gerencie os componentes comerciais, suas funcionalidades e personalizações.</p>
+        </div>
+        <button class="fs-btn fs-btn-primary fs-width-300" id="module-new" type="button" data-fs-target="#module-drawer">Novo módulo</button>
+    </header>
+
     <div class="fs-alert" id="modules-message" role="status" aria-live="polite" hidden></div>
-    <section class="fs-card fs-card-panel backoffice-page-card"><div class="fs-card-header card-header"><div class="fs-card-header-title card-header-title"><h2 class="fs-card-title header-title-name">Filtros</h2><p class="fs-card-subtitle header-title-description">Encontre módulos por nome, código, produto, contexto ou situação.</p></div></div><form class="fs-card-body card-content content-filter" id="module-filter-form"><label class="form-label"><span class="label">Nome ou código</span><input class="input-label fs-width-800" id="module-query" type="search" placeholder="Nome ou código do módulo" autocomplete="off" /></label><label class="form-label"><span class="label">Produto</span><select class="form-select fs-width-500" id="module-product-filter"><option value="">Todos os produtos</option></select></label><label class="form-label"><span class="label">Status</span><select class="form-select fs-width-500" id="module-status-filter"><option value="">Todos os status</option><option value="ativo">Ativos</option><option value="inativo">Inativos</option><option value="rascunho">Rascunhos</option><option value="pausado">Pausados</option><option value="arquivado">Arquivados</option></select></label><button class="fs-btn fs-btn-outline-secondary fs-width-300" type="submit">Filtrar</button></form></section>
-    <section class="fs-card fs-card-panel backoffice-page-card"><div class="fs-card-header card-header fs-u-d-flex fs-u-justify-content-between fs-u-gap-3"><div class="fs-card-header-title card-header-title"><h2 class="fs-card-title header-title-name">Módulos cadastrados</h2><p class="fs-card-subtitle header-title-description">Consulte funcionalidades, preços, publicação e planos vinculados.</p></div><span class="fs-card-header-info" id="module-table-summary">0 registros encontrados</span></div><div class="fs-card-body card-content fs-u-p-0"><div class="fs-table-responsive fs-datatable" data-fs="datatable" data-fs-page-size="1000"><table class="fs-table fs-table-records fs-table-hover card-table" aria-label="Módulos cadastrados"><thead><tr><th class="fs-width-600">Produto</th><th class="fs-width-600">Módulo e funcionalidade</th><th class="fs-width-300">Preço mensal</th><th class="fs-width-300">Status</th><th class="fs-width-300">Publicação</th><th class="fs-width-400">Ações</th></tr></thead><tbody id="module-list"><tr><td colspan="6">Carregando módulos...</td></tr></tbody></table></div></div><div class="fs-card-footer fs-u-d-flex fs-u-justify-content-between fs-u-align-items-center fs-u-gap-3 fs-u-flex-wrap"><span id="module-table-footer-summary">Mostrando página 1 de 1 com 0 registros.</span><nav class="fs-pagination" id="module-pagination" aria-label="Paginação de módulos"></nav></div></section>
-    <button id="module-destructive-trigger" type="button" data-fs="modal" data-fs-target="#module-destructive-dialog" hidden></button><div id="module-destructive-dialog" class="fs-modal fs-confirmation-dialog" tabindex="-1" role="dialog" aria-modal="true"><div class="fs-modal-dialog"><div class="fs-modal-content"><div class="fs-modal-header"><div class="fs-confirmation-dialog-heading"><span class="fs-confirmation-dialog-kicker">CATÁLOGO</span><h2 class="fs-modal-title" id="module-dialog-title">Confirmar ação</h2><p class="fs-confirmation-dialog-description">Informe o motivo para registrar esta ação.</p></div><button class="fs-btn-close" type="button" data-fs-dismiss="modal" aria-label="Fechar"></button></div><form class="fs-form fs-confirmation-dialog-form" id="module-destructive-form"><div class="fs-modal-body fs-confirmation-dialog-body"><label class="fs-form-label" for="module-dialog-reason"><span>Motivo obrigatório</span><select class="fs-form-select" id="module-dialog-reason" name="reason" required><option value="">Selecione um motivo</option><option>Módulo duplicado ou cadastrado incorretamente.</option><option>Módulo substituído por outra funcionalidade.</option><option>Módulo não faz mais parte do produto.</option><option>Encerramento da oferta comercial do módulo.</option><option>Outro motivo administrativo.</option></select></label></div><div class="fs-modal-footer"><button class="fs-btn fs-btn-outline-primary fs-width-300" type="button" data-fs-dismiss="modal">Cancelar</button><button class="fs-btn fs-btn-danger fs-width-400" type="submit">Confirmar</button></div></form></div></div></div>
-    <aside class="fs-offcanvas fs-offcanvas-end create-drawer backoffice-records-drawer" id="module-drawer" aria-labelledby="module-drawer-title" tabindex="-1"><div class="fs-offcanvas-header painel-header"><div class="painel-header-title"><span class="painel-header-section" id="module-drawer-kicker">CATÁLOGO</span><h2 class="painel-header-text" id="module-drawer-title">NOVO MÓDULO</h2><span class="painel-header-description" id="module-drawer-description">Cadastre um componente comercial e suas funcionalidades.</span></div><button class="drawer-close" id="module-drawer-close" type="button" data-fs-dismiss="offcanvas" aria-label="Fechar painel">×</button></div><form class="fs-offcanvas-body painel-form fs-form" id="module-form" novalidate><section class="form-section"><h3 class="section-title">Dados principais</h3><span class="section-description">O código público, status inicial, ordem e destaque são definidos automaticamente.</span><div class="fs-form-row"><div class="fs-form-col"><label class="fs-form-label" for="module-product">Produto</label><select class="fs-form-select" id="module-product" name="product_id" required></select></div><div class="fs-form-col"><label class="fs-form-label" for="module-name">Nome da funcionalidade</label><input class="fs-form-control" id="module-name" name="name" maxlength="120" required /></div></div><div class="fs-form-row"><div class="fs-form-col"><label class="fs-form-label" for="module-code-technical">Família técnica</label><select class="fs-form-select" id="module-code-technical" name="module_code" required></select><div id="module-code-custom-wrap" hidden><input class="fs-form-control fs-u-mt-2" id="module-code-custom" name="module_code_custom_name" maxlength="120" placeholder="Nome da nova família técnica" /></div></div><div class="fs-form-col"><label class="fs-form-label" for="module-segments">Segmentos</label><select class="fs-form-select" id="module-segments" name="segments[]" multiple required size="3"></select></div></div><div class="fs-form-row"><div class="fs-form-col"><label class="fs-form-label" for="module-context">Contexto</label><select class="fs-form-select" id="module-context" name="context_code"><option value="">Selecione um contexto</option></select></div><div class="fs-form-col" id="module-edit-controls" hidden><label class="fs-form-label" for="module-order">Ordem de exibição</label><input class="fs-form-control" id="module-order" name="display_order" type="number" min="0" step="1" /><label class="fs-form-label fs-u-mt-2" for="module-featured">Destaque</label><select class="fs-form-select" id="module-featured" name="featured"><option value="0">Não</option><option value="1">Sim</option></select></div></div></section><section class="form-section"><h3 class="section-title">Conteúdo comercial e técnico</h3><span class="section-description">Use descrições que possam ser aproveitadas no catálogo publicado.</span><div class="fs-form-row"><div class="fs-form-col"><label class="fs-form-label" for="module-price">Preço mensal</label><div class="fs-input-group"><span class="fs-input-group-text" aria-hidden="true">R$</span><input class="fs-form-control" id="module-price" name="monthly_price" type="text" inputmode="decimal" autocomplete="off" data-currency-input required /></div></div><div class="fs-form-col"><label class="fs-form-label" for="module-price-estimate">Preço estimado</label><select class="fs-form-select" id="module-price-estimate" name="price_is_estimate"><option value="0">Não</option><option value="1">Sim</option></select></div></div><label class="fs-form-label" for="module-technical-description">Descrição técnica<textarea class="fs-form-control" id="module-technical-description" name="technical_description" maxlength="2000"></textarea></label><label class="fs-form-label" for="module-commercial-content">Conteúdo comercial<textarea class="fs-form-control" id="module-commercial-content" name="commercial_content" maxlength="20000"></textarea></label></section><section class="form-section"><h3 class="section-title">Funcionalidades e regras</h3><span class="section-description">Selecione opções válidas para a família e o produto.</span><label class="fs-form-label" for="module-capabilities">Funcionalidades oferecidas<select class="fs-form-select" id="module-capabilities" name="capability_codes[]" multiple size="5"></select></label><div id="module-capabilities-custom-wrap" hidden><input class="fs-form-control" id="module-capabilities-custom" placeholder="Outra funcionalidade (pressione Enter)" /></div><div class="fs-form-row"><div class="fs-form-col"><label class="fs-form-label" for="module-dependencies">Dependências<select class="fs-form-select" id="module-dependencies" name="dependency_ids[]" multiple size="4"></select></label></div><div class="fs-form-col"><label class="fs-form-label" for="module-incompatibilities">Incompatibilidades<select class="fs-form-select" id="module-incompatibilities" name="incompatibility_ids[]" multiple size="4"></select></label></div></div></section><section class="form-section"><h3 class="section-title">Personalizações e limites</h3><span class="section-description">Capacidade e uso são personalizações independentes, com faixas e acréscimo mensal.</span><button class="fs-btn fs-btn-outline-primary" id="module-personalizations-open" type="button" data-fs="offcanvas" data-fs-target="#module-personalizations-drawer">Configurar personalizações</button><div id="module-personalizations-summary" class="fs-u-mt-2 fs-u-color-secondary">Nenhuma personalização configurada.</div></section><div class="fs-offcanvas-footer drawer-actions"><button class="fs-btn fs-btn-outline-primary fs-width-300" id="module-form-cancel" type="button">Cancelar</button><button class="fs-btn fs-btn-primary fs-width-400" id="module-form-submit" type="submit">Cadastrar módulo</button></div></form><section class="fs-offcanvas-body fs-u-d-flex fs-u-flex-column fs-u-gap-4 backoffice-records-view-panel" id="module-view-panel" aria-label="Detalhes do módulo" hidden></section></aside>
-<aside class="fs-offcanvas fs-offcanvas-end create-drawer backoffice-records-drawer" data-backoffice-overlay="personalizations" data-fs-portal="false" id="module-personalizations-drawer" aria-labelledby="module-personalizations-title" tabindex="-1"><div class="fs-offcanvas-header painel-header"><div class="painel-header-title"><span class="painel-header-section">CATÁLOGO</span><h2 class="painel-header-text" id="module-personalizations-title">PERSONALIZAÇÕES</h2><span class="painel-header-description">Defina tipos, obrigatoriedade e faixas de preço.</span></div><button class="drawer-close" id="module-personalizations-close" type="button" data-fs-dismiss="offcanvas" aria-label="Fechar painel">×</button></div><div class="fs-offcanvas-body painel-form fs-form"><div id="personalizations-list"></div><div class="fs-offcanvas-footer drawer-actions"><button class="fs-btn fs-btn-outline-primary fs-width-400" id="personalization-add" type="button">Adicionar personalização</button><button class="fs-btn fs-btn-primary fs-width-400" id="personalizations-save" type="button">Concluir</button></div></div></aside>
+
+    <section class="fs-card fs-card-panel" aria-labelledby="module-filter-title">
+        <div class="fs-card-header">
+            <div class="fs-card-header-title">
+                <h2 class="fs-card-title" id="module-filter-title">Filtros</h2>
+                <p class="fs-card-subtitle">Encontre módulos por nome, código, produto, contexto ou situação.</p>
+            </div>
+        </div>
+        <form class="fs-card-body fs-filter-form" id="module-filter-form">
+            <label class="fs-form-label" for="module-query">
+                <span>Nome ou código</span>
+                <span class="fs-input-group fs-input-group-subtle">
+                    <span class="fs-input-group-text" aria-hidden="true"><img class="fs-input-group-icon" src="/backoffice/assets/icons/Search-Bar--Streamline-Ultimate.png" alt="" /></span>
+                    <input class="fs-form-control fs-width-800" id="module-query" type="search" placeholder="Nome ou código do módulo" autocomplete="off" />
+                </span>
+            </label>
+            <label class="fs-form-label" for="module-product-filter"><span>Produto</span><select class="fs-form-select fs-width-500" id="module-product-filter"><option value="">Todos os produtos</option></select></label>
+            <label class="fs-form-label" for="module-status-filter"><span>Status</span><select class="fs-form-select fs-width-500" id="module-status-filter"><option value="">Todos os status</option><option value="ativo">Ativos</option><option value="inativo">Inativos</option><option value="rascunho">Rascunhos</option><option value="pausado">Pausados</option><option value="arquivado">Arquivados</option></select></label>
+            <button class="fs-btn fs-btn-outline-secondary fs-width-300 fs-form-action" type="submit">Filtrar</button>
+        </form>
+    </section>
+
+    <section class="fs-card fs-card-panel" aria-labelledby="module-list-title">
+        <div class="fs-card-header">
+            <div class="fs-card-header-title">
+                <h2 class="fs-card-title" id="module-list-title">Módulos cadastrados</h2>
+                <p class="fs-card-subtitle">Consulte funcionalidades, preços, publicação e planos vinculados.</p>
+            </div>
+            <span class="fs-card-header-info" id="module-table-summary">0 registros encontrados</span>
+        </div>
+        <div class="fs-card-body fs-u-p-0">
+            <div class="fs-table-responsive fs-datatable" data-fs="datatable" data-fs-page-size="1000">
+                <table class="fs-table fs-table-records fs-table-hover" aria-label="Módulos cadastrados">
+                    <thead><tr><th class="fs-width-600" scope="col">Produto</th><th class="fs-width-600" scope="col">Módulo e funcionalidade</th><th class="fs-width-300" scope="col">Preço mensal</th><th class="fs-width-300" scope="col">Status</th><th class="fs-width-300" scope="col">Publicação</th><th class="fs-width-400" scope="col">Ações</th></tr></thead>
+                    <tbody id="module-list"><tr><td colspan="6">Carregando módulos...</td></tr></tbody>
+                </table>
+                <p data-fs-datatable-empty class="fs-table-empty" hidden>Nenhum módulo encontrado com os filtros informados.</p>
+                <p data-fs-datatable-loading class="fs-table-empty" hidden>Carregando módulos...</p>
+                <div data-fs-datatable-error class="fs-alert fs-alert-danger" hidden><span data-fs-datatable-error-message></span></div>
+            </div>
+        </div>
+        <div class="fs-card-footer fs-u-d-flex fs-u-flex-wrap fs-u-align-items-center fs-u-justify-content-between fs-u-gap-3">
+            <span class="fs-u-fs-sm fs-u-color-secondary" id="module-table-footer-summary">Mostrando página 1 de 1 com 0 registros, de um total de 1 páginas.</span>
+            <nav id="module-pagination" aria-label="Paginação de módulos"></nav>
+        </div>
+    </section>
+
+    <button id="module-destructive-trigger" type="button" data-fs="modal" data-fs-target="#module-destructive-dialog" hidden></button>
+    <div id="module-destructive-dialog" class="fs-modal fs-confirmation-dialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="module-dialog-title">
+        <div class="fs-modal-dialog"><div class="fs-modal-content">
+            <div class="fs-modal-header"><div class="fs-confirmation-dialog-heading"><span class="fs-confirmation-dialog-kicker">CATÁLOGO</span><h2 class="fs-modal-title" id="module-dialog-title">Confirmar ação</h2><p class="fs-confirmation-dialog-description">Informe o motivo para registrar esta ação.</p></div><button class="fs-btn-close" type="button" data-fs-dismiss="modal" aria-label="Fechar"></button></div>
+            <form class="fs-form fs-confirmation-dialog-form" id="module-destructive-form"><div class="fs-modal-body fs-confirmation-dialog-body"><label class="fs-form-label fs-confirmation-dialog-field" for="module-dialog-reason"><span>Motivo obrigatório</span><select class="fs-form-select" id="module-dialog-reason" name="reason" required><option value="">Selecione um motivo</option><option>Módulo duplicado ou cadastrado incorretamente.</option><option>Módulo substituído por outra funcionalidade.</option><option>Módulo não faz mais parte do produto.</option><option>Encerramento da oferta comercial do módulo.</option><option>Outro motivo administrativo.</option></select></label></div><div class="fs-modal-footer"><button class="fs-btn fs-btn-outline-primary fs-width-300" type="button" data-fs-dismiss="modal">Cancelar</button><button class="fs-btn fs-btn-danger fs-width-400" type="submit">Confirmar</button></div></form>
+        </div></div>
+    </div>
+
+    <aside class="fs-offcanvas fs-offcanvas-end backoffice-records-drawer" id="module-drawer" aria-labelledby="module-drawer-title" tabindex="-1">
+        <div class="fs-offcanvas-header">
+            <div class="fs-u-d-flex fs-u-flex-column fs-u-gap-1">
+                <span class="fs-u-fs-xs fs-u-color-secondary" id="module-drawer-kicker">CATÁLOGO</span>
+                <h2 class="fs-offcanvas-title" id="module-drawer-title">Novo módulo</h2>
+                <p class="fs-u-m-0 fs-u-fs-sm fs-u-color-secondary" id="module-drawer-description">Cadastre um componente comercial e suas funcionalidades.</p>
+            </div>
+            <button class="fs-btn-close" id="module-drawer-close" type="button" data-fs-dismiss="offcanvas" aria-label="Fechar painel"></button>
+        </div>
+
+        <form class="fs-offcanvas-body fs-form" id="module-form" novalidate>
+            <section class="fs-card fs-card-panel" aria-labelledby="module-main-data-title">
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="module-main-data-title">Dados principais</h3><p class="fs-card-subtitle">O código público, status inicial, ordem e destaque são definidos automaticamente.</p></div></div>
+                <div class="fs-card-body fs-u-mx-2 fs-u-mt-2 fs-u-mb-3">
+                    <div class="fs-form-row fs-u-mb-2">
+                        <div class="fs-form-col"><label class="fs-form-label fs-u-mt-3" for="module-product"><span class="fs-u-ml-2">Produto</span><select class="fs-form-select fs-width-500" id="module-product" name="product_id" aria-describedby="module-product-help" required></select><small class="fs-form-text" id="module-product-help">Produto ao qual o módulo pertence.</small></label></div>
+                        <div class="fs-form-col"><label class="fs-form-label fs-u-mt-3" for="module-name"><span class="fs-u-ml-2">Nome da funcionalidade</span><input class="fs-form-control fs-width-600" id="module-name" name="name" maxlength="120" required /></label></div>
+                    </div>
+                    <div class="fs-form-row fs-u-mb-2">
+                        <div class="fs-form-col"><label class="fs-form-label fs-u-mt-3" for="module-code-technical"><span class="fs-u-ml-2">Família técnica</span><select class="fs-form-select fs-width-500" id="module-code-technical" name="module_code" required></select></label><div id="module-code-custom-wrap" hidden><input class="fs-form-control fs-width-600 fs-u-mt-2" id="module-code-custom" name="module_code_custom_name" maxlength="120" placeholder="Nome da nova família técnica" /></div></div>
+                        <div class="fs-form-col"><label class="fs-form-label fs-u-mt-3" for="module-segments"><span class="fs-u-ml-2">Segmentos</span><select class="fs-form-select fs-width-500" id="module-segments" name="segments[]" multiple required size="1"></select></label></div>
+                    </div>
+                    <div class="fs-form-row fs-u-mb-2">
+                        <div class="fs-form-col"><label class="fs-form-label fs-u-mt-3" for="module-context"><span class="fs-u-ml-2">Contexto</span><select class="fs-form-select fs-width-500" id="module-context" name="context_code"><option value="">Selecione um contexto</option></select></label></div>
+                        <div class="fs-form-col" id="module-edit-controls" hidden><label class="fs-form-label fs-u-mt-3" for="module-order"><span class="fs-u-ml-2">Ordem de exibição</span><input class="fs-form-control fs-width-300" id="module-order" name="display_order" type="number" min="0" step="1" /></label><label class="fs-form-label fs-u-mt-3" for="module-featured"><span class="fs-u-ml-2">Destaque</span><select class="fs-form-select fs-width-300" id="module-featured" name="featured"><option value="0">Não</option><option value="1">Sim</option></select></label></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="fs-card fs-card-panel" aria-labelledby="module-content-title">
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="module-content-title">Conteúdo comercial e técnico</h3><p class="fs-card-subtitle">Use descrições que possam ser aproveitadas no catálogo publicado.</p></div></div>
+                <div class="fs-card-body fs-u-mx-2 fs-u-mt-2 fs-u-mb-3">
+                    <div class="fs-form-row fs-u-mb-2">
+                        <div class="fs-form-col"><label class="fs-form-label fs-u-mt-3" for="module-price"><span class="fs-u-ml-2">Preço mensal</span><span class="fs-input-group"><span class="fs-input-group-text" aria-hidden="true">R$</span><input class="fs-form-control fs-width-400" id="module-price" name="monthly_price" type="text" inputmode="decimal" autocomplete="off" data-currency-input required /></span></label></div>
+                        <div class="fs-form-col"><label class="fs-form-label fs-u-mt-3" for="module-price-estimate"><span class="fs-u-ml-2">Preço estimado</span><select class="fs-form-select fs-width-300" id="module-price-estimate" name="price_is_estimate"><option value="0">Não</option><option value="1">Sim</option></select></label></div>
+                    </div>
+                    <label class="fs-form-label fs-u-mt-3" for="module-technical-description"><span class="fs-u-ml-2">Descrição técnica</span><textarea class="fs-form-control fs-width-600" id="module-technical-description" name="technical_description" maxlength="2000"></textarea></label>
+                    <label class="fs-form-label fs-u-mt-3" for="module-commercial-content"><span class="fs-u-ml-2">Conteúdo comercial</span><textarea class="fs-form-control fs-width-600" id="module-commercial-content" name="commercial_content" maxlength="20000"></textarea></label>
+                </div>
+            </section>
+
+            <section class="fs-card fs-card-panel" aria-labelledby="module-rules-title">
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="module-rules-title">Funcionalidades e regras</h3><p class="fs-card-subtitle">Selecione opções válidas para a família e o produto.</p></div></div>
+                <div class="fs-card-body fs-u-mx-2 fs-u-mt-2 fs-u-mb-3">
+                    <label class="fs-form-label fs-u-mt-3" for="module-capabilities"><span class="fs-u-ml-2">Funcionalidades oferecidas</span><select class="fs-form-select fs-width-600" id="module-capabilities" name="capability_codes[]" multiple size="1"></select></label>
+                    <div id="module-capabilities-custom-wrap" hidden><input class="fs-form-control fs-width-600 fs-u-mt-2" id="module-capabilities-custom" placeholder="Outra funcionalidade (pressione Enter)" /></div>
+                    <div class="fs-form-row fs-u-mb-2">
+                        <div class="fs-form-col"><label class="fs-form-label fs-u-mt-3" for="module-dependencies"><span class="fs-u-ml-2">Dependências</span><select class="fs-form-select fs-width-500" id="module-dependencies" name="dependency_ids[]" multiple size="1"></select></label></div>
+                        <div class="fs-form-col"><label class="fs-form-label fs-u-mt-3" for="module-incompatibilities"><span class="fs-u-ml-2">Incompatibilidades</span><select class="fs-form-select fs-width-500" id="module-incompatibilities" name="incompatibility_ids[]" multiple size="1"></select></label></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="fs-card fs-card-panel" aria-labelledby="module-personalizations-section-title">
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="module-personalizations-section-title">Personalizações e limites</h3><p class="fs-card-subtitle">Capacidade e uso são personalizações independentes, com faixas e acréscimo mensal.</p></div></div>
+                <div class="fs-card-body fs-u-mx-2 fs-u-mt-2 fs-u-mb-3"><button class="fs-btn fs-btn-outline-primary fs-width-400" id="module-personalizations-open" type="button" data-fs-target="#module-personalizations-drawer">Configurar personalizações</button><div id="module-personalizations-summary" class="fs-u-mt-2 fs-u-color-secondary">Nenhuma personalização configurada.</div></div>
+            </section>
+
+            <div class="fs-offcanvas-footer"><button class="fs-btn fs-btn-outline-primary fs-width-300" id="module-form-cancel" type="button">Cancelar</button><button class="fs-btn fs-btn-primary fs-width-400" id="module-form-submit" type="submit">Cadastrar módulo</button></div>
+        </form>
+
+        <section class="fs-offcanvas-body fs-u-d-flex fs-u-flex-column fs-u-gap-4 backoffice-records-view-panel" id="module-view-panel" aria-label="Detalhes do módulo" hidden></section>
+
+        <aside class="fs-offcanvas fs-offcanvas-end backoffice-records-drawer" data-backoffice-overlay="personalizations" data-fs-portal="false" id="module-personalizations-drawer" aria-labelledby="module-personalizations-title" tabindex="-1">
+            <div class="fs-offcanvas-header"><div class="fs-u-d-flex fs-u-flex-column fs-u-gap-1"><span class="fs-u-fs-xs fs-u-color-secondary">CATÁLOGO</span><h2 class="fs-offcanvas-title" id="module-personalizations-title">Personalizações</h2><p class="fs-u-m-0 fs-u-fs-sm fs-u-color-secondary">Defina tipos, obrigatoriedade e faixas de preço.</p></div><button class="fs-btn-close" id="module-personalizations-close" type="button" data-fs-dismiss="offcanvas" aria-label="Fechar painel"></button></div>
+            <div class="fs-offcanvas-body fs-form"><div id="personalizations-list"></div><div class="fs-offcanvas-footer"><button class="fs-btn fs-btn-outline-primary fs-width-400" id="personalization-add" type="button">Adicionar personalização</button><button class="fs-btn fs-btn-primary fs-width-400" id="personalizations-save" type="button">Concluir</button></div></div>
+        </aside>
+    </aside>
 </main>
-<span class="fs-confirmation-dialog-field" hidden></span>
-<div aria-describedby="module-product-help" hidden></div>
-<script>
-window.FokusApprovedCatalogOptions = {
-    families: {
-        law: [
-            { code: 'processos', label: 'Processos' },
-            { code: 'contatos', label: 'Contatos' },
-            { code: 'expedicoes', label: 'Expedições' },
-            { code: 'tarefas', label: 'Tarefas' },
-            { code: 'audiencias', label: 'Audiências' },
-        ],
-        lead: [
-            { code: 'pessoas', label: 'Pessoas' },
-            { code: 'imoveis', label: 'Imóveis' },
-            { code: 'empreendimentos', label: 'Empreendimentos' },
-            { code: 'leads', label: 'Leads' },
-            { code: 'funil', label: 'Funil' },
-            { code: 'website', label: 'Website' },
-            { code: 'relatorios', label: 'Relatórios' },
-            { code: 'notificacoes', label: 'Notificações' },
-        ],
-    },
-    segments: {
-        law: [{ code: 'advocacia', label: 'Advocacia' }, { code: 'setor_publico', label: 'Setor público' }],
-        lead: [{ code: 'one', label: 'One' }, { code: 'team', label: 'Team' }],
-    },
-    contexts: {
-        law: {
-            advocacia: [{ code: 'escritorio', label: 'Escritório' }],
-            setor_publico: [{ code: 'judiciario', label: 'Judiciário' }, { code: 'orgao_publico', label: 'Órgão público' }],
-        },
-        lead: {
-            one: [{ code: 'corretor_independente', label: 'Corretor independente' }],
-            team: [{ code: 'imobiliaria_equipe', label: 'Imobiliária/equipe' }],
-        },
-    },
-};
-</script>
-<script>
-(() => {
-    const page = document.querySelector('.admin-modules-page');
-    if (page && !page.dataset.offcanvasQueryFallback) {
-        const queryInPage = page.querySelector.bind(page);
-        page.querySelector = (selector) => queryInPage(selector) || document.querySelector(selector);
-        page.dataset.offcanvasQueryFallback = 'true';
-    }
-    document.querySelectorAll('#module-personalizations-drawer').forEach((drawer) => {
-        if (!page?.contains(drawer)) drawer.remove();
-    });
-    const moduleDrawer = document.querySelector('#module-drawer');
-    const personalizationDrawer = document.querySelector('#module-personalizations-drawer');
-    if (moduleDrawer && personalizationDrawer && !moduleDrawer.contains(personalizationDrawer)) {
-        moduleDrawer.appendChild(personalizationDrawer);
-    }
-    document.querySelectorAll('#module-segments, #module-capabilities, #module-dependencies, #module-incompatibilities').forEach((select) => {
-        select.size = 1;
-        select.setAttribute('size', '1');
-    });
-})();
-</script>
-<script>
-(() => {
-    setTimeout(() => {
-        const family = document.getElementById('module-code-technical');
-        const segments = document.getElementById('module-segments');
-        const context = document.getElementById('module-context');
-        if (family && !family.options.length) family.innerHTML = '<option value="">Selecione uma família</option><option value="processos">Processos</option><option value="contatos">Contatos</option><option value="expedicoes">Expedições</option><option value="tarefas">Tarefas</option><option value="audiencias">Audiências</option><option value="outro">Outro</option>';
-        if (segments && !segments.options.length) segments.innerHTML = '<option value="advocacia">Advocacia</option><option value="setor_publico">Setor público</option>';
-        if (context && context.options.length === 1) context.innerHTML = '<option value="">Selecione um contexto</option><option value="escritorio">Escritório</option><option value="judiciario">Judiciário</option><option value="orgao_publico">Órgão público</option>';
-    }, 0);
-    const approvedCatalog = { families: { law: [{ code: 'processos', label: 'Processos' }, { code: 'contatos', label: 'Contatos' }, { code: 'expedicoes', label: 'Expedições' }, { code: 'tarefas', label: 'Tarefas' }, { code: 'audiencias', label: 'Audiências' }], lead: [{ code: 'pessoas', label: 'Pessoas' }, { code: 'imoveis', label: 'Imóveis' }, { code: 'empreendimentos', label: 'Empreendimentos' }, { code: 'leads', label: 'Leads' }, { code: 'funil', label: 'Funil' }, { code: 'website', label: 'Website' }, { code: 'relatorios', label: 'Relatórios' }, { code: 'notificacoes', label: 'Notificações' }] }, segments: { law: [{ code: 'advocacia', label: 'Advocacia' }, { code: 'setor_publico', label: 'Setor público' }], lead: [{ code: 'one', label: 'One' }, { code: 'team', label: 'Team' }] }, contexts: { law: { advocacia: [{ code: 'escritorio', label: 'Escritório' }], setor_publico: [{ code: 'judiciario', label: 'Judiciário' }, { code: 'orgao_publico', label: 'Órgão público' }] }, lead: { one: [{ code: 'corretor_independente', label: 'Corretor independente' }], team: [{ code: 'imobiliaria_equipe', label: 'Imobiliária/equipe' }] } } };
-    const root = document.querySelector('.admin-modules-page'); if (!root) return; const api = window.FokusApi; const form = root.querySelector('#module-form'); const drawerTrigger = root.querySelector('#module-new'); const drawer = root.querySelector('#module-drawer'); const viewPanel = root.querySelector('#module-view-panel'); const state = { catalog: { products: [], options: {} }, modules: [], editing: null, pending: null, personalizations: [], page: 1 }; window.initBackofficeRecordsPage?.(root); const offcanvas = window.FokusStyles?.Offcanvas?.getOrCreateInstance(drawerTrigger); const personalTrigger = root.querySelector('#module-personalizations-open'); const personalOffcanvas = personalTrigger?.getAttribute('data-fs-target') ? window.FokusStyles?.Offcanvas?.getOrCreateInstance(personalTrigger) : null; const destructive = window.FokusStyles?.Modal?.getOrCreateInstance(root.querySelector('#module-destructive-trigger')); const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char])); const money = (value) => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); const labels = { ativo: 'Ativo', inativo: 'Inativo', rascunho: 'Rascunho', pausado: 'Pausado', arquivado: 'Arquivado', publicado: 'Publicado' }; const badge = (value) => `<span class="fs-badge fs-badge-width-80 fs-badge-soft-${String(value).toLowerCase() === 'ativo' || String(value).toLowerCase() === 'publicado' ? 'success' : String(value).toLowerCase() === 'pausado' ? 'warning' : String(value).toLowerCase() === 'arquivado' ? 'danger' : 'secondary'}">${esc(value || '-')}</span>`; const message = (text, tone = 'danger') => { const node = root.querySelector('#modules-message'); if (!node) return; node.textContent = text || ''; node.dataset.tone = tone; node.hidden = !text; }; const field = (name) => form.elements.namedItem(name); const productById = (id) => state.catalog.products.find((product) => String(product.id) === String(id)); const values = (selector) => [...root.querySelector(selector).selectedOptions].map((option) => option.value).filter(Boolean); const selected = (selector, list) => { const set = new Set(list || []); [...root.querySelector(selector).options].forEach((option) => option.selected = set.has(option.value)); };
-    const allModules = () => state.catalog.products.flatMap((product) => (product.modules || []).map((module) => ({ ...module, product_name: product.name, product_code: product.code, linked_plans: (product.plans || []).filter((plan) => (plan.modules || []).some((item) => item.id === module.id)) }))); const statusLabel = (item) => labels[item.status] || item.status || '-'; const publicationLabel = (item) => labels[item.publication_state] || item.publication_state || '-'; const catalogProductCode = (productCode) => ({ 'fokus-law': 'law', 'fokus-lead': 'lead' }[productCode] || productCode); const catalogOptionsFor = (collection, productCode, fallbackKey) => (collection?.[productCode]?.length ? collection[productCode] : null) || (collection?.[catalogProductCode(productCode)]?.length ? collection[catalogProductCode(productCode)] : null) || approvedCatalog[fallbackKey]?.[catalogProductCode(productCode)] || []; const familyOptions = (productCode) => catalogOptionsFor(state.catalog.options.families, productCode, 'families'); const fillOptions = (module = {}) => { const productField = field('product_id'); const family = root.querySelector('#module-code-technical'); const segment = root.querySelector('#module-segments'); const context = root.querySelector('#module-context'); const capability = root.querySelector('#module-capabilities'); const dependencies = root.querySelector('#module-dependencies'); const incompatibilities = root.querySelector('#module-incompatibilities'); if (!productField || !family || !segment || !context || !capability || !dependencies || !incompatibilities) return; const product = productById(productField.value) || state.catalog.products[productField.selectedIndex - 1]; const productLabel = productField.selectedOptions[0]?.textContent || ''; const code = product?.code || (productLabel.includes('Lead') ? 'fokus-lead' : productLabel.includes('Law') ? 'fokus-law' : ''); const catalogCode = catalogProductCode(code); family.innerHTML = '<option value="">Selecione uma família</option>' + familyOptions(code).map((item) => `<option value="${esc(item.code)}">${esc(item.label)}</option>`).join('') + '<option value="outro">Outro</option>'; family.value = module.module_code || ''; root.querySelector('#module-code-custom-wrap')?.toggleAttribute('hidden', family.value !== 'outro'); segment.innerHTML = catalogOptionsFor(state.catalog.options.segments, code, 'segments').map((item) => `<option value="${esc(item.code)}">${esc(item.label)}</option>`).join(''); selected('#module-segments', module.segments || []); const segmentCode = values('#module-segments')[0]; const contexts = state.catalog.options.contexts?.[code]?.[segmentCode]?.length ? state.catalog.options.contexts[code][segmentCode] : state.catalog.options.contexts?.[catalogCode]?.[segmentCode]?.length ? state.catalog.options.contexts[catalogCode][segmentCode] : approvedCatalog.contexts?.[catalogCode]?.[segmentCode] || []; context.innerHTML = '<option value="">Selecione um contexto</option>' + contexts.map((item) => `<option value="${esc(item.code)}">${esc(item.label)}</option>`).join(''); context.value = module.context_code || ''; const caps = state.catalog.options.capabilities?.[code]?.[family.value] || state.catalog.options.capabilities?.[catalogCode]?.[family.value] || []; const savedCapabilities = module.capability_items || (module.capability_codes || []).map((item, index) => ({ code: item, name: module.capabilities?.[index] || item })); const missingCapabilities = savedCapabilities.filter((item) => !caps.some((capabilityItem) => capabilityItem.code === item.code)); capability.innerHTML = [...caps, ...missingCapabilities].map((item) => `<option value="${esc(item.code)}">${esc(item.label || item.name || item.code)}${item.optional ? ' (opcional)' : ''}</option>`).join('') + '<option value="outro">Outro</option>'; selected('#module-capabilities', module.capability_codes || []); const siblings = state.modules.filter((item) => item.product_id === field('product_id').value && item.id !== module.id); const siblingHtml = siblings.map((item) => `<option value="${esc(item.id)}">${esc(item.name)} — ${esc(item.code)}</option>`).join(''); dependencies.innerHTML = siblingHtml; incompatibilities.innerHTML = siblingHtml; selected('#module-dependencies', module.dependency_ids || []); selected('#module-incompatibilities', module.incompatibility_ids || []); };
-    const render = () => {
-        const query = root.querySelector('#module-query').value.trim().toLowerCase();
-        const product = root.querySelector('#module-product-filter').value;
-        const status = root.querySelector('#module-status-filter').value;
-        const rows = state.modules.filter((module) => (!query || [module.name, module.code, module.module_code, module.context_code, module.product_name, ...(module.segments || [])].some((value) => String(value || '').toLowerCase().includes(query))) && (!product || module.product_id === product) && (!status || module.status === status));
-        const pages = Math.max(1, Math.ceil(rows.length / 15));
-        state.page = Math.min(Math.max(state.page, 1), pages);
-        const visible = rows.slice((state.page - 1) * 15, state.page * 15);
-        const action = (type, label, file, module, danger = false) => `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action${danger ? ' fs-btn-danger' : ''}" type="button" data-action="${type}" data-id="${esc(module.id)}" aria-label="${label}" title="${label}"><img src="/backoffice/assets/icons/${file}?v=20260921-catalog-model-v30" alt="" width="20" height="20"></button>`;
-        const actions = (module) => {
-            const canPublish = window.__backofficePermissions?.has('platform.catalog.publish') === true;
-            const items = [action('view', 'Ver detalhes do módulo', 'Folder-File--Streamline-Ultimate.png', module), action('edit', 'Editar módulo', 'Common-File-Edit--Streamline-Ultimate.png', module)];
-            if (module.status === 'rascunho' && canPublish) items.push(action('activate', 'Ativar módulo', 'Common-File-Check--Streamline-Ultimate.png', module), action('archive', 'Arquivar módulo', 'File-Code-Remove--Streamline-Ultimate.png', module));
-            else if (module.status === 'ativo' && module.publication_state === 'publicado' && canPublish) items.push(action('pause', 'Pausar publicação', 'File-Code-Subtract--Streamline-Ultimate.png', module));
-            else if (module.status === 'ativo' && canPublish) items.push(action('publish', 'Publicar módulo', 'File-Code-2--Streamline-Ultimate.png', module));
-            else if (module.status !== 'arquivado' && canPublish) items.push(action('activate', 'Reativar módulo', 'Common-File-Check--Streamline-Ultimate.png', module));
-            if (module.status === 'arquivado' && canPublish) items.push(action('delete', 'Excluir módulo', 'Common-File-Remove--Streamline-Ultimate.png', module, true));
-            return items.join('');
-        };
-        root.querySelector('#module-list').innerHTML = visible.length ? visible.map((module) => `<tr><td data-label="Produto"><strong>${esc(module.product_name)}</strong><small class="fs-u-d-block fs-u-fs-sm">${esc([module.module_code, ...(module.segments || []), module.context_code].filter(Boolean).join(' / ') || 'Contexto não informado')}</small></td><td data-label="Módulo e funcionalidade"><strong>${esc(module.name)}</strong><small class="fs-u-d-block fs-u-fs-sm module-capability-list">${esc((module.capabilities || []).join(', ') || 'Sem funcionalidades descritas')}</small></td><td data-label="Preço mensal">${money(module.monthly_price)}</td><td data-label="Status">${badge(statusLabel(module))}</td><td data-label="Publicação">${badge(publicationLabel(module))}</td><td data-label="Ações"><div class="fs-u-d-flex fs-u-gap-2">${actions(module)}</div></td></tr>`).join('') : '<tr><td colspan="6">Nenhum módulo encontrado com os filtros informados.</td></tr>';
-        root.querySelector('#module-table-summary').textContent = `${rows.length} registros encontrados`;
-        root.querySelector('#module-table-footer-summary').textContent = `Mostrando página ${state.page} de ${pages} com ${visible.length} registros.`;
-        root.querySelector('#module-pagination').innerHTML = `<ul class="fs-pagination fs-pagination-compact">${Array.from({ length: pages }, (_, index) => `<li class="fs-page-item${index + 1 === state.page ? ' is-active' : ''}"><button class="fs-page-link" type="button" data-module-page="${index + 1}" aria-current="${index + 1 === state.page ? 'page' : 'false'}">${index + 1}</button></li>`).join('')}</ul>`;
-    };
-    const personalizationsPanel = root.querySelector('#module-personalizations-drawer');
-    const personalizationsList = personalizationsPanel?.querySelector('#personalizations-list');
-    const renderPersonalizations = () => { if (!personalizationsList) return; const types = state.catalog.options.personalization_types || []; personalizationsList.innerHTML = state.personalizations.map((item, index) => `<div class="fs-card fs-u-mb-3" data-index="${index}"><div class="fs-card-body"><label class="fs-form-label">Tipo<select class="fs-form-select p-type" data-index="${index}">${types.map((type) => `<option value="${esc(type.code)}"${type.code === item.type_code ? ' selected' : ''}>${esc(type.label)}</option>`).join('')}</select></label><label class="fs-form-label">Obrigatória<select class="fs-form-select p-required" data-index="${index}"><option value="1"${item.required ? ' selected' : ''}>Sim</option><option value="0"${!item.required ? ' selected' : ''}>Não</option></select></label><label class="fs-form-label">Ativa<select class="fs-form-select p-active" data-index="${index}"><option value="1"${item.active !== false ? ' selected' : ''}>Sim</option><option value="0"${item.active === false ? ' selected' : ''}>Não</option></select></label><p class="fs-form-label">Faixas</p>${item.tiers.map((tier, tierIndex) => `<div class="fs-form-row"><input class="fs-form-control p-value" data-index="${index}" data-tier="${tierIndex}" type="number" min="1" value="${esc(tier.value)}" placeholder="Quantidade"><input class="fs-form-control p-price" data-index="${index}" data-tier="${tierIndex}" type="number" min="0" step="0.01" value="${esc(tier.additional_monthly_amount)}" placeholder="Acréscimo mensal"><button class="fs-btn fs-btn-outline-primary p-tier-remove" type="button" data-index="${index}" data-tier="${tierIndex}">Remover</button></div>`).join('')}<button class="fs-btn fs-btn-outline-primary p-tier-add" type="button" data-index="${index}">Adicionar faixa</button><button class="fs-btn fs-btn-danger p-remove" type="button" data-index="${index}">Remover personalização</button></div></div>`).join(''); }; const summary = () => { const node = root.querySelector('#module-personalizations-summary'); if (!node) return; node.innerHTML = state.personalizations.length ? state.personalizations.map((item) => `<div>${esc(item.type_code)} · ${item.required ? 'Obrigatória' : 'Opcional'} · ${item.tiers.length} faixa(s)</div>`).join('') : 'Nenhuma personalização configurada.'; };
-    const resetForm = () => { form.reset(); field('product_id').innerHTML = '<option value="">Selecione um produto</option>' + state.catalog.products.map((product) => `<option value="${esc(product.id)}">${esc(product.name)}</option>`).join(''); if (state.catalog.products[0]) field('product_id').value = state.catalog.products[0].id; root.querySelector('#module-edit-controls')?.setAttribute('hidden', ''); root.querySelector('#module-form-submit')?.replaceChildren(document.createTextNode('Cadastrar módulo')); viewPanel?.setAttribute('hidden', ''); form.hidden = false; state.personalizations = []; fillOptions(); summary(); }; const fillForm = (module = null) => { resetForm(); if (module) { field('product_id').value = module.product_id; field('name').value = module.name || ''; field('module_code').value = module.module_code || ''; field('context_code').value = module.context_code || ''; field('technical_description').value = module.technical_description || ''; field('commercial_content').value = module.commercial_content || ''; field('monthly_price').value = window.FokusCurrency?.format(module.monthly_price) || ''; field('price_is_estimate').value = module.price_is_estimate ? '1' : '0'; field('display_order').value = module.display_order || 0; field('featured').value = module.featured ? '1' : '0'; root.querySelector('#module-edit-controls')?.removeAttribute('hidden'); state.personalizations = (module.personalizations || []).map((item) => ({ type_code: item.type_code, required: !!item.required, active: item.active !== false, tiers: (item.tiers || []).map((tier) => ({ value: tier.value, additional_monthly_amount: tier.additional_monthly_amount, active: tier.active !== false })) })); } fillOptions(module || {}); summary(); };
-    const detailList = (items, get = (item) => item) => items?.length ? `<ul>${items.map((item) => `<li>${esc(get(item))}</li>`).join('')}</ul>` : '<p class="fs-u-color-secondary">Nenhum item informado.</p>'; const showDetails = (module) => { viewPanel.innerHTML = `<div class="fs-card"><div class="fs-card-header"><h3 class="fs-card-title">Dados do módulo</h3></div><div class="fs-card-body"><dl><div><dt class="fs-form-label">Produto</dt><dd>${esc(module.product_name)}</dd></div><div><dt class="fs-form-label">Nome</dt><dd>${esc(module.name)}</dd></div><div><dt class="fs-form-label">Código público</dt><dd>${esc(module.code)}</dd></div><div><dt class="fs-form-label">Família técnica</dt><dd>${esc(module.module_code || '-')}</dd></div><div><dt class="fs-form-label">Segmentos / contexto</dt><dd>${esc([...(module.segments || []), module.context_code].filter(Boolean).join(' / ') || '-')}</dd></div><div><dt class="fs-form-label">Status</dt><dd>${badge(statusLabel(module))}</dd></div></dl></div></div><div class="fs-card"><div class="fs-card-header"><h3 class="fs-card-title">Funcionalidades e personalizações</h3></div><div class="fs-card-body"><h4>Funcionalidades</h4>${detailList(module.capabilities)}<h4>Personalizações</h4>${detailList(module.personalizations, (item) => `${item.type_label} · ${item.unit} · ${item.required ? 'obrigatória' : 'opcional'} · ${item.tiers.length} faixa(s)`)}</div></div><div class="fs-card"><div class="fs-card-header"><h3 class="fs-card-title">Regras e planos</h3></div><div class="fs-card-body"><h4>Dependências</h4>${detailList(module.dependencies, (item) => item.name)}<h4>Incompatibilidades</h4>${detailList(module.incompatibilities, (item) => item.name)}<h4>Planos vinculados</h4>${detailList(module.linked_plans, (item) => item.full_name || item.name)}</div></div>`; form.hidden = true; viewPanel.hidden = false; };
-    const load = async () => { try { state.catalog = await api.request('/backoffice/catalog'); state.catalog.options = state.catalog.options || {}; state.modules = allModules(); root.querySelector('#module-product-filter').innerHTML = '<option value="">Todos os produtos</option>' + state.catalog.products.map((product) => `<option value="${esc(product.id)}">${esc(product.name)}</option>`).join(''); resetForm(); render(); message(''); } catch (error) { message(error.message || 'Não foi possível carregar os módulos.'); } }; const openCreate = () => { state.editing = null; fillForm(); root.querySelector('#module-drawer-kicker')?.replaceChildren(document.createTextNode('CATÁLOGO')); root.querySelector('#module-drawer-title')?.replaceChildren(document.createTextNode('NOVO MÓDULO')); offcanvas?.show(); setTimeout(() => field('name').focus(), 0); }; const openEdit = (module) => { state.editing = module.id; fillForm(module); root.querySelector('#module-drawer-title')?.replaceChildren(document.createTextNode('EDITAR MÓDULO')); root.querySelector('#module-form-submit')?.replaceChildren(document.createTextNode('Salvar alterações')); offcanvas?.show(); setTimeout(() => field('name').focus(), 0); }; const openView = (module) => { showDetails(module); root.querySelector('#module-drawer-kicker')?.replaceChildren(document.createTextNode('CONSULTA')); root.querySelector('#module-drawer-title')?.replaceChildren(document.createTextNode('DETALHES DO MÓDULO')); offcanvas?.show(); };
-    drawerTrigger?.addEventListener('click', openCreate); root.querySelector('#module-drawer-close')?.addEventListener('click', () => offcanvas?.hide()); root.querySelector('#module-form-cancel')?.addEventListener('click', () => offcanvas?.hide()); root.querySelector('#module-filter-form')?.addEventListener('submit', (event) => { event.preventDefault(); state.page = 1; render(); }); field('product_id')?.addEventListener('change', () => fillOptions()); root.querySelector('#module-segments')?.addEventListener('change', () => fillOptions()); root.querySelector('#module-code-technical')?.addEventListener('change', () => fillOptions()); personalTrigger?.addEventListener('click', () => { renderPersonalizations(); personalOffcanvas?.show(); }); personalizationsPanel?.querySelector('#module-personalizations-close')?.addEventListener('click', () => personalOffcanvas?.hide()); personalizationsPanel?.querySelector('#personalizations-save')?.addEventListener('click', () => { summary(); personalOffcanvas?.hide(); }); personalizationsPanel?.querySelector('#personalization-add')?.addEventListener('click', (event) => { event.preventDefault(); state.personalizations.push({ type_code: state.catalog.options.personalization_types?.[0]?.code || '', required: true, active: true, tiers: [{ value: 1, additional_monthly_amount: 0, active: true }] }); renderPersonalizations(); }); personalizationsList?.addEventListener('click', (event) => { const control = event.target.closest('.p-remove, .p-tier-add, .p-tier-remove'); if (!control || !personalizationsList.contains(control)) return; const index = Number(control.dataset.index); if (!Number.isInteger(index)) return; const item = state.personalizations[index]; if (!item) return; if (control.classList.contains('p-remove')) state.personalizations.splice(index, 1); if (control.classList.contains('p-tier-add')) item.tiers.push({ value: 1, additional_monthly_amount: 0, active: true }); if (control.classList.contains('p-tier-remove')) item.tiers.splice(Number(control.dataset.tier), 1); renderPersonalizations(); }); personalizationsList?.addEventListener('change', (event) => { const index = Number(event.target.dataset.index); if (!Number.isInteger(index)) return; const item = state.personalizations[index]; if (event.target.classList.contains('p-type')) item.type_code = event.target.value; if (event.target.classList.contains('p-required')) item.required = event.target.value === '1'; if (event.target.classList.contains('p-active')) item.active = event.target.value === '1'; if (event.target.classList.contains('p-value')) item.tiers[Number(event.target.dataset.tier)].value = Number(event.target.value); if (event.target.classList.contains('p-price')) item.tiers[Number(event.target.dataset.tier)].additional_monthly_amount = Number(event.target.value); });
-    form.addEventListener('submit', async (event) => { event.preventDefault(); const payload = { product_id: field('product_id').value, name: field('name').value, module_code: field('module_code').value, module_code_custom_name: field('module_code_custom_name').value, segments: values('#module-segments'), context_code: field('context_code').value || null, monthly_price: window.FokusCurrency?.parse(field('monthly_price').value) ?? 0, price_is_estimate: field('price_is_estimate').value === '1', technical_description: field('technical_description').value, commercial_content: field('commercial_content').value, capability_codes: values('#module-capabilities').filter((item) => item !== 'outro'), dependency_ids: values('#module-dependencies'), incompatibility_ids: values('#module-incompatibilities'), personalizations: state.personalizations }; if (state.editing) { payload.display_order = Number(field('display_order').value || 0); payload.featured = field('featured').value === '1'; } try { await api.request(state.editing ? `/backoffice/catalog/modules/${state.editing}` : '/backoffice/catalog/modules', { method: state.editing ? 'PATCH' : 'POST', body: payload }); offcanvas?.hide(); await load(); message('Módulo salvo com sucesso.', 'success'); } catch (error) { message(error.message || 'Não foi possível salvar o módulo.'); } }); root.querySelector('#module-list').addEventListener('click', async (event) => { const control = event.target.closest('[data-action]'); if (!control) return; const module = state.modules.find((item) => item.id === control.dataset.id); if (!module) return; const type = control.dataset.action; if (type === 'view') return openView(module); if (type === 'edit') return openEdit(module); if (type === 'archive' || type === 'delete') { state.pending = { type, module }; destructive?.show(); return; } try { const endpoint = type === 'publish' ? 'publish' : type === 'pause' ? 'pause' : 'activate'; await api.request(`/backoffice/catalog/modules/${module.id}/${endpoint}`, { method: 'POST' }); await load(); message('Status do módulo atualizado.', 'success'); } catch (error) { message(error.message || 'Não foi possível atualizar o módulo.'); } }); root.querySelector('#module-pagination').addEventListener('click', (event) => { const button = event.target.closest('[data-module-page]'); if (button) { state.page = Number(button.dataset.modulePage); render(); } }); root.querySelector('#module-destructive-form').addEventListener('submit', async (event) => { event.preventDefault(); if (!state.pending) return; const { type, module } = state.pending; const reason = new FormData(event.currentTarget).get('reason'); try { await api.request(type === 'delete' ? `/backoffice/catalog/modules/${module.id}` : `/backoffice/catalog/modules/${module.id}/archive`, { method: type === 'delete' ? 'DELETE' : 'POST', body: { reason } }); destructive?.hide(); await load(); message('Ação concluída.', 'success'); } catch (error) { message(error.message || 'Não foi possível concluir a ação.'); } }); load();
-})();
-</script>
-<script>
-(() => {
-    const root = document.querySelector('.admin-modules-page');
-    if (!root) return;
-    const family = root.querySelector('#module-code-technical');
-    const segments = root.querySelector('#module-segments');
-    const context = root.querySelector('#module-context');
-    const capabilities = root.querySelector('#module-capabilities');
-    family?.addEventListener('change', () => {
-        const value = family.value;
-        setTimeout(() => { family.value = value; root.querySelector('#module-code-custom-wrap').hidden = value !== 'outro'; }, 0);
-    }, true);
-    segments?.addEventListener('change', (event) => {
-        // The general form refresh rebuilds all selectors with empty values.
-        // Handle this dependency here so the family already selected is preserved.
-        event.stopImmediatePropagation();
-
-        const contextsBySegment = {
-            advocacia: [{ code: 'escritorio', label: 'Escritório' }],
-            setor_publico: [
-                { code: 'judiciario', label: 'Judiciário' },
-                { code: 'orgao_publico', label: 'Órgão público' },
-            ],
-            one: [{ code: 'corretor_independente', label: 'Corretor independente' }],
-            team: [{ code: 'imobiliaria_equipe', label: 'Imobiliária/equipe' }],
-        };
-        const previousValue = context.value;
-        const items = [...segments.selectedOptions]
-            .flatMap((option) => contextsBySegment[option.value] || []);
-
-        context.innerHTML = '<option value="">Selecione um contexto</option>'
-            + items.map((item) => `<option value="${item.code}">${item.label}</option>`).join('');
-        context.value = items.some((item) => item.code === previousValue) ? previousValue : '';
-    }, true);
-    capabilities?.addEventListener('change', () => {
-        const values = [...capabilities.selectedOptions].map((option) => option.value);
-        setTimeout(() => [...capabilities.options].forEach((option) => { option.selected = values.includes(option.value); }), 0);
-    }, true);
-})();
-</script>
-<script>
-(() => {
-    const select = document.querySelector('#module-capabilities');
-    const custom = document.querySelector('#module-capabilities-custom');
-    const wrap = document.querySelector('#module-capabilities-custom-wrap');
-    if (!select || !custom || !wrap) return;
-    select.size = 1;
-    select.addEventListener('change', () => {
-        wrap.hidden = ![...select.selectedOptions].some((option) => option.value === 'outro');
-    });
-    custom.addEventListener('keydown', (event) => {
-        if (event.key !== 'Enter') return;
-        event.preventDefault();
-        const name = custom.value.trim();
-        if (!name) return;
-        const code = `custom_${name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')}`;
-        if (!select.querySelector(`option[value="${CSS.escape(code)}"]`)) {
-            const option = new Option(name, code, true, true);
-            select.add(option, select.options.length - 1);
-        }
-        custom.value = '';
-    });
-})();
-</script>

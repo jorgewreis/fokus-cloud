@@ -33,29 +33,6 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 450px; max-width: ca
 .fs-offcanvas-backdrop { z-index: 2000 !important; }
 .backoffice-records-drawer .fs-invalid-feedback { margin: 5px; padding: 2px 10px; }
 .backoffice-records-page .fs-page-layout > .fs-btn-primary { color: var(--fs-color-on-primary); border-color: var(--fs-color-primary); background-color: var(--fs-color-primary); }
-.admin-products-page .fs-table-responsive.fs-datatable,
-.admin-modules-page .fs-table-responsive.fs-datatable { overflow-x: hidden; overflow-y: hidden; }
-.admin-products-page .fs-table-records thead tr,
-.admin-products-page .fs-table-records tbody tr { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1.5fr) minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1.5fr); justify-content: initial; }
-.admin-modules-page .fs-table-records thead tr,
-.admin-modules-page .fs-table-records tbody tr { display: flex !important; width: max-content !important; min-width: 100% !important; justify-content: initial !important; }
-.admin-products-page .fs-table-records thead th,
-.admin-products-page .fs-table-records tbody td,
-.admin-modules-page .fs-table-records thead th,
-.admin-modules-page .fs-table-records tbody td { box-sizing: border-box; min-width: 0 !important; }
-.admin-modules-page .fs-table-records tr > * { min-width: 0 !important; max-width: none !important; }
-.admin-modules-page .fs-table-records thead tr > :nth-child(1), .admin-modules-page .fs-table-records tbody tr > :nth-child(1) { flex: 0 0 300px; }
-.admin-modules-page .fs-table-records thead tr > :nth-child(2), .admin-modules-page .fs-table-records tbody tr > :nth-child(2) { flex: 0 0 300px; }
-.admin-modules-page .fs-table-records thead tr > :nth-child(3), .admin-modules-page .fs-table-records tbody tr > :nth-child(3), .admin-modules-page .fs-table-records thead tr > :nth-child(4), .admin-modules-page .fs-table-records tbody tr > :nth-child(4), .admin-modules-page .fs-table-records thead tr > :nth-child(5), .admin-modules-page .fs-table-records tbody tr > :nth-child(5) { flex: 0 0 120px; }
-.admin-modules-page .fs-table-records thead tr > :nth-child(6), .admin-modules-page .fs-table-records tbody tr > :nth-child(6) { flex: 0 0 180px; }
-.admin-modules-page .fs-table-records tbody td[colspan] { flex: 1 1 100%; }
-.admin-modules-page .fs-table-records .module-capability-list { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.35; }
-.admin-products-page .fs-table-records tbody td[colspan],
-.admin-modules-page .fs-table-records tbody td[colspan] { grid-column: 1 / -1; }
-.admin-products-page .fs-card-footer { align-items: center; padding: 12px 20px; }
-.admin-products-page #product-table-footer-summary { color: #58758a; font: 400 .8rem/1.35 "Google Sans", sans-serif; }
-.admin-products-page #product-pagination { margin-left: auto; }
-.admin-products-page #product-pagination .fs-pagination { margin: 0; }
 .fs-confirmation-dialog .fs-modal-dialog { width: min(480px, calc(100vw - 32px)); }
 .fs-confirmation-dialog .fs-modal-content { overflow: hidden; }
 .fs-confirmation-dialog .fs-modal-header { align-items: flex-start; gap: 16px; padding: 20px; }
@@ -211,64 +188,6 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 450px; max-width: ca
 .create-drawer .painel-form :is(.input-label, .fs-form-control)::placeholder { color: var(--color-muted, #58758a); opacity: .4; }
 .create-drawer .painel-form :is(.input-label, .fs-form-control):disabled,
 .create-drawer .painel-form :is(.form-select, .fs-form-select):disabled { background: var(--color-surface-light, #edf7f7); color: var(--color-muted, #58758a); }
-
-#product-drawer .painel-form textarea.input-label {
-    height: 70px !important;
-    min-height: 70px !important;
-    padding: 12px 15px !important;
-}
-
-#module-drawer .painel-form textarea.fs-form-control {
-    height: 70px !important;
-    min-height: 70px !important;
-    padding: 12px 15px !important;
-}
-
-#module-personalizations-open {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 38px;
-    padding: 0 16px;
-    color: var(--fs-alert-primary-text);
-    border: var(--fs-border-width, 1px) solid var(--fs-color-primary);
-    background-color: transparent;
-}
-
-#module-personalizations-open:hover,
-#module-personalizations-open:focus-visible,
-#module-personalizations-open:active {
-    color: var(--fs-color-on-primary);
-    background-color: var(--fs-color-primary);
-}
-
-#module-personalizations-drawer #personalization-add {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 38px;
-    padding: 0 16px;
-    color: var(--fs-alert-primary-text);
-    border: var(--fs-border-width, 1px) solid var(--fs-color-primary);
-    border-radius: var(--fs-border-radius, 4px);
-    background-color: transparent;
-    font: 500 .8rem/1 "Google Sans", sans-serif;
-}
-
-#module-personalizations-drawer #personalization-add:hover,
-#module-personalizations-drawer #personalization-add:focus-visible,
-#module-personalizations-drawer #personalization-add:active {
-    color: var(--fs-color-on-primary);
-    background-color: var(--fs-color-primary);
-}
-
-#module-personalizations-drawer #personalizations-list .fs-card.fs-u-mb-3 {
-    padding: 15px;
-}
-
-#module-personalizations-drawer #personalizations-list .fs-form-label {
-    margin-bottom: 10px;
-}
 
 .create-drawer .painel-form .form-line { margin-bottom: 10px; }
 .create-drawer .painel-form .fs-width-400 { width: 180px !important; }
