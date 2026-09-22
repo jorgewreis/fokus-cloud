@@ -31,17 +31,18 @@
         />
         <link
             rel="stylesheet"
-            href="/assets/css/shared/fokus.css?v=20260918-fokus-styles-companies-v47"
+            href="/assets/css/shared/fokus.css?v=20260922-backoffice-contract-v1"
         />
     </head>
     <body>
         <script src="/assets/js/api-client.js?v=20260828-19"></script>
         <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script>
         <script src="/backoffice/assets/js/toast-notifications.js?v=20260922-backoffice-toast-v2"></script>
-        <script src="/backoffice/assets/js/form-system.js?v=20260919-record-validation-v1"></script>
+        <script src="/backoffice/assets/js/form-system.js?v=20260922-backoffice-contract-v1"></script>
         <script src="/backoffice/assets/js/brazilian-documents.js?v=20260919-cnpj-alphanumeric-v2"></script>
         <script src="/backoffice/assets/js/currency-input.js?v=20260902-currency-prefix-fix"></script>
-        <script src="/backoffice/assets/js/records-page.js?v=20260922-records-nested-drawer-v4"></script>
+        <script src="/backoffice/assets/js/records-page.js?v=20260922-records-nested-drawer-v5"></script>
+        <script src="/backoffice/assets/js/backoffice-router.js?v=20260922-backoffice-contract-v2"></script>
         <template id="backoffice-app-template">
         <div class="container-page expanded">
             <div class="fs-sidebar expanded" id="sidebar">
@@ -549,14 +550,6 @@
                 return parts.join(" ").trim();
             }
 
-            function runPageScripts(container) {
-                container.querySelectorAll("script").forEach((script) => {
-                    const nextScript = document.createElement("script");
-                    nextScript.textContent = script.textContent;
-                    script.replaceWith(nextScript);
-                });
-            }
-
             function initFokusStylesComponents() {
                 const definitions = [
                     ["tooltip", window.FokusStyles?.Tooltip],
@@ -582,43 +575,7 @@
             };
 
             async function loadSidebarPage(pageName) {
-                if (pageName === "products" && window.__backofficeAdmin?.role !== "superadministrador") {
-                    pageName = "companies";
-                }
-                document.querySelectorAll("link[data-page-css]").forEach((stylesheet) => stylesheet.remove());
-                pageContent.innerHTML =
-                    '<div class="text-body fs-u-color-secondary">Carregando...</div>';
-
-                try {
-                    const response = await fetch(
-                        `${pagePath}/${pageName}.html?v=${pageVersion}`,
-                    );
-
-                    if (!response.ok) {
-                        throw new Error(`Pagina nao encontrada: ${pageName}`);
-                    }
-
-                    pageContent.innerHTML = await response.text();
-                    window.FokusForm?.enhance(pageContent);
-                    initFokusStylesComponents();
-                    runPageScripts(pageContent);
-
-                    sidebarButtons.forEach((button) => {
-                        button.classList.toggle(
-                            "active",
-                            button.dataset.sidebarItem === pageName,
-                        );
-                    });
-                } catch (error) {
-                    pageContent.innerHTML = "";
-                    sidebarButtons.forEach((button) => {
-                        button.classList.toggle(
-                            "active",
-                            button.dataset.sidebarItem === pageName,
-                        );
-                    });
-                    console.error(error);
-                }
+                return window.__backofficeRouter?.navigate(pageName);
             }
 
             window.__adminHeaderNotifications = [];
@@ -709,9 +666,8 @@
 
             async function hydrateAdmin() {
                 try {
-                    const response = await FokusApi.request(
-                        "/backoffice/auth/me",
-                    );
+                    const response = window.__backofficeBootstrapResponse;
+                    if (!response?.admin) throw new Error("Não autorizado.");
                         document
                         .querySelectorAll("[data-platform-permission]")
                         .forEach((element) => {
@@ -739,12 +695,14 @@
 
                 window.__backofficeAuthorized = true;
                 document.documentElement.dataset.backofficeAuth = "authorized";
+                window.__backofficeRouter = window.BackofficeRouter.create({
+                    root: pageContent,
+                    sidebarButtons,
+                    admin,
+                    onComponentsReady: initFokusStylesComponents,
+                });
                 loadAdminHeaderData().catch(() => {});
-                loadSidebarPage(
-                    routePageMap[
-                        location.pathname.split("/").filter(Boolean).pop()
-                    ] || "companies",
-                );
+                window.__backofficeRouter.start();
             })();
         })();
         </script>
@@ -754,6 +712,7 @@
                 try {
                     const response = await FokusApi.request("/backoffice/auth/me");
                     if (!response?.admin) throw new Error("Não autorizado.");
+                    window.__backofficeBootstrapResponse = response;
                     document.documentElement.dataset.backofficeAuth = "authorized";
                     const template = document.querySelector("#backoffice-app-template");
                     const fragment = template.content.cloneNode(true);

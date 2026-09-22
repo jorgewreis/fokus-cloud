@@ -100,9 +100,30 @@ travar foco, fechar com Escape e devolver foco ao acionador.
 
 ## Processo para novas páginas
 
-1. Copiar a anatomia do playground.
-2. Escolher somente classes oficiais e utilitários existentes.
-3. Adicionar os hooks de dados necessários sem criar classes visuais.
-4. Validar desktop, mobile, teclado e estados de erro.
-5. Criar CSS local apenas se o caso for exclusivo do shell e registrar a razão;
-   necessidades globais devem ser encaminhadas ao repositório `fokus-styles`.
+1. Criar a base com `npm run backoffice:page:new -- --id=... --title="..."`.
+   O gerador cria o fragmento declarativo e o módulo de ciclo de vida; a rota
+   só pode ser publicada após o registro em `BackofficePageRegistry`.
+2. Implementar `mount(root, context)` e retornar uma função de descarte. O
+   descarte remove listeners, timers, requests e overlays criados pela página.
+3. Escolher somente classes oficiais e composições desta página; hooks de
+   dados não podem ser usados como classes visuais.
+4. Executar `npm run backoffice:contract:check`, `npm run tokens:check` e os
+   testes da aplicação antes de solicitar revisão visual.
+5. Validar desktop, tablet, mobile, teclado, carregamento, vazio, erro,
+   criação, edição e detalhes. O shell nunca pode renderizar antes da resposta
+   autorizada de `/backoffice/auth/me`.
+6. Criar CSS local somente para um caso exclusivo do shell e registrar a
+   razão. Necessidades genéricas pertencem ao repositório `fokus-styles`.
+
+## Contrato imutável de ciclo de vida
+
+`public/backoffice/assets/js/backoffice-router.js` é o único carregador de
+fragmentos. Ele controla rota, histórico, permissões, cancelamento de
+requisições, estilos exclusivos e descarte da página anterior. O contexto de
+montagem contém `admin`, `permissions`, `api`, `router`, `root` e `signal`.
+
+Os fragmentos legados continuam atendidos por uma ponte de compatibilidade
+durante a migração, mas páginas novas não podem adicionar scripts inline. Todo
+novo comportamento deve estar no módulo da página. Drawers portaled recebem
+um proprietário de página e são removidos pelo ciclo de descarte, evitando IDs
+duplicados após troca de rota.

@@ -16,6 +16,8 @@ storage/framework/views/
 dist/
 build/
 coverage/
+playwright-report/
+test-results/
 *.log
 .phpunit.result.cache
 

@@ -56,7 +56,7 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringContainsString('20260921-catalog-model-v30', file_get_contents(base_path('public/backoffice/pages/modules.html')));
         $this->assertStringContainsString('window.initBackofficeRecordsPage?.(root)', file_get_contents(base_path('public/backoffice/pages/modules.html')));
         $this->assertStringContainsString("document.addEventListener('fs:show'", file_get_contents(base_path('public/backoffice/assets/js/records-page.js')));
-        $this->assertStringContainsString('] || "companies",', $panel);
+        $this->assertStringContainsString('BackofficeRouter.create', $panel);
         $this->assertStringContainsString('data-sidebar-item="companies"', $panel);
         $this->assertStringContainsString('data-platform-access-card', $home);
         $this->assertStringContainsString('platform-access.js?v=20260914-platform-access1', $home);

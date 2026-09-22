@@ -1,0 +1,30 @@
+<main class="backoffice-records-page fs-container-fluid fs-u-d-flex fs-u-flex-column" aria-labelledby="{{PAGE_ID}}-page-title">
+    <header class="fs-page-layout">
+        <div class="fs-page-header-display">
+            <span>{{CONTEXT}}</span>
+            <h1 id="{{PAGE_ID}}-page-title">{{TITLE}}</h1>
+            <p>{{DESCRIPTION}}</p>
+        </div>
+        <button class="fs-btn fs-btn-primary fs-width-300" type="button" data-fs-target="#{{PAGE_ID}}-drawer">Novo cadastro</button>
+    </header>
+
+    <section class="fs-card fs-card-panel" aria-labelledby="{{PAGE_ID}}-filters-title">
+        <div class="fs-card-header"><div class="fs-card-header-title"><h2 class="fs-card-title" id="{{PAGE_ID}}-filters-title">Filtros</h2><p class="fs-card-subtitle">Localize registros por seus dados operacionais.</p></div></div>
+        <form class="fs-card-body fs-filter-form" novalidate>
+            <label class="fs-form-label"><span>Pesquisar</span><input class="fs-form-control fs-width-800" type="search" autocomplete="off" /></label>
+            <button class="fs-btn fs-btn-outline-primary fs-width-300" type="submit">Filtrar</button>
+        </form>
+    </section>
+
+    <section class="fs-card fs-card-panel" aria-labelledby="{{PAGE_ID}}-list-title">
+        <div class="fs-card-header"><div class="fs-card-header-title"><h2 class="fs-card-title" id="{{PAGE_ID}}-list-title">Registros cadastrados</h2><p class="fs-card-subtitle">Dados atualizados pela API desta área.</p></div><span class="fs-card-header-info">0 registros encontrados</span></div>
+        <div class="fs-card-body fs-u-p-0"><div class="fs-table-responsive fs-datatable" data-fs="datatable"><table class="fs-table fs-table-records" aria-label="{{TITLE}}"><thead><tr><th class="fs-width-600" scope="col">Registro</th><th class="fs-width-400" scope="col">Status</th><th class="fs-width-400" scope="col">Ações</th></tr></thead><tbody><tr><td colspan="3">Carregando registros…</td></tr></tbody></table></div></div>
+        <div class="fs-card-footer fs-u-d-flex fs-u-justify-content-between fs-u-align-items-center fs-u-flex-wrap fs-u-gap-3"><span>Mostrando página 1 de 1.</span><nav class="fs-pagination fs-pagination-compact" aria-label="Paginação"></nav></div>
+    </section>
+
+    <aside class="fs-offcanvas fs-offcanvas-end backoffice-records-drawer" id="{{PAGE_ID}}-drawer" aria-labelledby="{{PAGE_ID}}-drawer-title" tabindex="-1">
+        <div class="fs-offcanvas-header"><h2 id="{{PAGE_ID}}-drawer-title">NOVO CADASTRO</h2><button class="fs-btn-close" type="button" data-fs-dismiss="offcanvas" aria-label="Fechar painel"></button></div>
+        <form class="fs-offcanvas-body fs-form" novalidate><label class="fs-form-label" for="{{PAGE_ID}}-name">Nome<input class="fs-form-control" id="{{PAGE_ID}}-name" required /></label></form>
+        <div class="fs-offcanvas-footer"><button class="fs-btn fs-btn-outline-primary fs-width-300" type="button" data-fs-dismiss="offcanvas">Cancelar</button><button class="fs-btn fs-btn-primary fs-width-400" type="submit">Cadastrar</button></div>
+    </aside>
+</main>

@@ -1,7 +1,7 @@
-<link data-page-css="companies" rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260918-fokus-styles-companies-v57" />
-<link data-page-css="companies" rel="stylesheet" href="/backoffice/assets/css/pages/companies.css?v=20260919-companies-records-drawer-v55" />
+<link data-page-css="companies" rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260922-backoffice-contract-v1" />
+<link data-page-css="companies" rel="stylesheet" href="/backoffice/assets/css/pages/companies.css?v=20260922-backoffice-contract-v1" />
 
-<main class="admin-company-page container-page fs-container-fluid fs-u-d-flex fs-u-flex-column" aria-labelledby="companies-page-title">
+<main class="admin-company-page backoffice-records-page container-page fs-container-fluid fs-u-d-flex fs-u-flex-column" aria-labelledby="companies-page-title">
     <header class="fs-page-layout">
         <div class="fs-page-header-display">
             <span>Admin</span>
@@ -44,24 +44,24 @@
 
     <div id="company-message" class="fs-alert" role="status" aria-live="polite" hidden></div>
 
-    <section class="fs-card fs-card-panel card-page" aria-labelledby="company-filter-title">
-        <div class="fs-card-header card-header">
-            <div class="fs-card-header-title card-header-title">
-                <h2 class="fs-card-title header-title-name" id="company-filter-title">Filtros</h2>
-                <p class="fs-card-subtitle header-title-description">Encontre rapidamente um cadastro filtrando por nome, documento ou status.</p>
+    <section class="fs-card fs-card-panel" aria-labelledby="company-filter-title">
+        <div class="fs-card-header">
+            <div class="fs-card-header-title">
+                <h2 class="fs-card-title" id="company-filter-title">Filtros</h2>
+                <p class="fs-card-subtitle">Encontre rapidamente um cadastro filtrando por nome, documento ou status.</p>
             </div>
         </div>
-        <form id="company-filter-form" class="fs-card-body card-content content-filter">
-                <label class="form-label" for="company-query">
-                    <span class="label">Nome ou termo relevante</span>
-                    <span class="input-group">
+        <form id="company-filter-form" class="fs-card-body fs-filter-form">
+                <label class="fs-form-label" for="company-query">
+                    <span>Nome ou termo relevante</span>
+                    <span class="fs-input-group fs-input-group-subtle">
                         <span class="fs-input-group-text" aria-hidden="true"><img src="/backoffice/assets/icons/Search-Bar--Streamline-Ultimate.png" alt="" /></span>
-                        <input class="input-label fs-width-800" id="company-query" name="q" type="search" placeholder="Nome, CPF ou CNPJ" autocomplete="off" />
+                        <input class="fs-form-control fs-width-800" id="company-query" name="q" type="search" placeholder="Nome, CPF ou CNPJ" autocomplete="off" />
                     </span>
                 </label>
-                <label class="form-label" for="company-status">
-                    <span class="label">Status</span>
-                    <select class="form-select fs-width-500" id="company-status" name="status">
+                <label class="fs-form-label" for="company-status">
+                    <span>Status</span>
+                    <select class="fs-form-select fs-width-500" id="company-status" name="status">
                         <option value="">Todos os status</option>
                         <option value="ativa">Ativas</option>
                         <option value="suspensa">Suspensas</option>
@@ -74,15 +74,15 @@
         </form>
     </section>
 
-    <section class="fs-card fs-card-panel card-page" aria-labelledby="company-list-title">
-        <div class="fs-card-header card-header">
-            <div class="fs-card-header-title card-header-title">
-                <h2 class="fs-card-title header-title-name" id="company-list-title">Empresas cadastradas</h2>
-                <p class="fs-card-subtitle header-title-description">Consulte dados, responsáveis, assinaturas e ações disponíveis.</p>
+    <section class="fs-card fs-card-panel" aria-labelledby="company-list-title">
+        <div class="fs-card-header">
+            <div class="fs-card-header-title">
+                <h2 class="fs-card-title" id="company-list-title">Empresas cadastradas</h2>
+                <p class="fs-card-subtitle">Consulte dados, responsáveis, assinaturas e ações disponíveis.</p>
             </div>
-            <span class="fs-card-header-info card-header-info" id="company-table-summary">Mostrando 0 a 0 de 0 empresas</span>
+            <span class="fs-card-header-info" id="company-table-summary">Mostrando 0 a 0 de 0 empresas</span>
         </div>
-        <div class="fs-card-body card-content fs-u-p-0">
+        <div class="fs-card-body fs-u-p-0">
             <div class="fs-table-responsive fs-datatable" data-fs="datatable" data-fs-page-size="1000">
                 <table class="fs-table fs-table-records fs-table-hover card-table" aria-label="Empresas cadastradas">
                     <thead>

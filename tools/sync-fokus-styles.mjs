@@ -34,6 +34,108 @@ const directionalIconPolicy = `
     content: none !important;
 }
 `;
+const immutableBackofficeContract = `
+
+/* Immutable Backoffice record-page contract. Page CSS may compose this API,
+   but may not redefine controls, cards, tables, badges or overlays. */
+html[data-role="admin"] {
+    --fs-backoffice-panel-space: var(--fs-space-3, 16px);
+    --fs-backoffice-card-space: var(--fs-space-4, 24px);
+}
+.backoffice-records-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fs-backoffice-panel-space);
+    min-width: 0;
+}
+.backoffice-records-page .fs-card-panel > .fs-card-header,
+.backoffice-records-page .fs-card-panel > .fs-card-body,
+.backoffice-records-page .fs-card-panel > .fs-card-footer {
+    box-sizing: border-box;
+}
+.backoffice-records-page .fs-filter-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: var(--fs-backoffice-panel-space);
+}
+.backoffice-records-page .fs-filter-form .fs-form-label {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: min(100%, 180px);
+    gap: var(--fs-space-1, 4px);
+}
+.backoffice-records-page .fs-form-label,
+.backoffice-records-page .fs-form-control,
+.backoffice-records-page .fs-form-select,
+.backoffice-records-page textarea.fs-form-control {
+    font-family: var(--fs-font-family, "Google Sans", sans-serif);
+}
+.backoffice-records-page .fs-form-control,
+.backoffice-records-page .fs-form-select {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 38px;
+}
+.backoffice-records-page textarea.fs-form-control {
+    min-height: 96px;
+    resize: vertical;
+}
+.backoffice-records-page .fs-table-responsive {
+    min-width: 0;
+    overflow-x: auto;
+}
+.fs-table-action,
+.fs-table-action:hover,
+.fs-table-action:focus-visible,
+.fs-table-action:active {
+    display: inline-flex;
+    flex: 0 0 24px;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    min-height: 24px;
+    padding: 0;
+    visibility: visible !important;
+}
+.fs-table-action::before { display: none !important; content: none !important; }
+.fs-table-action > img { width: 20px; height: 20px; object-fit: contain; }
+.backoffice-records-drawer .fs-offcanvas-body {
+    min-width: 0;
+}
+.backoffice-records-drawer .fs-offcanvas-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fs-space-2, 8px);
+    justify-content: flex-end;
+}
+.backoffice-records-view-panel dl {
+    margin: 0;
+}
+.backoffice-records-view-panel dt {
+    color: var(--fs-color-text-secondary);
+    font-weight: 600;
+}
+.backoffice-records-view-panel dd {
+    margin: var(--fs-space-1, 4px) 0 0;
+    overflow-wrap: anywhere;
+}
+[data-backoffice-overlay="personalizations"] #personalizations-list > .fs-card {
+    padding: 15px;
+}
+[data-backoffice-overlay="personalizations"] #personalizations-list .fs-form-label {
+    margin-bottom: 10px;
+}
+@media (max-width: 680px) {
+    .backoffice-records-page { gap: var(--fs-space-2, 8px); }
+    .backoffice-records-page .fs-filter-form .fs-form-label,
+    .backoffice-records-page .fs-filter-form > .fs-btn { flex-basis: 100%; }
+    .backoffice-records-drawer .fs-offcanvas-footer > .fs-btn { flex: 1 1 100%; }
+}
+`;
 const sharedPageHeaderPolicy = `
 
 /* Compatibility contract for existing internal pages. */
@@ -464,5 +566,5 @@ body { font-family: "Google Sans", sans-serif; }
     .fs-card-panel > .fs-card-footer { align-items: flex-start; padding: 14px 16px; }
 }
 `;
-await writeFile(target, `${sanitizedCss}${linkPolicy}${directionalIconPolicy}${sharedPageHeaderPolicy}`, 'utf8');
+await writeFile(target, `${sanitizedCss}${linkPolicy}${directionalIconPolicy}${sharedPageHeaderPolicy}${immutableBackofficeContract}`, 'utf8');
 console.log(`Synced fokus-styles to ${target}`);

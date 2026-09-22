@@ -10,9 +10,13 @@
         "predev": "npm run styles:sync",
         "build": "npm run seo:sync && npm run styles:sync && npm run styles:cache-bust && vite build",
         "dev": "vite",
-        "tokens:check": "node tools/validate-css-tokens.mjs"
+        "tokens:check": "node tools/validate-css-tokens.mjs",
+        "backoffice:contract:check": "node tools/check-backoffice-ui-contract.mjs",
+        "backoffice:page:new": "node tools/create-backoffice-page.mjs",
+        "test:backoffice:visual": "playwright test --config=playwright.backoffice.config.mjs"
     },
     "devDependencies": {
+        "@playwright/test": "^1.57.0",
         "@tailwindcss/vite": "^4.0.0",
         "concurrently": "^9.0.1",
         "laravel-vite-plugin": "^3.1",

@@ -142,7 +142,7 @@
 
             const label = required.id
                 ? field.querySelector(`label[for="${CSS.escape(required.id)}"]`)
-                : field.querySelector("label, legend, .form-label");
+                : field.querySelector("label, legend, .fs-form-label");
 
             if (!label) {
                 return;

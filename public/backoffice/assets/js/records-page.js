@@ -1,12 +1,16 @@
 /* Shared Backoffice records composition. Portals drawers before the overlay opens. */
 (() => {
+    const pageOwner = (container) => container?.dataset?.backofficePage || "legacy";
+
     const removeOrphanedDrawers = (container) => {
+        const owner = pageOwner(container);
         document.querySelectorAll('body > .backoffice-records-drawer').forEach((drawer) => {
-            if (!container?.contains(drawer)) drawer.remove();
+            if (drawer.dataset.backofficeOwner && drawer.dataset.backofficeOwner !== owner) drawer.remove();
+            if (!drawer.dataset.backofficeOwner && !container?.contains(drawer)) drawer.remove();
         });
     };
 
-    const portalDrawerFromTrigger = (trigger) => {
+    const portalDrawerFromTrigger = (trigger, container = trigger?.closest?.('#page-content')) => {
         const selector = trigger?.getAttribute('data-fs-target');
         const drawer = selector ? document.querySelector(selector) : null;
         if (drawer?.dataset.fsPortal === 'false') return;
@@ -16,6 +20,7 @@
             });
         }
         if (drawer?.classList.contains('backoffice-records-drawer') && drawer.parentElement !== document.body) {
+            drawer.dataset.backofficeOwner = pageOwner(container);
             document.body.appendChild(drawer);
         }
     };
@@ -33,7 +38,22 @@
             });
             if (drawer.parentElement === document.body) return;
             const trigger = container.querySelector?.(`[data-fs-target="#${drawer.id}"]`);
-            if (trigger) portalDrawerFromTrigger(trigger);
+            if (trigger) portalDrawerFromTrigger(trigger, container);
+        });
+        const ids = new Set();
+        document.querySelectorAll('body > [id]').forEach((element) => {
+            if (!ids.has(element.id)) {
+                ids.add(element.id);
+                return;
+            }
+            element.remove();
+        });
+    };
+
+    window.disposeBackofficeRecordsPage = (container = document) => {
+        const owner = pageOwner(container);
+        document.querySelectorAll('body > .backoffice-records-drawer').forEach((drawer) => {
+            if (drawer.dataset.backofficeOwner === owner || !drawer.dataset.backofficeOwner) drawer.remove();
         });
     };
 })();
