@@ -143,7 +143,7 @@ class BackofficeController extends Controller
     public function companies(Request $request, PlatformAudit $audit)
     {
         $query = trim((string) $request->query('q', ''));
-        $perPage = min(max((int) $request->query('per_page', 25), 1), 100);
+        $perPage = min(max((int) $request->query('per_page', 15), 1), 100);
         $status = $request->query('status');
         $sorts = [
             'company' => 'company.legal_name',
@@ -438,7 +438,7 @@ class BackofficeController extends Controller
         $query = trim((string) $request->query('q', ''));
         $status = $request->query('status');
         $productId = $request->query('product_id');
-        $perPage = min(max((int) $request->query('per_page', 25), 1), 100);
+        $perPage = min(max((int) $request->query('per_page', 15), 1), 100);
         $paginator = DB::table('subscriptions as subscription')
             ->join('companies as company', 'company.id', '=', 'subscription.company_id')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
@@ -474,7 +474,7 @@ class BackofficeController extends Controller
 
     public function payments(Request $request, PlatformAudit $audit)
     {
-        $perPage = min(max((int) $request->query('per_page', 25), 1), 100);
+        $perPage = min(max((int) $request->query('per_page', 15), 1), 100);
         $paginator = DB::table('payments as payment')
             ->join('companies as company', 'company.id', '=', 'payment.company_id')
             ->leftJoin('subscriptions as subscription', 'subscription.id', '=', 'payment.subscription_id')
@@ -519,7 +519,7 @@ class BackofficeController extends Controller
     {
         $query = DB::table('refund_requests')->orderByDesc('created_at');
         if ($request->query('status')) $query->where('status', $request->query('status'));
-        $paginator = $query->paginate(min(max((int) $request->query('per_page', 25), 1), 100));
+        $paginator = $query->paginate(min(max((int) $request->query('per_page', 15), 1), 100));
         $audit->record($request->user()->id, 'backoffice.refunds_viewed', request: $request);
         return response()->json(['data' => collect($paginator->items())->map(fn (object $refund): array => $manager->payload($refund))->values(), 'meta' => $this->paginationMeta($paginator)]);
     }

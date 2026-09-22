@@ -30,7 +30,7 @@ class BillingReconciliationManager
         $query = DB::table('payment_reconciliation_alerts')->orderByDesc('opened_at');
         if (! empty($filters['status'])) $query->where('status', $filters['status']);
         if (! empty($filters['impact'])) $query->where('impact', $filters['impact']);
-        $paginator = $query->paginate(min(max((int) ($filters['per_page'] ?? 25), 1), 100));
+        $paginator = $query->paginate(min(max((int) ($filters['per_page'] ?? 15), 1), 100));
         return ['data' => $paginator->items(), 'meta' => ['current_page' => $paginator->currentPage(), 'per_page' => $paginator->perPage(), 'total' => $paginator->total(), 'last_page' => $paginator->lastPage()]];
     }
 

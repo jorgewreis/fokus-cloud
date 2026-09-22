@@ -12,7 +12,7 @@ class ProductInterestBackofficeController extends Controller
 {
     public function index(Request $request)
     {
-        $perPage = min(max((int) $request->query('per_page', 25), 1), 100);
+        $perPage = min(max((int) $request->query('per_page', 15), 1), 100);
         $query = ProductInterest::query()
             ->when($request->query('product'), fn ($builder, $value) => $builder->whereJsonContains('products', $value))
             ->when($request->query('profile'), fn ($builder, $value) => $builder->whereJsonContains('profiles', $value))

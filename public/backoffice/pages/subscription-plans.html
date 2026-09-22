@@ -115,7 +115,7 @@
             editing: { product: null, module: null, plan: null },
             pages: { products: 1, modules: 1, plans: 1, publications: 1 },
         };
-        const pageSize = 20;
+        const pageSize = 15;
         const message = document.querySelector("#catalog-message");
         const money = (value) => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
         const parseMoney = (value) => window.FokusCurrency?.parse(value) ?? 0;
