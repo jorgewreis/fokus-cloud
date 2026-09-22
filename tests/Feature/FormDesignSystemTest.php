@@ -100,7 +100,9 @@ class FormDesignSystemTest extends TestCase
     public function test_module_actions_use_publication_semantics_and_assets(): void
     {
         $modules = file_get_contents(base_path('public/backoffice/pages/modules.html'));
-        $products = file_get_contents(base_path('public/backoffice/pages/products.html'));
+        $productPage = file_get_contents(base_path('public/backoffice/pages/products.html'));
+        $productModule = file_get_contents(base_path('public/backoffice/assets/js/products-page.js'));
+        $products = $productPage.$productModule;
         $drawerStyles = file_get_contents(base_path('public/backoffice/assets/css/components/drawer-form.css'));
         $sharedStyles = file_get_contents(base_path('public/assets/css/shared/fokus.css'));
 
@@ -144,15 +146,15 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringContainsString('Common-File-Check--Streamline-Ultimate.png', $products);
         $this->assertStringNotContainsString('Button-Pause-1--Streamline-Ultimate.png', $products);
         $this->assertStringNotContainsString('Power-Button-1--Streamline-Ultimate.png', $products);
-        $this->assertStringContainsString("action('pause'", $products);
+        $this->assertStringContainsString('action("pause"', $products);
         $this->assertStringContainsString('/pause', $products);
-        $this->assertStringContainsString('status === \'ativo\'', $products);
+        $this->assertStringContainsString('status === "ativo"', $products);
         $this->assertStringContainsString('product-view-panel', $products);
         $this->assertStringContainsString('resetDrawerState', $products);
-        $this->assertStringContainsString("form.elements.namedItem('code').disabled = true", $products);
+        $this->assertStringContainsString('form.elements.namedItem("code").disabled = true', $products);
         $this->assertStringContainsString('data-sidebar-item="products"', file_get_contents(base_path('public/backoffice/index.html')));
         $this->assertStringNotContainsString('product-confirm-dialog', $products);
-        $this->assertStringNotContainsString("action('deactivate'", $products);
+        $this->assertStringNotContainsString('action("deactivate"', $products);
         $this->assertStringNotContainsString('/deactivate', $products);
         $this->assertStringNotContainsString('name="status"', $products);
         $this->assertStringNotContainsString('publication_state', $products);
@@ -217,6 +219,7 @@ class FormDesignSystemTest extends TestCase
     {
         $pages = [
             'public/backoffice/pages/companies.html' => 'backoffice-companies-page',
+            'public/backoffice/pages/products.html' => 'backoffice-products-page',
             'public/backoffice/pages/subscriptions.html' => 'subscription-page',
             'public/backoffice/pages/pagamentos.html' => 'pagamentos-page',
         ];
@@ -235,12 +238,20 @@ class FormDesignSystemTest extends TestCase
 
         $companies = file_get_contents(base_path('public/backoffice/pages/companies.html'));
         $products = file_get_contents(base_path('public/backoffice/pages/products.html'));
+        $productSource = $products.file_get_contents(base_path('public/backoffice/assets/js/products-page.js'));
         $subscriptions = file_get_contents(base_path('public/backoffice/pages/subscriptions.html'));
         $this->assertStringContainsString('fs-card-title">Dados da empresa', $companies);
         $this->assertStringContainsString('fs-card-title">Administrador responsável', $companies);
         $this->assertStringContainsString('fs-badge', $companies);
         $this->assertStringContainsString('fs-offcanvas', $companies);
         $this->assertStringContainsString('backoffice-records-page', $products);
+        $this->assertStringContainsString('fs-filter-form', $products);
+        $this->assertStringContainsString('fs-table-records', $products);
+        $this->assertStringContainsString('fs-pagination', $productSource);
+        $this->assertStringContainsString('fs-card fs-card-panel', $products);
+        $this->assertStringNotContainsString('<script', $products);
+        $this->assertStringNotContainsString('class="form-label', $products);
+        $this->assertStringNotContainsString('class="input-label', $products);
         $this->assertStringNotContainsString('product-confirm-dialog', $products);
         $this->assertStringNotContainsString('window.confirm', $products);
         $this->assertStringContainsString('card-body', $subscriptions);

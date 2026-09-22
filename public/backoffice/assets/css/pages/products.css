@@ -1,0 +1,26 @@
+/* Produtos compõe o mesmo contrato visual aprovado para Empresas. */
+.backoffice-products-page {
+    box-sizing: border-box;
+    width: min(100% - 40px, 1480px);
+    margin: 0 auto;
+    padding: var(--fs-space-4, 24px) 0 var(--fs-space-6, 60px);
+}
+
+.backoffice-products-page > .fs-page-layout {
+    width: 100%;
+    padding: 0 var(--fs-space-4, 24px) var(--fs-space-3, 16px);
+}
+
+.backoffice-products-page > section.fs-card-panel {
+    width: calc(100% - var(--fs-space-3, 16px));
+    margin-inline: auto;
+}
+
+@media (max-width: 680px) {
+    .backoffice-products-page {
+        width: 100%;
+        padding: var(--fs-space-4, 24px) var(--fs-space-3, 16px) var(--fs-space-5, 32px);
+    }
+
+    .backoffice-products-page > .fs-page-layout { padding-inline: 0; }
+}

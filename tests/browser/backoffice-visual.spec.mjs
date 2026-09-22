@@ -96,3 +96,50 @@ test('drawer de empresas preserva largura, cards e alertas do contrato visual', 
         padding: '10px 20px',
     });
 });
+
+test('produtos replica o contrato visual e mantém create, edit e view independentes', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/backoffice/produtos');
+    await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'products');
+    await expect(page.locator('#product-list tr')).toHaveCount(1);
+
+    await page.locator('#product-new').click();
+    await expect(page.locator('#product-drawer')).toBeVisible();
+    await expect(page.locator('#product-drawer')).toHaveAttribute('data-mode', 'create');
+    const createContract = await page.locator('#product-drawer').evaluate((drawer) => {
+        const labels = [...drawer.querySelectorAll('#product-form label.fs-form-label')].filter((label) => !label.hidden);
+        const controls = [...drawer.querySelectorAll('#product-form input, #product-form select, #product-form textarea')].filter((control) => !control.disabled);
+        return {
+            width: getComputedStyle(drawer).width,
+            cards: drawer.querySelectorAll('#product-form > .fs-card.fs-card-panel').length,
+            labelsHaveSpans: labels.every((label) => label.firstElementChild?.matches('span.fs-u-ml-2')),
+            labelsHaveSpacing: labels.every((label) => label.classList.contains('fs-u-mt-3')),
+            cardBodySpacing: [...drawer.querySelectorAll('#product-form .fs-card-panel > .fs-card-body')]
+                .every((body) => body.matches('.fs-u-mx-2.fs-u-mt-2.fs-u-mb-3')),
+            controlsUseGoogleSans: controls.every((control) => getComputedStyle(control).fontFamily.includes('Google Sans')),
+        };
+    });
+    expect(createContract).toEqual({
+        width: '450px',
+        cards: 2,
+        labelsHaveSpans: true,
+        labelsHaveSpacing: true,
+        cardBodySpacing: true,
+        controlsUseGoogleSans: true,
+    });
+
+    await page.locator('#product-drawer-close').click();
+    await expect(page.locator('#product-drawer')).toBeHidden();
+    await page.getByRole('button', { name: 'Editar produto' }).click();
+    await expect(page.locator('#product-drawer')).toHaveAttribute('data-mode', 'edit');
+    await expect(page.locator('#product-drawer-title')).toHaveText('Editar dados do produto');
+    await expect(page.locator('#product-form-submit')).toHaveText('Salvar alterações');
+    await expect(page.locator('#product-display-order-field')).toBeVisible();
+
+    await page.locator('#product-drawer-close').click();
+    await page.getByRole('button', { name: 'Ver detalhes do produto' }).click();
+    await expect(page.locator('#product-drawer')).toHaveAttribute('data-mode', 'view');
+    await expect(page.locator('#product-form')).toBeHidden();
+    await expect(page.locator('#product-view-panel')).toBeVisible();
+    await expect(page.locator('#product-view-name')).toHaveText('Fokus Law');
+});
