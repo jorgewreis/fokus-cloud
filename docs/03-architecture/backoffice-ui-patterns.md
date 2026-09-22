@@ -74,7 +74,7 @@ Estas classes complementam as primitivas instaladas e ficam no CSS gerado por
 | Cabeçalho de página | `fs-page-layout`, `fs-page-header-display` | Contexto, `h1`, descrição e ação principal. |
 | Painel operacional | `fs-card fs-card-panel` | Card com cabeçalho, corpo e rodapé alinhados. |
 | Filtros | `fs-filter-form`, `fs-input-group-subtle` | Campos rotulados, grupo de busca e ação. |
-| Larguras de conteúdo | `fs-width-200` a `fs-width-800` | Larguras semânticas em filtros e colunas. |
+| Larguras de conteúdo | `fs-width-100` a `fs-width-900` | Escala completa de 100 em 100 para filtros, formulários e colunas; aplique a mesma classe no cabeçalho e nas células da tabela. |
 | Listagem de registros | `fs-table fs-table-records` | Cabeçalho, linhas, separadores e larguras consistentes. |
 | Estado fixo | `fs-badge-width-80` | Badge de status com largura de 80px. |
 | Ações por ícone | `fs-btn-icon-plain` | Ícones com fundo transparente. |

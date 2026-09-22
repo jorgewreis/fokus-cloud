@@ -166,6 +166,21 @@ class FormDesignSystemTest extends TestCase
     {
         $sharedStyles = file_get_contents(base_path('public/assets/css/shared/fokus.css'));
 
+        foreach ([
+            'fs-width-100' => '38px',
+            'fs-width-200' => '80px',
+            'fs-width-300' => '120px',
+            'fs-width-400' => '180px',
+            'fs-width-500' => '240px',
+            'fs-width-600' => '300px',
+            'fs-width-700' => '360px',
+            'fs-width-800' => '420px',
+            'fs-width-900' => '480px',
+        ] as $class => $width) {
+            $this->assertStringContainsString(".{$class} { width: {$width}; }", $sharedStyles);
+            $this->assertStringContainsString(".fs-table-records .{$class} { flex-basis: {$width}; }", $sharedStyles);
+        }
+
         foreach (glob(base_path('public/backoffice/pages/*.html')) as $page) {
             preg_match_all('/class="([^"]*\\bfs-btn-icon\\b[^"]*)"/', file_get_contents($page), $matches);
 

@@ -17632,12 +17632,15 @@ body { font-family: "Google Sans", sans-serif; }
     opacity: .4;
 }
 .fs-filter-form .fs-form-action { flex: 0 0 auto; }
+.fs-width-100 { width: 38px; }
 .fs-width-200 { width: 80px; }
 .fs-width-300 { width: 120px; }
 .fs-width-400 { width: 180px; }
 .fs-width-500 { width: 240px; }
 .fs-width-600 { width: 300px; }
+.fs-width-700 { width: 360px; }
 .fs-width-800 { width: 420px; }
+.fs-width-900 { width: 480px; }
 .fs-input-group-subtle {
     display: flex;
     width: 100%;
@@ -17715,11 +17718,15 @@ body { font-family: "Google Sans", sans-serif; }
     border-bottom: 1px solid #cbcbcb;
 }
 .fs-table-records tbody tr:not(:first-child) { border-top: 1px solid #cbcbcb; }
+.fs-table-records .fs-width-100 { flex-basis: 38px; }
 .fs-table-records .fs-width-200 { flex-basis: 80px; }
 .fs-table-records .fs-width-300 { flex-basis: 120px; }
 .fs-table-records .fs-width-400 { flex-basis: 180px; }
 .fs-table-records .fs-width-500 { flex-basis: 240px; }
 .fs-table-records .fs-width-600 { flex-basis: 300px; }
+.fs-table-records .fs-width-700 { flex-basis: 360px; }
+.fs-table-records .fs-width-800 { flex-basis: 420px; }
+.fs-table-records .fs-width-900 { flex-basis: 480px; }
 .fs-table-records th {
     color: #252525;
     font-size: .7rem;
