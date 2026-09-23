@@ -85,7 +85,9 @@ class SubscriptionController extends Controller
             ->when($query, fn ($builder) => $builder->where('company.legal_name', 'like', '%'.$query.'%'))
             ->select('company.id', 'company.legal_name')->distinct()->orderBy('company.legal_name')->limit(20)->get();
         $products = [];
-        foreach (['law', 'lead'] as $code) {
+        $catalogUnavailable = false;
+        $productCodes = DB::table('products')->where('active', true)->where('status', 'ativo')->orderBy('name')->pluck('code');
+        foreach ($productCodes as $code) {
             try {
                 $published = $catalog->publicCatalog($code, allowPendingPublication: true);
                 $plans = collect($published['plans'] ?? [])->filter(fn (array $plan): bool => ! empty($plan['module_codes']))->map(fn (array $plan): array => [
@@ -93,13 +95,19 @@ class SubscriptionController extends Controller
                 ])->values()->all();
                 if ($plans) $products[] = ['code' => $code, 'name' => $published['name'] ?? $code, 'plans' => $plans];
             } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
-                // An unpublished product is not available for checkout.
+                // Products without a current published catalog cannot be offered for checkout.
+                $catalogUnavailable = true;
             }
         }
+        $catalogMessage = $products
+            ? null
+            : ($catalogUnavailable
+                ? 'Nenhuma oferta está disponível porque falta uma publicação vigente do catálogo. Publique o catálogo do produto para liberar planos no checkout.'
+                : 'Nenhuma oferta publicada está disponível para contratação no momento.');
         return response()->json([
             'companies' => $companies,
             'products' => $products,
-            'catalog_message' => $products ? null : 'Nenhuma oferta publicada está disponível para contratação no momento.',
+            'catalog_message' => $catalogMessage,
         ]);
     }
 
@@ -108,7 +116,7 @@ class SubscriptionController extends Controller
         if (! $request->header('Idempotency-Key')) $request->headers->set('Idempotency-Key', (string) Str::uuid());
         $input = $request->validate([
             'company_id' => ['required', 'string', 'max:64'],
-            'product_code' => ['required', Rule::in(['law', 'lead'])],
+            'product_code' => ['required', 'string', 'max:64', Rule::exists('products', 'code')->where('active', true)->where('status', 'ativo')],
             'plan_code' => ['required', 'string', 'max:64'],
             'cycle' => ['required', Rule::in(['monthly', 'annual'])],
         ]);
