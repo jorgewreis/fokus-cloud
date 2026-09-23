@@ -183,16 +183,13 @@ test('Assinaturas comunica resultado vazio e falha de carregamento', async ({ pa
     });
     await page.goto('/backoffice/assinaturas');
     await page.getByLabel('Empresa ou produto').fill('empresa inexistente');
-    const emptyResponse = page.waitForResponse((response) => response.url().includes('/api/backoffice/subscriptions?') && new URL(response.url()).searchParams.get('q') === 'empresa inexistente');
     await page.getByRole('button', { name: 'Filtrar' }).click();
-    await emptyResponse;
     await expect(page.locator('[data-fs-datatable-empty]')).toBeVisible();
     await expect(page.locator('#subscription-table-summary')).toHaveText('0 assinaturas encontradas');
+    expect(await page.evaluate(() => new URL(location.href).searchParams.get('q'))).toBe('empresa inexistente');
 
     await page.getByLabel('Empresa ou produto').fill('erro');
-    const errorResponse = page.waitForResponse((response) => response.url().includes('/api/backoffice/subscriptions?') && new URL(response.url()).searchParams.get('q') === 'erro');
     await page.getByRole('button', { name: 'Filtrar' }).click();
-    await errorResponse;
     await expect(page.locator('[data-fs-datatable-error]')).toContainText('Serviço indisponível.');
     await expect(page.locator('[data-fs-datatable-loading]')).toBeHidden();
 });
