@@ -46,4 +46,23 @@ class BackofficeUiContractTest extends TestCase
             $this->assertStringContainsString('backoffice-records-drawer', $contents, $page);
         }
     }
+
+    public function test_catalog_navigation_order_and_users_placement_are_current(): void
+    {
+        $panel = file_get_contents(base_path('public/backoffice/index.html'));
+        $users = strpos($panel, 'data-sidebar-item="users"');
+        $catalog = strpos($panel, 'data-sidebar-group="catalog"');
+        $overview = strpos($panel, '>Visão geral<');
+        $products = strpos($panel, '>Produtos<');
+        $modules = strpos($panel, '>Módulos<');
+        $plans = strpos($panel, '>Planos<');
+
+        $this->assertNotFalse($users);
+        $this->assertNotFalse($catalog);
+        $this->assertLessThan($catalog, $users, 'Usuários deve aparecer antes do grupo Catálogo.');
+        $this->assertLessThan($products, $overview, 'Visão geral deve anteceder Produtos.');
+        $this->assertLessThan($modules, $products, 'Produtos deve anteceder Módulos.');
+        $this->assertLessThan($plans, $modules, 'Módulos deve anteceder Planos.');
+        $this->assertStringNotContainsString('Publicações e versões', $panel);
+    }
 }

@@ -42,7 +42,7 @@
         <script src="/backoffice/assets/js/brazilian-documents.js?v=20260919-cnpj-alphanumeric-v2"></script>
         <script src="/backoffice/assets/js/currency-input.js?v=20260902-currency-prefix-fix"></script>
         <script src="/backoffice/assets/js/records-page.js?v=20260922-records-nested-drawer-v5"></script>
-        <script src="/backoffice/assets/js/backoffice-router.js?v=20260923-unified-users-v1"></script>
+        <script src="/backoffice/assets/js/backoffice-router.js?v=20260923-users-catalog-nav-v1"></script>
         <template id="backoffice-app-template">
         <div class="container-page expanded">
             <div class="fs-sidebar expanded" id="sidebar">
@@ -92,6 +92,19 @@
                             >Empresas</span
                         >
                     </button>
+                    <button
+                        class="sidebar-button"
+                        type="button"
+                        data-sidebar-item="users"
+                        data-platform-permission="platform.users.view"
+                    >
+                        <img
+                            src="/backoffice/assets/icons/Multiple-Actions-Setting--Streamline-Ultimate.png?v=20260915-sidebar-icons-v2"
+                        />
+                        <span class="sidebar-button-label text-subtitle-sm"
+                            >Usuários</span
+                        >
+                    </button>
                     <div class="sidebar-nav-group" data-sidebar-group="catalog">
                         <button
                             class="sidebar-button sidebar-group-toggle"
@@ -108,20 +121,17 @@
                             <img class="sidebar-group-chevron" src="/backoffice/assets/icons/Arrow-Down-1--Streamline-Ultimate.png?v=20260916-catalog-arrow-v2" alt="" aria-hidden="true" />
                         </button>
                         <div class="sidebar-subnav" id="catalog-subnav" role="group" aria-label="Seções do catálogo">
-                            <button class="sidebar-button sidebar-subnav-button" type="button" data-sidebar-item="products" data-platform-role="superadministrador">
-                                <span class="sidebar-button-label text-subtitle-sm">Produtos</span>
-                            </button>
                             <button class="sidebar-button sidebar-subnav-button" type="button" disabled title="Em breve">
                                 <span class="sidebar-button-label text-subtitle-sm">Visão geral</span>
                             </button>
-                            <button class="sidebar-button sidebar-subnav-button" type="button" data-sidebar-item="subscription-plans">
-                                <span class="sidebar-button-label text-subtitle-sm">Planos de assinatura</span>
+                            <button class="sidebar-button sidebar-subnav-button" type="button" data-sidebar-item="products" data-platform-role="superadministrador">
+                                <span class="sidebar-button-label text-subtitle-sm">Produtos</span>
                             </button>
                             <button class="sidebar-button sidebar-subnav-button" type="button" data-sidebar-item="modules">
-                                <span class="sidebar-button-label text-subtitle-sm">Modulos</span>
+                                <span class="sidebar-button-label text-subtitle-sm">Módulos</span>
                             </button>
-                            <button class="sidebar-button sidebar-subnav-button" type="button" disabled title="Em breve">
-                                <span class="sidebar-button-label text-subtitle-sm">Publicações e versões</span>
+                            <button class="sidebar-button sidebar-subnav-button" type="button" data-sidebar-item="subscription-plans">
+                                <span class="sidebar-button-label text-subtitle-sm">Planos</span>
                             </button>
                         </div>
                     </div>
@@ -160,19 +170,6 @@
                         />
                         <span class="sidebar-button-label text-subtitle-sm"
                             >Vouchers</span
-                        >
-                    </button>
-                    <button
-                        class="sidebar-button"
-                        type="button"
-                        data-sidebar-item="users"
-                        data-platform-permission="platform.users.view"
-                    >
-                        <img
-                            src="/backoffice/assets/icons/Multiple-Actions-Setting--Streamline-Ultimate.png?v=20260915-sidebar-icons-v2"
-                        />
-                        <span class="sidebar-button-label text-subtitle-sm"
-                            >Usuários</span
                         >
                     </button>
                     <button
@@ -256,7 +253,7 @@
                 "[data-sidebar-item]",
             );
             const pagePath = "./pages";
-            const pageVersion = "20260923-unified-users-v1";
+            const pageVersion = "20260923-users-catalog-nav-v1";
             const routePageMap = {
                 painel: "platform-dashboard-final",
                 empresas: "companies",
