@@ -254,6 +254,48 @@ test('módulos replica o contrato visual, personalizações e estados do drawer'
     await expect(page.locator('#module-view-panel')).toContainText('Gestão de processos');
 });
 
+test('salvar alterações de módulo usa PATCH no módulo em edição', async ({ page }) => {
+    let saveRequest = null;
+    page.on('request', (request) => {
+        if (request.url().endsWith('/api/backoffice/catalog/modules/MOD_1')) saveRequest = { method: request.method(), url: request.url() };
+    });
+
+    await page.goto('/backoffice/modulos');
+    await page.getByRole('button', { name: 'Editar módulo' }).click();
+    await expect(page.locator('#module-drawer')).toHaveAttribute('data-mode', 'edit');
+    await page.locator('#module-name').fill('Gestão de processos atualizada');
+    await page.locator('#module-form-submit').click();
+    await expect.poll(() => saveRequest).toEqual({ method: 'PATCH', url: 'http://127.0.0.1:4177/api/backoffice/catalog/modules/MOD_1' });
+});
+
+test('salvar alterações de produto usa PATCH no produto em edição', async ({ page }) => {
+    let saveRequest = null;
+    page.on('request', (request) => {
+        if (request.url().endsWith('/api/backoffice/catalog/products/PRD_LAW')) saveRequest = { method: request.method(), url: request.url() };
+    });
+
+    await page.goto('/backoffice/produtos');
+    await page.getByRole('button', { name: 'Editar produto' }).click();
+    await expect(page.locator('#product-drawer')).toHaveAttribute('data-mode', 'edit');
+    await page.locator('#product-name').fill('Fokus Law atualizado');
+    await page.locator('#product-form-submit').click();
+    await expect.poll(() => saveRequest).toEqual({ method: 'PATCH', url: 'http://127.0.0.1:4177/api/backoffice/catalog/products/PRD_LAW' });
+});
+
+test('salvar alterações de plano usa PATCH no plano em edição', async ({ page }) => {
+    let saveRequest = null;
+    page.on('request', (request) => {
+        if (request.url().endsWith('/api/backoffice/catalog/plans/PLN_1')) saveRequest = { method: request.method(), url: request.url() };
+    });
+
+    await page.goto('/backoffice/planos');
+    await page.getByRole('button', { name: 'Editar plano' }).click();
+    await expect(page.locator('#plan-drawer')).toHaveAttribute('data-mode', 'edit');
+    await page.locator('#plan-name').fill('Essencial atualizado');
+    await page.locator('#plan-form-submit').click();
+    await expect.poll(() => saveRequest).toEqual({ method: 'PATCH', url: 'http://127.0.0.1:4177/api/backoffice/catalog/plans/PLN_1' });
+});
+
 test('planos replica o contrato visual, composição e estados do drawer', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/backoffice/planos');

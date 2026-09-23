@@ -133,11 +133,16 @@ export async function mount(root, context = {}) {
     const submit = async (event) => {
         event.preventDefault();
         if (window.FokusForm && !window.FokusForm.validate(form)) return;
+        const drawerState = drawer.getState();
+        if (drawerState.mode === "view") return;
+        const editId = drawerState.mode === "edit" ? String(state.productId || drawerState.record?.id || "") : "";
+        if (drawerState.mode === "edit" && !editId) { showMessage("Não foi possível identificar o produto que será atualizado."); return; }
+        const editing = Boolean(editId);
         const payload = Object.fromEntries(new FormData(form));
-        if (state.mode === "edit") payload.display_order = Number(payload.display_order);
+        if (editing) payload.display_order = Number(payload.display_order);
         else delete payload.display_order;
         try {
-            await api.request(state.mode === "edit" ? `/backoffice/catalog/products/${state.productId}` : "/backoffice/catalog/products", { method: state.mode === "edit" ? "PATCH" : "POST", body: payload });
+            await api.request(editing ? `/backoffice/catalog/products/${editId}` : "/backoffice/catalog/products", { method: editing ? "PATCH" : "POST", body: payload });
             closeDrawer();
             await load();
             showMessage("Produto salvo com sucesso.", "success");

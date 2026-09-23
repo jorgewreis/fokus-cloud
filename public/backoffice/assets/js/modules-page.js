@@ -113,6 +113,7 @@ export async function mount(root, context = {}) {
     };
     const updatePersonalizationsSummary = () => { $("#module-personalizations-summary").innerHTML = state.personalizations.length ? state.personalizations.map((item) => `<div>${escapeHtml(item.type_code)} · ${item.required ? "Obrigatória" : "Opcional"} · ${item.tiers.length} faixa(s)</div>`).join("") : "Nenhuma personalização configurada."; };
     const resetForm = () => {
+        state.editing = null;
         form.reset();
         field("product_id").innerHTML = '<option value="">Selecione um produto</option>' + state.catalog.products.map((product) => `<option value="${escapeHtml(product.id)}">${escapeHtml(product.name)}</option>`).join("");
         if (state.catalog.products[0]) field("product_id").value = state.catalog.products[0].id;
@@ -156,9 +157,9 @@ export async function mount(root, context = {}) {
         $("#module-view-panel").hidden = false;
     };
     const setDrawerHeader = (kicker, title, description) => { $("#module-drawer-kicker").textContent = kicker; $("#module-drawer-title").textContent = title; $("#module-drawer-description").textContent = description; };
-    const openCreate = () => { state.editing = null; fillForm(); drawer.setState({ mode: "create" }); setDrawerHeader("CATÁLOGO", "Novo módulo", "Cadastre um componente comercial e suas funcionalidades."); drawer.show(); field("name").focus(); };
-    const openEdit = (module) => { state.editing = module.id; fillForm(module); drawer.setState({ mode: "edit", record: module }); setDrawerHeader("EDITAR MÓDULO", "Editar dados do módulo", "Altere os dados comerciais, técnicos e as regras permitidas."); $("#module-form-submit").textContent = "Salvar alterações"; drawer.show(); field("name").focus(); };
-    const openView = (module) => { showDetails(module); drawer.setState({ mode: "view", record: module }); setDrawerHeader("CONSULTA", "Detalhes do módulo", "Consulte os dados, regras, publicação e vínculos do módulo."); drawer.show(); };
+    const openCreate = () => { fillForm(); drawer.setState({ mode: "create" }); setDrawerHeader("CATÁLOGO", "Novo módulo", "Cadastre um componente comercial e suas funcionalidades."); drawer.show(); field("name").focus(); };
+    const openEdit = (module) => { fillForm(module); state.editing = String(module.id); drawer.setState({ mode: "edit", record: module }); setDrawerHeader("EDITAR MÓDULO", "Editar dados do módulo", "Altere os dados comerciais, técnicos e as regras permitidas."); $("#module-form-submit").textContent = "Salvar alterações"; drawer.show(); field("name").focus(); };
+    const openView = (module) => { state.editing = null; showDetails(module); drawer.setState({ mode: "view", record: module }); setDrawerHeader("CONSULTA", "Detalhes do módulo", "Consulte os dados, regras, publicação e vínculos do módulo."); drawer.show(); };
     const closeDrawer = () => drawer.close();
     const load = async () => {
         try {
@@ -204,9 +205,13 @@ export async function mount(root, context = {}) {
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
         if (window.FokusForm && !window.FokusForm.validate(form)) return;
+        const drawerState = drawer.getState();
+        const editId = drawerState.mode === "edit" ? String(state.editing || drawerState.record?.id || "") : "";
+        if (drawerState.mode === "edit" && !editId) { showMessage("Não foi possível identificar o módulo que será atualizado."); return; }
+        const editing = Boolean(editId);
         const payload = { product_id: field("product_id").value, name: field("name").value, module_code: field("module_code").value, module_code_custom_name: field("module_code_custom_name").value, segments: selectedValues("#module-segments"), context_code: field("context_code").value || null, monthly_price: window.FokusCurrency?.parse(field("monthly_price").value) ?? 0, price_is_estimate: field("price_is_estimate").value === "1", technical_description: field("technical_description").value, commercial_content: field("commercial_content").value, capability_codes: selectedValues("#module-capabilities").filter((item) => item !== "outro"), dependency_ids: selectedValues("#module-dependencies"), incompatibility_ids: selectedValues("#module-incompatibilities"), personalizations: state.personalizations };
-        if (state.editing) { payload.display_order = Number(field("display_order").value || 0); payload.featured = field("featured").value === "1"; }
-        try { await api.request(state.editing ? `/backoffice/catalog/modules/${state.editing}` : "/backoffice/catalog/modules", { method: state.editing ? "PATCH" : "POST", body: payload }); closeDrawer(); await load(); showMessage("Módulo salvo com sucesso.", "success"); } catch (error) { window.FokusForm?.mapServerErrors(form, error.errors); showMessage(error.message || "Não foi possível salvar o módulo."); }
+        if (editing) { payload.display_order = Number(field("display_order").value || 0); payload.featured = field("featured").value === "1"; }
+        try { await api.request(editing ? `/backoffice/catalog/modules/${editId}` : "/backoffice/catalog/modules", { method: editing ? "PATCH" : "POST", body: payload }); closeDrawer(); await load(); showMessage("Módulo salvo com sucesso.", "success"); } catch (error) { window.FokusForm?.mapServerErrors(form, error.errors); showMessage(error.message || "Não foi possível salvar o módulo."); }
     });
     $("#module-list").addEventListener("click", async (event) => {
         const control = event.target.closest("[data-module-action]");

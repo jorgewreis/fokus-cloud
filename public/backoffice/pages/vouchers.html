@@ -471,6 +471,8 @@
 
         function editVoucher(voucher) {
             editingVoucher = voucher;
+            form.dataset.mode = "edit";
+            form.dataset.recordId = String(voucher.id);
             name.value = voucher.name || "";
             code.value = voucher.code || "";
             products.value = voucher.product_id || "";
@@ -495,6 +497,8 @@
 
         function clearVoucherForm() {
             editingVoucher = null;
+            form.dataset.mode = "create";
+            delete form.dataset.recordId;
             form.querySelector('button[type="submit"]').textContent = "Cadastrar voucher";
             codeSuffix = "";
             plans.disabled = true;
@@ -633,9 +637,14 @@
 
             try {
                 setMessage("Salvando voucher...");
-                const wasEditing = Boolean(editingVoucher);
-                const path = editingVoucher ? `/backoffice/vouchers/${editingVoucher.id}` : "/backoffice/vouchers";
-                await api.request(path, { method: editingVoucher ? "PATCH" : "POST", body: payload });
+                const editId = form.dataset.mode === "edit" ? String(editingVoucher?.id || form.dataset.recordId || "") : "";
+                if (form.dataset.mode === "edit" && !editId) {
+                    setMessage("Não foi possível identificar o voucher que será atualizado.", "danger");
+                    return;
+                }
+                const wasEditing = Boolean(editId);
+                const path = wasEditing ? `/backoffice/vouchers/${editId}` : "/backoffice/vouchers";
+                await api.request(path, { method: wasEditing ? "PATCH" : "POST", body: payload });
                 form.reset();
                 clearVoucherForm();
                 await loadVouchers();
