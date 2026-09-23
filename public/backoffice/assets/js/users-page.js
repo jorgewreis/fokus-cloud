@@ -27,13 +27,13 @@ export async function mount(root, context = {}) {
     const labels = { plataforma: "Usuário interno - FokusCloud", empresa: "Usuário Externo - Assinatura", administrador_comercial: "Administrador comercial", superadministrador: "Superadministrador", Administrador: "Administrador", Gestor: "Gerente", Usuário: "Usuário comum", ativo: "Ativo", ativa: "Ativo", suspenso: "Suspenso", suspensa: "Suspensa", bloqueado: "Bloqueado", bloqueio_temporario: "Bloqueio temporário", desativado: "Desativado", desativada: "Desativada", bloqueada: "Bloqueada", pendente: "Pendente", cancelamento_agendado: "Cancelamento agendado", inadimplente: "Inadimplente", aguardando_pagamento: "Aguardando pagamento" };
     const status = (value) => `<span class="fs-badge fs-badge-soft-${["ativo", "ativa"].includes(value) ? "success" : ["pendente", "aguardando_pagamento"].includes(value) ? "info" : ["suspenso", "suspensa", "bloqueado", "bloqueio_temporario", "inadimplente", "cancelamento_agendado"].includes(value) ? "warning" : "secondary"}">${esc(labels[value] || value || "Sem status")}</span>`;
     const showMessage = (text, tone = "danger") => { message.textContent = text || ""; message.dataset.tone = tone; message.hidden = !text; };
-    const actionButton = (action, id, label) => `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action${action === "deactivate" ? " fs-btn-danger" : ""}" type="button" data-user-action="${action}" data-user-id="${esc(id)}" aria-label="${esc(label)}" title="${esc(label)}"><img src="${iconBase}${actionIcons[action]}?v=20260923-users-directory-profile-v3" alt=""></button>`;
+    const actionButton = (action, id, label) => `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action${action === "deactivate" ? " fs-btn-danger" : ""}" type="button" data-user-action="${action}" data-user-id="${esc(id)}" aria-label="${esc(label)}" title="${esc(label)}"><img src="${iconBase}${actionIcons[action]}?v=20260923-users-directory-profile-v4" alt=""></button>`;
     const render = (response) => {
         const rows = response.data || [];
         list.innerHTML = rows.length ? rows.map((user) => {
-            const actions = [actionButton("details", user.id, "Detalhes")];
+            const actions = [actionButton("details", user.id, "Ver detalhes")];
             if (user.type === "plataforma" && canManage) {
-                actions.unshift(actionButton("edit", user.id, "Editar"));
+                actions.push(actionButton("edit", user.id, "Editar"));
                 if (user.status === "bloqueado" || user.status === "bloqueio_temporario") actions.push(actionButton("unblock", user.id, "Desbloquear"));
                 else if (user.status === "ativo") actions.push(actionButton("block", user.id, "Bloquear"));
                 if (user.status !== "desativado") actions.push(actionButton("deactivate", user.id, "Desativar"));

@@ -50,7 +50,7 @@ test('diretório Usuários abre detalhes de conta e se adapta a telas menores', 
         await expect(page.locator('#users-list tr[data-account-type="plataforma"] [data-label="Tipo"]')).toHaveText('Usuário interno - FokusCloud');
         const brokenActionIcons = await page.locator('#users-list button[data-user-action] img').evaluateAll((images) => images.filter((image) => image.naturalWidth === 0).map((image) => new URL(image.src).pathname));
         expect(brokenActionIcons).toEqual([]);
-        await page.getByRole('button', { name: 'Detalhes' }).nth(1).click();
+        await page.getByRole('button', { name: 'Ver detalhes' }).nth(1).click();
         await expect(page.locator('#user-drawer')).toBeVisible();
         await expect(page.locator('#user-drawer-title')).toHaveText('Ana Empresa');
         await expect(page.locator('#user-view-panel')).toContainText('Assinaturas da empresa');

@@ -72,6 +72,10 @@ class BackofficeUiContractTest extends TestCase
         $module = file_get_contents(base_path('public/backoffice/assets/js/users-page.js'));
 
         $this->assertStringContainsString('id="user-invite" type="button">Novo usuário</button>', $markup);
+        $this->assertStringContainsString('<h1 id="users-page-title">Usuarios</h1>', $markup);
+        $this->assertStringContainsString('<h1 id="modules-page-title">Modulos</h1>', file_get_contents(base_path('public/backoffice/pages/modules.html')));
+        $this->assertStringContainsString('actionButton("details", user.id, "Ver detalhes")', $module);
+        $this->assertStringContainsString('actions.push(actionButton("edit", user.id, "Editar"))', $module);
         $this->assertStringContainsString('Usuário interno - FokusCloud', $module);
         $this->assertStringContainsString('Usuário Externo - Assinatura', $module);
         $this->assertStringContainsString('data-label="Perfil ou vínculos"><strong>${esc(profile)}</strong>', $module);
