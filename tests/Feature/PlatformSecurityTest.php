@@ -144,6 +144,81 @@ class PlatformSecurityTest extends TestCase
         $this->actingAs($admin, 'platform')->getJson('/api/backoffice/admins')->assertForbidden();
     }
 
+    public function test_commercial_admin_can_read_directory_but_never_receives_company_cpf(): void
+    {
+        $admin = $this->admin('administrador_comercial');
+        $customer = User::create(['id' => PrefixedUlid::make('USR'), 'name' => 'Pessoa Cliente', 'cpf' => '12345678901', 'email' => $admin->email, 'password' => 'SenhaCliente!2026', 'status' => 'ativa']);
+
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/directory/users')
+            ->assertOk()->assertJsonCount(2, 'data');
+        $this->actingAs($admin, 'platform')->getJson("/api/backoffice/directory/users/empresa/{$customer->id}")
+            ->assertOk()->assertJsonMissingPath('cpf');
+    }
+
+    public function test_superadmin_can_read_full_cpf_and_duplicate_email_remains_two_accounts(): void
+    {
+        $admin = $this->admin();
+        $customer = User::create(['id' => PrefixedUlid::make('USR'), 'name' => 'Pessoa Cliente', 'cpf' => '12345678901', 'email' => $admin->email, 'password' => 'SenhaCliente!2026', 'status' => 'ativa']);
+
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/directory/users?q='.$admin->email)
+            ->assertOk()->assertJsonCount(2, 'data');
+        $this->actingAs($admin, 'platform')->getJson("/api/backoffice/directory/users/empresa/{$customer->id}")
+            ->assertOk()->assertJsonPath('cpf', '12345678901');
+    }
+
+    public function test_company_user_details_include_current_company_memberships_and_company_subscriptions(): void
+    {
+        $admin = $this->admin();
+        $customer = User::create(['id' => PrefixedUlid::make('USR'), 'name' => 'Pessoa Cliente', 'cpf' => '12345678901', 'email' => 'cliente@example.test', 'password' => 'SenhaCliente!2026', 'status' => 'ativa']);
+        $companyId = PrefixedUlid::make('COM');
+        $product = DB::table('products')->first();
+        DB::table('companies')->insert(['id' => $companyId, 'document_type' => 'cnpj', 'document_number' => '12345678000100', 'legal_name' => 'Empresa vinculada', 'status' => 'ativa', 'version' => 1, 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('company_memberships')->insert(['id' => PrefixedUlid::make('MBS'), 'company_id' => $companyId, 'user_id' => $customer->id, 'role_id' => DB::table('roles')->where('code', 'admin')->value('id'), 'status' => 'ativo', 'active_admin_company_id' => $companyId, 'version' => 1, 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('subscriptions')->insert(['id' => PrefixedUlid::make('ASS'), 'company_id' => $companyId, 'product_id' => $product->id, 'status' => 'ativa', 'open_company_product' => $companyId.'-'.$product->id, 'version' => 1, 'billing_cycle' => 'monthly', 'current_period_starts_at' => now(), 'current_period_ends_at' => now()->addMonth(), 'commercial_snapshot' => json_encode(['plan_name' => 'Essencial']), 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->actingAs($admin, 'platform')->getJson("/api/backoffice/directory/users/empresa/{$customer->id}")
+            ->assertOk()->assertJsonPath('memberships.0.company_name', 'Empresa vinculada')
+            ->assertJsonPath('memberships.0.role', 'Administrador')
+            ->assertJsonPath('memberships.0.subscriptions.0.plan_name', 'Essencial');
+    }
+
+    public function test_internal_email_confirmation_is_single_use_and_updates_address_only_after_confirmation(): void
+    {
+        $admin = $this->admin();
+        $token = str_repeat('b', 64);
+        $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/admins/{$admin->id}/profile", ['name' => 'Nome atualizado', 'email' => 'novo@example.test'])->assertOk()->assertJsonPath('email_change_pending', true);
+        $this->assertSame($admin->email, $admin->fresh()->email);
+        $this->assertSame('Nome atualizado', $admin->fresh()->name);
+
+        DB::table('platform_admin_email_changes')->where('platform_admin_id', $admin->id)->update(['token_hash' => hash('sha256', $token)]);
+        $this->postJson('/api/backoffice/auth/confirm-email-change', ['token' => $token])->assertOk();
+        $this->assertSame('novo@example.test', $admin->fresh()->email);
+        $this->postJson('/api/backoffice/auth/confirm-email-change', ['token' => $token])->assertUnprocessable();
+    }
+
+    public function test_expired_internal_email_confirmation_is_rejected(): void
+    {
+        $admin = $this->admin();
+        $token = str_repeat('c', 64);
+        $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/admins/{$admin->id}/profile", ['name' => $admin->name, 'email' => 'expirado@example.test'])->assertOk();
+        DB::table('platform_admin_email_changes')->where('platform_admin_id', $admin->id)->update(['token_hash' => hash('sha256', $token), 'expires_at' => now()->subSecond()]);
+
+        $this->postJson('/api/backoffice/auth/confirm-email-change', ['token' => $token])->assertUnprocessable();
+        $this->assertNotSame('expirado@example.test', $admin->fresh()->email);
+    }
+
+    public function test_internal_email_confirmation_rechecks_uniqueness_before_changing_address(): void
+    {
+        $admin = $this->admin();
+        $token = str_repeat('d', 64);
+        $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/admins/{$admin->id}/profile", ['name' => $admin->name, 'email' => 'ocupado@example.test'])->assertOk();
+        DB::table('platform_admin_email_changes')->where('platform_admin_id', $admin->id)->update(['token_hash' => hash('sha256', $token)]);
+        $this->admin('administrador_comercial')->forceFill(['email' => 'ocupado@example.test'])->save();
+
+        $this->postJson('/api/backoffice/auth/confirm-email-change', ['token' => $token])->assertUnprocessable();
+        $this->assertNotSame('ocupado@example.test', $admin->fresh()->email);
+    }
+
     public function test_invitation_creates_a_suspended_admin_without_a_plain_password_or_token(): void
     {
         $super = $this->admin();

@@ -42,7 +42,7 @@
         <script src="/backoffice/assets/js/brazilian-documents.js?v=20260919-cnpj-alphanumeric-v2"></script>
         <script src="/backoffice/assets/js/currency-input.js?v=20260902-currency-prefix-fix"></script>
         <script src="/backoffice/assets/js/records-page.js?v=20260922-records-nested-drawer-v5"></script>
-        <script src="/backoffice/assets/js/backoffice-router.js?v=20260923-catalog-edit-after-pause-v1"></script>
+        <script src="/backoffice/assets/js/backoffice-router.js?v=20260923-unified-users-v1"></script>
         <template id="backoffice-app-template">
         <div class="container-page expanded">
             <div class="fs-sidebar expanded" id="sidebar">
@@ -165,14 +165,14 @@
                     <button
                         class="sidebar-button"
                         type="button"
-                        data-sidebar-item="security"
-                        data-platform-permission="platform.security.manage"
+                        data-sidebar-item="users"
+                        data-platform-permission="platform.users.view"
                     >
                         <img
                             src="/backoffice/assets/icons/Multiple-Actions-Setting--Streamline-Ultimate.png?v=20260915-sidebar-icons-v2"
                         />
                         <span class="sidebar-button-label text-subtitle-sm"
-                            >Admins</span
+                            >Usuários</span
                         >
                     </button>
                     <button
@@ -256,7 +256,7 @@
                 "[data-sidebar-item]",
             );
             const pagePath = "./pages";
-            const pageVersion = "20260923-catalog-edit-after-pause-v1";
+            const pageVersion = "20260923-unified-users-v1";
             const routePageMap = {
                 painel: "platform-dashboard-final",
                 empresas: "companies",
@@ -269,7 +269,8 @@
                 pagamentos: "pagamentos",
                 billing: "pagamentos",
                 vouchers: "vouchers",
-                seguranca: "security",
+                usuarios: "users",
+                seguranca: "users",
                 interesses: "product-interests",
                 "product-interests": "product-interests",
                 componentes: "ui-components",

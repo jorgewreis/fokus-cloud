@@ -6,7 +6,7 @@
  * portalled overlays and release listeners before the next page is mounted.
  */
 (() => {
-    const ASSET_VERSION = "20260923-catalog-edit-after-pause-v1";
+    const ASSET_VERSION = "20260923-unified-users-v1";
 
     const pages = {
         "platform-dashboard-final": { route: "painel", fragment: "platform-dashboard-final" },
@@ -17,7 +17,7 @@
         subscriptions: { route: "assinaturas", fragment: "subscriptions" },
         pagamentos: { route: "pagamentos", fragment: "pagamentos" },
         vouchers: { route: "vouchers", fragment: "vouchers", role: "superadministrador" },
-        security: { route: "seguranca", fragment: "security", permission: "platform.security.manage" },
+        users: { route: "usuarios", fragment: "users", module: "/backoffice/assets/js/users-page.js", permission: "platform.users.view" },
         "product-interests": { route: "interesses", fragment: "product-interests" },
         "ui-components": { route: "componentes", fragment: "ui-components" },
     };
@@ -34,7 +34,8 @@
         pagamentos: "pagamentos",
         billing: "pagamentos",
         vouchers: "vouchers",
-        seguranca: "security",
+        usuarios: "users",
+        seguranca: "users",
         interesses: "product-interests",
         "product-interests": "product-interests",
         componentes: "ui-components",

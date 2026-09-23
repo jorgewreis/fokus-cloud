@@ -387,14 +387,24 @@ class BackofficeController extends Controller
             ->leftJoin('companies as company', function ($join): void {
                 $join->on('company.id', '=', 'membership.company_id')->whereNull('company.deleted_at');
             })
-            ->where(fn ($builder) => $builder->where('user.name', 'like', $term)->orWhere('user.email', 'like', $term)->orWhere('user.cpf', 'like', $term))
+            ->where(fn ($builder) => $builder->where('user.name', 'like', $term)->orWhere('user.email', 'like', $term))
+            ->select('user.id', 'user.name', 'user.email')->distinct()
             ->orderBy('user.name')
             ->limit(6)
-            ->get(['user.name', 'user.email', 'company.legal_name as company_name'])
+            ->get()
             ->map(fn (object $user): array => [
                 'title' => $user->name,
-                'subtitle' => 'Cliente/usuário · '.($user->company_name ?: $user->email),
-                'href' => $user->company_name ? '/backoffice/empresas?q='.rawurlencode($user->company_name) : '/backoffice/empresas',
+                'subtitle' => 'Usuário de empresa · '.$user->email,
+                'href' => '/backoffice/usuarios?q='.rawurlencode($user->name),
+            ])->values();
+
+        $internalUsers = DB::table('platform_admins as admin')
+            ->where(fn ($builder) => $builder->where('admin.name', 'like', $term)->orWhere('admin.email', 'like', $term))
+            ->orderBy('admin.name')->limit(6)->get(['admin.id', 'admin.name', 'admin.email'])
+            ->map(fn (object $user): array => [
+                'title' => $user->name,
+                'subtitle' => 'Conta interna Fokus Cloud · '.$user->email,
+                'href' => '/backoffice/usuarios?q='.rawurlencode($user->name),
             ])->values();
 
         $subscriptions = DB::table('subscriptions as subscription')
@@ -415,7 +425,7 @@ class BackofficeController extends Controller
 
         return response()->json(['groups' => [
             ['label' => 'Empresas', 'items' => $companies],
-            ['label' => 'Clientes e usuários', 'items' => $users],
+            ['label' => 'Usuários', 'items' => $internalUsers->concat($users)->take(8)->values()],
             ['label' => 'Assinaturas', 'items' => $subscriptions],
         ]]);
     }

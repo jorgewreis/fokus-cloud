@@ -22,6 +22,77 @@ class PlatformAdminController extends Controller
         return response()->json(['admins' => PlatformAdmin::with('role.permissions')->orderBy('name')->get()->map(fn (PlatformAdmin $admin) => $this->payload($admin))]);
     }
 
+    public function updateProfile(Request $request, PlatformAdmin $admin, PlatformAudit $audit)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email:rfc', 'max:255', Rule::unique('platform_admins', 'email')->ignore($admin->id)],
+        ]);
+        $name = trim($data['name']);
+        $email = Str::lower(trim($data['email']));
+        $before = ['name' => $admin->name, 'email' => $admin->email];
+        $pendingEmail = null;
+
+        DB::transaction(function () use ($admin, $name, $email, &$pendingEmail): void {
+            $locked = PlatformAdmin::query()->lockForUpdate()->findOrFail($admin->id);
+            $locked->forceFill(['name' => $name])->save();
+            if ($email === Str::lower($locked->email)) {
+                return;
+            }
+
+            abort_if(PlatformAdmin::where('email', $email)->where('id', '!=', $locked->id)->exists(), 422, 'Este e-mail já pertence a uma conta interna.');
+            DB::table('platform_admin_email_changes')->where('platform_admin_id', $locked->id)->whereNull('used_at')->whereNull('superseded_at')->update(['superseded_at' => now(), 'updated_at' => now()]);
+            $plain = Str::random(64);
+            DB::table('platform_admin_email_changes')->insert([
+                'id' => PrefixedUlid::make('PAE'),
+                'platform_admin_id' => $locked->id,
+                'new_email' => $email,
+                'token_hash' => hash('sha256', $plain),
+                'expires_at' => now()->addHours(24),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $pendingEmail = ['email' => $email, 'token' => $plain, 'old_email' => $locked->email];
+        });
+
+        if ($pendingEmail) {
+            $url = rtrim(config('app.url'), '/').'/backoffice/confirmar-email?token='.urlencode($pendingEmail['token']);
+            Mail::raw("Foi solicitada uma alteração do e-mail da sua conta interna Fokus Cloud. Confirme o novo endereço em até 24 horas: {$url}", fn ($mail) => $mail->to($pendingEmail['email'])->subject('Fokus Cloud: confirme seu novo e-mail interno'));
+            Mail::raw('Foi solicitada a alteração do e-mail desta conta interna. O endereço atual continuará ativo até que o novo endereço seja confirmado.', fn ($mail) => $mail->to($pendingEmail['old_email'])->subject('Fokus Cloud: alteração de e-mail solicitada'));
+        }
+
+        $updated = $admin->fresh('role');
+        $after = ['name' => $updated->name, 'email' => $pendingEmail['email'] ?? $updated->email, 'email_change_pending' => (bool) $pendingEmail];
+        $audit->record($request->user()->id, 'backoffice.admin_profile_updated', 'platform_admin', $admin->id, reason: 'Atualização de nome e/ou solicitação de alteração de e-mail.', before: $before, after: $after, request: $request);
+        return response()->json([
+            'message' => $pendingEmail ? 'Nome atualizado. Confirme o novo e-mail para concluir a alteração; o endereço atual continua ativo até lá.' : 'Dados da conta atualizados.',
+            'email_change_pending' => (bool) $pendingEmail,
+            'admin' => $this->payload($updated),
+        ]);
+    }
+
+    public function confirmEmailChange(Request $request, PlatformAudit $audit, PlatformSecurity $security)
+    {
+        $data = $request->validate(['token' => ['required', 'string', 'size:64']]);
+        $result = DB::transaction(function () use ($data): array {
+            $change = DB::table('platform_admin_email_changes')->where('token_hash', hash('sha256', $data['token']))
+                ->whereNull('used_at')->whereNull('superseded_at')->where('expires_at', '>', now())->lockForUpdate()->first();
+            abort_unless($change, 422, 'Link inválido ou expirado.');
+            $admin = PlatformAdmin::query()->lockForUpdate()->findOrFail($change->platform_admin_id);
+            abort_if(PlatformAdmin::where('email', $change->new_email)->where('id', '!=', $admin->id)->exists(), 422, 'Este e-mail já pertence a outra conta interna. Solicite um novo link com outro endereço.');
+            DB::table('platform_admin_email_changes')->where('platform_admin_id', $admin->id)->whereNull('used_at')->whereNull('superseded_at')->update(['superseded_at' => now(), 'updated_at' => now()]);
+            DB::table('platform_admin_email_changes')->where('id', $change->id)->update(['used_at' => now(), 'updated_at' => now()]);
+            $oldEmail = $admin->email;
+            $admin->forceFill(['email' => $change->new_email, 'email_verified_at' => now()])->save();
+            return ['admin' => $admin->fresh('role'), 'old_email' => $oldEmail, 'new_email' => $change->new_email];
+        });
+        Mail::raw('O e-mail da conta interna Fokus Cloud foi alterado com sucesso. Se você não solicitou essa alteração, contate o suporte.', fn ($mail) => $mail->to($result['old_email'])->subject('Fokus Cloud: e-mail da conta alterado'));
+        $audit->record($result['admin']->id, 'backoffice.admin_email_changed', 'platform_admin', $result['admin']->id, before: ['email' => $result['old_email']], after: ['email' => $result['new_email']], request: $request);
+        $security->revokeSessions($result['admin']->id);
+
+        return response()->json(['message' => 'Novo e-mail confirmado. Entre novamente com o endereço atualizado.']);
+    }
+
     public function invite(Request $request, PlatformAudit $audit, PlatformSecurity $security)
     {
         $data = $request->validate(['name' => ['required', 'string', 'max:255'], 'email' => ['required', 'email:rfc', 'max:255', 'unique:platform_admins,email'], 'role' => ['required', Rule::in(['superadministrador', 'administrador_comercial'])]]);

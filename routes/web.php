@@ -62,6 +62,7 @@ Route::get('/portal/usuarios', fn () => response()->file(public_path('portal/use
 Route::get('/portal/assinaturas', fn () => response()->file(public_path('portal/subscriptions.html')));
 Route::get('/portal/transferir-administracao', fn () => response()->file(public_path('portal/admin-transfer.html')));
 Route::get('/backoffice/ativar', fn () => response()->file(public_path('backoffice/ativar.html')));
+Route::get('/backoffice/confirmar-email', fn () => response()->file(public_path('backoffice/confirmar-email.html')));
 $serveBackofficeShell = function () {
     $admin = Auth::guard('platform')->user();
 
@@ -73,7 +74,7 @@ $serveBackofficeShell = function () {
 };
 Route::get('/backoffice/index.html', $serveBackofficeShell);
 Route::get('/backoffice/{page?}', $serveBackofficeShell)
-    ->where('page', 'painel|empresas|produtos|modulos|modules|planos|catalogo|assinaturas|vouchers|pagamentos|billing|seguranca|interesses|product-interests|componentes');
+    ->where('page', 'painel|empresas|produtos|modulos|modules|planos|catalogo|assinaturas|vouchers|pagamentos|billing|seguranca|usuarios|interesses|product-interests|componentes');
 Route::get('/produtos', fn () => response()->file(public_path('marketing/products/index.html')));
 Route::get('/produtos/fokus-styles', fn () => response()->file(public_path('marketing/products/fokus-styles.html')));
 Route::get('/produtos/fokus-law', fn () => response()->file(public_path('marketing/products/fokus-law.html')));

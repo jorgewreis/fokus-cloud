@@ -38,6 +38,24 @@ test('navegação cancela a página anterior e mantém somente um drawer portale
     await expect(page.locator('body > #company-drawer')).toHaveCount(1);
 });
 
+test('diretório Usuários abre detalhes de conta e se adapta a telas menores', async ({ page }) => {
+    for (const viewport of [{ width: 1440, height: 900 }, { width: 768, height: 1024 }, { width: 375, height: 812 }]) {
+        await page.setViewportSize(viewport);
+        await page.goto('/backoffice/usuarios');
+        await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'users');
+        await expect(page.locator('#users-list tr[data-account-type]')).toHaveCount(2);
+        await page.getByRole('button', { name: 'Detalhes' }).nth(1).click();
+        await expect(page.locator('#user-drawer')).toBeVisible();
+        await expect(page.locator('#user-drawer-title')).toHaveText('Ana Empresa');
+        await expect(page.locator('#user-view-panel')).toContainText('Assinaturas da empresa');
+        await expect(page.locator('#user-view-panel')).toContainText('123.456.789-01');
+        const overflow = await page.locator('.backoffice-records-page').evaluate((element) => element.scrollWidth > element.clientWidth);
+        expect(overflow).toBe(false);
+        await page.keyboard.press('Escape');
+        await expect(page.locator('#user-drawer')).toBeHidden();
+    }
+});
+
 test('drawer de empresas preserva largura, cards e alertas do contrato visual', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/backoffice/empresas');

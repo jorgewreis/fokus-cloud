@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex,nofollow">
+    <title>Confirmar e-mail interno | Fokus Cloud</title>
+    <link rel="stylesheet" href="/backoffice/assets/css/main.css?v=20260923-unified-users-v1">
+    <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260923-unified-users-v1">
+    <link rel="stylesheet" href="/backoffice/assets/css/components/form-admin.css?v=20260923-unified-users-v1">
+</head>
+<body class="auth-shell" data-theme="light" data-role="admin">
+    <main class="auth-panel fs-card fs-card-panel" aria-labelledby="confirm-title">
+        <header class="fs-card-header">
+            <div class="fs-card-header-title">
+                <h1 class="fs-card-title" id="confirm-title">Confirmar novo e-mail</h1>
+                <p class="fs-card-subtitle">Confirme que você tem acesso ao novo endereço da sua conta interna.</p>
+            </div>
+        </header>
+        <div class="fs-card-body fs-u-d-flex fs-u-flex-column fs-u-gap-3">
+            <p id="confirm-help">O endereço atual continuará ativo até a confirmação. O link expira em 24 horas.</p>
+            <div class="fs-alert" id="confirm-message" role="status" aria-live="polite" hidden></div>
+            <div class="fs-u-d-flex fs-u-justify-content-end">
+                <button class="fs-btn fs-btn-primary" id="confirm-button" type="button">Confirmar novo e-mail</button>
+            </div>
+        </div>
+    </main>
+    <script src="/assets/js/api-client.js"></script>
+    <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script>
+    <script src="/backoffice/assets/js/confirm-admin-email-change.js?v=20260923-unified-users-v1"></script>
+</body>
+</html>

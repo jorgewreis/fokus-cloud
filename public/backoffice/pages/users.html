@@ -1,0 +1,92 @@
+<main class="backoffice-records-page fs-container-fluid fs-u-d-flex fs-u-flex-column fs-u-gap-4" aria-labelledby="users-page-title">
+    <header class="fs-page-layout">
+        <div class="fs-page-header-display">
+            <span>Plataforma</span>
+            <h1 id="users-page-title">Usuários</h1>
+            <p>Consulte contas internas e usuários vinculados às empresas.</p>
+        </div>
+        <button class="fs-btn fs-btn-primary fs-width-300" id="user-invite" type="button">Convidar administrador</button>
+    </header>
+
+    <div id="users-message" class="fs-alert" role="status" aria-live="polite" hidden></div>
+
+    <section class="fs-card fs-card-panel" aria-labelledby="users-filter-title">
+        <div class="fs-card-header">
+            <div class="fs-card-header-title">
+                <h2 class="fs-card-title" id="users-filter-title">Buscar usuários</h2>
+                <p class="fs-card-subtitle">Pesquise por nome ou e-mail.</p>
+            </div>
+        </div>
+        <form id="users-filter-form" class="fs-card-body fs-filter-form">
+            <label class="fs-form-label" for="users-query">
+                <span>Nome ou e-mail</span>
+                <input class="fs-form-control fs-width-800" id="users-query" name="q" type="search" placeholder="Nome ou e-mail" autocomplete="off">
+            </label>
+            <button class="fs-btn fs-btn-outline-secondary fs-width-300 fs-form-action" type="submit">Buscar</button>
+        </form>
+    </section>
+
+    <section class="fs-card fs-card-panel" aria-labelledby="users-list-title">
+        <div class="fs-card-header">
+            <div class="fs-card-header-title">
+                <h2 class="fs-card-title" id="users-list-title">Contas cadastradas</h2>
+                <p class="fs-card-subtitle">Cada linha representa uma conta da plataforma ou de uma empresa.</p>
+            </div>
+            <span class="fs-card-header-info" id="users-table-summary">Carregando usuários...</span>
+        </div>
+        <div class="fs-card-body fs-u-p-0">
+            <div class="fs-table-responsive fs-datatable" data-fs="datatable" data-fs-page-size="1000">
+                <table class="fs-table fs-table-records fs-table-hover" aria-label="Usuários cadastrados">
+                    <thead><tr><th class="fs-width-600" scope="col">Usuário</th><th class="fs-width-300" scope="col">Tipo de conta</th><th class="fs-width-400" scope="col">Perfil ou vínculos</th><th class="fs-width-300" scope="col">Status</th><th class="fs-width-300" scope="col">Ações</th></tr></thead>
+                    <tbody id="users-list"><tr><td colspan="5">Carregando usuários...</td></tr></tbody>
+                </table>
+                <p data-fs-datatable-empty class="fs-table-empty" hidden>Nenhuma conta encontrada.</p>
+                <p data-fs-datatable-loading class="fs-table-empty" hidden>Carregando usuários...</p>
+                <div data-fs-datatable-error class="fs-alert fs-alert-danger" hidden><span data-fs-datatable-error-message></span></div>
+            </div>
+        </div>
+        <div class="fs-card-footer fs-u-d-flex fs-u-flex-wrap fs-u-align-items-center fs-u-justify-content-between fs-u-gap-3">
+            <span class="fs-u-fs-sm fs-u-color-secondary" id="users-table-footer-summary"></span>
+            <nav id="users-pagination" aria-label="Paginação de usuários"></nav>
+        </div>
+    </section>
+
+    <button id="user-drawer-trigger" type="button" data-fs="offcanvas" data-fs-target="#user-drawer" hidden aria-hidden="true" tabindex="-1"></button>
+    <aside class="fs-offcanvas fs-offcanvas-end backoffice-records-drawer" id="user-drawer" aria-labelledby="user-drawer-title" tabindex="-1">
+        <div class="fs-offcanvas-header">
+            <div class="fs-u-d-flex fs-u-flex-column fs-u-gap-1">
+                <span class="fs-u-fs-xs fs-u-color-secondary" id="user-drawer-kicker">USUÁRIOS</span>
+                <h2 class="fs-offcanvas-title" id="user-drawer-title">Detalhes do usuário</h2>
+                <p class="fs-u-m-0 fs-u-fs-sm fs-u-color-secondary" id="user-drawer-description">Consulte os dados da conta.</p>
+            </div>
+            <button class="fs-btn-close" id="user-drawer-close" type="button" data-fs-dismiss="offcanvas" aria-label="Fechar painel"></button>
+        </div>
+        <form id="user-form" class="fs-offcanvas-body fs-form" hidden novalidate>
+            <section class="fs-card fs-card-panel" aria-labelledby="user-form-data-title">
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="user-form-data-title">Dados da conta interna</h3><p class="fs-card-subtitle" id="user-form-help">Informe os dados do convite.</p></div></div>
+                <div class="fs-card-body fs-u-d-flex fs-u-flex-column fs-u-gap-3">
+                    <label class="fs-form-label" for="user-name"><span>Nome</span><input class="fs-form-control" id="user-name" name="name" maxlength="255" autocomplete="name" required></label>
+                    <label class="fs-form-label" for="user-email"><span>E-mail</span><input class="fs-form-control" id="user-email" name="email" type="email" maxlength="255" autocomplete="email" required></label>
+                    <label class="fs-form-label" id="user-role-field" for="user-role"><span>Perfil interno</span><select class="fs-form-select" id="user-role" name="role" required><option value="administrador_comercial">Administrador comercial</option><option value="superadministrador">Superadministrador</option></select></label>
+                    <p class="fs-u-fs-sm fs-u-color-secondary" id="user-email-change-help" hidden>O e-mail atual continua ativo até o titular confirmar o novo endereço. O link expira em 24 horas.</p>
+                </div>
+            </section>
+            <footer class="fs-u-d-flex fs-u-justify-content-end fs-u-gap-2 fs-u-mt-3" id="user-form-footer">
+                <button class="fs-btn fs-btn-outline-secondary" id="user-form-cancel" type="button">Cancelar</button>
+                <button class="fs-btn fs-btn-primary" id="user-form-submit" type="submit">Enviar convite</button>
+            </footer>
+        </form>
+        <div class="fs-offcanvas-body fs-u-d-flex fs-u-flex-column fs-u-gap-4" id="user-view-panel" hidden></div>
+    </aside>
+
+    <button id="user-action-trigger" type="button" data-fs="modal" data-fs-target="#user-action-dialog" hidden></button>
+    <div class="fs-modal" id="user-action-dialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="user-action-title">
+        <div class="fs-modal-dialog"><div class="fs-modal-content">
+            <div class="fs-modal-header"><div><span class="fs-u-fs-xs fs-u-color-secondary">SEGURANÇA</span><h2 class="fs-modal-title" id="user-action-title">Confirmar ação</h2><p id="user-action-description">Informe o motivo para registrar esta ação.</p></div><button class="fs-btn-close" type="button" data-fs-dismiss="modal" aria-label="Fechar"></button></div>
+            <form class="fs-form fs-modal-body fs-u-d-flex fs-u-flex-column fs-u-gap-3" id="user-action-form">
+                <label class="fs-form-label" for="user-action-reason"><span>Motivo obrigatório</span><textarea class="fs-form-control" id="user-action-reason" name="reason" rows="3" maxlength="1000" required></textarea></label>
+                <div class="fs-modal-footer"><button class="fs-btn fs-btn-outline-secondary" type="button" data-fs-dismiss="modal">Cancelar</button><button class="fs-btn fs-btn-primary" id="user-action-submit" type="submit">Confirmar</button></div>
+            </form>
+        </div></div>
+    </div>
+</main>

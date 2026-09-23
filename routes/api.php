@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CompanyUserController;
 use App\Http\Controllers\Api\LawHearingController;
 use App\Http\Controllers\Api\PlatformAdminController;
 use App\Http\Controllers\Api\PlatformAuthController;
+use App\Http\Controllers\Api\PlatformUserDirectoryController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\UsageSnapshotController;
 use App\Http\Controllers\Api\ProductInterestController;
@@ -36,6 +37,7 @@ Route::prefix('backoffice/auth')->group(function () {
     Route::post('/verify-mfa', [PlatformAuthController::class, 'verifyMfa'])->middleware('throttle:5,1');
     Route::post('/resend-mfa', [PlatformAuthController::class, 'resendMfa'])->middleware('throttle:2,1');
     Route::post('/activate-invitation', [PlatformAuthController::class, 'activateInvitation'])->middleware('throttle:5,1');
+    Route::post('/confirm-email-change', [PlatformAdminController::class, 'confirmEmailChange'])->middleware('throttle:5,1');
 });
 
 Route::middleware('auth')->group(function () {
@@ -130,7 +132,10 @@ Route::middleware(EnsurePlatformAdmin::class)->prefix('backoffice')->group(funct
     Route::delete('/vouchers/{voucher}', [BackofficeController::class, 'deleteVoucher'])->middleware(EnsurePlatformPermission::class.':platform.catalog.publish');
     Route::get('/admins', [PlatformAdminController::class, 'index'])->middleware(EnsurePlatformPermission::class.':platform.security.manage');
     Route::post('/admins/invitations', [PlatformAdminController::class, 'invite'])->middleware(EnsurePlatformPermission::class.':platform.security.manage');
+    Route::get('/directory/users', [PlatformUserDirectoryController::class, 'index'])->middleware(EnsurePlatformPermission::class.':platform.users.view');
+    Route::get('/directory/users/{type}/{id}', [PlatformUserDirectoryController::class, 'show'])->middleware(EnsurePlatformPermission::class.':platform.users.view');
     Route::patch('/admins/{admin}/role', [PlatformAdminController::class, 'updateRole'])->middleware(EnsurePlatformPermission::class.':platform.security.manage');
+    Route::patch('/admins/{admin}/profile', [PlatformAdminController::class, 'updateProfile'])->middleware(EnsurePlatformPermission::class.':platform.security.manage');
     Route::post('/admins/{admin}/block', [PlatformAdminController::class, 'block'])->middleware(EnsurePlatformPermission::class.':platform.security.manage');
     Route::post('/admins/{admin}/unblock', [PlatformAdminController::class, 'unblock'])->middleware(EnsurePlatformPermission::class.':platform.security.manage');
     Route::post('/admins/{admin}/deactivate', [PlatformAdminController::class, 'deactivate'])->middleware(EnsurePlatformPermission::class.':platform.security.manage');

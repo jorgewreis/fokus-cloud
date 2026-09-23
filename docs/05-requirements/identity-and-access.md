@@ -116,3 +116,11 @@ Definir a base de identidade e autorizacao do Fokus Cloud, garantindo que usuari
 - Convites expirados devem poder ser reenviados automaticamente?
 - A empresa deve poder ter administradores temporarios ou somente transferencia definitiva?
 - Eventos de login devem aparecer para o usuario final ou apenas em auditoria interna?
+
+## Diretorio unificado de usuarios do Backoffice
+
+- Administrador comercial e superadministrador podem consultar todas as contas internas e de empresas em `/backoffice/usuarios`, com busca por nome ou e-mail e paginacao no servidor. `/backoffice/seguranca` permanece como rota compativel.
+- Cada cadastro e uma linha propria. Contas internas (`platform_admins`) e de empresas (`users`) permanecem separadas mesmo quando usam o mesmo e-mail.
+- Os detalhes de usuarios de empresas exibem vinculos atuais e assinaturas vigentes da empresa associada. CPF completo e incluido apenas na resposta autorizada ao superadministrador.
+- Convites, bloqueio, desbloqueio, desativacao e edicao de contas internas permanecem exclusivos do superadministrador. Usuarios de empresas sao somente para consulta nesta pagina.
+- A alteracao de nome e imediata. A alteracao de e-mail interno depende de token de uso unico com hash, validade de 24 horas, confirmacao no novo endereco, encerramento das sessoes e auditoria; o endereco antigo recebe aviso e continua ativo ate a confirmacao.
