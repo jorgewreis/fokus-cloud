@@ -6,14 +6,7 @@
 }
 
 /* Reusable records-page anatomy shared by Backoffice management pages. */
-.backoffice-records-page {
-    box-sizing: border-box;
-    width: min(100% - 40px, 1480px);
-    margin: 0 auto;
-    padding: 24px 0 60px;
-    color: #252525;
-    font-family: "Google Sans", sans-serif;
-}
+.backoffice-records-page { color: #252525; font-family: "Google Sans", sans-serif; }
 
 /* Universal shell contract: dynamically loaded pages must keep natural card
    height instead of being compressed by the legacy viewport container. */
@@ -26,7 +19,6 @@
 }
 .admin-shell-content > #page-content > .container-page > * { flex-shrink: 0; }
 
-.backoffice-records-page > .fs-page-layout { width: 100%; padding: 0 30px 20px; }
 .backoffice-records-page > .backoffice-page-card { width: calc(100% - 20px); margin: 10px; }
 .backoffice-records-drawer.fs-offcanvas-end,
 body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: calc(100vw - 16px); z-index: 2001 !important; }
@@ -52,7 +44,7 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: ca
 @media (max-width: 520px) { .fs-confirmation-dialog .fs-modal-footer { flex-direction: column-reverse; } .fs-confirmation-dialog .fs-modal-footer .fs-btn { width: 100%; min-width: 0; } }
 .backoffice-records-page .fs-card-body dl { display: flex; flex-direction: column; gap: 10px; margin: 0; }
 .backoffice-records-page .fs-card-body dl > div { display: flex; flex-direction: column; gap: 2px; }
-@media (max-width: 680px) { .backoffice-records-page { padding: 24px 16px 36px; } .backoffice-records-page > .fs-page-layout { padding: 0 0 20px; } }
+@media (max-width: 680px) { .backoffice-records-page { padding-bottom: 36px; } }
 
 .create-drawer .painel-header {
     display: flex;

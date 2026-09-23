@@ -43,10 +43,22 @@ html[data-role="admin"] {
     --fs-backoffice-card-space: var(--fs-space-4, 24px);
 }
 .backoffice-records-page {
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     gap: var(--fs-backoffice-panel-space);
     min-width: 0;
+    width: min(100% - 40px, 1480px);
+    margin: 0 auto;
+    padding: var(--fs-space-4, 24px) 0 var(--fs-space-6, 60px);
+}
+.backoffice-records-page > .fs-page-layout {
+    width: 100%;
+    padding: 0 var(--fs-space-4, 24px) var(--fs-space-3, 16px);
+}
+.backoffice-records-page > section.fs-card-panel {
+    width: calc(100% - var(--fs-space-3, 16px));
+    margin-inline: auto;
 }
 .backoffice-records-page .fs-card-panel > .fs-card-header,
 .backoffice-records-page .fs-card-panel > .fs-card-body,
@@ -190,7 +202,13 @@ html[data-role="admin"] .fs-alert[hidden] {
     margin-bottom: 10px;
 }
 @media (max-width: 680px) {
-    .backoffice-records-page { gap: var(--fs-space-2, 8px); }
+    .backoffice-records-page {
+        width: 100%;
+        gap: var(--fs-space-2, 8px);
+        padding: var(--fs-space-4, 24px) var(--fs-space-3, 16px) var(--fs-space-5, 32px);
+    }
+    .backoffice-records-page > .fs-page-layout { padding-inline: 0; }
+    .backoffice-records-page > section.fs-card-panel { width: 100%; }
     .backoffice-records-page .fs-filter-form .fs-form-label,
     .backoffice-records-page .fs-filter-form > .fs-btn { flex-basis: 100%; }
     .backoffice-records-drawer .fs-offcanvas-footer > .fs-btn { flex: 1 1 100%; }

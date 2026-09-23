@@ -1,6 +1,7 @@
 import { createRecordsDrawer } from "./records-drawer.js";
 
 const SUBSCRIPTIONS_PER_PAGE = 15;
+const ICONS_PATH = "/backoffice/assets/icons/";
 
 const STATUS_LABELS = {
     aguardando_pagamento: "Aguardando pagamento",
@@ -133,6 +134,7 @@ export function mount(root, context = {}) {
     const $ = (selector) => root.querySelector(selector) || document.querySelector(selector);
     const api = context.api || window.FokusApi;
     const form = $("#subscription-change-form");
+    const actionFooter = $("#subscription-action-footer");
     const list = $("#subscription-list");
     const pagination = $("#subscription-pagination");
     const table = root.querySelector(".fs-table-responsive");
@@ -218,7 +220,7 @@ export function mount(root, context = {}) {
             <td class="fs-width-500" data-label="Status">${badge(subscription.status)}</td>
             <td class="fs-width-400" data-label="Vigência">${escapeHtml(formatDate(subscription.current_period_ends_at))}</td>
             <td class="fs-width-300 cell-value" data-label="Valor">${escapeHtml(money(subscription.amount))}</td>
-            <td class="fs-width-300" data-label="Ações"><button class="fs-btn fs-btn-outline-primary fs-btn-sm" type="button" data-subscription-id="${escapeHtml(subscription.id)}" aria-label="Ver detalhes da assinatura de ${escapeHtml(subscription.company_name || "empresa")}">Detalhes</button></td>
+            <td class="fs-width-400" data-label="Ações"><div class="fs-u-d-flex fs-u-gap-2"><button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action" type="button" data-subscription-id="${escapeHtml(subscription.id)}" aria-label="Ver detalhes da assinatura de ${escapeHtml(subscription.company_name || "empresa")}" title="Ver detalhes da assinatura"><img src="${ICONS_PATH}Folder-File--Streamline-Ultimate.png" alt="" /></button></div></td>
         </tr>`).join("") : "";
         $("#subscription-table-summary").textContent = `${total.toLocaleString("pt-BR")} ${total === 1 ? "assinatura encontrada" : "assinaturas encontradas"}`;
         const from = total ? (currentPage - 1) * perPage + 1 : 0;
@@ -330,6 +332,8 @@ export function mount(root, context = {}) {
         ])}</dl><details><summary>Consultar snapshots comerciais</summary><div class="fs-u-d-flex fs-u-flex-column fs-u-gap-2 fs-u-mt-2">${snapshotCard("Antes da alteração", change.before_snapshot)}${snapshotCard("Depois da alteração", change.after_snapshot)}</div></details></div></article>`).join("") : '<p class="fs-u-fs-sm fs-u-color-secondary">Nenhuma alteração comercial registrada.</p>';
 
         $("#subscription-detail-sections").hidden = false;
+        form.hidden = false;
+        actionFooter.hidden = false;
         $("#subscription-detail-loading").hidden = true;
         $("#subscription-detail-error").hidden = true;
         $("#subscription-drawer-content").setAttribute("aria-busy", "false");
@@ -455,9 +459,8 @@ export function mount(root, context = {}) {
         const button = event.target.closest("[data-subscription-id]");
         if (!button || !list.contains(button)) return;
         state.lastTriggerId = button.dataset.subscriptionId;
-        const loaded = await loadDetails(state.lastTriggerId);
-        if (loaded) showDrawer();
-        else showDrawer();
+        showDrawer();
+        await loadDetails(state.lastTriggerId);
     };
 
     const onPageClick = (event) => {

@@ -58,6 +58,7 @@ test('Assinaturas filtra por empresa, produto e status e consulta detalhes em dr
         await page.goto('/backoffice/assinaturas');
         await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'subscriptions');
         await expect(page.locator('#subscription-list tr')).toHaveCount(15);
+        await expect(page.locator('#subscription-list .fs-table-action img[src*="Folder-File--Streamline-Ultimate.png"]')).toHaveCount(15);
         await expect(page.locator('#subscription-product option')).toHaveCount(3);
         await expect(page).toHaveScreenshot(`subscriptions-${name}.png`, { fullPage: true, animations: 'disabled', maxDiffPixelRatio: 0.08 });
 
@@ -264,13 +265,49 @@ test('consulta de e-mail mostra usuário existente sem assinatura ativa', async 
 });
 
 test('Fokus Law usa o mesmo toast do Backoffice para erro de consulta', async ({ page }) => {
-    await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ message: 'Acesso interno não autenticado.' }) }));
     await page.route('**/api/auth/law-context', (route) => route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'Usuário não encontrado.' }) }));
     await page.goto('/marketing/products/fokus-law.html');
     await page.locator('#law-email').fill('ausente@example.test');
     await expect(page.locator('#backoffice-toast-container .fs-backoffice-toast')).toBeVisible();
     await expect(page.locator('#backoffice-toast-container .fs-toast-title')).toHaveText('Erro');
     await expect(page.locator('#backoffice-toast-container .fs-toast-body')).toHaveText('Usuário não encontrado.');
+    await expect(page.locator('#backoffice-toast-container .fs-backoffice-toast')).toHaveScreenshot('fokus-law-login-error-toast.png', { animations: 'disabled', maxDiffPixelRatio: 0.02 });
+    const lawToastStyles = await page.locator('#backoffice-toast-container .fs-backoffice-toast').evaluate((toast) => {
+        const read = (element) => {
+            const style = getComputedStyle(element);
+            return Object.fromEntries(['position', 'display', 'flexDirection', 'alignItems', 'gap', 'padding', 'borderInlineStartWidth', 'borderRadius'].map((property) => [property, style[property]]));
+        };
+        return {
+            container: read(toast.parentElement),
+            toast: read(toast),
+            header: read(toast.querySelector('.fs-toast-header')),
+            title: read(toast.querySelector('.fs-toast-title')),
+            body: read(toast.querySelector('.fs-toast-body')),
+            close: read(toast.querySelector('.fs-toast-close')),
+            progress: read(toast.querySelector('.fs-toast-progress')),
+        };
+    });
+
+    await page.goto('/backoffice/assinaturas');
+    await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'subscriptions');
+    await page.evaluate(() => window.FokusToast.show('Usuário não encontrado.', 'danger'));
+    await expect(page.locator('#backoffice-toast-container .fs-backoffice-toast')).toBeVisible();
+    const backofficeToastStyles = await page.locator('#backoffice-toast-container .fs-backoffice-toast').evaluate((toast) => {
+        const read = (element) => {
+            const style = getComputedStyle(element);
+            return Object.fromEntries(['position', 'display', 'flexDirection', 'alignItems', 'gap', 'padding', 'borderInlineStartWidth', 'borderRadius'].map((property) => [property, style[property]]));
+        };
+        return {
+            container: read(toast.parentElement),
+            toast: read(toast),
+            header: read(toast.querySelector('.fs-toast-header')),
+            title: read(toast.querySelector('.fs-toast-title')),
+            body: read(toast.querySelector('.fs-toast-body')),
+            close: read(toast.querySelector('.fs-toast-close')),
+            progress: read(toast.querySelector('.fs-toast-progress')),
+        };
+    });
+    expect(lawToastStyles).toEqual(backofficeToastStyles);
 });
 
 test('Superadministrador MFA pode iniciar acesso de suporte a perfil real', async ({ page }) => {

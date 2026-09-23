@@ -1,4 +1,4 @@
-<link data-page-css="subscriptions" rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260923-subscriptions-refactor-v1" />
+<link data-page-css="subscriptions" rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260923-subscriptions-visual-alignment-v2" />
 
 <main class="backoffice-records-page container-page fs-container-fluid" aria-labelledby="subscriptions-page-title">
     <header class="fs-page-layout">
@@ -21,7 +21,10 @@
         <form class="fs-card-body fs-filter-form" id="subscription-filter-form">
             <label class="fs-form-label" for="subscription-query">
                 <span>Empresa ou produto</span>
-                <input class="fs-form-control fs-width-700" id="subscription-query" name="q" type="search" placeholder="Buscar empresa ou produto" autocomplete="off" />
+                <span class="fs-input-group fs-input-group-subtle">
+                    <span class="fs-input-group-text" aria-hidden="true"><img class="fs-input-group-icon" src="/backoffice/assets/icons/Search-Bar--Streamline-Ultimate.png" alt="" /></span>
+                    <input class="fs-form-control fs-width-400" id="subscription-query" name="q" type="search" placeholder="Empresa ou produto" autocomplete="off" />
+                </span>
             </label>
             <label class="fs-form-label" for="subscription-product">
                 <span>Produto</span>
@@ -64,7 +67,7 @@
                             <th class="fs-width-500" scope="col">Status</th>
                             <th class="fs-width-400" scope="col">Vigência</th>
                             <th class="fs-width-300" scope="col">Valor</th>
-                            <th class="fs-width-300" scope="col">Ações</th>
+                            <th class="fs-width-400" scope="col">Ações</th>
                         </tr>
                     </thead>
                     <tbody id="subscription-list"></tbody>
@@ -95,25 +98,25 @@
             <div class="fs-alert fs-alert-info" id="subscription-detail-loading" role="status" aria-live="polite" hidden>Carregando detalhes da assinatura...</div>
             <div class="fs-alert fs-alert-danger" id="subscription-detail-error" role="alert" hidden></div>
             <div id="subscription-detail-sections" class="fs-u-d-flex fs-u-flex-column fs-u-gap-3 backoffice-records-view-panel" hidden>
-                <section class="fs-card fs-card-panel" aria-labelledby="subscription-detail-data-title">
-                    <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-detail-data-title">Dados comerciais</h3><p class="fs-card-subtitle" id="subscription-detail-summary"></p></div></div>
-                    <div class="fs-card-body"><dl class="fs-detail-list" id="subscription-detail-data"></dl></div>
+                <section class="fs-card" aria-labelledby="subscription-detail-data-title">
+                    <div class="fs-card-header"><h3 class="fs-card-title" id="subscription-detail-data-title">Dados comerciais</h3></div>
+                    <div class="fs-card-body"><p class="fs-u-fs-sm fs-u-color-secondary" id="subscription-detail-summary"></p><dl class="fs-detail-list" id="subscription-detail-data"></dl></div>
                 </section>
-                <section class="fs-card fs-card-panel" aria-labelledby="subscription-detail-items-title">
-                    <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-detail-items-title">Itens contratados</h3><p class="fs-card-subtitle">Módulos, quantidades e condições da contratação.</p></div></div>
+                <section class="fs-card" aria-labelledby="subscription-detail-items-title">
+                    <div class="fs-card-header"><h3 class="fs-card-title" id="subscription-detail-items-title">Itens contratados</h3></div>
                     <div class="fs-card-body" id="subscription-detail-items"></div>
                 </section>
-                <section class="fs-card fs-card-panel" aria-labelledby="subscription-detail-payments-title">
-                    <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-detail-payments-title">Pagamentos</h3><p class="fs-card-subtitle">Cobranças vinculadas à assinatura.</p></div></div>
+                <section class="fs-card" aria-labelledby="subscription-detail-payments-title">
+                    <div class="fs-card-header"><h3 class="fs-card-title" id="subscription-detail-payments-title">Pagamentos</h3></div>
                     <div class="fs-card-body fs-u-d-flex fs-u-flex-column fs-u-gap-2" id="subscription-detail-payments"></div>
                 </section>
-                <section class="fs-card fs-card-panel" aria-labelledby="subscription-detail-history-title">
-                    <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-detail-history-title">Histórico comercial</h3><p class="fs-card-subtitle">Alterações, motivos, vigência e snapshots registrados.</p></div></div>
+                <section class="fs-card" aria-labelledby="subscription-detail-history-title">
+                    <div class="fs-card-header"><h3 class="fs-card-title" id="subscription-detail-history-title">Histórico comercial</h3></div>
                     <div class="fs-card-body fs-u-d-flex fs-u-flex-column fs-u-gap-2" id="subscription-detail-history"></div>
                 </section>
             </div>
 
-            <form class="fs-form fs-card fs-card-panel" id="subscription-change-form" novalidate>
+            <form class="fs-form fs-card fs-card-panel" id="subscription-change-form" novalidate hidden>
                 <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-change-title">Registrar ação comercial</h3><p class="fs-card-subtitle">As alterações exigem motivo e são registradas no histórico.</p></div></div>
                 <div class="fs-card-body fs-u-d-flex fs-u-flex-column fs-u-gap-2">
                     <label class="fs-form-label" for="subscription-action">
@@ -145,7 +148,7 @@
                 </div>
             </form>
         </div>
-        <div class="fs-offcanvas-footer">
+        <div class="fs-offcanvas-footer" id="subscription-action-footer" hidden>
             <button class="fs-btn fs-btn-outline-secondary" id="subscription-action-reset" type="reset" form="subscription-change-form">Limpar ação</button>
             <button class="fs-btn fs-btn-primary" id="subscription-action-submit" type="submit" form="subscription-change-form">Registrar ação</button>
         </div>
