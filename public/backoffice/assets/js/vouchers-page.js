@@ -102,9 +102,9 @@ export async function mount(root, context = {}) {
     const benefitLabel = (voucher) => {
         const type = voucher.discount_type;
         if (type === "trial_free") return `${BENEFITS[type]} · 100%`;
-        if (type === "percentage") return `${Number(voucher.discount_value || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
+        if (type === "percentage") return `${BENEFITS[type]} · ${Number(voucher.discount_value || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
         if (type === "commercial_credit") return `${BENEFITS[type]} · ${money(voucher.discount_value)}`;
-        if (type === "fixed") return money(voucher.discount_value);
+        if (type === "fixed") return `${BENEFITS[type]} · ${money(voucher.discount_value)}`;
         return "—";
     };
 
@@ -350,7 +350,7 @@ export async function mount(root, context = {}) {
         if (type === "trial_free") help.textContent = base ? `O voucher cobre 100% do valor-base de ${money(base)}. A duração começa na ativação.` : "A assinatura terá 100% de desconto durante a duração selecionada.";
         else if (type === "percentage" && percent > 0 && base > 0) help.textContent = `Desconto estimado de ${money(Math.min(base, base * percent / 100))}. O valor final é recalculado no servidor.`;
         else if (["fixed", "commercial_credit"].includes(type) && amount > 0) help.textContent = type === "commercial_credit" ? `Crédito aplicado somente à primeira cobrança, limitado ao valor cobrado (${money(amount)} informado).` : `Desconto informado: ${money(amount)}. O valor aplicado será limitado ao preço da contratação.`;
-        else if ($( "#voucher-plan").value === "__all__") help.textContent = "Válido para todos os planos do produto. Nesse modo, somente o benefício percentual é permitido.";
+        else if ($( "#voucher-plan").value === "__all__") help.textContent = "Todos os planos aceita apenas desconto percentual. Para assinatura gratuita, desconto fixo ou crédito, selecione um plano específico.";
         else help.textContent = "Selecione o produto, o plano e a duração para consultar o valor-base.";
     };
 
@@ -362,7 +362,7 @@ export async function mount(root, context = {}) {
             const option = typeSelect.querySelector(`option[value="${type}"]`);
             if (option) option.disabled = allPlans;
         });
-        if (allPlans && typeSelect.value && typeSelect.value !== "percentage") typeSelect.value = "percentage";
+        if (allPlans && typeSelect.value && typeSelect.value !== "percentage") typeSelect.value = "";
         const type = typeSelect.value;
         const canUseBase = Boolean(planSelect.value && !allPlans);
         $("#voucher-base-field").hidden = !canUseBase;

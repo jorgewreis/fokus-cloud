@@ -977,7 +977,8 @@ test('Vouchers cria campanha e limita ações comerciais às permissões documen
     await expect(page.locator('#voucher-discount-amount')).toBeDisabled();
     await page.locator('#voucher-plan').selectOption('__all__');
     await expect(page.locator('#voucher-discount-type option[value="trial_free"]')).toHaveAttribute('disabled', '');
-    await expect(page.locator('#voucher-discount-type')).toHaveValue('percentage');
+    await expect(page.locator('#voucher-discount-type')).toHaveValue('');
+    await expect(page.locator('#voucher-benefit-help')).toContainText('Para assinatura gratuita, desconto fixo ou crédito, selecione um plano específico.');
     await page.locator('#voucher-plan').selectOption('PLN_VOUCHER_01');
     await page.locator('#voucher-discount-type').selectOption('percentage');
     await page.locator('#voucher-duration').selectOption('m1');
