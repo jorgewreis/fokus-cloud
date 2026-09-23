@@ -227,6 +227,7 @@ class PlatformSecurityTest extends TestCase
         $customer = User::create(['id' => PrefixedUlid::make('USR'), 'name' => 'Pessoa de Teste', 'cpf' => '12345678901', 'email' => 'pessoa@example.test', 'password' => 'SenhaCliente!2026', 'status' => 'ativa']);
         $companyId = PrefixedUlid::make('COM');
         $product = DB::table('products')->where('code', 'law')->firstOrFail();
+        DB::table('products')->where('id', $product->id)->update(['code' => 'fokus-law']);
         DB::table('companies')->insert(['id' => $companyId, 'document_type' => 'cnpj', 'document_number' => '12345678000100', 'legal_name' => 'Empresa para suporte', 'status' => 'ativa', 'version' => 1, 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
         $membershipId = PrefixedUlid::make('MBS');
         DB::table('company_memberships')->insert(['id' => $membershipId, 'company_id' => $companyId, 'user_id' => $customer->id, 'role_id' => DB::table('roles')->where('code', 'admin')->value('id'), 'status' => 'ativo', 'active_admin_company_id' => $companyId, 'version' => 1, 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);

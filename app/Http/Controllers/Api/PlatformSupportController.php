@@ -17,7 +17,7 @@ class PlatformSupportController extends Controller
         $subscriptions = DB::table('subscriptions as subscription')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->join('companies as company', 'company.id', '=', 'subscription.company_id')
-            ->where('product.code', 'law')->whereNull('company.deleted_at')
+            ->whereIn('product.code', ['law', 'fokus-law'])->whereNull('company.deleted_at')
             ->select('subscription.id', 'subscription.company_id', 'subscription.status', 'subscription.commercial_snapshot', 'company.legal_name')
             ->orderBy('company.legal_name')->get()
             ->map(function (object $subscription): array {
@@ -59,7 +59,7 @@ class PlatformSupportController extends Controller
             })
             ->join('companies as company', 'company.id', '=', 'subscription.company_id')
             ->join('users as user', 'user.id', '=', 'membership.user_id')
-            ->where('subscription.id', $data['subscription_id'])->where('product.code', 'law')
+            ->where('subscription.id', $data['subscription_id'])->whereIn('product.code', ['law', 'fokus-law'])
             ->where('membership.status', 'ativo')->whereNull('membership.deleted_at')
             ->where('company.status', 'ativa')->whereNull('company.deleted_at')->where('user.status', 'ativa')
             ->select('subscription.id as subscription_id', 'subscription.company_id', 'membership.id as membership_id', 'membership.user_id', 'company.legal_name')
