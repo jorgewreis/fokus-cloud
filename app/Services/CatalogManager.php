@@ -85,6 +85,7 @@ class CatalogManager
                 'plan.segment',
                 'plan.status',
                 'plan.publication_state',
+                'plan.published_version',
                 'plan.display_order',
                 'plan.featured',
                 'product.name',
@@ -103,6 +104,7 @@ class CatalogManager
                 'plan.segment',
                 'plan.status',
                 'plan.publication_state',
+                'plan.published_version',
                 'plan.display_order',
                 'plan.featured',
                 'product.name as product_name',
@@ -149,9 +151,11 @@ class CatalogManager
             return [
                 'id' => $plan->id,
                 'product_id' => $plan->product_id,
+                'product_name' => $plan->product_name,
                 'product_code' => $plan->product_code,
                 'product_status' => $plan->product_status,
                 'product_publication_version' => (int) ($plan->product_publication_version ?? 0),
+                'published_version' => (int) $plan->published_version,
                 'code' => $plan->code,
                 'name' => $plan->name,
                 'base_name' => $plan->name,
@@ -426,6 +430,7 @@ class CatalogManager
             ]);
             DB::table('products')->where('id', $productId)->update(['published_catalog_version' => $version, 'updated_at' => now()]);
             DB::table('modules')->where('product_id', $productId)->where('status', 'ativo')->update(['publication_state' => 'publicado', 'updated_at' => now()]);
+            DB::table('plans')->where('product_id', $productId)->where('status', 'ativo')->where('publication_state', '!=', 'publicado')->increment('published_version');
             DB::table('plans')->where('product_id', $productId)->where('status', 'ativo')->update(['publication_state' => 'publicado', 'updated_at' => now()]);
         });
 
@@ -511,6 +516,7 @@ class CatalogManager
 
         DB::table('plans')->where('id', $id)->update([
             'publication_state' => 'publicado',
+            'published_version' => $current->publication_state === 'publicado' ? $current->published_version : $current->published_version + 1,
             'updated_at' => now(),
         ]);
 

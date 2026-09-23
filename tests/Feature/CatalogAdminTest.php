@@ -264,6 +264,24 @@ class CatalogAdminTest extends TestCase
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_plan_published', 'entity_id' => $planId]);
     }
 
+    public function test_plan_details_include_product_name_and_the_plans_own_publication_version(): void
+    {
+        $admin = $this->admin();
+        $planId = DB::table('plans')->where('code', 'law-cartorio-criminal')->value('id');
+
+        $plans = $this->actingAs($admin, 'platform')->getJson('/api/backoffice/plans')->assertOk()->json();
+        $plan = collect($plans)->firstWhere('id', $planId);
+        $this->assertSame('Fokus Law', $plan['product_name']);
+        $this->assertSame(1, $plan['published_version']);
+
+        $this->postJson("/api/backoffice/catalog/plans/{$planId}/pause")->assertOk();
+        $this->postJson("/api/backoffice/catalog/plans/{$planId}/activate")->assertOk();
+        $this->postJson("/api/backoffice/catalog/plans/{$planId}/publish")->assertOk();
+        $this->postJson("/api/backoffice/catalog/plans/{$planId}/publish")->assertOk();
+
+        $this->assertDatabaseHas('plans', ['id' => $planId, 'published_version' => 2]);
+    }
+
     public function test_superadmin_can_archive_modules_and_plans_but_commercial_admin_cannot(): void
     {
         $commercial = $this->admin('administrador_comercial');
