@@ -30,8 +30,9 @@ export async function mount(root, context = {}) {
         return `<span class="fs-badge fs-badge-width-80 fs-badge-soft-${tone}">${escapeHtml(label)}</span>`;
     };
     const productActions = (product) => {
+        const needsCatalogPublication = product.publication_pending || Number(product.published_catalog_version) === 0;
         const lifecycle = product.status === "ativo"
-            ? action("pause", product, "Pausar produto", "Common-File-Subtract--Streamline-Ultimate.png") + (product.publication_pending ? action("publish", product, "Publicar nova versão do catálogo", "File-Code-2--Streamline-Ultimate.png") : "")
+            ? action("pause", product, "Pausar produto", "Common-File-Subtract--Streamline-Ultimate.png") + (needsCatalogPublication ? action("publish", product, product.publication_pending ? "Publicar nova versão do catálogo" : "Publicar catálogo", "File-Code-2--Streamline-Ultimate.png") : "")
             : action("activate", product, "Ativar produto", "Common-File-Check--Streamline-Ultimate.png") + action("delete", product, "Excluir produto", "Common-File-Remove--Streamline-Ultimate.png");
         const edit = ["pausado", "inativo"].includes(product.status) ? action("edit", product, "Editar produto", "Common-File-Edit--Streamline-Ultimate.png") : "";
         return `${action("view", product, "Ver detalhes do produto", "Folder-File--Streamline-Ultimate.png")}${edit}${lifecycle}`;
@@ -109,7 +110,7 @@ export async function mount(root, context = {}) {
         $("#product-view-status").innerHTML = statusBadge(product.status);
         $("#product-view-plans").textContent = String((product.plans || []).length);
         $("#product-view-version").textContent = Number(product.published_catalog_version) > 0 ? `v${Number(product.published_catalog_version)}.0` : "—";
-        $("#product-view-publication").textContent = product.publication_pending ? "Republicação pendente" : "Atualizada";
+        $("#product-view-publication").textContent = product.publication_pending ? "Republicação pendente" : Number(product.published_catalog_version) > 0 ? "Atualizada" : "Não publicado";
         setDescription("#product-view-technical-description", product.technical_description, "Nenhuma descrição técnica informada.");
         setDescription("#product-view-commercial-content", product.commercial_content, "Nenhuma descrição comercial informada.");
         drawer.show();
@@ -177,7 +178,7 @@ export async function mount(root, context = {}) {
         else if (["pause", "publish"].includes(type)) {
             state.pendingAction = { product, type };
             $("#product-action-title").textContent = type === "publish" ? "Publicar nova versão" : "Pausar produto";
-            $("#product-action-description").textContent = type === "publish" ? "A publicação gera uma nova versão do catálogo e libera o produto para novas contratações." : "O catálogo do produto ficará indisponível até a nova publicação.";
+            $("#product-action-description").textContent = type === "publish" ? "A publicação gera uma versão do catálogo com os módulos e planos publicados e libera o produto para novas contratações." : "O catálogo do produto ficará indisponível até a nova publicação.";
             $("#product-action-submit").textContent = type === "publish" ? "Publicar catálogo" : "Confirmar pausa";
             actionModal?.show();
         }
