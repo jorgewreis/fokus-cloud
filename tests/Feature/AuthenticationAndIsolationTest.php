@@ -96,7 +96,7 @@ class AuthenticationAndIsolationTest extends TestCase
         $this->postJson('/api/auth/law-context', ['email' => 'ADMIN@EXAMPLE.TEST'])
             ->assertOk()
             ->assertJsonPath('user.name', 'Administrador Teste')
-            ->assertJsonPath('systems.0.label', 'Fokus Law · Advocacia - Empresa Teste Ltda')
+            ->assertJsonPath('systems.0.label', 'Empresa Teste Ltda — Fokus Law · Advocacia')
             ->assertJsonPath('systems.0.profiles.0.value', 'admin');
         DB::table('users')->where('id', $user->id)->update(['email_verified_at' => null]);
         $this->postJson('/api/auth/law-context', ['email' => 'admin@example.test'])->assertOk()->assertJsonPath('user.name', 'Administrador Teste');

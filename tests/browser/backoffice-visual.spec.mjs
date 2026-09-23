@@ -82,7 +82,7 @@ test('consulta de e-mail no acesso Fokus Law identifica nome e sistema ativo', a
     await page.goto('/marketing/products/fokus-law.html');
     await page.locator('#law-email').fill('pessoa@example.test');
     await expect(page.locator('#law-system')).toBeEnabled();
-    await expect(page.locator('#law-system option')).toHaveText('Fokus Law · Advocacia - Empresa de Demonstração');
+    await expect(page.locator('#law-system option')).toHaveText('Empresa de Demonstração — Fokus Law · Advocacia');
     await expect(page.locator('[data-law-login-status]')).toContainText('Pessoa Teste');
     await expect(page.locator('#law-password')).toBeEnabled();
 });
@@ -116,10 +116,13 @@ test('Fokus Law usa o mesmo toast do Backoffice para erro de consulta', async ({
 });
 
 test('Superadministrador MFA pode iniciar acesso de suporte a perfil real', async ({ page }) => {
-    await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ admin: { role: 'superadministrador' } }) }));
+    await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ admin: { role: 'superadministrador', name: 'Superadmin Teste', email: 'superadmin@example.test' } }) }));
     await page.route('**/api/backoffice/support/law-context', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ subscriptions: [{ id: 'SUB_TESTE_01', label: 'Empresa Teste — Essencial (Suspensa)', status: 'suspensa', users: [{ membership_id: 'MBS_TESTE_01', label: 'Administrador — Pessoa Teste (pessoa@example.test)' }] }] }) }));
     await page.route('**/api/backoffice/support/access', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ redirect_to: '/portal' }) }));
     await page.goto('/marketing/products/fokus-law.html');
+    await expect(page.locator('[data-law-login-form]')).toBeVisible();
+    await expect(page.locator('[aria-labelledby="law-support-title"]')).toBeHidden();
+    await page.locator('#law-email').fill('superadmin@example.test');
     await expect(page.locator('[aria-labelledby="law-support-title"]')).toBeVisible();
     await expect(page.locator('[data-law-login-form]')).toBeHidden();
     await page.locator('#law-support-subscription').selectOption('SUB_TESTE_01');

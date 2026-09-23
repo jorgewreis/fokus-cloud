@@ -69,12 +69,27 @@
 
     email.addEventListener('input', () => {
       clearTimeout(lookupTimer);
+      support.hidden = true;
+      form.hidden = false;
       reset('Informe um e-mail válido para consultar seu cadastro.');
       const value = email.value.trim();
       if (!value) return;
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return;
       status.textContent = 'Consultando os sistemas vinculados ao e-mail…';
-      lookupTimer = setTimeout(() => {
+      lookupTimer = setTimeout(async () => {
+        if (!supportAdminReady) {
+          status.textContent = 'Verificando o tipo de acesso…';
+          await supportAdminCheck;
+        }
+        if (email.value.trim().toLowerCase() !== value.toLowerCase()) return;
+        if (supportAdmin && value.toLowerCase() === supportAdmin.email.toLowerCase()) {
+          form.hidden = true;
+          support.hidden = false;
+          support.querySelector('[data-support-email]').textContent = `${supportAdmin.name} — ${supportAdmin.email}`;
+          supportStatus.textContent = 'Carregando assinaturas Fokus Law…';
+          loadSupportSubscriptions();
+          return;
+        }
         window.FokusApi.request('/auth/law-context', { method: 'POST', body: { email: value } })
           .then(renderSystems)
           .catch((error) => {
@@ -100,12 +115,34 @@
     support.hidden = true;
     support.className = 'law-support-access';
     support.setAttribute('aria-labelledby', 'law-support-title');
-    support.innerHTML = '<h2 id="law-support-title">Acesso de suporte</h2><p>Escolha uma assinatura e um usuário real da empresa. O acesso será registrado em auditoria.</p><label for="law-support-subscription">Assinatura</label><select id="law-support-subscription" required></select><label for="law-support-user">Usuário e perfil</label><select id="law-support-user" required></select><label for="law-support-reason">Motivo do acesso</label><textarea id="law-support-reason" minlength="10" maxlength="1000" required></textarea><button class="law-submit" type="button" id="law-support-start">Acessar em modo de suporte</button><p role="status" aria-live="polite" id="law-support-status"></p>';
+    support.innerHTML = '<h2 id="law-support-title">Acesso de suporte</h2><p data-support-email></p><p>Escolha uma assinatura e um usuário real da empresa. O acesso será registrado em auditoria.</p><label for="law-support-subscription">Assinatura</label><select id="law-support-subscription" required></select><label for="law-support-user">Usuário e perfil</label><select id="law-support-user" required></select><label for="law-support-reason">Motivo do acesso</label><textarea id="law-support-reason" minlength="10" maxlength="1000" required></textarea><button class="law-submit" type="button" id="law-support-start">Acessar em modo de suporte</button><p role="status" aria-live="polite" id="law-support-status"></p>';
     form.before(support);
     const subscriptionSelect = support.querySelector('#law-support-subscription');
     const userSelect = support.querySelector('#law-support-user');
     const supportStatus = support.querySelector('#law-support-status');
     let supportSubscriptions = [];
+    let supportAdmin = null;
+    let supportAdminReady = false;
+    let supportSubscriptionsLoaded = false;
+    let supportSubscriptionsLoading = false;
+    const loadSupportSubscriptions = async () => {
+      if (supportSubscriptionsLoaded || supportSubscriptionsLoading) return;
+      supportSubscriptionsLoading = true;
+      try {
+        const payload = await window.FokusApi.request('/backoffice/support/law-context');
+        supportSubscriptions = payload.subscriptions || [];
+        subscriptionSelect.replaceChildren(new Option('Selecione a assinatura', ''));
+        supportSubscriptions.forEach((item) => subscriptionSelect.add(new Option(item.label, item.id)));
+        subscriptionSelect.disabled = !supportSubscriptions.length;
+        supportStatus.textContent = supportSubscriptions.length ? 'Sessão interna autenticada com MFA. O acesso de suporte será auditado.' : 'Nenhuma assinatura Fokus Law foi encontrada.';
+        supportSubscriptionsLoaded = true;
+      } catch (error) {
+        supportStatus.textContent = error.message || 'Não foi possível carregar as assinaturas.';
+        showToast(supportStatus.textContent);
+      } finally {
+        supportSubscriptionsLoading = false;
+      }
+    };
     const renderSupportUsers = () => {
       const selected = supportSubscriptions.find((item) => item.id === subscriptionSelect.value);
       userSelect.replaceChildren(new Option('Selecione o usuário', ''));
@@ -129,18 +166,9 @@
         showToast(supportStatus.textContent);
       }
     });
-    window.FokusApi.request('/backoffice/auth/me').then(async ({ admin }) => {
-      if (admin?.role !== 'superadministrador') return;
-      form.hidden = true;
-      support.hidden = false;
-      supportStatus.textContent = 'Carregando assinaturas Fokus Law…';
-      const payload = await window.FokusApi.request('/backoffice/support/law-context');
-      supportSubscriptions = payload.subscriptions || [];
-      subscriptionSelect.replaceChildren(new Option('Selecione a assinatura', ''));
-      supportSubscriptions.forEach((item) => subscriptionSelect.add(new Option(item.label, item.id)));
-      subscriptionSelect.disabled = !supportSubscriptions.length;
-      supportStatus.textContent = supportSubscriptions.length ? 'Sessão interna autenticada com MFA. O acesso de suporte será auditado.' : 'Nenhuma assinatura Fokus Law foi encontrada.';
-    }).catch(() => {});
+    const supportAdminCheck = window.FokusApi.request('/backoffice/auth/me').then(({ admin }) => {
+      if (admin?.role === 'superadministrador' && admin?.email) supportAdmin = admin;
+    }).catch(() => {}).finally(() => { supportAdminReady = true; });
   }
 
   const livePlans = document.querySelector('[data-law-live-plans]'), grid = document.querySelector('[data-law-live-plan-grid]');

@@ -75,7 +75,7 @@ class AuthController extends Controller
 
             return [
                 'value' => (string) $rows->first()->company_id,
-                'label' => $rows->first()->product_name.' · '.$segmentLabel.' - '.$rows->first()->company_name,
+                'label' => $rows->first()->company_name.' — '.$rows->first()->product_name.' · '.$segmentLabel,
                 'profiles' => $rows->map(fn (object $row): array => [
                     'value' => (string) $row->profile_code,
                     'label' => (string) $row->profile_name,

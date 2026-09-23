@@ -19,7 +19,7 @@ const json = (response, payload, status = 200) => {
 createServer(async (request, response) => {
     const url = new URL(request.url, `http://${request.headers.host}`);
     if (url.pathname === '/api/csrf-token') return json(response, { token: 'visual-test-token' });
-    if (url.pathname === '/api/auth/law-context') return json(response, { user: { name: 'Pessoa Teste' }, systems: [{ value: 'CMP_VISUAL', label: 'Fokus Law · Advocacia - Empresa de Demonstração', profiles: [{ value: 'usuario', label: 'Usuário comum' }] }] });
+    if (url.pathname === '/api/auth/law-context') return json(response, { user: { name: 'Pessoa Teste' }, systems: [{ value: 'CMP_VISUAL', label: 'Empresa de Demonstração — Fokus Law · Advocacia', profiles: [{ value: 'usuario', label: 'Usuário comum' }] }] });
     if (url.pathname === '/api/backoffice/auth/me') return json(response, { admin });
     if (url.pathname === '/api/backoffice/dashboard') return json(response, { user: admin, alerts: [] });
     if (url.pathname === '/api/backoffice/companies') return json(response, { data: [], meta: { total: 0, current_page: 1, per_page: 15, last_page: 1 }, summary: {} });
