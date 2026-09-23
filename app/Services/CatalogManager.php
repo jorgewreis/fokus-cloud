@@ -148,7 +148,10 @@ class CatalogManager
             $personalizationDefaults = $this->planPersonalizationDefaults($plan->id);
             $linkedSubscriptions = $subscriptionRows->filter(function (object $subscription) use ($plan): bool {
                 $snapshot = json_decode((string) $subscription->commercial_snapshot, true) ?: [];
-                return (string) ($snapshot['plan_id'] ?? '') === (string) $plan->id;
+                if ((string) ($snapshot['plan_id'] ?? '') === (string) $plan->id) return true;
+                return empty($snapshot['plan_id'])
+                    && (string) ($snapshot['product_id'] ?? '') === (string) $plan->product_id
+                    && (string) ($snapshot['plan_code'] ?? '') === (string) $plan->code;
             });
 
             return [

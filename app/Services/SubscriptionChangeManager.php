@@ -200,7 +200,7 @@ class SubscriptionChangeManager
     {
         $stored = json_decode((string) ($subscription->commercial_snapshot ?? ''), true);
         if (is_array($stored) && $stored !== []) {
-            return [...$stored, 'status' => $subscription->status, 'cancel_at' => $subscription->cancel_at];
+            return [...$this->withPlanMetadata($stored, $subscription), 'status' => $subscription->status, 'cancel_at' => $subscription->cancel_at];
         }
 
         $product = DB::table('products')->where('id', $subscription->product_id)->first();
@@ -221,7 +221,7 @@ class SubscriptionChangeManager
             ? round((float) collect($mappedItems)->sum(fn (array $item): float => $item['unit_price'] * $item['quantity']) / 10, 2)
             : round((float) collect($mappedItems)->sum(fn (array $item): float => $item['unit_price'] * $item['quantity']), 2);
 
-        return [
+        return $this->withPlanMetadata([
             'subscription_id' => $subscription->id,
             'company_id' => $subscription->company_id,
             'product_id' => $subscription->product_id,
@@ -236,7 +236,26 @@ class SubscriptionChangeManager
             'cancel_at' => $subscription->cancel_at,
             'status' => $subscription->status,
             'items' => $mappedItems,
-        ];
+        ], $subscription);
+    }
+
+    private function withPlanMetadata(array $snapshot, object $subscription): array
+    {
+        $plan = null;
+        if (! empty($snapshot['plan_id'])) {
+            $plan = DB::table('plans')->where('id', $snapshot['plan_id'])->where('product_id', $subscription->product_id)->first(['id', 'code', 'name']);
+        }
+        if (! $plan && ! empty($snapshot['plan_code'])) {
+            $plan = DB::table('plans')->where('product_id', $subscription->product_id)->where('code', $snapshot['plan_code'])->first(['id', 'code', 'name']);
+        }
+
+        if ($plan) {
+            $snapshot['plan_id'] = $plan->id;
+            $snapshot['plan_code'] = $plan->code;
+            $snapshot['plan_name'] = $plan->name;
+        }
+
+        return $snapshot;
     }
 
     private function targetPlanSnapshot(object $subscription, array $data): array

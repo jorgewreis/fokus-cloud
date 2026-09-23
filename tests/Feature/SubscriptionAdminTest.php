@@ -48,6 +48,8 @@ class SubscriptionAdminTest extends TestCase
         $subscriptionId = $response->json('subscription_id');
         $this->assertDatabaseHas('subscriptions', ['id' => $subscriptionId, 'status' => 'aguardando_pagamento', 'created_by' => $fixture['user_id']]);
         $commercialSnapshot = json_decode((string) DB::table('subscriptions')->where('id', $subscriptionId)->value('commercial_snapshot'), true);
+        $this->assertSame($plan->id, $commercialSnapshot['plan_id']);
+        $this->assertSame($plan->name, $commercialSnapshot['plan_name']);
         $this->assertSame(1, $commercialSnapshot['publication_versions']['product_catalog_version']);
         $this->assertSame(1, $commercialSnapshot['publication_versions']['plan_version']);
         $this->assertSame(1, $commercialSnapshot['publication_versions']['module_versions']['processos-advocacia']);
@@ -64,6 +66,17 @@ class SubscriptionAdminTest extends TestCase
         $this->actingAs($admin, 'platform')->postJson("/api/backoffice/subscriptions/{$subscriptionId}/free-voucher", ['voucher_code' => 'FREE7'])
             ->assertOk()->assertJsonPath('subscription_id', $subscriptionId);
         $this->assertDatabaseHas('subscriptions', ['id' => $subscriptionId, 'status' => 'ativa', 'provider_subscription_id' => null]);
+        $activeSnapshot = json_decode((string) DB::table('subscriptions')->where('id', $subscriptionId)->value('commercial_snapshot'), true);
+        $this->assertSame($plan->id, $activeSnapshot['plan_id']);
+        $this->assertSame($plan->name, $activeSnapshot['plan_name']);
+        $listedCompany = $this->actingAs($admin, 'platform')->getJson('/api/backoffice/companies?q=Alpha')->assertOk();
+        $this->assertSame(1, $listedCompany->json('data.0.active_subscriptions'));
+        $this->assertSame($plan->name, $listedCompany->json('data.0.plan_name'));
+        $catalogPlan = app(\App\Services\CatalogManager::class)->managementPlans()->firstWhere('id', $plan->id);
+        $this->assertSame(2, $catalogPlan['subscription_count']);
+        $this->assertSame(1, $catalogPlan['active_subscription_count']);
+        $this->postJson('/api/auth/law-context', ['email' => User::find($fixture['user_id'])->email])
+            ->assertOk()->assertJsonPath('systems.0.value', $fixture['company_id']);
         $this->assertDatabaseHas('voucher_redemptions', ['subscription_id' => $subscriptionId]);
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.subscription_free_voucher_activated', 'entity_id' => $subscriptionId]);
         Http::assertSent(fn ($request) => $request->method() === 'PUT' && $request->url() === 'https://api.mercadopago.com/preapproval/pre-assisted' && $request['status'] === 'cancelled');

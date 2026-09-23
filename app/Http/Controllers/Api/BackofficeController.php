@@ -164,6 +164,10 @@ class BackofficeController extends Controller
             ->whereColumn('membership.company_id', 'company.id')
             ->whereNull('membership.deleted_at')
             ->where('membership.status', 'ativo');
+        $activeSubscriptions = DB::table('subscriptions as subscription')
+            ->selectRaw('count(*)')
+            ->whereColumn('subscription.company_id', 'company.id')
+            ->where('subscription.status', 'ativa');
         $lastActivity = DB::table('usage_snapshots as usage')
             ->selectRaw('max(usage.last_activity_at)')
             ->whereColumn('usage.company_id', 'company.id');
@@ -186,6 +190,7 @@ class BackofficeController extends Controller
             ->when(in_array($status, ['pendente', 'ativa', 'suspensa', 'encerrando', 'encerrada'], true), fn ($builder) => $builder->where('company.status', $status))
             ->select('company.id', 'company.legal_name', 'company.document_type', 'company.document_number', 'company.status')
             ->selectSub($latestSubscription, 'plan_snapshot')
+            ->selectSub($activeSubscriptions, 'active_subscriptions')
             ->selectSub($activeUsers, 'active_users')
             ->selectSub($lastActivity, 'last_activity_at')
             ->selectSub($companyAdmin, 'admin_name')
@@ -1016,6 +1021,10 @@ class BackofficeController extends Controller
     private function dashboardCompanyListPayload(object $row): array
     {
         $snapshot = json_decode((string) ($row->plan_snapshot ?? ''), true) ?: [];
+        $planName = $snapshot['plan_name'] ?? null;
+        if (! $planName && ! empty($snapshot['plan_code'])) {
+            $planName = DB::table('plans')->where('product_id', $snapshot['product_id'] ?? null)->where('code', $snapshot['plan_code'])->value('name');
+        }
 
         return [
             'id' => $row->id,
@@ -1026,7 +1035,8 @@ class BackofficeController extends Controller
             'admin_name' => $row->admin_name,
             'admin_email' => $row->admin_email,
             'admin_email_masked' => $this->maskEmail($row->admin_email),
-            'plan_name' => $snapshot['plan_name'] ?? 'Sem assinatura ativa',
+            'plan_name' => $planName ?? 'Sem assinatura ativa',
+            'active_subscriptions' => (int) ($row->active_subscriptions ?? 0),
             'status' => $row->status,
             'active_users' => (int) ($row->active_users ?? 0),
             'last_activity_at' => $row->last_activity_at,
@@ -1060,6 +1070,13 @@ class BackofficeController extends Controller
     private function subscriptionPayload(object $subscription, bool $details = false): array
     {
         $snapshot = json_decode((string) ($subscription->commercial_snapshot ?? ''), true) ?: [];
+        if (empty($snapshot['plan_name']) && ! empty($snapshot['plan_code'])) {
+            $plan = DB::table('plans')->where('product_id', $subscription->product_id)->where('code', $snapshot['plan_code'])->first(['id', 'name']);
+            if ($plan) {
+                $snapshot['plan_id'] = $snapshot['plan_id'] ?? $plan->id;
+                $snapshot['plan_name'] = $plan->name;
+            }
+        }
         $payment = DB::table('payments')->where('subscription_id', $subscription->id)->latest('created_at')->first();
         $payload = [
             'id' => $subscription->id,

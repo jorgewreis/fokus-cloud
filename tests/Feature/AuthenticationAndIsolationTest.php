@@ -125,6 +125,23 @@ class AuthenticationAndIsolationTest extends TestCase
             ->assertJsonPath('message', 'Não existe nenhuma assinatura ativa do Fokus Law vinculada a este usuário.');
     }
 
+    public function test_law_context_accepts_fokus_law_product_code(): void
+    {
+        $this->postJson('/api/auth/register-company', $this->registration())->assertCreated();
+        $user = User::where('email', 'admin@example.test')->firstOrFail();
+        $companyId = DB::table('companies')->value('id');
+        DB::table('users')->where('id', $user->id)->update(['status' => 'ativa', 'email_verified_at' => now()]);
+        DB::table('companies')->where('id', $companyId)->update(['status' => 'ativa']);
+        $product = DB::table('products')->where('code', 'law')->firstOrFail();
+        DB::table('products')->where('id', $product->id)->update(['code' => 'fokus-law']);
+        $module = DB::table('modules as module')->join('module_segments as segment', 'segment.module_id', '=', 'module.id')->where('module.product_id', $product->id)->where('segment.segment_code', 'advocacia')->firstOrFail(['module.*']);
+        $subscriptionId = PrefixedUlid::make('ASS');
+        DB::table('subscriptions')->insert(['id' => $subscriptionId, 'company_id' => $companyId, 'product_id' => $product->id, 'status' => 'ativa', 'open_company_product' => $companyId.'-'.$product->id, 'version' => 1, 'billing_cycle' => 'monthly', 'current_period_starts_at' => now(), 'current_period_ends_at' => now()->addMonth(), 'created_by' => $user->id, 'updated_by' => $user->id, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('subscription_items')->insert(['id' => PrefixedUlid::make('ITM'), 'company_id' => $companyId, 'subscription_id' => $subscriptionId, 'module_id' => $module->id, 'name_snapshot' => $module->name, 'quantity' => 1, 'unit_price_snapshot' => $module->monthly_price, 'conditions_snapshot' => json_encode(['segment_code' => 'advocacia']), 'version' => 1, 'created_by' => $user->id, 'updated_by' => $user->id, 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->postJson('/api/auth/law-context', ['email' => $user->email])->assertOk()->assertJsonPath('systems.0.value', $companyId);
+    }
+
     public function test_user_cannot_select_another_company_without_membership(): void
     {
         $user = User::create([

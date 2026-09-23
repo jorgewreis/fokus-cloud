@@ -56,7 +56,7 @@ class AuthController extends Controller
             ->where('company.status', 'ativa')
             ->whereNull('company.deleted_at')
             ->where('subscription.status', 'ativa')
-            ->where('product.code', 'law')
+            ->whereIn('product.code', ['law', 'fokus-law'])
             ->select('company.id as company_id', 'company.legal_name as company_name', 'product.name as product_name', 'role.code as profile_code', 'role.name as profile_name', 'module_segment.segment_code')
             ->orderBy('company.legal_name')
             ->get();
