@@ -40,10 +40,12 @@ class RefundManager
             abort_unless($refund, 404, 'Solicitação de reembolso não encontrada.');
             if ($action === 'aprovar') {
                 abort_unless($refund->status === 'solicitado', 422, 'A solicitação não está pendente de aprovação.');
+                abort_unless($refund->requested_by_platform_admin_id !== $admin->id, 403, 'Quem solicitou o reembolso não pode aprovar a própria solicitação.');
                 DB::table('refund_requests')->where('id', $id)->update(['status' => 'aprovado', 'approved_by_platform_admin_id' => $admin->id, 'approved_at' => now(), 'updated_at' => now()]);
                 $audit->record($admin->id, 'billing.refund_approved', 'refund_request', $id, $refund->company_id, $reason, before: ['status' => $refund->status], after: ['status' => 'aprovado', 'amount' => $refund->amount]);
             } elseif ($action === 'recusar') {
                 abort_unless(in_array($refund->status, ['solicitado', 'aprovado'], true), 422, 'A solicitação não pode ser recusada neste estado.');
+                abort_unless($refund->requested_by_platform_admin_id !== $admin->id, 403, 'Quem solicitou o reembolso não pode decidir sobre a própria solicitação.');
                 DB::table('refund_requests')->where('id', $id)->update(['status' => 'recusado', 'approved_by_platform_admin_id' => $admin->id, 'refused_at' => now(), 'updated_at' => now()]);
                 $audit->record($admin->id, 'billing.refund_refused', 'refund_request', $id, $refund->company_id, $reason, before: ['status' => $refund->status], after: ['status' => 'recusado']);
             } elseif ($action === 'executar') {
@@ -74,6 +76,8 @@ class RefundManager
     {
         return [
             'id' => $refund->id, 'payment_id' => $refund->payment_id, 'subscription_id' => $refund->subscription_id,
+            'requested_by_platform_admin_id' => $refund->requested_by_platform_admin_id,
+            'approved_by_platform_admin_id' => $refund->approved_by_platform_admin_id,
             'amount' => (float) $refund->amount, 'allowed_case' => $refund->allowed_case, 'reason' => $refund->reason,
             'status' => $refund->status, 'provider_refund_id' => $refund->provider_refund_id, 'requested_at' => $refund->requested_at,
             'approved_at' => $refund->approved_at, 'executed_at' => $refund->executed_at, 'refused_at' => $refund->refused_at,

@@ -489,6 +489,11 @@ class BackofficeController extends Controller
 
     public function payments(Request $request, PlatformAudit $audit)
     {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:150'],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+        ]);
         $perPage = min(max((int) $request->query('per_page', 15), 1), 100);
         $paginator = DB::table('payments as payment')
             ->join('companies as company', 'company.id', '=', 'payment.company_id')
@@ -496,6 +501,18 @@ class BackofficeController extends Controller
             ->whereNull('company.deleted_at')
             ->when($request->query('status'), fn ($query, $status) => $query->where('payment.status', $status))
             ->when($request->query('company_id'), fn ($query, $companyId) => $query->where('payment.company_id', $companyId))
+            ->when($filters['q'] ?? null, function ($query, string $term): void {
+                $like = '%'.trim($term).'%';
+                $query->where(function ($search) use ($like): void {
+                    $search->where('company.legal_name', 'like', $like)
+                        ->orWhere('payment.id', 'like', $like)
+                        ->orWhere('payment.provider_payment_id', 'like', $like)
+                        ->orWhere('payment.provider_subscription_id', 'like', $like)
+                        ->orWhere('payment.subscription_id', 'like', $like);
+                });
+            })
+            ->when($filters['date_from'] ?? null, fn ($query, string $date) => $query->whereDate('payment.created_at', '>=', $date))
+            ->when($filters['date_to'] ?? null, fn ($query, string $date) => $query->whereDate('payment.created_at', '<=', $date))
             ->select('payment.*', 'company.legal_name as company_name', 'subscription.provider_subscription_id')
             ->orderByDesc('payment.created_at')->paginate($perPage);
         $audit->record($request->user()->id, 'backoffice.payments_viewed', request: $request);
@@ -512,13 +529,22 @@ class BackofficeController extends Controller
 
     public function reconciliation(Request $request, BillingReconciliationManager $manager, PlatformAudit $audit)
     {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:150'],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+        ]);
         $audit->record($request->user()->id, 'backoffice.reconciliation_viewed', request: $request);
-        return response()->json($manager->list($request->query()));
+        return response()->json($manager->list([...$request->query(), ...$filters]));
     }
 
     public function reconciliationDetail(Request $request, string $alert, PlatformAudit $audit)
     {
-        $row = DB::table('payment_reconciliation_alerts')->where('id', $alert)->first();
+        $row = DB::table('payment_reconciliation_alerts as alert')
+            ->leftJoin('companies as company', 'company.id', '=', 'alert.company_id')
+            ->where('alert.id', $alert)
+            ->select('alert.*', 'company.legal_name as company_name')
+            ->first();
         abort_unless($row, 404, 'Divergência não encontrada.');
         $audit->record($request->user()->id, 'backoffice.reconciliation_detail_viewed', 'payment_reconciliation_alert', $alert, $row->company_id, request: $request);
         return response()->json($row);
@@ -532,19 +558,45 @@ class BackofficeController extends Controller
 
     public function refunds(Request $request, RefundManager $manager, PlatformAudit $audit)
     {
-        $query = DB::table('refund_requests')->orderByDesc('created_at');
-        if ($request->query('status')) $query->where('status', $request->query('status'));
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:150'],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+        ]);
+        $query = DB::table('refund_requests as refund')
+            ->leftJoin('companies as company', 'company.id', '=', 'refund.company_id')
+            ->leftJoin('payments as payment', 'payment.id', '=', 'refund.payment_id')
+            ->select('refund.*', 'company.legal_name as company_name', 'payment.provider_payment_id')
+            ->orderByDesc('refund.created_at');
+        if ($request->query('status')) $query->where('refund.status', $request->query('status'));
+        if ($filters['q'] ?? null) {
+            $like = '%'.trim($filters['q']).'%';
+            $query->where(function ($search) use ($like): void {
+                $search->where('company.legal_name', 'like', $like)
+                    ->orWhere('refund.id', 'like', $like)
+                    ->orWhere('refund.payment_id', 'like', $like)
+                    ->orWhere('payment.provider_payment_id', 'like', $like)
+                    ->orWhere('refund.subscription_id', 'like', $like);
+            });
+        }
+        if ($filters['date_from'] ?? null) $query->whereDate('refund.requested_at', '>=', $filters['date_from']);
+        if ($filters['date_to'] ?? null) $query->whereDate('refund.requested_at', '<=', $filters['date_to']);
         $paginator = $query->paginate(min(max((int) $request->query('per_page', 15), 1), 100));
         $audit->record($request->user()->id, 'backoffice.refunds_viewed', request: $request);
-        return response()->json(['data' => collect($paginator->items())->map(fn (object $refund): array => $manager->payload($refund))->values(), 'meta' => $this->paginationMeta($paginator)]);
+        return response()->json(['data' => collect($paginator->items())->map(fn (object $refund): array => [...$manager->payload($refund), 'company_name' => $refund->company_name, 'provider_payment_id' => $refund->provider_payment_id])->values(), 'meta' => $this->paginationMeta($paginator)]);
     }
 
     public function refund(Request $request, string $refund, RefundManager $manager, PlatformAudit $audit)
     {
-        $row = DB::table('refund_requests')->where('id', $refund)->first();
+        $row = DB::table('refund_requests as refund')
+            ->leftJoin('companies as company', 'company.id', '=', 'refund.company_id')
+            ->leftJoin('payments as payment', 'payment.id', '=', 'refund.payment_id')
+            ->where('refund.id', $refund)
+            ->select('refund.*', 'company.legal_name as company_name', 'payment.provider_payment_id')
+            ->first();
         abort_unless($row, 404, 'Solicitação de reembolso não encontrada.');
         $audit->record($request->user()->id, 'backoffice.refund_viewed', 'refund_request', $refund, $row->company_id, request: $request);
-        return response()->json($manager->payload($row));
+        return response()->json([...$manager->payload($row), 'company_name' => $row->company_name, 'provider_payment_id' => $row->provider_payment_id]);
     }
 
     public function createRefund(Request $request, RefundManager $manager, PlatformAudit $audit)

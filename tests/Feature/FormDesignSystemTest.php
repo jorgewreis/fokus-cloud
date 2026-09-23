@@ -279,7 +279,7 @@ class FormDesignSystemTest extends TestCase
             'public/backoffice/pages/products.html' => 'backoffice-products-page',
             'public/backoffice/pages/modules.html' => 'backoffice-modules-page',
             'public/backoffice/pages/subscriptions.html' => 'backoffice-records-page',
-            'public/backoffice/pages/pagamentos.html' => 'pagamentos-page',
+            'public/backoffice/pages/pagamentos.html' => 'backoffice-records-page',
         ];
 
         foreach ($pages as $page => $rootClass) {

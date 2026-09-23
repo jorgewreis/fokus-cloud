@@ -27,9 +27,24 @@ class BillingReconciliationManager
 
     public function list(array $filters = []): array
     {
-        $query = DB::table('payment_reconciliation_alerts')->orderByDesc('opened_at');
-        if (! empty($filters['status'])) $query->where('status', $filters['status']);
-        if (! empty($filters['impact'])) $query->where('impact', $filters['impact']);
+        $query = DB::table('payment_reconciliation_alerts as alert')
+            ->leftJoin('companies as company', 'company.id', '=', 'alert.company_id')
+            ->select('alert.*', 'company.legal_name as company_name')
+            ->orderByDesc('alert.opened_at');
+        if (! empty($filters['status'])) $query->where('alert.status', $filters['status']);
+        if (! empty($filters['impact'])) $query->where('alert.impact', $filters['impact']);
+        if (! empty($filters['q'])) {
+            $like = '%'.trim((string) $filters['q']).'%';
+            $query->where(function ($search) use ($like): void {
+                $search->where('company.legal_name', 'like', $like)
+                    ->orWhere('alert.id', 'like', $like)
+                    ->orWhere('alert.company_id', 'like', $like)
+                    ->orWhere('alert.payment_id', 'like', $like)
+                    ->orWhere('alert.subscription_id', 'like', $like);
+            });
+        }
+        if (! empty($filters['date_from'])) $query->whereDate('alert.opened_at', '>=', $filters['date_from']);
+        if (! empty($filters['date_to'])) $query->whereDate('alert.opened_at', '<=', $filters['date_to']);
         $paginator = $query->paginate(min(max((int) ($filters['per_page'] ?? 15), 1), 100));
         return ['data' => $paginator->items(), 'meta' => ['current_page' => $paginator->currentPage(), 'per_page' => $paginator->perPage(), 'total' => $paginator->total(), 'last_page' => $paginator->lastPage()]];
     }
