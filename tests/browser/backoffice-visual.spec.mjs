@@ -889,6 +889,10 @@ test('Vouchers filtra, pagina e consulta regras, resgates e reservas em drawer r
         await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'vouchers');
         await expect(page.locator('.backoffice-records-page')).toBeVisible();
         await expect(page.locator('#voucher-list tr')).toHaveCount(15);
+        await expect(page.locator('.fs-table thead th')).toHaveCount(7);
+        await expect(page.locator('.fs-table thead')).not.toContainText('Código');
+        await expect(page.locator('#voucher-list tr').first().locator('td').first()).toContainText('Campanha visual 1');
+        await expect(page.locator('#voucher-list tr').first().locator('td').first()).toContainText('Código: CAMPANHA1');
         await expect(page.locator('#voucher-product-filter option')).toHaveCount(2);
         await expect(page.locator('#voucher-table-footer-summary')).toContainText('página 1 de 2');
         await expect(page.locator('#voucher-pagination')).toHaveAccessibleName('Paginação de vouchers');

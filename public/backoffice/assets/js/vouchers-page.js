@@ -155,8 +155,7 @@ export async function mount(root, context = {}) {
                 ? `${Number(voucher.redemptions_count || 0)} / ${Number(voucher.redemption_limit)}`
                 : `${Number(voucher.redemptions_count || 0)} / Sem limite`;
             return `<tr>
-                <td class="fs-width-300" data-label="Código"><strong class="fs-u-text-uppercase">${escapeHtml(voucher.code || "—")}</strong></td>
-                <td class="fs-width-500" data-label="Voucher"><strong>${escapeHtml(voucher.name || voucher.code || "—")}</strong>${voucher.origin ? `<small class="fs-u-d-block fs-u-fs-sm fs-u-color-secondary">${escapeHtml(voucher.origin)}</small>` : ""}</td>
+                <td class="fs-width-500" data-label="Voucher"><strong>${escapeHtml(voucher.name || voucher.code || "—")}</strong><small class="fs-u-d-block fs-u-fs-sm fs-u-color-secondary">Código: ${escapeHtml(voucher.code || "—")}</small>${voucher.origin ? `<small class="fs-u-d-block fs-u-fs-sm fs-u-color-secondary">${escapeHtml(voucher.origin)}</small>` : ""}</td>
                 <td class="fs-width-500" data-label="Produto e plano"><strong>${escapeHtml(product)}</strong><small class="fs-u-d-block fs-u-fs-sm fs-u-color-secondary">${escapeHtml(plan)}</small></td>
                 <td class="fs-width-500" data-label="Benefício">${escapeHtml(benefitLabel(voucher))}${voucher.benefit_duration ? `<small class="fs-u-d-block fs-u-fs-sm fs-u-color-secondary">${escapeHtml(DURATION[voucher.benefit_duration] || voucher.benefit_duration)}</small>` : ""}</td>
                 <td class="fs-width-300" data-label="Utilização">${escapeHtml(usage)}</td>
@@ -164,7 +163,7 @@ export async function mount(root, context = {}) {
                 <td class="fs-width-300" data-label="Status">${statusBadge(currentStatus(voucher))}</td>
                 <td class="fs-width-500" data-label="Ações"><div class="fs-u-d-flex fs-u-flex-wrap fs-u-gap-2">${actionsFor(voucher)}</div></td>
             </tr>`;
-        }).join("") : '<tr><td colspan="8">Nenhum voucher encontrado com os filtros informados.</td></tr>';
+        }).join("") : '<tr><td colspan="7">Nenhum voucher encontrado com os filtros informados.</td></tr>';
         $("#voucher-table-summary").textContent = `${vouchers.length} de ${state.vouchers.length} vouchers carregados`;
         $("#voucher-table-footer-summary").textContent = `Mostrando página ${state.page} de ${totalPages} com ${rows.length} registros. A consulta carrega até 100 vouchers recentes.`;
         renderPagination(state.page, totalPages);
