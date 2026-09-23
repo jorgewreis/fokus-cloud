@@ -328,6 +328,8 @@ test('planos replica o contrato visual, composição e estados do drawer', async
     await expect(page.locator('#plan-pagination .fs-page-link')).toHaveCount(3);
     await expect(page.locator('#plan-pagination .fs-page-item.is-active')).toContainText('1');
     await expect(page.locator('#plan-table-footer-summary')).toHaveText('Mostrando página 1 de 1 com 1 registros, de um total de 1 páginas.');
+    await expect(page.locator('#plan-list [data-plan-action="pause"]')).toHaveCount(1);
+    await expect(page.locator('#plan-list [data-plan-action="activate"], #plan-list [data-plan-action="archive"], #plan-list [data-plan-action="delete"]')).toHaveCount(0);
     await expect(page.locator('#plan-product-filter, #plan-publication-filter, #plan-featured-filter')).toHaveCount(0);
     await expect(page.locator('table[aria-label="Planos de assinatura"] thead th')).toHaveText(['Plano', 'Produto', 'Valores', 'Status', 'Publicação', 'Assinaturas', 'Ações']);
     const priceContract = await page.locator('#plan-list td[data-label="Valores"]').evaluate((cell) => ({
@@ -381,4 +383,22 @@ test('planos replica o contrato visual, composição e estados do drawer', async
     await expect(page.locator('#plan-view-panel')).toHaveClass(/fs-offcanvas-body/);
     await expect(page.locator('#plan-view-panel > .fs-card.fs-card-panel')).toHaveCount(3);
     await expect(page.locator('#plan-view-panel')).toContainText('2');
+});
+
+test('planos limita os ícones de ciclo de vida aos estados permitidos', async ({ page }) => {
+    let status = 'inativo';
+    await page.route('**/api/backoffice/plans', async (route) => {
+        const response = await route.fetch();
+        const plans = await response.json();
+        await route.fulfill({ response, json: plans.map((plan) => ({ ...plan, status, publication_state: status === 'arquivado' ? 'arquivado' : 'pausado' })) });
+    });
+    await page.goto('/backoffice/planos');
+    await expect(page.locator('#plan-list [data-plan-action="activate"]')).toHaveCount(1);
+    await expect(page.locator('#plan-list [data-plan-action="archive"]')).toHaveCount(1);
+    await expect(page.locator('#plan-list [data-plan-action="pause"], #plan-list [data-plan-action="delete"]')).toHaveCount(0);
+
+    status = 'arquivado';
+    await page.reload();
+    await expect(page.locator('#plan-list [data-plan-action="delete"]')).toHaveCount(1);
+    await expect(page.locator('#plan-list [data-plan-action="activate"], #plan-list [data-plan-action="archive"], #plan-list [data-plan-action="pause"]')).toHaveCount(0);
 });

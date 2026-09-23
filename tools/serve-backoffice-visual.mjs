@@ -6,7 +6,7 @@ import { extname, resolve } from 'node:path';
 const publicRoot = resolve(import.meta.dirname, '../public');
 const port = Number(process.env.BACKOFFICE_VISUAL_PORT || 4177);
 const types = { '.css': 'text/css', '.html': 'text/html', '.js': 'application/javascript', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
-const admin = { id: 'PAD_VISUAL', name: 'Administração Fokus', role: 'superadministrador', permissions: ['platform.security.manage'] };
+const admin = { id: 'PAD_VISUAL', name: 'Administração Fokus', role: 'superadministrador', permissions: ['platform.security.manage', 'platform.catalog.publish'] };
 const products = [{ id: 'PRD_LAW', name: 'Fokus Law', code: 'law', status: 'ativo', plans: [{ id: 'PLN_1', name: 'Essencial' }] }];
 const modules = [{ id: 'MOD_1', product_id: 'PRD_LAW', product_name: 'Fokus Law', name: 'Gestão de processos', code: 'processos', module_code: 'processos', status: 'ativo', publication_state: 'publicado', monthly_price: 29.9, segments: ['advocacia'], capabilities: ['Controle de prazos'], capability_codes: ['prazos'], dependencies: [], incompatibilities: [], linked_plans: [], personalizations: [] }];
 const plans = [{ id: 'PLN_1', product_id: 'PRD_LAW', product_code: 'law', product_name: 'Fokus Law', product_status: 'ativo', product_publication_version: 3, code: 'law-essencial', name: 'Essencial', full_name: 'Fokus Law - Essencial', segment: 'advocacia', status: 'ativo', publication_state: 'publicado', featured: true, configured_monthly_amount: null, monthly_amount: 24.9, annual_amount: 249, modules_count: 1, modules: [{ ...modules[0], monthly_amount: 29.9 }], personalization_defaults: [], subscription_count: 2, company_count: 2, voucher_count: 1 }];
