@@ -83,19 +83,20 @@ class FormDesignSystemTest extends TestCase
         $catalog = file_get_contents(base_path('public/backoffice/pages/subscription-plans.html'));
         $catalogScript = file_get_contents(base_path('public/backoffice/assets/js/subscription-plans-page.js'));
         $vouchers = file_get_contents(base_path('public/backoffice/pages/vouchers.html'));
+        $voucherScript = file_get_contents(base_path('public/backoffice/assets/js/vouchers-page.js'));
 
         $this->assertStringContainsString('id="plan-destructive-dialog"', $catalog);
-        $this->assertStringContainsString('id="voucher-destructive-dialog"', $vouchers);
+        $this->assertStringContainsString('id="voucher-action-dialog"', $vouchers);
+        $this->assertStringContainsString('id="voucher-action-reason"', $vouchers);
         $this->assertStringContainsString('Common-File-Edit--Streamline-Ultimate.png', $catalogScript);
         $this->assertStringContainsString('Common-File-Remove--Streamline-Ultimate.png', $catalogScript);
-        foreach (['Tags-Add--Streamline-Ultimate.png', 'Ticket-Exchange--Streamline-Ultimate.png', 'Tags-Minus--Streamline-Ultimate.png', 'Tags-Remove--Streamline-Ultimate.png'] as $icon) {
-            $this->assertStringContainsString($icon, $vouchers, $icon);
+        foreach (['Common-File-Edit--Streamline-Ultimate.png', 'Common-File-Subtract--Streamline-Ultimate.png', 'Common-File-Quill--Streamline-Ultimate.png', 'Tags-Minus--Streamline-Ultimate.png', 'Tags-Remove--Streamline-Ultimate.png'] as $icon) {
+            $this->assertStringContainsString($icon, $voucherScript, $icon);
         }
-        $this->assertStringContainsString('data-voucher-action="remove-or-archive"', $vouchers);
-        $this->assertStringNotContainsString('data-voucher-action="archive"', $vouchers);
-        $this->assertStringNotContainsString('data-voucher-action="delete"', $vouchers);
-        $this->assertStringNotContainsString('window.confirm', $catalog.$vouchers);
-        $this->assertStringNotContainsString('prompt(', $catalog.$vouchers);
+        $this->assertStringContainsString('actionButton("archive", voucher', $voucherScript);
+        $this->assertStringContainsString('actionButton("delete", voucher', $voucherScript);
+        $this->assertStringNotContainsString('window.confirm', $catalog.$vouchers.$voucherScript);
+        $this->assertStringNotContainsString('prompt(', $catalog.$vouchers.$voucherScript);
     }
 
     public function test_module_actions_use_publication_semantics_and_assets(): void

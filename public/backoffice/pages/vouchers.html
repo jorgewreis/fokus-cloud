@@ -1,706 +1,202 @@
+<link data-page-css="vouchers" rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260923-vouchers-refactor-v1" />
 
-<div class="voucher-page fs-container-fluid fs-u-d-flex fs-u-flex-column fs-u-gap-4">
+<main class="backoffice-vouchers-page backoffice-records-page container-page fs-container-fluid" aria-labelledby="vouchers-page-title">
+    <header class="fs-page-layout">
+        <div class="fs-page-header-display">
+            <span>Comercial</span>
+            <h1 id="vouchers-page-title">Vouchers</h1>
+            <p>Gerencie benefícios comerciais, validade e utilização dos códigos promocionais.</p>
+        </div>
+        <button class="fs-btn fs-btn-primary fs-width-300" id="voucher-create" type="button" data-fs-target="#voucher-drawer">Novo voucher</button>
+    </header>
 
-    <div class="fs-col fs-u-gap-3 fs-u-mb-3">
-        <h1 class="fs-u-fs-h1">Vouchers</h1>
-        <p class="fs-u-fs-h5 fs-u-color-secondary">Crie e acompanhe vouchers promocionais.</p>
-    </div>
+    <div class="fs-alert" id="voucher-message" role="status" aria-live="polite" aria-atomic="true" hidden></div>
 
-    <hr>
-
-    <form class="fs-form fs-card fs-u-p-3" id="voucher-form">
-        <div class="fs-col">
-            <div class="fs-form-row">
-                <div class="fs-form-col fs-col-6">
-                    <label class="fs-form-label" for="voucher-name">Nome do voucher</label>
-                    <input class="fs-form-control" id="voucher-name" name="name" type="text" autocomplete="off" required>
-                </div>
-
-                <div class="fs-form-col fs-col-3">
-                    <label class="fs-form-label" for="voucher-code">Código</label>
-                    <input id="voucher-code" name="code" type="text" class="fs-u-text-uppercase fs-form-control" placeholder="ONEYEAR10" autocomplete="off" readonly required>
-                </div>
-
-            </div>
-
-            <div class="fs-form-row">
-                <div class="fs-form-col fs-col-5">
-                    <label class="fs-form-label" for="voucher-system">Sistema</label>
-                    <select class="fs-form-select" id="voucher-system" name="product_id" required>
-                        <option value="" selected disabled>Carregando...</option>
-                    </select>
-                </div>
-
-                <div class="fs-form-col fs-col-4">
-                    <label class="fs-form-label" for="voucher-plans">Planos aplicáveis</label>
-                    <select class="fs-form-select" id="voucher-plans" name="plan_id" required disabled>
-                        <option value="" selected disabled>Selecione um sistema</option>
-                    </select>
-                </div>
-
-                <div class="fs-form-col fs-col-3" id="voucher-base-field">
-                    <label class="fs-form-label" for="voucher-base-value">Valor da assinatura</label>
-                    <div class="fs-input-group"><span class="fs-input-group-text" aria-hidden="true">R$</span><input id="voucher-base-value" name="base_amount" class="fs-form-control" type="text" inputmode="decimal" autocomplete="off" data-currency-input readonly required></div>
-                </div>
-            </div>
-
-            <div class="fs-form-row">
-                <div class="fs-form-col fs-col-4">
-                    <label class="fs-form-label" for="voucher-discount-type">Tipo de desconto</label>
-                    <select class="fs-form-select" id="voucher-discount-type" name="discount_mode" required>
-                        <option value="" selected disabled>Selecione aqui</option>
-                        <option value="trial_free">Assinatura gratuita</option>
-                        <option value="percentage">Desconto percentual</option>
-                        <option value="fixed">Desconto por valor fixo</option>
-                        <option value="commercial_credit">Crédito comercial na primeira cobrança</option>
-                    </select>
-                </div>
-
-                <div class="fs-form-col fs-col-3">
-                    <label class="fs-form-label" for="voucher-discount-percent">Desconto %</label>
-                    <input class="fs-form-control" id="voucher-discount-percent" name="discount_percent" type="number" min="0" max="100" step="0.01" placeholder="0,00">
-                </div>
-
-                <div class="fs-form-col fs-col-2" id="voucher-discount-value-field">
-                    <label class="fs-form-label" for="voucher-discount-value">Desconto R$</label>
-                    <div class="fs-input-group"><span class="fs-input-group-text" aria-hidden="true">R$</span><input id="voucher-discount-value" name="discount_value_display" class="fs-form-control" type="text" inputmode="decimal" autocomplete="off" data-currency-input></div>
-                </div>
-
-                <div class="fs-form-col fs-col-3">
-                    <label class="fs-form-label" for="voucher-duration">Duração do benefício após ativação</label>
-                    <select class="fs-form-select" id="voucher-duration" name="benefit_duration" required>
-                        <option value="" selected disabled>Selecione aqui</option>
-                        <option value="d7">7 dias</option>
-                        <option value="m1">1 mês</option>
-                        <option value="m3">3 meses</option>
-                        <option value="m6">6 meses</option>
-                        <option value="a1">1 ano</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="fs-form-row">
-                <div class="fs-form-col fs-col-3">
-                    <label class="fs-form-label" for="voucher-start-date">Início da validade do voucher</label>
-                    <input class="fs-form-control" id="voucher-start-date" name="starts_at" type="date" required>
-                </div>
-
-                <div class="fs-form-col fs-col-3">
-                    <label class="fs-form-label" for="voucher-end-date">Fim da validade do voucher</label>
-                    <input class="fs-form-control" id="voucher-end-date" name="ends_at" type="date" required>
-                </div>
-
-                <div class="fs-form-col fs-col-3">
-                    <label class="fs-form-label" for="voucher-total">Quantidade total</label>
-                    <input class="fs-form-control" id="voucher-total" name="redemption_limit" type="number" min="1" step="1" required>
-                </div>
-
-                <div class="fs-form-col fs-col-3">
-                    <label class="fs-form-label" for="voucher-company-limit">Limite por empresa</label>
-                    <input class="fs-form-control" id="voucher-company-limit" name="redemption_limit_per_company" type="number" min="1" step="1" value="1" required>
-                </div>
-            </div>
-
-            <div class="fs-form-row">
-                <div class="fs-form-col fs-col-4">
-                    <label class="fs-form-label" for="voucher-origin">Campanha/origem</label>
-                    <input class="fs-form-control" id="voucher-origin" name="origin" type="text" placeholder="Lançamento, parceria, retenção">
-                </div>
-
-                <div class="fs-form-col fs-col-8">
-                    <label class="fs-form-label" for="voucher-notes">Observações internas</label>
-                    <textarea class="fs-form-control" id="voucher-notes" name="notes" placeholder="Regras comerciais, exceções e contexto do benefício"></textarea>
-                </div>
+    <section class="fs-card fs-card-panel" aria-labelledby="voucher-filter-title">
+        <div class="fs-card-header">
+            <div class="fs-card-header-title">
+                <h2 class="fs-card-title" id="voucher-filter-title">Filtros</h2>
+                <p class="fs-card-subtitle">Encontre vouchers por código, campanha, produto, benefício ou situação.</p>
             </div>
         </div>
+        <form class="fs-card-body fs-filter-form" id="voucher-filter-form">
+            <label class="fs-form-label" for="voucher-search">
+                <span>Código ou campanha</span>
+                <span class="fs-input-group fs-input-group-subtle">
+                    <span class="fs-input-group-text" aria-hidden="true"><img class="fs-input-group-icon" src="/backoffice/assets/icons/Search-Bar--Streamline-Ultimate.png" alt="" /></span>
+                    <input class="fs-form-control fs-width-600" id="voucher-search" name="q" type="search" placeholder="Buscar voucher" autocomplete="off" />
+                </span>
+            </label>
+            <label class="fs-form-label" for="voucher-product-filter">
+                <span>Produto</span>
+                <select class="fs-form-select fs-width-400" id="voucher-product-filter" name="product_id"><option value="">Todos os produtos</option></select>
+            </label>
+            <label class="fs-form-label" for="voucher-type-filter">
+                <span>Benefício</span>
+                <select class="fs-form-select fs-width-400" id="voucher-type-filter" name="discount_type">
+                    <option value="">Todos os benefícios</option>
+                    <option value="trial_free">Assinatura gratuita</option>
+                    <option value="percentage">Desconto percentual</option>
+                    <option value="fixed">Desconto fixo</option>
+                    <option value="commercial_credit">Crédito comercial</option>
+                </select>
+            </label>
+            <label class="fs-form-label" for="voucher-status-filter">
+                <span>Status</span>
+                <select class="fs-form-select fs-width-400" id="voucher-status-filter" name="status">
+                    <option value="">Todos os status</option>
+                    <option value="ativa">Ativos</option>
+                    <option value="suspensa">Suspensos</option>
+                    <option value="expirada">Expirados</option>
+                    <option value="encerrada">Encerrados</option>
+                </select>
+            </label>
+            <button class="fs-btn fs-btn-outline-secondary fs-width-300 fs-form-action" type="submit">Filtrar</button>
+        </form>
+    </section>
 
-        <div class="fs-u-d-flex fs-u-flex-wrap fs-u-justify-content-end fs-u-gap-2">
-            <button class="fs-btn fs-btn-primary" type="submit">Cadastrar voucher</button>
-            <button class="fs-btn fs-btn-outline-primary" type="reset">Limpar</button>
+    <section class="fs-card fs-card-panel" aria-labelledby="voucher-list-title">
+        <div class="fs-card-header">
+            <div class="fs-card-header-title">
+                <h2 class="fs-card-title" id="voucher-list-title">Vouchers cadastrados</h2>
+                <p class="fs-card-subtitle">Consulte as regras comerciais e o uso de cada código.</p>
+            </div>
+            <span class="fs-card-header-info" id="voucher-table-summary">Carregando vouchers...</span>
+        </div>
+        <div class="fs-card-body fs-u-p-0">
+            <div class="fs-table-responsive fs-datatable" data-fs="datatable" data-fs-page-size="15" aria-busy="true">
+                <table class="fs-table fs-table-records fs-table-hover" aria-label="Vouchers cadastrados">
+                    <thead>
+                        <tr>
+                            <th class="fs-width-300" scope="col">Código</th>
+                            <th class="fs-width-500" scope="col">Voucher</th>
+                            <th class="fs-width-500" scope="col">Produto e plano</th>
+                            <th class="fs-width-500" scope="col">Benefício</th>
+                            <th class="fs-width-300" scope="col">Utilização</th>
+                            <th class="fs-width-400" scope="col">Validade</th>
+                            <th class="fs-width-300" scope="col">Status</th>
+                            <th class="fs-width-500" scope="col">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="voucher-list"><tr><td colspan="8">Carregando vouchers...</td></tr></tbody>
+                </table>
+                <p data-fs-datatable-empty class="fs-table-empty" hidden>Nenhum voucher encontrado com os filtros informados.</p>
+                <p data-fs-datatable-loading class="fs-table-empty">Carregando vouchers...</p>
+                <div data-fs-datatable-error class="fs-alert fs-alert-danger" role="alert" hidden><span data-fs-datatable-error-message></span></div>
+            </div>
+        </div>
+        <div class="fs-card-footer fs-u-d-flex fs-u-flex-wrap fs-u-align-items-center fs-u-justify-content-between fs-u-gap-3">
+            <span class="fs-u-fs-sm fs-u-color-secondary" id="voucher-table-footer-summary">Carregando resultados...</span>
+            <nav id="voucher-pagination" aria-label="Paginação de vouchers"></nav>
+        </div>
+    </section>
+
+    <aside class="fs-offcanvas fs-offcanvas-end backoffice-records-drawer" id="voucher-drawer" aria-labelledby="voucher-drawer-title" tabindex="-1">
+        <div class="fs-offcanvas-header">
+            <div class="fs-u-d-flex fs-u-flex-column fs-u-gap-1">
+                <span class="fs-u-fs-xs fs-u-color-secondary" id="voucher-drawer-kicker">COMERCIAL</span>
+                <h2 class="fs-offcanvas-title" id="voucher-drawer-title">Novo voucher</h2>
+                <p class="fs-u-m-0 fs-u-fs-sm fs-u-color-secondary" id="voucher-drawer-description">Configure a campanha e o benefício comercial.</p>
+            </div>
+            <button class="fs-btn-close" id="voucher-drawer-close" type="button" data-fs-dismiss="offcanvas" aria-label="Fechar painel"></button>
         </div>
 
-        <div class="fs-alert" id="voucher-message" role="status" aria-live="polite" aria-atomic="true" hidden></div>
-    </form>
+        <form class="fs-offcanvas-body fs-form" id="voucher-form" novalidate>
+            <section class="fs-card fs-card-panel" aria-labelledby="voucher-identification-title">
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="voucher-identification-title">Identificação</h3><p class="fs-card-subtitle">O código pode ser informado ou gerado a partir do nome da campanha.</p></div></div>
+                <div class="fs-card-body fs-u-mx-2 fs-u-mt-2 fs-u-mb-3 fs-u-d-flex fs-u-flex-column fs-u-gap-2">
+                    <label class="fs-form-label fs-u-mt-3" for="voucher-name"><span class="fs-u-ml-2">Nome da campanha</span><input class="fs-form-control fs-width-600" id="voucher-name" name="name" type="text" maxlength="120" autocomplete="off" required /></label>
+                    <label class="fs-form-label fs-u-mt-3" for="voucher-code"><span class="fs-u-ml-2">Código do voucher</span><input class="fs-form-control fs-width-500 fs-u-text-uppercase" id="voucher-code" name="code" type="text" maxlength="64" autocomplete="off" required aria-describedby="voucher-code-help" /><span class="fs-u-ml-2 fs-u-fs-sm fs-u-color-secondary" id="voucher-code-help">Use apenas letras e números. A unicidade será confirmada pelo servidor.</span></label>
+                </div>
+            </section>
 
-    <button id="voucher-destructive-trigger" type="button" data-fs="modal" data-fs-target="#voucher-destructive-dialog" hidden aria-hidden="true"></button>
-    <div id="voucher-destructive-dialog" class="fs-modal" tabindex="-1">
+            <section class="fs-card fs-card-panel" aria-labelledby="voucher-eligibility-title">
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="voucher-eligibility-title">Elegibilidade</h3><p class="fs-card-subtitle">Defina o produto e os planos em que o benefício poderá ser usado.</p></div></div>
+                <div class="fs-card-body fs-u-mx-2 fs-u-mt-2 fs-u-mb-3 fs-u-d-flex fs-u-flex-column fs-u-gap-2">
+                    <label class="fs-form-label fs-u-mt-3" for="voucher-product"><span class="fs-u-ml-2">Produto</span><select class="fs-form-select fs-width-600" id="voucher-product" name="product_id" required><option value="">Carregando produtos...</option></select></label>
+                    <label class="fs-form-label fs-u-mt-3" for="voucher-plan"><span class="fs-u-ml-2">Plano aplicável</span><select class="fs-form-select fs-width-600" id="voucher-plan" name="plan_id" required disabled><option value="">Selecione um produto</option></select></label>
+                </div>
+            </section>
+
+            <section class="fs-card fs-card-panel" aria-labelledby="voucher-benefit-title">
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="voucher-benefit-title">Benefício</h3><p class="fs-card-subtitle">Os valores finais e a elegibilidade são recalculados pela API.</p></div></div>
+                <div class="fs-card-body fs-u-mx-2 fs-u-mt-2 fs-u-mb-3 fs-u-d-flex fs-u-flex-column fs-u-gap-2">
+                    <label class="fs-form-label fs-u-mt-3" for="voucher-discount-type"><span class="fs-u-ml-2">Tipo de benefício</span><select class="fs-form-select fs-width-600" id="voucher-discount-type" name="discount_type" required><option value="">Selecione um benefício</option><option value="trial_free">Assinatura gratuita</option><option value="percentage">Desconto percentual</option><option value="fixed">Desconto em valor fixo</option><option value="commercial_credit">Crédito na primeira cobrança</option></select></label>
+                    <label class="fs-form-label fs-u-mt-3" for="voucher-duration"><span class="fs-u-ml-2">Duração do benefício</span><select class="fs-form-select fs-width-400" id="voucher-duration" name="benefit_duration" required><option value="">Selecione a duração</option><option value="d7">7 dias</option><option value="m1">1 mês</option><option value="m3">3 meses</option><option value="m6">6 meses</option><option value="a1">1 ano</option></select></label>
+                    <label class="fs-form-label fs-u-mt-3" id="voucher-base-field" for="voucher-base-value"><span class="fs-u-ml-2">Valor-base do benefício</span><span class="fs-input-group"><span class="fs-input-group-text" aria-hidden="true">R$</span><input class="fs-form-control fs-width-400" id="voucher-base-value" name="base_amount" type="text" inputmode="decimal" autocomplete="off" data-currency-input readonly aria-describedby="voucher-base-help" /></span><span class="fs-u-ml-2 fs-u-fs-sm fs-u-color-secondary" id="voucher-base-help">Referência calculada a partir do preço atual do plano e da duração.</span></label>
+                    <label class="fs-form-label fs-u-mt-3" id="voucher-percent-field" for="voucher-discount-percent"><span class="fs-u-ml-2">Desconto percentual</span><span class="fs-input-group"><input class="fs-form-control fs-width-300" id="voucher-discount-percent" name="discount_percent" type="number" min="0.01" max="100" step="0.01" inputmode="decimal" required disabled /><span class="fs-input-group-text">%</span></span></label>
+                    <label class="fs-form-label fs-u-mt-3" id="voucher-amount-field" for="voucher-discount-amount"><span class="fs-u-ml-2" id="voucher-amount-label">Valor do benefício</span><span class="fs-input-group"><span class="fs-input-group-text" aria-hidden="true">R$</span><input class="fs-form-control fs-width-400" id="voucher-discount-amount" name="discount_amount" type="text" inputmode="decimal" autocomplete="off" data-currency-input required disabled /></span></label>
+                    <p class="fs-u-fs-sm fs-u-color-secondary" id="voucher-benefit-help">Selecione o produto, o plano e a duração para consultar o valor-base.</p>
+                </div>
+            </section>
+
+            <section class="fs-card fs-card-panel" aria-labelledby="voucher-limits-title">
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="voucher-limits-title">Validade e limites</h3><p class="fs-card-subtitle">A janela de validade controla o resgate; a duração começa na ativação do benefício.</p></div></div>
+                <div class="fs-card-body fs-u-mx-2 fs-u-mt-2 fs-u-mb-3 fs-u-d-flex fs-u-flex-column fs-u-gap-2">
+                    <label class="fs-form-label fs-u-mt-3" for="voucher-start-date"><span class="fs-u-ml-2">Início da validade</span><input class="fs-form-control fs-width-400" id="voucher-start-date" name="starts_at" type="date" required /></label>
+                    <label class="fs-form-label fs-u-mt-3" for="voucher-end-date"><span class="fs-u-ml-2">Fim da validade</span><input class="fs-form-control fs-width-400" id="voucher-end-date" name="ends_at" type="date" required /></label>
+                    <label class="fs-form-label fs-u-mt-3" for="voucher-total"><span class="fs-u-ml-2">Limite total de resgates</span><input class="fs-form-control fs-width-300" id="voucher-total" name="redemption_limit" type="number" min="1" step="1" required /></label>
+                    <label class="fs-form-label fs-u-mt-3" for="voucher-company-limit"><span class="fs-u-ml-2">Limite por empresa</span><input class="fs-form-control fs-width-300" id="voucher-company-limit" name="redemption_limit_per_company" type="number" min="1" step="1" value="1" required /></label>
+                </div>
+            </section>
+
+            <section class="fs-card fs-card-panel" aria-labelledby="voucher-campaign-title">
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="voucher-campaign-title">Contexto interno</h3><p class="fs-card-subtitle">Registre a origem e as observações da campanha para consulta operacional.</p></div></div>
+                <div class="fs-card-body fs-u-mx-2 fs-u-mt-2 fs-u-mb-3 fs-u-d-flex fs-u-flex-column fs-u-gap-2">
+                    <label class="fs-form-label fs-u-mt-3" for="voucher-origin"><span class="fs-u-ml-2">Campanha ou origem</span><input class="fs-form-control fs-width-600" id="voucher-origin" name="origin" type="text" maxlength="120" /></label>
+                    <label class="fs-form-label fs-u-mt-3" for="voucher-notes"><span class="fs-u-ml-2">Observações internas</span><textarea class="fs-form-control fs-width-600" id="voucher-notes" name="notes" maxlength="2000" rows="4"></textarea></label>
+                </div>
+            </section>
+
+            <div class="fs-alert fs-alert-danger" id="voucher-form-error" role="alert" hidden></div>
+            <div class="fs-offcanvas-footer">
+                <button class="fs-btn fs-btn-outline-primary fs-width-300" id="voucher-form-cancel" type="button">Cancelar</button>
+                <button class="fs-btn fs-btn-primary fs-width-400" id="voucher-form-submit" type="submit">Cadastrar voucher</button>
+            </div>
+        </form>
+
+        <div class="fs-offcanvas-body fs-u-d-flex fs-u-flex-column fs-u-gap-3 backoffice-records-view-panel" id="voucher-view-panel" aria-label="Detalhes do voucher" hidden>
+            <div class="fs-alert fs-alert-info" id="voucher-detail-loading" role="status" aria-live="polite" hidden>Carregando detalhes do voucher...</div>
+            <div class="fs-alert fs-alert-danger" id="voucher-detail-error" role="alert" hidden></div>
+            <div id="voucher-detail-sections" class="fs-u-d-flex fs-u-flex-column fs-u-gap-3" hidden>
+                <section class="fs-card" aria-labelledby="voucher-detail-commercial-title">
+                    <div class="fs-card-header"><h3 class="fs-card-title" id="voucher-detail-commercial-title">Dados comerciais</h3></div>
+                    <div class="fs-card-body"><dl class="fs-detail-list" id="voucher-detail-commercial"></dl></div>
+                </section>
+                <section class="fs-card" aria-labelledby="voucher-detail-usage-title">
+                    <div class="fs-card-header"><h3 class="fs-card-title" id="voucher-detail-usage-title">Utilização</h3></div>
+                    <div class="fs-card-body"><dl class="fs-detail-list" id="voucher-detail-usage"></dl></div>
+                </section>
+                <section class="fs-card" aria-labelledby="voucher-detail-redemptions-title">
+                    <div class="fs-card-header"><h3 class="fs-card-title" id="voucher-detail-redemptions-title">Resgates confirmados</h3></div>
+                    <div class="fs-card-body fs-u-d-flex fs-u-flex-column fs-u-gap-2" id="voucher-detail-redemptions"></div>
+                </section>
+                <section class="fs-card" aria-labelledby="voucher-detail-reservations-title">
+                    <div class="fs-card-header"><h3 class="fs-card-title" id="voucher-detail-reservations-title">Reservas de checkout</h3></div>
+                    <div class="fs-card-body fs-u-d-flex fs-u-flex-column fs-u-gap-2" id="voucher-detail-reservations"></div>
+                </section>
+            </div>
+        </div>
+        <div class="fs-offcanvas-footer" id="voucher-view-footer" hidden>
+            <button class="fs-btn fs-btn-outline-secondary fs-width-300" type="button" data-fs-dismiss="offcanvas">Fechar</button>
+            <button class="fs-btn fs-btn-primary fs-width-400" id="voucher-view-edit" type="button" hidden>Editar voucher</button>
+        </div>
+    </aside>
+
+    <button id="voucher-action-trigger" type="button" data-fs="modal" data-fs-target="#voucher-action-dialog" aria-label="Confirmar ação sobre voucher" hidden></button>
+    <div class="fs-modal fs-confirmation-dialog" id="voucher-action-dialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="voucher-action-title" aria-describedby="voucher-action-description">
         <div class="fs-modal-dialog"><div class="fs-modal-content">
-            <div class="fs-modal-header"><h2 class="fs-modal-title" id="voucher-dialog-title">Confirmar ação</h2><button class="fs-btn-close" type="button" data-fs-dismiss="modal" aria-label="Fechar"></button></div>
-            <form class="fs-form fs-modal-body fs-u-d-flex fs-u-flex-column fs-u-gap-3" id="voucher-destructive-form">
-                <p>Informe o motivo. A ação será registrada no histórico administrativo.</p>
-                <label class="fs-form-col fs-form-label" for="voucher-dialog-reason">Motivo obrigatório
-                    <textarea class="fs-form-control" id="voucher-dialog-reason" name="reason" maxlength="1000" required></textarea>
-                </label>
-                <div class="fs-modal-footer"><button class="fs-btn fs-btn-outline-primary" type="button" data-voucher-dialog-close data-fs-dismiss="modal">Cancelar</button><button class="fs-btn fs-btn-danger" type="submit">Confirmar</button></div>
+            <div class="fs-modal-header">
+                <div class="fs-confirmation-dialog-heading"><span class="fs-confirmation-dialog-kicker">GESTÃO DE VOUCHERS</span><h2 class="fs-modal-title" id="voucher-action-title">Confirmar ação</h2><p class="fs-confirmation-dialog-description" id="voucher-action-description"></p></div>
+                <button class="fs-btn-close" type="button" data-fs-dismiss="modal" aria-label="Fechar confirmação"></button>
+            </div>
+            <form class="fs-form fs-confirmation-dialog-form" id="voucher-action-form" novalidate>
+                <div class="fs-confirmation-dialog-body">
+                    <label class="fs-confirmation-dialog-field" for="voucher-action-reason"><span>Motivo obrigatório</span><textarea class="fs-form-control" id="voucher-action-reason" name="reason" maxlength="1000" required aria-describedby="voucher-action-error"></textarea></label>
+                    <div class="fs-alert fs-alert-danger" id="voucher-action-error" role="alert" hidden></div>
+                </div>
+                <div class="fs-modal-footer"><button class="fs-btn fs-btn-outline-secondary fs-width-300" type="button" data-fs-dismiss="modal">Cancelar</button><button class="fs-btn fs-btn-danger fs-width-400" id="voucher-action-submit" type="submit">Confirmar</button></div>
             </form>
         </div></div>
     </div>
-
-    <div class="fs-table-responsive fs-datatable" data-fs="datatable" data-fs-page-size="1000">
-        <table class="fs-table" aria-label="Vouchers cadastrados">
-            <thead>
-                <tr>
-                    <th>Código</th>
-                    <th>Voucher</th>
-                    <th>Sistema</th>
-                    <th>Desconto</th>
-                    <th>Uso</th>
-                    <th>Validade</th>
-                    <th>Status</th>
-                    <th>Ações</th>
-                </tr>
-            </thead>
-            <tbody id="voucher-list">
-                <tr>
-                    <td colspan="8">Carregando vouchers...</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-
-</div>
-
-<script>
-    (() => {
-        const standalone = !document.querySelector(".container-page");
-        const iconBasePath = "/backoffice/assets/icons/";
-        const voucherEditIcon = "Ticket-Exchange--Streamline-Ultimate.png";
-        const voucherAddIcon = "Tags-Add--Streamline-Ultimate.png";
-        const voucherMinusIcon = "Tags-Minus--Streamline-Ultimate.png";
-        const voucherRemoveIcon = "Tags-Remove--Streamline-Ultimate.png";
-
-        if (standalone) {
-            document.documentElement.dataset.theme ||= "light";
-            document.documentElement.dataset.role ||= "admin";
-            document.body.classList.add("container-content");
-
-            if (!document.querySelector('link[data-voucher-standalone-css]')) {
-                const css = document.createElement("link");
-                css.rel = "stylesheet";
-                css.href = "/backoffice/assets/css/main.css?v=20260902-catalog-inputs";
-                css.dataset.voucherStandaloneCss = "true";
-                document.head.appendChild(css);
-            }
-        }
-
-        const form = document.querySelector("#voucher-form");
-        const products = document.querySelector("#voucher-system");
-        const plans = document.querySelector("#voucher-plans");
-        const baseValue = document.querySelector("#voucher-base-value");
-        const discountType = document.querySelector("#voucher-discount-type");
-        const discountPercent = document.querySelector("#voucher-discount-percent");
-        const discountValue = document.querySelector("#voucher-discount-value");
-        const baseField = document.querySelector("#voucher-base-field");
-        const discountValueField = document.querySelector("#voucher-discount-value-field");
-        const duration = document.querySelector("#voucher-duration");
-        const startDate = document.querySelector("#voucher-start-date");
-        const endDate = document.querySelector("#voucher-end-date");
-        const voucherList = document.querySelector("#voucher-list");
-        const message = document.querySelector("#voucher-message");
-        let catalog = [];
-        let codeSuffix = "";
-        let messageTimer = null;
-        let editingVoucher = null;
-        let pendingVoucherAction = null;
-        window.FokusCurrency?.bind(document.querySelector(".voucher-page"));
-        let mockVouchers = [
-            {
-                id: "vch_oneyear10",
-                code: "ONEYEAR10",
-                name: "Lançamento anual FokusLaw",
-                product_name: "Fokus Law",
-                discount_type: "percentage",
-                discount_value: 10,
-                base_amount: 499,
-                redemptions_count: 12,
-                redemption_limit: 100,
-                starts_at: "2026-08-27",
-                ends_at: "2027-08-27",
-                status: "ativa",
-            },
-            {
-                id: "vch_lead30",
-                code: "LEAD30",
-                name: "Campanha imobiliária",
-                product_name: "Fokus Lead",
-                discount_type: "percentage",
-                discount_value: 30,
-                base_amount: 299.9,
-                redemptions_count: 8,
-                redemption_limit: 50,
-                starts_at: "2026-09-01",
-                ends_at: "2026-12-01",
-                status: "suspensa",
-            },
-            {
-                id: "vch_trial7",
-                code: "TRIAL7",
-                name: "Trial de ativação",
-                product_name: "Fokus Cloud",
-                discount_type: "trial_free",
-                discount_value: 100,
-                base_amount: 299.9,
-                redemptions_count: 25,
-                redemption_limit: 25,
-                starts_at: "2026-07-01",
-                ends_at: "2026-07-08",
-                status: "ativa",
-                computed_status: "expirada",
-            },
-        ];
-        const mockCatalog = {
-            products: [
-                {
-                    id: "prd_law",
-                    name: "Fokus Law - Jurídico",
-                    plans: [
-                        { id: "law_starter", name: "Starter", monthly_amount: 149.9, annual_amount: 1344.9 },
-                        { id: "law_professional", name: "Professional", monthly_amount: 299.9, annual_amount: 2694.9 },
-                        { id: "law_enterprise", name: "Enterprise", monthly_amount: 499, annual_amount: 4489.9 },
-                    ],
-                },
-                {
-                    id: "prd_lead",
-                    name: "Fokus Lead - Imobiliário",
-                    plans: [
-                        { id: "lead_starter", name: "Starter", monthly_amount: 99.9, annual_amount: 894.9 },
-                        { id: "lead_professional", name: "Professional", monthly_amount: 299.9, annual_amount: 2694.9 },
-                    ],
-                },
-            ],
-        };
-        const api = window.FokusApi || {
-            async request(path, options = {}) {
-                if (path === "/backoffice/catalog") return mockCatalog;
-                if (path === "/backoffice/vouchers" && !options.method) return mockVouchers;
-                if (path === "/backoffice/vouchers" && options.method === "POST") {
-                    const product = mockCatalog.products.find((item) => item.id === options.body.product_id);
-                    mockVouchers = [{
-                        ...options.body,
-                        id: `vch_${Date.now()}`,
-                        code: normalizeCode(options.body.name),
-                        product_name: product?.name || "-",
-                        redemptions_count: 0,
-                    }, ...mockVouchers];
-                    return { message: "Voucher cadastrado." };
-                }
-                if (path.startsWith("/backoffice/vouchers/") && path.endsWith("/archive") && options.method === "POST") {
-                    const id = path.split("/").slice(-2, -1)[0];
-                    mockVouchers = mockVouchers.map((voucher) => voucher.id === id ? { ...voucher, status: "encerrada" } : voucher);
-                    return { message: "Voucher arquivado." };
-                }
-                if (path.startsWith("/backoffice/vouchers/") && options.method === "PATCH") {
-                    const id = path.split("/").pop();
-                    mockVouchers = mockVouchers.map((voucher) => voucher.id === id ? { ...voucher, ...options.body } : voucher);
-                    return { message: "Voucher atualizado." };
-                }
-                if (path.startsWith("/backoffice/vouchers/") && options.method === "DELETE") {
-                    const id = path.split("/").pop();
-                    mockVouchers = mockVouchers.filter((voucher) => voucher.id !== id);
-                    return { message: "Voucher excluído." };
-                }
-                return null;
-            },
-        };
-
-        const toNumber = (value) => Number(String(value || "").replace(",", ".")) || 0;
-        const toMoney = (value) => Number(value || 0).toFixed(2);
-        const formatMoneyValue = (value) => window.FokusCurrency?.format(value) ?? "";
-        const parseInputMoney = (value) => window.FokusCurrency?.parse(value) ?? 0;
-        const makeSuffix = () => {
-            const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-            if (window.crypto?.getRandomValues) {
-                const bytes = new Uint8Array(2);
-                window.crypto.getRandomValues(bytes);
-                return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
-            }
-            return Array.from({ length: 2 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
-        };
-        const normalizeCode = (value) => {
-            const normalized = String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-            const words = normalized.split(/[^A-Z0-9]+/).filter(Boolean);
-            let prefix = words.map((word) => word.slice(0, 3)).join("").slice(0, 6);
-            prefix = (prefix + normalized.replace(/[^A-Z0-9]/g, "")).slice(0, 6).padEnd(6, "X");
-            return prefix + (codeSuffix || (codeSuffix = makeSuffix()));
-        };
-        const toDateValue = (date) => date.toISOString().slice(0, 10);
-        const formatMoney = (value) => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-        const formatDate = (value) => value ? new Date(value).toLocaleDateString("pt-BR") : "-";
-        const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[char]));
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        startDate.min = toDateValue(today);
-
-        function setMessage(text, type = "info") {
-            clearTimeout(messageTimer);
-            message.textContent = text || "";
-            message.hidden = !text;
-            if (!text) {
-                message.removeAttribute("data-tone");
-                return;
-            }
-            message.dataset.tone = type || "info";
-            messageTimer = setTimeout(() => {
-                message.textContent = "";
-                message.hidden = true;
-                message.removeAttribute("data-tone");
-            }, 5000);
-        }
-
-        function statusMeta(status) {
-            const normalized = status === "expirada" ? "expired" : status === "suspensa" ? "paused" : status === "encerrada" ? "cancelled" : "active";
-            return {
-                active: ["Ativo", "fs-badge-soft-success"],
-                paused: ["Pausado", "fs-badge-soft-warning"],
-                expired: ["Expirado", "fs-badge-soft-secondary"],
-                cancelled: ["Cancelado", "fs-badge-soft-danger"],
-            }[normalized];
-        }
-
-        function updatePlans() {
-            const selectedProduct = catalog.find((product) => product.id === products.value);
-            plans.innerHTML = '<option value="" selected disabled>Selecione aqui</option>';
-            baseValue.value = "";
-
-            if (!selectedProduct) {
-                plans.disabled = true;
-                updateDiscountAvailability();
-                return;
-            }
-
-            const allOption = document.createElement("option");
-            allOption.value = "__all__";
-            allOption.textContent = "Todos";
-            plans.appendChild(allOption);
-
-            selectedProduct.plans.forEach((plan) => {
-                const option = document.createElement("option");
-                option.value = plan.id;
-                option.dataset.monthly = plan.monthly_amount;
-                option.dataset.annual = plan.annual_amount;
-                option.textContent = plan.full_name || `${selectedProduct.name} - ${plan.name}`;
-                plans.appendChild(option);
-            });
-
-            plans.disabled = !selectedProduct.plans.length;
-            updateDiscountAvailability();
-        }
-
-        function updateDiscountAvailability() {
-            const allPlans = plans.value === "__all__";
-            discountType.querySelector('option[value="trial_free"]').disabled = allPlans;
-            discountType.querySelector('option[value="fixed"]').disabled = allPlans;
-            discountType.querySelector('option[value="commercial_credit"]').disabled = allPlans;
-            baseField.hidden = allPlans;
-            discountValueField.hidden = allPlans;
-            baseValue.disabled = allPlans;
-            discountValue.disabled = allPlans;
-
-            if (allPlans) {
-                discountType.value = "percentage";
-                baseValue.value = "";
-                discountValue.value = "";
-            }
-        }
-
-        function updateBaseValueFromPlan() {
-            const selectedPlan = plans.options[plans.selectedIndex];
-            const monthly = Number(selectedPlan?.dataset.monthly || 0);
-            const annual = Number(selectedPlan?.dataset.annual || 0);
-            const amount = selectedPlan?.value === "__all__" ? null : {
-                d7: monthly / 30 * 7,
-                m1: monthly,
-                m3: monthly * 3,
-                m6: monthly * 6,
-                a1: annual,
-            }[duration.value];
-            baseValue.value = amount ? formatMoneyValue(Number(amount).toFixed(2)) : "";
-            updateDiscountAvailability();
-            syncDiscount("percent");
-        }
-
-        function syncDiscount(source) {
-            const base = parseInputMoney(baseValue.value);
-
-            if (discountType.value === "trial_free") {
-                discountPercent.value = "100.00";
-                discountValue.value = base ? formatMoneyValue(base) : "";
-                discountPercent.disabled = true;
-                discountValue.disabled = true;
-                return;
-            }
-
-            if (discountType.value === "commercial_credit") {
-                discountPercent.value = "";
-                discountPercent.disabled = true;
-                discountValue.disabled = false;
-                return;
-            }
-
-            discountPercent.disabled = false;
-            discountValue.disabled = false;
-
-            if (!base) {
-                if (source === "percent") discountValue.value = "";
-                if (source === "value") discountPercent.value = "";
-                return;
-            }
-
-            if (source === "value") {
-                const value = Math.min(parseInputMoney(discountValue.value), base);
-                discountValue.value = value ? formatMoneyValue(value) : "";
-                discountPercent.value = value ? toMoney((value / base) * 100) : "";
-                return;
-            }
-
-            const percent = Math.min(toNumber(discountPercent.value), 100);
-            discountPercent.value = percent ? toMoney(percent) : "";
-            discountValue.value = percent ? formatMoneyValue(base * (percent / 100)) : "";
-        }
-
-        function generateCode() {
-            code.value = name.value ? normalizeCode(name.value) : "";
-        }
-
-        async function updateVoucher(voucherId, status) {
-            await api.request(`/backoffice/vouchers/${voucherId}`, { method: "PATCH", body: { status } });
-            await loadVouchers();
-            setMessage(status === "ativa" ? "Voucher reativado." : "Voucher pausado.", "success");
-        }
-
-        function editVoucher(voucher) {
-            editingVoucher = voucher;
-            form.dataset.mode = "edit";
-            form.dataset.recordId = String(voucher.id);
-            name.value = voucher.name || "";
-            code.value = voucher.code || "";
-            products.value = voucher.product_id || "";
-            updatePlans();
-            plans.value = voucher.plan_id || "__all__";
-            duration.value = voucher.benefit_duration || "";
-            baseValue.value = voucher.base_amount ? formatMoneyValue(voucher.base_amount) : "";
-            discountType.value = voucher.discount_type || "percentage";
-            discountPercent.value = voucher.discount_type === "percentage" ? toMoney(voucher.discount_value) : "";
-            discountValue.value = ["fixed", "commercial_credit"].includes(voucher.discount_type) ? formatMoneyValue(voucher.discount_value) : "";
-            startDate.value = voucher.starts_at ? String(voucher.starts_at).slice(0, 10) : "";
-            endDate.value = voucher.ends_at ? String(voucher.ends_at).slice(0, 10) : "";
-            form.querySelector('[name="redemption_limit"]').value = voucher.redemption_limit || "";
-            form.querySelector('[name="redemption_limit_per_company"]').value = voucher.redemption_limit_per_company || "";
-            form.querySelector('[name="origin"]').value = voucher.origin || "";
-            form.querySelector('[name="notes"]').value = voucher.notes || "";
-            updateDiscountAvailability();
-            syncDiscount(discountType.value === "percentage" ? "percent" : "value");
-            form.querySelector('button[type="submit"]').textContent = "Salvar alterações";
-            form.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-
-        function clearVoucherForm() {
-            editingVoucher = null;
-            form.dataset.mode = "create";
-            delete form.dataset.recordId;
-            form.querySelector('button[type="submit"]').textContent = "Cadastrar voucher";
-            codeSuffix = "";
-            plans.disabled = true;
-            plans.innerHTML = '<option value="" selected disabled>Selecione um sistema</option>';
-            baseValue.value = "";
-            endDate.value = "";
-            updateDiscountAvailability();
-            syncDiscount("percent");
-        }
-
-        const destructiveDialog = document.querySelector("#voucher-destructive-dialog");
-        const destructiveForm = document.querySelector("#voucher-destructive-form");
-        const destructiveModal = window.FokusStyles?.Modal?.getOrCreateInstance(document.querySelector("#voucher-destructive-trigger"));
-        const closeDestructiveDialog = () => {
-            destructiveModal?.hide();
-            pendingVoucherAction = null;
-            destructiveForm.reset();
-        };
-        const openDestructiveDialog = (action, voucherId) => {
-            pendingVoucherAction = { action, voucherId };
-            document.querySelector("#voucher-dialog-title").textContent = "Confirmar exclusão ou arquivamento do voucher";
-            destructiveModal?.show();
-            window.setTimeout(() => document.querySelector("#voucher-dialog-reason")?.focus(), 0);
-        };
-        document.querySelector("[data-voucher-dialog-close]").addEventListener("click", closeDestructiveDialog);
-        destructiveForm.addEventListener("submit", async (event) => {
-            event.preventDefault();
-            if (!pendingVoucherAction || (window.FokusForm && !FokusForm.validate(destructiveForm))) return;
-            const { action, voucherId } = pendingVoucherAction;
-            const reason = new FormData(destructiveForm).get("reason");
-            FokusForm?.setLoading(destructiveForm, true);
-            try {
-                let response;
-                try {
-                    response = await api.request(`/backoffice/vouchers/${voucherId}`, { method: "DELETE", body: { reason } });
-                } catch (error) {
-                    if (error.status !== 422) throw error;
-                    response = await api.request(`/backoffice/vouchers/${voucherId}/archive`, { method: "POST", body: { reason } });
-                }
-                closeDestructiveDialog();
-                await loadVouchers();
-                setMessage(response.message || "Ação concluída.", "success");
-            } catch (error) {
-                setMessage(error.message || "Não foi possível concluir a ação.", "danger");
-            } finally {
-                FokusForm?.setLoading(destructiveForm, false);
-            }
-        });
-
-        function updateValidityWindow() {
-            if (!startDate.value) return;
-            endDate.min = startDate.value;
-            if (endDate.value && endDate.value < startDate.value) endDate.value = "";
-        }
-
-        async function loadCatalog() {
-            const data = await api.request("/backoffice/catalog");
-            catalog = data.products || [];
-            products.innerHTML = '<option value="" selected disabled>Selecione aqui</option>';
-            catalog.forEach((product) => {
-                const option = document.createElement("option");
-                option.value = product.id;
-                option.textContent = product.name;
-                products.appendChild(option);
-            });
-        }
-
-        async function loadVouchers() {
-            const rows = await api.request("/backoffice/vouchers");
-            if (!rows.length) {
-                voucherList.innerHTML = '<tr><td colspan="8">Nenhum voucher cadastrado.</td></tr>'; window.refreshFokusDataTables?.(document.querySelector(".vouchers-page"));
-                return;
-            }
-
-            voucherList.innerHTML = rows.map((voucher) => {
-                const currentStatus = voucher.computed_status || voucher.status;
-                const [statusLabel, statusClass] = statusMeta(currentStatus);
-                const discount = voucher.discount_type === "trial_free"
-                    ? `Assinatura gratuita | 100%`
-                    : voucher.discount_type === "commercial_credit"
-                    ? `Crédito na 1ª cobrança | ${formatMoney(voucher.discount_value)}`
-                    : voucher.discount_type === "percentage"
-                    ? `${Number(voucher.discount_value).toLocaleString("pt-BR")}% | ${formatMoney((Number(voucher.base_amount || 0) * Number(voucher.discount_value || 0)) / 100)}`
-                    : `${formatMoney(voucher.discount_value)}`;
-                const used = `${voucher.redemptions_count || 0} / ${voucher.redemption_limit || "-"}`;
-                const validity = `${formatDate(voucher.starts_at)} até ${formatDate(voucher.ends_at)}`;
-                const actionButton = currentStatus === "expirada"
-                    ? ""
-                    : voucher.status === "suspensa"
-                        ? `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action" type="button" data-voucher-action="reactivate" data-voucher-id="${escapeHtml(voucher.id)}" title="Reativar voucher" aria-label="Reativar voucher"><img src="${iconBasePath}${voucherAddIcon}" alt=""></button>`
-                        : `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action" type="button" data-voucher-action="pause" data-voucher-id="${escapeHtml(voucher.id)}" title="Pausar voucher" aria-label="Pausar voucher"><img src="${iconBasePath}${voucherMinusIcon}" alt=""></button>`;
-
-                return `<tr>
-                    <td>${escapeHtml(voucher.code)}</td>
-                    <td>${escapeHtml(voucher.name || voucher.code)}</td>
-                    <td>${escapeHtml(voucher.product_name || "-")}</td>
-                    <td>${escapeHtml(discount)}</td>
-                    <td>${escapeHtml(used)}</td>
-                    <td>${escapeHtml(validity)}</td>
-                    <td><span class="fs-badge ${statusClass}">${statusLabel}</span></td>
-                    <td class="fs-u-d-flex fs-u-gap-2">
-                        ${Number(voucher.redemptions_count || 0) === 0 && voucher.status !== "encerrada" ? `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action" type="button" data-voucher-action="edit" data-voucher-id="${escapeHtml(voucher.id)}" title="Editar voucher" aria-label="Editar voucher"><img src="${iconBasePath}${voucherEditIcon}" alt=""></button>` : ""}
-                        ${actionButton}
-                        ${voucher.status !== "encerrada" ? `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action ${Number(voucher.redemptions_count || 0) === 0 ?"fs-btn-danger" : ""}" type="button" data-voucher-action="remove-or-archive" data-voucher-id="${escapeHtml(voucher.id)}" title="${Number(voucher.redemptions_count || 0) === 0 ? "Excluir voucher" : "Arquivar voucher"}" aria-label="${Number(voucher.redemptions_count || 0) === 0 ? "Excluir voucher" : "Arquivar voucher"}"><img src="${iconBasePath}${Number(voucher.redemptions_count || 0) === 0 ? voucherRemoveIcon : voucherMinusIcon}" alt=""></button>` : ""}
-                    </td>
-                </tr>`;
-            }).join(""); window.refreshFokusDataTables?.(document.querySelector(".vouchers-page"));
-        }
-
-        async function submitVoucher(event) {
-            event.preventDefault();
-            if (window.FokusForm && !FokusForm.validate(form)) return;
-            FokusForm?.setLoading(form, true);
-            const values = Object.fromEntries(new FormData(form));
-            const discountMode = values.discount_mode;
-            const payload = {
-                name: values.name,
-                code: values.code || null,
-                product_id: values.product_id,
-                plan_id: values.plan_id === "__all__" ? null : values.plan_id,
-                base_amount: values.plan_id === "__all__" ? null : parseInputMoney(values.base_amount),
-                benefit_duration: values.benefit_duration,
-                starts_at: values.starts_at,
-                ends_at: values.ends_at,
-                redemption_limit: values.redemption_limit,
-                redemption_limit_per_company: values.redemption_limit_per_company,
-                origin: values.origin,
-                notes: values.notes,
-                discount_type: discountMode,
-                discount_value: discountMode === "trial_free"
-                    ? 100
-                    : ["fixed", "commercial_credit"].includes(discountMode)
-                        ? parseInputMoney(discountValue.value)
-                        : discountPercent.value,
-            };
-
-            try {
-                setMessage("Salvando voucher...");
-                const editId = form.dataset.mode === "edit" ? String(editingVoucher?.id || form.dataset.recordId || "") : "";
-                if (form.dataset.mode === "edit" && !editId) {
-                    setMessage("Não foi possível identificar o voucher que será atualizado.", "danger");
-                    return;
-                }
-                const wasEditing = Boolean(editId);
-                const path = wasEditing ? `/backoffice/vouchers/${editId}` : "/backoffice/vouchers";
-                await api.request(path, { method: wasEditing ? "PATCH" : "POST", body: payload });
-                form.reset();
-                clearVoucherForm();
-                await loadVouchers();
-                setMessage(wasEditing ? "Voucher atualizado." : "Voucher cadastrado.", "success");
-            } catch (error) {
-                FokusForm?.mapServerErrors(form, error.errors);
-                setMessage(error.message, "danger");
-            } finally {
-                FokusForm?.setLoading(form, false);
-            }
-        }
-
-        const name = document.querySelector("#voucher-name");
-        const code = document.querySelector("#voucher-code");
-        name.addEventListener("input", generateCode);
-        products.addEventListener("change", updatePlans);
-        plans.addEventListener("change", updateBaseValueFromPlan);
-        discountType.addEventListener("change", () => syncDiscount("percent"));
-        discountPercent.addEventListener("input", () => syncDiscount("percent"));
-        discountValue.addEventListener("input", () => syncDiscount("value"));
-        duration.addEventListener("change", updateBaseValueFromPlan);
-        startDate.addEventListener("change", updateValidityWindow);
-        endDate.addEventListener("change", updateValidityWindow);
-        form.addEventListener("submit", submitVoucher);
-        voucherList.addEventListener("click", async (event) => {
-            const button = event.target.closest("[data-voucher-action]");
-            if (!button) return;
-            try {
-                const action = button.dataset.voucherAction;
-                const voucher = (await api.request("/backoffice/vouchers")).find((item) => item.id === button.dataset.voucherId);
-                if (action === "edit") {
-                    editVoucher(voucher);
-                } else if (action === "remove-or-archive") {
-                    openDestructiveDialog(action, button.dataset.voucherId);
-                } else {
-                    await updateVoucher(button.dataset.voucherId, action === "pause" ? "suspensa" : "ativa");
-                }
-            } catch (error) {
-                setMessage(error.message, "danger");
-            }
-        });
-        form.addEventListener("reset", () => {
-            setTimeout(() => {
-                startDate.min = toDateValue(today);
-                endDate.min = "";
-                codeSuffix = "";
-                endDate.value = "";
-                clearVoucherForm();
-                updateDiscountAvailability();
-                syncDiscount("percent");
-                setMessage("");
-            });
-        });
-
-        Promise.all([loadCatalog(), loadVouchers()]).catch((error) => {
-            setMessage(error.message, "danger");
-        });
-    })();
-</script>
+</main>

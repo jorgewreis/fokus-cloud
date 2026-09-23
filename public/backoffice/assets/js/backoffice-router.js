@@ -6,7 +6,7 @@
  * portalled overlays and release listeners before the next page is mounted.
  */
 (() => {
-    const ASSET_VERSION = "20260923-publication-versions-v1";
+    const ASSET_VERSION = "20260923-vouchers-refactor-v1";
 
     const pages = {
         "platform-dashboard-final": { route: "painel", fragment: "platform-dashboard-final" },
@@ -16,7 +16,7 @@
         modules: { route: "modulos", fragment: "modules", module: "/backoffice/assets/js/modules-page.js", role: "superadministrador" },
         subscriptions: { route: "assinaturas", fragment: "subscriptions", module: "/backoffice/assets/js/subscriptions-page.js" },
         pagamentos: { route: "pagamentos", fragment: "pagamentos" },
-        vouchers: { route: "vouchers", fragment: "vouchers", role: "superadministrador" },
+        vouchers: { route: "vouchers", fragment: "vouchers", module: "/backoffice/assets/js/vouchers-page.js", permission: "platform.vouchers.manage" },
         users: { route: "usuarios", fragment: "users", module: "/backoffice/assets/js/users-page.js", permission: "platform.users.view" },
         "product-interests": { route: "interesses", fragment: "product-interests" },
         "ui-components": { route: "componentes", fragment: "ui-components" },

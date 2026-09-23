@@ -833,3 +833,170 @@ test('planos limita os ícones de ciclo de vida aos estados permitidos', async (
     await expect(page.locator('#plan-list [data-plan-action="pause"]')).toHaveCount(1);
     await expect(page.locator('#plan-list [data-plan-action="archive"], #plan-list [data-plan-action="edit"]')).toHaveCount(0);
 });
+
+test('Vouchers filtra, pagina e consulta regras, resgates e reservas em drawer responsivo', async ({ page }) => {
+    const products = [{
+        id: 'PRD_VOUCHER_LAW', name: 'Fokus Law', code: 'fokus-law', plans: [
+            { id: 'PLN_VOUCHER_01', name: 'Essencial', full_name: 'Fokus Law — Essencial', monthly_amount: 50, annual_amount: 500 },
+        ],
+    }];
+    const vouchers = Array.from({ length: 17 }, (_, index) => ({
+        id: `VCH_VISUAL_${String(index + 1).padStart(2, '0')}`,
+        code: `CAMPANHA${index + 1}`,
+        name: `Campanha visual ${index + 1}`,
+        product_id: 'PRD_VOUCHER_LAW',
+        product_name: 'Fokus Law',
+        plan_id: 'PLN_VOUCHER_01',
+        plan_name: 'Essencial',
+        discount_type: index % 2 ? 'percentage' : 'trial_free',
+        discount_value: index % 2 ? 10 : 100,
+        base_amount: 50,
+        benefit_duration: 'm1',
+        redemptions_count: index === 0 ? 1 : 0,
+        redemption_limit: 25,
+        redemption_limit_per_company: 1,
+        starts_at: '2026-09-01',
+        ends_at: '2027-09-01',
+        status: index === 1 ? 'suspensa' : 'ativa',
+        computed_status: index === 2 ? 'expirada' : index === 1 ? 'suspensa' : 'ativa',
+        origin: 'Homologação visual',
+        notes: 'Observação interna do voucher de teste.',
+    }));
+    await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+        admin: { role: 'superadministrador', name: 'Superadmin Teste', email: 'superadmin@example.test', permissions: ['platform.vouchers.manage', 'platform.catalog.publish'] },
+    }) }));
+    await page.route('**/api/backoffice/catalog', (route) => route.fulfill({
+        contentType: 'application/json', body: JSON.stringify({ products, options: { segments: {}, module_codes: [], personalization_types: [] } }),
+    }));
+    await page.route('**/api/backoffice/vouchers', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(vouchers) }));
+    await page.route('**/api/backoffice/vouchers/VCH_VISUAL_01', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+        voucher: vouchers[0],
+        redemptions: Array.from({ length: 24 }, (_, index) => ({
+            id: `VRD_VISUAL_${String(index + 1).padStart(2, '0')}`, voucher_id: vouchers[0].id, company_id: `COM_VISUAL_${String(index + 1).padStart(2, '0')}`, subscription_id: `SUB_VISUAL_${String(index + 1).padStart(2, '0')}`, discount_amount: 50,
+            benefit_starts_at: '2026-09-20T12:00:00Z', benefit_ends_at: '2026-10-20T12:00:00Z', created_at: '2026-09-20T12:00:00Z',
+            snapshot: { plan_name: 'Fokus Law — Essencial', company_id: `COM_VISUAL_${String(index + 1).padStart(2, '0')}`, discount_amount: 50 },
+        })),
+        reservations: Array.from({ length: 12 }, (_, index) => ({
+            id: `VRS_VISUAL_${String(index + 1).padStart(2, '0')}`, status: index ? 'released' : 'pending', company_id: `COM_RESERVATION_${String(index + 1).padStart(2, '0')}`, subscription_id: `SUB_RESERVATION_${String(index + 1).padStart(2, '0')}`,
+            reserved_at: '2026-09-22T12:00:00Z', expires_at: '2026-09-22T12:30:00Z', snapshot: { company_id: `COM_RESERVATION_${String(index + 1).padStart(2, '0')}` },
+        })),
+    }) }));
+    await page.route('**/api/backoffice/vouchers/VCH_VISUAL_02', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ voucher: vouchers[1], redemptions: [], reservations: [] }) }));
+
+    for (const [name, viewport] of [['desktop', { width: 1440, height: 900 }], ['tablet', { width: 768, height: 1024 }], ['mobile', { width: 375, height: 812 }]]) {
+        await page.setViewportSize(viewport);
+        await page.goto('/backoffice/vouchers');
+        await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'vouchers');
+        await expect(page.locator('.backoffice-records-page')).toBeVisible();
+        await expect(page.locator('#voucher-list tr')).toHaveCount(15);
+        await expect(page.locator('#voucher-product-filter option')).toHaveCount(2);
+        await expect(page.locator('#voucher-table-footer-summary')).toContainText('página 1 de 2');
+        await expect(page.locator('#voucher-pagination')).toHaveAccessibleName('Paginação de vouchers');
+
+        await page.locator('#voucher-search').fill('Campanha visual 1');
+        await expect(page.locator('#voucher-list tr')).toHaveCount(9);
+        await page.locator('#voucher-search').fill('');
+        await page.locator('#voucher-product-filter').selectOption('PRD_VOUCHER_LAW');
+        await page.locator('#voucher-type-filter').selectOption('trial_free');
+        await page.locator('#voucher-status-filter').selectOption('expirada');
+        await expect(page.locator('#voucher-list tr')).toHaveCount(1);
+        await expect(page.locator('#voucher-list')).toContainText('CAMPANHA3');
+        await page.locator('#voucher-type-filter').selectOption('');
+        await page.locator('#voucher-status-filter').selectOption('');
+        await page.getByRole('button', { name: 'Filtrar' }).click();
+
+        await page.locator('#voucher-search').fill('');
+        await page.getByRole('button', { name: 'Próxima página' }).click();
+        await expect(page.locator('#voucher-list tr')).toHaveCount(2);
+        await expect(page.locator('#voucher-table-footer-summary')).toContainText('página 2 de 2');
+        await page.getByRole('button', { name: 'Página anterior' }).click();
+        await expect(page.locator('#voucher-list tr')).toHaveCount(15);
+
+        const viewButton = page.getByRole('button', { name: 'Ver detalhes do voucher' }).first();
+        await viewButton.click();
+        await expect(page.locator('#voucher-drawer')).toBeVisible();
+        await expect(page.locator('#voucher-detail-commercial')).toContainText('CAMPANHA1');
+        await expect(page.locator('#voucher-detail-redemptions')).toContainText('COM_VISUAL_01');
+        await expect(page.locator('#voucher-detail-reservations')).toContainText('COM_RESERVATION_02');
+        await expect(page.locator('#voucher-detail-redemptions article')).toHaveCount(24);
+        await expect(page.locator('#voucher-detail-reservations article')).toHaveCount(12);
+        const drawer = await page.locator('#voucher-drawer').evaluate((element) => ({
+            width: element.getBoundingClientRect().width,
+            scrollWidth: element.scrollWidth,
+            clientWidth: element.clientWidth,
+            footerVisible: element.querySelector('#voucher-view-footer').getBoundingClientRect().bottom <= window.innerHeight,
+        }));
+        expect(drawer.width).toBeGreaterThan(0);
+        expect(drawer.width).toBeLessThanOrEqual(viewport.width);
+        expect(drawer.scrollWidth).toBeLessThanOrEqual(drawer.clientWidth);
+        expect(drawer.footerVisible).toBe(true);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+        await page.keyboard.press('Escape');
+        await expect(page.locator('#voucher-drawer')).toBeHidden();
+        await expect(viewButton).toBeFocused();
+        await page.getByRole('button', { name: 'Ver detalhes do voucher' }).nth(1).click();
+        await expect(page.locator('#voucher-detail-redemptions')).toContainText('Nenhum resgate confirmado');
+        await expect(page.locator('#voucher-detail-reservations')).toContainText('Nenhuma reserva de checkout registrada');
+        await page.locator('#voucher-drawer-close').click();
+    }
+});
+
+test('Vouchers cria campanha e limita ações comerciais às permissões documentadas', async ({ page }) => {
+    const products = [{ id: 'PRD_VOUCHER_LAW', name: 'Fokus Law', code: 'fokus-law', plans: [{ id: 'PLN_VOUCHER_01', name: 'Essencial', full_name: 'Fokus Law — Essencial', monthly_amount: 50, annual_amount: 500 }] }];
+    const vouchers = [];
+    await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+        admin: { role: 'administrador_comercial', name: 'Admin Comercial Teste', email: 'comercial@example.test', permissions: ['platform.vouchers.manage'] },
+    }) }));
+    await page.route('**/api/backoffice/catalog', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ products }) }));
+    await page.route('**/api/backoffice/vouchers', async (route) => {
+        if (route.request().method() === 'POST') {
+            const payload = route.request().postDataJSON();
+            expect(payload.code).toMatch(/^[A-Z0-9]+$/);
+            expect(payload).toMatchObject({ name: 'Campanha de boas-vindas', product_id: 'PRD_VOUCHER_LAW', plan_id: 'PLN_VOUCHER_01', discount_type: 'percentage', discount_value: 15, benefit_duration: 'm1' });
+            vouchers.unshift({ id: 'VCH_CREATED_01', ...payload, product_name: 'Fokus Law', plan_name: 'Essencial', redemptions_count: 0, status: 'ativa', computed_status: 'ativa' });
+            return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'VCH_CREATED_01', code: payload.code, message: 'Voucher criado.' }) });
+        }
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify(vouchers) });
+    });
+    await page.route('**/api/backoffice/vouchers/VCH_CREATED_01', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ voucher: vouchers[0], redemptions: [], reservations: [] }) }));
+
+    await page.goto('/backoffice/vouchers');
+    await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'vouchers');
+    await expect(page.getByRole('button', { name: 'Novo voucher' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Arquivar voucher' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Excluir voucher' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Novo voucher' }).click();
+    await expect(page.locator('#voucher-drawer')).toBeVisible();
+    await page.locator('#voucher-name').fill('Campanha de boas-vindas');
+    await expect(page.locator('#voucher-code')).toHaveValue(/^[A-Z0-9]+$/);
+    await page.locator('#voucher-product').selectOption('PRD_VOUCHER_LAW');
+    await page.locator('#voucher-plan').selectOption('PLN_VOUCHER_01');
+    await page.locator('#voucher-discount-type').selectOption('trial_free');
+    await expect(page.locator('#voucher-discount-percent')).toHaveValue('100');
+    await expect(page.locator('#voucher-discount-percent')).toBeDisabled();
+    await expect(page.locator('#voucher-discount-amount')).toBeDisabled();
+    await page.locator('#voucher-plan').selectOption('__all__');
+    await expect(page.locator('#voucher-discount-type option[value="trial_free"]')).toHaveAttribute('disabled', '');
+    await expect(page.locator('#voucher-discount-type')).toHaveValue('percentage');
+    await page.locator('#voucher-plan').selectOption('PLN_VOUCHER_01');
+    await page.locator('#voucher-discount-type').selectOption('percentage');
+    await page.locator('#voucher-duration').selectOption('m1');
+    await page.locator('#voucher-discount-percent').fill('15');
+    await page.locator('#voucher-start-date').fill('2026-09-23');
+    await page.locator('#voucher-end-date').fill('2027-09-23');
+    await page.locator('#voucher-total').fill('50');
+    await page.locator('#voucher-company-limit').fill('1');
+    await page.getByRole('button', { name: 'Cadastrar voucher' }).click();
+    await expect(page.locator('#voucher-message')).toContainText('Voucher cadastrado.');
+    await expect(page.locator('#voucher-list')).toContainText('Campanha de boas-vindas');
+    await expect(page.locator('#voucher-drawer')).toBeHidden();
+    await page.getByRole('button', { name: 'Editar voucher' }).click();
+    await expect(page.locator('#voucher-drawer-title')).toHaveText('Editar voucher');
+    await expect(page.locator('#voucher-form-submit')).toHaveText('Salvar alterações');
+    await expect(page.locator('#voucher-view-panel')).toBeHidden();
+    await page.locator('#voucher-form-cancel').click();
+    await page.getByRole('button', { name: 'Ver detalhes do voucher' }).click();
+    await expect(page.locator('#voucher-view-panel')).toBeVisible();
+    await expect(page.locator('#voucher-form')).toBeHidden();
+    await expect(page.locator('#voucher-detail-redemptions')).toContainText('Nenhum resgate confirmado');
+});
