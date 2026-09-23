@@ -333,15 +333,23 @@ test('planos replica o contrato visual, composição e estados do drawer', async
         cards: drawer.querySelectorAll('#plan-form > .fs-card.fs-card-panel').length,
         controlsUseGoogleSans: [...drawer.querySelectorAll('input, select, textarea')].every((control) => getComputedStyle(control).fontFamily.includes('Google Sans')),
         textareaPadding: [...new Set([...drawer.querySelectorAll('textarea')].map((textarea) => getComputedStyle(textarea).padding))],
+        segmentIsSelect: drawer.querySelector('#plan-segment')?.tagName === 'SELECT',
+        segmentOptions: [...drawer.querySelectorAll('#plan-segment option')].map((option) => option.value),
+        descriptionWidths: [...drawer.querySelectorAll('#plan-technical-description, #plan-commercial-content')].map((field) => field.classList.contains('fs-width-600')),
+        descriptionMaxLengths: [...drawer.querySelectorAll('#plan-technical-description, #plan-commercial-content')].map((field) => field.getAttribute('maxlength')),
         primaryButton: drawer.querySelector('#plan-form-submit')?.classList.contains('fs-btn-primary'),
     }));
-    expect(createContract).toEqual({ width: '450px', cards: 3, controlsUseGoogleSans: true, textareaPadding: ['10px 15px'], primaryButton: true });
+    expect(createContract).toEqual({ width: '450px', cards: 3, controlsUseGoogleSans: true, textareaPadding: ['10px 15px'], segmentIsSelect: true, segmentOptions: ['', 'advocacia'], descriptionWidths: [true, true], descriptionMaxLengths: ['2000', '20000'], primaryButton: true });
 
     await page.locator('#plan-product').selectOption('PRD_LAW');
+    await page.locator('#plan-segment').selectOption('advocacia');
     await page.locator('#plan-composition-open').click();
     await expect(page.locator('#plan-composition-drawer')).toBeVisible();
     await expect(page.locator('#plan-module-options')).toContainText('Gestão de processos');
-    await page.locator('#plan-module-options input[type="checkbox"]').evaluate((input) => { input.checked = true; input.dispatchEvent(new Event('change', { bubbles: true })); });
+    await expect(page.locator('#plan-module-options .fs-check-label')).toHaveCount(1);
+    const moduleCheckbox = page.locator('#plan-module-options input[type="checkbox"]').first();
+    await page.locator('#plan-module-options .plan-module-meta').click();
+    await expect(moduleCheckbox).toBeChecked();
     await page.locator('#plan-composition-save').click();
     await expect(page.locator('#plan-composition-drawer')).toBeHidden();
     await expect(page.locator('#plan-composition-summary')).toContainText('1 funcionalidade');
