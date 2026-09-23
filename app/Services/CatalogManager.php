@@ -1026,7 +1026,7 @@ class CatalogManager
                 'name' => isset($data['base_name']) ? trim((string) $data['base_name']) : (isset($data['name']) ? trim((string) $data['name']) : null),
                 'technical_description' => $data['technical_description'] ?? null,
                 'commercial_content' => $data['commercial_content'] ?? null,
-                'monthly_amount' => array_key_exists('monthly_amount', $data) ? $data['monthly_amount'] : null,
+                'monthly_amount' => array_key_exists('monthly_amount', $data) && $data['monthly_amount'] !== null ? max(0, (float) $data['monthly_amount']) : null,
                 'segment' => $data['segment'] ?? null,
                 'status' => $data['status'] ?? null,
                 'publication_state' => $data['publication_state'] ?? null,
@@ -1040,8 +1040,8 @@ class CatalogManager
     {
         $base = $plan->configured_monthly_amount === null
             ? CatalogPricing::suggestedMonthly((float) $plan->module_monthly_amount)
-            : (float) $plan->configured_monthly_amount;
-        return round($base + collect($this->planPersonalizationDefaults($plan->id))->sum(fn (array $default): float => (float) ($default['additional_monthly_amount'] ?? 0)), 2);
+            : max(0, (float) $plan->configured_monthly_amount);
+        return max(0, round($base + collect($this->planPersonalizationDefaults($plan->id))->sum(fn (array $default): float => max(0, (float) ($default['additional_monthly_amount'] ?? 0))), 2));
     }
 
     private function lineName(string $productName, ?string $segment): string

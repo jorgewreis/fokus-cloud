@@ -362,6 +362,8 @@ test('planos replica o contrato visual, composição e estados do drawer', async
     await page.locator('#plan-composition-save').click();
     await expect(page.locator('#plan-composition-drawer')).toBeHidden();
     await expect(page.locator('#plan-composition-summary')).toContainText('1 funcionalidade');
+    await expect(page.locator('#plan-suggested-price')).toHaveText('R$ 24,90');
+    await expect(page.locator('#plan-annual-price')).toHaveText('R$ 249,00');
 
     await page.locator('#plan-drawer-close').click();
     await page.getByRole('button', { name: 'Editar plano' }).click();

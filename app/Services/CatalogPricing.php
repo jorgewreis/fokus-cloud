@@ -11,13 +11,13 @@ final class CatalogPricing
 
     public static function annualFromMonthly(float $monthly): float
     {
-        return round($monthly * 10, 2);
+        return round(max(0, $monthly) * 10, 2);
     }
 
     private static function commercialRound(float $amount): float
     {
         $cents = (int) round($amount * 100);
-        if ($cents <= 0) return 0.0;
-        return (intdiv($cents, 500) * 500 - 10) / 100;
+        if ($cents < 500) return 0.0;
+        return max(0, (intdiv($cents, 500) * 500 - 10) / 100);
     }
 }
