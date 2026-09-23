@@ -11,6 +11,14 @@ export async function mount(root, context = {}) {
     const message = $("#users-message");
     const canManage = context.admin?.role === "superadministrador" && (window.__backofficePermissions || new Set()).has("platform.security.manage");
     const isSuperadmin = context.admin?.role === "superadministrador";
+    const iconBase = "/backoffice/assets/icons/";
+    const actionIcons = {
+        details: "Single-Man-Actions-Text--Streamline-Ultimate.png",
+        edit: "Single-Man-Actions-Edit-1--Streamline-Ultimate.png",
+        block: "Single-Man-Actions-Subtract--Streamline-Ultimate.png",
+        deactivate: "Single-Neutral-Actions-Remove--Streamline-Ultimate.png",
+        unblock: "Single-Man-Actions-Key--Streamline-Ultimate.png",
+    };
     const drawerController = createRecordsDrawer({ trigger, drawer });
     const modal = window.FokusStyles?.Modal?.getOrCreateInstance($("#user-action-trigger"));
     let selected = null;
@@ -19,7 +27,7 @@ export async function mount(root, context = {}) {
     const labels = { plataforma: "Conta interna Fokus Cloud", empresa: "Usuário de empresa", administrador_comercial: "Administrador comercial", superadministrador: "Superadministrador", ativo: "Ativo", ativa: "Ativo", suspenso: "Suspenso", suspensa: "Suspensa", bloqueado: "Bloqueado", bloqueio_temporario: "Bloqueio temporário", desativado: "Desativado", desativada: "Desativada", bloqueada: "Bloqueada", pendente: "Pendente", cancelamento_agendado: "Cancelamento agendado", inadimplente: "Inadimplente", aguardando_pagamento: "Aguardando pagamento" };
     const status = (value) => `<span class="fs-badge fs-badge-soft-${["ativo", "ativa"].includes(value) ? "success" : ["pendente", "aguardando_pagamento"].includes(value) ? "info" : ["suspenso", "suspensa", "bloqueado", "bloqueio_temporario", "inadimplente", "cancelamento_agendado"].includes(value) ? "warning" : "secondary"}">${esc(labels[value] || value || "Sem status")}</span>`;
     const showMessage = (text, tone = "danger") => { message.textContent = text || ""; message.dataset.tone = tone; message.hidden = !text; };
-    const actionButton = (action, id, label) => `<button class="fs-btn fs-btn-outline-secondary fs-btn-sm" type="button" data-user-action="${action}" data-user-id="${esc(id)}">${esc(label)}</button>`;
+    const actionButton = (action, id, label) => `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action${action === "deactivate" ? " fs-btn-danger" : ""}" type="button" data-user-action="${action}" data-user-id="${esc(id)}" aria-label="${esc(label)}" title="${esc(label)}"><img src="${iconBase}${actionIcons[action]}?v=20260923-users-page-ui-v2" alt=""></button>`;
     const render = (response) => {
         const rows = response.data || [];
         list.innerHTML = rows.length ? rows.map((user) => {
@@ -31,13 +39,13 @@ export async function mount(root, context = {}) {
                 if (user.status !== "desativado") actions.push(actionButton("deactivate", user.id, "Desativar"));
             }
             const detail = user.type === "plataforma" ? (labels[user.role] || user.role || "Conta interna") : `${Number(user.company_count || 0)} vínculo(s) atual(is)`;
-            return `<tr data-account-type="${esc(user.type)}"><td data-label="Usuário"><strong>${esc(user.name || "-")}</strong><small class="fs-u-d-block fs-u-fs-sm">${esc(user.email || "-")}</small></td><td data-label="Tipo">${esc(labels[user.type] || user.type)}</td><td data-label="Perfil ou vínculos">${esc(detail)}</td><td data-label="Status">${status(user.status)}</td><td data-label="Ações"><div class="fs-u-d-flex fs-u-flex-wrap fs-u-gap-2">${actions.join("")}</div></td></tr>`;
+            return `<tr data-account-type="${esc(user.type)}"><td class="fs-width-600" data-label="Usuário"><strong>${esc(user.name || "-")}</strong><small class="fs-u-d-block fs-u-fs-sm">${esc(user.email || "-")}</small></td><td class="fs-width-400" data-label="Tipo">${esc(labels[user.type] || user.type)}</td><td class="fs-width-500" data-label="Perfil ou vínculos">${esc(detail)}</td><td class="fs-width-300" data-label="Status">${status(user.status)}</td><td class="fs-width-400" data-label="Ações"><div class="fs-u-d-flex fs-u-flex-wrap fs-u-gap-2">${actions.join("")}</div></td></tr>`;
         }).join("") : '<tr><td colspan="5">Nenhuma conta encontrada.</td></tr>';
         const meta = response.meta || {};
         const page = Number(meta.current_page || 1), perPage = Number(meta.per_page || 15), total = Number(meta.total || 0), last = Math.max(1, Number(meta.last_page || 1));
         $("#users-table-summary").textContent = `${total.toLocaleString("pt-BR")} conta(s)`;
         $("#users-table-footer-summary").textContent = total ? `Mostrando ${(page - 1) * perPage + 1} a ${Math.min(page * perPage, total)} de ${total} contas` : "Nenhuma conta encontrada";
-        $("#users-pagination").innerHTML = `<ul class="fs-pagination fs-pagination-compact"><li class="fs-page-item"><button class="fs-page-link" type="button" data-users-page="${page - 1}" aria-label="Página anterior" ${page <= 1 ? "disabled" : ""}>‹</button></li><li class="fs-page-item is-active"><span class="fs-page-link" aria-current="page">${page} de ${last}</span></li><li class="fs-page-item"><button class="fs-page-link" type="button" data-users-page="${page + 1}" aria-label="Próxima página" ${page >= last ? "disabled" : ""}>›</button></li></ul>`;
+        $("#users-pagination").innerHTML = `<ul class="fs-pagination fs-pagination-compact"><li class="fs-page-item"><button class="fs-page-link" type="button" data-users-page="${page - 1}" aria-label="Página anterior" ${page === 1 ? "disabled" : ""}>‹</button></li><li class="fs-page-item is-active" aria-current="page"><button class="fs-page-link" type="button" data-users-page="${page}" aria-label="Página ${page}" aria-current="page">${page}</button></li><li class="fs-page-item"><button class="fs-page-link" type="button" data-users-page="${page + 1}" aria-label="Próxima página" ${page === last ? "disabled" : ""}>›</button></li></ul>`;
         window.refreshFokusDataTables?.();
     };
     const load = async () => {

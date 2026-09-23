@@ -44,6 +44,8 @@ test('diretório Usuários abre detalhes de conta e se adapta a telas menores', 
         await page.goto('/backoffice/usuarios');
         await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'users');
         await expect(page.locator('#users-list tr[data-account-type]')).toHaveCount(2);
+        const brokenActionIcons = await page.locator('#users-list button[data-user-action] img').evaluateAll((images) => images.filter((image) => image.naturalWidth === 0).map((image) => new URL(image.src).pathname));
+        expect(brokenActionIcons).toEqual([]);
         await page.getByRole('button', { name: 'Detalhes' }).nth(1).click();
         await expect(page.locator('#user-drawer')).toBeVisible();
         await expect(page.locator('#user-drawer-title')).toHaveText('Ana Empresa');

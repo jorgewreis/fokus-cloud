@@ -65,4 +65,21 @@ class BackofficeUiContractTest extends TestCase
         $this->assertLessThan($plans, $modules, 'Módulos deve anteceder Planos.');
         $this->assertStringNotContainsString('Publicações e versões', $panel);
     }
+
+    public function test_users_page_uses_requested_column_widths_actions_and_shared_pagination(): void
+    {
+        $markup = file_get_contents(base_path('public/backoffice/pages/users.html'));
+        $module = file_get_contents(base_path('public/backoffice/assets/js/users-page.js'));
+
+        $this->assertStringContainsString('id="user-invite" type="button">Novo usuário</button>', $markup);
+        $this->assertMatchesRegularExpression('/<thead>\s*<tr><th class="fs-width-600".*?<th class="fs-width-400".*?<th class="fs-width-500".*?<th class="fs-width-300".*?<th class="fs-width-400"/s', $markup);
+        foreach (['fs-width-600" data-label="Usuário', 'fs-width-400" data-label="Tipo', 'fs-width-500" data-label="Perfil ou vínculos', 'fs-width-300" data-label="Status', 'fs-width-400" data-label="Ações'] as $cell) {
+            $this->assertStringContainsString($cell, $module);
+        }
+        foreach (['Single-Man-Actions-Text--Streamline-Ultimate.png', 'Single-Man-Actions-Edit-1--Streamline-Ultimate.png', 'Single-Man-Actions-Subtract--Streamline-Ultimate.png', 'Single-Neutral-Actions-Remove--Streamline-Ultimate.png', 'Single-Man-Actions-Key--Streamline-Ultimate.png'] as $icon) {
+            $this->assertStringContainsString($icon, $module);
+        }
+        $this->assertStringContainsString('fs-page-item is-active" aria-current="page"><button class="fs-page-link"', $module);
+        $this->assertStringContainsString('data-users-page="${page}"', $module);
+    }
 }
