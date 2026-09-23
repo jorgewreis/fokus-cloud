@@ -182,6 +182,8 @@ test('Assinaturas comunica resultado vazio e falha de carregamento', async ({ pa
         return route.continue();
     });
     await page.goto('/backoffice/assinaturas');
+    await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'subscriptions');
+    await expect(page.locator('#subscription-list tr')).toHaveCount(15);
     await page.getByLabel('Empresa ou produto').fill('empresa inexistente');
     await page.getByRole('button', { name: 'Filtrar' }).click();
     await expect(page.locator('[data-fs-datatable-empty]')).toBeVisible();
