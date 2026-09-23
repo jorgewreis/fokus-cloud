@@ -752,7 +752,7 @@ class BackofficeController extends Controller
 
     public function pauseCatalogItem(Request $request, string $type, string $id, CatalogManager $catalog, PlatformAudit $audit)
     {
-        $data = $request->validate(['reason' => [$type === 'modules' ? 'nullable' : 'required', 'string', 'max:1000']]);
+        $data = $request->validate(['reason' => ['nullable', 'string', 'max:1000']]);
         [$before, $after] = $catalog->pauseOrArchive($type, $id, 'pausado');
         $audit->record($request->user()->id, 'backoffice.catalog_item_paused', $type, $id, reason: $data['reason'] ?? null, before: $before, after: $after, request: $request);
 
