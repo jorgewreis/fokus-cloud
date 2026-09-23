@@ -47,6 +47,10 @@ class SubscriptionAdminTest extends TestCase
         ])->assertCreated()->assertJsonPath('checkout_url', 'https://mercadopago.test/checkout');
         $subscriptionId = $response->json('subscription_id');
         $this->assertDatabaseHas('subscriptions', ['id' => $subscriptionId, 'status' => 'aguardando_pagamento', 'created_by' => $fixture['user_id']]);
+        $commercialSnapshot = json_decode((string) DB::table('subscriptions')->where('id', $subscriptionId)->value('commercial_snapshot'), true);
+        $this->assertSame(1, $commercialSnapshot['publication_versions']['product_catalog_version']);
+        $this->assertSame(1, $commercialSnapshot['publication_versions']['plan_version']);
+        $this->assertSame(1, $commercialSnapshot['publication_versions']['module_versions']['processos-advocacia']);
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.subscription_checkout_created', 'entity_id' => $subscriptionId]);
 
         DB::table('vouchers')->insert([
@@ -143,6 +147,8 @@ class SubscriptionAdminTest extends TestCase
         $snapshot = json_decode((string) DB::table('subscription_changes')->where('subscription_id', $fixture['subscription_id'])->value('after_snapshot'), true);
         $this->assertSame('law-cartorio-criminal', $snapshot['plan_code']);
         $this->assertSame('annual', $snapshot['billing_cycle']);
+        $this->assertSame(1, $snapshot['publication_versions']['product_catalog_version']);
+        $this->assertSame(1, $snapshot['publication_versions']['plan_version']);
     }
 
     public function test_immediate_cancellation_ends_subscription_and_preserves_history(): void

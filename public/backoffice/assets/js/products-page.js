@@ -24,6 +24,8 @@ export async function mount(root, context = {}) {
         const status = $("#product-status-filter").value;
         return state.products.filter((product) => (!query || `${product.name} ${product.code}`.toLowerCase().includes(query)) && (!status || product.status === status));
     };
+    const catalogPublicationLabel = (product) => product.publication_pending ? (Number(product.published_catalog_version) > 0 ? "Republicação pendente" : "Pendente") : Number(product.published_catalog_version) > 0 ? "Publicado" : "Não publicado";
+    const catalogPublicationBadge = (product) => { const label = catalogPublicationLabel(product); const tone = label === "Publicado" ? "success" : label.includes("pendente") || label === "Pendente" ? "warning" : "secondary"; return `<span class="fs-badge fs-badge-soft-${tone}">${escapeHtml(label)}</span>`; };
     const statusBadge = (status) => {
         const tone = { ativo: "success", pausado: "warning" }[status] || "secondary";
         const label = { ativo: "Ativo", pausado: "Pausado" }[status] || status || "Sem status";
@@ -46,7 +48,7 @@ export async function mount(root, context = {}) {
         state.page = Math.min(state.page, totalPages);
         const offset = (state.page - 1) * pageSize;
         const rows = products.slice(offset, offset + pageSize);
-        list.innerHTML = rows.length ? rows.map((product) => `<tr><td class="fs-width-600" data-label="Produto"><strong>${escapeHtml(product.name)}</strong><small class="fs-u-d-block fs-u-fs-sm">${escapeHtml(product.code)}</small></td><td class="fs-width-300" data-label="Status">${statusBadge(product.status)}</td><td class="fs-width-400" data-label="Planos cadastrados"><strong>${(product.plans || []).length}</strong></td><td class="fs-width-400" data-label="Ações"><div class="fs-u-d-flex fs-u-gap-2">${productActions(product)}</div></td></tr>`).join("") : '<tr><td colspan="4">Nenhum produto encontrado.</td></tr>';
+        list.innerHTML = rows.length ? rows.map((product) => `<tr><td class="fs-width-600" data-label="Produto"><strong>${escapeHtml(product.name)}</strong><small class="fs-u-d-block fs-u-fs-sm">${escapeHtml(product.code)}</small></td><td class="fs-width-300" data-label="Status">${statusBadge(product.status)}</td><td class="fs-width-300" data-label="Publicação">${catalogPublicationBadge(product)}</td><td class="fs-width-300" data-label="Versão do catálogo">${Number(product.published_catalog_version) > 0 ? `v${Number(product.published_catalog_version)}.0` : "—"}</td><td class="fs-width-400" data-label="Planos cadastrados"><strong>${(product.plans || []).length}</strong></td><td class="fs-width-400" data-label="Ações"><div class="fs-u-d-flex fs-u-gap-2">${productActions(product)}</div></td></tr>`).join("") : '<tr><td colspan="6">Nenhum produto encontrado.</td></tr>';
         $("#product-table-summary").textContent = `${products.length} registros encontrados`;
         $("#product-table-footer-summary").textContent = `Mostrando página ${state.page} de ${totalPages} com ${rows.length} registros, de um total de ${totalPages} páginas.`;
         renderPagination(state.page, totalPages);
@@ -130,9 +132,9 @@ export async function mount(root, context = {}) {
     const runAction = async (product, type) => {
         const endpoint = type === "publish" ? `/backoffice/catalog/${product.id}/publish` : type === "pause" ? `/backoffice/catalog/products/${product.id}/pause` : type === "activate" ? `/backoffice/catalog/products/${product.id}/activate` : `/backoffice/catalog/products/${product.id}`;
         try {
-            await api.request(endpoint, { method: type === "delete" ? "DELETE" : "POST" });
+            const response = await api.request(endpoint, { method: type === "delete" ? "DELETE" : "POST" });
             await load();
-            showMessage(type === "publish" ? "Nova versão do catálogo publicada." : type === "pause" ? "Produto pausado." : type === "activate" ? "Produto ativado. Publique a nova versão do catálogo." : "Produto excluído.", "success");
+            showMessage(type === "publish" ? `Catálogo publicado na versão v${Number(response.version)}.0.` : type === "pause" ? "Produto pausado." : type === "activate" ? "Produto ativado. Publique a nova versão do catálogo." : "Produto excluído.", "success");
         } catch (error) {
             showMessage(error.message || "Não foi possível concluir a ação.");
         }
@@ -177,7 +179,7 @@ export async function mount(root, context = {}) {
         else if (type === "edit" && ["pausado", "inativo"].includes(product.status)) openEdit(product);
         else if (["pause", "publish"].includes(type)) {
             state.pendingAction = { product, type };
-            $("#product-action-title").textContent = type === "publish" ? "Publicar nova versão" : "Pausar produto";
+            $("#product-action-title").textContent = type === "publish" ? (Number(product.published_catalog_version) > 0 ? "Publicar nova versão" : "Publicação inicial do catálogo") : "Pausar produto";
             $("#product-action-description").textContent = type === "publish" ? "A publicação gera uma versão do catálogo com os módulos e planos publicados e libera o produto para novas contratações." : "O catálogo do produto ficará indisponível até a nova publicação.";
             $("#product-action-submit").textContent = type === "publish" ? "Publicar catálogo" : "Confirmar pausa";
             actionModal?.show();

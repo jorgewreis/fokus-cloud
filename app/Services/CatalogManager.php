@@ -134,6 +134,7 @@ class CatalogManager
                 'module.monthly_price',
                 'module.status',
                 'module.publication_state',
+                'module.published_version',
                 'module.price_is_estimate',
             ])
             ->groupBy('plan_id');
@@ -427,11 +428,21 @@ class CatalogManager
 
     public function publish(string $productId, ?string $adminId, string $reason): array
     {
-        $snapshot = $this->buildPublicationSnapshot($productId);
-        $version = ((int) DB::table('catalog_publications')->where('product_id', $productId)->max('version')) + 1;
         $publicationId = PrefixedUlid::make('CPB');
 
-        DB::transaction(function () use ($productId, $adminId, $reason, $snapshot, $version, $publicationId): void {
+        $publication = DB::transaction(function () use ($productId, $adminId, $reason, $publicationId): array {
+            $product = DB::table('products')->where('id', $productId)->lockForUpdate()->first();
+            abort_unless($product, 404, 'Produto não encontrado.');
+
+            // An item promoted as part of the product release receives its first
+            // version here. Items explicitly published beforehand keep that version.
+            DB::table('modules')->where('product_id', $productId)->where('status', 'ativo')->where('publication_state', '!=', 'publicado')->increment('published_version');
+            DB::table('modules')->where('product_id', $productId)->where('status', 'ativo')->update(['publication_state' => 'publicado', 'updated_at' => now()]);
+            DB::table('plans')->where('product_id', $productId)->where('status', 'ativo')->where('publication_state', '!=', 'publicado')->increment('published_version');
+            DB::table('plans')->where('product_id', $productId)->where('status', 'ativo')->update(['publication_state' => 'publicado', 'updated_at' => now()]);
+
+            $snapshot = $this->buildPublicationSnapshot($productId);
+            $version = ((int) DB::table('catalog_publications')->where('product_id', $productId)->max('version')) + 1;
             DB::table('catalog_publications')->insert([
                 'id' => $publicationId,
                 'product_id' => $productId,
@@ -444,12 +455,10 @@ class CatalogManager
                 'updated_at' => now(),
             ]);
             DB::table('products')->where('id', $productId)->update(['published_catalog_version' => $version, 'publication_pending' => false, 'updated_at' => now()]);
-            DB::table('modules')->where('product_id', $productId)->where('status', 'ativo')->update(['publication_state' => 'publicado', 'updated_at' => now()]);
-            DB::table('plans')->where('product_id', $productId)->where('status', 'ativo')->where('publication_state', '!=', 'publicado')->increment('published_version');
-            DB::table('plans')->where('product_id', $productId)->where('status', 'ativo')->update(['publication_state' => 'publicado', 'updated_at' => now()]);
+            return ['version' => $version, 'snapshot' => $snapshot];
         });
 
-        return ['id' => $publicationId, 'version' => $version, 'snapshot' => [...$snapshot, 'published_version' => $version]];
+        return ['id' => $publicationId, 'version' => $publication['version'], 'snapshot' => [...$publication['snapshot'], 'published_version' => $publication['version']]];
     }
 
     public function publicCatalog(string $productCode, bool $allowPendingPublication = false): array
@@ -528,37 +537,39 @@ class CatalogManager
 
     public function publishPlan(string $id): array
     {
-        $current = DB::table('plans')->where('id', $id)->first();
-        abort_unless($current, 404, 'Plano não encontrado.');
-        abort_unless($current->status === 'ativo', 422, 'Somente planos ativos podem ser publicados.');
-        abort_if($current->publication_state === 'arquivado', 422, 'Plano arquivado não pode ser publicado.');
+        [$current, $published] = DB::transaction(function () use ($id): array {
+            $current = DB::table('plans')->where('id', $id)->lockForUpdate()->first();
+            abort_unless($current, 404, 'Plano não encontrado.');
+            abort_unless($current->status === 'ativo', 422, 'Somente planos ativos podem ser publicados.');
+            abort_if($current->publication_state === 'arquivado', 422, 'Plano arquivado não pode ser publicado.');
 
-        DB::transaction(function () use ($id, $current): void {
-            DB::table('plans')->where('id', $id)->update([
+            DB::table('plans')->where('id', $id)->increment('published_version', 1, [
                 'publication_state' => 'publicado',
-                'published_version' => $current->publication_state === 'publicado' ? $current->published_version : $current->published_version + 1,
                 'updated_at' => now(),
             ]);
             DB::table('products')->where('id', $current->product_id)->update(['publication_pending' => true, 'updated_at' => now()]);
+            return [$current, DB::table('plans')->where('id', $id)->first()];
         });
 
-        return [(array) $current, (array) DB::table('plans')->where('id', $id)->first()];
+        return [(array) $current, (array) $published];
     }
 
     public function publishModule(string $id): array
     {
-        $current = DB::table('modules')->where('id', $id)->first();
-        abort_unless($current, 404, 'Módulo não encontrado.');
-        abort_unless($current->status === 'ativo', 422, 'Somente módulos ativos podem ser publicados.');
-        DB::transaction(function () use ($id, $current): void {
-            DB::table('modules')->where('id', $id)->update([
+        [$current, $published] = DB::transaction(function () use ($id): array {
+            $current = DB::table('modules')->where('id', $id)->lockForUpdate()->first();
+            abort_unless($current, 404, 'Módulo não encontrado.');
+            abort_unless($current->status === 'ativo', 422, 'Somente módulos ativos podem ser publicados.');
+
+            DB::table('modules')->where('id', $id)->increment('published_version', 1, [
                 'publication_state' => 'publicado',
                 'updated_at' => now(),
             ]);
             DB::table('products')->where('id', $current->product_id)->update(['publication_pending' => true, 'updated_at' => now()]);
+            return [$current, DB::table('modules')->where('id', $id)->first()];
         });
 
-        return [(array) $current, (array) DB::table('modules')->where('id', $id)->first()];
+        return [(array) $current, (array) $published];
     }
 
     public function deleteCatalogItem(string $type, string $id): array
@@ -707,6 +718,7 @@ class CatalogManager
                 'id' => $plan['id'],
                 'code' => $plan['code'],
                 'name' => $plan['full_name'],
+                'published_version' => (int) $plan['published_version'],
                 'base_name' => $plan['base_name'],
                 'segment' => $plan['segment'],
                 'featured' => (bool) $plan['featured'],
@@ -814,6 +826,7 @@ class CatalogManager
             'personalizations' => $personalizations,
             'status' => $module->status ?? 'rascunho',
             'publication_state' => $module->publication_state ?? 'rascunho',
+            'published_version' => (int) ($module->published_version ?? 0),
             'display_order' => (int) ($module->display_order ?? 0),
             'featured' => (bool) ($module->featured ?? false),
             'available_standalone' => (bool) ($module->available_standalone ?? false),

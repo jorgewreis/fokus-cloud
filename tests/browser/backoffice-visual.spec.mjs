@@ -749,7 +749,7 @@ test('planos replica o contrato visual, composição e estados do drawer', async
     await expect(page.locator('#plan-list [data-plan-action="pause"]')).toHaveCount(1);
     await expect(page.locator('#plan-list [data-plan-action="activate"], #plan-list [data-plan-action="archive"], #plan-list [data-plan-action="delete"]')).toHaveCount(0);
     await expect(page.locator('#plan-product-filter, #plan-publication-filter, #plan-featured-filter')).toHaveCount(0);
-    await expect(page.locator('table[aria-label="Planos de assinatura"] thead th')).toHaveText(['Plano', 'Produto', 'Valores', 'Status', 'Publicação', 'Assinaturas', 'Ações']);
+    await expect(page.locator('table[aria-label="Planos de assinatura"] thead th')).toHaveText(['Plano', 'Produto', 'Valores', 'Status', 'Publicação', 'Versão', 'Assinaturas', 'Ações']);
     const priceContract = await page.locator('#plan-list td[data-label="Valores"]').evaluate((cell) => ({
         lines: cell.querySelectorAll('.plan-price-line').length,
         annualSmaller: Number.parseFloat(getComputedStyle(cell.querySelector('.plan-price-line--annual .plan-price-value')).fontSize) < Number.parseFloat(getComputedStyle(cell.querySelector('.plan-price-line:not(.plan-price-line--annual) .plan-price-value')).fontSize),

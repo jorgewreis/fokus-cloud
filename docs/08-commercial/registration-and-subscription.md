@@ -91,6 +91,9 @@ sob responsabilidade do webhook assinado ou da conciliação.
 O checkout assistido usa a versão mais recente já publicada mesmo enquanto uma
 edição posterior do catálogo aguarda publicação. Assim os contratos usam a
 oferta e o preço publicados; alterações de rascunho não entram na contratação.
+O snapshot comercial da assinatura também registra as versões do catálogo do
+produto, do plano e dos módulos contratados. A revisão numérica da assinatura
+continua sendo atualizada separadamente pelas mudanças operacionais do contrato.
 
 ## Estados do fluxo
 

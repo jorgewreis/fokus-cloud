@@ -113,6 +113,14 @@ const valueForDisplay = (key, value) => {
 };
 
 const detailList = (entries) => entries.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("");
+const publishedVersionLabel = (version) => Number(version) > 0 ? `v${Number(version)}.0` : "Não registrada";
+const publicationVersionEntries = (versions = {}) => [
+    ["Versão do catálogo contratada", publishedVersionLabel(versions.product_catalog_version)],
+    ["Versão do plano contratado", publishedVersionLabel(versions.plan_version)],
+    ["Versões dos módulos contratados", versions.module_versions && Object.keys(versions.module_versions).length
+        ? Object.entries(versions.module_versions).map(([code, version]) => `${code}: ${publishedVersionLabel(version)}`).join(", ")
+        : "Não registradas"],
+];
 
 const itemConditions = (conditions = {}) => Object.entries(conditions)
     .filter(([key, value]) => value !== null && value !== "" && !["module_code", "selection_mode", "context_code", "collaboration_code", "collaboration"].includes(key))
@@ -126,8 +134,9 @@ const snapshotCard = (title, snapshot) => {
     const other = Object.entries(snapshot)
         .filter(([key, value]) => !SNAPSHOT_LABELS[key] && value !== null && value !== undefined && typeof value !== "object")
         .map(([key, value]) => [key.replaceAll("_", " "), valueForDisplay(key, value)]);
+    const versions = snapshot.publication_versions ? publicationVersionEntries(snapshot.publication_versions) : [];
     const items = Array.isArray(snapshot.items) ? `<h5 class="fs-u-fs-sm">Itens</h5><ul>${snapshot.items.map((item) => `<li>${escapeHtml(item.name || item.module_name || "Item")} · ${escapeHtml(item.quantity ?? 1)} × ${escapeHtml(money(item.unit_price))}</li>`).join("")}</ul>` : "";
-    return `<section aria-label="${escapeHtml(title)}"><h4 class="fs-u-fs-sm">${escapeHtml(title)}</h4><dl class="fs-detail-list">${detailList([...known, ...other])}</dl>${items}</section>`;
+    return `<section aria-label="${escapeHtml(title)}"><h4 class="fs-u-fs-sm">${escapeHtml(title)}</h4><dl class="fs-detail-list">${detailList([...known, ...other, ...versions])}</dl>${items}</section>`;
 };
 
 export function mount(root, context = {}) {
@@ -411,11 +420,14 @@ export function mount(root, context = {}) {
         $("#subscription-drawer-title").textContent = "Detalhes da assinatura";
         $("#subscription-drawer-description").textContent = `${subscription.company_name || "Empresa"} · ${subscription.product_name || "Assinatura"}`;
         $("#subscription-detail-summary").textContent = `${subscription.plan_name || "Plano não informado"} · ${STATUS_LABELS[subscription.status] || subscription.status} · ${valueForDisplay("billing_cycle", subscription.billing_cycle)} · ${money(subscription.amount)}`;
+        const publicationVersions = subscription.commercial_snapshot?.publication_versions || {};
         const fields = [
             ["Número da assinatura", subscription.id],
+            ["Revisão do contrato", `r${Number(subscription.version) || 1}`],
             ["Empresa", subscription.company_name],
             ["Produto", subscription.product_name],
             ["Plano contratado", subscription.plan_name],
+            ...publicationVersionEntries(publicationVersions),
             ["Status", STATUS_LABELS[subscription.status] || subscription.status],
             ["Ciclo", valueForDisplay("billing_cycle", subscription.billing_cycle)],
             ["Valor contratado", money(subscription.amount)],

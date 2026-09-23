@@ -166,6 +166,20 @@ Cada publicacao gera snapshot versionado por produto em `catalog_publications`.
 Edicoes administrativas posteriores nao alteram o catalogo publico ate nova
 publicacao.
 
+Planos e modulos possuem sua propria `published_version`, incrementada em cada
+publicacao explicita. A publicacao do produto gera `published_catalog_version`
+e congela no snapshot as versoes dos planos e modulos incluidos. Publicar um
+plano ou modulo prepara sua versao e marca o catalogo do produto como pendente;
+somente a acao manual de publicar o catalogo do produto torna o conjunto
+disponivel para novas contratacoes. A publicacao inicial tambem deve estar
+disponivel quando ainda nao existe snapshot.
+
+Cada nova assinatura registra no snapshot comercial a versao do catalogo, do
+plano e de cada modulo contratado. O campo `subscriptions.version` continua
+representando a revisao operacional do contrato, incrementada quando a
+assinatura e alterada; contratos historicos sem referencias de versao devem
+ser exibidos como nao registrados, sem inferir a versao atual.
+
 ## Ofertas sugeridas e personalizadas
 
 Cada plano aprovado e uma oferta sugerida. O cliente pode alterar limites dentro das opcoes permitidas e pode montar uma oferta personalizada com funcionalidades ativas e compativeis. A oferta personalizada nao cria automaticamente um novo plano no catalogo.

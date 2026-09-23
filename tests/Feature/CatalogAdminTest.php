@@ -74,9 +74,13 @@ class CatalogAdminTest extends TestCase
         $admin = $this->admin();
         $productId = DB::table('products')->where('code', 'law')->value('id');
 
-        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/{$productId}/publish", [
+        $published = $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/{$productId}/publish", [
             'reason' => 'Publicação homologada do Marco 3.',
         ])->assertOk()->assertJsonPath('version', 2);
+
+        $publicCatalog = $this->getJson('/api/catalog/law')->assertOk()->json();
+        $this->assertSame(1, collect($publicCatalog['modules'])->first()['published_version']);
+        $this->assertSame(1, collect($publicCatalog['plans'])->first()['published_version']);
 
         $this->assertDatabaseHas('catalog_publications', [
             'product_id' => $productId,
@@ -149,6 +153,13 @@ class CatalogAdminTest extends TestCase
             ->assertJsonPath('version', $beforeVersion + 1);
         $modules = $this->getJson('/api/catalog/law')->assertOk()->json('modules');
         $this->assertContains('Processos Atualizados', collect($modules)->pluck('name')->all());
+        $this->assertSame(2, collect($modules)->firstWhere('code', $module->code)['published_version']);
+
+        $this->postJson("/api/backoffice/catalog/modules/{$module->id}/publish")
+            ->assertOk()->assertJsonPath('published_version', 3);
+        $this->postJson("/api/backoffice/catalog/{$module->product_id}/publish")->assertOk();
+        $modules = $this->getJson('/api/catalog/law')->assertOk()->json('modules');
+        $this->assertSame(3, collect($modules)->firstWhere('code', $module->code)['published_version']);
     }
 
     public function test_active_catalog_items_cannot_be_edited_or_have_plan_composition_changed(): void
@@ -351,9 +362,9 @@ class CatalogAdminTest extends TestCase
         $this->postJson("/api/backoffice/catalog/plans/{$planId}/pause")->assertOk();
         $this->postJson("/api/backoffice/catalog/plans/{$planId}/activate")->assertOk();
         $this->postJson("/api/backoffice/catalog/plans/{$planId}/publish")->assertOk();
-        $this->postJson("/api/backoffice/catalog/plans/{$planId}/publish")->assertOk();
-
         $this->assertDatabaseHas('plans', ['id' => $planId, 'published_version' => 2]);
+        $this->postJson("/api/backoffice/catalog/plans/{$planId}/publish")->assertOk();
+        $this->assertDatabaseHas('plans', ['id' => $planId, 'published_version' => 3]);
     }
 
     public function test_superadmin_can_archive_modules_and_plans_but_commercial_admin_cannot(): void

@@ -248,11 +248,13 @@ class SubscriptionChangeManager
             ->select('plans.*', 'products.code as product_code', 'products.name as product_name')->first();
         abort_unless($plan, 422, 'O plano publicado informado não está disponível para esta assinatura.');
 
-        $publishedPlan = $this->catalog->publishedPlanMap($plan->product_code)->get($plan->code);
+        $publishedCatalog = $this->catalog->publicCatalog($plan->product_code);
+        $publishedPlan = collect($publishedCatalog['plans'] ?? [])->firstWhere('code', $plan->code);
         abort_unless($publishedPlan, 422, 'O plano não está presente na publicação atual do catálogo.');
         $cycle = $data['billing_cycle'] ?? $subscription->billing_cycle ?? 'monthly';
-        $publishedModules = $this->catalog->publishedModuleMap($plan->product_code);
-        $items = collect($publishedPlan['module_codes'] ?? [])->map(function (string $moduleCode) use ($publishedModules, $subscription, $plan, $cycle): array {
+        $publishedModules = collect($publishedCatalog['modules'] ?? [])->keyBy('code');
+        $moduleCodes = $publishedPlan['module_codes'] ?? [];
+        $items = collect($moduleCodes)->map(function (string $moduleCode) use ($publishedModules, $subscription, $plan, $cycle): array {
             $module = $publishedModules->get($moduleCode);
             abort_unless($module, 422, 'O plano publicado contém uma funcionalidade indisponível.');
 
@@ -279,6 +281,11 @@ class SubscriptionChangeManager
                 'plan_id' => $plan->id,
                 'plan_code' => $plan->code,
                 'plan_name' => $plan->name,
+                'publication_versions' => [
+                    'product_catalog_version' => (int) ($publishedCatalog['published_version'] ?? 0),
+                    'plan_version' => (int) ($publishedPlan['published_version'] ?? 0),
+                    'module_versions' => collect($moduleCodes)->mapWithKeys(fn (string $code): array => [$code => (int) ($publishedModules->get($code)['published_version'] ?? 0)])->all(),
+                ],
                 'billing_cycle' => $cycle,
                 'monthly_amount' => $monthlyAmount,
                 'amount' => $cycle === 'annual' ? CatalogPricing::annualFromMonthly($monthlyAmount) : round($monthlyAmount, 2),

@@ -284,7 +284,10 @@ class SubscriptionController extends Controller
             if ($reservation) $vouchers->attachSubscription($reservation->id, $subscriptionId);
             $subscription = DB::table('subscriptions')->where('id', $subscriptionId)->first();
             DB::table('subscriptions')->where('id', $subscriptionId)->update([
-                'commercial_snapshot' => json_encode($subscriptionChanges->snapshot($subscription)),
+                'commercial_snapshot' => json_encode([
+                    ...$subscriptionChanges->snapshot($subscription),
+                    'publication_versions' => $quoted['publication_versions'],
+                ]),
                 'updated_at' => now(),
             ]);
             DB::table('billing_checkout_attempts')->where('id', $attemptId)->update([
@@ -482,8 +485,9 @@ class SubscriptionController extends Controller
     {
         $codes = array_column($data['items'], 'module_code');
         abort_if(count($codes) !== count(array_unique($codes)), 422, 'Um módulo só pode ser informado uma vez.');
-        $publishedModules = $catalog->publishedModuleMap($product->code, $allowPendingPublication);
-        $publishedPlans = $catalog->publishedPlanMap($product->code, $allowPendingPublication);
+        $publishedCatalog = $catalog->publicCatalog($product->code, $allowPendingPublication);
+        $publishedModules = collect($publishedCatalog['modules'] ?? [])->keyBy('code');
+        $publishedPlans = collect($publishedCatalog['plans'] ?? [])->keyBy('code');
         abort_unless($publishedModules->isNotEmpty(), 422, 'Catálogo publicado indisponível para este produto.');
 
         $publishedPlan = null;
@@ -516,7 +520,15 @@ class SubscriptionController extends Controller
             }
         }
         $amount = $data['cycle'] === 'annual' ? CatalogPricing::annualFromMonthly($monthly) : round($monthly, 2);
-        return ['items' => $items, 'amount' => $amount];
+        return [
+            'items' => $items,
+            'amount' => $amount,
+            'publication_versions' => [
+                'product_catalog_version' => (int) ($publishedCatalog['published_version'] ?? 0),
+                'plan_version' => isset($publishedPlan) ? (int) ($publishedPlan['published_version'] ?? 0) : null,
+                'module_versions' => collect($codes)->mapWithKeys(fn (string $code): array => [$code => (int) ($publishedModules->get($code)['published_version'] ?? 0)])->all(),
+            ],
+        ];
     }
 
     private function quotePersonalizations(array $module, array $requested, array $planDefaults): array
