@@ -619,9 +619,10 @@ class BackofficeController extends Controller
         if ($request->has('monthly_price')) {
             $request->merge(['monthly_price' => $this->normalizeDecimalInput($request->input('monthly_price'))]);
         }
-        $data = $this->validateModule($request, true);
         $current = DB::table('modules')->where('id', $module)->first();
         abort_unless($current, 404, 'Funcionalidade não encontrada.');
+        $moduleCount = DB::table('modules')->where('product_id', $current->product_id)->count();
+        $data = $this->validateModule($request, true, $moduleCount);
         abort_if(array_key_exists('code', $data), 422, 'O código público é automático e imutável.');
 
         [, $after] = $catalog->updateModule($module, $data);
@@ -827,7 +828,7 @@ class BackofficeController extends Controller
         return response()->json(['message' => 'Plano excluído.']);
     }
 
-    private function validateModule(Request $request, bool $partial = false): array
+    private function validateModule(Request $request, bool $partial = false, ?int $moduleCount = null): array
     {
         $required = $partial ? 'nullable' : 'required';
 
@@ -858,7 +859,9 @@ class BackofficeController extends Controller
             'personalizations.*.tiers.*.value' => ['required', 'integer', 'min:1'],
             'personalizations.*.tiers.*.additional_monthly_amount' => ['required', 'numeric', 'min:0'],
             'personalizations.*.tiers.*.active' => ['required', 'boolean'],
-            'display_order' => [$partial ? 'nullable' : 'prohibited', 'integer', 'min:0'],
+            'display_order' => $partial
+                ? ['nullable', 'integer', 'min:1', 'max:'.max(1, $moduleCount ?? 1)]
+                : ['prohibited'],
             'featured' => [$partial ? 'nullable' : 'prohibited', 'boolean'],
             'available_standalone' => [$partial ? 'nullable' : 'prohibited', 'boolean'],
             'price_is_estimate' => ['nullable', 'boolean'],

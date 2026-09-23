@@ -53,7 +53,7 @@ class FormDesignSystemTest extends TestCase
 
         $this->assertMatchesRegularExpression('/const pageVersion = "20\\d{6}-[a-z0-9-]+";/', $panel);
         $this->assertStringContainsString('(() => {', $panel);
-        $this->assertStringContainsString('20260922-backoffice-contract-v14', file_get_contents(base_path('public/backoffice/pages/modules.html')));
+        $this->assertStringContainsString('20260923-module-display-order-v1', file_get_contents(base_path('public/backoffice/pages/modules.html')));
         $this->assertStringContainsString('module: "/backoffice/assets/js/modules-page.js"', file_get_contents(base_path('public/backoffice/assets/js/backoffice-router.js')));
         $this->assertStringContainsString("document.addEventListener('fs:show'", file_get_contents(base_path('public/backoffice/assets/js/records-page.js')));
         $this->assertStringContainsString('BackofficeRouter.create', $panel);

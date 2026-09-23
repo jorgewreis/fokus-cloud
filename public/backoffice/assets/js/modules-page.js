@@ -116,6 +116,8 @@ export async function mount(root, context = {}) {
         form.reset();
         field("product_id").innerHTML = '<option value="">Selecione um produto</option>' + state.catalog.products.map((product) => `<option value="${escapeHtml(product.id)}">${escapeHtml(product.name)}</option>`).join("");
         if (state.catalog.products[0]) field("product_id").value = state.catalog.products[0].id;
+        field("display_order").innerHTML = "";
+        field("display_order").disabled = true;
         $("#module-edit-controls").hidden = true;
         $("#module-form-submit").textContent = "Cadastrar módulo";
         $("#module-view-panel").hidden = true;
@@ -135,7 +137,11 @@ export async function mount(root, context = {}) {
             field("commercial_content").value = module.commercial_content || "";
             field("monthly_price").value = window.FokusCurrency?.format(module.monthly_price) || "";
             field("price_is_estimate").value = module.price_is_estimate ? "1" : "0";
-            field("display_order").value = module.display_order || 0;
+            const productModules = state.modules.filter((item) => String(item.product_id) === String(module.product_id));
+            const currentPosition = productModules.findIndex((item) => String(item.id) === String(module.id)) + 1;
+            field("display_order").innerHTML = Array.from({ length: productModules.length }, (_, index) => `<option value="${index + 1}">${index + 1}</option>`).join("");
+            field("display_order").value = String(Math.max(1, currentPosition));
+            field("display_order").disabled = false;
             field("featured").value = module.featured ? "1" : "0";
             $("#module-edit-controls").hidden = false;
             state.personalizations = (module.personalizations || []).map((item) => ({ type_code: item.type_code, required: Boolean(item.required), active: item.active !== false, tiers: (item.tiers || []).map((tier) => ({ value: tier.value, additional_monthly_amount: tier.additional_monthly_amount, active: tier.active !== false })) }));

@@ -194,6 +194,26 @@ class CatalogAdminTest extends TestCase
         $this->assertSame('academy', DB::table('products')->orderByDesc('display_order')->value('code'));
     }
 
+    public function test_module_display_order_is_scoped_to_the_product_and_reorders_the_sequence(): void
+    {
+        $admin = $this->admin();
+        $productId = DB::table('products')->where('code', 'law')->value('id');
+        $modules = DB::table('modules')->where('product_id', $productId)->orderBy('display_order')->get(['id', 'code']);
+        $module = $modules->first();
+
+        $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/catalog/modules/{$module->id}", [
+            'display_order' => $modules->count() + 1,
+        ])->assertUnprocessable()->assertJsonValidationErrors('display_order');
+
+        $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/catalog/modules/{$module->id}", [
+            'display_order' => $modules->count(),
+        ])->assertOk();
+
+        $ordered = DB::table('modules')->where('product_id', $productId)->orderBy('display_order')->get(['id', 'code', 'display_order']);
+        $this->assertSame(range(1, $ordered->count()), $ordered->pluck('display_order')->map(fn ($order) => (int) $order)->all());
+        $this->assertSame($module->id, $ordered->last()->id);
+    }
+
     public function test_superadmin_can_pause_public_items_but_commercial_admin_cannot(): void
     {
         $commercial = $this->admin('administrador_comercial');

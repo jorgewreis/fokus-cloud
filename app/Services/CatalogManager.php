@@ -322,7 +322,30 @@ class CatalogManager
         $familyCode = array_key_exists('module_code', $data) ? $this->resolveFamilyCode($product, $data) : $current->module_code;
         $payload = $this->moduleWritePayload($data, ['updated_at' => now(), 'module_code' => $familyCode]);
         unset($payload['product_id'], $payload['code'], $payload['status'], $payload['publication_state']);
-        DB::transaction(function () use ($moduleId, $data, $product, $payload): void {
+        DB::transaction(function () use ($moduleId, $data, $product, $payload, $current): void {
+            if (array_key_exists('display_order', $data)) {
+                $currentOrder = (int) $current->display_order;
+                $nextOrder = (int) $data['display_order'];
+
+                if ($currentOrder < $nextOrder) {
+                    DB::table('modules')->where('id', $moduleId)->update(['display_order' => $this->temporaryModuleDisplayOrder($product->id), 'updated_at' => now()]);
+                    DB::table('modules')
+                        ->where('product_id', $product->id)
+                        ->whereBetween('display_order', [$currentOrder + 1, $nextOrder])
+                        ->orderBy('display_order')
+                        ->get(['id', 'display_order'])
+                        ->each(fn (object $item) => DB::table('modules')->where('id', $item->id)->update(['display_order' => (int) $item->display_order - 1, 'updated_at' => now()]));
+                } elseif ($currentOrder > $nextOrder) {
+                    DB::table('modules')->where('id', $moduleId)->update(['display_order' => $this->temporaryModuleDisplayOrder($product->id), 'updated_at' => now()]);
+                    DB::table('modules')
+                        ->where('product_id', $product->id)
+                        ->whereBetween('display_order', [$nextOrder, $currentOrder - 1])
+                        ->orderByDesc('display_order')
+                        ->get(['id', 'display_order'])
+                        ->each(fn (object $item) => DB::table('modules')->where('id', $item->id)->update(['display_order' => (int) $item->display_order + 1, 'updated_at' => now()]));
+                }
+            }
+
             DB::table('modules')->where('id', $moduleId)->update($payload);
             if (array_key_exists('module_code', $data) || array_key_exists('capability_codes', $data) || array_key_exists('segments', $data) || array_key_exists('dependency_ids', $data) || array_key_exists('incompatibility_ids', $data) || array_key_exists('personalizations', $data)) {
                 $this->syncModuleRelations($moduleId, $data, $product);
@@ -814,6 +837,11 @@ class CatalogManager
                 'price_is_estimate' => array_key_exists('price_is_estimate', $data) ? (bool) $data['price_is_estimate'] : null,
             ], fn ($value): bool => $value !== null),
         ];
+    }
+
+    private function temporaryModuleDisplayOrder(string $productId): int
+    {
+        return ((int) DB::table('modules')->where('product_id', $productId)->max('display_order')) + 1000;
     }
 
     private function catalogProductCode(string $productCode): string
