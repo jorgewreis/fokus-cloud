@@ -685,7 +685,7 @@ class BackofficeController extends Controller
             'commercial_content' => ['nullable', 'string', 'max:20000'],
             'segment' => ['nullable', 'string', 'max:16'],
             'monthly_amount' => ['nullable', 'numeric', 'min:0'],
-            'status' => ['nullable', Rule::in(['ativo', 'inativo'])],
+            'status' => ['prohibited'],
             'display_order' => ['nullable', 'integer', 'min:0'],
             'featured' => ['nullable', 'boolean'],
             'module_ids' => ['nullable', 'array'],
@@ -716,8 +716,14 @@ class BackofficeController extends Controller
             'personalization_defaults.*.personalization_id' => ['required', 'string', 'size:30'],
             'personalization_defaults.*.tier_id' => ['required', 'string', 'size:30'],
         ]);
+        $planRecord = DB::table('plans')->where('id', $plan)->first();
+        abort_unless($planRecord, 404, 'Plano não encontrado.');
+        abort_unless(in_array($planRecord->status, ['pausado', 'inativo'], true), 422, 'Pause o plano antes de editar sua composição.');
         $current = DB::table('plan_modules')->where('plan_id', $plan)->pluck('module_id')->all();
-        $catalog->syncPlanModules($plan, $data['module_ids'], $data['personalization_defaults'] ?? []);
+        DB::transaction(function () use ($catalog, $plan, $data, $planRecord): void {
+            $catalog->syncPlanModules($plan, $data['module_ids'], $data['personalization_defaults'] ?? []);
+            DB::table('products')->where('id', $planRecord->product_id)->update(['publication_pending' => true, 'updated_at' => now()]);
+        });
         $audit->record($request->user()->id, 'backoffice.plan_modules_updated', 'plan', $plan, reason: 'Atualização da composição do plano', before: ['module_ids' => $current], after: $data, request: $request);
 
         return response()->json(['message' => 'Composição atualizada.']);
@@ -725,9 +731,10 @@ class BackofficeController extends Controller
 
     public function publishCatalog(Request $request, string $product, CatalogManager $catalog, PlatformAudit $audit)
     {
-        $data = $request->validate(['reason' => ['required', 'string', 'max:1000']]);
-        $publication = $catalog->publish($product, $request->user()->id, $data['reason']);
-        $audit->record($request->user()->id, 'backoffice.catalog_published', 'product', $product, reason: $data['reason'], metadata: ['version' => $publication['version']], request: $request);
+        $data = $request->validate(['reason' => ['nullable', 'string', 'max:1000']]);
+        $reason = trim((string) ($data['reason'] ?? '')) ?: 'Publicação do catálogo pelo Backoffice.';
+        $publication = $catalog->publish($product, $request->user()->id, $reason);
+        $audit->record($request->user()->id, 'backoffice.catalog_published', 'product', $product, reason: $reason, metadata: ['version' => $publication['version']], request: $request);
 
         return response()->json(['message' => 'Catálogo publicado.', 'version' => $publication['version']]);
     }

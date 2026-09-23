@@ -47,10 +47,10 @@ auditoria.
 | RF-BO-001 | Permitir login interno no cartão administrativo da home (`/?acesso=administrativo`) com `platform_admins`, e-mail, senha e MFA obrigatorio por e-mail. | Uma conta de cliente em `users` nao autentica no Backoffice, e uma conta interna nao autentica no portal do cliente. |
 | RF-BO-002 | Bloquear rigidamente conta interna apos tentativas invalidas conforme politica definida. | Conta bloqueada nao acessa o Backoffice ate desbloqueio por superadministrador, com auditoria. |
 | RF-BO-003 | Permitir que superadministrador gerencie usuarios internos e perfis do Backoffice. | Administrador comercial nao consegue criar, alterar, bloquear ou desbloquear usuarios internos. |
-| RF-BO-004 | Permitir que administrador comercial crie e edite produtos, planos, funcionalidades, precos e vouchers. | Dados ficam salvos em estado nao publicado ate acao final permitida. |
+| RF-BO-004 | Permitir que administrador comercial crie e edite produtos, planos, funcionalidades, precos e vouchers. | Produtos, funcionalidades e planos so podem ser editados em status pausado ou inativo. A edicao deixa o catalogo do produto pendente de republicacao. |
 | RF-BO-005 | Permitir que superadministrador publique, pause e arquive itens comerciais. | Acoes exigem confirmacao explicita e geram auditoria. |
 | RF-BO-006 | Validar dados do catalogo antes da publicacao. | Item incompleto, invalido, pausado, arquivado ou nao publicado nao aparece no catalogo publico nem no checkout. |
-| RF-BO-007 | Permitir publicacao imediata do catalogo apos confirmacao explicita. | A versao publicada passa a ser consumida pelo catalogo publico e pelo checkout depois da invalidacao de cache, quando houver. |
+| RF-BO-007 | Permitir publicacao imediata do catalogo apos confirmacao explicita. | A nova versao libera o catalogo publico e o checkout apos ativacao e republicacao; enquanto houver pendencia, novas contratacoes ficam bloqueadas. |
 | RF-BO-008 | Permitir consultar assinaturas, pagamentos, historico e snapshots comerciais. | A consulta exibe plano, produto, ciclo, vigencia, itens, valores, status e origem dos dados disponiveis. |
 | RF-BO-009 | Permitir pausar, reativar, cancelar e trocar plano de uma assinatura. | Toda acao exige autorizacao, motivo quando afetar cliente ou cobranca, e auditoria. |
 | RF-BO-010 | Aplicar upgrade imediatamente e agendar downgrade ou cancelamento para fim da vigencia. | O status da assinatura e o historico registram vigencia, tipo de mudanca e data prevista. |

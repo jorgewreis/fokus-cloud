@@ -12,7 +12,8 @@ export async function mount(root, context = {}) {
     const drawerElement = $("#product-drawer");
     const createTrigger = $("#product-new");
     const drawer = createRecordsDrawer({ trigger: createTrigger, drawer: drawerElement });
-    const state = { products: [], page: 1, mode: "create", productId: null };
+    const actionModal = window.FokusStyles?.Modal?.getOrCreateInstance($("#product-action-trigger"));
+    const state = { products: [], page: 1, mode: "create", productId: null, pendingAction: null };
     const pageSize = 15;
     const iconsPath = "/backoffice/assets/icons/";
     const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[character]));
@@ -30,9 +31,10 @@ export async function mount(root, context = {}) {
     };
     const productActions = (product) => {
         const lifecycle = product.status === "ativo"
-            ? action("pause", product, "Pausar produto", "Common-File-Subtract--Streamline-Ultimate.png")
+            ? action("pause", product, "Pausar produto", "Common-File-Subtract--Streamline-Ultimate.png") + (product.publication_pending ? action("publish", product, "Publicar nova versão do catálogo", "File-Code-2--Streamline-Ultimate.png") : "")
             : action("activate", product, "Ativar produto", "Common-File-Check--Streamline-Ultimate.png") + action("delete", product, "Excluir produto", "Common-File-Remove--Streamline-Ultimate.png");
-        return `${action("view", product, "Ver detalhes do produto", "Folder-File--Streamline-Ultimate.png")}${action("edit", product, "Editar produto", "Common-File-Edit--Streamline-Ultimate.png")}${lifecycle}`;
+        const edit = ["pausado", "inativo"].includes(product.status) ? action("edit", product, "Editar produto", "Common-File-Edit--Streamline-Ultimate.png") : "";
+        return `${action("view", product, "Ver detalhes do produto", "Folder-File--Streamline-Ultimate.png")}${edit}${lifecycle}`;
     };
     const renderPagination = (currentPage, totalPages) => {
         pagination.innerHTML = `<ul class="fs-pagination fs-pagination-compact"><li class="fs-page-item"><button class="fs-page-link" type="button" data-product-page="${currentPage - 1}" aria-label="Página anterior" ${currentPage === 1 ? "disabled" : ""}>‹</button></li><li class="fs-page-item is-active" aria-current="page"><button class="fs-page-link" type="button" data-product-page="${currentPage}" aria-label="Página ${currentPage}" aria-current="page">${currentPage}</button></li><li class="fs-page-item"><button class="fs-page-link" type="button" data-product-page="${currentPage + 1}" aria-label="Próxima página" ${currentPage === totalPages ? "disabled" : ""}>›</button></li></ul>`;
@@ -66,6 +68,8 @@ export async function mount(root, context = {}) {
         $("#product-form-submit").textContent = "Cadastrar produto";
         ["#product-view-name", "#product-view-code", "#product-view-status"].forEach((selector) => { $(selector).textContent = "-"; });
         $("#product-view-plans").textContent = "0";
+        $("#product-view-version").textContent = "—";
+        $("#product-view-publication").textContent = "—";
         setDescription("#product-view-technical-description", "", "Nenhuma descrição técnica informada.");
         setDescription("#product-view-commercial-content", "", "Nenhuma descrição comercial informada.");
     };
@@ -104,6 +108,8 @@ export async function mount(root, context = {}) {
         $("#product-view-code").textContent = product.code || "-";
         $("#product-view-status").innerHTML = statusBadge(product.status);
         $("#product-view-plans").textContent = String((product.plans || []).length);
+        $("#product-view-version").textContent = Number(product.published_catalog_version) > 0 ? `v${Number(product.published_catalog_version)}.0` : "—";
+        $("#product-view-publication").textContent = product.publication_pending ? "Republicação pendente" : "Atualizada";
         setDescription("#product-view-technical-description", product.technical_description, "Nenhuma descrição técnica informada.");
         setDescription("#product-view-commercial-content", product.commercial_content, "Nenhuma descrição comercial informada.");
         drawer.show();
@@ -121,11 +127,11 @@ export async function mount(root, context = {}) {
         }
     };
     const runAction = async (product, type) => {
-        const endpoint = type === "pause" ? `/backoffice/catalog/products/${product.id}/pause` : type === "activate" ? `/backoffice/catalog/products/${product.id}/activate` : `/backoffice/catalog/products/${product.id}`;
+        const endpoint = type === "publish" ? `/backoffice/catalog/${product.id}/publish` : type === "pause" ? `/backoffice/catalog/products/${product.id}/pause` : type === "activate" ? `/backoffice/catalog/products/${product.id}/activate` : `/backoffice/catalog/products/${product.id}`;
         try {
             await api.request(endpoint, { method: type === "delete" ? "DELETE" : "POST" });
             await load();
-            showMessage(type === "pause" ? "Produto pausado." : type === "activate" ? "Produto ativado." : "Produto excluído.", "success");
+            showMessage(type === "publish" ? "Nova versão do catálogo publicada." : type === "pause" ? "Produto pausado." : type === "activate" ? "Produto ativado. Publique a nova versão do catálogo." : "Produto excluído.", "success");
         } catch (error) {
             showMessage(error.message || "Não foi possível concluir a ação.");
         }
@@ -145,7 +151,7 @@ export async function mount(root, context = {}) {
             await api.request(editing ? `/backoffice/catalog/products/${editId}` : "/backoffice/catalog/products", { method: editing ? "PATCH" : "POST", body: payload });
             closeDrawer();
             await load();
-            showMessage("Produto salvo com sucesso.", "success");
+            showMessage("Produto salvo. Ative e publique a nova versão do catálogo.", "success");
         } catch (error) {
             window.FokusForm?.mapServerErrors(form, error.errors);
             showMessage(error.message || "Não foi possível salvar o produto.");
@@ -167,13 +173,29 @@ export async function mount(root, context = {}) {
         if (!product) return;
         const type = button.dataset.productAction;
         if (type === "view") openView(product);
-        else if (type === "edit") openEdit(product);
+        else if (type === "edit" && ["pausado", "inativo"].includes(product.status)) openEdit(product);
+        else if (["pause", "publish"].includes(type)) {
+            state.pendingAction = { product, type };
+            $("#product-action-title").textContent = type === "publish" ? "Publicar nova versão" : "Pausar produto";
+            $("#product-action-description").textContent = type === "publish" ? "A publicação gera uma nova versão do catálogo e libera o produto para novas contratações." : "O catálogo do produto ficará indisponível até a nova publicação.";
+            $("#product-action-submit").textContent = type === "publish" ? "Publicar catálogo" : "Confirmar pausa";
+            actionModal?.show();
+        }
         else runAction(product, type);
+    });
+    $("#product-action-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!state.pendingAction) return;
+        const { product, type } = state.pendingAction;
+        state.pendingAction = null;
+        actionModal?.hide();
+        await runAction(product, type);
     });
 
     await load();
     return () => {
         drawer.dispose();
+        actionModal?.dispose?.();
         window.disposeBackofficeRecordsPage?.(root);
     };
 }

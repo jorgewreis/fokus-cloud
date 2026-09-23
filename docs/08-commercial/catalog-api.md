@@ -24,14 +24,15 @@ Resposta resumida:
 
 ```json
 {
-  "contract_version": "0.0.3",
+  "contract_version": "0.1.0",
   "products": [
     {
       "id": "PRD...",
       "code": "law",
       "name": "Fokus Law",
-      "publication_state": "publicado",
-      "published_version": 1,
+      "status": "ativo",
+      "published_catalog_version": 1,
+      "publication_pending": false,
       "modules": [],
       "plans": [
         {
@@ -65,6 +66,13 @@ cadastrada quando o plano nao possuir preco proprio.
 Criacao e edicao exigem `platform.catalog.manage`. Publicacao, pausa e
 arquivamento exigem `platform.catalog.publish`.
 
+Produtos, funcionalidades e planos so aceitam edicao quando estao pausados ou
+inativos. A alteracao ou pausa marca o catalogo do produto como pendente. Depois
+de ativar e publicar os itens alterados, o superadministrador publica uma nova
+versao pelo endpoint do produto. Enquanto a publicacao estiver pendente, o
+catalogo publico bloqueia novas contratacoes. A publicacao pode ser enviada sem
+`reason`; o Backoffice registra um motivo padrao na auditoria.
+
 ## Catalogo publico
 
 O endpoint publico retorna somente a ultima versao publicada:
@@ -73,11 +81,11 @@ O endpoint publico retorna somente a ultima versao publicada:
 GET /api/catalog/{product}
 ```
 
-Contrato `0.0.3`, em forma resumida:
+Contrato `0.1.0`, em forma resumida:
 
 ```json
 {
-  "contract_version": "0.0.3",
+  "contract_version": "0.1.0",
   "published_version": 1,
   "published_at": "2026-09-02 10:00:00",
   "product": {

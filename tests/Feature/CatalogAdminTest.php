@@ -109,21 +109,93 @@ class CatalogAdminTest extends TestCase
         ])->assertUnprocessable();
     }
 
-    public function test_public_catalog_keeps_the_last_snapshot_when_a_plan_is_changed_as_draft(): void
+    public function test_plan_edit_blocks_the_public_catalog_until_a_new_version_is_published(): void
     {
         $admin = $this->admin();
         $plan = DB::table('plans')->where('code', 'law-advocacia')->first();
         $before = $this->getJson('/api/catalog/law')->assertOk()->json();
 
-        $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/catalog/plans/{$plan->id}", [
+        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/plans/{$plan->id}/pause")->assertOk();
+        $this->patchJson("/api/backoffice/catalog/plans/{$plan->id}", [
             'name' => 'Advocacia Alterada',
-            'status' => 'ativo',
         ])->assertOk();
 
+        $this->getJson('/api/catalog/law')->assertUnprocessable();
+        $this->postJson("/api/backoffice/catalog/plans/{$plan->id}/activate")->assertOk();
+        $this->postJson("/api/backoffice/catalog/plans/{$plan->id}/publish")->assertOk();
+        $this->getJson('/api/catalog/law')->assertUnprocessable();
+        $this->postJson("/api/backoffice/catalog/{$plan->product_id}/publish")->assertOk();
+
         $after = $this->getJson('/api/catalog/law')->assertOk()->json();
-        $this->assertSame($before['published_version'], $after['published_version']);
-        $this->assertContains('Fokus Law - Advocacia', collect($after['plans'])->pluck('name')->all());
-        $this->assertNotContains('Fokus Law - Advocacia Alterada', collect($after['plans'])->pluck('name')->all());
+        $this->assertSame($before['published_version'] + 1, $after['published_version']);
+        $this->assertDatabaseHas('plans', ['id' => $plan->id, 'published_version' => 2]);
+        $this->assertContains('Fokus Law - Advocacia Alterada', collect($after['plans'])->pluck('name')->all());
+    }
+
+    public function test_module_change_requires_catalog_republication_before_new_contracts(): void
+    {
+        $admin = $this->admin();
+        $module = DB::table('modules')->where('code', 'processos-advocacia')->first();
+        $beforeVersion = (int) DB::table('products')->where('id', $module->product_id)->value('published_catalog_version');
+
+        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/modules/{$module->id}/pause")->assertOk();
+        $this->patchJson("/api/backoffice/catalog/modules/{$module->id}", ['name' => 'Processos Atualizados'])->assertOk();
+        $this->postJson("/api/backoffice/catalog/modules/{$module->id}/activate")->assertOk();
+        $this->postJson("/api/backoffice/catalog/modules/{$module->id}/publish")->assertOk();
+        $this->getJson('/api/catalog/law')->assertUnprocessable();
+
+        $this->postJson("/api/backoffice/catalog/{$module->product_id}/publish")
+            ->assertOk()
+            ->assertJsonPath('version', $beforeVersion + 1);
+        $modules = $this->getJson('/api/catalog/law')->assertOk()->json('modules');
+        $this->assertContains('Processos Atualizados', collect($modules)->pluck('name')->all());
+    }
+
+    public function test_active_catalog_items_cannot_be_edited_or_have_plan_composition_changed(): void
+    {
+        $admin = $this->admin();
+        $productId = DB::table('products')->where('code', 'law')->value('id');
+        $moduleId = DB::table('modules')->where('code', 'processos-advocacia')->value('id');
+        $planId = DB::table('plans')->where('code', 'law-advocacia')->value('id');
+        $moduleIds = DB::table('plan_modules')->where('plan_id', $planId)->pluck('module_id')->all();
+
+        $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/catalog/products/{$productId}", ['name' => 'Novo nome'])->assertUnprocessable();
+        $this->patchJson("/api/backoffice/catalog/modules/{$moduleId}", ['name' => 'Novo módulo'])->assertUnprocessable();
+        $this->patchJson("/api/backoffice/catalog/plans/{$planId}", ['name' => 'Novo plano'])->assertUnprocessable();
+        $this->putJson("/api/backoffice/catalog/plans/{$planId}/modules", ['module_ids' => $moduleIds])->assertUnprocessable();
+
+        $this->postJson("/api/backoffice/catalog/products/{$productId}/pause")->assertOk();
+        $this->postJson("/api/backoffice/catalog/modules/{$moduleId}/pause")->assertOk();
+        $this->postJson("/api/backoffice/catalog/plans/{$planId}/pause")->assertOk();
+
+        $this->patchJson("/api/backoffice/catalog/products/{$productId}", ['name' => 'Novo nome'])->assertOk();
+        $this->patchJson("/api/backoffice/catalog/modules/{$moduleId}", ['name' => 'Novo módulo'])->assertOk();
+        $this->patchJson("/api/backoffice/catalog/plans/{$planId}", ['name' => 'Novo plano'])->assertOk();
+        $this->putJson("/api/backoffice/catalog/plans/{$planId}/modules", ['module_ids' => $moduleIds])->assertOk();
+        $this->patchJson("/api/backoffice/catalog/plans/{$planId}", ['status' => 'ativo'])->assertUnprocessable()->assertJsonValidationErrors('status');
+
+        $this->assertDatabaseHas('products', ['id' => $productId, 'status' => 'pausado', 'publication_pending' => true]);
+        $this->assertDatabaseHas('modules', ['id' => $moduleId, 'status' => 'inativo']);
+        $this->assertDatabaseHas('plans', ['id' => $planId, 'status' => 'inativo']);
+    }
+
+    public function test_product_change_requires_a_new_catalog_version_after_activation(): void
+    {
+        $admin = $this->admin();
+        $productId = DB::table('products')->where('code', 'law')->value('id');
+        $beforeVersion = (int) DB::table('products')->where('id', $productId)->value('published_catalog_version');
+
+        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/products/{$productId}/pause")->assertOk();
+        $this->patchJson("/api/backoffice/catalog/products/{$productId}", ['name' => 'Fokus Law Atualizado'])->assertOk();
+        $this->postJson("/api/backoffice/catalog/products/{$productId}/activate")->assertOk();
+        $this->getJson('/api/catalog/law')->assertUnprocessable();
+
+        $this->postJson("/api/backoffice/catalog/{$productId}/publish")
+            ->assertOk()
+            ->assertJsonPath('version', $beforeVersion + 1);
+
+        $this->assertDatabaseHas('products', ['id' => $productId, 'publication_pending' => false, 'published_catalog_version' => $beforeVersion + 1]);
+        $this->getJson('/api/catalog/law')->assertOk()->assertJsonPath('product.name', 'Fokus Law Atualizado');
     }
 
     public function test_product_display_order_is_persisted_and_reflected_in_catalog_listing(): void
@@ -131,6 +203,7 @@ class CatalogAdminTest extends TestCase
         $admin = $this->admin();
         $productCount = DB::table('products')->count();
         $firstProduct = DB::table('products')->orderBy('display_order')->orderBy('name')->first(['id', 'code']);
+        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/products/{$firstProduct->id}/pause")->assertOk();
 
         $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/catalog/products/{$firstProduct->id}", [
             'display_order' => $productCount + 1,
@@ -200,6 +273,7 @@ class CatalogAdminTest extends TestCase
         $productId = DB::table('products')->where('code', 'law')->value('id');
         $modules = DB::table('modules')->where('product_id', $productId)->orderBy('display_order')->get(['id', 'code']);
         $module = $modules->first();
+        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/catalog/modules/{$module->id}/pause")->assertOk();
 
         $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/catalog/modules/{$module->id}", [
             'display_order' => $modules->count() + 1,
@@ -358,7 +432,7 @@ class CatalogAdminTest extends TestCase
             'product_id' => $productId,
             'code' => 'law-base-name',
             'base_name' => 'Plano criado pela interface',
-            'status' => 'ativo',
+            'status' => 'inativo',
             'module_ids' => [$moduleId],
         ])->assertCreated();
 
@@ -585,7 +659,7 @@ class CatalogAdminTest extends TestCase
             'segments' => ['advocacia'],
             'context_code' => 'escritorio',
         ])->assertCreated()->json('id');
-        $this->assertDatabaseHas('modules', ['id' => $inactiveId, 'status' => 'rascunho', 'publication_state' => 'rascunho']);
+        $this->assertDatabaseHas('modules', ['id' => $inactiveId, 'status' => 'inativo', 'publication_state' => 'pausado']);
 
         $archivedId = $this->actingAs($admin, 'platform')->postJson('/api/backoffice/catalog/modules', [
             'product_id' => $productId,
@@ -596,7 +670,7 @@ class CatalogAdminTest extends TestCase
             'segments' => ['advocacia'],
             'context_code' => 'escritorio',
         ])->assertCreated()->json('id');
-        $this->assertDatabaseHas('modules', ['id' => $archivedId, 'status' => 'rascunho', 'publication_state' => 'rascunho']);
+        $this->assertDatabaseHas('modules', ['id' => $archivedId, 'status' => 'inativo', 'publication_state' => 'pausado']);
     }
 
     private function admin(string $role = 'superadministrador'): PlatformAdmin
