@@ -502,6 +502,21 @@ class CatalogManager
         return [(array) $current, (array) DB::table('plans')->where('id', $id)->first()];
     }
 
+    public function publishPlan(string $id): array
+    {
+        $current = DB::table('plans')->where('id', $id)->first();
+        abort_unless($current, 404, 'Plano não encontrado.');
+        abort_unless($current->status === 'ativo', 422, 'Somente planos ativos podem ser publicados.');
+        abort_if($current->publication_state === 'arquivado', 422, 'Plano arquivado não pode ser publicado.');
+
+        DB::table('plans')->where('id', $id)->update([
+            'publication_state' => 'publicado',
+            'updated_at' => now(),
+        ]);
+
+        return [(array) $current, (array) DB::table('plans')->where('id', $id)->first()];
+    }
+
     public function publishModule(string $id): array
     {
         $current = DB::table('modules')->where('id', $id)->first();

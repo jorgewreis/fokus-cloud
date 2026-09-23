@@ -88,6 +88,7 @@ Route::middleware(EnsurePlatformAdmin::class)->prefix('backoffice')->group(funct
     Route::post('/catalog/modules', [BackofficeController::class, 'createModule'])->middleware(EnsurePlatformPermission::class.':platform.catalog.manage');
     Route::patch('/catalog/modules/{module}', [BackofficeController::class, 'updateModule'])->middleware(EnsurePlatformPermission::class.':platform.catalog.manage');
     Route::post('/catalog/modules/{module}/publish', [BackofficeController::class, 'publishModule'])->middleware(EnsurePlatformPermission::class.':platform.catalog.publish');
+    Route::post('/catalog/plans/{plan}/publish', [BackofficeController::class, 'publishPlan'])->middleware(EnsurePlatformPermission::class.':platform.catalog.publish');
     Route::delete('/catalog/modules/{module}', [BackofficeController::class, 'deleteModule'])->middleware(EnsurePlatformPermission::class.':platform.catalog.publish');
     Route::post('/catalog/plans', [BackofficeController::class, 'createPlan'])->middleware(EnsurePlatformPermission::class.':platform.catalog.manage');
     Route::patch('/catalog/plans/{plan}', [BackofficeController::class, 'updatePlan'])->middleware(EnsurePlatformPermission::class.':platform.catalog.manage');

@@ -783,6 +783,14 @@ class BackofficeController extends Controller
         return response()->json(['message' => 'Módulo publicado.']);
     }
 
+    public function publishPlan(Request $request, string $plan, CatalogManager $catalog, PlatformAudit $audit)
+    {
+        [$before, $after] = $catalog->publishPlan($plan);
+        $audit->record($request->user()->id, 'backoffice.catalog_plan_published', 'plan', $plan, before: $before, after: $after, request: $request);
+
+        return response()->json(['message' => 'Plano publicado.']);
+    }
+
     public function archiveCatalogItem(Request $request, string $type, string $id, CatalogManager $catalog, PlatformAudit $audit)
     {
         $data = $request->validate(['reason' => ['required', 'string', 'max:1000']]);

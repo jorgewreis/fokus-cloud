@@ -245,6 +245,25 @@ class CatalogAdminTest extends TestCase
         ]);
     }
 
+    public function test_superadmin_can_publish_an_active_plan(): void
+    {
+        $super = $this->admin();
+        $planId = DB::table('plans')->where('code', 'law-cartorio-criminal')->value('id');
+
+        DB::table('plans')->where('id', $planId)->update(['status' => 'ativo', 'publication_state' => 'rascunho']);
+
+        $this->actingAs($super, 'platform')->postJson("/api/backoffice/catalog/plans/{$planId}/publish")
+            ->assertOk()
+            ->assertJsonPath('message', 'Plano publicado.');
+
+        $this->assertDatabaseHas('plans', [
+            'id' => $planId,
+            'status' => 'ativo',
+            'publication_state' => 'publicado',
+        ]);
+        $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.catalog_plan_published', 'entity_id' => $planId]);
+    }
+
     public function test_superadmin_can_archive_modules_and_plans_but_commercial_admin_cannot(): void
     {
         $commercial = $this->admin('administrador_comercial');

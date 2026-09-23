@@ -401,4 +401,9 @@ test('planos limita os ícones de ciclo de vida aos estados permitidos', async (
     await page.reload();
     await expect(page.locator('#plan-list [data-plan-action="delete"]')).toHaveCount(1);
     await expect(page.locator('#plan-list [data-plan-action="activate"], #plan-list [data-plan-action="archive"], #plan-list [data-plan-action="pause"]')).toHaveCount(0);
+
+    status = 'ativo';
+    await page.reload();
+    await expect(page.locator('#plan-list [data-plan-action="publish"]')).toHaveCount(1);
+    await expect(page.locator('#plan-list [data-plan-action="pause"], #plan-list [data-plan-action="archive"]')).toHaveCount(0);
 });
