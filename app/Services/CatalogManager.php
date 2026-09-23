@@ -452,12 +452,12 @@ class CatalogManager
         return ['id' => $publicationId, 'version' => $version, 'snapshot' => [...$snapshot, 'published_version' => $version]];
     }
 
-    public function publicCatalog(string $productCode): array
+    public function publicCatalog(string $productCode, bool $allowPendingPublication = false): array
     {
         $product = DB::table('products')->where('code', $productCode)->first();
         abort_unless($product, 404, 'Produto não encontrado.');
         abort_unless($product->status === 'ativo' && $product->active, 422, 'Produto indisponível para novas contratações.');
-        abort_if($product->publication_pending, 422, 'Catálogo pendente de republicação para novas contratações.');
+        abort_if($product->publication_pending && ! $allowPendingPublication, 422, 'Catálogo pendente de republicação para novas contratações.');
 
         $publication = DB::table('catalog_publications')
             ->where('product_id', $product->id)
@@ -638,14 +638,14 @@ class CatalogManager
         });
     }
 
-    public function publishedModuleMap(string $productCode): Collection
+    public function publishedModuleMap(string $productCode, bool $allowPendingPublication = false): Collection
     {
-        return collect($this->publicCatalog($productCode)['modules'] ?? [])->keyBy('code');
+        return collect($this->publicCatalog($productCode, $allowPendingPublication)['modules'] ?? [])->keyBy('code');
     }
 
-    public function publishedPlanMap(string $productCode): Collection
+    public function publishedPlanMap(string $productCode, bool $allowPendingPublication = false): Collection
     {
-        return collect($this->publicCatalog($productCode)['plans'] ?? [])->keyBy('code');
+        return collect($this->publicCatalog($productCode, $allowPendingPublication)['plans'] ?? [])->keyBy('code');
     }
 
     private function buildPublicationSnapshot(string $productId): array

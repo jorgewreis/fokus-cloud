@@ -87,7 +87,7 @@ class SubscriptionController extends Controller
         $products = [];
         foreach (['law', 'lead'] as $code) {
             try {
-                $published = $catalog->publicCatalog($code);
+                $published = $catalog->publicCatalog($code, allowPendingPublication: true);
                 $plans = collect($published['plans'] ?? [])->filter(fn (array $plan): bool => ! empty($plan['module_codes']))->map(fn (array $plan): array => [
                     'code' => $plan['code'], 'name' => $plan['name'], 'monthly_amount' => $plan['monthly_amount'], 'annual_amount' => $plan['annual_amount'],
                 ])->values()->all();
@@ -96,7 +96,11 @@ class SubscriptionController extends Controller
                 // An unpublished product is not available for checkout.
             }
         }
-        return response()->json(['companies' => $companies, 'products' => $products]);
+        return response()->json([
+            'companies' => $companies,
+            'products' => $products,
+            'catalog_message' => $products ? null : 'Nenhuma oferta publicada está disponível para contratação no momento.',
+        ]);
     }
 
     public function assistedCheckout(Request $request, CatalogManager $catalog, VoucherManager $vouchers, SubscriptionChangeManager $subscriptionChanges, MercadoPagoClient $mercadoPago, PlatformAudit $audit)
@@ -115,14 +119,14 @@ class SubscriptionController extends Controller
             ->where('role.code', 'admin')->where('user.status', 'ativa')->whereNotNull('user.email_verified_at')
             ->select('user.id', 'user.email')->orderBy('membership.created_at')->first();
         abort_unless($customer, 422, 'A empresa precisa de um administrador ativo com e-mail confirmado.');
-        $published = $catalog->publicCatalog($input['product_code']);
+        $published = $catalog->publicCatalog($input['product_code'], allowPendingPublication: true);
         $plan = collect($published['plans'] ?? [])->firstWhere('code', $input['plan_code']);
         abort_unless($plan && ! empty($plan['module_codes']), 422, 'Plano publicado indisponível.');
         $data = [
             'product_code' => $input['product_code'], 'selection_mode' => 'plan', 'plan_code' => $input['plan_code'], 'cycle' => $input['cycle'],
             'items' => collect($plan['module_codes'])->map(fn (string $code): array => ['module_code' => $code, 'quantity' => 1])->all(),
         ];
-        $response = $this->executeCheckout($request, $data, $company->id, $customer->id, $customer->email, $catalog, $vouchers, $subscriptionChanges, $mercadoPago);
+        $response = $this->executeCheckout($request, $data, $company->id, $customer->id, $customer->email, $catalog, $vouchers, $subscriptionChanges, $mercadoPago, allowPendingPublication: true);
         if ($response->getStatusCode() === 201) {
             $payload = $response->getData(true);
             $audit->record($request->user()->id, 'backoffice.subscription_checkout_created', 'subscription', $payload['subscription_id'], $company->id, after: ['product_code' => $data['product_code'], 'plan_code' => $data['plan_code'], 'cycle' => $data['cycle'], 'amount' => $payload['amount']], request: $request);
@@ -140,11 +144,11 @@ class SubscriptionController extends Controller
         return response()->json(['message' => 'Assinatura ativada pelo voucher gratuito.', ...$result]);
     }
 
-    private function executeCheckout(Request $request, array $data, string $companyId, string $customerUserId, string $customerEmail, CatalogManager $catalog, VoucherManager $vouchers, SubscriptionChangeManager $subscriptionChanges, MercadoPagoClient $mercadoPago)
+    private function executeCheckout(Request $request, array $data, string $companyId, string $customerUserId, string $customerEmail, CatalogManager $catalog, VoucherManager $vouchers, SubscriptionChangeManager $subscriptionChanges, MercadoPagoClient $mercadoPago, bool $allowPendingPublication = false)
     {
         $product = DB::table('products')->where('code', $data['product_code'])->where('active', true)->first();
         abort_unless($product, 404, 'Produto não encontrado.');
-        $quoted = $this->quote($product, $data, $catalog);
+        $quoted = $this->quote($product, $data, $catalog, $allowPendingPublication);
         $payerEmail = $mercadoPago->payerEmail((string) $customerEmail);
         $requestKey = (string) ($request->header('Idempotency-Key') ?: hash('sha256', implode('|', [
             $customerUserId, $companyId, json_encode($data), $payerEmail,
@@ -466,12 +470,12 @@ class SubscriptionController extends Controller
         return response()->json(['received' => true]);
     }
 
-    private function quote(object $product, array $data, CatalogManager $catalog): array
+    private function quote(object $product, array $data, CatalogManager $catalog, bool $allowPendingPublication = false): array
     {
         $codes = array_column($data['items'], 'module_code');
         abort_if(count($codes) !== count(array_unique($codes)), 422, 'Um módulo só pode ser informado uma vez.');
-        $publishedModules = $catalog->publishedModuleMap($product->code);
-        $publishedPlans = $catalog->publishedPlanMap($product->code);
+        $publishedModules = $catalog->publishedModuleMap($product->code, $allowPendingPublication);
+        $publishedPlans = $catalog->publishedPlanMap($product->code, $allowPendingPublication);
         abort_unless($publishedModules->isNotEmpty(), 422, 'Catálogo publicado indisponível para este produto.');
 
         $publishedPlan = null;

@@ -214,6 +214,19 @@ test('assinatura pendente pode ser ativada por voucher gratuito no drawer', asyn
     expect(submittedCode).toBe('FREE7');
 });
 
+test('checkout assistido explica quando ainda não há oferta publicada', async ({ page }) => {
+    await useSubscriptionCatalog(page);
+    await page.route('**/api/backoffice/subscriptions/checkout-options?**', (route) => route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ companies: [], products: [], catalog_message: 'Nenhuma oferta publicada está disponível para contratação no momento.' }),
+    }));
+    await page.goto('/backoffice/assinaturas');
+    await page.getByRole('button', { name: 'Nova assinatura' }).click();
+    await expect(page.locator('#subscription-create-product')).toContainText('Nenhuma oferta publicada disponível');
+    await expect(page.locator('#subscription-create-plan')).toContainText('Nenhum plano publicado disponível');
+    await expect(page.locator('#subscription-create-catalog-notice')).toContainText('Nenhuma oferta publicada está disponível');
+});
+
 test('encerramento imediato de assinatura exige confirmação e atualiza detalhe e listagem', async ({ page }) => {
     let patchCount = 0;
     page.on('request', (request) => {

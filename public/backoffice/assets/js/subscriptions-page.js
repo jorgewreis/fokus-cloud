@@ -303,11 +303,14 @@ export function mount(root, context = {}) {
             const options = await api.request(`/backoffice/subscriptions/checkout-options?q=${encodeURIComponent(query)}`, { signal: scope.signal });
             if (scope.signal.aborted) return;
             state.checkoutProducts = options.products || [];
+            const catalogNotice = $("#subscription-create-catalog-notice");
+            catalogNotice.textContent = options.catalog_message || "";
+            catalogNotice.hidden = !options.catalog_message;
             companySelect.innerHTML = '<option value="">Selecione uma empresa</option>' + (options.companies || []).map((company) => `<option value="${escapeHtml(company.id)}">${escapeHtml(company.legal_name)}</option>`).join("");
             if ([...companySelect.options].some((option) => option.value === selectedCompany)) companySelect.value = selectedCompany;
             const productSelect = $("#subscription-create-product");
             const selectedProduct = productSelect.value;
-            productSelect.innerHTML = '<option value="">Selecione um produto</option>' + state.checkoutProducts.map((product) => `<option value="${escapeHtml(product.code)}">${escapeHtml(product.name)}</option>`).join("");
+            productSelect.innerHTML = `<option value="">${state.checkoutProducts.length ? "Selecione um produto" : "Nenhuma oferta publicada disponível"}</option>` + state.checkoutProducts.map((product) => `<option value="${escapeHtml(product.code)}">${escapeHtml(product.name)}</option>`).join("");
             productSelect.value = selectedProduct;
             updateCheckoutPlans();
         } catch (error) {
@@ -333,7 +336,8 @@ export function mount(root, context = {}) {
         const select = $("#subscription-create-plan");
         const previous = select.value;
         const product = state.checkoutProducts.find((item) => item.code === $("#subscription-create-product").value);
-        select.innerHTML = '<option value="">Selecione um plano</option>' + (product?.plans || []).map((plan) => `<option value="${escapeHtml(plan.code)}">${escapeHtml(plan.name)}</option>`).join("");
+        const plans = product?.plans || [];
+        select.innerHTML = `<option value="">${plans.length ? "Selecione um plano" : "Nenhum plano publicado disponível"}</option>` + plans.map((plan) => `<option value="${escapeHtml(plan.code)}">${escapeHtml(plan.name)}</option>`).join("");
         if ([...select.options].some((option) => option.value === previous)) select.value = previous;
         updateCheckoutAmount();
     };

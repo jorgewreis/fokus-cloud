@@ -88,6 +88,10 @@ auditada com a identidade do administrador interno. O operador recebe o link
 de checkout para encaminhar ao cliente. A confirmação do pagamento continua
 sob responsabilidade do webhook assinado ou da conciliação.
 
+O checkout assistido usa a versão mais recente já publicada mesmo enquanto uma
+edição posterior do catálogo aguarda publicação. Assim os contratos usam a
+oferta e o preço publicados; alterações de rascunho não entram na contratação.
+
 ## Estados do fluxo
 
 | Estado | Resultado |

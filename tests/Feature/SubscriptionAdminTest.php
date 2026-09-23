@@ -29,6 +29,7 @@ class SubscriptionAdminTest extends TestCase
         $fixture = $this->subscriptionFixture();
         DB::table('subscriptions')->where('id', $fixture['subscription_id'])->update(['status' => 'encerrada', 'open_company_product' => null]);
         $product = DB::table('products')->where('code', 'law')->first();
+        DB::table('products')->where('id', $product->id)->update(['publication_pending' => true]);
         $plan = DB::table('plans')->where('product_id', $product->id)->where('code', 'law-advocacia')->first();
         Http::fake(function ($request) {
             static $created = 0;
@@ -38,7 +39,9 @@ class SubscriptionAdminTest extends TestCase
         });
 
         $this->actingAs($admin, 'platform')->getJson('/api/backoffice/subscriptions/checkout-options?q=Alpha')
-            ->assertOk()->assertJsonPath('companies.0.id', $fixture['company_id']);
+            ->assertOk()->assertJsonPath('companies.0.id', $fixture['company_id'])
+            ->assertJsonPath('products.0.code', 'law')
+            ->assertJsonPath('products.0.plans.0.code', 'law-advocacia');
         $response = $this->actingAs($admin, 'platform')->postJson('/api/backoffice/subscriptions/checkout', [
             'company_id' => $fixture['company_id'], 'product_code' => 'law', 'plan_code' => 'law-advocacia', 'cycle' => 'monthly',
         ])->assertCreated()->assertJsonPath('checkout_url', 'https://mercadopago.test/checkout');
