@@ -15,6 +15,12 @@ class SubscriptionBillingManager
             }
 
             $subscription = DB::table('subscriptions')->where('id', $payment->subscription_id)->lockForUpdate()->first();
+            if ($subscription && ! $subscription->provider_subscription_id && DB::table('voucher_redemptions as redemption')
+                ->join('vouchers as voucher', 'voucher.id', '=', 'redemption.voucher_id')
+                ->where('redemption.subscription_id', $subscription->id)->where('voucher.discount_type', 'trial_free')
+                ->exists()) {
+                return $subscription;
+            }
             $now = now();
             $paymentUpdates = [
                 'provider_payment_id' => isset($remote['id']) ? (string) $remote['id'] : $payment->provider_payment_id,

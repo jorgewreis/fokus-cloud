@@ -144,6 +144,8 @@ export function mount(root, context = {}) {
     const drawerElement = $("#subscription-drawer");
     const drawerTrigger = $("#subscription-drawer-trigger");
     const drawer = createRecordsDrawer({ trigger: drawerTrigger, drawer: drawerElement });
+    const createTrigger = $("#subscription-create-trigger");
+    const createDrawer = createRecordsDrawer({ trigger: createTrigger, drawer: $("#subscription-create-drawer") });
     const confirmTrigger = $("#subscription-confirm-trigger");
     const confirmDialog = $("#subscription-confirm-dialog");
     const confirmModal = window.FokusStyles?.Modal?.getOrCreateInstance(confirmTrigger);
@@ -163,6 +165,9 @@ export function mount(root, context = {}) {
         lastTriggerId: null,
         pendingAction: null,
         saving: false,
+        checkoutProducts: [],
+        optionsController: null,
+        creating: false,
     };
 
     const canOverride = context.permissions?.has?.("platform.commercial.override")
@@ -192,13 +197,9 @@ export function mount(root, context = {}) {
         };
     };
 
-    const renderPagination = (meta) => {
-        if (!meta || Number(meta.last_page) <= 1) {
-            pagination.innerHTML = "";
-            return;
-        }
-        const currentPage = Number(meta.current_page) || 1;
-        const lastPage = Number(meta.last_page) || 1;
+    const renderPagination = (meta = {}) => {
+        const lastPage = Math.max(1, Number(meta.last_page) || 1);
+        const currentPage = Math.min(lastPage, Math.max(1, Number(meta.current_page) || 1));
         pagination.innerHTML = `<ul class="fs-pagination fs-pagination-compact" aria-label="Páginas de assinaturas">
             <li class="fs-page-item"><button class="fs-page-link" type="button" data-subscription-page="${currentPage - 1}" aria-label="Página anterior" ${currentPage <= 1 ? "disabled" : ""}>‹</button></li>
             <li class="fs-page-item is-active" aria-current="page"><span class="fs-page-link" aria-label="Página ${currentPage} de ${lastPage}">${currentPage}</span></li>
@@ -209,10 +210,11 @@ export function mount(root, context = {}) {
     const renderList = (response) => {
         const rows = response.data || [];
         const meta = response.meta || {};
-        const currentPage = Number(meta.current_page) || 1;
+        const currentPage = Math.max(1, Number(meta.current_page) || 1);
         const lastPage = Math.max(1, Number(meta.last_page) || 1);
         const perPage = Number(meta.per_page) || SUBSCRIPTIONS_PER_PAGE;
         const total = Number(meta.total) || 0;
+        state.page = currentPage;
         list.innerHTML = rows.length ? rows.map((subscription) => `<tr>
             <td class="fs-width-600" data-label="Empresa"><strong>${escapeHtml(subscription.company_name || "—")}</strong></td>
             <td class="fs-width-400" data-label="Produto">${escapeHtml(subscription.product_name || "—")}</td>
@@ -243,6 +245,7 @@ export function mount(root, context = {}) {
         if (state.status) params.set("status", state.status);
         if (state.productId) params.set("product_id", state.productId);
         list.innerHTML = "";
+        pagination.innerHTML = "";
         emptyState.hidden = true;
         setTableError("");
         loadingState.hidden = false;
@@ -290,8 +293,117 @@ export function mount(root, context = {}) {
         }
     };
 
+    const loadCheckoutOptions = async () => {
+        const scope = requestScope("optionsController");
+        const query = $("#subscription-company-search").value.trim();
+        const companySelect = $("#subscription-create-company");
+        const selectedCompany = companySelect.value;
+        companySelect.innerHTML = '<option value="">Carregando empresas...</option>';
+        try {
+            const options = await api.request(`/backoffice/subscriptions/checkout-options?q=${encodeURIComponent(query)}`, { signal: scope.signal });
+            if (scope.signal.aborted) return;
+            state.checkoutProducts = options.products || [];
+            companySelect.innerHTML = '<option value="">Selecione uma empresa</option>' + (options.companies || []).map((company) => `<option value="${escapeHtml(company.id)}">${escapeHtml(company.legal_name)}</option>`).join("");
+            if ([...companySelect.options].some((option) => option.value === selectedCompany)) companySelect.value = selectedCompany;
+            const productSelect = $("#subscription-create-product");
+            const selectedProduct = productSelect.value;
+            productSelect.innerHTML = '<option value="">Selecione um produto</option>' + state.checkoutProducts.map((product) => `<option value="${escapeHtml(product.code)}">${escapeHtml(product.name)}</option>`).join("");
+            productSelect.value = selectedProduct;
+            updateCheckoutPlans();
+        } catch (error) {
+            if (error.name !== "AbortError") {
+                companySelect.innerHTML = '<option value="">Empresas indisponíveis</option>';
+                $("#subscription-create-error").textContent = error.message || "Não foi possível carregar as opções de contratação.";
+                $("#subscription-create-error").hidden = false;
+            }
+        } finally {
+            scope.done();
+        }
+    };
+
+    const updateCheckoutAmount = () => {
+        const product = state.checkoutProducts.find((item) => item.code === $("#subscription-create-product").value);
+        const plan = product?.plans?.find((item) => item.code === $("#subscription-create-plan").value);
+        $("#subscription-create-amount").textContent = plan
+            ? `Valor publicado: ${money($("#subscription-create-cycle").value === "annual" ? plan.annual_amount : plan.monthly_amount)}. O servidor confirma o preço no checkout.`
+            : "Selecione um plano para consultar o valor publicado. O servidor confirma o preço no checkout.";
+    };
+
+    const updateCheckoutPlans = () => {
+        const select = $("#subscription-create-plan");
+        const previous = select.value;
+        const product = state.checkoutProducts.find((item) => item.code === $("#subscription-create-product").value);
+        select.innerHTML = '<option value="">Selecione um plano</option>' + (product?.plans || []).map((plan) => `<option value="${escapeHtml(plan.code)}">${escapeHtml(plan.name)}</option>`).join("");
+        if ([...select.options].some((option) => option.value === previous)) select.value = previous;
+        updateCheckoutAmount();
+    };
+
+    const onCreateSubmit = async (event) => {
+        event.preventDefault();
+        if (state.creating || !event.currentTarget.reportValidity()) return;
+        state.creating = true;
+        const submit = $("#subscription-create-submit");
+        submit.disabled = true;
+        $("#subscription-create-error").hidden = true;
+        $("#subscription-create-success").hidden = true;
+        try {
+            const body = Object.fromEntries(new FormData(event.currentTarget));
+            const response = await api.request("/backoffice/subscriptions/checkout", {
+                method: "POST", body, headers: { "Idempotency-Key": crypto.randomUUID() }, signal: pageAbort.signal,
+            });
+            const success = $("#subscription-create-success");
+            success.replaceChildren(document.createTextNode(`Assinatura ${response.subscription_id} criada e aguardando pagamento. `));
+            if (response.checkout_url) {
+                const link = document.createElement("a");
+                link.href = response.checkout_url;
+                link.target = "_blank";
+                link.rel = "noopener noreferrer";
+                link.textContent = "Abrir checkout do Mercado Pago";
+                success.append(link);
+            }
+            success.hidden = false;
+            setMessage("Assinatura criada e checkout gerado. A ativação depende da confirmação do pagamento.", "success");
+            await loadList();
+        } catch (error) {
+            if (error.name !== "AbortError") {
+                $("#subscription-create-error").textContent = error.message || "Não foi possível gerar o checkout.";
+                $("#subscription-create-error").hidden = false;
+            }
+        } finally {
+            state.creating = false;
+            submit.disabled = false;
+        }
+    };
+
+    const onFreeVoucherSubmit = async (event) => {
+        event.preventDefault();
+        if (!state.current || !event.currentTarget.reportValidity()) return;
+        const subscriptionId = state.current.id;
+        const submit = $("#subscription-free-voucher-submit");
+        submit.disabled = true;
+        $("#subscription-free-voucher-error").hidden = true;
+        try {
+            const code = String(new FormData(event.currentTarget).get("voucher_code") || "").trim();
+            const result = await api.request(`/backoffice/subscriptions/${encodeURIComponent(subscriptionId)}/free-voucher`, {
+                method: "POST", body: { voucher_code: code }, signal: pageAbort.signal,
+            });
+            setMessage(`${result.message} Benefício até ${formatDate(result.benefit_ends_at)}.`, "success");
+            await Promise.all([loadDetails(subscriptionId), loadList()]);
+        } catch (error) {
+            if (error.name !== "AbortError") {
+                $("#subscription-free-voucher-error").textContent = error.message || "Não foi possível ativar o voucher.";
+                $("#subscription-free-voucher-error").hidden = false;
+            }
+        } finally {
+            submit.disabled = false;
+        }
+    };
+
     const renderDetails = (subscription) => {
         state.current = subscription;
+        $("#subscription-free-voucher-form").hidden = subscription.status !== "aguardando_pagamento";
+        $("#subscription-free-voucher-form").reset();
+        $("#subscription-free-voucher-error").hidden = true;
         $("#subscription-drawer-title").textContent = "Detalhes da assinatura";
         $("#subscription-drawer-description").textContent = `${subscription.company_name || "Empresa"} · ${subscription.product_name || "Assinatura"}`;
         $("#subscription-detail-summary").textContent = `${subscription.plan_name || "Plano não informado"} · ${STATUS_LABELS[subscription.status] || subscription.status} · ${valueForDisplay("billing_cycle", subscription.billing_cycle)} · ${money(subscription.amount)}`;
@@ -516,6 +628,26 @@ export function mount(root, context = {}) {
     }
 
     $("#subscription-filter-form").addEventListener("submit", onFilterSubmit, { signal: listeners.signal });
+    $("#subscription-create-open").addEventListener("click", () => {
+        $("#subscription-create-form").reset();
+        $("#subscription-create-error").hidden = true;
+        $("#subscription-create-success").hidden = true;
+        createDrawer.setState({ mode: "create" });
+        createDrawer.show();
+        loadCheckoutOptions();
+        queueMicrotask(() => $("#subscription-company-search").focus());
+    }, { signal: listeners.signal });
+    let companySearchTimer;
+    $("#subscription-company-search").addEventListener("input", () => {
+        clearTimeout(companySearchTimer);
+        companySearchTimer = setTimeout(loadCheckoutOptions, 250);
+    }, { signal: listeners.signal });
+    $("#subscription-create-product").addEventListener("change", updateCheckoutPlans, { signal: listeners.signal });
+    $("#subscription-create-plan").addEventListener("change", updateCheckoutAmount, { signal: listeners.signal });
+    $("#subscription-create-cycle").addEventListener("change", updateCheckoutAmount, { signal: listeners.signal });
+    $("#subscription-create-form").addEventListener("submit", onCreateSubmit, { signal: listeners.signal });
+    $("#subscription-free-voucher-form").addEventListener("submit", onFreeVoucherSubmit, { signal: listeners.signal });
+    createTrigger.addEventListener("fs:hidden", () => $("#subscription-create-open").focus(), { signal: listeners.signal });
     form.addEventListener("submit", onActionSubmit, { signal: listeners.signal });
     list.addEventListener("click", onListClick, { signal: listeners.signal });
     pagination.addEventListener("click", onPageClick, { signal: listeners.signal });
@@ -536,6 +668,8 @@ export function mount(root, context = {}) {
         context.signal?.removeEventListener("abort", abortOnRouterNavigation);
         pageAbort.abort();
         listeners.abort();
+        clearTimeout(companySearchTimer);
+        createDrawer.dispose();
         drawer.dispose();
         confirmModal?.dispose?.();
         window.disposeBackofficeRecordsPage?.(root);

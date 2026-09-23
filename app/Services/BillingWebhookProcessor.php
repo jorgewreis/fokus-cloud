@@ -82,6 +82,13 @@ class BillingWebhookProcessor
         if (! $subscription) {
             return;
         }
+        if ($status === 'encerrada' && $subscription->status === 'aguardando_pagamento'
+            && DB::table('voucher_redemption_reservations as reservation')
+                ->join('vouchers as voucher', 'voucher.id', '=', 'reservation.voucher_id')
+                ->where('reservation.subscription_id', $subscription->id)->where('reservation.status', 'pending')
+                ->where('voucher.discount_type', 'trial_free')->exists()) {
+            return;
+        }
         DB::table('subscriptions')->where('id', $subscription->id)->update([
             'status' => $status,
             'provider_status' => $remote['status'] ?? null,

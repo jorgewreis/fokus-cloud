@@ -74,6 +74,9 @@ test('Assinaturas filtra por empresa, produto e status e consulta detalhes em dr
         await page.getByRole('button', { name: 'Filtrar' }).click();
         await expect(page.locator('#subscription-list tr')).toHaveCount(1);
         await expect(page.locator('#subscription-list')).toContainText('Empresa de Demonstração');
+        await expect(page.locator('#subscription-pagination .fs-page-item.is-active')).toContainText('1');
+        await expect(page.getByRole('button', { name: 'Página anterior' })).toBeDisabled();
+        await expect(page.getByRole('button', { name: 'Próxima página' })).toBeDisabled();
         await expect(page).toHaveURL(/q=Demonstra%C3%A7%C3%A3o/);
         await expect(page).toHaveURL(/status=ativa/);
         await expect(page).toHaveURL(/product_id=PRD_LAW/);
@@ -137,6 +140,78 @@ test('drawer de assinaturas organiza dados longos e mostra vazios sem pagamentos
     await expect(page.locator('#subscription-detail-items')).toContainText('Nenhum item contratado');
     await expect(page.locator('#subscription-detail-payments')).toContainText('Nenhum pagamento vinculado');
     await expect(page.locator('#subscription-detail-history')).toContainText('Nenhuma alteração comercial registrada');
+});
+
+test('Backoffice gera checkout assistido e atualiza a listagem', async ({ page }) => {
+    await useSubscriptionCatalog(page);
+    await page.route('**/api/backoffice/subscriptions/checkout-options?**', (route) => route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+            companies: [{ id: 'COM_ALPHA', legal_name: 'Empresa Alpha' }],
+            products: [{ code: 'law', name: 'Fokus Law', plans: [{ code: 'law-advocacia', name: 'Advocacia', monthly_amount: 64.7, annual_amount: 647 }] }],
+        }),
+    }));
+    let checkoutBody;
+    await page.route('**/api/backoffice/subscriptions/checkout', (route) => {
+        checkoutBody = route.request().postDataJSON();
+        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ subscription_id: 'ASS_NEW', checkout_url: 'https://mercadopago.test/checkout', amount: 64.7 }) });
+    });
+    await page.goto('/backoffice/assinaturas');
+    await page.getByRole('button', { name: 'Nova assinatura' }).click();
+    await expect(page.locator('#subscription-create-drawer')).toBeVisible();
+    await page.locator('#subscription-create-company').selectOption('COM_ALPHA');
+    await page.locator('#subscription-create-product').selectOption('law');
+    await page.locator('#subscription-create-plan').selectOption('law-advocacia');
+    await expect(page.locator('#subscription-create-amount')).toContainText('R$ 64,70');
+    await page.getByRole('button', { name: 'Gerar checkout' }).click();
+    await expect(page.locator('#subscription-create-success')).toContainText('ASS_NEW');
+    await expect(page.getByRole('link', { name: 'Abrir checkout do Mercado Pago' })).toHaveAttribute('href', 'https://mercadopago.test/checkout');
+    expect(checkoutBody).toEqual({ company_id: 'COM_ALPHA', product_code: 'law', plan_code: 'law-advocacia', cycle: 'monthly' });
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: 'Nova assinatura' })).toBeFocused();
+});
+
+test('checkout assistido segue o drawer de registros em desktop e mobile', async ({ page }) => {
+    for (const [name, viewport] of [['desktop', { width: 1440, height: 900 }], ['mobile', { width: 375, height: 812 }]]) {
+        await page.setViewportSize(viewport);
+        await page.route('**/api/backoffice/subscriptions/checkout-options?**', (route) => route.fulfill({
+            contentType: 'application/json', body: JSON.stringify({ companies: [{ id: 'COM_ALPHA', legal_name: 'Empresa Alpha' }], products: [{ code: 'law', name: 'Fokus Law', plans: [{ code: 'law-advocacia', name: 'Advocacia', monthly_amount: 64.7, annual_amount: 647 }] }] }),
+        }));
+        await page.goto('/backoffice/assinaturas');
+        await page.getByRole('button', { name: 'Nova assinatura' }).click();
+        await expect(page.locator('#subscription-create-drawer')).toBeVisible();
+        await expect(page.locator('#subscription-create-company option')).toHaveCount(2);
+        await page.locator('#subscription-create-product').selectOption('law');
+        await page.locator('#subscription-create-plan').selectOption('law-advocacia');
+        await expect(page).toHaveScreenshot(`subscriptions-create-${name}.png`, { fullPage: true, animations: 'disabled', maxDiffPixelRatio: 0.08 });
+        expect(await page.locator('#subscription-create-drawer').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+        await page.keyboard.press('Escape');
+        await expect(page.getByRole('button', { name: 'Nova assinatura' })).toBeFocused();
+    }
+});
+
+test('assinatura pendente pode ser ativada por voucher gratuito no drawer', async ({ page }) => {
+    await useSubscriptionCatalog(page);
+    let activated = false;
+    let submittedCode;
+    await page.route('**/api/backoffice/subscriptions/SUB_VISUAL_02', async (route) => {
+        const response = await route.fetch();
+        const subscription = await response.json();
+        await route.fulfill({ response, json: { ...subscription, status: activated ? 'ativa' : 'aguardando_pagamento' } });
+    });
+    await page.route('**/api/backoffice/subscriptions/SUB_VISUAL_02/free-voucher', (route) => {
+        submittedCode = route.request().postDataJSON().voucher_code;
+        activated = true;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ message: 'Assinatura ativada pelo voucher gratuito.', benefit_ends_at: '2026-10-01T12:00:00Z' }) });
+    });
+    await page.goto('/backoffice/assinaturas');
+    await page.getByRole('button', { name: /Ver detalhes da assinatura/ }).nth(1).click();
+    await expect(page.locator('#subscription-free-voucher-form')).toBeVisible();
+    await page.locator('#subscription-free-voucher-code').fill('FREE7');
+    await page.getByRole('button', { name: 'Ativar acesso gratuito' }).click();
+    await expect(page.locator('#subscription-detail-summary')).toContainText('Ativa');
+    await expect(page.locator('#subscription-free-voucher-form')).toBeHidden();
+    expect(submittedCode).toBe('FREE7');
 });
 
 test('encerramento imediato de assinatura exige confirmação e atualiza detalhe e listagem', async ({ page }) => {

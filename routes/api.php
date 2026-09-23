@@ -117,6 +117,9 @@ Route::middleware(EnsurePlatformAdmin::class)->prefix('backoffice')->group(funct
     Route::post('/companies/{company}/activate', [BackofficeController::class, 'activateCompany'])->middleware(EnsurePlatformPermission::class.':platform.companies.manage');
     Route::delete('/companies/{company}', [BackofficeController::class, 'deleteCompany'])->middleware(EnsurePlatformPermission::class.':platform.companies.manage');
     Route::get('/subscriptions', [BackofficeController::class, 'subscriptions'])->middleware(EnsurePlatformPermission::class.':platform.subscriptions.manage');
+    Route::get('/subscriptions/checkout-options', [SubscriptionController::class, 'assistedCheckoutOptions'])->middleware(EnsurePlatformPermission::class.':platform.subscriptions.manage');
+    Route::post('/subscriptions/checkout', [SubscriptionController::class, 'assistedCheckout'])->middleware(EnsurePlatformPermission::class.':platform.subscriptions.manage');
+    Route::post('/subscriptions/{subscription}/free-voucher', [SubscriptionController::class, 'activateWithFreeVoucher'])->middleware(EnsurePlatformPermission::class.':platform.subscriptions.manage');
     Route::get('/subscriptions/{subscription}', [BackofficeController::class, 'subscription'])->middleware(EnsurePlatformPermission::class.':platform.subscriptions.manage');
     Route::patch('/subscriptions/{subscription}', [BackofficeController::class, 'changeSubscription'])->middleware(EnsurePlatformPermission::class.':platform.subscriptions.manage');
     Route::get('/payments', [BackofficeController::class, 'payments'])->middleware(EnsurePlatformPermission::class.':platform.payments.view');

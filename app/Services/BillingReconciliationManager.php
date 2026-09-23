@@ -47,6 +47,10 @@ class BillingReconciliationManager
                     if ($paymentStatus) DB::table('payments')->where('id', $alert->payment_id)->update(['status' => $paymentStatus, 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
                 }
                 if ($alert->subscription_id) {
+                    abort_if(DB::table('subscriptions')->where('id', $alert->subscription_id)->whereNull('provider_subscription_id')->exists()
+                        && DB::table('voucher_redemptions as redemption')->join('vouchers as voucher', 'voucher.id', '=', 'redemption.voucher_id')
+                            ->where('redemption.subscription_id', $alert->subscription_id)->where('voucher.discount_type', 'trial_free')->exists(),
+                        422, 'A assinatura foi ativada por voucher gratuito; a divergência antiga não pode alterar seu estado.');
                     $subscriptionStatus = match ($alert->mercado_pago_status) { 'authorized' => 'ativa', 'paused' => 'suspensa', 'cancelled' => 'encerrada', default => null };
                     if ($subscriptionStatus) DB::table('subscriptions')->where('id', $alert->subscription_id)->update(['status' => $subscriptionStatus, 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
                 }

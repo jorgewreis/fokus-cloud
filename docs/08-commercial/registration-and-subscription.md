@@ -80,6 +80,14 @@ A assinatura só é persistida depois que o Mercado Pago cria o checkout ou
 `aguardando_pagamento` e a ativação depende de webhook assinado ou conciliação
 posterior com o Mercado Pago.
 
+No Backoffice, `/backoffice/assinaturas` oferece checkout assistido para uma
+empresa ativa com administrador ativo e e-mail confirmado. O operador seleciona
+um plano da publicação vigente e o ciclo; a API recalcula o preço, cria a
+pré-aprovação e só então persiste assinatura e pagamento pendentes. A ação é
+auditada com a identidade do administrador interno. O operador recebe o link
+de checkout para encaminhar ao cliente. A confirmação do pagamento continua
+sob responsabilidade do webhook assinado ou da conciliação.
+
 ## Estados do fluxo
 
 | Estado | Resultado |

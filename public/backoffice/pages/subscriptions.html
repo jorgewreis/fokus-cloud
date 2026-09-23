@@ -7,6 +7,7 @@
             <h1 id="subscriptions-page-title">Assinaturas</h1>
             <p>Consulte contratos, pagamentos, histórico e ações comerciais.</p>
         </div>
+        <button class="fs-btn fs-btn-primary fs-width-300" id="subscription-create-open" type="button">Nova assinatura</button>
     </header>
 
     <div class="fs-alert" id="subscription-message" role="status" aria-live="polite" aria-atomic="true" hidden></div>
@@ -83,6 +84,35 @@
         </div>
     </section>
 
+    <button id="subscription-create-trigger" type="button" data-fs="offcanvas" data-fs-target="#subscription-create-drawer" aria-label="Abrir criação de assinatura" hidden></button>
+    <aside class="fs-offcanvas fs-offcanvas-end backoffice-records-drawer" id="subscription-create-drawer" aria-labelledby="subscription-create-title" tabindex="-1">
+        <div class="fs-offcanvas-header">
+            <div class="fs-u-d-flex fs-u-flex-column fs-u-gap-1"><span class="fs-u-fs-xs fs-u-color-secondary">CHECKOUT ASSISTIDO</span><h2 class="fs-offcanvas-title" id="subscription-create-title">Nova assinatura</h2><p class="fs-u-m-0 fs-u-fs-sm fs-u-color-secondary">Selecione a empresa e uma oferta publicada.</p></div>
+            <button class="fs-btn-close" type="button" data-fs-dismiss="offcanvas" aria-label="Fechar painel"></button>
+        </div>
+        <form id="subscription-create-form" class="fs-offcanvas-body fs-form">
+            <section class="fs-card fs-card-panel" aria-labelledby="subscription-create-company-title">
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-create-company-title">Empresa</h3><p class="fs-card-subtitle">Selecione quem receberá a assinatura.</p></div></div>
+                <div class="fs-card-body fs-u-mx-2 fs-u-mt-2 fs-u-mb-3 fs-u-d-flex fs-u-flex-column fs-u-gap-2">
+                    <label class="fs-form-label fs-u-mt-3" for="subscription-company-search"><span class="fs-u-ml-2">Buscar empresa</span><input class="fs-form-control fs-width-600" id="subscription-company-search" type="search" autocomplete="off" placeholder="Nome da empresa" /></label>
+                    <label class="fs-form-label fs-u-mt-3" for="subscription-create-company"><span class="fs-u-ml-2">Empresa</span><select class="fs-form-select fs-width-600" id="subscription-create-company" name="company_id" required><option value="">Carregando empresas...</option></select></label>
+                </div>
+            </section>
+            <section class="fs-card fs-card-panel" aria-labelledby="subscription-create-offer-title">
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-create-offer-title">Oferta publicada</h3><p class="fs-card-subtitle">O valor final é calculado pelo servidor.</p></div></div>
+                <div class="fs-card-body fs-u-mx-2 fs-u-mt-2 fs-u-mb-3 fs-u-d-flex fs-u-flex-column fs-u-gap-2">
+                    <label class="fs-form-label fs-u-mt-3" for="subscription-create-product"><span class="fs-u-ml-2">Produto</span><select class="fs-form-select fs-width-500" id="subscription-create-product" name="product_code" required><option value="">Selecione um produto</option></select></label>
+                    <label class="fs-form-label fs-u-mt-3" for="subscription-create-plan"><span class="fs-u-ml-2">Plano publicado</span><select class="fs-form-select fs-width-500" id="subscription-create-plan" name="plan_code" required><option value="">Selecione um plano</option></select></label>
+                    <label class="fs-form-label fs-u-mt-3" for="subscription-create-cycle"><span class="fs-u-ml-2">Ciclo</span><select class="fs-form-select fs-width-300" id="subscription-create-cycle" name="cycle" required><option value="monthly">Mensal</option><option value="annual">Anual</option></select></label>
+                    <p class="fs-u-fs-sm fs-u-color-secondary" id="subscription-create-amount">Selecione um plano para consultar o valor publicado. O servidor confirma o preço no checkout.</p>
+                    <div class="fs-alert fs-alert-danger" id="subscription-create-error" role="alert" hidden></div>
+                    <div class="fs-alert fs-alert-success" id="subscription-create-success" role="status" hidden></div>
+                </div>
+            </section>
+            <div class="fs-offcanvas-footer"><button class="fs-btn fs-btn-outline-primary fs-width-300" type="button" data-fs-dismiss="offcanvas">Fechar</button><button class="fs-btn fs-btn-primary fs-width-400" id="subscription-create-submit" type="submit">Gerar checkout</button></div>
+        </form>
+    </aside>
+
     <button id="subscription-drawer-trigger" type="button" data-fs="offcanvas" data-fs-target="#subscription-drawer" aria-label="Abrir detalhes da assinatura" hidden></button>
     <aside class="fs-offcanvas fs-offcanvas-end backoffice-records-drawer" id="subscription-drawer" aria-labelledby="subscription-drawer-title" tabindex="-1">
         <div class="fs-offcanvas-header">
@@ -115,6 +145,11 @@
                     <div class="fs-card-body fs-u-d-flex fs-u-flex-column fs-u-gap-2" id="subscription-detail-history"></div>
                 </section>
             </div>
+            <form id="subscription-free-voucher-form" class="fs-card" hidden>
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title">Ativar com voucher gratuito</h3><p class="fs-card-subtitle">A pré-aprovação pendente será cancelada. O acesso termina na data definida pelo voucher; depois disso, uma nova contratação paga será necessária.</p></div></div>
+                <div class="fs-card-body fs-u-d-flex fs-u-flex-column fs-u-gap-2"><label class="fs-form-label" for="subscription-free-voucher-code"><span>Código do voucher</span><input class="fs-form-control" id="subscription-free-voucher-code" name="voucher_code" maxlength="64" required autocomplete="off" /></label><div class="fs-alert fs-alert-danger" id="subscription-free-voucher-error" role="alert" hidden></div></div>
+                <div class="fs-card-footer"><button class="fs-btn fs-btn-primary" id="subscription-free-voucher-submit" type="submit">Ativar acesso gratuito</button></div>
+            </form>
 
             <form class="fs-form fs-card fs-card-panel" id="subscription-change-form" novalidate hidden>
                 <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-change-title">Registrar ação comercial</h3><p class="fs-card-subtitle">As alterações exigem motivo e são registradas no histórico.</p></div></div>

@@ -22,6 +22,60 @@ class SubscriptionAdminTest extends TestCase
         $this->seed();
     }
 
+    public function test_assisted_checkout_and_free_voucher_activate_pending_subscription_until_expiry(): void
+    {
+        config(['services.mercado_pago.access_token' => 'test-token', 'services.mercado_pago.test_payer_email' => 'test_user_123@testuser.com']);
+        $admin = $this->platformAdmin();
+        $fixture = $this->subscriptionFixture();
+        DB::table('subscriptions')->where('id', $fixture['subscription_id'])->update(['status' => 'encerrada', 'open_company_product' => null]);
+        $product = DB::table('products')->where('code', 'law')->first();
+        $plan = DB::table('plans')->where('product_id', $product->id)->where('code', 'law-advocacia')->first();
+        Http::fake(function ($request) {
+            static $created = 0;
+            if ($request->method() === 'POST') return Http::response(['id' => ++$created === 1 ? 'pre-assisted' : 'pre-assisted-2', 'init_point' => 'https://mercadopago.test/checkout'], 201);
+            if ($request->method() === 'GET') return Http::response(['status' => 'pending'], 200);
+            return Http::response(['status' => 'cancelled'], 200);
+        });
+
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/subscriptions/checkout-options?q=Alpha')
+            ->assertOk()->assertJsonPath('companies.0.id', $fixture['company_id']);
+        $response = $this->actingAs($admin, 'platform')->postJson('/api/backoffice/subscriptions/checkout', [
+            'company_id' => $fixture['company_id'], 'product_code' => 'law', 'plan_code' => 'law-advocacia', 'cycle' => 'monthly',
+        ])->assertCreated()->assertJsonPath('checkout_url', 'https://mercadopago.test/checkout');
+        $subscriptionId = $response->json('subscription_id');
+        $this->assertDatabaseHas('subscriptions', ['id' => $subscriptionId, 'status' => 'aguardando_pagamento', 'created_by' => $fixture['user_id']]);
+        $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.subscription_checkout_created', 'entity_id' => $subscriptionId]);
+
+        DB::table('vouchers')->insert([
+            'id' => PrefixedUlid::make('VCH'), 'code' => 'FREE7', 'name' => 'Sete dias gratuitos',
+            'discount_type' => 'trial_free', 'discount_value' => 100, 'product_id' => $product->id,
+            'plan_id' => $plan->id, 'benefit_duration' => 'd7', 'status' => 'ativa',
+            'created_by_platform_admin_id' => $admin->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->actingAs(User::find($fixture['user_id']))->postJson("/api/backoffice/subscriptions/{$subscriptionId}/free-voucher", ['voucher_code' => 'FREE7'])
+            ->assertUnauthorized();
+        $this->actingAs($admin, 'platform')->postJson("/api/backoffice/subscriptions/{$subscriptionId}/free-voucher", ['voucher_code' => 'FREE7'])
+            ->assertOk()->assertJsonPath('subscription_id', $subscriptionId);
+        $this->assertDatabaseHas('subscriptions', ['id' => $subscriptionId, 'status' => 'ativa', 'provider_subscription_id' => null]);
+        $this->assertDatabaseHas('voucher_redemptions', ['subscription_id' => $subscriptionId]);
+        $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.subscription_free_voucher_activated', 'entity_id' => $subscriptionId]);
+        Http::assertSent(fn ($request) => $request->method() === 'PUT' && $request->url() === 'https://api.mercadopago.com/preapproval/pre-assisted' && $request['status'] === 'cancelled');
+        $paymentId = DB::table('payments')->where('subscription_id', $subscriptionId)->value('id');
+        app(\App\Services\SubscriptionBillingManager::class)->applyPayment($paymentId, ['id' => 'late-payment', 'preapproval_id' => 'pre-assisted'], 'cancelado');
+        $this->assertDatabaseHas('subscriptions', ['id' => $subscriptionId, 'status' => 'ativa']);
+
+        $this->travel(8)->days();
+        $this->artisan('fokus:expire-free-voucher-subscriptions')->assertSuccessful();
+        $this->assertDatabaseHas('subscriptions', ['id' => $subscriptionId, 'status' => 'suspensa']);
+        $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/subscriptions/{$subscriptionId}", ['action' => 'reativacao', 'reason' => 'Tentativa sem novo pagamento.'])
+            ->assertUnprocessable();
+        $newCheckout = $this->actingAs($admin, 'platform')->postJson('/api/backoffice/subscriptions/checkout', [
+            'company_id' => $fixture['company_id'], 'product_code' => 'law', 'plan_code' => 'law-advocacia', 'cycle' => 'monthly',
+        ])->assertCreated();
+        $this->assertDatabaseHas('subscriptions', ['id' => $subscriptionId, 'status' => 'encerrada']);
+        $this->assertDatabaseHas('subscriptions', ['id' => $newCheckout->json('subscription_id'), 'status' => 'aguardando_pagamento']);
+    }
+
     public function test_internal_admin_can_list_masked_companies_and_subscription_detail(): void
     {
         $admin = $this->platformAdmin();

@@ -20,6 +20,11 @@ class SubscriptionChangeManager
 
             $before = $this->snapshot($subscription);
             $action = (string) $data['action'];
+            if (in_array($action, ['reativacao', 'upgrade', 'downgrade'], true) && $subscription->status === 'suspensa' && ! $subscription->provider_subscription_id) {
+                abort_if(DB::table('voucher_redemptions as redemption')->join('vouchers as voucher', 'voucher.id', '=', 'redemption.voucher_id')
+                    ->where('redemption.subscription_id', $subscriptionId)->where('voucher.discount_type', 'trial_free')
+                    ->where('redemption.benefit_ends_at', '<=', now())->exists(), 422, 'O benefício gratuito terminou. Inicie uma nova contratação paga.');
+            }
             $after = $before;
             $status = 'aplicada';
             $effectiveAt = now();
