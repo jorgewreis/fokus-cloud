@@ -81,6 +81,12 @@ class SubscriptionAdminTest extends TestCase
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.subscription_free_voucher_activated', 'entity_id' => $subscriptionId]);
         Http::assertSent(fn ($request) => $request->method() === 'PUT' && $request->url() === 'https://api.mercadopago.com/preapproval/pre-assisted' && $request['status'] === 'cancelled');
         $paymentId = DB::table('payments')->where('subscription_id', $subscriptionId)->value('id');
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/payments')
+            ->assertOk()->assertJsonFragment(['id' => $paymentId, 'status' => 'cancelado']);
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/payments?status=cancelado')
+            ->assertOk()->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $paymentId)
+            ->assertJsonPath('data.0.status', 'cancelado');
         app(\App\Services\SubscriptionBillingManager::class)->applyPayment($paymentId, ['id' => 'late-payment', 'preapproval_id' => 'pre-assisted'], 'cancelado');
         $this->assertDatabaseHas('subscriptions', ['id' => $subscriptionId, 'status' => 'ativa']);
 

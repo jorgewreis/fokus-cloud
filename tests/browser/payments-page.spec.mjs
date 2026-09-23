@@ -78,6 +78,8 @@ test('console financeiro pagina, filtra e conclui ações pelos drawers', async 
     await grantBillingPermissions(page);
     await page.goto('/backoffice/pagamentos');
     await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'pagamentos');
+    await expect(page.locator('#billing-reload')).toHaveCount(0);
+    await expect(page.locator('#billing-payments-panel')).toBeVisible();
     await expect(page.locator('#billing-payments-list tr')).toHaveCount(15);
     await expect(page.locator('#billing-payments-page-summary')).toContainText('página 1 de 2');
     await page.getByRole('button', { name: 'Próxima página' }).click();
@@ -102,6 +104,8 @@ test('console financeiro pagina, filtra e conclui ações pelos drawers', async 
     await expect(paymentDetail).toBeFocused();
 
     await page.locator('#billing-reconciliation-tab').click();
+    await expect(page.locator('#billing-reconciliation-panel')).toBeVisible();
+    await expect(page.locator('#billing-payments-panel')).toBeHidden();
     await expect(page.locator('#billing-reconciliation-list tr')).toHaveCount(1);
     await page.locator('#billing-reconciliation-list [data-billing-detail]').click();
     await expect(page.locator('#billing-detail-sections')).toContainText('Empresa Alpha Financeira');
@@ -113,6 +117,8 @@ test('console financeiro pagina, filtra e conclui ações pelos drawers', async 
     await page.locator('#billing-drawer-close').click();
 
     await page.locator('#billing-refunds-tab').click();
+    await expect(page.locator('#billing-refunds-panel')).toBeVisible();
+    await expect(page.locator('#billing-reconciliation-panel')).toBeHidden();
     await expect(page.locator('#billing-refunds-list tr')).toHaveCount(1);
     await page.locator('#billing-refunds-list [data-billing-detail]').click();
     await expect(page.locator('#billing-detail-sections')).toContainText('Falha técnica confirmada.');

@@ -115,7 +115,7 @@ test('drawer de assinaturas organiza dados longos e mostra vazios sem pagamentos
         const subscription = await response.json();
         await route.fulfill({ response, json: {
             ...subscription,
-            items: [{ ...subscription.items[0], name: 'Item de assinatura com nome extenso para conferir a quebra de linha em painéis estreitos', conditions: { ...subscription.items[0].conditions, long_description: 'Descrição complementar extensa para verificar leitura e ausência de overflow horizontal dentro do drawer.' } }],
+            items: [{ ...subscription.items[0], name: 'Item de assinatura com nome extenso para conferir a quebra de linha em painéis estreitos', conditions: { ...subscription.items[0].conditions, personalizations: { 'gestao-contatos': { value: 1, additional_monthly_amount: 4.49 } }, personalization_delta: 0, long_description: 'Descrição complementar extensa para verificar leitura e ausência de overflow horizontal dentro do drawer.' } }],
             payments: [],
             history: Array.from({ length: 24 }, (_, index) => ({ ...subscription.history[0], id: `CHG_LONG_${index}`, reason: `Registro de histórico comercial número ${index + 1} com observações de atendimento e motivo detalhado.`, created_at: `2026-08-${String((index % 28) + 1).padStart(2, '0')}T12:00:00.000Z` })),
         } });
@@ -130,6 +130,9 @@ test('drawer de assinaturas organiza dados longos e mostra vazios sem pagamentos
     await expect(page.locator('#subscription-drawer')).toBeVisible();
     await expect(page.locator('#subscription-drawer-close')).toBeFocused();
     await expect(page.locator('#subscription-detail-items')).toContainText('Item de assinatura com nome extenso');
+    await expect(page.locator('#subscription-detail-items')).toContainText('gestao-contatos: 1 · R$ 4,49/mês');
+    await expect(page.locator('#subscription-detail-items')).toContainText('R$ 0,00');
+    await expect(page.locator('#subscription-detail-items')).not.toContainText('[object Object]');
     await expect(page.locator('#subscription-detail-payments')).toContainText('Nenhum pagamento vinculado');
     await expect(page.locator('#subscription-detail-history article')).toHaveCount(24);
     expect(await page.locator('#subscription-drawer').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
@@ -892,7 +895,8 @@ test('Vouchers filtra, pagina e consulta regras, resgates e reservas em drawer r
         await expect(page.locator('.fs-table thead th')).toHaveCount(7);
         await expect(page.locator('.fs-table thead')).not.toContainText('Código');
         await expect(page.locator('#voucher-list tr').first().locator('td').first()).toContainText('Campanha visual 1');
-        await expect(page.locator('#voucher-list tr').first().locator('td').first()).toContainText('Código: CAMPANHA1');
+        await expect(page.locator('#voucher-list tr').first().locator('td').first().locator('strong')).toHaveText('Campanha visual 1');
+        await expect(page.locator('#voucher-list tr').first().locator('td').first().locator('small')).toHaveText('CAMPANHA1');
         await expect(page.locator('#voucher-product-filter option')).toHaveCount(2);
         await expect(page.locator('#voucher-table-footer-summary')).toContainText('página 1 de 2');
         await expect(page.locator('#voucher-pagination')).toHaveAccessibleName('Paginação de vouchers');

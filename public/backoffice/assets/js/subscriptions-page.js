@@ -103,7 +103,7 @@ const badge = (value, labels = STATUS_LABELS) => {
 const valueForDisplay = (key, value) => {
     if (value === null || value === undefined || value === "") return "—";
     if (key === "billing_cycle" || key === "cycle") return value === "annual" ? "Anual" : value === "monthly" ? "Mensal" : String(value);
-    if (key === "amount" || key === "monthly_amount" || key === "unit_price" || key === "proration_amount") return money(value);
+    if (["amount", "monthly_amount", "unit_price", "proration_amount", "personalization_delta", "additional_monthly_amount"].includes(key)) return money(value);
     if (key.endsWith("_at") || key.endsWith("_date")) return formatDate(value, String(value).includes("T") && String(value).length > 10);
     if (key === "status") return STATUS_LABELS[value] || String(value).replaceAll("_", " ");
     if (typeof value === "boolean") return value ? "Sim" : "Não";
@@ -125,7 +125,25 @@ const publicationVersionEntries = (versions = {}) => [
 const itemConditions = (conditions = {}) => Object.entries(conditions)
     .filter(([key, value]) => value !== null && value !== "" && !["module_code", "selection_mode", "context_code", "collaboration_code", "collaboration"].includes(key))
     .filter(([key, value]) => !(key === "variant_code" && value === "colaboracao"))
-    .map(([key, value]) => [CONDITION_LABELS[key] || key.replaceAll("_", " "), key === "cycle" ? valueForDisplay(key, value) : Array.isArray(value) ? value.join(", ") : valueForDisplay(key, value)]);
+    .map(([key, value]) => {
+        if (key === "personalizations") {
+            const entries = Array.isArray(value) ? value : (value && typeof value === "object" ? Object.entries(value).map(([type_code, selection]) => ({ type_code, ...(selection && typeof selection === "object" ? selection : { value: selection }) })) : []);
+            const formatted = entries.map((selection) => {
+                if (!selection || typeof selection !== "object") return String(selection ?? "");
+                const type = selection.type_label || selection.type_code || selection.name || "Personalização";
+                const selected = selection.value ?? selection.tier_value ?? selection.tier?.value;
+                const amount = selection.additional_monthly_amount ?? selection.monthly_amount;
+                const parts = [selected !== undefined && selected !== null ? String(selected) : "Faixa selecionada"];
+                if (amount !== undefined && amount !== null) parts.push(`${money(amount)}/mês`);
+                return `${type}: ${parts.join(" · ")}`;
+            }).filter(Boolean).join("; ");
+            return ["Personalizações", formatted || "—"];
+        }
+        const formatted = key === "cycle" ? valueForDisplay(key, value)
+            : Array.isArray(value) ? value.map((entry) => entry && typeof entry === "object" ? JSON.stringify(entry) : String(entry)).join(", ")
+                : valueForDisplay(key, value);
+        return [CONDITION_LABELS[key] || key.replaceAll("_", " "), formatted];
+    });
 
 const snapshotCard = (title, snapshot) => {
     if (!snapshot || !Object.keys(snapshot).length) return `<p class="fs-u-fs-sm fs-u-color-secondary">Snapshot não disponível.</p>`;

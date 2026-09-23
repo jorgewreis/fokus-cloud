@@ -155,7 +155,7 @@ export async function mount(root, context = {}) {
                 ? `${Number(voucher.redemptions_count || 0)} / ${Number(voucher.redemption_limit)}`
                 : `${Number(voucher.redemptions_count || 0)} / Sem limite`;
             return `<tr>
-                <td class="fs-width-500" data-label="Voucher"><strong>${escapeHtml(voucher.name || voucher.code || "—")}</strong><small class="fs-u-d-block fs-u-fs-sm fs-u-color-secondary">Código: ${escapeHtml(voucher.code || "—")}</small>${voucher.origin ? `<small class="fs-u-d-block fs-u-fs-sm fs-u-color-secondary">${escapeHtml(voucher.origin)}</small>` : ""}</td>
+                <td class="fs-width-500" data-label="Voucher"><strong class="fs-u-d-block">${escapeHtml(voucher.name || "Voucher")}</strong><small class="fs-u-d-block fs-u-fs-sm fs-u-color-secondary">${escapeHtml(voucher.code || "—")}</small></td>
                 <td class="fs-width-500" data-label="Produto e plano"><strong>${escapeHtml(product)}</strong><small class="fs-u-d-block fs-u-fs-sm fs-u-color-secondary">${escapeHtml(plan)}</small></td>
                 <td class="fs-width-500" data-label="Benefício">${escapeHtml(benefitLabel(voucher))}${voucher.benefit_duration ? `<small class="fs-u-d-block fs-u-fs-sm fs-u-color-secondary">${escapeHtml(DURATION[voucher.benefit_duration] || voucher.benefit_duration)}</small>` : ""}</td>
                 <td class="fs-width-300" data-label="Utilização">${escapeHtml(usage)}</td>

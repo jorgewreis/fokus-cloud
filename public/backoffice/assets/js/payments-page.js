@@ -336,7 +336,7 @@ export function mount(root, context = {}) {
         state.lists[kind].filters = currentFilters(event.currentTarget);
         state.lists[kind].page = 1;
         state.lists[kind].loaded = false;
-        load(kind, { force: true });
+        if (!state.lists[kind].loading) load(kind, { force: true });
     };
     const pageClick = (event) => {
         const button = event.target.closest("[data-billing-page]");
@@ -363,6 +363,26 @@ export function mount(root, context = {}) {
         state.active = match[0];
         if (!state.lists[state.active].loaded) load(state.active);
     };
+    const onTabClick = (event) => {
+        const tab = event.target.closest("[data-fs-target]");
+        const kind = Object.keys(panelSelectors).find((key) => tabButtons[key] === tab);
+        if (!kind || tab.disabled || tab.getAttribute("aria-disabled") === "true") return;
+        // Keep panel visibility explicit even if the shared Tabs controller was
+        // initialized before this fragment or its change event was missed.
+        for (const [panelKind, selector] of Object.entries(panelSelectors)) {
+            const selected = panelKind === kind;
+            const panel = $(selector);
+            panel.hidden = !selected;
+            panel.classList.toggle("is-active", selected);
+            tabButtons[panelKind].classList.toggle("is-active", selected);
+            tabButtons[panelKind].setAttribute("aria-selected", String(selected));
+            tabButtons[panelKind].setAttribute("tabindex", selected ? "0" : "-1");
+        }
+        state.active = kind;
+        // Refresh on entry so out-of-band billing changes (for example applying
+        // a free voucher from subscription details) appear without a reload button.
+        load(kind, { force: true });
+    };
     const onDrawerHidden = () => {
         state.detailController?.abort();
         state.lastTrigger?.focus?.();
@@ -375,6 +395,7 @@ export function mount(root, context = {}) {
         setFormValues(kind);
     }
     tabsElement.addEventListener("fs:tab:changed", onTabChanged, { signal: pageSignal });
+    tabsElement.addEventListener("click", onTabClick, { signal: pageSignal });
     $("#billing-detail-sections").addEventListener("click", (event) => {
         actionClick(event);
         if (event.target.closest("#billing-refund-request-toggle")) $("#billing-refund-request-form").hidden = false;
@@ -382,7 +403,6 @@ export function mount(root, context = {}) {
     $("#billing-action-form").addEventListener("submit", submitAction, { signal: pageSignal });
     drawerTrigger.addEventListener("fs:hidden", onDrawerHidden, { signal: pageSignal });
     $("#billing-drawer-close").addEventListener("click", () => drawer.close(), { signal: pageSignal });
-    $("#billing-reload").addEventListener("click", () => load(state.active, { force: true }), { signal: pageSignal });
 
     modalTrigger.addEventListener("fs:hidden", () => {
         if (!state.pendingAction) return;
