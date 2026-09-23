@@ -296,6 +296,28 @@ test('salvar alterações de plano usa PATCH no plano em edição', async ({ pag
     await expect.poll(() => saveRequest).toEqual({ method: 'PATCH', url: 'http://127.0.0.1:4177/api/backoffice/catalog/plans/PLN_1' });
 });
 
+test('ativar módulo não dispara a ação nem o toast mais de uma vez', async ({ page }) => {
+    let activationRequests = 0;
+    page.on('request', (request) => {
+        if (request.url().endsWith('/api/backoffice/catalog/modules/MOD_1/activate')) activationRequests += 1;
+    });
+
+    await page.goto('/backoffice/modulos');
+    await expect(page.locator('#module-list')).toBeVisible();
+    await page.evaluate(() => {
+        window.__moduleClickCount = 0;
+        document.querySelector('#module-list').addEventListener('click', () => { window.__moduleClickCount += 1; }, true);
+    });
+    await page.locator('#module-list [data-module-action="edit"]').first().evaluate((button) => {
+        button.dataset.moduleAction = 'activate';
+        button.setAttribute('aria-label', 'Ativar módulo');
+    });
+    await page.locator('#module-list [data-module-action="activate"]').click();
+    expect(await page.evaluate(() => window.__moduleClickCount)).toBe(1);
+    await expect.poll(() => activationRequests).toBe(1);
+    await expect.poll(() => page.locator('#backoffice-toast-container .fs-toast').count()).toBe(1);
+});
+
 test('planos replica o contrato visual, composição e estados do drawer', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/backoffice/planos');
