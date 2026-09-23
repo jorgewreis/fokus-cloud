@@ -47,7 +47,7 @@ export async function mount(root, context = {}) {
         const canPublish = context.permissions?.has("platform.catalog.publish") || window.__backofficePermissions?.has("platform.catalog.publish");
         const items = [action("view", plan, "Ver detalhes do plano"), action("edit", plan, "Editar plano")];
         if (!canPublish) return items.join("");
-        if (plan.status === "ativo" && plan.publication_state === "publicado") items.push(action("pause", plan, "Pausar plano"));
+        if (plan.status === "ativo") items.push(action("pause", plan, "Pausar plano"));
         else if (["inativo", "pausado"].includes(plan.status)) items.push(action("activate", plan, "Ativar plano"), action("archive", plan, "Arquivar plano"));
         else if (plan.status === "arquivado") items.push(action("delete", plan, "Excluir plano", true));
         return items.join("");
