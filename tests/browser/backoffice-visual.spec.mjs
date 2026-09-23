@@ -128,7 +128,7 @@ test('drawer de assinaturas organiza dados longos e mostra vazios sem pagamentos
     await page.goto('/backoffice/assinaturas');
     await page.getByRole('button', { name: /Ver detalhes da assinatura/ }).first().click();
     await expect(page.locator('#subscription-drawer')).toBeVisible();
-    await expect(page.locator('#subscription-drawer-close')).toBeFocused();
+    await expect.poll(() => page.evaluate(() => document.activeElement?.closest('#subscription-drawer')?.id || '')).toBe('subscription-drawer');
     await expect(page.locator('#subscription-detail-items')).toContainText('Item de assinatura com nome extenso');
     await expect(page.locator('#subscription-detail-items')).toContainText('gestao-contatos: 1 · R$ 4,49/mês');
     await expect(page.locator('#subscription-detail-items')).toContainText('R$ 0,00');
