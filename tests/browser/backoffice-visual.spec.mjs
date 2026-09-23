@@ -8,6 +8,19 @@ const viewports = [
     ['mobile-narrow', { width: 320, height: 700 }],
 ];
 
+const useSubscriptionCatalog = async (page) => {
+    await page.route('**/api/backoffice/catalog', (route) => route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+            products: [
+                { id: 'PRD_LAW', name: 'Fokus Law', code: 'law', plans: [{ id: 'PLN_1', name: 'Advocacia', full_name: 'Fokus Law - Advocacia' }] },
+                { id: 'PRD_LEAD', name: 'Fokus Lead', code: 'lead', plans: [{ id: 'PLN_LEAD', name: 'Essencial', full_name: 'Fokus Lead - Essencial' }] },
+            ],
+            options: { segments: {}, module_codes: [], personalization_types: [] },
+        }),
+    }));
+};
+
 for (const [name, viewport] of viewports) {
     for (const [route, pageId] of [['empresas', 'companies'], ['produtos', 'products'], ['modulos', 'modules']]) {
         test(`visual ${pageId} ${name}`, async ({ page }) => {
@@ -36,6 +49,152 @@ test('navegação cancela a página anterior e mantém somente um drawer portale
     await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'companies');
     await expect(page.locator('body > #product-drawer')).toHaveCount(0);
     await expect(page.locator('body > #company-drawer')).toHaveCount(1);
+});
+
+test('Assinaturas filtra por empresa, produto e status e consulta detalhes em drawer responsivo', async ({ page }) => {
+    for (const [name, viewport] of [['desktop', { width: 1440, height: 900 }], ['tablet', { width: 768, height: 1024 }], ['mobile', { width: 375, height: 812 }]]) {
+        await page.setViewportSize(viewport);
+        await useSubscriptionCatalog(page);
+        await page.goto('/backoffice/assinaturas');
+        await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'subscriptions');
+        await expect(page.locator('#subscription-list tr')).toHaveCount(15);
+        await expect(page.locator('#subscription-product option')).toHaveCount(3);
+        await expect(page).toHaveScreenshot(`subscriptions-${name}.png`, { fullPage: true, animations: 'disabled', maxDiffPixelRatio: 0.08 });
+
+        await page.getByRole('button', { name: 'Próxima página' }).click();
+        await expect(page.locator('#subscription-list tr')).toHaveCount(2);
+        await expect(page.locator('#subscription-table-footer-summary')).toContainText('Página 2 de 2');
+        await page.getByRole('button', { name: 'Página anterior' }).click();
+        await expect(page.locator('#subscription-list tr')).toHaveCount(15);
+
+        await page.getByLabel('Empresa ou produto').fill('Demonstração');
+        await page.locator('#subscription-product').selectOption('PRD_LAW');
+        await page.locator('#subscription-status').selectOption('ativa');
+        await page.getByRole('button', { name: 'Filtrar' }).click();
+        await expect(page.locator('#subscription-list tr')).toHaveCount(1);
+        await expect(page.locator('#subscription-list')).toContainText('Empresa de Demonstração');
+        await expect(page).toHaveURL(/q=Demonstra%C3%A7%C3%A3o/);
+        await expect(page).toHaveURL(/status=ativa/);
+        await expect(page).toHaveURL(/product_id=PRD_LAW/);
+
+        await page.getByRole('button', { name: /Ver detalhes da assinatura/ }).click();
+        await expect(page.locator('#subscription-drawer')).toBeVisible();
+        await expect(page.locator('#subscription-drawer-title')).toHaveText('Detalhes da assinatura');
+        await expect(page.locator('#subscription-detail-payments')).toContainText('Pago');
+        await expect(page.locator('#subscription-detail-items')).toContainText('Gestão de processos');
+        await expect(page.locator('#subscription-detail-history')).toContainText('Atualização do contrato');
+        await expect(page.locator('#subscription-detail-history')).toContainText('Consultar snapshots comerciais');
+        await expect(page.locator('#subscription-override-option')).toBeHidden();
+        await expect(page).toHaveScreenshot(`subscriptions-drawer-${name}.png`, { fullPage: true, animations: 'disabled', maxDiffPixelRatio: 0.08 });
+
+        const drawerMetrics = await page.locator('#subscription-drawer').evaluate((drawer) => ({
+            width: Number.parseFloat(getComputedStyle(drawer).width),
+            footerVisible: (() => {
+                const footer = drawer.querySelector(':scope > .fs-offcanvas-footer').getBoundingClientRect();
+                return footer.bottom <= window.innerHeight && footer.top >= 0;
+            })(),
+        }));
+        expect(drawerMetrics.width).toBe(Math.min(480, viewport.width - 16));
+        expect(drawerMetrics.footerVisible).toBe(true);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+        await page.keyboard.press('Escape');
+        await expect(page.locator('#subscription-drawer')).toBeHidden();
+        await expect(page.getByRole('button', { name: /Ver detalhes da assinatura/ })).toBeFocused();
+    }
+});
+
+test('drawer de assinaturas organiza dados longos e mostra vazios sem pagamentos ou itens', async ({ page }) => {
+    await useSubscriptionCatalog(page);
+    await page.route('**/api/backoffice/subscriptions/SUB_VISUAL_01', async (route) => {
+        const response = await route.fetch();
+        const subscription = await response.json();
+        await route.fulfill({ response, json: {
+            ...subscription,
+            items: [{ ...subscription.items[0], name: 'Item de assinatura com nome extenso para conferir a quebra de linha em painéis estreitos', conditions: { ...subscription.items[0].conditions, long_description: 'Descrição complementar extensa para verificar leitura e ausência de overflow horizontal dentro do drawer.' } }],
+            payments: [],
+            history: Array.from({ length: 24 }, (_, index) => ({ ...subscription.history[0], id: `CHG_LONG_${index}`, reason: `Registro de histórico comercial número ${index + 1} com observações de atendimento e motivo detalhado.`, created_at: `2026-08-${String((index % 28) + 1).padStart(2, '0')}T12:00:00.000Z` })),
+        } });
+    });
+    await page.route('**/api/backoffice/subscriptions/SUB_VISUAL_02', async (route) => {
+        const response = await route.fetch();
+        const subscription = await response.json();
+        await route.fulfill({ response, json: { ...subscription, items: [], payments: [], history: [] } });
+    });
+    await page.goto('/backoffice/assinaturas');
+    await page.getByRole('button', { name: /Ver detalhes da assinatura/ }).first().click();
+    await expect(page.locator('#subscription-drawer')).toBeVisible();
+    await expect(page.locator('#subscription-drawer-close')).toBeFocused();
+    await expect(page.locator('#subscription-detail-items')).toContainText('Item de assinatura com nome extenso');
+    await expect(page.locator('#subscription-detail-payments')).toContainText('Nenhum pagamento vinculado');
+    await expect(page.locator('#subscription-detail-history article')).toHaveCount(24);
+    expect(await page.locator('#subscription-drawer').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await page.locator('#subscription-drawer-close').click();
+    await expect(page.getByRole('button', { name: /Ver detalhes da assinatura/ }).first()).toBeFocused();
+
+    await page.getByRole('button', { name: /Ver detalhes da assinatura/ }).nth(1).click();
+    await expect(page.locator('#subscription-detail-items')).toContainText('Nenhum item contratado');
+    await expect(page.locator('#subscription-detail-payments')).toContainText('Nenhum pagamento vinculado');
+    await expect(page.locator('#subscription-detail-history')).toContainText('Nenhuma alteração comercial registrada');
+});
+
+test('encerramento imediato de assinatura exige confirmação e atualiza detalhe e listagem', async ({ page }) => {
+    let patchCount = 0;
+    page.on('request', (request) => {
+        if (request.method() === 'PATCH' && request.url().includes('/api/backoffice/subscriptions/')) patchCount += 1;
+    });
+    await useSubscriptionCatalog(page);
+    await page.goto('/backoffice/assinaturas');
+    await page.getByRole('button', { name: /Ver detalhes da assinatura/ }).first().click();
+    await page.locator('#subscription-action').selectOption('cancelamento_imediato');
+    await page.getByLabel('Motivo').fill('Encerramento solicitado pela empresa.');
+    await page.getByRole('button', { name: 'Registrar ação' }).click();
+    await expect(page.locator('#subscription-confirm-dialog')).toBeVisible();
+    expect(patchCount).toBe(0);
+
+    await page.locator('#subscription-confirm-submit').click();
+    await expect(page.locator('#backoffice-toast-container .fs-toast-body')).toContainText('Alteração comercial registrada.');
+    await expect(page.locator('#subscription-detail-summary')).toContainText('Encerrada');
+    await expect(page.locator('#subscription-list')).toContainText('Encerrada');
+    expect(patchCount).toBe(1);
+});
+
+test('ações de mudança mostram os campos próprios e respeitam permissão de override', async ({ page }) => {
+    await useSubscriptionCatalog(page);
+    await page.goto('/backoffice/assinaturas');
+    await page.getByRole('button', { name: /Ver detalhes da assinatura/ }).first().click();
+    await expect(page.locator('#subscription-drawer')).toBeVisible();
+    await page.locator('#subscription-action').selectOption('upgrade');
+    await expect(page.locator('#subscription-target-fields')).toBeVisible();
+    await expect(page.locator('#subscription-target-plan')).toHaveAttribute('required', '');
+    await page.locator('#subscription-action').selectOption('downgrade');
+    await expect(page.locator('#subscription-target-fields')).toBeVisible();
+    await page.locator('#subscription-action').selectOption('suspensao');
+    await expect(page.locator('#subscription-target-fields')).toBeHidden();
+    await expect(page.locator('#subscription-override-option')).toBeHidden();
+});
+
+test('Assinaturas comunica resultado vazio e falha de carregamento', async ({ page }) => {
+    await page.route('**/api/backoffice/subscriptions?**', (route) => {
+        const query = new URL(route.request().url()).searchParams.get('q');
+        if (query === 'empresa inexistente') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [], meta: { total: 0, current_page: 1, per_page: 15, last_page: 1 } }) });
+        if (query === 'erro') return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Serviço indisponível.' }) });
+        return route.continue();
+    });
+    await page.goto('/backoffice/assinaturas');
+    await page.getByLabel('Empresa ou produto').fill('empresa inexistente');
+    const emptyResponse = page.waitForResponse((response) => response.url().includes('/api/backoffice/subscriptions?') && new URL(response.url()).searchParams.get('q') === 'empresa inexistente');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await emptyResponse;
+    await expect(page.locator('[data-fs-datatable-empty]')).toBeVisible();
+    await expect(page.locator('#subscription-table-summary')).toHaveText('0 assinaturas encontradas');
+
+    await page.getByLabel('Empresa ou produto').fill('erro');
+    const errorResponse = page.waitForResponse((response) => response.url().includes('/api/backoffice/subscriptions?') && new URL(response.url()).searchParams.get('q') === 'erro');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await errorResponse;
+    await expect(page.locator('[data-fs-datatable-error]')).toContainText('Serviço indisponível.');
+    await expect(page.locator('[data-fs-datatable-loading]')).toBeHidden();
 });
 
 test('diretório Usuários abre detalhes de conta e se adapta a telas menores', async ({ page }) => {
@@ -180,7 +339,7 @@ test('drawer de empresas preserva largura, cards e alertas do contrato visual', 
     });
 
     expect(drawerContract).toEqual({
-        width: '450px',
+        width: '480px',
         bodyPadding: '20px',
         cardsFitContent: true,
         cardBodySpacing: true,
@@ -278,7 +437,7 @@ test('produtos replica o contrato visual e mantém create, edit e view independe
         };
     });
     expect(createContract).toEqual({
-        width: '450px',
+        width: '480px',
         cards: 2,
         labelsHaveSpans: true,
         labelsHaveSpacing: true,
@@ -336,7 +495,7 @@ test('módulos replica o contrato visual, personalizações e estados do drawer'
         };
     });
     expect(createContract).toEqual({
-        width: '450px',
+        width: '480px',
         cards: 4,
         labelsHaveSpans: true,
         cardBodySpacing: true,
@@ -487,7 +646,7 @@ test('planos replica o contrato visual, composição e estados do drawer', async
         descriptionMaxLengths: [...drawer.querySelectorAll('#plan-technical-description, #plan-commercial-content')].map((field) => field.getAttribute('maxlength')),
         primaryButton: drawer.querySelector('#plan-form-submit')?.classList.contains('fs-btn-primary'),
     }));
-    expect(createContract).toEqual({ width: '450px', cards: 3, controlsUseGoogleSans: true, textareaPadding: ['10px 15px'], segmentIsSelect: true, segmentOptions: ['', 'advocacia'], descriptionWidths: [true, true], descriptionMaxLengths: ['2000', '20000'], primaryButton: true });
+    expect(createContract).toEqual({ width: '480px', cards: 3, controlsUseGoogleSans: true, textareaPadding: ['10px 15px'], segmentIsSelect: true, segmentOptions: ['', 'advocacia'], descriptionWidths: [true, true], descriptionMaxLengths: ['2000', '20000'], primaryButton: true });
 
     await page.locator('#plan-product').selectOption('PRD_LAW');
     await page.locator('#plan-segment').selectOption('advocacia');

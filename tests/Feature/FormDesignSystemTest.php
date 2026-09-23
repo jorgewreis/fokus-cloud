@@ -277,7 +277,7 @@ class FormDesignSystemTest extends TestCase
             'public/backoffice/pages/companies.html' => 'backoffice-companies-page',
             'public/backoffice/pages/products.html' => 'backoffice-products-page',
             'public/backoffice/pages/modules.html' => 'backoffice-modules-page',
-            'public/backoffice/pages/subscriptions.html' => 'subscription-page',
+            'public/backoffice/pages/subscriptions.html' => 'backoffice-records-page',
             'public/backoffice/pages/pagamentos.html' => 'pagamentos-page',
         ];
 
@@ -311,8 +311,10 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringNotContainsString('class="input-label', $products);
         $this->assertStringNotContainsString('product-confirm-dialog', $products);
         $this->assertStringNotContainsString('window.confirm', $products);
-        $this->assertStringContainsString('card-body', $subscriptions);
-        $this->assertStringContainsString('cancelamento_imediato', $subscriptions);
+        $this->assertStringContainsString('fs-filter-form', $subscriptions);
+        $this->assertStringContainsString('fs-table-records', $subscriptions);
+        $this->assertStringContainsString('fs-offcanvas', $subscriptions);
+        $this->assertStringContainsString('name="product_id"', $subscriptions);
 
         $this->assertStringNotContainsString('admin-company-page {', file_get_contents(base_path('public/backoffice/assets/css/pages/admin-dashboard.css')));
         $this->assertFileDoesNotExist(base_path('public/backoffice/assets/css/pages/admin-products.css'));

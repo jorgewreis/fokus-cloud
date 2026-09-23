@@ -17893,7 +17893,7 @@ html[data-role="admin"] textarea {
 }
 .backoffice-records-drawer.fs-offcanvas-end,
 body > .backoffice-records-drawer.fs-offcanvas-end {
-    width: 450px;
+    width: 480px;
     max-width: calc(100vw - 16px);
 }
 .backoffice-records-drawer .fs-offcanvas-body.fs-form {

@@ -1,57 +1,167 @@
-<div class="subscription-page fs-container-fluid fs-u-d-flex fs-u-flex-column fs-u-gap-4">
-    <div class="fs-col fs-u-gap-3 fs-u-mb-3"><h1 class="fs-u-fs-h1">Assinaturas</h1><p class="fs-u-fs-h5 fs-u-color-secondary">Consulte contratos, pagamentos, histórico e ações comerciais.</p></div>
+<link data-page-css="subscriptions" rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260923-subscriptions-refactor-v1" />
 
-    <hr>
-
-    <div id="subscription-message" class="fs-alert" role="status" aria-live="polite" aria-atomic="true" hidden></div>
-    <form class="fs-form fs-card fs-u-p-3" id="subscription-filter-form">
-        <div class="fs-form-row fs-u-align-items-end">
-            <div class="fs-form-col fs-col-6"><label class="fs-form-label" for="subscription-query">Buscar</label><input class="fs-form-control" id="subscription-query" name="q" type="search" placeholder="Empresa ou produto" autocomplete="off"></div>
-            <div class="fs-form-col fs-col-3"><label class="fs-form-label" for="subscription-status">Status</label><select class="fs-form-select" id="subscription-status" name="status"><option value="">Todos</option><option value="aguardando_pagamento">Aguardando pagamento</option><option value="ativa">Ativa</option><option value="inadimplente">Inadimplente</option><option value="suspensa">Suspensa</option><option value="cancelamento_agendado">Cancelamento agendado</option><option value="encerrada">Encerrada</option></select></div>
-            <div class="fs-u-d-flex fs-u-flex-wrap fs-u-justify-content-end fs-u-gap-2 fs-col-3"><button class="fs-btn fs-btn-outline-secondary" type="submit">Filtrar</button></div>
+<main class="backoffice-records-page container-page fs-container-fluid" aria-labelledby="subscriptions-page-title">
+    <header class="fs-page-layout">
+        <div class="fs-page-header-display">
+            <span>Comercial</span>
+            <h1 id="subscriptions-page-title">Assinaturas</h1>
+            <p>Consulte contratos, pagamentos, histórico e ações comerciais.</p>
         </div>
-    </form>
-    <div class="fs-table-responsive fs-datatable" data-fs="datatable" data-fs-page-size="15"><table class="fs-table" aria-label="Assinaturas cadastradas"><thead><tr><th>Empresa</th><th>Produto</th><th>Plano</th><th>Status</th><th>Vigência</th><th>Valor</th><th>Ações</th></tr></thead><tbody id="subscription-list"><tr><td colspan="7">Carregando assinaturas...</td></tr></tbody></table></div>
-    <nav id="subscription-pagination" class="fs-pagination" aria-label="Paginação de assinaturas"></nav>
+    </header>
 
-    <section class="fs-card fs-u-p-3" id="subscription-detail" hidden aria-live="polite">
-        <div class="fs-u-d-flex fs-u-justify-content-between fs-u-align-items-center fs-u-gap-3"><div class="fs-col fs-u-gap-1"><h2 class="fs-u-fs-h3" id="subscription-detail-title"></h2><p class="fs-u-fs-md fs-u-color-secondary" id="subscription-detail-summary"></p></div><button class="fs-btn fs-btn-outline-primary" id="subscription-detail-close" type="button">Fechar</button></div>
-        <div class="fs-col fs-u-gap-2 fs-u-mt-3"><h3 class="fs-u-fs-h4">Itens contratados</h3><div id="subscription-detail-items"></div></div>
-        <div class="fs-col fs-u-gap-2 fs-u-mt-3"><h3 class="fs-u-fs-h4">Histórico comercial</h3><div id="subscription-detail-history"></div></div>
-        <form class="fs-form fs-card fs-u-p-3 fs-u-mt-3" id="subscription-change-form">
-            <h3 class="fs-u-fs-h4">Registrar ação comercial</h3>
-            <div class="fs-form-row"><div class="fs-form-col fs-col-4"><label class="fs-form-label" for="subscription-action">Ação</label><select class="fs-form-select" id="subscription-action" name="action" required><option value="">Selecione</option><option value="suspensao">Suspender</option><option value="reativacao">Reativar</option><option value="cancelamento">Agendar cancelamento</option><option value="cancelamento_imediato">Encerrar assinatura imediatamente</option><option value="upgrade">Solicitar upgrade</option><option value="downgrade">Agendar downgrade</option><option value="override">Override comercial</option></select></div><div class="fs-form-col fs-col-8"><label class="fs-form-label" for="subscription-reason">Motivo</label><textarea class="fs-form-control" id="subscription-reason" name="reason" rows="2" required maxlength="1000"></textarea></div></div>
-            <div class="fs-form-row" id="subscription-target-fields" hidden><div class="fs-form-col fs-col-6"><label class="fs-form-label" for="subscription-target-plan">Plano de destino</label><select class="fs-form-select" id="subscription-target-plan" name="target_plan_id"><option value="">Carregando planos...</option></select></div><div class="fs-form-col fs-col-3"><label class="fs-form-label" for="subscription-cycle">Ciclo</label><select class="fs-form-select" id="subscription-cycle" name="billing_cycle"><option value="monthly">Mensal</option><option value="annual">Anual</option></select></div></div>
-            <div class="fs-form-row" id="subscription-override-fields" hidden><div class="fs-form-col fs-col-4"><label class="fs-form-label" for="subscription-override-amount">Valor mensal</label><input class="fs-form-control" id="subscription-override-amount" name="override_monthly_amount" type="number" min="0" step="0.01" inputmode="decimal"></div><div class="fs-form-col fs-col-4"><label class="fs-form-label" for="subscription-override-cycle">Ciclo do override</label><select class="fs-form-select" id="subscription-override-cycle" name="override_billing_cycle"><option value="monthly">Mensal</option><option value="annual">Anual</option></select></div></div>
-            <div class="fs-u-d-flex fs-u-flex-wrap fs-u-justify-content-end fs-u-gap-2"><button class="fs-btn fs-btn-primary" type="submit">Registrar ação</button></div>
+    <div class="fs-alert" id="subscription-message" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+
+    <section class="fs-card fs-card-panel" aria-labelledby="subscription-filter-title">
+        <div class="fs-card-header">
+            <div class="fs-card-header-title">
+                <h2 class="fs-card-title" id="subscription-filter-title">Filtros</h2>
+                <p class="fs-card-subtitle">Encontre assinaturas por empresa, produto ou status.</p>
+            </div>
+        </div>
+        <form class="fs-card-body fs-filter-form" id="subscription-filter-form">
+            <label class="fs-form-label" for="subscription-query">
+                <span>Empresa ou produto</span>
+                <input class="fs-form-control fs-width-700" id="subscription-query" name="q" type="search" placeholder="Buscar empresa ou produto" autocomplete="off" />
+            </label>
+            <label class="fs-form-label" for="subscription-product">
+                <span>Produto</span>
+                <select class="fs-form-select fs-width-500" id="subscription-product" name="product_id">
+                    <option value="">Todos os produtos</option>
+                </select>
+            </label>
+            <label class="fs-form-label" for="subscription-status">
+                <span>Status</span>
+                <select class="fs-form-select fs-width-500" id="subscription-status" name="status">
+                    <option value="">Todos os status</option>
+                    <option value="aguardando_pagamento">Aguardando pagamento</option>
+                    <option value="ativa">Ativa</option>
+                    <option value="inadimplente">Inadimplente</option>
+                    <option value="suspensa">Suspensa</option>
+                    <option value="cancelamento_agendado">Cancelamento agendado</option>
+                    <option value="encerrada">Encerrada</option>
+                </select>
+            </label>
+            <button class="fs-btn fs-btn-outline-secondary fs-width-300 fs-form-action" type="submit">Filtrar</button>
         </form>
     </section>
-</div>
 
-<script>
-(() => {
-    const api = window.FokusApi;
-    const state = { page: 1, query: new URLSearchParams(location.search).get("q")?.trim() || "", status: "", current: null, plans: [] };
-    const list = document.querySelector("#subscription-list");
-    const pagination = document.querySelector("#subscription-pagination");
-    const detail = document.querySelector("#subscription-detail");
-    const message = document.querySelector("#subscription-message");
-    document.querySelector("#subscription-query").value = state.query;
-    const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#039;","\"":"&quot;"}[char]));
-    const money = (value) => `R$ ${Number(value || 0).toFixed(2).replace(".", ",")}`;
-    const showMessage = (value, tone = "danger") => { message.textContent = value || ""; message.dataset.tone = tone; message.hidden = !value; };
-    const statusBadge = (value) => { const classes = { ativa: "fs-badge-soft-success", suspensa: "fs-badge-soft-warning", cancelamento_agendado: "fs-badge-soft-warning", encerrada: "fs-badge-soft-danger", inadimplente: "fs-badge-soft-danger", aguardando_pagamento: "fs-badge-soft-info" }; return `<span class="fs-badge ${classes[value] ||"fs-badge-soft-secondary"}">${escapeHtml(value)}</span>`; };
-    const renderPagination = (meta) => { if (!meta || meta.last_page <= 1) { pagination.innerHTML = meta ? `<span class="fs-u-fs-sm fs-u-color-secondary">${meta.total} assinaturas</span>` : ""; return; } pagination.innerHTML = `<span class="fs-u-fs-sm fs-u-color-secondary">Página ${meta.current_page} de ${meta.last_page} · ${meta.total} assinaturas</span><ul class="fs-pagination">${Array.from({length: meta.last_page}, (_, i) => i + 1).map((page) => `<li class="fs-page-item${page === meta.current_page ? " is-active" : ""}"><button class="fs-page-link" type="button" data-subscription-page="${page}" aria-current="${page === meta.current_page ? "page" : "false"}">${page}</button></li>`).join("")}</ul>`; }; ;
-    const loadPlans = async () => { try { const catalog = await api.request("/backoffice/catalog"); state.plans = (catalog.products || []).flatMap((product) => (product.plans || []).map((plan) => ({ ...plan, product_name: product.name }))); document.querySelector("#subscription-target-plan").innerHTML = state.plans.map((plan) => `<option value="${escapeHtml(plan.id)}">${escapeHtml(plan.full_name || plan.name)}</option>`).join("") || '<option value="">Nenhum plano disponível</option>'; } catch (error) { showMessage(error.message || "Não foi possível carregar os planos."); } };
-    const load = async () => { try { const params = new URLSearchParams({ page: String(state.page), per_page: "15" }); if (state.query) params.set("q", state.query); if (state.status) params.set("status", state.status); const response = await api.request(`/backoffice/subscriptions?${params}`); list.innerHTML = response.data?.length ? response.data.map((item) => `<tr><td data-label="Empresa">${escapeHtml(item.company_name)}</td><td data-label="Produto">${escapeHtml(item.product_name)}</td><td data-label="Plano">${escapeHtml(item.plan_name || "-")}</td><td data-label="Status">${statusBadge(item.status)}</td><td data-label="Vigência">${item.current_period_ends_at ? new Date(item.current_period_ends_at).toLocaleDateString("pt-BR") : "-"}</td><td data-label="Valor" class="cell-value">${money(item.amount)}</td><td data-label="Ações"><button class="fs-btn fs-btn-outline-primary fs-btn-sm" type="button" data-subscription-id="${escapeHtml(item.id)}">Detalhes</button></td></tr>`).join("") : '<tr><td colspan="7">Nenhuma assinatura encontrada.</td></tr>'; renderPagination(response.meta); window.refreshFokusDataTables?.(document.querySelector(".subscriptions-page")); showMessage(""); } catch (error) { showMessage(error.message || "Não foi possível carregar as assinaturas."); } };
-    const renderDetail = (subscription) => { state.current = subscription; document.querySelector("#subscription-detail-title").textContent = `${subscription.company_name} · ${subscription.product_name}`; document.querySelector("#subscription-detail-summary").textContent = `${subscription.plan_name || "Plano não informado"} · ${subscription.status} · ${subscription.billing_cycle || "-"} · ${money(subscription.amount)}`; document.querySelector("#subscription-detail-items").innerHTML = subscription.items?.length ? `<ul>${subscription.items.map((item) => `<li>${escapeHtml(item.name)} · ${item.quantity} × ${money(item.unit_price)}</li>`).join("")}</ul>` : '<p class="fs-u-fs-md fs-u-color-secondary">Nenhum item ativo.</p>'; document.querySelector("#subscription-detail-history").innerHTML = subscription.history?.length ? subscription.history.map((item) => `<article class="fs-card"><div class="fs-card-header fs-u-d-flex fs-u-justify-content-between fs-u-align-items-center fs-u-gap-2"><strong class="fs-card-title">${escapeHtml(item.type)}</strong>${statusBadge(item.status)}</div><div class="fs-card-body"><p class="fs-u-fs-md">${escapeHtml(item.reason || "Sem motivo")}</p><p class="fs-card-subtitle">${item.created_at ? new Date(item.created_at).toLocaleString("pt-BR") : "-"}</p></div></article>`).join("") : '<p class="fs-u-fs-md fs-u-color-secondary">Nenhuma alteração registrada.</p>'; detail.hidden = false; detail.scrollIntoView({ behavior: "smooth", block: "start" }); };
-    document.querySelector("#subscription-filter-form").addEventListener("submit", (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); state.query = data.get("q")?.trim() || ""; state.status = data.get("status") || ""; state.page = 1; load(); });
-    pagination.addEventListener("click", (event) => { const button = event.target.closest("[data-subscription-page]"); if (!button) return; state.page = Number(button.dataset.subscriptionPage); load(); });
-    list.addEventListener("click", async (event) => { const button = event.target.closest("[data-subscription-id]"); if (!button) return; try { renderDetail(await api.request(`/backoffice/subscriptions/${button.dataset.subscriptionId}`)); } catch (error) { showMessage(error.message || "Não foi possível carregar a assinatura."); } });
-    document.querySelector("#subscription-detail-close").addEventListener("click", () => { detail.hidden = true; });
-    document.querySelector("#subscription-action").addEventListener("change", (event) => { const target = ["upgrade", "downgrade"].includes(event.target.value); document.querySelector("#subscription-target-fields").hidden = !target; document.querySelector("#subscription-override-fields").hidden = event.target.value !== "override"; });
-    document.querySelector("#subscription-change-form").addEventListener("submit", async (event) => { event.preventDefault(); if (!state.current) return; const form = event.currentTarget; if (window.FokusForm && !FokusForm.validate(form)) return; const data = new FormData(form); const action = data.get("action"); const body = { action, reason: data.get("reason") }; if (["upgrade", "downgrade"].includes(action)) { body.target_plan_id = data.get("target_plan_id"); body.billing_cycle = data.get("billing_cycle"); } if (action === "override") body.override = { monthly_amount: Number(data.get("override_monthly_amount")), billing_cycle: data.get("override_billing_cycle") }; try { await api.request(`/backoffice/subscriptions/${state.current.id}`, { method: "PATCH", body }); showMessage("Ação comercial registrada.", "success"); form.reset(); document.querySelector("#subscription-target-fields").hidden = true; document.querySelector("#subscription-override-fields").hidden = true; renderDetail(await api.request(`/backoffice/subscriptions/${state.current.id}`)); load(); } catch (error) { showMessage(error.message || "Não foi possível registrar a ação."); } });
-    loadPlans();
-    load();
-})();
-</script>
+    <section class="fs-card fs-card-panel" aria-labelledby="subscription-list-title">
+        <div class="fs-card-header">
+            <div class="fs-card-header-title">
+                <h2 class="fs-card-title" id="subscription-list-title">Assinaturas cadastradas</h2>
+                <p class="fs-card-subtitle">Consulte a situação comercial e os dados de cada contrato.</p>
+            </div>
+            <span class="fs-card-header-info" id="subscription-table-summary">Carregando assinaturas...</span>
+        </div>
+        <div class="fs-card-body fs-u-p-0">
+            <div class="fs-table-responsive fs-datatable" data-fs="datatable" data-fs-page-size="15" aria-busy="true">
+                <table class="fs-table fs-table-records fs-table-hover" aria-label="Assinaturas cadastradas">
+                    <thead>
+                        <tr>
+                            <th class="fs-width-600" scope="col">Empresa</th>
+                            <th class="fs-width-400" scope="col">Produto</th>
+                            <th class="fs-width-400" scope="col">Plano</th>
+                            <th class="fs-width-500" scope="col">Status</th>
+                            <th class="fs-width-400" scope="col">Vigência</th>
+                            <th class="fs-width-300" scope="col">Valor</th>
+                            <th class="fs-width-300" scope="col">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="subscription-list"></tbody>
+                </table>
+                <p data-fs-datatable-empty class="fs-table-empty" hidden>Nenhuma assinatura encontrada com os filtros informados.</p>
+                <p data-fs-datatable-loading class="fs-table-empty">Carregando assinaturas...</p>
+                <div data-fs-datatable-error class="fs-alert fs-alert-danger" role="alert" hidden><span data-fs-datatable-error-message></span></div>
+            </div>
+        </div>
+        <div class="fs-card-footer fs-u-d-flex fs-u-flex-wrap fs-u-align-items-center fs-u-justify-content-between fs-u-gap-3">
+            <span class="fs-u-fs-sm fs-u-color-secondary" id="subscription-table-footer-summary">Carregando resultados...</span>
+            <nav id="subscription-pagination" aria-label="Paginação de assinaturas"></nav>
+        </div>
+    </section>
+
+    <button id="subscription-drawer-trigger" type="button" data-fs="offcanvas" data-fs-target="#subscription-drawer" aria-label="Abrir detalhes da assinatura" hidden></button>
+    <aside class="fs-offcanvas fs-offcanvas-end backoffice-records-drawer" id="subscription-drawer" aria-labelledby="subscription-drawer-title" tabindex="-1">
+        <div class="fs-offcanvas-header">
+            <div class="fs-u-d-flex fs-u-flex-column fs-u-gap-1">
+                <span class="fs-u-fs-xs fs-u-color-secondary" id="subscription-drawer-kicker">CONSULTA COMERCIAL</span>
+                <h2 class="fs-offcanvas-title" id="subscription-drawer-title">Detalhes da assinatura</h2>
+                <p class="fs-u-m-0 fs-u-fs-sm fs-u-color-secondary" id="subscription-drawer-description">Consulte os dados comerciais, pagamentos e histórico.</p>
+            </div>
+            <button class="fs-btn-close" id="subscription-drawer-close" type="button" data-fs-dismiss="offcanvas" aria-label="Fechar painel"></button>
+        </div>
+
+        <div class="fs-offcanvas-body fs-u-d-flex fs-u-flex-column fs-u-gap-3" id="subscription-drawer-content" aria-busy="false">
+            <div class="fs-alert fs-alert-info" id="subscription-detail-loading" role="status" aria-live="polite" hidden>Carregando detalhes da assinatura...</div>
+            <div class="fs-alert fs-alert-danger" id="subscription-detail-error" role="alert" hidden></div>
+            <div id="subscription-detail-sections" class="fs-u-d-flex fs-u-flex-column fs-u-gap-3 backoffice-records-view-panel" hidden>
+                <section class="fs-card fs-card-panel" aria-labelledby="subscription-detail-data-title">
+                    <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-detail-data-title">Dados comerciais</h3><p class="fs-card-subtitle" id="subscription-detail-summary"></p></div></div>
+                    <div class="fs-card-body"><dl class="fs-detail-list" id="subscription-detail-data"></dl></div>
+                </section>
+                <section class="fs-card fs-card-panel" aria-labelledby="subscription-detail-items-title">
+                    <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-detail-items-title">Itens contratados</h3><p class="fs-card-subtitle">Módulos, quantidades e condições da contratação.</p></div></div>
+                    <div class="fs-card-body" id="subscription-detail-items"></div>
+                </section>
+                <section class="fs-card fs-card-panel" aria-labelledby="subscription-detail-payments-title">
+                    <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-detail-payments-title">Pagamentos</h3><p class="fs-card-subtitle">Cobranças vinculadas à assinatura.</p></div></div>
+                    <div class="fs-card-body fs-u-d-flex fs-u-flex-column fs-u-gap-2" id="subscription-detail-payments"></div>
+                </section>
+                <section class="fs-card fs-card-panel" aria-labelledby="subscription-detail-history-title">
+                    <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-detail-history-title">Histórico comercial</h3><p class="fs-card-subtitle">Alterações, motivos, vigência e snapshots registrados.</p></div></div>
+                    <div class="fs-card-body fs-u-d-flex fs-u-flex-column fs-u-gap-2" id="subscription-detail-history"></div>
+                </section>
+            </div>
+
+            <form class="fs-form fs-card fs-card-panel" id="subscription-change-form" novalidate>
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-change-title">Registrar ação comercial</h3><p class="fs-card-subtitle">As alterações exigem motivo e são registradas no histórico.</p></div></div>
+                <div class="fs-card-body fs-u-d-flex fs-u-flex-column fs-u-gap-2">
+                    <label class="fs-form-label" for="subscription-action">
+                        <span>Ação</span>
+                        <select class="fs-form-select" id="subscription-action" name="action" required>
+                            <option value="">Selecione uma ação</option>
+                            <option value="suspensao">Suspender</option>
+                            <option value="reativacao">Reativar</option>
+                            <option value="cancelamento">Agendar cancelamento</option>
+                            <option value="cancelamento_imediato">Encerrar assinatura imediatamente</option>
+                            <option value="upgrade">Solicitar upgrade</option>
+                            <option value="downgrade">Agendar downgrade</option>
+                            <option value="override" id="subscription-override-option">Override comercial</option>
+                        </select>
+                    </label>
+                    <label class="fs-form-label" for="subscription-reason">
+                        <span>Motivo</span>
+                        <textarea class="fs-form-control" id="subscription-reason" name="reason" rows="3" maxlength="1000" required></textarea>
+                    </label>
+                    <div class="fs-form-row" id="subscription-target-fields" hidden>
+                        <label class="fs-form-col fs-col-8 fs-form-label" for="subscription-target-plan"><span>Plano de destino</span><select class="fs-form-select" id="subscription-target-plan" name="target_plan_id"><option value="">Selecione um plano</option></select></label>
+                        <label class="fs-form-col fs-col-4 fs-form-label" for="subscription-cycle"><span>Ciclo</span><select class="fs-form-select" id="subscription-cycle" name="billing_cycle"><option value="monthly">Mensal</option><option value="annual">Anual</option></select></label>
+                    </div>
+                    <div class="fs-form-row" id="subscription-override-fields" hidden>
+                        <label class="fs-form-col fs-col-6 fs-form-label" for="subscription-override-amount"><span>Valor mensal</span><input class="fs-form-control" id="subscription-override-amount" name="override_monthly_amount" type="number" min="0" step="0.01" inputmode="decimal" /></label>
+                        <label class="fs-form-col fs-col-6 fs-form-label" for="subscription-override-cycle"><span>Ciclo do override</span><select class="fs-form-select" id="subscription-override-cycle" name="override_billing_cycle"><option value="monthly">Mensal</option><option value="annual">Anual</option></select></label>
+                    </div>
+                    <div class="fs-alert fs-alert-danger" id="subscription-form-error" role="alert" hidden></div>
+                </div>
+            </form>
+        </div>
+        <div class="fs-offcanvas-footer">
+            <button class="fs-btn fs-btn-outline-secondary" id="subscription-action-reset" type="reset" form="subscription-change-form">Limpar ação</button>
+            <button class="fs-btn fs-btn-primary" id="subscription-action-submit" type="submit" form="subscription-change-form">Registrar ação</button>
+        </div>
+        <button id="subscription-confirm-trigger" type="button" data-fs="modal" data-fs-target="#subscription-confirm-dialog" aria-label="Confirmar encerramento" hidden></button>
+        <div class="fs-modal fs-confirmation-dialog" id="subscription-confirm-dialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="subscription-confirm-title" aria-describedby="subscription-confirm-description">
+            <div class="fs-modal-dialog"><div class="fs-modal-content">
+                <div class="fs-modal-header">
+                    <div class="fs-confirmation-dialog-heading"><span class="fs-confirmation-dialog-kicker">AÇÃO COMERCIAL</span><h2 class="fs-modal-title" id="subscription-confirm-title">Encerrar assinatura imediatamente?</h2><p class="fs-confirmation-dialog-description" id="subscription-confirm-description">A assinatura será encerrada agora. Confira o motivo informado antes de confirmar.</p></div>
+                    <button class="fs-btn-close" type="button" data-fs-dismiss="modal" aria-label="Fechar confirmação"></button>
+                </div>
+                <div class="fs-modal-body fs-confirmation-dialog-body"><p id="subscription-confirm-reason"></p></div>
+                <div class="fs-modal-footer">
+                    <button class="fs-btn fs-btn-outline-secondary" id="subscription-confirm-cancel" type="button" data-fs-dismiss="modal">Voltar</button>
+                    <button class="fs-btn fs-btn-danger" id="subscription-confirm-submit" type="button">Confirmar encerramento</button>
+                </div>
+            </div></div>
+        </div>
+    </aside>
+</main>
