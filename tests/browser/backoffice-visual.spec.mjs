@@ -284,16 +284,18 @@ test('salvar alterações de produto usa PATCH no produto em edição', async ({
 
 test('salvar alterações de plano usa PATCH no plano em edição', async ({ page }) => {
     let saveRequest = null;
+    let saveRequests = 0;
     page.on('request', (request) => {
-        if (request.url().endsWith('/api/backoffice/catalog/plans/PLN_1')) saveRequest = { method: request.method(), url: request.url() };
+        if (request.url().endsWith('/api/backoffice/catalog/plans/PLN_1')) { saveRequests += 1; saveRequest = { method: request.method(), url: request.url() }; }
     });
 
     await page.goto('/backoffice/planos');
     await page.getByRole('button', { name: 'Editar plano' }).click();
     await expect(page.locator('#plan-drawer')).toHaveAttribute('data-mode', 'edit');
     await page.locator('#plan-name').fill('Essencial atualizado');
-    await page.locator('#plan-form-submit').click();
+    await page.locator('#plan-form-submit').dblclick();
     await expect.poll(() => saveRequest).toEqual({ method: 'PATCH', url: 'http://127.0.0.1:4177/api/backoffice/catalog/plans/PLN_1' });
+    expect(saveRequests).toBe(1);
 });
 
 test('ativar módulo não dispara a ação nem o toast mais de uma vez', async ({ page }) => {
@@ -324,6 +326,13 @@ test('planos replica o contrato visual, composição e estados do drawer', async
     await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'subscription-plans');
     await expect(page.locator('#plan-list tr')).toHaveCount(1);
     await expect(page.locator('#plan-pagination')).toContainText('1 planos');
+    await expect(page.locator('#plan-product-filter, #plan-publication-filter, #plan-featured-filter')).toHaveCount(0);
+    await expect(page.locator('table[aria-label="Planos de assinatura"] thead th')).toHaveText(['Plano', 'Produto', 'Valores', 'Status', 'Publicação', 'Assinaturas', 'Ações']);
+    const priceContract = await page.locator('#plan-list td[data-label="Valores"]').evaluate((cell) => ({
+        lines: cell.querySelectorAll('.plan-price-line').length,
+        annualSmaller: Number.parseFloat(getComputedStyle(cell.querySelector('.plan-price-line--annual .plan-price-value')).fontSize) < Number.parseFloat(getComputedStyle(cell.querySelector('.plan-price-line:not(.plan-price-line--annual) .plan-price-value')).fontSize),
+    }));
+    expect(priceContract).toEqual({ lines: 2, annualSmaller: true });
 
     await page.locator('#plan-new').click();
     await expect(page.locator('#plan-drawer')).toBeVisible();
@@ -365,5 +374,7 @@ test('planos replica o contrato visual, composição e estados do drawer', async
     await expect(page.locator('#plan-drawer')).toHaveAttribute('data-mode', 'view');
     await expect(page.locator('#plan-form')).toBeHidden();
     await expect(page.locator('#plan-view-panel')).toBeVisible();
+    await expect(page.locator('#plan-view-panel')).toHaveClass(/fs-offcanvas-body/);
+    await expect(page.locator('#plan-view-panel > .fs-card.fs-card-panel')).toHaveCount(3);
     await expect(page.locator('#plan-view-panel')).toContainText('2');
 });

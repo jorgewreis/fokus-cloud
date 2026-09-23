@@ -2,7 +2,12 @@
 .backoffice-plans-page { box-sizing: border-box; width: min(100% - 40px, 1480px); margin: 0 auto; padding: var(--fs-space-4, 24px) 0 var(--fs-space-6, 60px); }
 .backoffice-plans-page > .fs-page-layout { width: 100%; padding: 0 var(--fs-space-4, 24px) var(--fs-space-3, 16px); }
 .backoffice-plans-page > section.fs-card-panel { width: calc(100% - var(--fs-space-3, 16px)); margin-inline: auto; }
-.backoffice-plans-page .fs-table-records { min-width: 1560px; }
+.backoffice-plans-page .fs-table-records { min-width: 1260px; }
+.backoffice-plans-page .plan-price-stack { display: flex; flex-direction: column; gap: 3px; }
+.backoffice-plans-page .plan-price-line { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+.backoffice-plans-page .plan-price-label { color: var(--fs-color-text-secondary, #6b7280); font-size: .75rem; }
+.backoffice-plans-page .plan-price-value { font-size: .875rem; font-weight: 600; }
+.backoffice-plans-page .plan-price-line--annual .plan-price-value { color: var(--fs-color-text-secondary, #6b7280); font-size: .75rem; font-weight: 400; }
 .backoffice-plans-page .fs-form-output { display: block; min-height: 40px; padding: 10px 15px; color: var(--fs-color-text, #1f2937); font-family: var(--fs-font-family-sans, 'Google Sans', sans-serif); font-weight: 600; }
 .backoffice-plans-page .fs-check { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--fs-color-border, #e5e7eb); }
 .backoffice-plans-page .fs-check:last-child { border-bottom: 0; }
