@@ -1301,7 +1301,7 @@ class BackofficeController extends Controller
             'product_id' => ['nullable', 'string', 'size:30'],
             'plan_id' => ['nullable', 'string', 'size:30'],
             'base_amount' => ['nullable', 'numeric', 'min:0'],
-            'benefit_duration' => ['nullable', Rule::in(['d7', 'm1', 'm3', 'm6', 'a1'])],
+            'benefit_duration' => [Rule::requiredIf(fn () => $request->input('discount_type') === 'trial_free'), 'nullable', Rule::in(['d7', 'm1', 'm3', 'm6', 'a1'])],
             'module_codes' => ['nullable', 'array'],
             'redemption_limit' => ['nullable', 'integer', 'min:1'],
             'redemption_limit_per_company' => ['nullable', 'integer', 'min:1'],
@@ -1405,8 +1405,12 @@ class BackofficeController extends Controller
         $editableFields = array_diff(array_keys($data), ['status']);
         abort_if($redemptions && $editableFields !== [], 422, 'Voucher com resgate não pode ter suas regras comerciais alteradas.');
 
+        $merged = [...(array) $current, ...$data];
+        abort_if(($merged['discount_type'] ?? null) === 'trial_free' && empty($merged['benefit_duration'])
+            && ($editableFields !== [] || ($data['status'] ?? null) === 'ativa'),
+            422, 'Voucher de assinatura gratuita precisa ter uma duração definida.');
+
         if ($editableFields !== []) {
-            $merged = [...(array) $current, ...$data];
             if (($merged['discount_type'] ?? null) === 'percentage') abort_if((float) $merged['discount_value'] > 100, 422, 'O percentual não pode exceder 100%.');
             if (! empty($merged['product_id'])) abort_unless(DB::table('products')->where('id', $merged['product_id'])->where('active', true)->exists(), 422, 'O sistema selecionado não está disponível no catálogo.');
             if (! empty($merged['plan_id'])) abort_unless(DB::table('plans')->where('id', $merged['plan_id'])->exists(), 422, 'O plano selecionado não existe no catálogo.');

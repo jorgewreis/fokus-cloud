@@ -110,6 +110,41 @@ class BackofficeSecurityTest extends TestCase
         ]);
     }
 
+    public function test_free_voucher_requires_duration_and_legacy_voucher_can_be_repaired(): void
+    {
+        $admin = $this->admin();
+        $product = DB::table('products')->where('code', 'law')->first();
+        $plan = DB::table('plans')->where('product_id', $product->id)->where('code', 'law-advocacia')->first();
+        $basePayload = [
+            'code' => 'FREEWITHOUTDURATION',
+            'discount_type' => 'trial_free',
+            'discount_value' => 100,
+            'product_id' => $product->id,
+            'plan_id' => $plan->id,
+        ];
+
+        $this->actingAs($admin, 'platform')->postJson('/api/backoffice/vouchers', $basePayload)
+            ->assertUnprocessable()->assertJsonValidationErrors('benefit_duration');
+
+        $legacyId = PrefixedUlid::make('VCH');
+        DB::table('vouchers')->insert([
+            ...$basePayload,
+            'id' => $legacyId,
+            'code' => 'LEGACYFREE',
+            'status' => 'ativa',
+            'created_by_platform_admin_id' => $admin->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/vouchers/{$legacyId}", ['name' => 'Voucher sem duração'])
+            ->assertUnprocessable()->assertJsonPath('message', 'Voucher de assinatura gratuita precisa ter uma duração definida.');
+
+        $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/vouchers/{$legacyId}", ['benefit_duration' => 'm1'])
+            ->assertOk();
+        $this->assertDatabaseHas('vouchers', ['id' => $legacyId, 'benefit_duration' => 'm1']);
+    }
+
     public function test_commercial_credit_is_capped_and_voucher_can_be_edited_before_first_redemption(): void
     {
         $admin = $this->admin();

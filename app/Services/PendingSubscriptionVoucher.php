@@ -22,7 +22,8 @@ class PendingSubscriptionVoucher
         $moduleCodes = DB::table('subscription_items as item')->join('modules as module', 'module.id', '=', 'item.module_id')
             ->where('item.subscription_id', $subscriptionId)->whereNull('item.deleted_at')->pluck('module.code')->all();
         $voucher = $this->vouchers->findEligible($code, $subscription->product_id, $subscription->company_id, $moduleCodes, $snapshot['plan_code'] ?? null);
-        abort_unless($voucher->discount_type === 'trial_free' && $voucher->benefit_duration, 422, 'Informe um voucher de assinatura gratuita com duração definida.');
+        abort_unless($voucher->discount_type === 'trial_free', 422, 'Este voucher não é de assinatura gratuita.');
+        abort_unless($voucher->benefit_duration, 422, 'Este voucher de assinatura gratuita está sem duração definida. Edite o voucher e informe uma duração antes de usá-lo.');
         $payment = DB::table('payments')->where('subscription_id', $subscriptionId)->latest('created_at')->first();
         abort_unless($payment && $payment->status === 'aguardando_pagamento', 422, 'Pagamento pendente não encontrado.');
         abort_unless($subscription->provider_subscription_id, 422, 'Pré-aprovação do pagamento não encontrada.');

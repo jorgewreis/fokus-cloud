@@ -1000,3 +1000,35 @@ test('Vouchers cria campanha e limita ações comerciais às permissões documen
     await expect(page.locator('#voucher-form')).toBeHidden();
     await expect(page.locator('#voucher-detail-redemptions')).toContainText('Nenhum resgate confirmado');
 });
+
+test('voucher de assinatura gratuita envia uma duração ao cadastro', async ({ page }) => {
+    const products = [{ id: 'PRD_VOUCHER_LAW', name: 'Fokus Law', plans: [{ id: 'PLN_VOUCHER_01', name: 'Essencial', monthly_amount: 50, annual_amount: 500 }] }];
+    await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+        admin: { role: 'superadministrador', name: 'Superadmin Teste', permissions: ['platform.vouchers.manage', 'platform.catalog.publish'] },
+    }) }));
+    await page.route('**/api/backoffice/catalog', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ products }) }));
+    await page.route('**/api/backoffice/vouchers', async (route) => {
+        if (route.request().method() === 'POST') {
+            expect(route.request().postDataJSON()).toMatchObject({
+                product_id: 'PRD_VOUCHER_LAW', plan_id: 'PLN_VOUCHER_01',
+                discount_type: 'trial_free', discount_value: 100, benefit_duration: 'm3',
+            });
+            return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'VCH_FREE_01', code: 'GRATUITO1', message: 'Voucher criado.' }) });
+        }
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify([]) });
+    });
+
+    await page.goto('/backoffice/vouchers');
+    await page.getByRole('button', { name: 'Novo voucher' }).click();
+    await page.locator('#voucher-name').fill('Acesso gratuito de teste');
+    await page.locator('#voucher-product').selectOption('PRD_VOUCHER_LAW');
+    await page.locator('#voucher-plan').selectOption('PLN_VOUCHER_01');
+    await page.locator('#voucher-discount-type').selectOption('trial_free');
+    await page.locator('#voucher-duration').selectOption('m3');
+    await page.locator('#voucher-start-date').fill(await page.evaluate(() => new Date().toISOString().slice(0, 10)));
+    await page.locator('#voucher-end-date').fill(await page.evaluate(() => { const date = new Date(); date.setFullYear(date.getFullYear() + 1); return date.toISOString().slice(0, 10); }));
+    await page.locator('#voucher-total').fill('10');
+    await page.locator('#voucher-company-limit').fill('1');
+    await page.getByRole('button', { name: 'Cadastrar voucher' }).click();
+    await expect(page.locator('#voucher-message')).toContainText('Voucher cadastrado.');
+});
