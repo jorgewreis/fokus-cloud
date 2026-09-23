@@ -184,6 +184,13 @@ test('produtos replica o contrato visual e mantém create, edit e view independe
 
     await page.locator('#product-drawer-close').click();
     await expect(page.locator('#product-drawer')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Editar produto' })).toHaveCount(0);
+    await page.route('**/api/backoffice/catalog/products', async (route) => {
+        const response = await route.fetch();
+        const data = await response.json();
+        await route.fulfill({ response, json: { ...data, products: data.products.map((product) => ({ ...product, status: 'pausado' })) } });
+    });
+    await page.reload();
     await page.getByRole('button', { name: 'Editar produto' }).click();
     await expect(page.locator('#product-drawer')).toHaveAttribute('data-mode', 'edit');
     await expect(page.locator('#product-drawer-title')).toHaveText('Editar dados do produto');
@@ -240,6 +247,13 @@ test('módulos replica o contrato visual, personalizações e estados do drawer'
     await expect(page.locator('#module-personalizations-drawer')).toBeHidden();
 
     await page.locator('#module-drawer-close').click();
+    await expect(page.getByRole('button', { name: 'Editar módulo' })).toHaveCount(0);
+    await page.route('**/api/backoffice/catalog', async (route) => {
+        const response = await route.fetch();
+        const data = await response.json();
+        await route.fulfill({ response, json: { ...data, products: data.products.map((product) => ({ ...product, modules: product.modules.map((module) => ({ ...module, status: 'inativo', publication_state: 'pausado' })) })) } });
+    });
+    await page.reload();
     await page.getByRole('button', { name: 'Editar módulo' }).click();
     await expect(page.locator('#module-drawer')).toHaveAttribute('data-mode', 'edit');
     await expect(page.locator('#module-drawer-title')).toHaveText('Editar dados do módulo');
@@ -260,6 +274,11 @@ test('salvar alterações de módulo usa PATCH no módulo em edição', async ({
         if (request.url().endsWith('/api/backoffice/catalog/modules/MOD_1')) saveRequest = { method: request.method(), url: request.url() };
     });
 
+    await page.route('**/api/backoffice/catalog', async (route) => {
+        const response = await route.fetch();
+        const data = await response.json();
+        await route.fulfill({ response, json: { ...data, products: data.products.map((product) => ({ ...product, modules: product.modules.map((module) => ({ ...module, status: 'inativo', publication_state: 'pausado' })) })) } });
+    });
     await page.goto('/backoffice/modulos');
     await page.getByRole('button', { name: 'Editar módulo' }).click();
     await expect(page.locator('#module-drawer')).toHaveAttribute('data-mode', 'edit');
@@ -274,6 +293,11 @@ test('salvar alterações de produto usa PATCH no produto em edição', async ({
         if (request.url().endsWith('/api/backoffice/catalog/products/PRD_LAW')) saveRequest = { method: request.method(), url: request.url() };
     });
 
+    await page.route('**/api/backoffice/catalog/products', async (route) => {
+        const response = await route.fetch();
+        const data = await response.json();
+        await route.fulfill({ response, json: { ...data, products: data.products.map((product) => ({ ...product, status: 'pausado' })) } });
+    });
     await page.goto('/backoffice/produtos');
     await page.getByRole('button', { name: 'Editar produto' }).click();
     await expect(page.locator('#product-drawer')).toHaveAttribute('data-mode', 'edit');
@@ -289,6 +313,11 @@ test('salvar alterações de plano usa PATCH no plano em edição', async ({ pag
         if (request.url().endsWith('/api/backoffice/catalog/plans/PLN_1')) { saveRequests += 1; saveRequest = { method: request.method(), url: request.url() }; }
     });
 
+    await page.route('**/api/backoffice/plans', async (route) => {
+        const response = await route.fetch();
+        const data = await response.json();
+        await route.fulfill({ response, json: data.map((plan) => ({ ...plan, status: 'inativo', publication_state: 'pausado' })) });
+    });
     await page.goto('/backoffice/planos');
     await page.getByRole('button', { name: 'Editar plano' }).click();
     await expect(page.locator('#plan-drawer')).toHaveAttribute('data-mode', 'edit');
@@ -310,7 +339,7 @@ test('ativar módulo não dispara a ação nem o toast mais de uma vez', async (
         window.__moduleClickCount = 0;
         document.querySelector('#module-list').addEventListener('click', () => { window.__moduleClickCount += 1; }, true);
     });
-    await page.locator('#module-list [data-module-action="edit"]').first().evaluate((button) => {
+    await page.locator('#module-list [data-module-action="view"]').first().evaluate((button) => {
         button.dataset.moduleAction = 'activate';
         button.setAttribute('aria-label', 'Ativar módulo');
     });
@@ -370,6 +399,13 @@ test('planos replica o contrato visual, composição e estados do drawer', async
     await expect(page.locator('#plan-annual-price')).toHaveText('R$ 249,00');
 
     await page.locator('#plan-drawer-close').click();
+    await expect(page.getByRole('button', { name: 'Editar plano' })).toHaveCount(0);
+    await page.route('**/api/backoffice/plans', async (route) => {
+        const response = await route.fetch();
+        const data = await response.json();
+        await route.fulfill({ response, json: data.map((plan) => ({ ...plan, status: 'inativo', publication_state: 'pausado' })) });
+    });
+    await page.reload();
     await page.getByRole('button', { name: 'Editar plano' }).click();
     await expect(page.locator('#plan-drawer')).toHaveAttribute('data-mode', 'edit');
     await expect(page.locator('#plan-form-submit')).toHaveText('Salvar alterações');
@@ -405,5 +441,6 @@ test('planos limita os ícones de ciclo de vida aos estados permitidos', async (
     status = 'ativo';
     await page.reload();
     await expect(page.locator('#plan-list [data-plan-action="publish"]')).toHaveCount(1);
-    await expect(page.locator('#plan-list [data-plan-action="pause"], #plan-list [data-plan-action="archive"]')).toHaveCount(0);
+    await expect(page.locator('#plan-list [data-plan-action="pause"]')).toHaveCount(1);
+    await expect(page.locator('#plan-list [data-plan-action="archive"], #plan-list [data-plan-action="edit"]')).toHaveCount(0);
 });
