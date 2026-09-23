@@ -762,11 +762,17 @@ class BackofficeController extends Controller
     public function activateCatalogItem(Request $request, string $type, string $id, CatalogManager $catalog, PlatformAudit $audit)
     {
         $data = $request->validate(['reason' => ['nullable', 'string', 'max:1000']]);
-        abort_unless($type === 'modules', 404, 'Item de catálogo não encontrado.');
-        [$before, $after] = $catalog->activateModule($id);
-        $audit->record($request->user()->id, 'backoffice.catalog_module_activated', 'module', $id, reason: $data['reason'] ?? null, before: $before, after: $after, request: $request);
+        if ($type === 'modules') {
+            [$before, $after] = $catalog->activateModule($id);
+            $audit->record($request->user()->id, 'backoffice.catalog_module_activated', 'module', $id, reason: $data['reason'] ?? null, before: $before, after: $after, request: $request);
 
-        return response()->json(['message' => 'Módulo reativado.']);
+            return response()->json(['message' => 'Módulo reativado.']);
+        }
+        abort_unless($type === 'plans', 404, 'Item de catálogo não encontrado.');
+        [$before, $after] = $catalog->activatePlan($id);
+        $audit->record($request->user()->id, 'backoffice.catalog_plan_activated', 'plan', $id, reason: $data['reason'] ?? null, before: $before, after: $after, request: $request);
+
+        return response()->json(['message' => 'Plano ativado.']);
     }
 
     public function publishModule(Request $request, string $module, CatalogManager $catalog, PlatformAudit $audit)

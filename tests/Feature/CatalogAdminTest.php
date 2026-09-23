@@ -233,6 +233,16 @@ class CatalogAdminTest extends TestCase
             'status' => 'inativo',
             'publication_state' => 'pausado',
         ]);
+
+        $this->actingAs($super, 'platform')->postJson("/api/backoffice/catalog/plans/{$planId}/activate", [
+            'reason' => 'Reativação homologada.',
+        ])->assertOk()->assertJsonPath('message', 'Plano ativado.');
+
+        $this->assertDatabaseHas('plans', [
+            'id' => $planId,
+            'status' => 'ativo',
+            'publication_state' => 'pausado',
+        ]);
     }
 
     public function test_superadmin_can_archive_modules_and_plans_but_commercial_admin_cannot(): void
