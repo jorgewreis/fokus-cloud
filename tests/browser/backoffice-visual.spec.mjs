@@ -78,6 +78,7 @@ test('Novo usuário permite convidar usuário externo vinculado a empresa Fokus 
 });
 
 test('consulta de e-mail no acesso Fokus Law identifica nome e sistema ativo', async ({ page }) => {
+    await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ message: 'Acesso interno não autenticado.' }) }));
     await page.goto('/marketing/products/fokus-law.html');
     await page.locator('#law-email').fill('pessoa@example.test');
     await expect(page.locator('#law-system')).toBeEnabled();
@@ -87,6 +88,7 @@ test('consulta de e-mail no acesso Fokus Law identifica nome e sistema ativo', a
 });
 
 test('consulta de e-mail mostra usuário existente sem assinatura ativa', async ({ page }) => {
+    await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ message: 'Acesso interno não autenticado.' }) }));
     await page.route('**/api/auth/law-context', (route) => route.fulfill({
         status: 200,
         contentType: 'application/json',
