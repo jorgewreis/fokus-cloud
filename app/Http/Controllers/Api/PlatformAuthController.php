@@ -115,7 +115,16 @@ class PlatformAuthController extends Controller
 
     public function logout(Request $request, PlatformAudit $audit)
     {
-        $audit->record(Auth::guard('platform')->id(), 'backoffice.logout', request: $request);
+        $adminId = Auth::guard('platform')->id();
+        $supportId = $request->session()->get('support_session_id');
+        if ($supportId) {
+            $support = DB::table('platform_support_sessions')->where('id', $supportId)->whereNull('ended_at')->first();
+            if ($support) {
+                DB::table('platform_support_sessions')->where('id', $supportId)->update(['ended_at' => now(), 'end_ip' => $request->ip(), 'end_user_agent' => $request->userAgent(), 'updated_at' => now()]);
+                $audit->record($adminId, 'backoffice.support_access_ended', 'platform_support_session', $supportId, $support->company_id, 'Sessão encerrada ao sair do Backoffice.', request: $request);
+            }
+        }
+        $audit->record($adminId, 'backoffice.logout', request: $request);
         Auth::guard('platform')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

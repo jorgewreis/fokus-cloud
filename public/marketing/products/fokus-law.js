@@ -1,33 +1,7 @@
 (() => {
   const form = document.querySelector('[data-law-login-form]');
 
-  const showToast = (message) => {
-    let container = document.querySelector('[data-law-toast-container]');
-    if (!container) {
-      container = document.createElement('div');
-      container.className = 'fs-toast-container';
-      container.dataset.lawToastContainer = '';
-      container.setAttribute('aria-live', 'polite');
-      document.body.append(container);
-    }
-
-    let toast = container.querySelector('[data-law-toast]');
-    if (!toast) {
-      toast = document.createElement('div');
-      toast.className = 'fs-toast fs-toast-danger is-progressing';
-      toast.dataset.lawToast = '';
-      toast.dataset.toastProgress = 'true';
-      toast.dataset.autohide = 'true';
-      toast.setAttribute('role', 'alert');
-      toast.innerHTML = '<div><strong class="fs-toast-title">Não foi possível continuar</strong><span class="fs-toast-message"></span></div><button type="button" class="icon-button icon-button-close fs-toast-close" aria-label="Fechar">×</button><span class="fs-toast-progress"></span>';
-      toast.querySelector('.fs-toast-close').addEventListener('click', () => { toast.hidden = true; });
-      container.append(toast);
-    }
-    toast.querySelector('.fs-toast-message').textContent = message;
-    toast.hidden = false;
-    clearTimeout(showToast.timer);
-    showToast.timer = setTimeout(() => { toast.hidden = true; }, 4200);
-  };
+  const showToast = (message) => window.FokusToast?.show(message, 'danger');
 
   if (form) {
     const email = form.elements.email;
@@ -77,13 +51,17 @@
       const items = payload.systems || [];
       userName = payload.user?.name || '';
       systems = items;
+      if (!systems.length) {
+        const message = payload.message || 'Não existe nenhuma assinatura ativa do Fokus Law vinculada a este usuário.';
+        reset(`${userName ? `${userName} — ` : ''}${message}`);
+        showToast(message);
+        return;
+      }
       system.innerHTML = systems.map((item) => `<option value="${item.value}">${item.label}</option>`).join('');
       system.disabled = systems.length === 0;
       if (systems.length) {
         system.value = systems[0].value;
         renderProfiles();
-      } else {
-        reset('Não encontramos um sistema Fokus Law ativo vinculado a este e-mail. Confirme o vínculo com uma empresa e a assinatura ativa do Fokus Law.');
       }
     };
 
@@ -101,7 +79,7 @@
           .then(renderSystems)
           .catch((error) => {
             const message = error.status === 404
-              ? 'Não encontramos um sistema Fokus Law ativo vinculado a este e-mail. Confirme o vínculo com uma empresa e a assinatura ativa do Fokus Law.'
+              ? 'Usuário não encontrado.'
               : (error.message || 'Não foi possível consultar os sistemas vinculados a este e-mail.');
             reset(message);
             showToast(message);
@@ -117,6 +95,52 @@
       if (!profile.value) password.value = '';
     });
     form.addEventListener('submit', (event) => { event.preventDefault(); status.textContent = 'O acesso contextual será ativado junto à publicação do ambiente Fokus Law.'; });
+
+    const support = document.createElement('section');
+    support.hidden = true;
+    support.className = 'law-support-access';
+    support.setAttribute('aria-labelledby', 'law-support-title');
+    support.innerHTML = '<h2 id="law-support-title">Acesso de suporte</h2><p>Escolha uma assinatura e um usuário real da empresa. O acesso será registrado em auditoria.</p><label for="law-support-subscription">Assinatura</label><select id="law-support-subscription" required></select><label for="law-support-user">Usuário e perfil</label><select id="law-support-user" required></select><label for="law-support-reason">Motivo do acesso</label><textarea id="law-support-reason" minlength="10" maxlength="1000" required></textarea><button class="law-submit" type="button" id="law-support-start">Acessar em modo de suporte</button><p role="status" aria-live="polite" id="law-support-status"></p>';
+    form.before(support);
+    const subscriptionSelect = support.querySelector('#law-support-subscription');
+    const userSelect = support.querySelector('#law-support-user');
+    const supportStatus = support.querySelector('#law-support-status');
+    let supportSubscriptions = [];
+    const renderSupportUsers = () => {
+      const selected = supportSubscriptions.find((item) => item.id === subscriptionSelect.value);
+      userSelect.replaceChildren(new Option('Selecione o usuário', ''));
+      (selected?.users || []).forEach((user) => userSelect.add(new Option(user.label, user.membership_id)));
+      userSelect.disabled = !selected?.users?.length;
+      if (selected && !selected.users.length) supportStatus.textContent = 'Esta assinatura não possui usuários ativos disponíveis para teste.';
+    };
+    subscriptionSelect.addEventListener('change', renderSupportUsers);
+    support.querySelector('#law-support-start').addEventListener('click', async () => {
+      const reason = support.querySelector('#law-support-reason').value.trim();
+      if (!subscriptionSelect.value || !userSelect.value || reason.length < 10) {
+        supportStatus.textContent = 'Selecione assinatura e usuário e informe um motivo com pelo menos 10 caracteres.';
+        return;
+      }
+      supportStatus.textContent = 'Iniciando acesso de suporte…';
+      try {
+        const result = await window.FokusApi.request('/backoffice/support/access', { method: 'POST', body: { subscription_id: subscriptionSelect.value, membership_id: userSelect.value, reason } });
+        location.assign(result.redirect_to || '/portal');
+      } catch (error) {
+        supportStatus.textContent = error.message || 'Não foi possível iniciar o acesso de suporte.';
+        showToast(supportStatus.textContent);
+      }
+    });
+    window.FokusApi.request('/backoffice/auth/me').then(async ({ admin }) => {
+      if (admin?.role !== 'superadministrador') return;
+      form.hidden = true;
+      support.hidden = false;
+      supportStatus.textContent = 'Carregando assinaturas Fokus Law…';
+      const payload = await window.FokusApi.request('/backoffice/support/law-context');
+      supportSubscriptions = payload.subscriptions || [];
+      subscriptionSelect.replaceChildren(new Option('Selecione a assinatura', ''));
+      supportSubscriptions.forEach((item) => subscriptionSelect.add(new Option(item.label, item.id)));
+      subscriptionSelect.disabled = !supportSubscriptions.length;
+      supportStatus.textContent = supportSubscriptions.length ? 'Sessão interna autenticada com MFA. O acesso de suporte será auditado.' : 'Nenhuma assinatura Fokus Law foi encontrada.';
+    }).catch(() => {});
   }
 
   const livePlans = document.querySelector('[data-law-live-plans]'), grid = document.querySelector('[data-law-live-plan-grid]');

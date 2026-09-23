@@ -21,9 +21,31 @@
     const inner = document.createElement('div'); inner.className = 'portal-content';
     const header = document.createElement('header'); header.className = 'portal-header';
     header.innerHTML = `<div><p class="portal-eyebrow">Portal do cliente</p><h1>${document.title.split('|')[0].trim()}</h1></div><p id="portal-user-name">Carregando conta...</p>`;
-    inner.append(header, main); content.append(inner); shell.append(aside, content); document.body.append(shell);
-    document.querySelector('#portal-logout').onclick = async () => { try { await FokusApi.request('/auth/logout', { method: 'POST' }); } finally { location.assign('/'); } };
-    if (window.FokusApi) window.FokusApi.request('/auth/me').then((data) => { const company = data.companies?.find((item) => item.id === data.active_company_id); document.querySelector('#portal-user-name').textContent = data.user?.name || ''; document.querySelector('#portal-context strong').textContent = company?.name || 'Nenhuma empresa selecionada'; }).catch(() => {});
+    const supportNotice = document.createElement('section'); supportNotice.className = 'fs-alert fs-alert-warning'; supportNotice.hidden = true; supportNotice.setAttribute('role', 'status'); supportNotice.innerHTML = '<div><strong>Modo de suporte ativo</strong><p data-support-context></p><button type="button" class="fs-btn fs-btn-secondary" data-support-exit>Encerrar acesso de suporte</button></div>';
+    inner.append(header, supportNotice, main); content.append(inner); shell.append(aside, content); document.body.append(shell);
+    let supportModeActive = false;
+    document.querySelector('#portal-logout').onclick = async () => {
+      if (supportModeActive) {
+        try { const result = await FokusApi.request('/backoffice/support/exit', { method: 'POST' }); location.assign(result.redirect_to || '/backoffice/'); }
+        catch (error) { window.FokusToast?.show(error.message || 'Não foi possível encerrar o acesso de suporte.', 'danger'); }
+        return;
+      }
+      try { await FokusApi.request('/auth/logout', { method: 'POST' }); } finally { location.assign('/'); }
+    };
+    if (window.FokusApi) window.FokusApi.request('/auth/me').then((data) => {
+      const company = data.companies?.find((item) => item.id === data.active_company_id);
+      document.querySelector('#portal-user-name').textContent = data.user?.name || '';
+      document.querySelector('#portal-context strong').textContent = company?.name || 'Nenhuma empresa selecionada';
+      if (data.support_mode?.active) {
+        supportModeActive = true;
+        supportNotice.hidden = false;
+        supportNotice.querySelector('[data-support-context]').textContent = `${data.support_mode.company} · Assinatura ${data.support_mode.subscription_status} · ${data.support_mode.reason}`;
+        supportNotice.querySelector('[data-support-exit]').addEventListener('click', async () => {
+          try { const result = await FokusApi.request('/backoffice/support/exit', { method: 'POST' }); location.assign(result.redirect_to || '/backoffice/'); }
+          catch (error) { window.FokusToast?.show(error.message || 'Não foi possível encerrar o acesso de suporte.', 'danger'); }
+        });
+      }
+    }).catch(() => {});
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
 })();

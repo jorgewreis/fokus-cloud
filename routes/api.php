@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CompanyUserController;
 use App\Http\Controllers\Api\LawHearingController;
 use App\Http\Controllers\Api\PlatformAdminController;
 use App\Http\Controllers\Api\PlatformAuthController;
+use App\Http\Controllers\Api\PlatformSupportController;
 use App\Http\Controllers\Api\PlatformUserDirectoryController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\UsageSnapshotController;
@@ -80,6 +81,9 @@ Route::middleware(EnsurePlatformAdmin::class)->prefix('backoffice')->group(funct
     Route::get('/search', [BackofficeController::class, 'search'])->middleware(EnsurePlatformPermission::class.':platform.dashboard.view');
     Route::get('/catalog', [BackofficeController::class, 'catalog'])->middleware(EnsurePlatformPermission::class.':platform.catalog.manage');
     Route::middleware(EnsurePlatformSuperadmin::class)->group(function (): void {
+        Route::get('/support/law-context', [PlatformSupportController::class, 'lawContext']);
+        Route::post('/support/access', [PlatformSupportController::class, 'start']);
+        Route::post('/support/exit', [PlatformSupportController::class, 'exit']);
         Route::get('/catalog/products', [BackofficeController::class, 'products']);
         Route::post('/catalog/products', [BackofficeController::class, 'createProduct']);
         Route::patch('/catalog/products/{product}', [BackofficeController::class, 'updateProduct']);

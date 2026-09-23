@@ -86,6 +86,59 @@ test('consulta de e-mail no acesso Fokus Law identifica nome e sistema ativo', a
     await expect(page.locator('#law-password')).toBeEnabled();
 });
 
+test('consulta de e-mail mostra usuário existente sem assinatura ativa', async ({ page }) => {
+    await page.route('**/api/auth/law-context', (route) => route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+            user: { name: 'Pessoa Teste', email: 'pessoa@example.test' },
+            systems: [],
+            message: 'Não existe nenhuma assinatura ativa do Fokus Law vinculada a este usuário.',
+        }),
+    }));
+    await page.goto('/marketing/products/fokus-law.html');
+    await page.locator('#law-email').fill('pessoa@example.test');
+    await expect(page.locator('[data-law-login-status]')).toContainText('Pessoa Teste — Não existe nenhuma assinatura ativa do Fokus Law vinculada a este usuário.');
+    await expect(page.locator('#law-system')).toBeDisabled();
+    await expect(page.locator('#law-password')).toBeDisabled();
+});
+
+test('Fokus Law usa o mesmo toast do Backoffice para erro de consulta', async ({ page }) => {
+    await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ message: 'Acesso interno não autenticado.' }) }));
+    await page.route('**/api/auth/law-context', (route) => route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ message: 'Usuário não encontrado.' }) }));
+    await page.goto('/marketing/products/fokus-law.html');
+    await page.locator('#law-email').fill('ausente@example.test');
+    await expect(page.locator('#backoffice-toast-container .fs-backoffice-toast')).toBeVisible();
+    await expect(page.locator('#backoffice-toast-container .fs-toast-title')).toHaveText('Erro');
+    await expect(page.locator('#backoffice-toast-container .fs-toast-body')).toHaveText('Usuário não encontrado.');
+});
+
+test('Superadministrador MFA pode iniciar acesso de suporte a perfil real', async ({ page }) => {
+    await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ admin: { role: 'superadministrador' } }) }));
+    await page.route('**/api/backoffice/support/law-context', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ subscriptions: [{ id: 'SUB_TESTE_01', label: 'Empresa Teste — Essencial (Suspensa)', status: 'suspensa', users: [{ membership_id: 'MBS_TESTE_01', label: 'Administrador — Pessoa Teste (pessoa@example.test)' }] }] }) }));
+    await page.route('**/api/backoffice/support/access', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ redirect_to: '/portal' }) }));
+    await page.goto('/marketing/products/fokus-law.html');
+    await expect(page.locator('[aria-labelledby="law-support-title"]')).toBeVisible();
+    await expect(page.locator('[data-law-login-form]')).toBeHidden();
+    await page.locator('#law-support-subscription').selectOption('SUB_TESTE_01');
+    await page.locator('#law-support-user').selectOption('MBS_TESTE_01');
+    await page.locator('#law-support-reason').fill('Investigar erro de permissões');
+    await page.locator('#law-support-start').click();
+    await expect(page).toHaveURL(/\/portal$/);
+});
+
+test('Portal identifica e encerra modo de suporte preservando o retorno ao Backoffice', async ({ page }) => {
+    await page.route('**/api/csrf-token', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ token: 'csrf-visual' }) }));
+    await page.route('**/api/auth/me', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ user: { name: 'Pessoa Teste', email_verified: true }, companies: [{ id: 'CMP_TESTE', name: 'Empresa Teste', role: 'admin' }], active_company_id: 'CMP_TESTE', support_mode: { active: true, company: 'Empresa Teste', subscription_status: 'suspensa', reason: 'Investigar falha' } }) }));
+    await page.route('**/api/subscriptions', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) }));
+    await page.route('**/api/backoffice/support/exit', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ redirect_to: '/backoffice/' }) }));
+    await page.goto('/portal/dashboard.html');
+    await expect(page.getByText('Modo de suporte ativo')).toBeVisible();
+    await expect(page.locator('[data-support-context]')).toContainText('Empresa Teste');
+    await page.getByRole('button', { name: 'Encerrar acesso de suporte' }).click();
+    await expect(page).toHaveURL(/\/backoffice\/$/);
+});
+
 test('drawer de empresas preserva largura, cards e alertas do contrato visual', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/backoffice/empresas');

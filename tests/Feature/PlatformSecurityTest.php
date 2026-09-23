@@ -214,6 +214,42 @@ class PlatformSecurityTest extends TestCase
         $this->assertDatabaseHas('security_tokens', ['user_id' => $invited->id, 'purpose' => 'password_creation']);
     }
 
+    public function test_only_superadmin_can_list_law_subscriptions_for_support(): void
+    {
+        $commercial = $this->admin('administrador_comercial');
+        $this->actingAs($commercial, 'platform')->getJson('/api/backoffice/support/law-context')->assertForbidden();
+        $this->assertGuest('web');
+    }
+
+    public function test_superadmin_support_access_uses_real_member_and_is_audited_until_exit(): void
+    {
+        $admin = $this->admin();
+        $customer = User::create(['id' => PrefixedUlid::make('USR'), 'name' => 'Pessoa de Teste', 'cpf' => '12345678901', 'email' => 'pessoa@example.test', 'password' => 'SenhaCliente!2026', 'status' => 'ativa']);
+        $companyId = PrefixedUlid::make('COM');
+        $product = DB::table('products')->where('code', 'law')->firstOrFail();
+        DB::table('companies')->insert(['id' => $companyId, 'document_type' => 'cnpj', 'document_number' => '12345678000100', 'legal_name' => 'Empresa para suporte', 'status' => 'ativa', 'version' => 1, 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
+        $membershipId = PrefixedUlid::make('MBS');
+        DB::table('company_memberships')->insert(['id' => $membershipId, 'company_id' => $companyId, 'user_id' => $customer->id, 'role_id' => DB::table('roles')->where('code', 'admin')->value('id'), 'status' => 'ativo', 'active_admin_company_id' => $companyId, 'version' => 1, 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
+        $subscriptionId = PrefixedUlid::make('ASS');
+        DB::table('subscriptions')->insert(['id' => $subscriptionId, 'company_id' => $companyId, 'product_id' => $product->id, 'status' => 'suspensa', 'open_company_product' => null, 'version' => 1, 'billing_cycle' => 'monthly', 'commercial_snapshot' => json_encode(['plan_name' => 'Essencial']), 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/support/law-context')->assertOk()
+            ->assertJsonPath('subscriptions.0.status', 'suspensa')
+            ->assertJsonPath('subscriptions.0.users.0.membership_id', $membershipId);
+        $this->actingAs($admin, 'platform')->postJson('/api/backoffice/support/access', ['subscription_id' => $subscriptionId, 'membership_id' => $membershipId, 'reason' => 'Investigar falha reportada'])->assertOk()->assertJsonPath('redirect_to', '/portal');
+        $this->assertAuthenticatedAs($customer, 'web');
+        $this->assertAuthenticatedAs($admin, 'platform');
+        $this->assertDatabaseHas('platform_support_sessions', ['platform_admin_id' => $admin->id, 'company_id' => $companyId, 'subscription_id' => $subscriptionId, 'target_user_id' => $customer->id, 'ended_at' => null]);
+        $this->getJson('/api/auth/me')->assertOk()->assertJsonPath('support_mode.active', true)->assertJsonPath('support_mode.company', 'Empresa para suporte');
+
+        $this->postJson('/api/backoffice/support/exit')->assertOk()->assertJsonPath('redirect_to', '/backoffice/');
+        $this->assertGuest('web');
+        $this->assertAuthenticatedAs($admin, 'platform');
+        $this->assertNotNull(DB::table('platform_support_sessions')->value('ended_at'));
+        $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.support_access_started', 'platform_admin_id' => $admin->id]);
+        $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.support_access_ended', 'platform_admin_id' => $admin->id]);
+    }
+
     public function test_internal_email_confirmation_is_single_use_and_updates_address_only_after_confirmation(): void
     {
         $admin = $this->admin();

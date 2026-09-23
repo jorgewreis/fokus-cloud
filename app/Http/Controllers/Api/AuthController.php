@@ -25,7 +25,24 @@ class AuthController extends Controller
         ])['email']));
 
         $user = User::whereRaw('LOWER(email) = ?', [$email])->first();
-        $lawSystems = $user && $user->status === 'ativa' ? DB::table('company_memberships as membership')
+        abort_unless($user, 404, 'Usuário não encontrado.');
+        $userPayload = ['name' => $user->name, 'email' => $user->email];
+
+        if ($user->status !== 'ativa') {
+            return response()->json(['user' => $userPayload, 'systems' => [], 'message' => 'A conta deste usuário não está ativa.']);
+        }
+
+        $hasActiveCompany = DB::table('company_memberships as membership')
+            ->join('companies as company', 'company.id', '=', 'membership.company_id')
+            ->where('membership.user_id', $user->id)->where('membership.status', 'ativo')
+            ->whereNull('membership.deleted_at')->where('company.status', 'ativa')->whereNull('company.deleted_at')
+            ->exists();
+
+        if (! $hasActiveCompany) {
+            return response()->json(['user' => $userPayload, 'systems' => [], 'message' => 'Este usuário não possui vínculo ativo com uma empresa.']);
+        }
+
+        $lawSystems = DB::table('company_memberships as membership')
             ->join('companies as company', 'company.id', '=', 'membership.company_id')
             ->join('roles as role', 'role.id', '=', 'membership.role_id')
             ->join('subscriptions as subscription', 'subscription.company_id', '=', 'company.id')
@@ -42,9 +59,11 @@ class AuthController extends Controller
             ->where('product.code', 'law')
             ->select('company.id as company_id', 'company.legal_name as company_name', 'product.name as product_name', 'role.code as profile_code', 'role.name as profile_name', 'module_segment.segment_code')
             ->orderBy('company.legal_name')
-            ->get() : collect();
+            ->get();
 
-        abort_if($lawSystems->isEmpty(), 404, 'Não encontramos um sistema Fokus Law ativo vinculado a este e-mail. Verifique se a conta está ativa, vinculada a uma empresa e se a empresa possui uma assinatura ativa do Fokus Law.');
+        if ($lawSystems->isEmpty()) {
+            return response()->json(['user' => $userPayload, 'systems' => [], 'message' => 'Não existe nenhuma assinatura ativa do Fokus Law vinculada a este usuário.']);
+        }
 
         $systems = $lawSystems->groupBy('company_id')->map(function ($rows): array {
             $segment = $rows->pluck('segment_code')->filter()->first() ?: 'juridico';
@@ -64,7 +83,7 @@ class AuthController extends Controller
             ];
         })->values()->all();
 
-        return response()->json(['user' => ['name' => $user->name], 'systems' => $systems]);
+        return response()->json(['user' => $userPayload, 'systems' => $systems]);
     }
 
     public function registerCompany(Request $request, PasswordSecurity $passwordSecurity)
@@ -206,10 +225,21 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
+        $user = Auth::guard('web')->user();
+        abort_unless($user, 401, 'Acesso de usuário não autenticado.');
+        $supportId = $request->session()->get('support_session_id');
+        $supportMode = $supportId ? DB::table('platform_support_sessions as support')
+            ->join('subscriptions as subscription', 'subscription.id', '=', 'support.subscription_id')
+            ->join('companies as company', 'company.id', '=', 'support.company_id')
+            ->where('support.id', $supportId)->whereNull('support.ended_at')
+            ->select('support.id', 'support.reason', 'subscription.status as subscription_status', 'company.legal_name as company_name')
+            ->first() : null;
+
         return response()->json([
-            'user' => $this->userPayload($request->user()),
-            'companies' => $this->companiesFor($request->user()),
+            'user' => $this->userPayload($user),
+            'companies' => $this->companiesFor($user),
             'active_company_id' => $request->session()->get('active_company_id'),
+            'support_mode' => $supportMode ? ['active' => true, 'company' => $supportMode->company_name, 'subscription_status' => $supportMode->subscription_status, 'reason' => $supportMode->reason] : null,
         ]);
     }
 

@@ -106,7 +106,23 @@ class AuthenticationAndIsolationTest extends TestCase
     {
         $this->postJson('/api/auth/law-context', ['email' => 'nao-existe@example.test'])
             ->assertNotFound()
-            ->assertJsonPath('message', 'Não encontramos um sistema Fokus Law ativo vinculado a este e-mail. Verifique se a conta está ativa, vinculada a uma empresa e se a empresa possui uma assinatura ativa do Fokus Law.');
+            ->assertJsonPath('message', 'Usuário não encontrado.');
+    }
+
+    public function test_law_context_reports_missing_subscription_for_an_existing_user(): void
+    {
+        $this->postJson('/api/auth/register-company', $this->registration())->assertCreated();
+        $user = User::where('email', 'admin@example.test')->firstOrFail();
+        $companyId = DB::table('companies')->value('id');
+        DB::table('users')->where('id', $user->id)->update(['status' => 'ativa']);
+        DB::table('companies')->where('id', $companyId)->update(['status' => 'ativa']);
+
+        $this->postJson('/api/auth/law-context', ['email' => 'ADMIN@example.test'])
+            ->assertOk()
+            ->assertJsonPath('user.name', 'Administrador Teste')
+            ->assertJsonPath('user.email', 'admin@example.test')
+            ->assertJsonCount(0, 'systems')
+            ->assertJsonPath('message', 'Não existe nenhuma assinatura ativa do Fokus Law vinculada a este usuário.');
     }
 
     public function test_user_cannot_select_another_company_without_membership(): void
