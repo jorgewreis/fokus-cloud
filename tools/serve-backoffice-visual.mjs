@@ -24,7 +24,7 @@ createServer(async (request, response) => {
     if (url.pathname === '/api/backoffice/companies') return json(response, { data: [], meta: { total: 0, current_page: 1, per_page: 15, last_page: 1 }, summary: {} });
     if (url.pathname === '/api/backoffice/directory/users') return json(response, { data: [
         { id: 'PAD_VISUAL', name: 'Administração Fokus', email: 'admin@fokuscloud.test', type: 'plataforma', role: 'superadministrador', status: 'ativo', company_count: 0 },
-        { id: 'USR_VISUAL', name: 'Ana Empresa', email: 'ana@example.test', type: 'empresa', status: 'ativa', company_count: 1 },
+        { id: 'USR_VISUAL', name: 'Ana Empresa', email: 'ana@example.test', type: 'empresa', status: 'ativa', profile: 'Administrador', company_names: ['Empresa de Demonstração'], company_count: 1 },
     ], meta: { total: 2, current_page: Number(url.searchParams.get('page') || 1), per_page: 15, last_page: 1 } });
     if (url.pathname === '/api/backoffice/directory/users/empresa/USR_VISUAL') return json(response, { id: 'USR_VISUAL', name: 'Ana Empresa', email: 'ana@example.test', type: 'empresa', status: 'ativa', cpf: '12345678901', memberships: [{ company_id: 'CMP_VISUAL', company_name: 'Empresa de Demonstração', role: 'admin', status: 'ativo', subscriptions: [{ product_name: 'Fokus Law', plan_name: 'Essencial', status: 'ativa', billing_cycle: 'monthly' }] }] });
     if (url.pathname === '/api/backoffice/directory/users/plataforma/PAD_VISUAL') return json(response, { id: 'PAD_VISUAL', name: 'Administração Fokus', email: 'admin@fokuscloud.test', type: 'plataforma', role: 'superadministrador', status: 'ativo' });

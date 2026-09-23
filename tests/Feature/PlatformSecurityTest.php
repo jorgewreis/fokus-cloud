@@ -180,6 +180,10 @@ class PlatformSecurityTest extends TestCase
             ->assertOk()->assertJsonPath('memberships.0.company_name', 'Empresa vinculada')
             ->assertJsonPath('memberships.0.role', 'Administrador')
             ->assertJsonPath('memberships.0.subscriptions.0.plan_name', 'Essencial');
+
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/directory/users?q=cliente@example.test')
+            ->assertOk()->assertJsonPath('data.0.profile', 'Administrador')
+            ->assertJsonPath('data.0.company_names.0', 'Empresa vinculada');
     }
 
     public function test_internal_email_confirmation_is_single_use_and_updates_address_only_after_confirmation(): void

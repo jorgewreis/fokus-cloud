@@ -72,6 +72,10 @@ class BackofficeUiContractTest extends TestCase
         $module = file_get_contents(base_path('public/backoffice/assets/js/users-page.js'));
 
         $this->assertStringContainsString('id="user-invite" type="button">Novo usuário</button>', $markup);
+        $this->assertStringContainsString('Usuário interno - FokusCloud', $module);
+        $this->assertStringContainsString('Usuário Externo - Assinatura', $module);
+        $this->assertStringContainsString('data-label="Perfil ou vínculos"><strong>${esc(profile)}</strong>', $module);
+        $this->assertStringContainsString('company_names', $module);
         $this->assertMatchesRegularExpression('/<thead>\s*<tr><th class="fs-width-600".*?<th class="fs-width-400".*?<th class="fs-width-500".*?<th class="fs-width-300".*?<th class="fs-width-400"/s', $markup);
         foreach (['fs-width-600" data-label="Usuário', 'fs-width-400" data-label="Tipo', 'fs-width-500" data-label="Perfil ou vínculos', 'fs-width-300" data-label="Status', 'fs-width-400" data-label="Ações'] as $cell) {
             $this->assertStringContainsString($cell, $module);

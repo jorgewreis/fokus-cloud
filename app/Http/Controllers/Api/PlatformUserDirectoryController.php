@@ -42,15 +42,23 @@ class PlatformUserDirectoryController extends Controller
         $audit->record($request->user()->id, 'backoffice.user_directory_viewed', request: $request);
 
         return response()->json([
-            'data' => collect($directory->items())->map(fn (object $row): array => [
-                'id' => $row->id,
-                'name' => $row->name,
-                'email' => $row->email,
-                'type' => $row->account_type,
-                'role' => $row->role_name,
-                'status' => $row->status,
-                'company_count' => $row->account_type === 'empresa' ? $memberships->get($row->id, collect())->count() : 0,
-            ])->values(),
+            'data' => collect($directory->items())->map(function (object $row) use ($memberships): array {
+                $accountMemberships = $row->account_type === 'empresa' ? $memberships->get($row->id, collect()) : collect();
+
+                return [
+                    'id' => $row->id,
+                    'name' => $row->name,
+                    'email' => $row->email,
+                    'type' => $row->account_type,
+                    'role' => $row->role_name,
+                    'profile' => $row->account_type === 'empresa'
+                        ? $accountMemberships->pluck('role_name')->unique()->implode(' / ')
+                        : $row->role_name,
+                    'company_names' => $accountMemberships->pluck('company_name')->unique()->values(),
+                    'status' => $row->status,
+                    'company_count' => $accountMemberships->count(),
+                ];
+            })->values(),
             'meta' => [
                 'current_page' => $directory->currentPage(),
                 'last_page' => $directory->lastPage(),

@@ -44,6 +44,10 @@ test('diretório Usuários abre detalhes de conta e se adapta a telas menores', 
         await page.goto('/backoffice/usuarios');
         await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'users');
         await expect(page.locator('#users-list tr[data-account-type]')).toHaveCount(2);
+        await expect(page.locator('#users-list tr[data-account-type="empresa"] [data-label="Tipo"]')).toHaveText('Usuário Externo - Assinatura');
+        await expect(page.locator('#users-list tr[data-account-type="empresa"] [data-label="Perfil ou vínculos"]')).toContainText('Administrador');
+        await expect(page.locator('#users-list tr[data-account-type="empresa"] [data-label="Perfil ou vínculos"]')).toContainText('Empresa de Demonstração');
+        await expect(page.locator('#users-list tr[data-account-type="plataforma"] [data-label="Tipo"]')).toHaveText('Usuário interno - FokusCloud');
         const brokenActionIcons = await page.locator('#users-list button[data-user-action] img').evaluateAll((images) => images.filter((image) => image.naturalWidth === 0).map((image) => new URL(image.src).pathname));
         expect(brokenActionIcons).toEqual([]);
         await page.getByRole('button', { name: 'Detalhes' }).nth(1).click();
