@@ -95,15 +95,18 @@ class AuthenticationAndIsolationTest extends TestCase
 
         $this->postJson('/api/auth/law-context', ['email' => 'ADMIN@EXAMPLE.TEST'])
             ->assertOk()
-            ->assertJsonPath('systems.0.label', 'Advocacia - Empresa Teste Ltda')
+            ->assertJsonPath('user.name', 'Administrador Teste')
+            ->assertJsonPath('systems.0.label', 'Fokus Law · Advocacia - Empresa Teste Ltda')
             ->assertJsonPath('systems.0.profiles.0.value', 'admin');
+        DB::table('users')->where('id', $user->id)->update(['email_verified_at' => null]);
+        $this->postJson('/api/auth/law-context', ['email' => 'admin@example.test'])->assertOk()->assertJsonPath('user.name', 'Administrador Teste');
     }
 
     public function test_law_context_rejects_unknown_email(): void
     {
         $this->postJson('/api/auth/law-context', ['email' => 'nao-existe@example.test'])
             ->assertNotFound()
-            ->assertJsonPath('message', 'Usuário não encontrado.');
+            ->assertJsonPath('message', 'Não encontramos um sistema Fokus Law ativo vinculado a este e-mail. Verifique se a conta está ativa, vinculada a uma empresa e se a empresa possui uma assinatura ativa do Fokus Law.');
     }
 
     public function test_user_cannot_select_another_company_without_membership(): void

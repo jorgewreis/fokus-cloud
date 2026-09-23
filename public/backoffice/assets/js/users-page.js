@@ -24,10 +24,10 @@ export async function mount(root, context = {}) {
     let selected = null;
     let pendingAction = null;
     const esc = (value) => String(value ?? "").replace(/[&<>\x27"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\x27": "&#039;", "\"": "&quot;" })[c]);
-    const labels = { plataforma: "Usuário interno - FokusCloud", empresa: "Usuário Externo - Assinatura", administrador_comercial: "Administrador comercial", superadministrador: "Superadministrador", Administrador: "Administrador", Gestor: "Gerente", Usuário: "Usuário comum", ativo: "Ativo", ativa: "Ativo", suspenso: "Suspenso", suspensa: "Suspensa", bloqueado: "Bloqueado", bloqueio_temporario: "Bloqueio temporário", desativado: "Desativado", desativada: "Desativada", bloqueada: "Bloqueada", pendente: "Pendente", cancelamento_agendado: "Cancelamento agendado", inadimplente: "Inadimplente", aguardando_pagamento: "Aguardando pagamento" };
-    const status = (value) => `<span class="fs-badge fs-badge-soft-${["ativo", "ativa"].includes(value) ? "success" : ["pendente", "aguardando_pagamento"].includes(value) ? "info" : ["suspenso", "suspensa", "bloqueado", "bloqueio_temporario", "inadimplente", "cancelamento_agendado"].includes(value) ? "warning" : "secondary"}">${esc(labels[value] || value || "Sem status")}</span>`;
+    const labels = { plataforma: "Usuário interno - FokusCloud", empresa: "Usuário Externo - Assinatura", administrador_comercial: "Administrador comercial", superadministrador: "Superadministrador", Administrador: "Administrador", Gestor: "Gerente", Usuário: "Usuário comum", ativo: "Ativo", ativa: "Ativo", active: "Ativo", bloqueado: "Bloqueado", bloqueada: "Bloqueado", bloqueio_temporario: "Bloqueado", blocked: "Bloqueado", suspenso: "Suspenso", suspensa: "Suspenso", suspended: "Suspenso", pendente: "Pendente", pending: "Pendente", desativado: "Encerrado", desativada: "Encerrado", encerrado: "Encerrado", encerrada: "Encerrado", closed: "Encerrado", cancelamento_agendado: "Cancelamento agendado", inadimplente: "Inadimplente", aguardando_pagamento: "Aguardando pagamento" };
+    const status = (value) => { const tone = ["ativo", "ativa", "active"].includes(value) ? "success" : ["pendente", "pending"].includes(value) ? "info" : ["bloqueado", "bloqueada", "bloqueio_temporario", "blocked", "suspenso", "suspensa", "suspended"].includes(value) ? "warning" : "secondary"; return `<span class="fs-badge fs-badge-soft-${tone}">${esc(labels[value] || value || "Sem status")}</span>`; };
     const showMessage = (text, tone = "danger") => { message.textContent = text || ""; message.dataset.tone = tone; message.hidden = !text; };
-    const actionButton = (action, id, label) => `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action${action === "deactivate" ? " fs-btn-danger" : ""}" type="button" data-user-action="${action}" data-user-id="${esc(id)}" aria-label="${esc(label)}" title="${esc(label)}"><img src="${iconBase}${actionIcons[action]}?v=20260923-users-directory-profile-v4" alt=""></button>`;
+    const actionButton = (action, id, label) => `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action${action === "deactivate" ? " fs-btn-danger" : ""}" type="button" data-user-action="${action}" data-user-id="${esc(id)}" aria-label="${esc(label)}" title="${esc(label)}"><img src="${iconBase}${actionIcons[action]}?v=20260923-user-management-law-context-v1" alt=""></button>`;
     const render = (response) => {
         const rows = response.data || [];
         list.innerHTML = rows.length ? rows.map((user) => {
@@ -59,25 +59,57 @@ export async function mount(root, context = {}) {
             showMessage("");
         } catch (error) { showMessage(error.message || "Não foi possível carregar os usuários."); }
     };
+    let companiesLoaded = false;
+    const setAccountType = (type) => {
+        const isExternal = type === "empresa";
+        $("#user-external-fields").hidden = !isExternal;
+        $("#user-internal-role-field").hidden = isExternal;
+        $("#user-role").disabled = isExternal;
+        [$("#user-cpf"), $("#user-company"), $("#user-external-role")].forEach((field) => { field.disabled = !isExternal; field.required = isExternal; });
+        $("#user-form-submit").disabled = isExternal && !companiesLoaded;
+        $("#user-form-data-title").textContent = isExternal ? "Vínculo com empresa" : "Dados da conta interna";
+        $("#user-form-submit").textContent = isExternal ? "Enviar convite externo" : "Enviar convite interno";
+        if (isExternal && !companiesLoaded) loadCompanies();
+    };
+    const loadCompanies = async () => {
+        const select = $("#user-company");
+        select.innerHTML = '<option value="">Carregando empresas...</option>';
+        try {
+            const response = await api.request("/backoffice/directory/companies");
+            const companies = response.data || [];
+            select.innerHTML = '<option value="">Selecione a empresa e o sistema</option>' + companies.map((company) => `<option value="${esc(company.id)}">${esc(company.label)}</option>`).join("");
+            select.disabled = companies.length === 0;
+            $("#user-form-submit").disabled = companies.length === 0 && $("#user-account-type").value === "empresa";
+            if (!companies.length) showMessage("Não há empresas ativas com assinatura ativa do Fokus Law para receber um vínculo.");
+            else { companiesLoaded = true; showMessage(""); }
+        } catch (error) {
+            select.innerHTML = '<option value="">Não foi possível carregar as empresas</option>';
+            $("#user-form-submit").disabled = $("#user-account-type").value === "empresa";
+            showMessage(error.message || "Não foi possível carregar as empresas ativas.");
+        }
+    };
     const resetForm = () => {
         form.reset(); form.hidden = false; $("#user-view-panel").hidden = true;
-        $("#user-role-field").hidden = false; $("#user-role").disabled = false;
+        $("#user-account-type-field").hidden = false; $("#user-account-type").value = "plataforma"; setAccountType("plataforma");
         $("#user-email").readOnly = false; $("#user-email-change-help").hidden = true;
         $("#user-form-submit").hidden = false; $("#user-form-cancel").textContent = "Cancelar";
     };
     const openForm = (mode, record = null) => {
         resetForm(); selected = record; drawerController.setState({ mode, record });
-        $("#user-drawer-kicker").textContent = mode === "invite" ? "CONVITE" : "EDIÇÃO INTERNA";
-        $("#user-drawer-title").textContent = mode === "invite" ? "Convidar administrador" : "Editar conta interna";
-        $("#user-drawer-description").textContent = mode === "invite" ? "Envie um convite para uma nova conta interna." : "O nome será atualizado imediatamente. A troca de e-mail exige confirmação.";
-        $("#user-form-help").textContent = mode === "invite" ? "Defina o perfil da conta interna." : "A alteração de e-mail será enviada para confirmação.";
+        $("#user-drawer-kicker").textContent = mode === "invite" ? "NOVO USUÁRIO" : "EDIÇÃO INTERNA";
+        $("#user-drawer-title").textContent = mode === "invite" ? "Novo usuário" : "Editar conta interna";
+        $("#user-drawer-description").textContent = mode === "invite" ? "Convide uma conta interna ou vincule um usuário a uma empresa." : "O nome será atualizado imediatamente. A troca de e-mail exige confirmação.";
+        $("#user-form-help").textContent = mode === "invite" ? "Escolha o tipo de conta e informe os dados necessários." : "A alteração de e-mail será enviada para confirmação.";
         if (mode === "edit") {
+            $("#user-account-type-field").hidden = true;
             $("#user-name").value = record.name || ""; $("#user-email").value = record.email || "";
-            $("#user-email-change-help").hidden = false; $("#user-role-field").hidden = true;
+            $("#user-email-change-help").hidden = false; $("#user-internal-role-field").hidden = true;
         }
         drawerController.show();
         $("#user-name").focus();
     };
+    $("#user-account-type").addEventListener("change", (event) => setAccountType(event.target.value));
+    $("#user-cpf").addEventListener("input", (event) => { event.target.value = window.FokusDocuments?.formatCpf(event.target.value) || event.target.value; });
     const card = (title, content) => `<section class="fs-card fs-card-panel"><div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title">${esc(title)}</h3></div></div><div class="fs-card-body">${content}</div></section>`;
     const field = (label, value) => `<div><dt class="fs-u-fs-sm fs-u-color-secondary">${esc(label)}</dt><dd class="fs-u-m-0">${esc(value || "-")}</dd></div>`;
     const openDetails = (record) => {
@@ -120,8 +152,13 @@ export async function mount(root, context = {}) {
         const mode = drawerController.getState().mode;
         try {
             if (mode === "invite") {
-                await api.request("/backoffice/admins/invitations", { method: "POST", body: values });
-                showMessage("Convite enviado.", "success");
+                if (values.account_type === "empresa") {
+                    await api.request("/backoffice/directory/users", { method: "POST", body: { name: values.name, email: values.email, cpf: values.cpf, company_id: values.company_id, role: values.role } });
+                    showMessage("Convite enviado ao usuário externo.", "success");
+                } else {
+                    await api.request("/backoffice/admins/invitations", { method: "POST", body: { name: values.name, email: values.email, role: values.role } });
+                    showMessage("Convite enviado à conta interna.", "success");
+                }
             } else {
                 const result = await api.request(`/backoffice/admins/${encodeURIComponent(selected.id)}/profile`, { method: "PATCH", body: { name: values.name, email: values.email } });
                 showMessage(result.message || "Dados atualizados.", "success");

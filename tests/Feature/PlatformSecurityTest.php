@@ -142,6 +142,7 @@ class PlatformSecurityTest extends TestCase
     {
         $admin = $this->admin('administrador_comercial');
         $this->actingAs($admin, 'platform')->getJson('/api/backoffice/admins')->assertForbidden();
+        $this->actingAs($admin, 'platform')->postJson('/api/backoffice/directory/users', [])->assertForbidden();
     }
 
     public function test_commercial_admin_can_read_directory_but_never_receives_company_cpf(): void
@@ -184,6 +185,33 @@ class PlatformSecurityTest extends TestCase
         $this->actingAs($admin, 'platform')->getJson('/api/backoffice/directory/users?q=cliente@example.test')
             ->assertOk()->assertJsonPath('data.0.profile', 'Administrador')
             ->assertJsonPath('data.0.company_names.0', 'Empresa vinculada');
+    }
+
+    public function test_superadmin_can_invite_external_user_to_active_law_company_with_role(): void
+    {
+        $admin = $this->admin();
+        $owner = User::create(['id' => PrefixedUlid::make('USR'), 'name' => 'Responsável', 'cpf' => '11144477735', 'email' => 'responsavel@example.test', 'password' => 'SenhaResponsavel!2026', 'status' => 'ativa', 'email_verified_at' => now()]);
+        $companyId = PrefixedUlid::make('COM');
+        $product = DB::table('products')->where('code', 'law')->firstOrFail();
+        DB::table('companies')->insert(['id' => $companyId, 'document_type' => 'cnpj', 'document_number' => '12345678000100', 'legal_name' => 'Empresa Externa', 'status' => 'ativa', 'version' => 1, 'created_by' => $owner->id, 'updated_by' => $owner->id, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('company_memberships')->insert(['id' => PrefixedUlid::make('MBS'), 'company_id' => $companyId, 'user_id' => $owner->id, 'role_id' => DB::table('roles')->where('code', 'admin')->value('id'), 'status' => 'ativo', 'active_admin_company_id' => $companyId, 'version' => 1, 'created_by' => $owner->id, 'updated_by' => $owner->id, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('subscriptions')->insert(['id' => PrefixedUlid::make('ASS'), 'company_id' => $companyId, 'product_id' => $product->id, 'status' => 'ativa', 'open_company_product' => $companyId.'-'.$product->id, 'version' => 1, 'billing_cycle' => 'monthly', 'current_period_starts_at' => now(), 'current_period_ends_at' => now()->addMonth(), 'commercial_snapshot' => json_encode(['plan_name' => 'Essencial']), 'created_by' => $owner->id, 'updated_by' => $owner->id, 'created_at' => now(), 'updated_at' => now()]);
+
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/directory/companies')
+            ->assertOk()->assertJsonPath('data.0.id', $companyId)
+            ->assertJsonPath('data.0.label', 'Fokus Law - Empresa Externa');
+        $this->actingAs($admin, 'platform')->postJson('/api/backoffice/directory/users', [
+            'name' => 'Pessoa Convidada', 'email' => 'convidada@example.test', 'cpf' => '52998224725',
+            'company_id' => $companyId, 'role' => 'gestor',
+        ])->assertCreated();
+
+        $invited = User::where('email', 'convidada@example.test')->firstOrFail();
+        $membership = DB::table('company_memberships')->where('company_id', $companyId)->where('user_id', $invited->id)->first();
+        $this->assertSame('pendente', $invited->status);
+        $this->assertSame('pendente', $membership->status);
+        $this->assertSame('gestor', DB::table('roles')->where('id', $membership->role_id)->value('code'));
+        $this->assertDatabaseHas('company_invitations', ['membership_id' => $membership->id]);
+        $this->assertDatabaseHas('security_tokens', ['user_id' => $invited->id, 'purpose' => 'password_creation']);
     }
 
     public function test_internal_email_confirmation_is_single_use_and_updates_address_only_after_confirmation(): void

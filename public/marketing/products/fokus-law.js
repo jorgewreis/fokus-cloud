@@ -39,10 +39,12 @@
     const profileField = profile.closest('div');
     let lookupTimer;
     let systems = [];
+    let userName = '';
     submit.textContent = 'Entrar';
 
     const reset = (message = 'A identificação começa ao informar seu e-mail.') => {
       systems = [];
+      userName = '';
       system.disabled = true;
       system.innerHTML = '<option value="">Aguardando identificação</option>';
       profile.disabled = true;
@@ -65,13 +67,15 @@
       submit.disabled = availableProfiles.length === 0;
       if (availableProfiles.length === 1) {
         profile.value = availableProfiles[0].value;
-        status.textContent = 'Perfil confirmado. Digite sua senha.';
+        status.textContent = `${userName ? `${userName} — ` : ''}Perfil confirmado. Digite sua senha.`;
       } else {
-        status.textContent = availableProfiles.length ? 'Sistema localizado. Escolha o perfil para liberar a senha.' : 'Nenhum perfil disponível para este sistema.';
+        status.textContent = availableProfiles.length ? `${userName ? `${userName} — ` : ''}Sistema localizado. Escolha o perfil para liberar a senha.` : `${userName ? `${userName} — ` : ''}Nenhum perfil disponível para este sistema.`;
       }
     };
 
-    const renderSystems = (items) => {
+    const renderSystems = (payload) => {
+      const items = payload.systems || [];
+      userName = payload.user?.name || '';
       systems = items;
       system.innerHTML = systems.map((item) => `<option value="${item.value}">${item.label}</option>`).join('');
       system.disabled = systems.length === 0;
@@ -79,7 +83,7 @@
         system.value = systems[0].value;
         renderProfiles();
       } else {
-        reset('Nenhum sistema Fokus Law foi encontrado para este usuário.');
+        reset('Não encontramos um sistema Fokus Law ativo vinculado a este e-mail. Confirme o vínculo com uma empresa e a assinatura ativa do Fokus Law.');
       }
     };
 
@@ -94,10 +98,13 @@
       status.textContent = 'Consultando os sistemas vinculados ao e-mail…';
       lookupTimer = setTimeout(() => {
         window.FokusApi.request('/auth/law-context', { method: 'POST', body: { email: value } })
-          .then((payload) => renderSystems(payload.systems || []))
+          .then(renderSystems)
           .catch((error) => {
-            reset('Usuário não encontrado.');
-            showToast(error.status === 404 ? 'Usuário não encontrado.' : (error.message || 'Não foi possível consultar o usuário.'));
+            const message = error.status === 404
+              ? 'Não encontramos um sistema Fokus Law ativo vinculado a este e-mail. Confirme o vínculo com uma empresa e a assinatura ativa do Fokus Law.'
+              : (error.message || 'Não foi possível consultar os sistemas vinculados a este e-mail.');
+            reset(message);
+            showToast(message);
           });
       }, 420);
     });
@@ -106,7 +113,7 @@
     profile.addEventListener('change', () => {
       password.disabled = !profile.value;
       submit.disabled = !profile.value;
-      status.textContent = profile.value ? 'Perfil confirmado. Digite sua senha.' : 'Escolha seu perfil para continuar.';
+      status.textContent = profile.value ? `${userName ? `${userName} — ` : ''}Perfil confirmado. Digite sua senha.` : 'Escolha seu perfil para continuar.';
       if (!profile.value) password.value = '';
     });
     form.addEventListener('submit', (event) => { event.preventDefault(); status.textContent = 'O acesso contextual será ativado junto à publicação do ambiente Fokus Law.'; });

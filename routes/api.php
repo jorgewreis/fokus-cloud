@@ -133,6 +133,8 @@ Route::middleware(EnsurePlatformAdmin::class)->prefix('backoffice')->group(funct
     Route::get('/admins', [PlatformAdminController::class, 'index'])->middleware(EnsurePlatformPermission::class.':platform.security.manage');
     Route::post('/admins/invitations', [PlatformAdminController::class, 'invite'])->middleware(EnsurePlatformPermission::class.':platform.security.manage');
     Route::get('/directory/users', [PlatformUserDirectoryController::class, 'index'])->middleware(EnsurePlatformPermission::class.':platform.users.view');
+    Route::get('/directory/companies', [PlatformUserDirectoryController::class, 'companiesForCreation'])->middleware(EnsurePlatformPermission::class.':platform.security.manage');
+    Route::post('/directory/users', [PlatformUserDirectoryController::class, 'createExternal'])->middleware(EnsurePlatformPermission::class.':platform.security.manage');
     Route::get('/directory/users/{type}/{id}', [PlatformUserDirectoryController::class, 'show'])->middleware(EnsurePlatformPermission::class.':platform.users.view');
     Route::patch('/admins/{admin}/role', [PlatformAdminController::class, 'updateRole'])->middleware(EnsurePlatformPermission::class.':platform.security.manage');
     Route::patch('/admins/{admin}/profile', [PlatformAdminController::class, 'updateProfile'])->middleware(EnsurePlatformPermission::class.':platform.security.manage');

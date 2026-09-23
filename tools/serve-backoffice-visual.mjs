@@ -19,9 +19,12 @@ const json = (response, payload, status = 200) => {
 createServer(async (request, response) => {
     const url = new URL(request.url, `http://${request.headers.host}`);
     if (url.pathname === '/api/csrf-token') return json(response, { token: 'visual-test-token' });
+    if (url.pathname === '/api/auth/law-context') return json(response, { user: { name: 'Pessoa Teste' }, systems: [{ value: 'CMP_VISUAL', label: 'Fokus Law · Advocacia - Empresa de Demonstração', profiles: [{ value: 'usuario', label: 'Usuário comum' }] }] });
     if (url.pathname === '/api/backoffice/auth/me') return json(response, { admin });
     if (url.pathname === '/api/backoffice/dashboard') return json(response, { user: admin, alerts: [] });
     if (url.pathname === '/api/backoffice/companies') return json(response, { data: [], meta: { total: 0, current_page: 1, per_page: 15, last_page: 1 }, summary: {} });
+    if (url.pathname === '/api/backoffice/directory/companies') return json(response, { data: [{ id: 'CMP_VISUAL', label: 'Fokus Law - Empresa de Demonstração' }] });
+    if (url.pathname === '/api/backoffice/directory/users' && request.method === 'POST') return json(response, { message: 'Convite enviado.' }, 201);
     if (url.pathname === '/api/backoffice/directory/users') return json(response, { data: [
         { id: 'PAD_VISUAL', name: 'Administração Fokus', email: 'admin@fokuscloud.test', type: 'plataforma', role: 'superadministrador', status: 'ativo', company_count: 0 },
         { id: 'USR_VISUAL', name: 'Ana Empresa', email: 'ana@example.test', type: 'empresa', status: 'ativa', profile: 'Administrador', company_names: ['Empresa de Demonstração'], company_count: 1 },

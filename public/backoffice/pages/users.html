@@ -63,11 +63,18 @@
         </div>
         <form id="user-form" class="fs-offcanvas-body fs-form" hidden novalidate>
             <section class="fs-card fs-card-panel" aria-labelledby="user-form-data-title">
-                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="user-form-data-title">Dados da conta interna</h3><p class="fs-card-subtitle" id="user-form-help">Informe os dados do convite.</p></div></div>
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="user-form-data-title">Dados da conta</h3><p class="fs-card-subtitle" id="user-form-help">Informe os dados do convite.</p></div></div>
                 <div class="fs-card-body fs-u-d-flex fs-u-flex-column fs-u-gap-3">
+                    <label class="fs-form-label" id="user-account-type-field" for="user-account-type"><span>Tipo de conta</span><select class="fs-form-select" id="user-account-type" name="account_type"><option value="plataforma">Usuário interno - FokusCloud</option><option value="empresa">Usuário externo - Assinatura</option></select></label>
                     <label class="fs-form-label" for="user-name"><span>Nome</span><input class="fs-form-control" id="user-name" name="name" maxlength="255" autocomplete="name" required></label>
                     <label class="fs-form-label" for="user-email"><span>E-mail</span><input class="fs-form-control" id="user-email" name="email" type="email" maxlength="255" autocomplete="email" required></label>
-                    <label class="fs-form-label" id="user-role-field" for="user-role"><span>Perfil interno</span><select class="fs-form-select" id="user-role" name="role" required><option value="administrador_comercial">Administrador comercial</option><option value="superadministrador">Superadministrador</option></select></label>
+                    <label class="fs-form-label" id="user-internal-role-field" for="user-role"><span>Perfil interno</span><select class="fs-form-select" id="user-role" name="role"><option value="administrador_comercial">Administrador comercial</option><option value="superadministrador">Superadministrador</option></select></label>
+                    <div class="fs-u-d-flex fs-u-flex-column fs-u-gap-3" id="user-external-fields" hidden>
+                        <label class="fs-form-label" for="user-cpf"><span>CPF</span><input class="fs-form-control" id="user-cpf" name="cpf" inputmode="numeric" autocomplete="off" data-brazilian-document="cpf"></label>
+                        <label class="fs-form-label" for="user-company"><span>Empresa e sistema</span><select class="fs-form-select" id="user-company" name="company_id" disabled><option value="">Carregando empresas...</option></select></label>
+                        <label class="fs-form-label" for="user-external-role"><span>Perfil no sistema</span><select class="fs-form-select" id="user-external-role" name="role"><option value="gestor">Gerente</option><option value="usuario">Usuário comum</option></select></label>
+                        <p class="fs-u-m-0 fs-u-fs-sm fs-u-color-secondary">O vínculo será enviado para confirmação por e-mail. O perfil Administrador é definido pelo fluxo formal de transferência da empresa.</p>
+                    </div>
                     <p class="fs-u-fs-sm fs-u-color-secondary" id="user-email-change-help" hidden>O e-mail atual continua ativo até o titular confirmar o novo endereço. O link expira em 24 horas.</p>
                 </div>
             </section>

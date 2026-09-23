@@ -24,8 +24,8 @@ class AuthController extends Controller
             'email' => ['required', 'email:rfc', 'max:255'],
         ])['email']));
 
-        $user = User::where('email', $email)->first();
-        $lawSystems = $user ? DB::table('company_memberships as membership')
+        $user = User::whereRaw('LOWER(email) = ?', [$email])->first();
+        $lawSystems = $user && $user->status === 'ativa' ? DB::table('company_memberships as membership')
             ->join('companies as company', 'company.id', '=', 'membership.company_id')
             ->join('roles as role', 'role.id', '=', 'membership.role_id')
             ->join('subscriptions as subscription', 'subscription.company_id', '=', 'company.id')
@@ -40,11 +40,11 @@ class AuthController extends Controller
             ->whereNull('company.deleted_at')
             ->where('subscription.status', 'ativa')
             ->where('product.code', 'law')
-            ->select('company.id as company_id', 'company.legal_name as company_name', 'role.code as profile_code', 'role.name as profile_name', 'module_segment.segment_code')
+            ->select('company.id as company_id', 'company.legal_name as company_name', 'product.name as product_name', 'role.code as profile_code', 'role.name as profile_name', 'module_segment.segment_code')
             ->orderBy('company.legal_name')
             ->get() : collect();
 
-        abort_if($lawSystems->isEmpty(), 404, 'Usuário não encontrado.');
+        abort_if($lawSystems->isEmpty(), 404, 'Não encontramos um sistema Fokus Law ativo vinculado a este e-mail. Verifique se a conta está ativa, vinculada a uma empresa e se a empresa possui uma assinatura ativa do Fokus Law.');
 
         $systems = $lawSystems->groupBy('company_id')->map(function ($rows): array {
             $segment = $rows->pluck('segment_code')->filter()->first() ?: 'juridico';
@@ -56,7 +56,7 @@ class AuthController extends Controller
 
             return [
                 'value' => (string) $rows->first()->company_id,
-                'label' => $segmentLabel.' - '.$rows->first()->company_name,
+                'label' => $rows->first()->product_name.' · '.$segmentLabel.' - '.$rows->first()->company_name,
                 'profiles' => $rows->map(fn (object $row): array => [
                     'value' => (string) $row->profile_code,
                     'label' => (string) $row->profile_name,
@@ -64,7 +64,7 @@ class AuthController extends Controller
             ];
         })->values()->all();
 
-        return response()->json(['systems' => $systems]);
+        return response()->json(['user' => ['name' => $user->name], 'systems' => $systems]);
     }
 
     public function registerCompany(Request $request, PasswordSecurity $passwordSecurity)

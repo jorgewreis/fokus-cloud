@@ -80,6 +80,9 @@ class BackofficeUiContractTest extends TestCase
         $this->assertStringContainsString('Usuário Externo - Assinatura', $module);
         $this->assertStringContainsString('data-label="Perfil ou vínculos"><strong>${esc(profile)}</strong>', $module);
         $this->assertStringContainsString('company_names', $module);
+        $this->assertStringContainsString('Encerrado', $module);
+        $this->assertStringContainsString('id="user-account-type"', $markup);
+        $this->assertStringContainsString('id="user-external-role"', $markup);
         $this->assertMatchesRegularExpression('/<thead>\s*<tr><th class="fs-width-600".*?<th class="fs-width-400".*?<th class="fs-width-500".*?<th class="fs-width-300".*?<th class="fs-width-400"/s', $markup);
         foreach (['fs-width-600" data-label="Usuário', 'fs-width-400" data-label="Tipo', 'fs-width-500" data-label="Perfil ou vínculos', 'fs-width-300" data-label="Status', 'fs-width-400" data-label="Ações'] as $cell) {
             $this->assertStringContainsString($cell, $module);

@@ -62,6 +62,30 @@ test('diretório Usuários abre detalhes de conta e se adapta a telas menores', 
     }
 });
 
+test('Novo usuário permite convidar usuário externo vinculado a empresa Fokus Law', async ({ page }) => {
+    await page.goto('/backoffice/usuarios');
+    await page.locator('#user-invite').click();
+    await page.locator('#user-account-type').selectOption('empresa');
+    await expect(page.locator('#user-company option[value="CMP_VISUAL"]')).toHaveText('Fokus Law - Empresa de Demonstração');
+    await expect(page.locator('#user-external-role')).toBeVisible();
+    await page.locator('#user-name').fill('Pessoa Convidada');
+    await page.locator('#user-email').fill('convidada@example.test');
+    await page.locator('#user-cpf').fill('52998224725');
+    await page.locator('#user-company').selectOption('CMP_VISUAL');
+    await page.locator('#user-external-role').selectOption('gestor');
+    await page.locator('#user-form-submit').click();
+    await expect(page.locator('#backoffice-toast-container .fs-toast-body')).toContainText('Convite enviado ao usuário externo.');
+});
+
+test('consulta de e-mail no acesso Fokus Law identifica nome e sistema ativo', async ({ page }) => {
+    await page.goto('/marketing/products/fokus-law.html');
+    await page.locator('#law-email').fill('pessoa@example.test');
+    await expect(page.locator('#law-system')).toBeEnabled();
+    await expect(page.locator('#law-system option')).toHaveText('Fokus Law · Advocacia - Empresa de Demonstração');
+    await expect(page.locator('[data-law-login-status]')).toContainText('Pessoa Teste');
+    await expect(page.locator('#law-password')).toBeEnabled();
+});
+
 test('drawer de empresas preserva largura, cards e alertas do contrato visual', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/backoffice/empresas');

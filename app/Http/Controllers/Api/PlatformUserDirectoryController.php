@@ -4,12 +4,107 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\PlatformAdmin;
+use App\Models\User;
 use App\Services\PlatformAudit;
+use App\Services\PrefixedUlid;
+use App\Support\BrazilianDocuments;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class PlatformUserDirectoryController extends Controller
 {
+    public function companiesForCreation()
+    {
+        $companies = DB::table('companies as company')
+            ->join('subscriptions as subscription', 'subscription.company_id', '=', 'company.id')
+            ->join('products as product', 'product.id', '=', 'subscription.product_id')
+            ->where('company.status', 'ativa')->whereNull('company.deleted_at')
+            ->where('subscription.status', 'ativa')
+            ->where('product.code', 'law')
+            ->orderBy('company.legal_name')
+            ->get(['company.id', 'company.legal_name', 'product.name as product_name'])
+            ->unique('id')->values()
+            ->map(fn (object $company): array => [
+                'id' => $company->id,
+                'label' => $company->product_name.' - '.$company->legal_name,
+            ]);
+
+        return response()->json(['data' => $companies]);
+    }
+
+    public function createExternal(Request $request, AuthController $auth, PlatformAudit $audit)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email:rfc', 'max:255'],
+            'cpf' => ['required', 'string'],
+            'company_id' => ['required', 'string', 'exists:companies,id'],
+            'role' => ['required', Rule::in(['gestor', 'usuario'])],
+        ]);
+        $email = Str::lower(trim($data['email']));
+        $cpf = BrazilianDocuments::digits($data['cpf']);
+        abort_unless(BrazilianDocuments::cpf($cpf), 422, 'CPF inválido.');
+        $admin = $request->user();
+
+        $created = DB::transaction(function () use ($data, $email, $cpf, $admin): array {
+            $company = DB::table('companies')->where('id', $data['company_id'])->where('status', 'ativa')->whereNull('deleted_at')->lockForUpdate()->first();
+            abort_unless($company, 422, 'A empresa selecionada não está ativa.');
+            $hasLawSubscription = DB::table('subscriptions as subscription')
+                ->join('products as product', 'product.id', '=', 'subscription.product_id')
+                ->where('subscription.company_id', $company->id)->where('subscription.status', 'ativa')
+                ->where('product.code', 'law')->exists();
+            abort_unless($hasLawSubscription, 422, 'A empresa não possui uma assinatura ativa do Fokus Law.');
+
+            $byEmail = User::whereRaw('LOWER(email) = ?', [$email])->lockForUpdate()->first();
+            $byCpf = User::where('cpf', $cpf)->lockForUpdate()->first();
+            abort_if($byEmail && $byCpf && $byEmail->id !== $byCpf->id, 409, 'O e-mail e o CPF pertencem a contas diferentes.');
+            $user = $byEmail ?? $byCpf;
+            if ($user) {
+                abort_if(Str::lower($user->email) !== $email || $user->cpf !== $cpf, 409, 'Os dados informados não correspondem à mesma conta existente. Confira o e-mail e o CPF cadastrados.');
+                abort_unless(in_array($user->status, ['ativa', 'pendente'], true), 422, 'A conta existente está bloqueada, suspensa ou encerrada e não pode receber novos vínculos.');
+            } else {
+                $user = User::create([
+                    'id' => PrefixedUlid::make('USR'), 'name' => trim($data['name']), 'cpf' => $cpf,
+                    'email' => $email, 'password' => Str::random(64), 'status' => 'pendente',
+                ]);
+            }
+
+            $existingMembership = DB::table('company_memberships')->where('company_id', $company->id)->where('user_id', $user->id)->lockForUpdate()->exists();
+            abort_if($existingMembership, 409, 'Este usuário já possui ou já possuiu vínculo com a empresa.');
+            $role = DB::table('roles')->where('code', $data['role'])->first();
+            abort_unless($role, 422, 'Perfil inválido.');
+            $membershipId = PrefixedUlid::make('VNC');
+            DB::table('company_memberships')->insert([
+                'id' => $membershipId, 'company_id' => $company->id, 'user_id' => $user->id,
+                'role_id' => $role->id, 'status' => 'pendente', 'version' => 1,
+                'created_by' => $admin->id, 'updated_by' => $admin->id,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            DB::table('company_invitations')->insert([
+                'id' => PrefixedUlid::make('CNV'), 'company_id' => $company->id,
+                'membership_id' => $membershipId, 'created_by' => $admin->id,
+                'expires_at' => now()->addDay(), 'created_at' => now(), 'updated_at' => now(),
+            ]);
+
+            return ['user' => $user, 'membership_id' => $membershipId, 'company' => $company, 'role' => $data['role'], 'needs_password' => ! $user->email_verified_at];
+        });
+
+        $auth->sendToken(
+            $created['user'],
+            $created['needs_password'] ? 'password_creation' : 'membership_acceptance',
+            $created['needs_password'] ? '/criar-senha' : '/aceitar-vinculo',
+            ['membership_id' => $created['membership_id']],
+        );
+        $audit->record($admin->id, 'backoffice.external_user_invited', 'company_membership', $created['membership_id'], companyId: $created['company']->id, after: [
+            'user_id' => $created['user']->id, 'company_id' => $created['company']->id,
+            'role' => $created['role'], 'status' => 'pendente',
+        ], request: $request);
+
+        return response()->json(['message' => 'Convite enviado para o e-mail informado. O vínculo ficará pendente até a confirmação do usuário.'], 201);
+    }
+
     public function index(Request $request, PlatformAudit $audit)
     {
         $filters = $request->validate([
