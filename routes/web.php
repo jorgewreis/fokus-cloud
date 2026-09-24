@@ -74,7 +74,7 @@ $serveBackofficeShell = function () {
 };
 Route::get('/backoffice/index.html', $serveBackofficeShell);
 Route::get('/backoffice/{page?}', $serveBackofficeShell)
-    ->where('page', 'painel|empresas|produtos|modulos|modules|planos|catalogo|assinaturas|vouchers|pagamentos|billing|seguranca|usuarios|interesses|product-interests|componentes');
+    ->where('page', 'painel|empresas|produtos|modulos|modules|planos|catalogo|visao-geral-catalogo|assinaturas|vouchers|pagamentos|billing|seguranca|usuarios|interesses|product-interests|componentes');
 Route::get('/produtos', fn () => response()->file(public_path('marketing/products/index.html')));
 Route::get('/produtos/fokus-styles', fn () => response()->file(public_path('marketing/products/fokus-styles.html')));
 Route::get('/produtos/fokus-law', fn () => response()->file(public_path('marketing/products/fokus-law.html')));

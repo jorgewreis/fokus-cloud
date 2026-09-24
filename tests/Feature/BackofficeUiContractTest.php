@@ -64,6 +64,25 @@ class BackofficeUiContractTest extends TestCase
         $this->assertLessThan($modules, $products, 'Produtos deve anteceder Módulos.');
         $this->assertLessThan($plans, $modules, 'Módulos deve anteceder Planos.');
         $this->assertStringNotContainsString('Publicações e versões', $panel);
+        $this->assertStringContainsString('data-sidebar-item="catalog-overview" data-platform-permission="platform.catalog.manage"', $panel);
+        $this->assertStringNotContainsString('data-sidebar-item="catalog-overview" type="button" disabled', $panel);
+    }
+
+    public function test_catalog_overview_has_its_own_permission_gated_route_and_summary_regions(): void
+    {
+        $router = file_get_contents(base_path('public/backoffice/assets/js/backoffice-router.js'));
+        $page = file_get_contents(base_path('public/backoffice/pages/catalog-overview.html'));
+        $module = file_get_contents(base_path('public/backoffice/assets/js/catalog-overview-page.js'));
+        $routes = file_get_contents(base_path('routes/web.php'));
+
+        $this->assertStringContainsString('catalog-overview', $router);
+        $this->assertStringContainsString('permission: "platform.catalog.manage"', $router);
+        $this->assertStringContainsString('visao-geral-catalogo', $routes);
+        foreach (['catalog-products-total', 'catalog-modules-total', 'catalog-plans-total', 'catalog-pending-list', 'catalog-history-list'] as $region) {
+            $this->assertStringContainsString('id="'.$region.'"', $page);
+        }
+        $this->assertStringContainsString('slice(0, 5)', $module);
+        $this->assertStringContainsString('publication_pending', $module);
     }
 
     public function test_users_page_uses_requested_column_widths_actions_and_shared_pagination(): void

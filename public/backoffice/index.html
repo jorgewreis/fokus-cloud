@@ -42,7 +42,7 @@
         <script src="/backoffice/assets/js/brazilian-documents.js?v=20260919-cnpj-alphanumeric-v2"></script>
         <script src="/backoffice/assets/js/currency-input.js?v=20260902-currency-prefix-fix"></script>
         <script src="/backoffice/assets/js/records-page.js?v=20260922-records-nested-drawer-v5"></script>
-        <script src="/backoffice/assets/js/backoffice-router.js?v=20260924-payments-tabs-actions-v1"></script>
+        <script src="/backoffice/assets/js/backoffice-router.js?v=20260924-catalog-overview-v1"></script>
         <template id="backoffice-app-template">
         <div class="container-page expanded">
             <div class="fs-sidebar expanded" id="sidebar">
@@ -121,7 +121,7 @@
                             <img class="sidebar-group-chevron" src="/backoffice/assets/icons/Arrow-Down-1--Streamline-Ultimate.png?v=20260916-catalog-arrow-v2" alt="" aria-hidden="true" />
                         </button>
                         <div class="sidebar-subnav" id="catalog-subnav" role="group" aria-label="Seções do catálogo">
-                            <button class="sidebar-button sidebar-subnav-button" type="button" disabled title="Em breve">
+                            <button class="sidebar-button sidebar-subnav-button" type="button" data-sidebar-item="catalog-overview" data-platform-permission="platform.catalog.manage">
                                 <span class="sidebar-button-label text-subtitle-sm">Visão geral</span>
                             </button>
                             <button class="sidebar-button sidebar-subnav-button" type="button" data-sidebar-item="products" data-platform-role="superadministrador">

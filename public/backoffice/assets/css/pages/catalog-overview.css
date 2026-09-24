@@ -1,0 +1,39 @@
+.backoffice-catalog-overview-page {
+    box-sizing: border-box;
+    width: min(100% - 40px, 1480px);
+    margin: 0 auto;
+    padding: var(--fs-space-4, 24px) 0 var(--fs-space-6, 60px);
+}
+
+.backoffice-catalog-overview-page > .fs-page-layout {
+    width: 100%;
+    padding: 0 var(--fs-space-4, 24px) var(--fs-space-3, 16px);
+}
+
+.catalog-overview-quick-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.catalog-overview-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--fs-space-3, 16px); margin: 0 var(--fs-space-3, 16px) var(--fs-space-3, 16px); }
+.catalog-overview-metric .fs-card-body { display: flex; flex-direction: column; gap: 12px; min-height: 122px; }
+.catalog-overview-metric-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.catalog-overview-metric-heading .fs-card-title { margin: 0; }
+.catalog-overview-total { color: var(--fs-color-text, #1f2937); font-size: 2rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.catalog-overview-statuses { display: flex; flex-wrap: wrap; gap: 6px; }
+.catalog-overview-status { color: var(--fs-color-text-secondary, #6b7280); font-size: .75rem; }
+.catalog-overview-section { width: calc(100% - var(--fs-space-3, 16px)); margin: 0 auto var(--fs-space-3, 16px); }
+.catalog-overview-section .fs-table { min-width: 760px; }
+.catalog-overview-section:last-child { margin-bottom: 0; }
+.catalog-overview-empty { margin: 0; }
+.catalog-overview-product { display: flex; flex-direction: column; gap: 2px; }
+.catalog-overview-product small { color: var(--fs-color-text-secondary, #6b7280); }
+.catalog-overview-reason { min-width: 180px; max-width: 420px; white-space: normal; }
+#catalog-overview-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 var(--fs-space-3, 16px) var(--fs-space-3, 16px); }
+#catalog-overview-loading { margin: 0 var(--fs-space-3, 16px) var(--fs-space-3, 16px); }
+
+@media (max-width: 760px) {
+    .backoffice-catalog-overview-page { width: 100%; padding: var(--fs-space-4, 24px) var(--fs-space-3, 16px) var(--fs-space-5, 32px); }
+    .backoffice-catalog-overview-page > .fs-page-layout { padding-inline: 0; }
+    .catalog-overview-quick-links { width: 100%; }
+    .catalog-overview-quick-links .fs-btn { flex: 1 1 auto; }
+    .catalog-overview-metrics { grid-template-columns: 1fr; margin-inline: 0; }
+    .catalog-overview-section { width: 100%; }
+    #catalog-overview-error, #catalog-overview-loading { margin-inline: 0; }
+}

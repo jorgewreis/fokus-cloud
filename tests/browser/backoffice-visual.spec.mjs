@@ -51,6 +51,69 @@ test('navegação cancela a página anterior e mantém somente um drawer portale
     await expect(page.locator('body > #company-drawer')).toHaveCount(1);
 });
 
+test('visão geral do catálogo resume estados, pendências e as cinco publicações recentes', async ({ page }) => {
+    const publications = Array.from({ length: 6 }, (_, index) => ({
+        id: `PUB_${index + 1}`,
+        product_id: 'PRD_LAW',
+        product_name: 'Fokus Law',
+        version: 6 - index,
+        reason: `Publicação ${6 - index}`,
+        published_at: `2026-09-${String(24 - index).padStart(2, '0')}T12:00:00.000Z`,
+        published_by: 'Administração Fokus',
+    }));
+    await page.route('**/api/backoffice/catalog', (route) => route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+            products: [
+                { id: 'PRD_LAW', name: 'Fokus Law', code: 'law', status: 'ativo', publication_pending: true, published_catalog_version: 5, modules: [{ id: 'MOD_1', status: 'ativo' }, { id: 'MOD_2', status: 'pausado' }], plans: [{ id: 'PLN_1', status: 'ativo' }, { id: 'PLN_2', status: 'rascunho' }] },
+                { id: 'PRD_LEAD', name: 'Fokus Lead', code: 'lead', status: 'ativo', publication_pending: false, published_catalog_version: 0, modules: [], plans: [] },
+                { id: 'PRD_OLD', name: 'Produto pausado', code: 'old', status: 'pausado', publication_pending: false, published_catalog_version: 2, modules: [], plans: [] },
+            ],
+            publications,
+        }),
+    }));
+
+    for (const viewport of [{ width: 1440, height: 900 }, { width: 768, height: 1024 }, { width: 375, height: 812 }, { width: 320, height: 700 }]) {
+        await page.setViewportSize(viewport);
+        await page.goto('/backoffice/visao-geral-catalogo');
+        await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'catalog-overview');
+        await expect(page.locator('#catalog-overview-content')).toBeVisible();
+        await expect(page.locator('#catalog-products-total')).toHaveText('3');
+        await expect(page.locator('#catalog-products-statuses')).toContainText('Ativo: 2');
+        await expect(page.locator('#catalog-modules-total')).toHaveText('2');
+        await expect(page.locator('#catalog-modules-statuses')).toContainText('Pausado: 1');
+        await expect(page.locator('#catalog-plans-statuses')).toContainText('Rascunho: 1');
+        await expect(page.locator('#catalog-pending-count')).toHaveText('2 pendentes');
+        await expect(page.locator('#catalog-pending-list tr')).toHaveCount(3);
+        await expect(page.locator('#catalog-pending-list tr').first()).toContainText('Fokus Law');
+        await expect(page.locator('#catalog-pending-list')).toContainText('Publicado');
+        await expect(page.locator('#catalog-history-list tr')).toHaveCount(5);
+        await expect(page.locator('#catalog-history-list')).toContainText('Publicação 6');
+        await expect(page.locator('#catalog-history-list')).not.toContainText('Publicação 1');
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    }
+
+    await page.locator('#catalog-pending-list').getByRole('button', { name: /Gerenciar produto Fokus Law/ }).click();
+    await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'products');
+});
+
+test('visão geral do catálogo apresenta estados vazios e permite tentar novamente após erro', async ({ page }) => {
+    let fail = true;
+    await page.route('**/api/backoffice/catalog', (route) => {
+        if (fail) return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Catálogo indisponível.' }) });
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ products: [], publications: [] }) });
+    });
+    await page.goto('/backoffice/visao-geral-catalogo');
+    await expect(page.locator('#catalog-overview-error')).toBeVisible();
+    await expect(page.locator('#catalog-overview-error-message')).toContainText('Catálogo indisponível');
+    fail = false;
+    await page.getByRole('button', { name: 'Tentar novamente' }).click();
+    await expect(page.locator('#catalog-overview-content')).toBeVisible();
+    await expect(page.locator('#catalog-products-total')).toHaveText('0');
+    await expect(page.locator('#catalog-pending-empty')).toBeVisible();
+    await expect(page.locator('#catalog-history-empty')).toBeVisible();
+});
+
 test('Assinaturas filtra por empresa, produto e status e consulta detalhes em drawer responsivo', async ({ page }) => {
     for (const [name, viewport] of [['desktop', { width: 1440, height: 900 }], ['tablet', { width: 768, height: 1024 }], ['mobile', { width: 375, height: 812 }]]) {
         await page.setViewportSize(viewport);

@@ -1,0 +1,81 @@
+<link data-page-css="catalog-overview" rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260924-catalog-overview-v1" />
+<link data-page-css="catalog-overview" rel="stylesheet" href="/backoffice/assets/css/pages/catalog-overview.css?v=20260924-catalog-overview-v1" />
+
+<main class="backoffice-catalog-overview-page backoffice-records-page container-page fs-container-fluid" aria-labelledby="catalog-overview-title">
+    <header class="fs-page-layout">
+        <div class="fs-page-header-display">
+            <span>Catálogo</span>
+            <h1 id="catalog-overview-title">Visão geral</h1>
+            <p>Acompanhe a estrutura comercial, a disponibilidade e as publicações do catálogo.</p>
+        </div>
+        <nav class="catalog-overview-quick-links" aria-label="Gestão do catálogo">
+            <button class="fs-btn fs-btn-outline-secondary" type="button" data-catalog-nav="products">Produtos</button>
+            <button class="fs-btn fs-btn-outline-secondary" type="button" data-catalog-nav="modules">Módulos</button>
+            <button class="fs-btn fs-btn-outline-secondary" type="button" data-catalog-nav="subscription-plans">Planos</button>
+        </nav>
+    </header>
+
+    <div class="fs-alert fs-alert-danger" id="catalog-overview-error" role="alert" hidden>
+        <span id="catalog-overview-error-message"></span>
+        <button class="fs-btn fs-btn-outline-primary" type="button" id="catalog-overview-retry">Tentar novamente</button>
+    </div>
+    <div class="fs-alert fs-alert-info" id="catalog-overview-loading" role="status" aria-live="polite" aria-busy="true">Carregando visão geral do catálogo…</div>
+
+    <div id="catalog-overview-content" hidden>
+        <section class="catalog-overview-metrics" aria-label="Resumo do catálogo">
+            <article class="fs-card fs-card-panel catalog-overview-metric" aria-labelledby="catalog-products-heading">
+                <div class="fs-card-body">
+                    <div class="catalog-overview-metric-heading"><h2 class="fs-card-title" id="catalog-products-heading">Produtos</h2></div>
+                    <strong class="catalog-overview-total" id="catalog-products-total">0</strong>
+                    <div class="catalog-overview-statuses" id="catalog-products-statuses" role="list" aria-label="Situação dos produtos"></div>
+                </div>
+            </article>
+            <article class="fs-card fs-card-panel catalog-overview-metric" aria-labelledby="catalog-modules-heading">
+                <div class="fs-card-body">
+                    <div class="catalog-overview-metric-heading"><h2 class="fs-card-title" id="catalog-modules-heading">Módulos</h2></div>
+                    <strong class="catalog-overview-total" id="catalog-modules-total">0</strong>
+                    <div class="catalog-overview-statuses" id="catalog-modules-statuses" role="list" aria-label="Situação dos módulos"></div>
+                </div>
+            </article>
+            <article class="fs-card fs-card-panel catalog-overview-metric" aria-labelledby="catalog-plans-heading">
+                <div class="fs-card-body">
+                    <div class="catalog-overview-metric-heading"><h2 class="fs-card-title" id="catalog-plans-heading">Planos</h2></div>
+                    <strong class="catalog-overview-total" id="catalog-plans-total">0</strong>
+                    <div class="catalog-overview-statuses" id="catalog-plans-statuses" role="list" aria-label="Situação dos planos"></div>
+                </div>
+            </article>
+        </section>
+
+        <section class="fs-card fs-card-panel catalog-overview-section" aria-labelledby="catalog-pending-title">
+            <div class="fs-card-header">
+                <div class="fs-card-header-title"><h2 class="fs-card-title" id="catalog-pending-title">Estado da publicação por produto</h2><p class="fs-card-subtitle">Pendências aparecem primeiro; a versão publicada é exibida para cada produto.</p></div>
+                <span class="fs-card-header-info" id="catalog-pending-count">0 pendentes</span>
+            </div>
+            <div class="fs-card-body fs-u-p-0">
+                <div class="fs-table-responsive">
+                    <table class="fs-table fs-table-records fs-table-hover" aria-label="Produtos pendentes de publicação">
+                        <thead><tr><th scope="col">Produto</th><th scope="col">Disponibilidade</th><th scope="col">Publicação</th><th scope="col">Versão publicada</th><th scope="col">Ação</th></tr></thead>
+                        <tbody id="catalog-pending-list"></tbody>
+                    </table>
+                </div>
+                <p class="catalog-overview-empty fs-table-empty" id="catalog-pending-empty" hidden>Nenhum produto cadastrado.</p>
+            </div>
+        </section>
+
+        <section class="fs-card fs-card-panel catalog-overview-section" aria-labelledby="catalog-history-title">
+            <div class="fs-card-header">
+                <div class="fs-card-header-title"><h2 class="fs-card-title" id="catalog-history-title">Publicações recentes</h2><p class="fs-card-subtitle">Últimas versões registradas para os produtos.</p></div>
+                <span class="fs-card-header-info" id="catalog-history-count">0 publicações</span>
+            </div>
+            <div class="fs-card-body fs-u-p-0">
+                <div class="fs-table-responsive">
+                    <table class="fs-table fs-table-records fs-table-hover" aria-label="Histórico recente de publicações do catálogo">
+                        <thead><tr><th scope="col">Produto</th><th scope="col">Versão</th><th scope="col">Data</th><th scope="col">Responsável</th><th scope="col">Motivo</th></tr></thead>
+                        <tbody id="catalog-history-list"></tbody>
+                    </table>
+                </div>
+                <p class="catalog-overview-empty fs-table-empty" id="catalog-history-empty" hidden>Nenhuma publicação registrada.</p>
+            </div>
+        </section>
+    </div>
+</main>

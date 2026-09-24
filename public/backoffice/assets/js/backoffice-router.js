@@ -6,10 +6,11 @@
  * portalled overlays and release listeners before the next page is mounted.
  */
 (() => {
-    const ASSET_VERSION = "20260924-payments-tabs-actions-v1";
+    const ASSET_VERSION = "20260924-catalog-overview-v1";
 
     const pages = {
         "platform-dashboard-final": { route: "painel", fragment: "platform-dashboard-final" },
+        "catalog-overview": { route: "visao-geral-catalogo", fragment: "catalog-overview", module: "/backoffice/assets/js/catalog-overview-page.js", permission: "platform.catalog.manage" },
         companies: { route: "empresas", fragment: "companies", module: "/backoffice/assets/js/companies-page.js" },
         "subscription-plans": { route: "planos", fragment: "subscription-plans", module: "/backoffice/assets/js/subscription-plans-page.js", role: "superadministrador" },
         products: { route: "produtos", fragment: "products", module: "/backoffice/assets/js/products-page.js", role: "superadministrador" },
@@ -24,6 +25,7 @@
 
     const routeAliases = {
         painel: "platform-dashboard-final",
+        "visao-geral-catalogo": "catalog-overview",
         empresas: "companies",
         planos: "subscription-plans",
         catalogo: "products",
