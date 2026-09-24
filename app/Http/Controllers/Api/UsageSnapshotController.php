@@ -11,8 +11,12 @@ class UsageSnapshotController extends Controller
 {
     public function store(Request $request)
     {
-        $secret = config('services.usage.ingestion_secret');
-        abort_unless($secret && hash_equals($secret, (string) $request->header('X-Fokus-Usage-Secret')), 401, 'Integração de uso não autenticada.');
+        $secrets = array_filter([(string) config('services.usage.ingestion_secret'), ...config('services.usage.ingestion_previous_secrets', [])]);
+        $valid = false;
+        foreach ($secrets as $secret) {
+            $valid = hash_equals($secret, (string) $request->header('X-Fokus-Usage-Secret')) || $valid;
+        }
+        abort_unless($valid, 401, 'Integração de uso não autenticada.');
         $data = $request->validate(['company_id' => ['required', 'string', 'size:30'], 'product_code' => ['required', 'in:law,lead'], 'reported_on' => ['required', 'date'], 'active_users' => ['required', 'integer', 'min:0'], 'licensed_seats' => ['required', 'integer', 'min:0'], 'used_seats' => ['required', 'integer', 'min:0'], 'key_records' => ['required', 'integer', 'min:0'], 'last_activity_at' => ['nullable', 'date'], 'metrics' => ['nullable', 'array']]);
         abort_if($data['used_seats'] > $data['licensed_seats'], 422, 'Assentos usados não podem exceder os licenciados.');
         $productId = DB::table('products')->where('code', $data['product_code'])->value('id');

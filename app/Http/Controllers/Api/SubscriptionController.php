@@ -179,7 +179,7 @@ class SubscriptionController extends Controller
         if ($previousAttempt?->status === 'started') {
             return response()->json(['message' => 'Este checkout já está em processamento.'], 409);
         }
-        if ($previousAttempt?->status === 'failed') {
+        if (in_array($previousAttempt?->status, ['failed', 'compensation_pending'], true)) {
             return response()->json(['message' => 'Esta tentativa de checkout já falhou. Gere uma nova chave de idempotência para tentar novamente.'], 502);
         }
         $openSubscription = DB::table('subscriptions')->where('company_id', $companyId)->where('product_id', $product->id)->where('status', '!=', 'encerrada')->first();
@@ -242,6 +242,7 @@ class SubscriptionController extends Controller
             ], $platformActor ? $request->user()->id : $customerUserId, $request, $platformActor ? 'admin' : 'customer');
         }
 
+        $response = null;
         try {
             $response = $mercadoPago->createPreapproval([
                 'external_reference' => $paymentId,
@@ -252,13 +253,25 @@ class SubscriptionController extends Controller
                 'back_url' => rtrim(config('app.url'), '/').'/portal/assinaturas',
                 'notification_url' => rtrim(config('app.url'), '/').'/api/webhooks/mercado-pago',
             ], $requestKey);
+            if (empty($response['id']) || empty($response['init_point'])) {
+                throw new \RuntimeException('Mercado Pago retornou um checkout incompleto.');
+            }
         } catch (\Throwable $exception) {
+            if (! empty($response['id'])) {
+                try { $mercadoPago->updatePreapproval((string) $response['id'], ['status' => 'cancelled'], 'compensate-'.$attemptId); } catch (\Throwable) { /* the scheduled compensator will retry */ }
+            }
             if ($reservation) $vouchers->release($reservation->id, 'released', $platformActor ? $request->user()->id : $customerUserId, $request, $platformActor ? 'admin' : 'customer');
-            DB::table('billing_checkout_attempts')->where('id', $attemptId)->update(['status' => 'failed', 'error_message' => app(\App\Services\AuditSanitizer::class)->sanitizeText(mb_substr($exception->getMessage(), 0, 1000)), 'updated_at' => now()]);
+            DB::table('billing_checkout_attempts')->where('id', $attemptId)->update([
+                'status' => empty($response['id']) ? 'failed' : 'compensation_pending',
+                'provider_subscription_id' => $response['id'] ?? null,
+                'error_message' => app(\App\Services\AuditSanitizer::class)->sanitizeText(mb_substr($exception->getMessage(), 0, 1000)),
+                'updated_at' => now(),
+            ]);
             return response()->json(['message' => 'Não foi possível iniciar o checkout. Nenhuma assinatura foi criada; tente novamente.'], 502);
         }
 
         try {
+            DB::table('billing_checkout_attempts')->where('id', $attemptId)->update(['provider_subscription_id' => $response['id'], 'updated_at' => now()]);
             DB::transaction(function () use ($companyId, $product, $quoted, $customerUserId, $subscriptionId, $paymentId, $response, $data) {
             $existing = DB::table('subscriptions')->where('company_id', $companyId)->where('product_id', $product->id)
                 ->where('status', '!=', 'encerrada')->lockForUpdate()->first();
@@ -316,7 +329,14 @@ class SubscriptionController extends Controller
             if (! empty($response['id'])) {
                 try { $mercadoPago->updatePreapproval((string) $response['id'], ['status' => 'cancelled'], 'compensate-'.$attemptId); } catch (\Throwable) { /* retry/reconciliation will handle the external orphan */ }
             }
-            DB::table('billing_checkout_attempts')->where('id', $attemptId)->update(['status' => 'failed', 'error_message' => app(\App\Services\AuditSanitizer::class)->sanitizeText(mb_substr($exception->getMessage(), 0, 1000)), 'updated_at' => now()]);
+            try {
+                DB::table('billing_checkout_attempts')->where('id', $attemptId)->update([
+                    'status' => 'compensation_pending', 'provider_subscription_id' => $response['id'],
+                    'error_message' => app(\App\Services\AuditSanitizer::class)->sanitizeText(mb_substr($exception->getMessage(), 0, 1000)), 'updated_at' => now(),
+                ]);
+            } catch (\Throwable) {
+                \Illuminate\Support\Facades\Log::critical('Falha ao registrar compensação de checkout', ['attempt_id' => $attemptId, 'provider_subscription_id' => $response['id']]);
+            }
             throw $exception;
         }
 
@@ -629,8 +649,8 @@ class SubscriptionController extends Controller
 
     private function assertWebhookSignature(Request $request): void
     {
-        $secret = config('services.mercado_pago.webhook_secret');
-        abort_unless($secret, 503, 'Assinatura do webhook não configurada.');
+        $secrets = array_filter([(string) config('services.mercado_pago.webhook_secret'), ...config('services.mercado_pago.webhook_previous_secrets', [])]);
+        abort_unless($secrets, 503, 'Assinatura do webhook não configurada.');
         $signature = (string) $request->header('x-signature');
         $requestId = (string) $request->header('x-request-id');
         preg_match('/(?:^|,)\s*ts=([^,]+)/', $signature, $timestamp);
@@ -644,7 +664,10 @@ class SubscriptionController extends Controller
         abort_unless($ts > 0 && abs(now()->timestamp - $ts) <= (int) config('services.mercado_pago.webhook_tolerance', 300), 401, 'Assinatura de webhook expirada.');
         abort_unless($dataId && ! empty($timestamp[1]) && ! empty($digest[1]), 401, 'Assinatura de webhook inválida.');
         $manifest = "id:{$dataId};request-id:{$requestId};ts:{$timestamp[1]};";
-        $expected = hash_hmac('sha256', $manifest, $secret);
-        abort_unless(hash_equals($expected, $digest[1]), 401, 'Assinatura de webhook inválida.');
+        $valid = false;
+        foreach ($secrets as $secret) {
+            $valid = hash_equals(hash_hmac('sha256', $manifest, $secret), $digest[1]) || $valid;
+        }
+        abort_unless($valid, 401, 'Assinatura de webhook inválida.');
     }
 }

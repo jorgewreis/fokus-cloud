@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\PlatformAudit;
 use App\Services\PrefixedUlid;
+use App\Services\SupportSessionSecurity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -44,7 +45,7 @@ class PlatformSupportController extends Controller
         return response()->json(['subscriptions' => $subscriptions]);
     }
 
-    public function start(Request $request, PlatformAudit $audit)
+    public function start(Request $request, PlatformAudit $audit, SupportSessionSecurity $security)
     {
         $data = $request->validate([
             'subscription_id' => ['required', 'string', 'size:30'],
@@ -66,6 +67,7 @@ class PlatformSupportController extends Controller
             ->first();
         abort_unless($target, 422, 'A assinatura e o usuário precisam pertencer à mesma empresa e estar disponíveis.');
 
+        $security->end($request, 'Acesso anterior encerrado ao iniciar outra sessão de suporte.');
         $id = PrefixedUlid::make('SUP');
         DB::table('platform_support_sessions')->insert([
             'id' => $id, 'platform_admin_id' => Auth::guard('platform')->id(), 'company_id' => $target->company_id,
@@ -81,16 +83,9 @@ class PlatformSupportController extends Controller
         return response()->json(['redirect_to' => '/portal']);
     }
 
-    public function exit(Request $request, PlatformAudit $audit)
+    public function exit(Request $request, SupportSessionSecurity $security)
     {
-        $id = $request->session()->get('support_session_id');
-        abort_unless($id, 404, 'Não há acesso de suporte ativo.');
-        $support = DB::table('platform_support_sessions')->where('id', $id)->whereNull('ended_at')->first();
-        abort_unless($support, 404, 'A sessão de suporte já foi encerrada.');
-        DB::table('platform_support_sessions')->where('id', $id)->update(['ended_at' => now(), 'end_ip' => $request->ip(), 'end_user_agent' => $request->userAgent(), 'updated_at' => now()]);
-        Auth::guard('web')->logout();
-        $request->session()->forget(['support_session_id', 'active_company_id']);
-        $audit->record(Auth::guard('platform')->id(), 'backoffice.support_access_ended', 'platform_support_session', $id, $support->company_id, before: ['status' => 'active'], after: ['status' => 'ended'], request: $request);
+        abort_unless($security->end($request), 404, 'Não há acesso de suporte ativo.');
 
         return response()->json(['redirect_to' => '/backoffice/']);
     }

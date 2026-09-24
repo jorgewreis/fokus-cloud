@@ -21,16 +21,19 @@ return [
     'mercado_pago' => [
         'access_token' => env('MERCADO_PAGO_ACCESS_TOKEN'),
         'webhook_secret' => env('MERCADO_PAGO_WEBHOOK_SECRET'),
+        'webhook_previous_secrets' => array_filter(explode(',', (string) env('MERCADO_PAGO_WEBHOOK_PREVIOUS_SECRETS', ''))),
         'environment' => env('MERCADO_PAGO_ENVIRONMENT', 'sandbox'),
         'test_payer_email' => env('MERCADO_PAGO_TEST_PAYER_EMAIL', 'test@testuser.com'),
         'api_base_url' => env('MERCADO_PAGO_API_BASE_URL', 'https://api.mercadopago.com'),
         'timeout' => (int) env('MERCADO_PAGO_TIMEOUT', 10),
         'webhook_tolerance' => (int) env('MERCADO_PAGO_WEBHOOK_TOLERANCE', 300),
+        'webhook_rate_limit' => (int) env('MERCADO_PAGO_WEBHOOK_RATE_LIMIT', 300),
         'scope' => env('MERCADO_PAGO_SCOPE'),
     ],
 
     'usage' => [
         'ingestion_secret' => env('FOKUS_USAGE_INGESTION_SECRET'),
+        'ingestion_previous_secrets' => array_filter(explode(',', (string) env('FOKUS_USAGE_INGESTION_PREVIOUS_SECRETS', ''))),
     ],
 
     'ga4' => [

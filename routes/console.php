@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::command('fokus:prune-expired-data')->daily();
+Schedule::command('fokus:expire-support-sessions')->everyFiveMinutes();
+Schedule::command('fokus:compensate-checkout-orphans')->everyFiveMinutes();
 Schedule::command('fokus:apply-subscription-changes')->hourly();
 Schedule::command('fokus:expire-voucher-reservations')->everyFiveMinutes();
 Schedule::command('fokus:expire-subscription-tolerance')->hourly();

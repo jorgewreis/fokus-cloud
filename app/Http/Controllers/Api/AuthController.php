@@ -215,8 +215,9 @@ class AuthController extends Controller
         return response()->json(['user' => $this->userPayload($user), 'companies' => $companies, 'active_company_id' => $companyId]);
     }
 
-    public function logout(Request $request)
+    public function logout(Request $request, \App\Services\SupportSessionSecurity $supportSecurity)
     {
+        $supportSecurity->end($request, 'Sessão encerrada ao sair do portal.');
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
@@ -274,6 +275,10 @@ class AuthController extends Controller
         }
         if ($changes) {
             $user->forceFill($changes)->save();
+            if (isset($changes['password'])) {
+                DB::table('sessions')->where('user_id', $user->id)->delete();
+                $request->session()->regenerate();
+            }
         }
 
         return response()->json(['message' => isset($data['email']) ? 'Confirme o novo e-mail para concluir a alteração.' : 'Dados atualizados.', 'user' => $this->userPayload($user)]);
@@ -338,6 +343,12 @@ class AuthController extends Controller
         $token = $this->consumeToken($data['token'], ['password_reset', 'password_creation']);
         $user = User::findOrFail($token->user_id);
         $user->forceFill(['password' => $data['password'], 'status' => 'ativa', 'email_verified_at' => $user->email_verified_at ?: now()])->save();
+        DB::table('sessions')->where('user_id', $user->id)->delete();
+        if (Auth::guard('web')->id() === $user->id) {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
         $payload = $token->payload ? json_decode($token->payload, true) : [];
         if (! empty($payload['membership_id'])) {
             DB::table('company_memberships')->where('id', $payload['membership_id'])->where('user_id', $user->id)->where('status', 'pendente')
@@ -532,6 +543,7 @@ class AuthController extends Controller
 
     private function authenticateIntoSession(Request $request, User $user, ?string $companyId = null): void
     {
+        app(\App\Services\SupportSessionSecurity::class)->end($request, 'Acesso de suporte encerrado por novo login de cliente.', true);
         $request->session()->regenerate();
         Auth::guard('web')->login($user);
         $request->session()->forget('active_company_id');

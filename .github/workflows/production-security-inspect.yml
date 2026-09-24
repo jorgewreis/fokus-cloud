@@ -1,0 +1,62 @@
+name: Inspect production security configuration
+
+"on":
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - name: Configure SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_HOST" && test -n "$DEPLOY_PORT" && test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY" && test -n "$DEPLOY_KNOWN_HOSTS"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Inspect effective settings without printing secrets
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && bash -s" <<'REMOTE'
+          set -eu
+          printf 'ssh_user='; id -un
+          printf 'app_path='; pwd
+          printf 'nginx_validation='; nginx -t 2>&1 | tail -n 2
+          printf 'vhost_files:\n'
+          find /etc/nginx -type f \( -name '*.conf' -o -path '*/sites-enabled/*' \) -print 2>/dev/null |
+            while IFS= read -r file; do
+              if grep -q 'server_name.*fokuscloud.com.br' "$file" 2>/dev/null; then printf '%s\n' "$file"; fi
+            done
+          printf 'database_tools:\n'
+          for tool in mysqldump mariadb-dump mysql mariadb; do command -v "$tool" || true; done
+          printf 'disk_space:\n'; df -h . | tail -n 1
+          printf 'backup_timers:\n'
+          systemctl list-timers --all --no-pager 2>/dev/null | grep -Ei 'backup|restic|borg|mysql|maria' || true
+          printf 'laravel_settings:\n'
+          php -r '
+            require "vendor/autoload.php";
+            $app = require "bootstrap/app.php";
+            $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+            foreach (["app.env", "session.driver", "session.cookie", "session.domain", "session.secure", "session.http_only", "session.same_site", "session.lifetime", "cache.default", "security.support_session_minutes"] as $name) {
+                $value = config($name);
+                echo $name, "=", is_bool($value) ? ($value ? "true" : "false") : ($value === null ? "null" : (string) $value), PHP_EOL;
+            }
+          '
+          REMOTE

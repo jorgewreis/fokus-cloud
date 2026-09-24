@@ -261,6 +261,13 @@ class PlatformSecurityTest extends TestCase
         $this->assertNotNull(DB::table('platform_support_sessions')->value('ended_at'));
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.support_access_started', 'platform_admin_id' => $admin->id]);
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.support_access_ended', 'platform_admin_id' => $admin->id]);
+
+        $this->postJson('/api/backoffice/support/access', ['subscription_id' => $subscriptionId, 'membership_id' => $membershipId, 'reason' => 'Validar limite temporal do suporte'])->assertOk();
+        $this->travel(31)->minutes();
+        $this->getJson('/api/auth/me')->assertUnauthorized();
+        $this->assertGuest('web');
+        $this->assertSame(0, DB::table('platform_support_sessions')->whereNull('ended_at')->count());
+        $this->travelBack();
     }
 
     public function test_internal_email_confirmation_is_single_use_and_updates_address_only_after_confirmation(): void
