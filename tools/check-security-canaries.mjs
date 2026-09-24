@@ -7,6 +7,7 @@ const roots = [
     'playwright-report',
     'test-results',
     process.env.RUNNER_TEMP ? join(process.env.RUNNER_TEMP, 'security-tests.log') : '',
+    process.env.RUNNER_TEMP ? join(process.env.RUNNER_TEMP, 'security-tests.xml') : '',
     process.env.RUNNER_TEMP ? join(process.env.RUNNER_TEMP, 'security-browser-tests.log') : '',
     process.env.RUNNER_TEMP ? join(process.env.RUNNER_TEMP, 'security-app.log') : '',
     process.env.GITHUB_STEP_SUMMARY ?? '',

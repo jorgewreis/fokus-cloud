@@ -120,9 +120,12 @@ jobs:
       - name: Run feature and unit suite on MySQL and Redis
         run: |
           set +e
-          vendor/bin/phpunit --configuration=phpunit.homologation.xml > "$RUNNER_TEMP/security-tests.log" 2>&1
+          vendor/bin/phpunit --configuration=phpunit.homologation.xml --log-junit "$RUNNER_TEMP/security-tests.xml" > "$RUNNER_TEMP/security-tests.log" 2>&1
           status=$?
           echo "SECURITY_PHPUNIT_STATUS=$status" >> "$GITHUB_ENV"
+          if [ "$status" -ne 0 ]; then
+            php -r '$report = simplexml_load_file($argv[1]); foreach ($report->xpath("//testcase") as $test) { if (isset($test->failure) || isset($test->error)) { printf("Failed test: %s::%s\n", (string) $test["class"], (string) $test["name"]); } }' "$RUNNER_TEMP/security-tests.xml"
+          fi
           exit 0
 
       - name: Reset isolated rate-limit cache before browser checks
