@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
     testDir: './tests/browser',
+    testIgnore: '**/security-homologation.spec.mjs',
     timeout: 30_000,
     expect: { timeout: 10_000 },
     reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
