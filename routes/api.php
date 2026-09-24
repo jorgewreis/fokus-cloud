@@ -18,27 +18,27 @@ use App\Http\Middleware\EnsurePlatformPermission;
 use App\Http\Middleware\EnsurePlatformSuperadmin;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/auth/register-company', [AuthController::class, 'registerCompany'])->middleware('throttle:5,10');
-Route::post('/auth/law-context', [AuthController::class, 'lawContext'])->middleware('throttle:10,1');
+Route::post('/auth/register-company', [AuthController::class, 'registerCompany'])->middleware('throttle:5,10,customer-registration');
+Route::post('/auth/law-context', [AuthController::class, 'lawContext'])->middleware('throttle:10,1,customer-law-context');
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1,customer-login');
 Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth');
-Route::post('/auth/verify-email', [AuthController::class, 'verifyEmail'])->middleware('throttle:10,1');
-Route::post('/auth/request-password-reset', [AuthController::class, 'requestPasswordReset'])->middleware('throttle:5,10');
-Route::post('/auth/set-password', [AuthController::class, 'setPassword'])->middleware('throttle:10,1');
-Route::post('/auth/accept-membership', [AuthController::class, 'acceptMembership'])->middleware('throttle:10,1');
-Route::post('/auth/accept-admin-transfer', [AuthController::class, 'acceptAdminTransfer'])->middleware('throttle:10,1');
+Route::post('/auth/verify-email', [AuthController::class, 'verifyEmail'])->middleware('throttle:10,1,customer-email-verification');
+Route::post('/auth/request-password-reset', [AuthController::class, 'requestPasswordReset'])->middleware('throttle:5,10,customer-password-reset');
+Route::post('/auth/set-password', [AuthController::class, 'setPassword'])->middleware('throttle:10,1,customer-password-setting');
+Route::post('/auth/accept-membership', [AuthController::class, 'acceptMembership'])->middleware('throttle:10,1,customer-membership');
+Route::post('/auth/accept-admin-transfer', [AuthController::class, 'acceptAdminTransfer'])->middleware('throttle:10,1,customer-admin-transfer');
 Route::post('/webhooks/mercado-pago', [SubscriptionController::class, 'webhook'])->middleware('throttle:mercado-pago-webhook');
-Route::post('/integrations/usage', [UsageSnapshotController::class, 'store'])->middleware('throttle:60,1');
+Route::post('/integrations/usage', [UsageSnapshotController::class, 'store'])->middleware('throttle:60,1,usage-ingestion');
 Route::get('/catalog/{product}', [SubscriptionController::class, 'publicCatalog']);
-Route::get('/analytics/config', fn () => response()->json(['measurement_id' => config('services.ga4.measurement_id')]))->middleware('throttle:30,1');
-Route::post('/product-interests', [ProductInterestController::class, 'store'])->middleware('throttle:5,10');
+Route::get('/analytics/config', fn () => response()->json(['measurement_id' => config('services.ga4.measurement_id')]))->middleware('throttle:30,1,analytics-config');
+Route::post('/product-interests', [ProductInterestController::class, 'store'])->middleware('throttle:5,10,product-interest');
 
 Route::prefix('backoffice/auth')->group(function () {
-    Route::post('/login', [PlatformAuthController::class, 'login'])->middleware('throttle:5,1');
-    Route::post('/verify-mfa', [PlatformAuthController::class, 'verifyMfa'])->middleware('throttle:5,1');
-    Route::post('/resend-mfa', [PlatformAuthController::class, 'resendMfa'])->middleware('throttle:2,1');
-    Route::post('/activate-invitation', [PlatformAuthController::class, 'activateInvitation'])->middleware('throttle:5,1');
-    Route::post('/confirm-email-change', [PlatformAdminController::class, 'confirmEmailChange'])->middleware('throttle:5,1');
+    Route::post('/login', [PlatformAuthController::class, 'login'])->middleware('throttle:5,1,platform-login');
+    Route::post('/verify-mfa', [PlatformAuthController::class, 'verifyMfa'])->middleware('throttle:5,1,platform-mfa');
+    Route::post('/resend-mfa', [PlatformAuthController::class, 'resendMfa'])->middleware('throttle:2,1,platform-mfa-resend');
+    Route::post('/activate-invitation', [PlatformAuthController::class, 'activateInvitation'])->middleware('throttle:5,1,platform-invitation');
+    Route::post('/confirm-email-change', [PlatformAdminController::class, 'confirmEmailChange'])->middleware('throttle:5,1,platform-email-change');
 });
 
 Route::middleware('auth')->group(function () {
@@ -46,7 +46,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/auth/profile', [AuthController::class, 'updateProfile']);
     Route::post('/auth/register-company-for-current-user', [AuthController::class, 'registerCompanyForCurrentUser']);
     Route::post('/auth/select-company', [AuthController::class, 'selectCompany']);
-    Route::post('/auth/resend-verification', [AuthController::class, 'resendVerification'])->middleware('throttle:2,10');
+    Route::post('/auth/resend-verification', [AuthController::class, 'resendVerification'])->middleware('throttle:2,10,customer-resend-verification');
     Route::middleware(EnsureCompanyContext::class)->group(function () {
         Route::get('/subscriptions', [SubscriptionController::class, 'index']);
         Route::post('/subscriptions/checkout', [SubscriptionController::class, 'checkout']);
