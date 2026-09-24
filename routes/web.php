@@ -43,7 +43,7 @@ Route::get('/', function () {
 
 // These endpoints intentionally inherit the web group: session cookies and
 // CSRF protection are required for every browser-originated request.
-Route::prefix('api')->group(base_path('routes/api.php'));
+Route::prefix('api')->middleware(\App\Http\Middleware\RequireApiCsrfToken::class)->group(base_path('routes/api.php'));
 
 Route::get('/api/csrf-token', fn () => response()->json(['token' => csrf_token()]));
 
