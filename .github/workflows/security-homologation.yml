@@ -125,6 +125,9 @@ jobs:
           echo "SECURITY_PHPUNIT_STATUS=$status" >> "$GITHUB_ENV"
           exit 0
 
+      - name: Reset isolated rate-limit cache before browser checks
+        run: php artisan cache:clear
+
       - name: Prepare isolated browser-test database
         env:
           APP_ENV: production
