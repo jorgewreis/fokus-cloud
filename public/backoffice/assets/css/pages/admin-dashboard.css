@@ -545,12 +545,12 @@ html[data-role="admin"] .sidebar-nav-group {
     gap: 0;
 }
 html[data-role="admin"] .fs-sidebar .sidebar-group-chevron {
-    width: 16px !important;
-    height: 16px !important;
-    flex: 0 0 16px !important;
-    margin: 0 8px 0 auto !important;
+    width: 10px !important;
+    height: 10px !important;
+    flex: 0 0 10px !important;
+    margin: 0 0 0 auto !important;
     filter: none !important;
-    opacity: .9 !important;
+    opacity: .75 !important;
 }
 html[data-role="admin"] .fs-sidebar.single .sidebar-group-chevron,
 html[data-role="admin"] .fs-sidebar.is-collapsing .sidebar-group-chevron {
@@ -558,6 +558,19 @@ html[data-role="admin"] .fs-sidebar.is-collapsing .sidebar-group-chevron {
 }
 html[data-role="admin"] .sidebar-subnav-button .sidebar-button-label {
     font-size: 12px !important;
+}
+html[data-role="admin"] .fs-sidebar .sidebar-subnav {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    width: 85%;
+    gap: 3px;
+    margin-left: 41px;
+    padding-left: 8px;
+    border-left: 1px solid rgba(255, 255, 255, .25);
+}
+html[data-role="admin"] .fs-sidebar .sidebar-subnav[hidden] {
+    display: none;
 }
 
 /* Final mobile authority: align the launcher icon inside its blue square. */

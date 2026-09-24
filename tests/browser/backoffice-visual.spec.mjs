@@ -101,11 +101,24 @@ test('menu lateral abre no Dashboard, mantém Catálogo como alternador e desati
         const link = subnav.querySelector('.sidebar-subnav-button').getBoundingClientRect();
         const chevron = document.querySelector('.sidebar-group-chevron');
         const chevronStyles = getComputedStyle(chevron);
-        return { groupWidth: group.width, linkWidth: link.width, chevronVisible: chevronStyles.display !== 'none', chevronMarginLeft: chevronStyles.marginLeft };
+        return {
+            groupWidth: group.width,
+            groupMarginLeft: getComputedStyle(subnav).marginLeft,
+            groupBorderLeftWidth: getComputedStyle(subnav).borderLeftWidth,
+            linkWidth: link.width,
+            chevronVisible: chevronStyles.display !== 'none',
+            chevronWidth: chevron.getBoundingClientRect().width,
+            chevronMarginLeft: chevronStyles.marginLeft,
+            chevronMarginRight: chevronStyles.marginRight,
+        };
     });
-    expect(menuLayout.groupWidth - menuLayout.linkWidth).toBeLessThanOrEqual(1);
+    expect(menuLayout.linkWidth).toBeLessThanOrEqual(menuLayout.groupWidth + 1);
+    expect(Number.parseFloat(menuLayout.groupMarginLeft)).toBeGreaterThanOrEqual(40);
+    expect(Number.parseFloat(menuLayout.groupBorderLeftWidth)).toBeGreaterThan(0);
     expect(menuLayout.chevronVisible).toBe(true);
     expect(Number.parseFloat(menuLayout.chevronMarginLeft)).toBeGreaterThan(0);
+    expect(menuLayout.chevronWidth).toBeLessThanOrEqual(10);
+    expect(Number.parseFloat(menuLayout.chevronMarginRight)).toBe(0);
 });
 
 test('dashboard usa cards e larguras responsivas sem alterar dados ou colunas', async ({ page }) => {
