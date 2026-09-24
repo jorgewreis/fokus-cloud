@@ -150,6 +150,9 @@ class BackofficeController extends Controller
                 };
                 $entityType = (string) ($event->entity_type ?? '');
                 $entityLabel = $entityLabels[$entityType] ?? 'Registro';
+                if (str_starts_with($event->action, 'backoffice.support_access_')) {
+                    $entityLabel = 'Empresa';
+                }
                 $statusBefore = $before['status'] ?? null;
                 $statusAfter = $after['status'] ?? null;
                 $entityName = $after['legal_name'] ?? $before['legal_name'] ?? $after['plan_name'] ?? $before['plan_name'] ?? $after['name'] ?? $before['name'] ?? $after['product_name'] ?? $before['product_name'] ?? $after['module_name'] ?? $before['module_name'] ?? null;
@@ -179,7 +182,7 @@ class BackofficeController extends Controller
                         }
                     }
                 }
-                if (! $entityName && $event->platform_admin_id) {
+                if (! $entityName && $event->platform_admin_id && ! str_starts_with($event->action, 'backoffice.support_access_')) {
                     $entityName = DB::table('platform_admins')->where('id', $event->platform_admin_id)->value('name');
                 }
                 if (! $entityName && $event->company_id) {
