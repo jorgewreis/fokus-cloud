@@ -21,6 +21,29 @@ const useSubscriptionCatalog = async (page) => {
     }));
 };
 
+const dashboardPayload = {
+    user: { name: 'Administração Fokus', role: 'Superadministrador' },
+    metrics: { active_companies: 24, active_people: 86, active_subscriptions: 31, mrr: 12450 },
+    subscription_registrations_6m: [
+        { month: '2026-04', label: 'Abr 2026', value: 2 },
+        { month: '2026-05', label: 'Mai 2026', value: 4 },
+        { month: '2026-06', label: 'Jun 2026', value: 3 },
+        { month: '2026-07', label: 'Jul 2026', value: 7 },
+        { month: '2026-08', label: 'Ago 2026', value: 5 },
+        { month: '2026-09', label: 'Set 2026', value: 9 },
+    ],
+    alerts: [{ key: 'declined_payments', label: 'Pagamentos recusados', description: 'Pagamentos que exigem acompanhamento comercial.', value: 3, href: '/backoffice/pagamentos?status=recusado', icon: 'warning' }],
+    recent_activity: [{ kind: 'backoffice.company_created', title: 'Empresa cadastrada no backoffice', description: 'Empresa Demonstração cadastrada com acesso administrativo.', created_at: '2026-09-24T12:00:00.000Z' }],
+};
+
+const dashboardSubscriptions = {
+    data: [
+        { id: 'SUB_DASH_01', company_name: 'Empresa Demonstração', product_name: 'Fokus Law', plan_name: 'Advocacia', status: 'ativa', current_period_ends_at: '2026-10-24T00:00:00.000Z', amount: 149 },
+        { id: 'SUB_DASH_02', company_name: 'Empresa Teste', product_name: 'Fokus Lead', plan_name: 'Essencial', status: 'aguardando_pagamento', current_period_ends_at: '2026-10-20T00:00:00.000Z', amount: 49 },
+    ],
+    meta: { total: 2, current_page: 1, per_page: 15, last_page: 1 },
+};
+
 for (const [name, viewport] of viewports) {
     for (const [route, pageId] of [['empresas', 'companies'], ['produtos', 'products'], ['modulos', 'modules']]) {
         test(`visual ${pageId} ${name}`, async ({ page }) => {
@@ -49,6 +72,101 @@ test('navegação cancela a página anterior e mantém somente um drawer portale
     await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'companies');
     await expect(page.locator('body > #product-drawer')).toHaveCount(0);
     await expect(page.locator('body > #company-drawer')).toHaveCount(1);
+});
+
+test('dashboard usa cards e larguras responsivas sem alterar dados ou colunas', async ({ page }) => {
+    await page.route('**/api/backoffice/dashboard', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(dashboardPayload) }));
+    await page.route('**/api/backoffice/subscriptions?**', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(dashboardSubscriptions) }));
+
+    for (const [name, viewport, expectedColumns] of [
+        ['desktop', { width: 1440, height: 900 }, 4],
+        ['notebook', { width: 1024, height: 768 }, 2],
+        ['tablet', { width: 768, height: 1024 }, 2],
+        ['mobile', { width: 375, height: 812 }, 1],
+        ['mobile-narrow', { width: 320, height: 700 }, 1],
+    ]) {
+        await page.setViewportSize(viewport);
+        await page.goto('/backoffice/painel');
+        await expect(page.locator('#metric-active-companies')).toHaveText('24');
+        await expect(page.locator('#metric-active-people')).toHaveText('86');
+        await expect(page.locator('#metric-active-subscriptions')).toHaveText('31');
+        await expect(page.locator('#metric-mrr')).toContainText('12.450');
+        await expect(page.getByRole('article', { name: 'Empresas ativas' })).toBeVisible();
+        await expect(page.getByRole('img', { name: 'Gráfico de novas assinaturas ativas' })).toBeVisible();
+        await expect(page.locator('.admin-chart-point')).toHaveCount(6);
+        await expect(page.locator('#dashboard-alerts .admin-attention-item')).toHaveCount(1);
+        await expect(page.locator('#subscriptions-table-body tr')).toHaveCount(2);
+        await expect(page.locator('#dashboard-recent-activity .admin-activity-item')).toHaveCount(1);
+        await expect(page.getByRole('link', { name: 'Nova empresa' })).toBeVisible();
+
+        const layout = await page.evaluate(() => {
+            const grid = document.querySelector('.admin-metrics-grid');
+            const gridRect = grid.getBoundingClientRect();
+            const metrics = [...grid.querySelectorAll('.admin-metric-card')].map((card) => card.getBoundingClientRect());
+            const table = document.querySelector('.admin-subscriptions-table');
+            const heads = [...table.querySelectorAll('thead th')].map((cell) => cell.getBoundingClientRect());
+            const cells = [...table.querySelector('tbody tr').querySelectorAll('td')].map((cell) => cell.getBoundingClientRect());
+            return {
+                metricColumns: getComputedStyle(grid).gridTemplateColumns.split(' ').length,
+                metricCardWidths: metrics.map((card) => card.width),
+                metricStartOffset: Math.abs(Math.min(...metrics.map((card) => card.x)) - gridRect.x),
+                metricEndOffset: Math.abs(gridRect.right - Math.max(...metrics.map((card) => card.right))),
+                metricGutter: metrics.length > 1 && metrics[1].y === metrics[0].y ? metrics[1].x - metrics[0].right : 0,
+                tableColumnStartDiffs: heads.map((cell, index) => Math.abs(cell.x - cells[index].x)),
+                tableColumnWidthDiffs: heads.map((cell, index) => Math.abs(cell.width - cells[index].width)),
+                pageHasHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,
+            };
+        });
+
+        expect(layout.metricColumns, name).toBe(expectedColumns);
+        expect(layout.metricCardWidths.every((width) => width > 0), name).toBe(true);
+        expect(Math.max(...layout.metricCardWidths) - Math.min(...layout.metricCardWidths), name).toBeLessThanOrEqual(1);
+        expect(layout.metricStartOffset, name).toBeLessThanOrEqual(1);
+        expect(layout.metricEndOffset, `${name} ${JSON.stringify(layout)}`).toBeLessThanOrEqual(1);
+        expect(layout.metricGutter, name).toBeGreaterThanOrEqual(0);
+        expect(layout.tableColumnStartDiffs.every((difference) => difference <= 1), name).toBe(true);
+        expect(layout.tableColumnWidthDiffs.every((difference) => difference <= 1), name).toBe(true);
+        expect(layout.pageHasHorizontalOverflow, name).toBe(false);
+        await expect(page.locator('#dashboard-load-error')).toBeHidden();
+
+        if (name === 'desktop') {
+            let reachedQuickActions = false;
+            for (let index = 0; index < 40 && !reachedQuickActions; index += 1) {
+                await page.keyboard.press('Tab');
+                reachedQuickActions = await page.evaluate(() => Boolean(document.activeElement?.closest('.admin-quick-actions-grid')));
+            }
+            expect(reachedQuickActions).toBe(true);
+            const focusedAction = page.locator('.admin-quick-actions-grid .fs-btn:focus-visible');
+            await expect(focusedAction).toHaveCount(1);
+            await expect.poll(() => focusedAction.evaluate((element) => getComputedStyle(element).outlineWidth)).toBe('3px');
+        }
+    }
+});
+
+test('dashboard preserva estados vazios e mostra erro de carregamento', async ({ page }) => {
+    let failDashboardRequest = false;
+    await page.route('**/api/backoffice/dashboard', (route) => failDashboardRequest
+        ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Dashboard indisponível.' }) })
+        : route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+            ...dashboardPayload,
+            metrics: { active_companies: 0, active_people: 0, active_subscriptions: 0, mrr: 0 },
+            subscription_registrations_6m: [],
+            alerts: [],
+            recent_activity: [],
+        }) }));
+    await page.route('**/api/backoffice/subscriptions?**', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: [], meta: { total: 0, current_page: 1, per_page: 15, last_page: 1 } }) }));
+
+    await page.goto('/backoffice/painel');
+    await expect(page.locator('#subscription-chart-empty')).toBeVisible();
+    await expect(page.locator('#dashboard-alerts-empty')).toBeVisible();
+    await expect(page.locator('#dashboard-recent-activity-empty')).toBeVisible();
+    await expect(page.locator('#subscriptions-table-summary')).toHaveText('Nenhuma assinatura encontrada');
+    await expect(page.locator('#dashboard-load-error')).toBeHidden();
+
+    failDashboardRequest = true;
+    await page.reload();
+    await expect(page.locator('#dashboard-load-error')).toBeVisible();
+    await expect(page.locator('#dashboard-load-error')).toContainText('Não foi possível carregar os dados do Dashboard');
 });
 
 test('visão geral do catálogo resume estados, pendências e as cinco publicações recentes', async ({ page }) => {

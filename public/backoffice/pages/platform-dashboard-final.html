@@ -10,54 +10,54 @@
                 </p>
             </div>
         </header>
-        <section class="admin-metrics-grid fs-row fs-row-cols-4 fs-u-gap-3" aria-label="Métricas da plataforma">
-            <article class="fs-card fs-card-sm admin-metric-card admin-metric-companies">
+        <section class="admin-metrics-grid" aria-label="Métricas da plataforma">
+            <article class="fs-card fs-card-panel fs-card-sm admin-metric-card admin-metric-companies" aria-label="Empresas ativas">
                 <div class="admin-metric-icon">
                     <img
                         src="/backoffice/assets/icons/Small-Office-Tall-Building--Streamline-Ultimate.png"
                         alt=""
                     />
                 </div>
-                <div>
+                <div class="fs-card-body">
                     <span>Empresas ativas</span
                     ><strong id="metric-active-companies">—</strong
                     ><small>Carregando dados</small>
                 </div>
             </article>
-            <article class="fs-card fs-card-sm admin-metric-card admin-metric-people">
+            <article class="fs-card fs-card-panel fs-card-sm admin-metric-card admin-metric-people" aria-label="Pessoas ativas">
                 <div class="admin-metric-icon">
                     <img
                         src="/backoffice/assets/icons/Single-Neutral-Actions-Check-1--Streamline-Ultimate-Regular.png"
                         alt=""
                     />
                 </div>
-                <div>
+                <div class="fs-card-body">
                     <span>Pessoas ativas</span
                     ><strong id="metric-active-people">—</strong
                     ><small>Carregando dados</small>
                 </div>
             </article>
-            <article class="fs-card fs-card-sm admin-metric-card admin-metric-subscriptions">
+            <article class="fs-card fs-card-panel fs-card-sm admin-metric-card admin-metric-subscriptions" aria-label="Assinaturas ativas">
                 <div class="admin-metric-icon">
                     <img
                         src="/backoffice/assets/icons/Customer-Relationship-Management-List-Document-Share--Streamline-Ultimate.png"
                         alt=""
                     />
                 </div>
-                <div>
+                <div class="fs-card-body">
                     <span>Assinaturas ativas</span
                     ><strong id="metric-active-subscriptions">—</strong
                     ><small>Carregando dados</small>
                 </div>
             </article>
-            <article class="fs-card fs-card-sm admin-metric-card admin-metric-mrr">
+            <article class="fs-card fs-card-panel fs-card-sm admin-metric-card admin-metric-mrr" aria-label="Receita recorrente mensal">
                 <div class="admin-metric-icon">
                     <img
                         src="/backoffice/assets/icons/Accounting-Coins--Streamline-Ultimate.png"
                         alt=""
                     />
                 </div>
-                <div>
+                <div class="fs-card-body">
                     <span>Receita recorrente (MRR)</span
                     ><strong id="metric-mrr">—</strong
                     ><small>Carregando dados</small>
@@ -66,17 +66,18 @@
         </section>
         <div class="fs-alert fs-alert-danger" id="dashboard-load-error" role="alert" hidden></div>
         <section class="admin-dashboard-overview-grid">
-            <article class="fs-card admin-panel-card admin-subscription-chart-card">
+            <article class="fs-card fs-card-panel admin-panel-card admin-subscription-chart-card">
                 <div class="fs-card-header admin-card-heading">
-                    <div>
-                        <h2>Novas assinaturas ativas</h2>
-                        <p>
+                    <div class="fs-card-header-title">
+                        <h2 class="fs-card-title">Novas assinaturas ativas</h2>
+                        <p class="fs-card-subtitle">
                             Assinaturas criadas por mês que permanecem ativas.
                         </p>
                     </div>
-                    <span>Últimos 6 meses</span>
+                    <span class="fs-card-header-info">Últimos 6 meses</span>
                 </div>
-                <div class="admin-subscription-chart" id="subscription-chart">
+                <div class="fs-card-body admin-chart-card-body">
+                    <div class="admin-subscription-chart" id="subscription-chart">
                     <div
                         class="admin-chart-axis"
                         id="subscription-chart-axis"
@@ -91,27 +92,30 @@
                         class="admin-chart-labels"
                         id="subscription-chart-labels"
                     ></div>
+                    </div>
+                    <p
+                        class="admin-chart-empty"
+                        id="subscription-chart-empty"
+                        hidden
+                    >
+                        Não há assinaturas ativas registradas nos últimos seis
+                        meses.
+                    </p>
                 </div>
-                <p
-                    class="admin-chart-empty"
-                    id="subscription-chart-empty"
-                    hidden
-                >
-                    Não há assinaturas ativas registradas nos últimos seis
-                    meses.
-                </p>
             </article>
-            <aside class="fs-card admin-panel-card admin-attention-card">
+            <aside class="fs-card fs-card-panel admin-panel-card admin-attention-card">
                 <div class="fs-card-header admin-card-heading">
-                    <div>
-                        <h2>Atenção necessária</h2>
-                        <p>Itens que exigem acompanhamento.</p>
+                    <div class="fs-card-header-title">
+                        <h2 class="fs-card-title">Atenção necessária</h2>
+                        <p class="fs-card-subtitle">Itens que exigem acompanhamento.</p>
                     </div>
                 </div>
-                <div id="dashboard-alerts" class="admin-attention-list"></div>
-                <p id="dashboard-alerts-empty" class="admin-panel-empty" hidden>
-                    Nenhum alerta operacional no momento.
-                </p>
+                <div class="fs-card-body admin-attention-card-body">
+                    <div id="dashboard-alerts" class="admin-attention-list"></div>
+                    <p id="dashboard-alerts-empty" class="admin-panel-empty" hidden>
+                        Nenhum alerta operacional no momento.
+                    </p>
+                </div>
             </aside>
         </section>
         <section class="admin-dashboard-subscriptions-row">
@@ -123,8 +127,9 @@
                     </div>
                     <a class="admin-card-link" href="/backoffice/assinaturas">Ver todas</a>
                 </div>
-                <div class="fs-table-responsive fs-datatable" data-fs="datatable" data-fs-page-size="1000">
-                    <table class="fs-table fs-table-records fs-table-hover" aria-label="Assinaturas recentes">
+                <div class="fs-card-body fs-u-p-0">
+                    <div class="fs-table-responsive fs-datatable" data-fs="datatable" data-fs-page-size="1000">
+                    <table class="fs-table fs-table-records fs-table-hover admin-subscriptions-table" aria-label="Assinaturas recentes">
                         <thead>
                             <tr>
                                 <th class="fs-width-600" scope="col">Empresa</th>
@@ -137,6 +142,7 @@
                         </thead>
                         <tbody id="subscriptions-table-body"></tbody>
                     </table>
+                    </div>
                 </div>
                 <div class="fs-card-footer fs-u-d-flex fs-u-flex-wrap fs-u-align-items-center fs-u-justify-content-between fs-u-gap-3">
                     <span id="subscriptions-table-summary">Carregando assinaturas...</span>
@@ -145,54 +151,58 @@
             </article>
         </section>
         <section class="admin-dashboard-activity-row">
-            <article class="fs-card admin-panel-card admin-recent-activity-card">
+            <article class="fs-card fs-card-panel admin-panel-card admin-recent-activity-card">
                     <div class="fs-card-header admin-card-heading">
-                        <div>
-                            <h2>Atividade recente</h2>
-                            <p>Eventos registrados na plataforma.</p>
+                        <div class="fs-card-header-title">
+                            <h2 class="fs-card-title">Atividade recente</h2>
+                            <p class="fs-card-subtitle">Eventos registrados na plataforma.</p>
                         </div>
                         <a class="admin-card-link" href="/backoffice/seguranca"
                             >Ver todas</a
                         >
                     </div>
-                    <div
-                        id="dashboard-recent-activity"
-                        class="admin-recent-activity-list"
-                    ></div>
-                    <p
-                        id="dashboard-recent-activity-empty"
-                        class="admin-panel-empty"
-                        hidden
-                    >
-                        Nenhuma atividade recente disponível.
-                    </p>
-            </article>
-            <article class="fs-card admin-panel-card admin-quick-actions-card">
-                    <div class="fs-card-header admin-card-heading">
-                        <div><h2>Ações rápidas</h2></div>
+                    <div class="fs-card-body admin-activity-card-body">
+                        <div
+                            id="dashboard-recent-activity"
+                            class="admin-recent-activity-list"
+                        ></div>
+                        <p
+                            id="dashboard-recent-activity-empty"
+                            class="admin-panel-empty"
+                            hidden
+                        >
+                            Nenhuma atividade recente disponível.
+                        </p>
                     </div>
+            </article>
+            <article class="fs-card fs-card-panel admin-panel-card admin-quick-actions-card">
+                    <div class="fs-card-header admin-card-heading">
+                        <div class="fs-card-header-title"><h2 class="fs-card-title">Ações rápidas</h2></div>
+                    </div>
+                    <div class="fs-card-body admin-quick-actions-body">
                     <div class="admin-quick-actions-grid">
-                        <a href="/backoffice/empresas"
+                        <a class="fs-btn fs-btn-outline-secondary" href="/backoffice/empresas"
                             ><img
                                 src="/backoffice/assets/icons/Add-Square--Streamline-Ultimate.png"
                                 alt=""
                             />Nova empresa</a
-                        ><a href="/backoffice/admins"
+                        ><a class="fs-btn fs-btn-outline-secondary" href="/backoffice/admins"
                             ><img
                                 src="/backoffice/assets/icons/Settings-User--Streamline-Ultimate.png"
                                 alt=""
                             />Convidar administrador</a
-                        ><a href="/backoffice/assinaturas"
+                        ><a class="fs-btn fs-btn-outline-secondary" href="/backoffice/assinaturas"
                             ><img
                                 src="/backoffice/assets/icons/Customer-Relationship-Management-List-Document-Share--Streamline-Ultimate.png"
                                 alt=""
                             />Ver assinaturas</a
-                        ><a href="/backoffice/catalogo"
+                        ><a class="fs-btn fs-btn-outline-secondary" href="/backoffice/catalogo"
                             ><img
                                 src="/backoffice/assets/icons/Shopping-Basket-Edit--Streamline-Ultimate.png"
                                 alt=""
                             />Abrir catálogo</a
                         >
+                    </div>
                     </div>
             </article>
         </section>
