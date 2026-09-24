@@ -726,19 +726,39 @@ test('Fokus Law usa o mesmo toast do Backoffice para erro de consulta', async ({
 
 test('Superadministrador MFA pode iniciar acesso de suporte a perfil real', async ({ page }) => {
     await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ admin: { role: 'superadministrador', name: 'Superadmin Teste', email: 'superadmin@example.test' } }) }));
-    await page.route('**/api/backoffice/support/law-context', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ subscriptions: [{ id: 'SUB_TESTE_01', label: 'Empresa Teste — Essencial (Suspensa)', status: 'suspensa', users: [{ membership_id: 'MBS_TESTE_01', label: 'Administrador — Pessoa Teste (pessoa@example.test)' }] }] }) }));
+    let supportContextRequested = false;
+    await page.route('**/api/backoffice/support/law-context', (route) => {
+        supportContextRequested = true;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ subscriptions: [{ id: 'SUB_TESTE_01', label: 'Empresa Teste — Essencial (Suspensa)', status: 'suspensa', users: [{ membership_id: 'MBS_TESTE_01', label: 'Administrador — Pessoa Teste (pessoa@example.test)' }] }] }) });
+    });
     await page.route('**/api/backoffice/support/access', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ redirect_to: '/portal' }) }));
     await page.goto('/marketing/products/fokus-law.html');
     await expect(page.locator('[data-law-login-form]')).toBeVisible();
     await expect(page.locator('[aria-labelledby="law-support-title"]')).toBeHidden();
     await page.locator('#law-email').fill('superadmin@example.test');
+    await expect(page.locator('#law-access-type')).toBeVisible();
+    await expect(page.locator('[aria-labelledby="law-support-title"]')).toBeHidden();
+    expect(supportContextRequested).toBe(false);
+    await page.locator('#law-access-type').selectOption('support');
     await expect(page.locator('[aria-labelledby="law-support-title"]')).toBeVisible();
-    await expect(page.locator('[data-law-login-form]')).toBeHidden();
+    expect(supportContextRequested).toBe(true);
     await page.locator('#law-support-subscription').selectOption('SUB_TESTE_01');
     await page.locator('#law-support-user').selectOption('MBS_TESTE_01');
     await page.locator('#law-support-reason').fill('Investigar erro de permissões');
     await page.locator('#law-support-start').click();
     await expect(page).toHaveURL(/\/portal$/);
+});
+
+test('Superadministrador pode escolher entrar pela própria assinatura Fokus Law', async ({ page }) => {
+    await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ admin: { role: 'superadministrador', name: 'Superadmin Teste', email: 'superadmin@example.test' } }) }));
+    await page.route('**/api/auth/law-context', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ user: { name: 'Superadmin Teste' }, systems: [{ value: 'CMP_SUPERADMIN', label: 'Empresa do Superadmin — Fokus Law · Advocacia', profiles: [{ value: 'admin', label: 'Administrador' }] }] }) }));
+    await page.goto('/marketing/products/fokus-law.html');
+    await page.locator('#law-email').fill('superadmin@example.test');
+    await expect(page.locator('#law-access-type')).toBeVisible();
+    await page.locator('#law-access-type').selectOption('subscription');
+    await expect(page.locator('#law-system')).toHaveValue('CMP_SUPERADMIN');
+    await expect(page.locator('#law-password')).toBeEnabled();
+    await expect(page.locator('[aria-labelledby="law-support-title"]')).toBeHidden();
 });
 
 test('Portal identifica e encerra modo de suporte preservando o retorno ao Backoffice', async ({ page }) => {

@@ -28,3 +28,5 @@
     }
 }
 .law-support-access{display:grid;gap:.55rem}.law-support-access h2{margin:0;font:400 1.8rem/.98 var(--law-display);text-transform:uppercase}.law-support-access>p{margin:.15rem 0 .45rem;color:#63586a;font-size:.8rem}.law-login-card .law-support-access textarea{width:100%;min-height:5.5rem;resize:vertical;border:1px solid rgba(43,23,61,.2);border-radius:0;background:rgba(255,255,255,.6);padding:.65rem .72rem;color:var(--law-ink);font:inherit;font-size:.86rem}.law-login-card .law-support-access textarea:focus{outline:2px solid var(--law-sage);outline-offset:2px}
+
+.law-support-access[hidden]{display:none}

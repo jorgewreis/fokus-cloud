@@ -10,6 +10,10 @@
     const password = form.elements.password;
     const submit = form.querySelector('button[type="submit"]');
     const status = form.querySelector('[data-law-login-status]');
+    const accessChoice = form.querySelector('[data-law-access-choice]');
+    const accessType = form.querySelector('#law-access-type');
+    const accessStatus = form.querySelector('[data-law-access-status]');
+    const subscriptionLogin = form.querySelector('[data-law-subscription-login]');
     const profileField = profile.closest('div');
     let lookupTimer;
     let systems = [];
@@ -70,7 +74,10 @@
     email.addEventListener('input', () => {
       clearTimeout(lookupTimer);
       support.hidden = true;
-      form.hidden = false;
+      accessChoice.hidden = true;
+      accessType.value = '';
+      accessStatus.textContent = '';
+      subscriptionLogin.hidden = false;
       reset('Informe um e-mail válido para consultar seu cadastro.');
       const value = email.value.trim();
       if (!value) return;
@@ -83,23 +90,49 @@
         }
         if (email.value.trim().toLowerCase() !== value.toLowerCase()) return;
         if (supportAdmin && value.toLowerCase() === supportAdmin.email.toLowerCase()) {
-          form.hidden = true;
-          support.hidden = false;
-          support.querySelector('[data-support-email]').textContent = `${supportAdmin.name} — ${supportAdmin.email}`;
-          supportStatus.textContent = 'Carregando assinaturas Fokus Law…';
-          loadSupportSubscriptions();
+          accessChoice.hidden = false;
+          subscriptionLogin.hidden = true;
+          accessStatus.textContent = `${supportAdmin.name} — escolha se deseja entrar pela sua assinatura ou iniciar um acesso de suporte.`;
           return;
         }
-        window.FokusApi.request('/auth/law-context', { method: 'POST', body: { email: value } })
-          .then(renderSystems)
-          .catch((error) => {
-            const message = error.status === 404
-              ? 'Usuário não encontrado.'
-              : (error.message || 'Não foi possível consultar os sistemas vinculados a este e-mail.');
-            reset(message);
-            showToast(message);
-          });
+        lookupSubscriptionContext(value);
       }, 420);
+    });
+
+    const lookupSubscriptionContext = (value) => window.FokusApi.request('/auth/law-context', { method: 'POST', body: { email: value } })
+      .then((payload) => {
+        if (email.value.trim().toLowerCase() === value.toLowerCase()) renderSystems(payload);
+      })
+      .catch((error) => {
+        if (email.value.trim().toLowerCase() !== value.toLowerCase()) return;
+        const message = error.status === 404
+          ? 'Usuário não encontrado.'
+          : (error.message || 'Não foi possível consultar os sistemas vinculados a este e-mail.');
+        reset(message);
+        showToast(message);
+      });
+
+    accessType.addEventListener('change', () => {
+      const value = email.value.trim();
+      support.hidden = true;
+      if (accessType.value === 'subscription') {
+        subscriptionLogin.hidden = false;
+        accessStatus.textContent = 'Consultando as assinaturas vinculadas ao e-mail…';
+        reset('Consultando as assinaturas vinculadas ao e-mail…');
+        lookupSubscriptionContext(value).then(() => {
+          if (accessType.value === 'subscription') accessStatus.textContent = '';
+        });
+      } else if (accessType.value === 'support') {
+        subscriptionLogin.hidden = true;
+        support.hidden = false;
+        support.querySelector('[data-support-email]').textContent = `${supportAdmin.name} — ${supportAdmin.email}`;
+        supportStatus.textContent = 'Carregando assinaturas Fokus Law…';
+        accessStatus.textContent = 'Acesso interno para suporte. Cada sessão será registrada em auditoria.';
+        loadSupportSubscriptions();
+      } else {
+        subscriptionLogin.hidden = true;
+        accessStatus.textContent = 'Selecione como deseja acessar o Fokus Law.';
+      }
     });
 
     system.addEventListener('change', renderProfiles);
@@ -116,7 +149,7 @@
     support.className = 'law-support-access';
     support.setAttribute('aria-labelledby', 'law-support-title');
     support.innerHTML = '<h2 id="law-support-title">Acesso de suporte</h2><p data-support-email></p><p>Escolha uma assinatura e um usuário real da empresa. O acesso será registrado em auditoria.</p><label for="law-support-subscription">Assinatura</label><select id="law-support-subscription" required></select><label for="law-support-user">Usuário e perfil</label><select id="law-support-user" required></select><label for="law-support-reason">Motivo do acesso</label><textarea id="law-support-reason" minlength="10" maxlength="1000" required></textarea><button class="law-submit" type="button" id="law-support-start">Acessar em modo de suporte</button><p role="status" aria-live="polite" id="law-support-status"></p>';
-    form.before(support);
+    form.after(support);
     const subscriptionSelect = support.querySelector('#law-support-subscription');
     const userSelect = support.querySelector('#law-support-user');
     const supportStatus = support.querySelector('#law-support-status');
