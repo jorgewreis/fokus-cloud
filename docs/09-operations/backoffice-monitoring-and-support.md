@@ -172,7 +172,9 @@ registrar melhorias operacionais.
 
 Logs tecnicos devem ser minimos, correlacionaveis e sem dados sensiveis. Quando
 houver alerta ou auditoria relacionada, o log deve registrar identificador ou
-referencia suficiente para investigacao.
+referencia suficiente para investigacao. A origem deve indicar canal tipado,
+rota/comando e request/correlation ID quando disponíveis; IP e User-Agent só
+entram quando a requisição os fornece.
 
 Nao devem aparecer em logs, comentarios ou evidencias:
 

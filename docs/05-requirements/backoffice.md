@@ -138,7 +138,15 @@ Devem gerar auditoria:
 - pausa, reativacao, cancelamento e troca de plano em assinatura;
 - override manual comercial;
 - divergencia e ajuste de conciliacao com Mercado Pago;
+- checkout, alteracoes de assinatura, transicoes de pagamento, confirmacao ou
+  liberacao de voucher, reembolso e rotinas automaticas, identificando cliente,
+  administrador, gateway ou sistema;
 - alteracao de usuario interno, perfil ou configuracao de seguranca.
+
+Cada classe de evento deve indicar ator, entidade, empresa quando aplicável,
+origem técnica, motivo ou não aplicabilidade, snapshots mascarados, data e
+expiração em 180 dias. Segredos, documentos completos, cartões e payload bruto
+do gateway não podem persistir em auditoria nem em logs.
 
 ## Criterios minimos de teste
 

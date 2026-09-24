@@ -70,13 +70,13 @@ class PlatformSupportController extends Controller
         DB::table('platform_support_sessions')->insert([
             'id' => $id, 'platform_admin_id' => Auth::guard('platform')->id(), 'company_id' => $target->company_id,
             'subscription_id' => $target->subscription_id, 'membership_id' => $target->membership_id,
-            'target_user_id' => $target->user_id, 'reason' => $data['reason'], 'started_at' => now(),
-            'start_ip' => $request->ip(), 'start_user_agent' => $request->userAgent(), 'created_at' => now(), 'updated_at' => now(),
+            'target_user_id' => $target->user_id, 'reason' => app(\App\Services\AuditSanitizer::class)->sanitizeText((string) $data['reason']), 'started_at' => now(),
+            'start_ip' => $request->ip(), 'start_user_agent' => app(\App\Services\AuditSanitizer::class)->sanitizeText((string) $request->userAgent()), 'created_at' => now(), 'updated_at' => now(),
         ]);
         $request->session()->put(['support_session_id' => $id, 'active_company_id' => $target->company_id]);
         Auth::guard('web')->login(User::findOrFail($target->user_id));
         $request->session()->regenerate();
-        $audit->record(Auth::guard('platform')->id(), 'backoffice.support_access_started', 'platform_support_session', $id, $target->company_id, $data['reason'], metadata: ['subscription_id' => $target->subscription_id, 'membership_id' => $target->membership_id, 'target_user_id' => $target->user_id], request: $request);
+        $audit->record(Auth::guard('platform')->id(), 'backoffice.support_access_started', 'platform_support_session', $id, $target->company_id, $data['reason'], metadata: ['subscription_id' => $target->subscription_id, 'membership_id' => $target->membership_id, 'target_user_id' => $target->user_id], after: ['status' => 'active', 'subscription_id' => $target->subscription_id], request: $request);
 
         return response()->json(['redirect_to' => '/portal']);
     }
@@ -90,7 +90,7 @@ class PlatformSupportController extends Controller
         DB::table('platform_support_sessions')->where('id', $id)->update(['ended_at' => now(), 'end_ip' => $request->ip(), 'end_user_agent' => $request->userAgent(), 'updated_at' => now()]);
         Auth::guard('web')->logout();
         $request->session()->forget(['support_session_id', 'active_company_id']);
-        $audit->record(Auth::guard('platform')->id(), 'backoffice.support_access_ended', 'platform_support_session', $id, $support->company_id, request: $request);
+        $audit->record(Auth::guard('platform')->id(), 'backoffice.support_access_ended', 'platform_support_session', $id, $support->company_id, before: ['status' => 'active'], after: ['status' => 'ended'], request: $request);
 
         return response()->json(['redirect_to' => '/backoffice/']);
     }

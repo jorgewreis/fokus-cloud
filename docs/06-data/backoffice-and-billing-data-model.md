@@ -120,6 +120,7 @@ Campos alvo:
 
 - `id`: prefixed ULID;
 - `platform_admin_id`: ator interno, quando houver;
+- `actor_type`: `anonymous`, `admin`, `customer`, `gateway` ou `system`;
 - `action`;
 - `entity_type`;
 - `entity_id`;
@@ -131,18 +132,22 @@ Campos alvo:
 - `metadata`;
 - `ip_address`;
 - `user_agent`;
+- `origin_channel`: `http`, `webhook`, `scheduler`, `cli` ou `system`;
+- `origin_context`: rota ou comando, quando houver;
+- `correlation_id`: identificador técnico sanitizado, quando houver;
 - `expires_at`;
 - `created_at`.
 
 Retencao: 180 dias.
 
-Evolucao necessaria:
+O serviço de auditoria compartilhado grava também em `audit_events` para ações
+no contexto da empresa, preservando os limites de leitura atuais. Os dois
+gravadores produzem estados JSON, representam lados inexistentes como `{}` e
+definem `expires_at` exatamente 180 dias após `created_at`. Motivos ausentes
+devem ser marcados explicitamente como não aplicáveis.
 
-- a tabela atual ja existe;
-- precisa incluir `before_masked`, `after_masked` e `expires_at`;
-- metadados devem continuar sem senhas, tokens, codigos MFA, CPF/CNPJ completo,
-  dados completos de cartao, payload completo do gateway ou documentos
-  pessoais.
+Metadados devem continuar sem senhas, tokens, codigos MFA, CPF/CNPJ completo,
+dados completos de cartao, payload completo do gateway ou documentos pessoais.
 
 ## Alertas operacionais
 

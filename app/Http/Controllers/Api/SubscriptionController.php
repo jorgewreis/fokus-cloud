@@ -135,7 +135,7 @@ class SubscriptionController extends Controller
             'product_code' => $input['product_code'], 'selection_mode' => 'plan', 'plan_code' => $input['plan_code'], 'cycle' => $input['cycle'],
             'items' => collect($plan['module_codes'])->map(fn (string $code): array => ['module_code' => $code, 'quantity' => 1])->all(),
         ];
-        $response = $this->executeCheckout($request, $data, $company->id, $customer->id, $customer->email, $catalog, $vouchers, $subscriptionChanges, $mercadoPago, allowPendingPublication: true);
+        $response = $this->executeCheckout($request, $data, $company->id, $customer->id, $customer->email, $catalog, $vouchers, $subscriptionChanges, $mercadoPago, allowPendingPublication: true, platformActor: true);
         if ($response->getStatusCode() === 201) {
             $payload = $response->getData(true);
             $audit->record($request->user()->id, 'backoffice.subscription_checkout_created', 'subscription', $payload['subscription_id'], $company->id, after: ['product_code' => $data['product_code'], 'plan_code' => $data['plan_code'], 'cycle' => $data['cycle'], 'amount' => $payload['amount']], request: $request);
@@ -146,22 +146,25 @@ class SubscriptionController extends Controller
     public function activateWithFreeVoucher(Request $request, string $subscription, PendingSubscriptionVoucher $pendingVoucher, PlatformAudit $audit)
     {
         $data = $request->validate(['voucher_code' => ['required', 'string', 'max:64']]);
-        $result = $pendingVoucher->activate($subscription, $data['voucher_code']);
+        $result = $pendingVoucher->activate($subscription, $data['voucher_code'], $request->user()->id, $request);
         $companyId = DB::table('subscriptions')->where('id', $subscription)->value('company_id');
         $audit->record($request->user()->id, 'backoffice.subscription_free_voucher_activated', 'subscription', $subscription, $companyId,
-            metadata: ['voucher_redemption_id' => $result['voucher_redemption_id'], 'benefit_ends_at' => $result['benefit_ends_at']], request: $request);
+            metadata: ['voucher_redemption_id' => $result['voucher_redemption_id'], 'benefit_ends_at' => $result['benefit_ends_at']],
+            before: ['status' => 'aguardando_pagamento'], after: ['status' => 'ativa', 'amount' => 0, 'discount_amount' => 0],
+            reason: 'Voucher gratuito aplicado pelo Backoffice.', request: $request);
         return response()->json(['message' => 'Assinatura ativada pelo voucher gratuito.', ...$result]);
     }
 
-    private function executeCheckout(Request $request, array $data, string $companyId, string $customerUserId, string $customerEmail, CatalogManager $catalog, VoucherManager $vouchers, SubscriptionChangeManager $subscriptionChanges, MercadoPagoClient $mercadoPago, bool $allowPendingPublication = false)
+    private function executeCheckout(Request $request, array $data, string $companyId, string $customerUserId, string $customerEmail, CatalogManager $catalog, VoucherManager $vouchers, SubscriptionChangeManager $subscriptionChanges, MercadoPagoClient $mercadoPago, bool $allowPendingPublication = false, bool $platformActor = false)
     {
         $product = DB::table('products')->where('code', $data['product_code'])->where('active', true)->first();
         abort_unless($product, 404, 'Produto não encontrado.');
         $quoted = $this->quote($product, $data, $catalog, $allowPendingPublication);
         $payerEmail = $mercadoPago->payerEmail((string) $customerEmail);
-        $requestKey = (string) ($request->header('Idempotency-Key') ?: hash('sha256', implode('|', [
+        $providedIdempotencyKey = trim((string) $request->header('Idempotency-Key'));
+        $requestKey = $providedIdempotencyKey !== '' ? hash('sha256', $providedIdempotencyKey) : hash('sha256', implode('|', [
             $customerUserId, $companyId, json_encode($data), $payerEmail,
-        ])));
+        ]));
         $previousAttempt = DB::table('billing_checkout_attempts')->where('company_id', $companyId)->where('request_key', $requestKey)->first();
         if (! $request->header('Idempotency-Key') && $previousAttempt?->status === 'completed') {
             $previousSubscription = DB::table('subscriptions')->where('id', $previousAttempt->subscription_id)->first();
@@ -236,7 +239,7 @@ class SubscriptionController extends Controller
                 'subscription_id' => $subscriptionId,
                 'selection_mode' => $data['selection_mode'],
                 'module_codes' => array_column($data['items'], 'module_code'),
-            ]);
+            ], $platformActor ? $request->user()->id : $customerUserId, $request, $platformActor ? 'admin' : 'customer');
         }
 
         try {
@@ -250,8 +253,8 @@ class SubscriptionController extends Controller
                 'notification_url' => rtrim(config('app.url'), '/').'/api/webhooks/mercado-pago',
             ], $requestKey);
         } catch (\Throwable $exception) {
-            if ($reservation) $vouchers->release($reservation->id);
-            DB::table('billing_checkout_attempts')->where('id', $attemptId)->update(['status' => 'failed', 'error_message' => mb_substr($exception->getMessage(), 0, 1000), 'updated_at' => now()]);
+            if ($reservation) $vouchers->release($reservation->id, 'released', $platformActor ? $request->user()->id : $customerUserId, $request, $platformActor ? 'admin' : 'customer');
+            DB::table('billing_checkout_attempts')->where('id', $attemptId)->update(['status' => 'failed', 'error_message' => app(\App\Services\AuditSanitizer::class)->sanitizeText(mb_substr($exception->getMessage(), 0, 1000)), 'updated_at' => now()]);
             return response()->json(['message' => 'Não foi possível iniciar o checkout. Nenhuma assinatura foi criada; tente novamente.'], 502);
         }
 
@@ -305,18 +308,31 @@ class SubscriptionController extends Controller
             DB::table('billing_checkout_attempts')->where('id', $attemptId)->update([
                 'status' => 'completed', 'payment_id' => $paymentId, 'subscription_id' => $subscriptionId,
                 'provider_subscription_id' => $response['id'] ?? null,
-                'response_snapshot_sanitized' => json_encode(['checkout_url' => $response['init_point'] ?? null, 'subscription_id' => $subscriptionId, 'amount' => $quoted['amount']]),
+                'response_snapshot_sanitized' => json_encode(['checkout_url' => app(\App\Services\AuditSanitizer::class)->sanitizeText((string) ($response['init_point'] ?? '')), 'subscription_id' => $subscriptionId, 'amount' => $quoted['amount']]),
                 'updated_at' => now(),
             ]);
         } catch (\Throwable $exception) {
-            if ($reservation) $vouchers->release($reservation->id);
+            if ($reservation) $vouchers->release($reservation->id, 'released', $platformActor ? $request->user()->id : $customerUserId, $request, $platformActor ? 'admin' : 'customer');
             if (! empty($response['id'])) {
                 try { $mercadoPago->updatePreapproval((string) $response['id'], ['status' => 'cancelled'], 'compensate-'.$attemptId); } catch (\Throwable) { /* retry/reconciliation will handle the external orphan */ }
             }
-            DB::table('billing_checkout_attempts')->where('id', $attemptId)->update(['status' => 'failed', 'error_message' => mb_substr($exception->getMessage(), 0, 1000), 'updated_at' => now()]);
+            DB::table('billing_checkout_attempts')->where('id', $attemptId)->update(['status' => 'failed', 'error_message' => app(\App\Services\AuditSanitizer::class)->sanitizeText(mb_substr($exception->getMessage(), 0, 1000)), 'updated_at' => now()]);
             throw $exception;
         }
 
+        if (! $platformActor) {
+            app(\App\Services\AuditRecorder::class)->company($companyId, $customerUserId, 'subscription', $subscriptionId, 'create', null,
+                ['status' => 'aguardando_pagamento', 'product_code' => $product->code, 'billing_cycle' => $data['cycle'], 'amount' => $quoted['amount'], 'discount_amount' => $quoted['discount_amount']],
+                reason: $voucher ? 'Contratação com voucher aplicado.' : 'Contratação iniciada pelo administrador da empresa.', request: $request, actorType: 'customer');
+        }
+        $paymentSnapshot = ['status' => 'aguardando_pagamento', 'subscription_id' => $subscriptionId, 'amount' => $quoted['amount'], 'currency' => 'BRL'];
+        if ($platformActor) {
+            app(\App\Services\AuditRecorder::class)->platform($request->user()->id, 'billing.payment_created_by_assisted_checkout', 'payment', $paymentId, $companyId,
+                'Pagamento criado durante checkout assistido.', after: $paymentSnapshot, request: $request, actorType: 'admin');
+        } else {
+            app(\App\Services\AuditRecorder::class)->company($companyId, $customerUserId, 'payment', $paymentId, 'create', null, $paymentSnapshot,
+                reason: 'Pagamento criado durante checkout da assinatura.', request: $request, actorType: 'customer');
+        }
         return response()->json(['checkout_url' => $response['init_point'] ?? null, 'subscription_id' => $subscriptionId, 'amount' => $quoted['amount']], 201);
     }
 
@@ -337,6 +353,7 @@ class SubscriptionController extends Controller
             'items' => ['nullable', 'array'],
             'reason' => ['nullable', 'string', 'max:1000'],
         ]);
+        if (isset($data['reason'])) $data['reason'] = app(\App\Services\AuditSanitizer::class)->sanitizeText((string) $data['reason']);
         $companyId = $request->attributes->get('active_company_id');
         $current = DB::table('subscriptions')->where('id', $subscription)->where('company_id', $companyId)->first();
         abort_unless($current && $current->status !== 'encerrada', 404, 'Assinatura não encontrada ou já encerrada.');
@@ -383,7 +400,8 @@ class SubscriptionController extends Controller
                 Log::error('Falha ao cancelar assinatura localmente.', [
                     'subscription_id' => $subscription,
                     'company_id' => $companyId,
-                    'exception' => $exception,
+                    'exception_class' => get_class($exception),
+                    'message' => app(\App\Services\AuditSanitizer::class)->sanitizeText($exception->getMessage()),
                 ]);
                 throw $exception;
             }
@@ -410,11 +428,15 @@ class SubscriptionController extends Controller
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
+                app(\App\Services\AuditRecorder::class)->company($companyId, $request->user()->id, 'subscription', $subscription, 'update',
+                    ['status' => $current->status, 'cancel_at' => $current->cancel_at], ['status' => $after['status'], 'cancel_at' => $after['cancel_at']],
+                    reason: $data['reason'] ?? 'Cancelamento imediato solicitado pelo administrador da empresa.', request: $request, actorType: 'customer');
             } catch (\Throwable $exception) {
                 Log::warning('Cancelamento local concluído, mas dados auxiliares não foram persistidos.', [
                     'subscription_id' => $subscription,
                     'company_id' => $companyId,
-                    'exception' => $exception,
+                    'exception_class' => get_class($exception),
+                    'message' => app(\App\Services\AuditSanitizer::class)->sanitizeText($exception->getMessage()),
                 ]);
                 throw $exception;
             }
@@ -428,7 +450,7 @@ class SubscriptionController extends Controller
                         'user-immediate-cancel-'.$current->id,
                     );
                 } catch (\Throwable $exception) {
-                    report($exception);
+                    \Illuminate\Support\Facades\Log::warning('Falha ao sincronizar cancelamento com Mercado Pago.', ['subscription_id' => $subscription, 'exception_class' => get_class($exception), 'message' => app(\App\Services\AuditSanitizer::class)->sanitizeText($exception->getMessage())]);
                     $providerCancellationPending = true;
                 }
             }
@@ -440,7 +462,7 @@ class SubscriptionController extends Controller
             ]);
         }
 
-        $effectiveAt = $data['type'] === 'upgrade' ? now() : ($current->current_period_ends_at ?: now());
+        $effectiveAt = $data['type'] === 'upgrade' ? now() : ($current->current_period_ends_at ? \Illuminate\Support\Carbon::parse($current->current_period_ends_at) : now());
         $status = $data['type'] === 'upgrade' ? 'aguardando_pagamento' : 'agendada';
         DB::table('subscription_changes')->insert([
             'id' => PrefixedUlid::make('SCH'), 'company_id' => $companyId, 'subscription_id' => $current->id,
@@ -448,6 +470,10 @@ class SubscriptionController extends Controller
             'items_snapshot' => isset($data['items']) ? json_encode($data['items']) : null, 'reason' => $data['reason'] ?? null,
             'requested_by_user_id' => $request->user()->id, 'created_at' => now(), 'updated_at' => now(),
         ]);
+        app(\App\Services\AuditRecorder::class)->company($companyId, $request->user()->id, 'subscription', $current->id, 'update',
+            ['status' => $current->status, 'cancel_at' => $current->cancel_at],
+            ['status' => $current->status, 'cancel_at' => $data['type'] === 'cancelamento' ? $effectiveAt->toISOString() : $current->cancel_at, 'scheduled_change' => $data['type'], 'effective_at' => $effectiveAt->toISOString()],
+            reason: $data['reason'] ?? 'Alteração comercial agendada pelo administrador da empresa.', request: $request, actorType: 'customer');
         if ($data['type'] === 'cancelamento') {
             DB::table('subscriptions')->where('id', $current->id)->update(['cancel_at' => $effectiveAt, 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
             return response()->json(['message' => 'Assinatura cancelada ao final do período vigente.', 'effective_at' => $effectiveAt]);
@@ -463,17 +489,16 @@ class SubscriptionController extends Controller
         $current = DB::table('subscriptions')->where('id', $subscription)->where('company_id', $companyId)->first();
         abort_unless($current && in_array($current->status, ['encerrada', 'cancelada'], true), 422, 'Somente assinaturas canceladas ou encerradas podem ser excluídas.');
 
+        app(\App\Services\AuditRecorder::class)->company($companyId, $request->user()->id, 'subscription', $current->id, 'delete',
+            ['status' => $current->status, 'product_id' => $current->product_id, 'public_name' => $current->public_name], null,
+            reason: 'Exclusão solicitada pelo administrador da empresa.', request: $request, actorType: 'customer');
+
         DB::transaction(function () use ($subscription, $current): void {
             $paymentIds = DB::table('payments')->where('subscription_id', $subscription)->pluck('id')->all();
             $changeIds = DB::table('subscription_changes')->where('subscription_id', $subscription)->pluck('id')->all();
             $refundIds = DB::table('refund_requests')->where('subscription_id', $subscription)->pluck('id')->all();
             $historyEntityIds = array_values(array_unique(array_merge([$subscription], $paymentIds, $changeIds, $refundIds)));
 
-            foreach (['audit_events', 'platform_audit_events'] as $auditTable) {
-                if (DB::getSchemaBuilder()->hasTable($auditTable)) {
-                    DB::table($auditTable)->whereIn('entity_id', $historyEntityIds)->delete();
-                }
-            }
             if ($current->provider_subscription_id && DB::getSchemaBuilder()->hasTable('billing_provider_events')) {
                 DB::table('billing_provider_events')->where('resource_id', $current->provider_subscription_id)->delete();
             }

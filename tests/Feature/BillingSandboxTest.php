@@ -35,12 +35,23 @@ class BillingSandboxTest extends TestCase
         $signature = 'ts='.$timestamp.',v1='.hash_hmac('sha256', 'id:pay-sandbox;request-id:req-sandbox;ts:'.$timestamp.';', 'test-secret');
         $headers = ['x-signature' => $signature, 'x-request-id' => 'req-sandbox'];
 
-        $this->withHeaders($headers)->postJson('/api/webhooks/mercado-pago?data.id=pay-sandbox', ['type' => 'payment'])->assertOk();
-        $this->withHeaders($headers)->postJson('/api/webhooks/mercado-pago?data.id=pay-sandbox', ['type' => 'payment'])->assertOk();
+        $sensitivePayload = ['type' => 'payment', 'access_token' => 'webhook-secret', 'identification' => ['number' => '12345678901'], 'card' => ['number' => '4111 1111 1111 1111']];
+        $this->withHeaders($headers)->postJson('/api/webhooks/mercado-pago?data.id=pay-sandbox', $sensitivePayload)->assertOk();
+        $this->withHeaders($headers)->postJson('/api/webhooks/mercado-pago?data.id=pay-sandbox', $sensitivePayload)->assertOk();
 
         $this->assertDatabaseHas('payments', ['id' => $fixture['payment_id'], 'status' => 'aprovado', 'provider_payment_id' => 'pay-sandbox']);
         $this->assertDatabaseHas('subscriptions', ['id' => $fixture['subscription_id'], 'status' => 'ativa']);
         $this->assertDatabaseCount('billing_provider_events', 1);
+        $platformEvents = DB::table('platform_audit_events')->where('action', 'billing.payment_status_updated')->get();
+        $this->assertCount(1, $platformEvents);
+        $this->assertSame('gateway', $platformEvents->first()->actor_type);
+        $this->assertSame('webhook', $platformEvents->first()->origin_channel);
+        $this->assertSame('req-sandbox', $platformEvents->first()->correlation_id);
+        $eventPayload = DB::table('billing_provider_events')->value('payload_sanitized');
+        $this->assertStringNotContainsString('webhook-secret', $eventPayload);
+        $this->assertStringNotContainsString('12345678901', $eventPayload);
+        $this->assertStringNotContainsString('4111 1111 1111 1111', $eventPayload);
+        $this->assertDatabaseHas('audit_events', ['company_id' => $fixture['company_id'], 'entity_type' => 'payment', 'entity_id' => $fixture['payment_id'], 'actor_type' => 'gateway']);
     }
 
     public function test_invalid_signature_does_not_call_gateway_or_change_data(): void
@@ -129,6 +140,6 @@ class BillingSandboxTest extends TestCase
         DB::table('subscriptions')->insert(['id' => $subscriptionId, 'company_id' => $companyId, 'product_id' => $product->id, 'status' => 'aguardando_pagamento', 'open_company_product' => $companyId.'-'.$product->id, 'version' => 1, 'billing_cycle' => 'monthly', 'current_period_starts_at' => now(), 'current_period_ends_at' => now()->addMonth(), 'provider_subscription_id' => 'pre-sandbox', 'created_by' => $userId, 'updated_by' => $userId, 'created_at' => now(), 'updated_at' => now()]);
         $paymentId = PrefixedUlid::make('PAG');
         DB::table('payments')->insert(['id' => $paymentId, 'company_id' => $companyId, 'subscription_id' => $subscriptionId, 'provider' => 'mercado_pago', 'status' => 'aguardando_pagamento', 'amount' => 64.70, 'currency' => 'BRL', 'provider_subscription_id' => 'pre-sandbox', 'version' => 1, 'created_at' => now(), 'updated_at' => now()]);
-        return ['admin' => $admin, 'subscription_id' => $subscriptionId, 'payment_id' => $paymentId];
+        return ['admin' => $admin, 'company_id' => $companyId, 'subscription_id' => $subscriptionId, 'payment_id' => $paymentId];
     }
 }

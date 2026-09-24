@@ -59,7 +59,12 @@ class BillingReconciliationManager
                 abort_unless($admin->hasPermission('platform.reconciliation.manage'), 403, 'Somente o superadministrador pode corrigir divergências.');
                 if ($alert->payment_id) {
                     $paymentStatus = match ($alert->mercado_pago_status) { 'approved' => 'aprovado', 'rejected' => 'recusado', 'cancelled', 'expired' => 'cancelado', 'refunded' => 'estornado', default => null };
-                    if ($paymentStatus) DB::table('payments')->where('id', $alert->payment_id)->update(['status' => $paymentStatus, 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
+                    $payment = DB::table('payments')->where('id', $alert->payment_id)->lockForUpdate()->first();
+                    if ($paymentStatus && $payment && $payment->status !== $paymentStatus) {
+                        DB::table('payments')->where('id', $payment->id)->update(['status' => $paymentStatus, 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
+                        app(AuditRecorder::class)->company($payment->company_id, $admin->id, 'payment', $payment->id, 'update', ['status' => $payment->status], ['status' => $paymentStatus], reason: $reason, actorType: 'admin');
+                        $audit->record($admin->id, 'billing.payment_reconciled', 'payment', $payment->id, $payment->company_id, $reason, before: ['status' => $payment->status], after: ['status' => $paymentStatus]);
+                    }
                 }
                 if ($alert->subscription_id) {
                     abort_if(DB::table('subscriptions')->where('id', $alert->subscription_id)->whereNull('provider_subscription_id')->exists()
@@ -67,7 +72,12 @@ class BillingReconciliationManager
                             ->where('redemption.subscription_id', $alert->subscription_id)->where('voucher.discount_type', 'trial_free')->exists(),
                         422, 'A assinatura foi ativada por voucher gratuito; a divergência antiga não pode alterar seu estado.');
                     $subscriptionStatus = match ($alert->mercado_pago_status) { 'authorized' => 'ativa', 'paused' => 'suspensa', 'cancelled' => 'encerrada', default => null };
-                    if ($subscriptionStatus) DB::table('subscriptions')->where('id', $alert->subscription_id)->update(['status' => $subscriptionStatus, 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
+                    $subscription = DB::table('subscriptions')->where('id', $alert->subscription_id)->lockForUpdate()->first();
+                    if ($subscriptionStatus && $subscription && $subscription->status !== $subscriptionStatus) {
+                        DB::table('subscriptions')->where('id', $subscription->id)->update(['status' => $subscriptionStatus, 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
+                        app(AuditRecorder::class)->company($subscription->company_id, $admin->id, 'subscription', $subscription->id, 'update', ['status' => $subscription->status], ['status' => $subscriptionStatus], reason: $reason, actorType: 'admin');
+                        $audit->record($admin->id, 'billing.subscription_reconciled', 'subscription', $subscription->id, $subscription->company_id, $reason, before: ['status' => $subscription->status], after: ['status' => $subscriptionStatus]);
+                    }
                 }
                 $status = 'corrigida';
                 $auditAction = 'billing.reconciliation_corrected';
@@ -93,10 +103,14 @@ class BillingReconciliationManager
     {
         $fingerprint = hash('sha256', implode('|', [$subscription->id, $type, $internal, $remote]));
         if ($dryRun || DB::table('payment_reconciliation_alerts')->where('fingerprint', $fingerprint)->whereIn('status', ['aberta', 'em_revisao'])->exists()) return 0;
+        $id = PrefixedUlid::make('RCA');
         DB::table('payment_reconciliation_alerts')->insert([
-            'id' => PrefixedUlid::make('RCA'), 'company_id' => $subscription->company_id, 'subscription_id' => $subscription->id, 'fingerprint' => $fingerprint,
+            'id' => $id, 'company_id' => $subscription->company_id, 'subscription_id' => $subscription->id, 'fingerprint' => $fingerprint,
             'type' => $type, 'internal_status' => $internal, 'mercado_pago_status' => $remote, 'impact' => $impact, 'status' => 'aberta', 'opened_at' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]);
+        app(AuditRecorder::class)->platform(null, 'billing.reconciliation_alert_opened', 'payment_reconciliation_alert', $id, $subscription->company_id,
+            'Divergência identificada na conciliação com o Mercado Pago.', after: ['type' => $type, 'internal_status' => $internal, 'mercado_pago_status' => $remote, 'impact' => $impact, 'status' => 'aberta'],
+            actorType: 'system', channel: 'scheduler', originContext: 'fokus:reconcile-mercado-pago');
         return 1;
     }
 }

@@ -4,12 +4,13 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Http\Request;
 
 class PendingSubscriptionVoucher
 {
     public function __construct(private readonly VoucherManager $vouchers, private readonly MercadoPagoClient $mercadoPago, private readonly SubscriptionChangeManager $changes) {}
 
-    public function activate(string $subscriptionId, string $code): array
+    public function activate(string $subscriptionId, string $code, ?string $adminId = null, ?Request $request = null): array
     {
         $subscription = DB::table('subscriptions')->where('id', $subscriptionId)->first();
         abort_unless($subscription, 404, 'Assinatura não encontrada.');
@@ -34,7 +35,7 @@ class PendingSubscriptionVoucher
             'base_amount' => (float) $payment->amount, 'discount_amount' => (float) $payment->amount, 'final_amount' => 0,
             'billing_cycle' => $subscription->billing_cycle, 'benefit_duration' => $voucher->benefit_duration,
             'company_id' => $subscription->company_id, 'subscription_id' => $subscriptionId, 'module_codes' => $moduleCodes,
-        ]);
+        ], $adminId, $request, 'admin');
         $this->vouchers->attachSubscription($reservation->id, $subscriptionId);
         try {
             $remote = $this->mercadoPago->getPreapproval((string) $subscription->provider_subscription_id);
@@ -43,15 +44,15 @@ class PendingSubscriptionVoucher
                 $this->mercadoPago->updatePreapproval((string) $subscription->provider_subscription_id, ['status' => 'cancelled'], 'trial-'.$subscriptionId);
             }
         } catch (\Throwable $exception) {
-            $this->vouchers->release($reservation->id);
+            $this->vouchers->release($reservation->id, 'released', $adminId, $request, 'admin');
             throw $exception;
         }
 
         try {
-            DB::transaction(function () use ($subscriptionId, $subscription, $payment, $reservation): void {
+            DB::transaction(function () use ($subscriptionId, $subscription, $payment, $reservation, $adminId, $request): void {
             $current = DB::table('subscriptions')->where('id', $subscriptionId)->lockForUpdate()->first();
             abort_unless($current && $current->status === 'aguardando_pagamento' && $current->provider_subscription_id === $subscription->provider_subscription_id, 409, 'A assinatura mudou durante a ativação.');
-            $this->vouchers->confirmForSubscription($subscriptionId);
+            $this->vouchers->confirmForSubscription($subscriptionId, $adminId, 'admin', 'http', request: $request);
             $redemption = DB::table('voucher_redemptions')->where('subscription_id', $subscriptionId)->latest('created_at')->first();
             abort_unless($redemption && $redemption->benefit_ends_at, 422, 'Não foi possível confirmar o benefício gratuito.');
             $commercial = $this->changes->snapshot($current);
@@ -74,9 +75,18 @@ class PendingSubscriptionVoucher
                 'provider_payload_sanitized' => json_encode(['preapproval_id' => $subscription->provider_subscription_id, 'cancelled_for_trial_free_voucher' => true]),
                 'updated_at' => now(), 'version' => DB::raw('version + 1'),
             ]);
+            $actorType = $adminId ? 'admin' : 'customer';
+            $reason = 'Voucher gratuito aplicado à assinatura; cobrança pendente cancelada.';
+            $recorder = app(AuditRecorder::class);
+            $recorder->company($current->company_id, $adminId, 'subscription', $current->id, 'update', ['status' => $current->status], ['status' => 'ativa', 'amount' => 0], reason: $reason, actorType: $actorType, request: $request);
+            $recorder->company($payment->company_id, $adminId, 'payment', $payment->id, 'update', ['status' => $payment->status, 'amount' => $payment->amount], ['status' => 'cancelado', 'amount' => $payment->amount], reason: $reason, actorType: $actorType, request: $request);
+            $recorder->platform($adminId, 'billing.subscription_activated_by_trial_voucher', 'subscription', $current->id, $current->company_id, $reason,
+                before: ['status' => $current->status], after: ['status' => 'ativa', 'amount' => 0], actorType: $actorType, request: $request);
+            $recorder->platform($adminId, 'billing.payment_cancelled_by_trial_voucher', 'payment', $payment->id, $payment->company_id, $reason,
+                before: ['status' => $payment->status, 'amount' => $payment->amount], after: ['status' => 'cancelado', 'amount' => $payment->amount], actorType: $actorType, request: $request);
             });
         } catch (\Throwable $exception) {
-            $this->vouchers->release($reservation->id);
+            $this->vouchers->release($reservation->id, 'released', $adminId, $request, 'admin');
             throw $exception;
         }
         $redemption = DB::table('voucher_redemptions')->where('subscription_id', $subscriptionId)->latest('created_at')->first();
@@ -90,8 +100,17 @@ class PendingSubscriptionVoucher
             ->where('voucher.discount_type', 'trial_free')->where('subscription.status', 'ativa')
             ->whereNull('subscription.provider_subscription_id')->where('redemption.benefit_ends_at', '<=', now())
             ->pluck('subscription.id');
-        return DB::table('subscriptions')->whereIn('id', $ids)->where('status', 'ativa')->update([
-            'status' => 'suspensa', 'updated_at' => now(), 'version' => DB::raw('version + 1'),
-        ]);
+        $suspended = 0;
+        foreach ($ids as $id) {
+            $subscription = DB::table('subscriptions')->where('id', $id)->where('status', 'ativa')->first();
+            if (! $subscription) continue;
+            DB::table('subscriptions')->where('id', $id)->update(['status' => 'suspensa', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
+            $redemption = DB::table('voucher_redemptions')->where('subscription_id', $id)->latest('created_at')->first();
+            $reason = 'Benefício temporário do voucher expirou.';
+            app(AuditRecorder::class)->company($subscription->company_id, null, 'subscription', $id, 'update', ['status' => 'ativa'], ['status' => 'suspensa'], reason: $reason, actorType: 'system', channel: 'scheduler', originContext: 'fokus:suspend-expired-voucher-subscriptions');
+            app(AuditRecorder::class)->platform(null, 'billing.subscription_trial_expired', 'subscription', $id, $subscription->company_id, $reason, before: ['status' => 'ativa', 'benefit_ends_at' => $redemption?->benefit_ends_at], after: ['status' => 'suspensa'], actorType: 'system', channel: 'scheduler', originContext: 'fokus:suspend-expired-voucher-subscriptions');
+            $suspended++;
+        }
+        return $suspended;
     }
 }

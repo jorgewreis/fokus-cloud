@@ -100,7 +100,7 @@ class SubscriptionChangeManager
                 'items_snapshot' => json_encode($after['items'] ?? []),
                 'before_snapshot' => json_encode($before),
                 'after_snapshot' => json_encode($after),
-                'reason' => $data['reason'],
+                'reason' => app(AuditSanitizer::class)->sanitizeText((string) $data['reason']),
                 'requested_by_platform_admin_id' => $admin->id,
                 'created_at' => now(),
                 'updated_at' => now(),

@@ -150,11 +150,6 @@ class CompanyUserController extends Controller
 
     private function audit(string $companyId, string $actorId, string $entityType, string $entityId, string $operation, ?array $before, ?array $after): void
     {
-        DB::table('audit_events')->insert([
-            'id' => PrefixedUlid::make('AUD'), 'company_id' => $companyId, 'actor_user_id' => $actorId,
-            'entity_type' => $entityType, 'entity_id' => $entityId, 'operation' => $operation,
-            'before_masked' => $before ? json_encode($before) : null, 'after_masked' => $after ? json_encode($after) : null,
-            'expires_at' => now()->addDays(180), 'created_at' => now(),
-        ]);
+        app(\App\Services\AuditRecorder::class)->company($companyId, $actorId, $entityType, $entityId, $operation, $before, $after, request: request());
     }
 }

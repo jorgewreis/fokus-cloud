@@ -30,6 +30,7 @@ Migrations ja existentes relacionadas ao modelo:
 
 - `2026_08_06_000300_create_governance_tables.php`: cria `payments`, `audit_events` e `support_accesses`.
 - `2026_08_08_000600_create_backoffice_and_commercial_governance_tables.php`: cria `platform_admins`, `platform_login_challenges`, `platform_audit_events`, `vouchers`, `voucher_redemptions`, `subscription_changes`, `usage_snapshots` e campos de recorrencia em `subscriptions`.
+- `2026_09_24_000100_unify_audit_contract_and_scrub_legacy_data.php`: adiciona origem e ator tipados às duas trilhas de auditoria, sanitiza eventos técnicos históricos, preenche expiração de 180 dias e remove o payload bruto legado de pagamentos.
 - `2026_08_31_000100_recreate_fokus_law_catalog.php`: recria o catalogo Law
   para os cinco modulos, interrompendo a operacao quando houver itens de
   assinatura dependentes e preservando o historico comercial.

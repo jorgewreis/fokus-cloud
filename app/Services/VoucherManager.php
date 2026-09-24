@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Http\Request;
 
 class VoucherManager
 {
@@ -57,9 +58,9 @@ class VoucherManager
         };
     }
 
-    public function reserve(object $voucher, string $companyId, string $requestKey, array $snapshot): object
+    public function reserve(object $voucher, string $companyId, string $requestKey, array $snapshot, ?string $actorId = null, ?Request $request = null, string $actorType = 'customer'): object
     {
-        return DB::transaction(function () use ($voucher, $companyId, $requestKey, $snapshot): object {
+        return DB::transaction(function () use ($voucher, $companyId, $requestKey, $snapshot, $actorId, $request, $actorType): object {
             $existing = DB::table('voucher_redemption_reservations')->where('request_key', $requestKey)->first();
             if ($existing) {
                 return $existing;
@@ -89,7 +90,16 @@ class VoucherManager
                 'updated_at' => now(),
             ]);
 
-            return DB::table('voucher_redemption_reservations')->where('id', $id)->first();
+            $reservation = DB::table('voucher_redemption_reservations')->where('id', $id)->first();
+            $after = ['status' => 'pending', 'voucher_id' => $voucher->id, 'subscription_id' => $snapshot['subscription_id'] ?? null, 'discount_amount' => $snapshot['discount_amount'] ?? null, 'expires_at' => $reservation->expires_at];
+            if ($actorType === 'admin') {
+                app(AuditRecorder::class)->platform($actorId, 'billing.voucher_redemption_reserved', 'voucher_redemption_reservation', $id, $companyId,
+                    'Voucher reservado para ativação de assinatura.', after: $after, request: $request, actorType: 'admin');
+            } else {
+                app(AuditRecorder::class)->company($companyId, $actorId, 'voucher_redemption_reservation', $id, 'create', null, $after,
+                    reason: 'Voucher reservado durante o checkout.', request: $request, actorType: $actorType);
+            }
+            return $reservation;
         });
     }
 
@@ -101,18 +111,27 @@ class VoucherManager
         ]);
     }
 
-    public function release(string $reservationId, string $status = 'released'): void
+    public function release(string $reservationId, string $status = 'released', ?string $actorId = null, ?Request $request = null, string $actorType = 'system', string $channel = 'http'): void
     {
+        $reservation = DB::table('voucher_redemption_reservations')->where('id', $reservationId)->where('status', 'pending')->first();
+        if (! $reservation) return;
         DB::table('voucher_redemption_reservations')->where('id', $reservationId)->where('status', 'pending')->update([
             'status' => $status,
             'released_at' => now(),
             'updated_at' => now(),
         ]);
+        $after = ['status' => $status, 'voucher_id' => $reservation->voucher_id, 'subscription_id' => $reservation->subscription_id];
+        if ($actorType === 'admin' || $actorType === 'system') {
+            app(AuditRecorder::class)->platform($actorId, 'billing.voucher_redemption_released', 'voucher_redemption_reservation', $reservation->id, $reservation->company_id,
+                'Reserva de voucher liberada após falha ou cancelamento.', before: ['status' => 'pending'], after: $after, request: $request, actorType: $actorType, channel: $channel);
+        }
+        app(AuditRecorder::class)->company($reservation->company_id, $actorType === 'customer' ? $actorId : null, 'voucher_redemption_reservation', $reservation->id, 'update',
+            ['status' => 'pending'], $after, reason: 'Reserva de voucher liberada após falha ou cancelamento.', request: $request, actorType: $actorType, channel: $channel);
     }
 
-    public function confirmForSubscription(string $subscriptionId): void
+    public function confirmForSubscription(string $subscriptionId, ?string $actorId = null, string $actorType = 'gateway', string $channel = 'webhook', ?string $correlationId = null, ?Request $request = null): void
     {
-        DB::transaction(function () use ($subscriptionId): void {
+        DB::transaction(function () use ($subscriptionId, $actorId, $actorType, $channel, $correlationId, $request): void {
             $reservation = DB::table('voucher_redemption_reservations')->where('subscription_id', $subscriptionId)->where('status', 'pending')->lockForUpdate()->first();
             if (! $reservation || ($reservation->expires_at && now()->gt($reservation->expires_at))) {
                 if ($reservation) {
@@ -146,15 +165,33 @@ class VoucherManager
                 'created_at' => now(),
             ]);
             DB::table('voucher_redemption_reservations')->where('id', $reservation->id)->update(['status' => 'confirmed', 'confirmed_at' => now(), 'updated_at' => now()]);
+            $after = ['status' => 'confirmed', 'voucher_id' => $reservation->voucher_id, 'subscription_id' => $subscriptionId, 'discount_amount' => (float) ($snapshot['discount_amount'] ?? 0), 'benefit_ends_at' => $endsAt?->toISOString()];
+            if ($actorType === 'admin' || $actorType === 'gateway' || $actorType === 'system') {
+                app(AuditRecorder::class)->platform($actorId, 'billing.voucher_redemption_confirmed', 'voucher_redemption', $redemptionId, $reservation->company_id,
+                    'Resgate de voucher confirmado na assinatura.', metadata: ['reservation_id' => $reservation->id], after: $after, request: $request, actorType: $actorType,
+                    channel: $channel, originContext: $channel === 'webhook' ? '/api/webhooks/mercado-pago' : null, correlationId: $correlationId);
+            }
+            app(AuditRecorder::class)->company($reservation->company_id, $actorType === 'customer' ? $actorId : null, 'voucher_redemption', $redemptionId, 'create', null, $after,
+                reason: 'Resgate de voucher confirmado na assinatura.', request: $request, actorType: $actorType, channel: $channel,
+                originContext: $channel === 'webhook' ? '/api/webhooks/mercado-pago' : null, correlationId: $correlationId);
         });
     }
 
-    public function releaseForSubscription(string $subscriptionId): void
+    public function releaseForSubscription(string $subscriptionId, ?string $correlationId = null): void
     {
-        DB::table('voucher_redemption_reservations')->where('subscription_id', $subscriptionId)->where('status', 'pending')->update([
-            'status' => 'released',
-            'released_at' => now(),
-            'updated_at' => now(),
-        ]);
+        DB::transaction(function () use ($subscriptionId, $correlationId): void {
+            $reservations = DB::table('voucher_redemption_reservations')->where('subscription_id', $subscriptionId)->where('status', 'pending')->lockForUpdate()->get();
+            foreach ($reservations as $reservation) {
+                DB::table('voucher_redemption_reservations')->where('id', $reservation->id)->where('status', 'pending')->update([
+                    'status' => 'released', 'released_at' => now(), 'updated_at' => now(),
+                ]);
+                $after = ['status' => 'released', 'voucher_id' => $reservation->voucher_id, 'subscription_id' => $subscriptionId];
+                app(AuditRecorder::class)->company($reservation->company_id, null, 'voucher_redemption_reservation', $reservation->id, 'update', ['status' => 'pending'], $after,
+                    reason: 'Reserva liberada após falha, recusa ou cancelamento da cobrança.', actorType: 'gateway', channel: 'webhook', originContext: '/api/webhooks/mercado-pago', correlationId: $correlationId);
+                app(AuditRecorder::class)->platform(null, 'billing.voucher_redemption_released', 'voucher_redemption_reservation', $reservation->id, $reservation->company_id,
+                    'Reserva liberada após falha, recusa ou cancelamento da cobrança.', before: ['status' => 'pending'], after: $after, actorType: 'gateway', channel: 'webhook',
+                    originContext: '/api/webhooks/mercado-pago', correlationId: $correlationId);
+            }
+        });
     }
 }

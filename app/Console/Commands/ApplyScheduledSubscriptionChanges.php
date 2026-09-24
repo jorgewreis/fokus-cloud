@@ -21,7 +21,7 @@ class ApplyScheduledSubscriptionChanges extends Command
             if ($result) {
                 $applied++;
                 $subscription = DB::table('subscriptions')->where('id', $change->subscription_id)->first();
-                $audit->record(null, 'subscription_change_applied', 'subscription', $change->subscription_id, $subscription?->company_id, 'Aplicação automática da alteração agendada', metadata: ['change_id' => $change->id, 'type' => $change->type], before: $result['before'], after: $result['after']);
+                $audit->record(null, 'subscription_change_applied', 'subscription', $change->subscription_id, $subscription?->company_id, 'Aplicação automática da alteração agendada', metadata: ['change_id' => $change->id, 'type' => $change->type], before: $result['before'], after: $result['after'], actorType: 'system', channel: 'scheduler', originContext: 'fokus:apply-subscription-changes');
             }
         }
         $this->info("Alterações aplicadas: {$applied}");

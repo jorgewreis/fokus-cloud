@@ -113,10 +113,13 @@ class BackofficeController extends Controller
                 $entityLabels = [
                     'company' => 'Empresa', 'product' => 'Produto', 'module' => 'Módulo', 'plan' => 'Plano',
                     'subscription' => 'Assinatura', 'payment' => 'Pagamento', 'voucher' => 'Voucher',
+                    'voucher_redemption' => 'Resgate de voucher', 'voucher_redemption_reservation' => 'Reserva de voucher',
                     'platform_admin' => 'Administrador', 'user' => 'Usuário', 'refund_request' => 'Reembolso',
                     'catalog_publication' => 'Publicação',
                 ];
                 $area = match (true) {
+                    str_starts_with($event->action, 'billing.voucher_') => ['label' => 'Vouchers', 'icon' => 'vouchers'],
+                    str_starts_with($event->action, 'billing.subscription_') => ['label' => 'Assinaturas', 'icon' => 'subscriptions'],
                     str_starts_with($event->action, 'backoffice.company_') => ['label' => 'Empresas', 'icon' => 'companies'],
                     str_starts_with($event->action, 'backoffice.catalog_'), str_starts_with($event->action, 'backoffice.plan_') => ['label' => 'Catálogo', 'icon' => 'catalog'],
                     str_starts_with($event->action, 'backoffice.subscription_') => ['label' => 'Assinaturas', 'icon' => 'subscriptions'],
@@ -127,6 +130,12 @@ class BackofficeController extends Controller
                     default => ['label' => 'Dashboard', 'icon' => 'dashboard'],
                 };
                 $operation = match (true) {
+                    $event->action === 'billing.payment_status_updated' => ['label' => 'Status do pagamento atualizado', 'tone' => 'alteration'],
+                    $event->action === 'billing.payment_created_by_assisted_checkout' => ['label' => 'Pagamento criado', 'tone' => 'creation'],
+                    $event->action === 'billing.subscription_status_updated' => ['label' => 'Status da assinatura atualizado', 'tone' => 'alteration'],
+                    $event->action === 'billing.voucher_redemption_confirmed' => ['label' => 'Voucher resgatado', 'tone' => 'publication'],
+                    $event->action === 'billing.voucher_redemption_released' => ['label' => 'Reserva de voucher liberada', 'tone' => 'alteration'],
+                    $event->action === 'billing.reconciliation_alert_opened' => ['label' => 'Divergência identificada', 'tone' => 'warning'],
                     $event->action === 'backoffice.subscription_public_name_updated' => ['label' => 'Atualizada', 'tone' => 'alteration'],
                     str_ends_with($event->action, 'subscription_suspensao') => ['label' => 'Suspensa', 'tone' => 'pause'],
                     str_ends_with($event->action, 'subscription_reativacao') => ['label' => 'Reativada', 'tone' => 'publication'],
@@ -256,8 +265,9 @@ class BackofficeController extends Controller
                     if ($changes !== []) $detail = implode(' ', array_slice($changes, 0, 2));
                     elseif ($statusBefore && $statusAfter && $statusBefore !== $statusAfter) $detail = "Status alterado de {$displayValue($statusBefore, 'status')} para {$displayValue($statusAfter, 'status')}.";
                 }
-                if (! $detail && $event->reason && ! in_array($event->action, ['backoffice.catalog_product_updated', 'backoffice.catalog_module_updated', 'backoffice.plan_updated', 'backoffice.voucher_updated'], true)) {
-                    $detail = 'Motivo: '.trim((string) $event->reason);
+                $reasonText = trim((string) ($event->reason ?? ''));
+                if (! $detail && $reasonText !== '' && $reasonText !== 'Não aplicável a esta classe de evento.' && ! in_array($event->action, ['backoffice.catalog_product_updated', 'backoffice.catalog_module_updated', 'backoffice.plan_updated', 'backoffice.voucher_updated'], true)) {
+                    $detail = $event->action === 'backoffice.company_created' && str_ends_with($reasonText, 'no sistema.') ? $reasonText : 'Motivo: '.$reasonText;
                 }
                 if (! $detail && str_contains($event->action, 'published')) $detail = isset(json_decode((string) $event->metadata, true)['version']) ? 'Versão '.json_decode((string) $event->metadata, true)['version'].' publicada.' : 'Nova versão publicada.';
                 if (! $detail && str_ends_with($event->action, '_created')) $detail = $entityLabel.' '.(in_array($entityType, ['company', 'subscription'], true) ? 'criada' : 'criado').' no sistema.';
@@ -462,7 +472,7 @@ class BackofficeController extends Controller
                 ]);
             }
 
-            $audit->record($request->user()->id, 'backoffice.company_created', 'company', $companyId, $companyId, metadata: ['admin_id' => $user->id], after: ['id' => $companyId, 'legal_name' => $data['legal_name'], 'status' => 'ativa'], request: $request);
+            $audit->record($request->user()->id, 'backoffice.company_created', 'company', $companyId, $companyId, 'Empresa criada no sistema.', metadata: ['admin_id' => $user->id], after: ['id' => $companyId, 'legal_name' => $data['legal_name'], 'status' => 'ativa'], request: $request);
 
             return $companyId;
         });
@@ -1007,9 +1017,14 @@ class BackofficeController extends Controller
     public function publishCatalog(Request $request, string $product, CatalogManager $catalog, PlatformAudit $audit)
     {
         $data = $request->validate(['reason' => ['nullable', 'string', 'max:1000']]);
-        $reason = trim((string) ($data['reason'] ?? '')) ?: 'Publicação do catálogo pelo Backoffice.';
+        $reason = app(\App\Services\AuditSanitizer::class)->sanitizeText(trim((string) ($data['reason'] ?? '')) ?: 'Publicação do catálogo pelo Backoffice.');
+        $productBefore = DB::table('products')->where('id', $product)->first();
+        abort_unless($productBefore, 404, 'Produto não encontrado.');
+        $previousPublication = DB::table('catalog_publications')->where('product_id', $product)->orderByDesc('version')->first();
         $publication = $catalog->publish($product, $request->user()->id, $reason);
-        $audit->record($request->user()->id, 'backoffice.catalog_published', 'product', $product, reason: $reason, metadata: ['version' => $publication['version']], request: $request);
+        $audit->record($request->user()->id, 'backoffice.catalog_published', 'product', $product, reason: $reason, metadata: ['version' => $publication['version']],
+            before: ['published_version' => $previousPublication?->version, 'publication_pending' => (bool) $productBefore->publication_pending, 'catalog_snapshot' => $previousPublication ? json_decode($previousPublication->snapshot, true) : []],
+            after: ['published_version' => $publication['version'], 'publication_pending' => false, 'catalog_snapshot' => $publication['snapshot']], request: $request);
 
         return response()->json(['message' => 'Catálogo publicado.', 'version' => $publication['version']]);
     }
@@ -1588,7 +1603,7 @@ class BackofficeController extends Controller
         $data = $request->validate(['name' => ['required', 'string', 'max:255'], 'email' => ['required', 'email:rfc', 'max:255', 'unique:platform_admins,email'], 'password' => ['required', 'string', 'min:12', 'confirmed']]);
         $admin = PlatformAdmin::create(['id' => PrefixedUlid::make('PAD'), 'name' => $data['name'], 'email' => strtolower($data['email']), 'password' => Hash::make($data['password']), 'status' => 'ativo', 'email_verified_at' => now()]);
         Mail::raw('Uma conta de superadministrador do backoffice Fokus Cloud foi criada para você. Use a senha entregue por canal seguro e o código enviado por e-mail para entrar.', fn ($mail) => $mail->to($admin->email)->subject('Fokus Cloud: acesso ao backoffice criado'));
-        $audit->record($request->user()->id, 'backoffice.admin_created', 'platform_admin', $admin->id, reason: 'Criação de superadministrador', request: $request);
+        $audit->record($request->user()->id, 'backoffice.admin_created', 'platform_admin', $admin->id, reason: 'Criação de superadministrador', after: ['name' => $admin->name, 'email' => $admin->email, 'status' => $admin->status], request: $request);
         return response()->json(['id' => $admin->id, 'message' => 'Superadministrador criado.'], 201);
     }
 
@@ -1631,7 +1646,7 @@ class BackofficeController extends Controller
         }
         $id = PrefixedUlid::make('VCH');
         DB::table('vouchers')->insert([...$data, 'id' => $id, 'code' => strtoupper($data['code']), 'module_codes' => isset($data['module_codes']) ? json_encode($data['module_codes']) : null, 'status' => $data['status'] ?? 'ativa', 'created_by_platform_admin_id' => $request->user()->id, 'created_at' => now(), 'updated_at' => now()]);
-        $audit->record($request->user()->id, 'backoffice.voucher_created', 'voucher', $id, reason: 'Criação de voucher', request: $request);
+        $audit->record($request->user()->id, 'backoffice.voucher_created', 'voucher', $id, reason: 'Criação de voucher', after: ['name' => $data['name'] ?? null, 'discount_type' => $data['discount_type'], 'discount_value' => $data['discount_value'], 'product_id' => $data['product_id'] ?? null, 'plan_id' => $data['plan_id'] ?? null, 'status' => $data['status'] ?? 'ativa'], request: $request);
         return response()->json(['id' => $id, 'code' => $data['code'], 'message' => 'Voucher criado.'], 201);
     }
 
@@ -1730,7 +1745,7 @@ class BackofficeController extends Controller
             $voucher,
             reason: $editableFields === [] ? ($data['status'] === 'ativa' ? 'Reativação de voucher' : 'Pausa de voucher') : 'Atualização de voucher',
             before: (array) $current,
-            after: $data,
+            after: array_intersect_key($merged, array_flip(['name', 'discount_type', 'discount_value', 'product_id', 'plan_id', 'base_amount', 'benefit_duration', 'redemption_limit', 'redemption_limit_per_company', 'starts_at', 'ends_at', 'status', 'origin', 'notes'])),
             request: $request,
         );
 
@@ -1743,7 +1758,7 @@ class BackofficeController extends Controller
         $current = DB::table('vouchers')->where('id', $voucher)->first();
         abort_unless($current, 404, 'Voucher não encontrado.');
         DB::table('vouchers')->where('id', $voucher)->update(['status' => 'encerrada', 'updated_at' => now()]);
-        $audit->record($request->user()->id, 'backoffice.voucher_archived', 'voucher', $voucher, reason: $data['reason'], before: (array) $current, request: $request);
+        $audit->record($request->user()->id, 'backoffice.voucher_archived', 'voucher', $voucher, reason: $data['reason'], before: (array) $current, after: ['status' => 'encerrada'], request: $request);
 
         return response()->json(['message' => 'Voucher arquivado.']);
     }
@@ -1761,7 +1776,7 @@ class BackofficeController extends Controller
         abort_if(DB::table('voucher_redemption_reservations')->where('voucher_id', $voucher)->where('status', 'pending')->exists(), 422, 'Voucher possui uma reserva de checkout pendente. Aguarde a expiração ou arquive-o.');
 
         DB::table('vouchers')->where('id', $voucher)->delete();
-        $audit->record($request->user()->id, 'backoffice.voucher_deleted', 'voucher', $voucher, reason: $data['reason'], request: $request);
+        $audit->record($request->user()->id, 'backoffice.voucher_deleted', 'voucher', $voucher, reason: $data['reason'], before: ['name' => $current->name, 'discount_type' => $current->discount_type, 'discount_value' => $current->discount_value, 'product_id' => $current->product_id, 'plan_id' => $current->plan_id, 'status' => $current->status], after: null, request: $request);
 
         return response()->noContent();
     }

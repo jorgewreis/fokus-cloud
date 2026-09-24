@@ -120,8 +120,8 @@ class PlatformAuthController extends Controller
         if ($supportId) {
             $support = DB::table('platform_support_sessions')->where('id', $supportId)->whereNull('ended_at')->first();
             if ($support) {
-                DB::table('platform_support_sessions')->where('id', $supportId)->update(['ended_at' => now(), 'end_ip' => $request->ip(), 'end_user_agent' => $request->userAgent(), 'updated_at' => now()]);
-                $audit->record($adminId, 'backoffice.support_access_ended', 'platform_support_session', $supportId, $support->company_id, 'Sessão encerrada ao sair do Backoffice.', request: $request);
+                DB::table('platform_support_sessions')->where('id', $supportId)->update(['ended_at' => now(), 'end_ip' => $request->ip(), 'end_user_agent' => app(\App\Services\AuditSanitizer::class)->sanitizeText((string) $request->userAgent()), 'updated_at' => now()]);
+                $audit->record($adminId, 'backoffice.support_access_ended', 'platform_support_session', $supportId, $support->company_id, 'Sessão encerrada ao sair do Backoffice.', before: ['status' => 'active'], after: ['status' => 'ended'], request: $request);
             }
         }
         $audit->record($adminId, 'backoffice.logout', request: $request);

@@ -13,8 +13,8 @@ class PruneExpiredData extends Command
     public function handle(): int
     {
         $tokens = DB::table('security_tokens')->where('expires_at', '<', now()->subDays(90))->delete();
-        $audits = DB::table('audit_events')->where('expires_at', '<', now())->delete();
-        $platformAudits = DB::table('platform_audit_events')->where('expires_at', '<', now())->delete();
+        $audits = DB::table('audit_events')->where('expires_at', '<=', now())->delete();
+        $platformAudits = DB::table('platform_audit_events')->where('expires_at', '<=', now())->delete();
         $platformChallenges = DB::table('platform_login_challenges')->where('expires_at', '<', now())->delete();
         $platformAttempts = DB::table('platform_login_attempts')->where('created_at', '<', now()->subDays(180))->delete();
         $platformInvitations = DB::table('platform_admin_invitations')->where('expires_at', '<', now()->subDays(90))->delete();

@@ -67,5 +67,12 @@ momento da ação, a decisão sobre o antigo admin e o resultado da confirmaçã
   e [Isolamento e governança](../06-data/data-isolation-and-governance.md).
 - Registrar eventos de criação, alteração, remoção, restauração e transferência
   de vínculos em auditoria mascarada, com retenção de 180 dias.
+- Usar o contrato comum de auditoria para classificar ator e origem técnica,
+  registrar motivo ou não aplicabilidade, estados anteriores/posteriores e
+  expiração calculada a partir da data do evento.
+- Nunca persistir em auditoria, logs ou evidências senhas, tokens, códigos MFA,
+  CPF/CNPJ completo, dados de cartão ou payload bruto do provedor. Payloads e
+  mensagens de erro técnicos devem ser allowlisted ou sanitizados antes de
+  gravar.
 - Invalidar tokens anteriores da mesma finalidade ao reenviar um link e marcar
   o token aceito em transação, impedindo reutilização concorrente.

@@ -11,6 +11,13 @@ Este arquivo deve descrever tabelas, colunas, tipos, obrigatoriedade e significa
 | platform_admins | role | enum | Sim | Perfil interno do Backoffice: `superadministrador` ou `administrador_comercial`. |
 | platform_admins | status | enum | Sim | Estado da conta interna: `ativo`, `bloqueado`, `suspenso` ou `desativado`. |
 | platform_audit_events | expires_at | timestamp | Sim | Data de expiracao da auditoria do Backoffice, com retencao de 180 dias. |
+| platform_audit_events | actor_type | enum | Sim | Tipo de ator auditado: anonimo, administrador, cliente, gateway ou sistema. |
+| platform_audit_events | origin_channel | enum | Sim | Origem tipada: HTTP, webhook, scheduler, CLI ou sistema. |
+| platform_audit_events | correlation_id | string | Nao | Identificador técnico de correlação sanitizado. |
+| platform_audit_events | reason | text | Sim | Motivo sanitizado ou indicação explícita de não aplicabilidade. |
+| audit_events | expires_at | timestamp | Sim | Data de expiracao da auditoria da empresa, 180 dias após a criação. |
+| audit_events | actor_type | enum | Sim | Tipo do ator que iniciou a ação auditada. |
+| audit_events | metadata | json | Nao | Campos tecnicos e lista explícita de campos não aplicáveis ao evento. |
 | platform_alerts | queue | enum | Sim | Fila operacional do alerta: financeiro, seguranca, catalogo, suporte interno ou auditoria/revisao. |
 | platform_alerts | due_at | timestamp | Sim | Prazo limite de atendimento conforme severidade. |
 | platform_alert_comments | expires_at | timestamp | Sim | Data de expiracao do comentario operacional, com retencao de 90 dias. |

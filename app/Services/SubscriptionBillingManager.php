@@ -6,9 +6,9 @@ use Illuminate\Support\Facades\DB;
 
 class SubscriptionBillingManager
 {
-    public function applyPayment(string $paymentId, array $remote, string $status): ?object
+    public function applyPayment(string $paymentId, array $remote, string $status, ?string $correlationId = null): ?object
     {
-        return DB::transaction(function () use ($paymentId, $remote, $status): ?object {
+        return DB::transaction(function () use ($paymentId, $remote, $status, $correlationId): ?object {
             $payment = DB::table('payments')->where('id', $paymentId)->lockForUpdate()->first();
             if (! $payment) {
                 return null;
@@ -38,6 +38,14 @@ class SubscriptionBillingManager
                 $paymentUpdates['paid_at'] = $remote['date_approved'];
             }
             DB::table('payments')->where('id', $payment->id)->update($paymentUpdates);
+            if ($payment->status !== $status) {
+                app(AuditRecorder::class)->company($payment->company_id, null, 'payment', $payment->id, 'update',
+                    ['status' => $payment->status, 'amount' => (float) $payment->amount], ['status' => $status, 'amount' => (float) $payment->amount],
+                    reason: 'Estado confirmado pelo Mercado Pago.', actorType: 'gateway', channel: 'webhook', originContext: '/api/webhooks/mercado-pago', correlationId: $correlationId);
+                app(AuditRecorder::class)->platform(null, 'billing.payment_status_updated', 'payment', $payment->id, $payment->company_id,
+                    'Estado confirmado pelo Mercado Pago.', metadata: ['source' => 'mercado_pago'], before: ['status' => $payment->status], after: ['status' => $status],
+                    actorType: 'gateway', channel: 'webhook', originContext: '/api/webhooks/mercado-pago', correlationId: $correlationId);
+            }
 
             if ($subscription) {
                 $subscriptionUpdates = ['provider_synced_at' => $now, 'updated_at' => $now, 'version' => DB::raw('version + 1')];
@@ -53,6 +61,14 @@ class SubscriptionBillingManager
                     $subscriptionUpdates['status'] = 'cancelamento_agendado';
                 }
                 DB::table('subscriptions')->where('id', $subscription->id)->update($subscriptionUpdates);
+                if (isset($subscriptionUpdates['status']) && $subscriptionUpdates['status'] !== $subscription->status) {
+                    app(AuditRecorder::class)->company($subscription->company_id, null, 'subscription', $subscription->id, 'update',
+                        ['status' => $subscription->status], ['status' => $subscriptionUpdates['status']], reason: 'Estado atualizado após confirmação do pagamento pelo Mercado Pago.',
+                        actorType: 'gateway', channel: 'webhook', originContext: '/api/webhooks/mercado-pago', correlationId: $correlationId);
+                    app(AuditRecorder::class)->platform(null, 'billing.subscription_status_updated', 'subscription', $subscription->id, $subscription->company_id,
+                        'Estado atualizado após confirmação do pagamento pelo Mercado Pago.', before: ['status' => $subscription->status], after: ['status' => $subscriptionUpdates['status']],
+                        actorType: 'gateway', channel: 'webhook', originContext: '/api/webhooks/mercado-pago', correlationId: $correlationId);
+                }
             }
 
             return $subscription;
@@ -69,6 +85,12 @@ class SubscriptionBillingManager
                     'updated_at' => now(),
                     'version' => DB::raw('version + 1'),
                 ]);
+                app(AuditRecorder::class)->company($subscription->company_id, null, 'subscription', $subscription->id, 'update',
+                    ['status' => $subscription->status, 'grace_ends_at' => $subscription->grace_ends_at], ['status' => 'suspensa'],
+                    reason: 'Prazo de tolerância de pagamento expirado.', actorType: 'system', channel: 'scheduler', originContext: 'fokus:expire-subscription-tolerance');
+                app(AuditRecorder::class)->platform(null, 'billing.subscription_suspended_for_delinquency', 'subscription', $subscription->id, $subscription->company_id,
+                    'Prazo de tolerância de pagamento expirado.', before: ['status' => $subscription->status, 'grace_ends_at' => $subscription->grace_ends_at], after: ['status' => 'suspensa'],
+                    actorType: 'system', channel: 'scheduler', originContext: 'fokus:expire-subscription-tolerance');
             }
 
             return $subscriptions->count();

@@ -100,25 +100,7 @@ class MercadoPagoClient
 
     public function sanitizePayload(mixed $payload): mixed
     {
-        if (is_array($payload)) {
-            $sanitized = [];
-            foreach ($payload as $key => $value) {
-                $normalizedKey = strtolower((string) $key);
-                if (preg_match('/token|secret|password|card|security|cvv|cvc|raw_payload|authorization|signature/', $normalizedKey)) {
-                    $sanitized[$key] = '[REDACTED]';
-                    continue;
-                }
-                $sanitized[$key] = $this->sanitizePayload($value);
-            }
-
-            return $sanitized;
-        }
-
-        if (is_object($payload)) {
-            return $this->sanitizePayload((array) $payload);
-        }
-
-        return $payload;
+        return app(AuditSanitizer::class)->providerPayload($payload);
     }
 
     private function send(string $method, string $path, array $payload = [], ?string $idempotencyKey = null, array $query = []): array
@@ -129,10 +111,19 @@ class MercadoPagoClient
             $request = $request->withHeaders(['X-Idempotency-Key' => $idempotencyKey]);
         }
 
-        $response = $method === 'get'
-            ? $request->get($url, $query ?: $payload)
-            : $request->{$method}($url, $payload);
-
-        return $response->throw()->json();
+        try {
+            $response = $method === 'get'
+                ? $request->get($url, $query ?: $payload)
+                : $request->{$method}($url, $payload);
+            if ($response->failed()) {
+                throw new RuntimeException('Mercado Pago respondeu com status HTTP '.$response->status().'.');
+            }
+            return $response->json() ?? [];
+        } catch (RuntimeException $exception) {
+            if (str_starts_with($exception->getMessage(), 'Mercado Pago respondeu com status HTTP')) throw $exception;
+            throw new RuntimeException('Falha na comunicação com Mercado Pago.');
+        } catch (\Throwable) {
+            throw new RuntimeException('Falha na comunicação com Mercado Pago.');
+        }
     }
 }

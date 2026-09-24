@@ -73,8 +73,11 @@ uma assinatura nao encerrada para o mesmo produto.
 | `em_disputa` | Pagamento em contestacao, chargeback ou disputa equivalente. |
 
 Os status nativos do Mercado Pago devem ser traduzidos para o modelo interno.
-O payload original do provedor deve ser preservado para auditoria e
-investigacao.
+O payload bruto do provedor nunca deve ser preservado em logs, snapshots de
+billing ou auditoria. Persistir somente campos necessários, selecionados por
+allowlist e sanitizados antes da gravação. A trilha de auditoria registra as
+transições comerciais e referencia o evento técnico por request/correlation
+ID, sem copiar o payload original.
 
 ## Ativacao
 

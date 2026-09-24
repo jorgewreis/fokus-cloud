@@ -26,7 +26,7 @@ class RefundManager
             $id = PrefixedUlid::make('RFD');
             DB::table('refund_requests')->insert([
                 'id' => $id, 'company_id' => $payment->company_id, 'subscription_id' => $payment->subscription_id, 'payment_id' => $payment->id,
-                'requested_by_platform_admin_id' => $admin->id, 'reason' => $data['reason'], 'allowed_case' => $data['allowed_case'],
+                'requested_by_platform_admin_id' => $admin->id, 'reason' => app(AuditSanitizer::class)->sanitizeText((string) $data['reason']), 'allowed_case' => $data['allowed_case'],
                 'amount' => round((float) $data['amount'], 2), 'status' => 'solicitado', 'requested_at' => now(), 'created_at' => now(), 'updated_at' => now(),
             ]);
             return DB::table('refund_requests')->where('id', $id)->first();
@@ -63,6 +63,9 @@ class RefundManager
                 $refunded = (float) DB::table('refund_requests')->where('payment_id', $refund->payment_id)->where('status', 'executado')->sum('amount');
                 if ($payment && $refunded >= (float) $payment->amount) {
                     DB::table('payments')->where('id', $payment->id)->update(['status' => 'estornado', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
+                    $audit->record($admin->id, 'billing.payment_refunded', 'payment', $payment->id, $payment->company_id, $reason,
+                        before: ['status' => $payment->status, 'amount' => $payment->amount],
+                        after: ['status' => 'estornado', 'amount' => $payment->amount, 'refund_amount' => $refunded]);
                 }
                 $audit->record($admin->id, 'billing.refund_executed', 'refund_request', $id, $refund->company_id, $reason, before: ['status' => $refund->status], after: ['status' => 'executado', 'provider_refund_id' => $providerRefundId]);
             } else {

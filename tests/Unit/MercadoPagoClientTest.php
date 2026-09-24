@@ -20,6 +20,11 @@ class MercadoPagoClientTest extends TestCase
 
         Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer sandbox-token') && $request->hasHeader('X-Idempotency-Key', 'refund-key'));
         $this->assertSame('[REDACTED]', $client->sanitizePayload(['access_token' => 'secret'])['access_token']);
+        $safe = $client->sanitizePayload(['id' => 'pay-1', 'status' => 'approved', 'identification' => ['number' => '12345678901'], 'card' => ['number' => '4111 1111 1111 1111'], 'raw_customer_field' => 'must-not-persist']);
+        $this->assertSame('pay-1', $safe['id']);
+        $this->assertArrayNotHasKey('identification', $safe);
+        $this->assertArrayNotHasKey('card', $safe);
+        $this->assertArrayNotHasKey('raw_customer_field', $safe);
     }
 
     public function test_sandbox_uses_the_documented_test_email_when_not_configured(): void
