@@ -11,15 +11,20 @@
 }
 
 .catalog-overview-quick-links { display: flex; flex-wrap: wrap; gap: 8px; }
-.catalog-overview-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--fs-space-3, 16px); margin: 0 var(--fs-space-3, 16px) var(--fs-space-3, 16px); }
+#catalog-overview-content { width: 100%; min-width: 0; }
+.catalog-overview-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--fs-space-3, 16px); width: 100%; min-width: 0; margin: 0 0 var(--fs-space-3, 16px); }
 .catalog-overview-metric .fs-card-body { display: flex; flex-direction: column; gap: 12px; min-height: 122px; }
 .catalog-overview-metric-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .catalog-overview-metric-heading .fs-card-title { margin: 0; }
 .catalog-overview-total { color: var(--fs-color-text, #1f2937); font-size: 2rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
 .catalog-overview-statuses { display: flex; flex-wrap: wrap; gap: 6px; }
 .catalog-overview-status { color: var(--fs-color-text-secondary, #6b7280); font-size: .75rem; }
-.catalog-overview-section { width: calc(100% - var(--fs-space-3, 16px)); margin: 0 auto var(--fs-space-3, 16px); }
-.catalog-overview-section .fs-table { min-width: 760px; }
+.catalog-overview-section { width: 100%; min-width: 0; margin: 0 0 var(--fs-space-3, 16px); }
+.catalog-overview-section .fs-table { width: 100%; min-width: 760px; }
+.catalog-overview-section[aria-labelledby="catalog-pending-title"] .fs-table thead tr,
+.catalog-overview-section[aria-labelledby="catalog-pending-title"] .fs-table tbody tr { display: grid; grid-template-columns: 30% 17% 17% 20% 16%; }
+.catalog-overview-section[aria-labelledby="catalog-history-title"] .fs-table thead tr,
+.catalog-overview-section[aria-labelledby="catalog-history-title"] .fs-table tbody tr { display: grid; grid-template-columns: 19% 12% 18% 23% 28%; }
 .catalog-overview-section:last-child { margin-bottom: 0; }
 .catalog-overview-empty { margin: 0; }
 .catalog-overview-product { display: flex; flex-direction: column; gap: 2px; }
@@ -33,7 +38,7 @@
     .backoffice-catalog-overview-page > .fs-page-layout { padding-inline: 0; }
     .catalog-overview-quick-links { width: 100%; }
     .catalog-overview-quick-links .fs-btn { flex: 1 1 auto; }
-    .catalog-overview-metrics { grid-template-columns: 1fr; margin-inline: 0; }
+    .catalog-overview-metrics { grid-template-columns: 1fr; }
     .catalog-overview-section { width: 100%; }
     #catalog-overview-error, #catalog-overview-loading { margin-inline: 0; }
 }

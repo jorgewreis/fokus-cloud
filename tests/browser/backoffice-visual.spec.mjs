@@ -78,6 +78,7 @@ test('visão geral do catálogo resume estados, pendências e as cinco publicaç
         await page.goto('/backoffice/visao-geral-catalogo');
         await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'catalog-overview');
         await expect(page.locator('#catalog-overview-content')).toBeVisible();
+        await expect(page.locator('#catalog-overview-title')).toHaveText('Visao geral');
         await expect(page.locator('#catalog-products-total')).toHaveText('3');
         await expect(page.locator('#catalog-products-statuses')).toContainText('Ativo: 2');
         await expect(page.locator('#catalog-modules-total')).toHaveText('2');
@@ -90,6 +91,23 @@ test('visão geral do catálogo resume estados, pendências e as cinco publicaç
         await expect(page.locator('#catalog-history-list tr')).toHaveCount(5);
         await expect(page.locator('#catalog-history-list')).toContainText('Publicação 6');
         await expect(page.locator('#catalog-history-list')).not.toContainText('Publicação 1');
+        const layout = await page.evaluate(() => {
+            const metrics = document.querySelector('.catalog-overview-metrics').getBoundingClientRect();
+            const section = document.querySelector('.catalog-overview-section').getBoundingClientRect();
+            const table = document.querySelector('.catalog-overview-section .fs-table');
+            const header = [...table.querySelectorAll('thead th')].map((cell) => cell.getBoundingClientRect());
+            const firstRow = [...table.querySelector('tbody tr').querySelectorAll('td')].map((cell) => cell.getBoundingClientRect());
+            return {
+                metricSectionWidthDifference: Math.abs(metrics.width - section.width),
+                columnStartDifferences: header.map((cell, index) => Math.abs(cell.x - firstRow[index].x)),
+                columnWidthDifferences: header.map((cell, index) => Math.abs(cell.width - firstRow[index].width)),
+                title: document.querySelector('#catalog-overview-title').textContent.trim(),
+            };
+        });
+        expect(layout.metricSectionWidthDifference).toBeLessThanOrEqual(1);
+        expect(layout.columnStartDifferences.every((difference) => difference <= 1)).toBe(true);
+        expect(layout.columnWidthDifferences.every((difference) => difference <= 1)).toBe(true);
+        expect(layout.title).toBe('Visao geral');
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     }
 
