@@ -18,7 +18,10 @@ export default defineConfig({
     },
     webServer: {
         command: 'node tools/security-homologation-proxy.mjs',
-        url: 'https://localhost:8443/up',
+        // Playwright's webServer readiness probe uses Node TLS defaults and
+        // cannot trust the temporary self-signed proxy certificate. The app
+        // server is already health-checked by the workflow over this upstream.
+        url: 'http://127.0.0.1:8000/up',
         reuseExistingServer: !process.env.CI,
         timeout: 30_000,
     },
