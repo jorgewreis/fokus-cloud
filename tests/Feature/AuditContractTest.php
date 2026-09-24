@@ -7,7 +7,9 @@ use App\Services\AuditRecorder;
 use App\Services\PlatformAudit;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
@@ -77,7 +79,7 @@ class AuditContractTest extends TestCase
         $logger = new Logger('audit-test');
         $handler = new TestHandler();
         $logger->pushHandler($handler);
-        (new SensitiveLogTap())($logger);
+        (new SensitiveLogTap())(new \Illuminate\Log\Logger($logger));
         $logger->error('Falha token=token-sentinela CPF 123.456.789-01 cartão 4111 1111 1111 1111 código de acesso 654321', [
             'password' => 'senha-sentinela', 'nested' => ['mfa_code' => '654321', 'safe' => 'ok'],
             'exception' => new \RuntimeException('access_token=segredo Bearer test-secret 987.654.321-00'),
@@ -88,6 +90,45 @@ class AuditContractTest extends TestCase
             $this->assertStringNotContainsString($secret, $output);
         }
         $this->assertStringContainsString('ok', $output);
+    }
+
+    public function test_real_file_log_and_audit_pipeline_redact_synthetic_security_canaries(): void
+    {
+        $canaries = json_decode(file_get_contents(base_path('tests/fixtures/security-log-canaries.json')), true, flags: JSON_THROW_ON_ERROR);
+        $path = storage_path('logs/security-canary.log');
+        $originalPath = config('logging.channels.single.path');
+        @unlink($path);
+
+        Config::set('logging.channels.single.path', $path);
+        Log::forgetChannel('single');
+        $channel = Log::channel('single');
+        $channel->error('Security canary password='.$canaries['password'].' token='.$canaries['token'].' MFA '.$canaries['mfa'], [
+            'password' => $canaries['password'],
+            'access_token' => $canaries['token'],
+            'mfa_code' => $canaries['mfa'],
+            'document_number' => $canaries['document'],
+            'card_number' => $canaries['card'],
+            'raw_payload' => $canaries['gateway'],
+        ]);
+
+        app(PlatformAudit::class)->record(null, 'security.canary_pipeline_test', 'security_canary', null,
+            reason: 'password='.$canaries['password'].' token='.$canaries['token'],
+            metadata: [
+                'mfa_code' => $canaries['mfa'],
+                'document_number' => $canaries['document'],
+                'card_number' => $canaries['card'],
+                'raw_payload' => ['body' => $canaries['gateway']],
+            ],
+            actorType: 'system', channel: 'security-test');
+
+        $event = DB::table('platform_audit_events')->where('action', 'security.canary_pipeline_test')->first();
+        $contents = (string) file_get_contents($path).(string) $event->reason.(string) $event->metadata;
+        foreach ($canaries as $canary) {
+            $this->assertFalse(str_contains($contents, $canary), 'A raw synthetic security canary reached an output.');
+        }
+        $this->assertStringContainsString('[redigido]', $contents);
+        Log::forgetChannel('single');
+        Config::set('logging.channels.single.path', $originalPath);
     }
 
     public function test_historical_audit_rows_are_scrubbed_and_get_180_day_expiration(): void

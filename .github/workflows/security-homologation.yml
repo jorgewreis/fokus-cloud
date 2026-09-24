@@ -1,0 +1,217 @@
+name: Ephemeral security homologation
+
+"on":
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/**'
+      - 'bootstrap/**'
+      - 'config/**'
+      - 'database/**'
+      - 'routes/**'
+      - 'tests/**'
+      - 'composer.json'
+      - 'composer.lock'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/security-homologation.yml'
+      - 'phpunit.homologation.xml'
+      - 'playwright.security.config.mjs'
+      - 'tools/check-security-canaries.mjs'
+      - 'tools/security-homologation-proxy.mjs'
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'bootstrap/**'
+      - 'config/**'
+      - 'database/**'
+      - 'routes/**'
+      - 'tests/**'
+      - 'composer.json'
+      - 'composer.lock'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/security-homologation.yml'
+      - 'phpunit.homologation.xml'
+      - 'playwright.security.config.mjs'
+      - 'tools/check-security-canaries.mjs'
+      - 'tools/security-homologation-proxy.mjs'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-homologation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security-homologation:
+    name: Security tests with isolated MySQL and Redis
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: homologation
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: security-test-only
+          MYSQL_DATABASE: fokuscloud_security
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot --password=security-test-only"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+    env:
+      APP_NAME: FokusCloudSecurityTest
+      APP_ENV: testing
+      APP_DEBUG: false
+      APP_URL: https://localhost:8443
+      BCRYPT_ROUNDS: 4
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: fokuscloud_security
+      DB_USERNAME: root
+      DB_PASSWORD: security-test-only
+      CACHE_STORE: redis
+      REDIS_CLIENT: phpredis
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+      SESSION_DRIVER: database
+      SESSION_LIFETIME: 120
+      MAIL_MAILER: array
+      QUEUE_CONNECTION: sync
+      MERCADO_PAGO_ACCESS_TOKEN: test-token-not-a-credential
+      MERCADO_PAGO_WEBHOOK_SECRET: test-webhook-not-a-credential
+      MERCADO_PAGO_WEBHOOK_RATE_LIMIT: 2
+      FOKUS_USAGE_INGESTION_SECRET: test-usage-not-a-credential
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      - name: Setup PHP and isolated database/cache drivers
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_mysql, redis
+          coverage: none
+
+      - name: Install PHP and browser dependencies
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: Install application dependencies
+        run: |
+          composer install --no-interaction --prefer-dist --optimize-autoloader
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run feature and unit suite on MySQL and Redis
+        run: |
+          set +e
+          vendor/bin/phpunit --configuration=phpunit.homologation.xml > "$RUNNER_TEMP/security-tests.log" 2>&1
+          status=$?
+          echo "SECURITY_PHPUNIT_STATUS=$status" >> "$GITHUB_ENV"
+          exit 0
+
+      - name: Prepare isolated browser-test database
+        env:
+          APP_ENV: production
+          APP_DEBUG: false
+          APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          APP_URL: https://localhost:8443
+          SESSION_DRIVER: database
+          CACHE_STORE: redis
+        run: php artisan migrate:fresh --seed --force --no-interaction
+
+      - name: Start isolated Laravel HTTP server
+        env:
+          APP_ENV: production
+          APP_DEBUG: false
+          APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          APP_URL: https://localhost:8443
+          SESSION_DRIVER: database
+          CACHE_STORE: redis
+          LOG_CHANNEL: single
+          LOG_LEVEL: debug
+        run: |
+          php artisan serve --host=127.0.0.1 --port=8000 > "$RUNNER_TEMP/security-app.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/security-app.pid"
+          for attempt in {1..30}; do
+            if curl --silent --fail http://127.0.0.1:8000/up >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          echo "Isolated Laravel server did not become ready."
+          exit 1
+
+      - name: Create temporary HTTPS certificate
+        run: |
+          openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+            -keyout "$RUNNER_TEMP/security-test.key" \
+            -out "$RUNNER_TEMP/security-test.crt" \
+            -subj '/CN=localhost' \
+            -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' >/dev/null 2>&1
+
+      - name: Run dynamic browser checks for CSRF, cookies and limits
+        env:
+          SECURITY_PROXY_CERT: ${{ runner.temp }}/security-test.crt
+          SECURITY_PROXY_KEY: ${{ runner.temp }}/security-test.key
+        run: |
+          set +e
+          npm run test:security:homologation > "$RUNNER_TEMP/security-browser-tests.log" 2>&1
+          status=$?
+          echo "SECURITY_BROWSER_STATUS=$status" >> "$GITHUB_ENV"
+          exit 0
+
+      - name: Scan logs and test outputs for raw canaries
+        id: canary_scan
+        if: ${{ always() }}
+        run: node tools/check-security-canaries.mjs
+
+      - name: Enforce test outcomes and show sanitized summaries
+        if: ${{ always() }}
+        run: |
+          if [ "${SECURITY_PHPUNIT_STATUS:-1}" != 0 ] || [ "${SECURITY_BROWSER_STATUS:-1}" != 0 ] || [ "${{ steps.canary_scan.outcome }}" != success ]; then
+            echo 'Security homologation tests failed. Raw output was withheld; inspect the canary scan result and fix the failing assertions.'
+            exit 1
+          fi
+          tail -n 24 "$RUNNER_TEMP/security-tests.log"
+          tail -n 18 "$RUNNER_TEMP/security-browser-tests.log"
+
+      - name: Record checks that require external operator evidence
+        if: ${{ success() }}
+        run: |
+          {
+            echo '## Security homologation evidence'
+            echo '- MySQL and Redis-backed feature/unit tests: passed.'
+            echo '- Browser CSRF, session-cookie attributes and rate-limit checks: passed.'
+            echo '- Synthetic canary scan of app logs and workflow outputs: passed.'
+            echo '- Mercado Pago live sandbox exercise: separate finance-owned step in the runbook; not replaced by HTTP mocks.'
+            echo '- Remote log sink coverage: pending unless a dedicated non-production sink was configured and inspected.'
+            echo '- Production credential cutovers: operator-owned; this workflow never reads production secrets.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload sanitized browser report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-homologation-report-${{ github.run_id }}
+          path: playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Stop isolated Laravel server
+        if: ${{ always() }}
+        run: |
+          if [ -f "$RUNNER_TEMP/security-app.pid" ]; then kill "$(cat "$RUNNER_TEMP/security-app.pid")" 2>/dev/null || true; fi

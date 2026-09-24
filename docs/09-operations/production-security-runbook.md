@@ -21,6 +21,27 @@ Nenhum valor deve aparecer neste documento, em commits, logs de Actions ou ticke
 4. Para `APP_KEY`, incluir a chave antiga em `APP_PREVIOUS_KEYS`, instalar a nova `APP_KEY`, recriar o cache de configuração e verificar leitura de dados cifrados e sessões. Remover chaves antigas somente após confirmar que os dados persistidos foram recifrados ou não dependem delas. [Laravel documenta a rotação com `APP_PREVIOUS_KEYS`](https://laravel.com/framework/docs/13.x/encryption#gracefully-rotating-encryption-keys).
 5. Registrar data, responsável, testes, impacto nas sessões, rollback e momento de revogação no cofre ou registro operacional protegido. Nunca copiar o valor para o registro.
 
+### Ensaio controlado e corte por grupos
+
+O workflow `.github/workflows/security-homologation.yml` roda em runner efêmero com MySQL e Redis isolados, dados sintéticos e certificado HTTPS temporário. Ele não consulta o ambiente `production` nem injeta credenciais reais. O workflow automatiza regressões, CSRF, atributos de cookies, limites e inspeção de logs locais. A execução do workflow, por si só, não comprova acesso a um serviço externo nem substitui a homologação do provedor.
+
+Antes do corte real, o responsável deve criar credenciais **de sandbox** nos provedores necessários e armazená-las apenas no ambiente GitHub `homologation` ou no cofre aprovado. Execute um ensaio por integração com contas e destinatários de teste: login/MFA e envio de e-mail; checkout e cancelamento Mercado Pago; webhook assinado, assinatura inválida, repetição e reconciliação; ingestão de uso; e acesso de deploy/Cloudflare. Confirme no provedor que não houve cobrança ou efeito em conta real. Inspecione o sink de logs de homologação usando os marcadores definidos em `tests/fixtures/security-log-canaries.json`; registre somente identificador do ensaio, sink, horário e resultado. A varredura do runner cobre arquivos locais e relatórios, mas não prova mascaramento em destinos remotos até que o ensaio seja consultado no próprio destino.
+
+Faça o corte de produção em grupos independentes, com janela, responsável, plano de rollback e verificação de saúde após cada grupo:
+
+1. **Integrações de menor acoplamento:** e-mail/AWS e Cloudflare. Instale a credencial nova, verifique um envio ou operação sintética permitida, então revogue a anterior.
+2. **Integrações de aplicação:** segredo HMAC de uso e credenciais/token do Mercado Pago. Para HMAC, aceite temporariamente a chave anterior, troque o emissor, confirme eventos válidos e repetidos, e remova a anterior após o prazo de retry do provedor. Faça o teste real somente com o modo/conta apropriado e sem criar transação real.
+3. **SSH de deploy:** instalar a nova chave pública no usuário de deploy, validar um deploy sem mudança funcional e só então revogar a chave antiga.
+4. **`APP_KEY` por último e em janela própria:** aplicar o procedimento de chaves anteriores acima, validar sessões e dados cifrados, e comunicar a reautenticação esperada. Não combinar esta alteração com outro grupo.
+
+Não agrupe alterações para “ganhar tempo”: cada etapa precisa de evidência de leitura/saúde e caminho de retorno antes de avançar. Para cada segredo, registrar no cofre a referência/versão, consumidores, horário, responsável, testes, período de sobreposição, revogação e rollback, sem registrar o valor. Credencial sem ensaio, sem confirmação do provedor ou sem evidência do sink continua pendente.
+
+### Evidência dos testes dinâmicos
+
+Abra o workflow de homologação por `workflow_dispatch` ou em uma pull request que toque código de aplicação, rotas, configuração ou testes. Exija sucesso de todas as etapas: suíte PHP em MySQL/Redis, navegação HTTPS com cookies seguros, token CSRF ausente/inválido/válido, limites de login e webhook e varredura dos marcadores sintéticos em logs e artefatos. O workflow retém o relatório do navegador por 14 dias; não habilite traces, screenshots ou vídeos com dados reais. Registre o ID da execução e o resultado no relatório de prontidão.
+
+O workflow cobre o ciclo de expiração do cliente e revogação de sessão no conjunto PHP; a evidência dos dois guards deve incluir login/MFA, logout e revogação administrativa conforme os testes existentes. Os testes HTTP automatizados não comprovam o fluxo Sandbox do gateway: esse passo permanece separado e deve registrar falha/timeout, estado financeiro não confirmado, repetição segura e reconciliação concluída sem dados de pagamento nos logs.
+
 ## Sessões e suporte
 
 Em produção, o cookie de sessão usa o prefixo `__Host-`, é limitado ao host, exige HTTPS e usa o driver `database` para revogação. A mudança do nome do cookie encerra sessões antigas; usuários e administradores devem autenticar novamente. O acesso de suporte termina após 30 minutos absolutos, na próxima requisição ou pelo comando agendado `fokus:expire-support-sessions`, além da saída manual.

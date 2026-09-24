@@ -13,7 +13,8 @@
         "tokens:check": "node tools/validate-css-tokens.mjs",
         "backoffice:contract:check": "node tools/check-backoffice-ui-contract.mjs",
         "backoffice:page:new": "node tools/create-backoffice-page.mjs",
-        "test:backoffice:visual": "playwright test --config=playwright.backoffice.config.mjs"
+        "test:backoffice:visual": "playwright test --config=playwright.backoffice.config.mjs",
+        "test:security:homologation": "playwright test --config=playwright.security.config.mjs"
     },
     "devDependencies": {
         "@playwright/test": "^1.57.0",

@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\ExpireIdleDatabaseSession;
 use App\Models\User;
 use App\Services\MercadoPagoClient;
 use App\Services\PrefixedUlid;
+use Illuminate\Http\Request;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -98,6 +101,43 @@ class ProductionSecurityHardeningTest extends TestCase
 
         $this->assertDatabaseMissing('sessions', ['id' => 'older-customer-session']);
         $this->assertAuthenticatedAs($user, 'web');
+    }
+
+    public function test_database_session_rotates_on_customer_login_and_expires_after_idle_lifetime(): void
+    {
+        Config::set('session.driver', 'database');
+        Config::set('session.lifetime', 1);
+        $user = User::create([
+            'id' => PrefixedUlid::make('USR'), 'name' => 'Cliente de Homologação', 'cpf' => '52998224725',
+            'email' => 'security-session@example.test', 'password' => Hash::make('SenhaHomologacao!2026'),
+            'status' => 'ativa', 'email_verified_at' => now(),
+        ]);
+
+        $this->withSession(['_token' => 'security-session-csrf-token']);
+        $originalSessionId = app('session.store')->getId();
+        $login = $this->postJson('/api/auth/login', ['cpf' => $user->cpf, 'password' => 'SenhaHomologacao!2026'])->assertOk();
+        $sessionCookie = $login->getCookie(config('session.cookie'));
+        $this->assertNotNull($sessionCookie);
+        // Laravel's test response exposes the unencrypted cookie value.
+        $rotatedSessionId = $sessionCookie->getValue();
+        $this->assertNotSame($originalSessionId, $rotatedSessionId);
+        $this->assertDatabaseHas('sessions', ['id' => $rotatedSessionId, 'user_id' => $user->id]);
+
+        DB::table('sessions')->where('id', $rotatedSessionId)->update(['last_activity' => now()->subMinutes(2)->timestamp]);
+        app('session')->forgetDrivers();
+        $store = app('session')->driver();
+        $store->setId($rotatedSessionId);
+        $store->start();
+        $request = Request::create('/api/auth/me', 'GET');
+        $request->setLaravelSession($store);
+
+        $response = app(ExpireIdleDatabaseSession::class)->handle(
+            $request,
+            fn () => response()->json(['authenticated' => Auth::guard('web')->check()]),
+        );
+
+        $this->assertFalse($response->getData(true)['authenticated']);
+        $this->assertDatabaseMissing('sessions', ['id' => $rotatedSessionId]);
     }
 
     public function test_password_reset_revokes_all_customer_sessions(): void

@@ -3,8 +3,8 @@
 namespace App\Logging;
 
 use App\Services\AuditSanitizer;
-use Monolog\Logger;
 use Monolog\LogRecord;
+use Illuminate\Log\Logger;
 
 class SensitiveLogTap
 {

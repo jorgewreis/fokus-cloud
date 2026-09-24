@@ -56,3 +56,22 @@ Após sincronizar o commit `c5f29a2` e limpar o cache Cloudflare no deploy `3604
 Em 24/09/2026, a secret `FOKUS_BACKUP_PASSPHRASE` foi configurada no ambiente GitHub Actions `production` e o workflow [Encrypted production backup and isolated restore](https://github.com/jorgewreis/fokus-cloud/actions/runs/36042334951) terminou com sucesso. A execução exportou o banco e `storage/app` por SSH, cifrou os arquivos com AES-256, verificou os hashes, restaurou o banco em um serviço MySQL efêmero, confirmou tabelas não vazias e restaurou o armazenamento privado em diretório isolado. O GitHub Actions confirmou o upload dos artefatos cifrados com retenção de 30 dias e removeu o arquivo temporário da chave do runner. Resultado do controle **backup e restauração: aprovado nesta execução**; manter a chave de recuperação no cofre operacional.
 
 **Pendências para aprovação geral:** testes dinâmicos em homologação para CSRF, ciclo de sessão/revogação, limites e falhas/reconciliação do gateway; evidência operacional da rotação de credenciais externas e procedimento/impacto; e evidência com dados-canário nos destinos reais de logs. A execução de backup aprova a demonstração de restauração, mas não comprova sozinha uma política recorrente de RPO/RTO nem torna a liberação geral aprovada.
+
+## Implementação do plano de fechamento — 24/09/2026
+
+Foi adicionado o workflow `.github/workflows/security-homologation.yml`, executado sob demanda ou em pull requests relevantes, com serviços efêmeros MySQL e Redis, aplicação local protegida por HTTPS temporário e navegador automatizado. O conjunto verifica CSRF ausente/inválido/válido, cookies de sessão e CSRF, rate limiting de login e webhook, ciclo de expiração de sessão do cliente e os testes de integração existentes. Um marcador sintético atravessa o canal de arquivo e a auditoria; a varredura inspeciona logs da aplicação, relatórios e saídas capturadas antes de exibir qualquer resumo no Actions. O novo teste encontrou uma incompatibilidade real no tipo recebido pelo tap `SensitiveLogTap`; ela foi corrigida, e o teste com o canal de arquivo configurado passou localmente.
+
+Também foi implementada a expiração efetiva de sessões de banco vencidas antes da autenticação da rota, limpando os dois guards (`web` e `platform`) e invalidando o identificador antigo. O teste direcionado de rotação e expiração passou localmente. Esses resultados locais comprovam as regressões específicas, mas não substituem uma execução completa no workflow efêmero.
+
+O workflow **ainda precisa executar com sucesso** para que esses itens passem de “implementados, sem evidência de execução” para aprovados. Os testes com credenciais do Mercado Pago Sandbox, inspeção dos destinos remotos de logs e rotação dos grupos de credenciais reais continuam operações separadas, descritas no runbook. O workflow não lê secrets do ambiente `production` e não cria transações em provedores externos.
+
+| Controle | Situação após a implementação | Próxima evidência exigida |
+| --- | --- | --- |
+| CSRF, cookies e limites | Implementado no workflow; execução pendente | Execução Actions verde e relatório retido sem canários brutos |
+| Sessões e revogação | Teste de expiração/rotação de cliente adicionado; cobertura administrativa existente incluída na suíte | Execução verde e evidência dos fluxos de login/MFA, logout e revogação nos dois guards |
+| Falhas e reconciliação do gateway | Regressões de código incluídas na suíte; provedor não chamado pelo CI | Ensaio do Mercado Pago Sandbox para timeout/falha, confirmação, duplicidade e reconciliação |
+| Mascaramento de logs | Teste novo para arquivo e auditoria local; varredura de canários no runner | Execução verde e consulta do canário sintético no sink remoto de homologação |
+| Rotação de credenciais externas | Runbook e sequência por grupos documentados; nenhuma credencial foi alterada | Registro no cofre da simulação sandbox e de cada corte/validação/revogação aprovada |
+| Backup e restauração | Aprovado na execução registrada acima | Manter execução recorrente e exercício trimestral dentro de RPO/RTO |
+
+**Decisão atual:** a liberação para clientes reais segue **não aprovada** até concluir e registrar as evidências pendentes desta tabela. Código e procedimento implementados não equivalem à execução operacional.

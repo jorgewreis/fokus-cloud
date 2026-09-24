@@ -15,7 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(\App\Http\Middleware\SearchVisibility::class);
         $middleware->append(\App\Http\Middleware\SecurityResponseHeaders::class);
-        $middleware->web(append: [\App\Http\Middleware\EnsureSupportSession::class]);
+        $middleware->web(append: [
+            \App\Http\Middleware\ExpireIdleDatabaseSession::class,
+            \App\Http\Middleware\EnsureSupportSession::class,
+        ]);
         $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : '/?acesso=cliente');
         // The API shares Laravel's encrypted, HttpOnly session cookie. Webhooks
         // are authenticated by their provider signature, not by a browser CSRF token.
