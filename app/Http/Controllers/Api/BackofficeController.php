@@ -1130,6 +1130,24 @@ class BackofficeController extends Controller
             }
         }
         $payment = DB::table('payments')->where('subscription_id', $subscription->id)->latest('created_at')->first();
+        $redemption = DB::table('voucher_redemptions')->where('subscription_id', $subscription->id)->latest('created_at')->first();
+        $redemptionSnapshot = $redemption ? (json_decode((string) $redemption->snapshot, true) ?: []) : [];
+        $hasActiveFreeBenefit = (bool) ($subscription->status === 'ativa'
+            && ($redemptionSnapshot['discount_type'] ?? null) === 'trial_free'
+            && $redemption->benefit_ends_at
+            && now()->lt($redemption->benefit_ends_at));
+        $baseAmount = $hasActiveFreeBenefit
+            ? (float) ($snapshot['base_amount'] ?? $redemptionSnapshot['base_amount'] ?? $payment?->amount ?? $snapshot['amount'] ?? 0)
+            : ($snapshot['base_amount'] ?? null);
+        $baseMonthlyAmount = $hasActiveFreeBenefit
+            ? (float) ($snapshot['base_monthly_amount'] ?? ($subscription->billing_cycle === 'annual' ? round($baseAmount / 10, 2) : $baseAmount))
+            : ($snapshot['base_monthly_amount'] ?? null);
+        if ($hasActiveFreeBenefit) {
+            $snapshot['amount'] = 0.0;
+            $snapshot['monthly_amount'] = 0.0;
+            $snapshot['base_amount'] = $baseAmount;
+            $snapshot['base_monthly_amount'] = $baseMonthlyAmount;
+        }
         $payload = [
             'id' => $subscription->id,
             'company_id' => $subscription->company_id,
@@ -1144,6 +1162,9 @@ class BackofficeController extends Controller
             'billing_cycle' => $subscription->billing_cycle,
             'monthly_amount' => $snapshot['monthly_amount'] ?? null,
             'amount' => $snapshot['amount'] ?? ($payment?->amount ? (float) $payment->amount : null),
+            'base_monthly_amount' => $baseMonthlyAmount,
+            'base_amount' => $baseAmount,
+            'has_active_free_benefit' => $hasActiveFreeBenefit,
             'current_period_starts_at' => $subscription->current_period_starts_at,
             'current_period_ends_at' => $subscription->current_period_ends_at,
             'cancel_at' => $subscription->cancel_at,
@@ -1158,7 +1179,8 @@ class BackofficeController extends Controller
                 'module_id' => $item->module_id,
                 'name' => $item->name_snapshot,
                 'quantity' => (int) $item->quantity,
-                'unit_price' => (float) $item->unit_price_snapshot,
+                'unit_price' => $hasActiveFreeBenefit ? 0.0 : (float) $item->unit_price_snapshot,
+                'base_unit_price' => $hasActiveFreeBenefit ? (float) $item->unit_price_snapshot : null,
                 'conditions' => json_decode((string) $item->conditions_snapshot, true) ?: [],
             ])->values();
             $payload['payments'] = DB::table('payments')->where('subscription_id', $subscription->id)->orderByDesc('created_at')->get()->map(fn (object $item): array => $this->paymentPayload($item))->values();

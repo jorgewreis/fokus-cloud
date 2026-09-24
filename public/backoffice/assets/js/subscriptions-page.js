@@ -248,7 +248,7 @@ export function mount(root, context = {}) {
             <td class="fs-width-400" data-label="Plano">${escapeHtml(subscription.plan_name || "—")}</td>
             <td class="fs-width-500" data-label="Status">${badge(subscription.status)}</td>
             <td class="fs-width-400" data-label="Vigência">${escapeHtml(formatDate(subscription.current_period_ends_at))}</td>
-            <td class="fs-width-300 cell-value" data-label="Valor">${escapeHtml(money(subscription.amount))}</td>
+            <td class="fs-width-300 cell-value" data-label="Valor"><strong>${escapeHtml(money(subscription.amount))}</strong>${subscription.has_active_free_benefit && subscription.base_amount !== null ? `<small class="fs-u-d-block fs-u-fs-sm">Preço-base: ${escapeHtml(money(subscription.base_amount))}</small>` : ""}</td>
             <td class="fs-width-400" data-label="Ações"><div class="fs-u-d-flex fs-u-gap-2"><button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action" type="button" data-subscription-id="${escapeHtml(subscription.id)}" aria-label="Ver detalhes da assinatura de ${escapeHtml(subscription.company_name || "empresa")}" title="Ver detalhes da assinatura"><img src="${ICONS_PATH}Folder-File--Streamline-Ultimate.png" alt="" /></button></div></td>
         </tr>`).join("") : "";
         $("#subscription-table-summary").textContent = `${total.toLocaleString("pt-BR")} ${total === 1 ? "assinatura encontrada" : "assinaturas encontradas"}`;
@@ -450,6 +450,7 @@ export function mount(root, context = {}) {
             ["Ciclo", valueForDisplay("billing_cycle", subscription.billing_cycle)],
             ["Valor contratado", money(subscription.amount)],
             ["Valor mensal", subscription.monthly_amount === null ? "—" : money(subscription.monthly_amount)],
+            ...(subscription.has_active_free_benefit ? [["Preço-base", money(subscription.base_amount)], ["Preço-base mensal", money(subscription.base_monthly_amount)]] : []),
             ["Início da vigência", formatDate(subscription.current_period_starts_at)],
             ["Fim da vigência", formatDate(subscription.current_period_ends_at)],
             ["Cancelamento agendado", formatDate(subscription.cancel_at)],
@@ -459,7 +460,8 @@ export function mount(root, context = {}) {
         const items = subscription.items || [];
         $("#subscription-detail-items").innerHTML = items.length ? `<div class="fs-u-d-flex fs-u-flex-column fs-u-gap-2">${items.map((item) => {
             const conditions = itemConditions(item.conditions || {});
-            return `<article class="fs-card"><div class="fs-card-header fs-u-d-flex fs-u-justify-content-between fs-u-align-items-center fs-u-gap-2"><h4 class="fs-card-title">${escapeHtml(item.name || "Item contratado")}</h4><span class="fs-badge fs-badge-soft-secondary">${escapeHtml(item.quantity)} × ${escapeHtml(money(item.unit_price))}</span></div><div class="fs-card-body"><dl class="fs-detail-list">${detailList([["Quantidade", item.quantity], ["Valor unitário", money(item.unit_price)], ...conditions])}</dl></div></article>`;
+            const basePrice = item.base_unit_price === null || item.base_unit_price === undefined ? "" : `<small class="fs-u-d-block">Preço-base: ${escapeHtml(money(item.base_unit_price))}</small>`;
+            return `<article class="fs-card"><div class="fs-card-header fs-u-d-flex fs-u-justify-content-between fs-u-align-items-center fs-u-gap-2"><h4 class="fs-card-title">${escapeHtml(item.name || "Item contratado")}</h4><span class="fs-badge fs-badge-soft-secondary">${escapeHtml(item.quantity)} × ${escapeHtml(money(item.unit_price))}${basePrice}</span></div><div class="fs-card-body"><dl class="fs-detail-list">${detailList([["Quantidade", item.quantity], ["Valor unitário", money(item.unit_price)], ...conditions])}</dl></div></article>`;
         }).join("")}</div>` : '<p class="fs-u-fs-sm fs-u-color-secondary">Nenhum item contratado foi informado.</p>';
 
         const payments = subscription.payments || [];

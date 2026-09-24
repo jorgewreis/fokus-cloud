@@ -55,6 +55,13 @@ class PendingSubscriptionVoucher
             $redemption = DB::table('voucher_redemptions')->where('subscription_id', $subscriptionId)->latest('created_at')->first();
             abort_unless($redemption && $redemption->benefit_ends_at, 422, 'Não foi possível confirmar o benefício gratuito.');
             $commercial = $this->changes->snapshot($current);
+            $baseAmount = (float) $payment->amount;
+            $baseMonthlyAmount = $subscription->billing_cycle === 'annual' ? round($baseAmount / 10, 2) : $baseAmount;
+            $commercial['base_amount'] = $baseAmount;
+            $commercial['base_monthly_amount'] = $baseMonthlyAmount;
+            $commercial['discount_amount'] = $baseAmount;
+            $commercial['amount'] = 0.0;
+            $commercial['monthly_amount'] = 0.0;
             DB::table('subscriptions')->where('id', $subscriptionId)->update([
                 'status' => 'ativa', 'provider_subscription_id' => null, 'provider_status' => 'cancelled',
                 'current_period_starts_at' => $redemption->benefit_starts_at,

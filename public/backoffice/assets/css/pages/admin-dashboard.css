@@ -1497,13 +1497,14 @@ html[data-role="admin"] .fs-sidebar .sidebar-button {
     padding: 0 24px 16px;
 }
 .admin-final-dashboard .admin-dashboard-intro .fs-page-header-display > h1 {
-    margin: -15px 0 0 -1px;
+    margin: 0 0 0 -1px;
     color: #252525;
     font-family: "Bebas Neue", sans-serif;
     font-size: 3.5rem;
     font-weight: 600;
-    line-height: 1;
+    line-height: 1.05;
     letter-spacing: 2px;
+    overflow: visible;
 }
 .admin-final-dashboard .admin-dashboard-intro .fs-page-header-display > span {
     color: var(--admin-terracotta, #c96f4a);
@@ -1511,9 +1512,12 @@ html[data-role="admin"] .fs-sidebar .sidebar-button {
 }
 .admin-final-dashboard .admin-dashboard-intro .fs-page-header-display > p {
     margin: 0;
+    max-width: 100%;
     color: #909090;
     font-family: "Google Sans", sans-serif;
     font-size: 1rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
 }
 .admin-final-dashboard .admin-metrics-grid {
     display: grid;
@@ -1525,20 +1529,23 @@ html[data-role="admin"] .fs-sidebar .sidebar-button {
 }
 .admin-final-dashboard .admin-metric-card {
     display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
     align-items: center;
     min-width: 0;
-    min-height: 116px;
-    padding: 0;
-    gap: 0;
+    min-height: 112px;
+    padding: 18px 20px;
+    gap: 16px;
     border-radius: 8px;
 }
 .admin-final-dashboard .admin-metric-card .fs-card-body {
     display: grid;
     flex: 1 1 auto;
     align-content: center;
-    gap: 4px;
+    gap: 5px;
     min-width: 0;
-    padding: 16px;
+    padding: 0;
+    text-align: left;
 }
 .admin-final-dashboard .admin-metric-icon {
     display: grid;
@@ -1546,7 +1553,7 @@ html[data-role="admin"] .fs-sidebar .sidebar-button {
     place-items: center;
     width: 48px;
     height: 48px;
-    margin-left: 16px;
+    margin: 0;
     border-radius: 50%;
     background: #fff1ea;
 }
@@ -1556,13 +1563,14 @@ html[data-role="admin"] .fs-sidebar .sidebar-button {
 .admin-final-dashboard .admin-metric-icon img { width: 26px; height: 26px; object-fit: contain; }
 .admin-final-dashboard .admin-metric-card span {
     color: #667085;
-    font-size: .8rem;
+    font-size: .8125rem;
+    font-weight: 500;
     line-height: 1.35;
 }
 .admin-final-dashboard .admin-metric-card strong {
     margin: 0;
     color: #102a43;
-    font-size: 1.75rem;
+    font-size: 1.875rem;
     font-variant-numeric: tabular-nums;
     line-height: 1.05;
 }

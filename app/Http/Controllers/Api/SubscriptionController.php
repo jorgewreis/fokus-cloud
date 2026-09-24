@@ -197,9 +197,14 @@ class SubscriptionController extends Controller
         $voucher = ! empty($data['voucher_code'])
             ? $vouchers->findEligible($data['voucher_code'], $product->id, $companyId, array_column($data['items'], 'module_code'), $data['plan_code'] ?? null)
             : null;
+        $quoted['base_amount'] = $quoted['amount'];
+        $quoted['base_monthly_amount'] = $quoted['monthly_amount'];
+        $quoted['discount_amount'] = 0.0;
         if ($voucher) {
             $quoted['discount_amount'] = $vouchers->discount($voucher, $quoted['amount']);
             $quoted['amount'] = round($quoted['amount'] - $quoted['discount_amount'], 2);
+            $discountRatio = $quoted['base_amount'] > 0 ? $quoted['amount'] / $quoted['base_amount'] : 0;
+            $quoted['monthly_amount'] = round($quoted['base_monthly_amount'] * $discountRatio, 2);
         }
         $subscriptionId = PrefixedUlid::make('ASS');
         $paymentId = PrefixedUlid::make('PAG');
@@ -283,9 +288,15 @@ class SubscriptionController extends Controller
             });
             if ($reservation) $vouchers->attachSubscription($reservation->id, $subscriptionId);
             $subscription = DB::table('subscriptions')->where('id', $subscriptionId)->first();
+            $commercialSnapshot = $subscriptionChanges->snapshot($subscription);
+            $commercialSnapshot['monthly_amount'] = $quoted['monthly_amount'];
+            $commercialSnapshot['amount'] = $quoted['amount'];
+            $commercialSnapshot['base_monthly_amount'] = $quoted['base_monthly_amount'];
+            $commercialSnapshot['base_amount'] = $quoted['base_amount'];
+            $commercialSnapshot['discount_amount'] = $quoted['discount_amount'];
             DB::table('subscriptions')->where('id', $subscriptionId)->update([
                 'commercial_snapshot' => json_encode([
-                    ...$subscriptionChanges->snapshot($subscription),
+                    ...$commercialSnapshot,
                     'publication_versions' => $quoted['publication_versions'],
                 ]),
                 'updated_at' => now(),
@@ -523,6 +534,7 @@ class SubscriptionController extends Controller
         return [
             'items' => $items,
             'amount' => $amount,
+            'monthly_amount' => round($monthly, 2),
             'publication_versions' => [
                 'product_catalog_version' => (int) ($publishedCatalog['published_version'] ?? 0),
                 'plan_version' => isset($publishedPlan) ? (int) ($publishedPlan['published_version'] ?? 0) : null,

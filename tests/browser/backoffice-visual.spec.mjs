@@ -98,16 +98,36 @@ test('dashboard usa cards e larguras responsivas sem alterar dados ou colunas', 
         await expect(page.locator('#subscriptions-table-body tr')).toHaveCount(2);
         await expect(page.locator('#dashboard-recent-activity .admin-activity-item')).toHaveCount(1);
         await expect(page.getByRole('link', { name: 'Nova empresa' })).toBeVisible();
+        await expect(page.locator('.admin-metric-card small')).toHaveCount(0);
 
         const layout = await page.evaluate(() => {
+            const intro = document.querySelector('.admin-dashboard-intro');
+            const introContent = intro.querySelector('.fs-page-header-display');
+            const introTitle = intro.querySelector('#dashboard-page-title');
+            const introDescription = intro.querySelector('p');
+            const introRect = intro.getBoundingClientRect();
+            const contentRect = introContent.getBoundingClientRect();
+            const titleRect = introTitle.getBoundingClientRect();
+            const descriptionRect = introDescription.getBoundingClientRect();
             const grid = document.querySelector('.admin-metrics-grid');
             const gridRect = grid.getBoundingClientRect();
             const metrics = [...grid.querySelectorAll('.admin-metric-card')].map((card) => card.getBoundingClientRect());
+            const metricDirection = [...grid.querySelectorAll('.admin-metric-card')].map((card) => getComputedStyle(card).flexDirection);
+            const metricAlignment = [...grid.querySelectorAll('.admin-metric-card')].map((card) => {
+                const icon = card.querySelector('.admin-metric-icon').getBoundingClientRect();
+                const body = card.querySelector('.fs-card-body').getBoundingClientRect();
+                return { textAlign: getComputedStyle(card.querySelector('.fs-card-body')).textAlign, iconBeforeText: icon.right <= body.left };
+            });
             const table = document.querySelector('.admin-subscriptions-table');
             const heads = [...table.querySelectorAll('thead th')].map((cell) => cell.getBoundingClientRect());
             const cells = [...table.querySelector('tbody tr').querySelectorAll('td')].map((cell) => cell.getBoundingClientRect());
             return {
                 metricColumns: getComputedStyle(grid).gridTemplateColumns.split(' ').length,
+                titleInsideIntro: titleRect.top >= contentRect.top && titleRect.bottom <= contentRect.bottom,
+                descriptionInsideIntro: descriptionRect.left >= introRect.left && descriptionRect.right <= introRect.right,
+                titleDescriptionGap: descriptionRect.top - titleRect.bottom,
+                metricDirection,
+                metricAlignment,
                 metricCardWidths: metrics.map((card) => card.width),
                 metricStartOffset: Math.abs(Math.min(...metrics.map((card) => card.x)) - gridRect.x),
                 metricEndOffset: Math.abs(gridRect.right - Math.max(...metrics.map((card) => card.right))),
@@ -119,6 +139,11 @@ test('dashboard usa cards e larguras responsivas sem alterar dados ou colunas', 
         });
 
         expect(layout.metricColumns, name).toBe(expectedColumns);
+        expect(layout.titleInsideIntro, name).toBe(true);
+        expect(layout.descriptionInsideIntro, name).toBe(true);
+        expect(layout.titleDescriptionGap, name).toBeGreaterThanOrEqual(0);
+        expect(layout.metricDirection.every((direction) => direction === 'row'), name).toBe(true);
+        expect(layout.metricAlignment.every((alignment) => alignment.textAlign === 'left' && alignment.iconBeforeText), name).toBe(true);
         expect(layout.metricCardWidths.every((width) => width > 0), name).toBe(true);
         expect(Math.max(...layout.metricCardWidths) - Math.min(...layout.metricCardWidths), name).toBeLessThanOrEqual(1);
         expect(layout.metricStartOffset, name).toBeLessThanOrEqual(1);
@@ -401,7 +426,15 @@ test('assinatura pendente pode ser ativada por voucher gratuito no drawer', asyn
     await page.route('**/api/backoffice/subscriptions/SUB_VISUAL_02', async (route) => {
         const response = await route.fetch();
         const subscription = await response.json();
-        await route.fulfill({ response, json: { ...subscription, status: activated ? 'ativa' : 'aguardando_pagamento' } });
+        await route.fulfill({ response, json: { ...subscription,
+            status: activated ? 'ativa' : 'aguardando_pagamento',
+            amount: activated ? 0 : subscription.amount,
+            monthly_amount: activated ? 0 : subscription.monthly_amount,
+            base_amount: activated ? subscription.amount : null,
+            base_monthly_amount: activated ? subscription.monthly_amount : null,
+            has_active_free_benefit: activated,
+            items: activated ? (subscription.items || []).map((item) => ({ ...item, base_unit_price: item.unit_price, unit_price: 0 })) : subscription.items,
+        } });
     });
     await page.route('**/api/backoffice/subscriptions/SUB_VISUAL_02/free-voucher', (route) => {
         submittedCode = route.request().postDataJSON().voucher_code;
@@ -414,6 +447,9 @@ test('assinatura pendente pode ser ativada por voucher gratuito no drawer', asyn
     await page.locator('#subscription-free-voucher-code').fill('FREE7');
     await page.getByRole('button', { name: 'Ativar acesso gratuito' }).click();
     await expect(page.locator('#subscription-detail-summary')).toContainText('Ativa');
+    await expect(page.locator('#subscription-detail-summary')).toContainText('R$ 0,00');
+    await expect(page.locator('#subscription-detail-data')).toContainText('Preço-base');
+    await expect(page.locator('#subscription-detail-items')).toContainText('Preço-base');
     await expect(page.locator('#subscription-free-voucher-form')).toBeHidden();
     expect(submittedCode).toBe('FREE7');
 });

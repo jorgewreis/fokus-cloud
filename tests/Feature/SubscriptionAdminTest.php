@@ -47,9 +47,12 @@ class SubscriptionAdminTest extends TestCase
         ])->assertCreated()->assertJsonPath('checkout_url', 'https://mercadopago.test/checkout');
         $subscriptionId = $response->json('subscription_id');
         $this->assertDatabaseHas('subscriptions', ['id' => $subscriptionId, 'status' => 'aguardando_pagamento', 'created_by' => $fixture['user_id']]);
+        $originalAmount = (float) DB::table('payments')->where('subscription_id', $subscriptionId)->value('amount');
         $commercialSnapshot = json_decode((string) DB::table('subscriptions')->where('id', $subscriptionId)->value('commercial_snapshot'), true);
         $this->assertSame($plan->id, $commercialSnapshot['plan_id']);
         $this->assertSame($plan->name, $commercialSnapshot['plan_name']);
+        $this->assertEqualsWithDelta($originalAmount, (float) $commercialSnapshot['amount'], 0.01);
+        $this->assertEqualsWithDelta($originalAmount, (float) $commercialSnapshot['monthly_amount'], 0.01);
         $this->assertSame(1, $commercialSnapshot['publication_versions']['product_catalog_version']);
         $this->assertSame(1, $commercialSnapshot['publication_versions']['plan_version']);
         $this->assertSame(1, $commercialSnapshot['publication_versions']['module_versions']['processos-advocacia']);
@@ -69,6 +72,16 @@ class SubscriptionAdminTest extends TestCase
         $activeSnapshot = json_decode((string) DB::table('subscriptions')->where('id', $subscriptionId)->value('commercial_snapshot'), true);
         $this->assertSame($plan->id, $activeSnapshot['plan_id']);
         $this->assertSame($plan->name, $activeSnapshot['plan_name']);
+        $this->assertSame(0.0, (float) $activeSnapshot['amount']);
+        $this->assertSame(0.0, (float) $activeSnapshot['monthly_amount']);
+        $this->assertEqualsWithDelta($originalAmount, (float) $activeSnapshot['base_amount'], 0.01);
+        $subscriptionDetails = $this->actingAs($admin, 'platform')->getJson("/api/backoffice/subscriptions/{$subscriptionId}")
+            ->assertOk()
+            ->assertJsonPath('amount', 0)
+            ->assertJsonPath('monthly_amount', 0)
+            ->assertJsonPath('has_active_free_benefit', true)
+            ->assertJsonPath('items.0.unit_price', 0);
+        $this->assertEqualsWithDelta($originalAmount, (float) $subscriptionDetails->json('base_amount'), 0.01);
         $listedCompany = $this->actingAs($admin, 'platform')->getJson('/api/backoffice/companies?q=Alpha')->assertOk();
         $this->assertSame(1, $listedCompany->json('data.0.active_subscriptions'));
         $this->assertSame($plan->name, $listedCompany->json('data.0.plan_name'));
@@ -81,6 +94,7 @@ class SubscriptionAdminTest extends TestCase
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.subscription_free_voucher_activated', 'entity_id' => $subscriptionId]);
         Http::assertSent(fn ($request) => $request->method() === 'PUT' && $request->url() === 'https://api.mercadopago.com/preapproval/pre-assisted' && $request['status'] === 'cancelled');
         $paymentId = DB::table('payments')->where('subscription_id', $subscriptionId)->value('id');
+        $this->assertEqualsWithDelta($originalAmount, (float) DB::table('payments')->where('id', $paymentId)->value('amount'), 0.01);
         $this->actingAs($admin, 'platform')->getJson('/api/backoffice/payments')
             ->assertOk()->assertJsonFragment(['id' => $paymentId, 'status' => 'cancelado']);
         $this->actingAs($admin, 'platform')->getJson('/api/backoffice/payments?status=cancelado')
