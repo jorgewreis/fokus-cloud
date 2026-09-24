@@ -151,7 +151,7 @@ test('dashboard usa cards e larguras responsivas sem alterar dados ou colunas', 
         await expect(page.locator('.admin-activity-item time')).toHaveText(/09:00/);
         const sidebarCompanyIcon = await page.locator('[data-sidebar-item="companies"] img').getAttribute('src');
         const activityIcon = await page.locator('.admin-activity-symbol img').getAttribute('src');
-        expect(new URL(activityIcon, page.url()).pathname).toBe(new URL(sidebarCompanyIcon, page.url()).pathname);
+        expect(activityIcon).toBe(sidebarCompanyIcon);
         await expect(page.getByRole('link', { name: 'Nova empresa' })).toBeVisible();
         await expect(page.locator('.admin-metric-card small')).toHaveCount(0);
 

@@ -6,7 +6,7 @@
  * portalled overlays and release listeners before the next page is mounted.
  */
 (() => {
-    const ASSET_VERSION = "20260924-dashboard-catalog-indent-v7";
+    const ASSET_VERSION = "20260924-dashboard-menu-icons-v8";
 
     const pages = {
         "platform-dashboard-final": { route: "painel", fragment: "platform-dashboard-final" },

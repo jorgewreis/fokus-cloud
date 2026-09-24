@@ -273,6 +273,18 @@
                 cancelamento_agendado: "Cancelamento agendado",
                 encerrada: "Encerrada",
             })[v] || "Sem status";
+        const sidebarIcon = (area) => {
+            const selectors = {
+                dashboard: '[data-sidebar-item="platform-dashboard-final"] img',
+                companies: '[data-sidebar-item="companies"] img',
+                users: '[data-sidebar-item="users"] img',
+                catalog: '[data-sidebar-group="catalog"] .sidebar-group-toggle img:not(.sidebar-group-chevron)',
+                subscriptions: '[data-sidebar-item="subscriptions"] img',
+                payments: '[data-sidebar-item="payments"] img',
+                vouchers: '[data-sidebar-item="vouchers"] img',
+            };
+            return document.querySelector(selectors[area] || "")?.getAttribute("src") || `${B}${I[area] || I.dashboard}`;
+        };
         const nameParticles = new Set(["de", "da", "do", "das", "dos", "e"]);
         const displayName = (value) => {
             const words = String(value || "Administrador")
@@ -390,7 +402,7 @@
                 .map((x) => {
                     const area = x.icon && I[x.icon] ? x.icon : "dashboard";
                     const tone = ["creation", "alteration", "pause", "deletion", "publication", "warning"].includes(x.tone) ? x.tone : "alteration";
-                    return `<div class="admin-activity-item admin-activity-${tone}"><span class="admin-activity-marker" aria-hidden="true"></span><span class="admin-activity-symbol">${img(area)}</span><span class="admin-activity-copy"><strong>${e(x.title || "Atividade no Dashboard")}</strong><small>${e(x.description || "Detalhes não informados.")}</small></span><time datetime="${e(x.created_at || "")}">${date(x.created_at)}</time></div>`;
+                    return `<div class="admin-activity-item admin-activity-${tone}"><span class="admin-activity-marker" aria-hidden="true"></span><span class="admin-activity-symbol"><img src="${e(sidebarIcon(area))}" alt=""></span><span class="admin-activity-copy"><strong>${e(x.title || "Atividade no Dashboard")}</strong><small>${e(x.description || "Detalhes não informados.")}</small></span><time datetime="${e(x.created_at || "")}">${date(x.created_at)}</time></div>`;
                 })
                 .join("");
         };

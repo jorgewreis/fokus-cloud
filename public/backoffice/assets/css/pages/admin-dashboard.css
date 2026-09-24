@@ -1820,7 +1820,7 @@ html[data-role="admin"] .fs-sidebar .sidebar-button {
     border-radius: 8px;
     background: #f3f6f8;
 }
-.admin-final-dashboard .admin-activity-symbol img { width: 18px; height: 18px; object-fit: contain; }
+.admin-final-dashboard .admin-activity-symbol img { width: 22px; height: 22px; object-fit: contain; }
 .admin-final-dashboard .admin-activity-item strong,
 .admin-final-dashboard .admin-activity-item small { display: block; }
 .admin-final-dashboard .admin-activity-item strong { color: #17345c; font-size: .85rem; line-height: 1.25; }
