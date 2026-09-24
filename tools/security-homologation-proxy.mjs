@@ -1,5 +1,5 @@
 import { createServer as createHttpsServer } from 'node:https';
-import { request as httpRequest } from 'node:http';
+import { createServer as createHttpServer, request as httpRequest } from 'node:http';
 import { readFileSync } from 'node:fs';
 
 const certificatePath = process.env.SECURITY_PROXY_CERT;
@@ -36,6 +36,14 @@ const server = createHttpsServer({
 });
 
 server.listen(8443, '127.0.0.1');
+const healthServer = createHttpServer((request, response) => {
+    response.writeHead(request.url === '/up' ? 200 : 404, { 'Content-Type': 'text/plain' });
+    response.end(request.url === '/up' ? 'ok' : 'not found');
+});
+healthServer.listen(8444, '127.0.0.1');
 for (const signal of ['SIGINT', 'SIGTERM']) {
-    process.on(signal, () => server.close(() => process.exit(0)));
+    process.on(signal, () => {
+        healthServer.close();
+        server.close(() => process.exit(0));
+    });
 }
