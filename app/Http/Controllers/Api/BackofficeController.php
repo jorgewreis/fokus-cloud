@@ -102,7 +102,7 @@ class BackofficeController extends Controller
         ];
 
         $recentActivity = DB::table('platform_audit_events')
-            ->select('action', 'entity_type', 'entity_id', 'company_id', 'reason', 'metadata', 'created_at', 'before_masked', 'after_masked')
+            ->select('action', 'entity_type', 'entity_id', 'platform_admin_id', 'company_id', 'reason', 'metadata', 'created_at', 'before_masked', 'after_masked')
             ->where('action', 'not like', '%_viewed')
             ->orderByDesc('created_at')
             ->limit(5)
@@ -122,10 +122,21 @@ class BackofficeController extends Controller
                     str_starts_with($event->action, 'backoffice.subscription_') => ['label' => 'Assinaturas', 'icon' => 'subscriptions'],
                     str_starts_with($event->action, 'backoffice.payment'), str_starts_with($event->action, 'billing.') => ['label' => 'Pagamentos', 'icon' => 'payments'],
                     str_starts_with($event->action, 'backoffice.voucher_') => ['label' => 'Vouchers', 'icon' => 'vouchers'],
-                    str_starts_with($event->action, 'backoffice.admin_'), str_starts_with($event->action, 'backoffice.password_') => ['label' => 'Usuários', 'icon' => 'users'],
+                    str_starts_with($event->action, 'backoffice.admin_'), str_starts_with($event->action, 'backoffice.password_'), str_starts_with($event->action, 'backoffice.login'), str_starts_with($event->action, 'backoffice.logout'), str_starts_with($event->action, 'backoffice.mfa_'), str_starts_with($event->action, 'backoffice.account_'), str_starts_with($event->action, 'backoffice.external_user_') => ['label' => 'Usuários', 'icon' => 'users'],
+                    str_starts_with($event->action, 'backoffice.support_access_') => ['label' => 'Empresas', 'icon' => 'companies'],
                     default => ['label' => 'Dashboard', 'icon' => 'dashboard'],
                 };
                 $operation = match (true) {
+                    str_ends_with($event->action, 'login_succeeded') => ['label' => 'Entrou no Backoffice', 'tone' => 'alteration'],
+                    str_ends_with($event->action, 'logout') => ['label' => 'Saiu do Backoffice', 'tone' => 'alteration'],
+                    str_contains($event->action, 'login_failed'), str_contains($event->action, 'login_origin_locked'), str_contains($event->action, 'mfa_failed'), str_contains($event->action, 'mfa_delivery_failed') => ['label' => 'Falha de autenticação', 'tone' => 'warning'],
+                    str_ends_with($event->action, 'mfa_requested') => ['label' => 'Código de acesso solicitado', 'tone' => 'alteration'],
+                    str_contains($event->action, 'support_access_started') => ['label' => 'Acesso de suporte iniciado', 'tone' => 'warning'],
+                    str_contains($event->action, 'support_access_ended') => ['label' => 'Acesso de suporte encerrado', 'tone' => 'alteration'],
+                    str_contains($event->action, 'account_manually_blocked'), str_contains($event->action, 'account_temporarily_locked'), str_contains($event->action, 'admin_blocked') => ['label' => 'Administrador bloqueado', 'tone' => 'warning'],
+                    str_contains($event->action, 'admin_unblocked') => ['label' => 'Administrador desbloqueado', 'tone' => 'alteration'],
+                    str_contains($event->action, 'admin_invited'), str_contains($event->action, 'admin_created'), str_contains($event->action, 'external_user_invited') => ['label' => 'Convite criado', 'tone' => 'creation'],
+                    str_contains($event->action, 'admin_invitation_accepted') => ['label' => 'Convite aceito', 'tone' => 'publication'],
                     str_contains($event->action, '_created') => ['label' => 'Criado', 'tone' => 'creation'],
                     str_contains($event->action, '_deleted'), str_contains($event->action, '_archived') => ['label' => 'Excluído ou arquivado', 'tone' => 'deletion'],
                     str_contains($event->action, 'paused'), str_contains($event->action, 'pausado'), str_contains($event->action, 'suspensao'), str_contains($event->action, 'deactivated'), str_contains($event->action, 'suspended') => ['label' => 'Pausado', 'tone' => 'pause'],
@@ -167,6 +178,12 @@ class BackofficeController extends Controller
                             }
                         }
                     }
+                }
+                if (! $entityName && $event->platform_admin_id) {
+                    $entityName = DB::table('platform_admins')->where('id', $event->platform_admin_id)->value('name');
+                }
+                if (! $entityName && $event->company_id) {
+                    $entityName = DB::table('companies')->where('id', $event->company_id)->value('legal_name');
                 }
 
                 $entityName ??= $entityLabel.' sem nome informado';
