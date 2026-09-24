@@ -17,6 +17,9 @@ return [
 
     'default' => env('CACHE_STORE', 'database'),
 
+    // Allow rate limiting to use a dedicated store independently of app cache.
+    'limiter' => env('CACHE_LIMITER', env('CACHE_STORE', 'database')),
+
     /*
     |--------------------------------------------------------------------------
     | Cache Stores
