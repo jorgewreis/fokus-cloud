@@ -124,7 +124,7 @@ jobs:
           status=$?
           echo "SECURITY_PHPUNIT_STATUS=$status" >> "$GITHUB_ENV"
           if [ "$status" -ne 0 ]; then
-            php -r '$report = simplexml_load_file($argv[1]); foreach ($report->xpath("//testcase") as $test) { if (isset($test->failure) || isset($test->error)) { printf("Failed test: %s::%s\n", (string) $test["class"], (string) $test["name"]); } }' "$RUNNER_TEMP/security-tests.xml"
+            php -r '$report = simplexml_load_file($argv[1]); foreach ($report->xpath("//testcase") as $test) { foreach (["failure", "error"] as $kind) { if (isset($test->$kind)) { $message = (string) $test->$kind[0]["message"]; $detail = ""; if (preg_match("/Expected response status code \\[(\\d+)\\] but received (\\d+)/", $message, $match)) { $detail = " (HTTP assertion {$match[1]} vs {$match[2]})"; } printf("Failed test: %s::%s%s\n", (string) $test["class"], (string) $test["name"], $detail); break; } } }' "$RUNNER_TEMP/security-tests.xml"
           fi
           exit 0
 
