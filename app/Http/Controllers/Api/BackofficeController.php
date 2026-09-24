@@ -127,6 +127,40 @@ class BackofficeController extends Controller
                     default => ['label' => 'Dashboard', 'icon' => 'dashboard'],
                 };
                 $operation = match (true) {
+                    $event->action === 'backoffice.subscription_public_name_updated' => ['label' => 'Atualizada', 'tone' => 'alteration'],
+                    str_ends_with($event->action, 'subscription_suspensao') => ['label' => 'Suspensa', 'tone' => 'pause'],
+                    str_ends_with($event->action, 'subscription_reativacao') => ['label' => 'Reativada', 'tone' => 'publication'],
+                    str_ends_with($event->action, 'subscription_cancelamento_imediato') => ['label' => 'Cancelada imediatamente', 'tone' => 'warning'],
+                    str_ends_with($event->action, 'subscription_cancelamento') => ['label' => 'Cancelamento agendado', 'tone' => 'warning'],
+                    str_ends_with($event->action, 'subscription_upgrade') => ['label' => 'Plano alterado para uma opção superior', 'tone' => 'alteration'],
+                    str_ends_with($event->action, 'subscription_downgrade') => ['label' => 'Plano alterado para uma opção inferior', 'tone' => 'alteration'],
+                    str_ends_with($event->action, 'subscription_override') => ['label' => 'Condições comerciais ajustadas', 'tone' => 'alteration'],
+                    str_ends_with($event->action, 'subscription_free_voucher_activated') => ['label' => 'Ativada com voucher gratuito', 'tone' => 'publication'],
+                    str_ends_with($event->action, 'subscription_checkout_created') => ['label' => 'Criada', 'tone' => 'creation'],
+                    str_ends_with($event->action, 'refund_requested') => ['label' => 'Reembolso solicitado', 'tone' => 'warning'],
+                    str_ends_with($event->action, 'refund_approved') => ['label' => 'Reembolso aprovado', 'tone' => 'warning'],
+                    str_ends_with($event->action, 'refund_refused') => ['label' => 'Reembolso recusado', 'tone' => 'alteration'],
+                    str_ends_with($event->action, 'refund_executed') => ['label' => 'Reembolso executado', 'tone' => 'warning'],
+                    str_ends_with($event->action, 'reconciliation_corrected') => ['label' => 'Conciliação corrigida', 'tone' => 'alteration'],
+                    str_ends_with($event->action, 'reconciliation_discarded') => ['label' => 'Alerta de conciliação descartado', 'tone' => 'deletion'],
+                    str_ends_with($event->action, 'reconciliation_reviewed') => ['label' => 'Conciliação revisada', 'tone' => 'alteration'],
+                    str_ends_with($event->action, 'company_status_changed') => ['label' => 'Status da empresa alterado', 'tone' => 'alteration'],
+                    str_ends_with($event->action, 'company_deleted') => ['label' => 'Excluída', 'tone' => 'deletion'],
+                    str_ends_with($event->action, 'company_updated') => ['label' => 'Atualizada', 'tone' => 'alteration'],
+                    str_ends_with($event->action, 'company_created') => ['label' => 'Criada', 'tone' => 'creation'],
+                    str_ends_with($event->action, 'product_interest_status_updated') => ['label' => 'Status do interesse atualizado', 'tone' => 'alteration'],
+                    str_ends_with($event->action, 'admin_profile_updated') => ['label' => 'Perfil de administrador atualizado', 'tone' => 'alteration'],
+                    str_ends_with($event->action, 'admin_email_changed') => ['label' => 'E-mail de administrador alterado', 'tone' => 'alteration'],
+                    str_ends_with($event->action, 'admin_role_changed') => ['label' => 'Permissão de administrador alterada', 'tone' => 'alteration'],
+                    str_ends_with($event->action, 'admin_deactivated') => ['label' => 'Administrador desativado', 'tone' => 'pause'],
+                    str_ends_with($event->action, 'admin_unblocked') => ['label' => 'Administrador desbloqueado', 'tone' => 'publication'],
+                    str_ends_with($event->action, 'admin_blocked') => ['label' => 'Administrador bloqueado', 'tone' => 'warning'],
+                    str_ends_with($event->action, 'voucher_archived') => ['label' => 'Arquivado', 'tone' => 'deletion'],
+                    str_ends_with($event->action, 'voucher_deleted') => ['label' => 'Excluído', 'tone' => 'deletion'],
+                    str_ends_with($event->action, 'voucher_reactivated') => ['label' => 'Reativado', 'tone' => 'publication'],
+                    str_ends_with($event->action, 'voucher_paused') => ['label' => 'Pausado', 'tone' => 'pause'],
+                    str_ends_with($event->action, 'voucher_updated') => ['label' => 'Atualizado', 'tone' => 'alteration'],
+                    str_ends_with($event->action, 'voucher_created') => ['label' => 'Criado', 'tone' => 'creation'],
                     str_ends_with($event->action, 'login_succeeded') => ['label' => 'Entrou no Backoffice', 'tone' => 'alteration'],
                     str_ends_with($event->action, 'logout') => ['label' => 'Saiu do Backoffice', 'tone' => 'alteration'],
                     str_contains($event->action, 'login_failed'), str_contains($event->action, 'login_origin_locked'), str_contains($event->action, 'mfa_failed'), str_contains($event->action, 'mfa_delivery_failed') => ['label' => 'Falha de autenticação', 'tone' => 'warning'],
@@ -190,27 +224,74 @@ class BackofficeController extends Controller
                 }
 
                 $entityName ??= $entityLabel.' sem nome informado';
-                $detail = $statusBefore && $statusAfter && $statusBefore !== $statusAfter
-                    ? "Status: {$statusBefore} → {$statusAfter}"
-                    : '';
-                if (! $detail && $operation['label'] === 'Atualizado') {
-                    $fieldLabels = ['legal_name' => 'nome da empresa', 'name' => 'nome', 'status' => 'status', 'monthly_amount' => 'valor mensal', 'billing_cycle' => 'ciclo', 'segment' => 'segmento', 'module_ids' => 'módulos do plano', 'module_codes' => 'módulos', 'publication_state' => 'publicação'];
-                    $changedFields = array_values(array_filter(array_keys($after), fn (string $key): bool => array_key_exists($key, $fieldLabels) && ($before[$key] ?? null) !== $after[$key]));
-                    if ($changedFields !== []) {
-                        $detail = 'Campos: '.implode(', ', array_map(fn (string $key): string => $fieldLabels[$key], array_slice($changedFields, 0, 2)));
+                $fieldLabels = [
+                    'public_name' => 'nome público', 'legal_name' => 'nome da empresa', 'name' => 'nome', 'status' => 'status',
+                    'monthly_amount' => 'valor mensal', 'amount' => 'valor', 'billing_cycle' => 'ciclo de cobrança', 'cycle' => 'ciclo',
+                    'segment' => 'segmento', 'module_ids' => 'módulos do plano', 'module_codes' => 'módulos', 'publication_state' => 'publicação',
+                    'discount_type' => 'tipo de desconto', 'discount_value' => 'desconto', 'benefit_duration' => 'duração do benefício',
+                    'redemption_limit' => 'limite de resgates', 'ends_at' => 'data de encerramento', 'starts_at' => 'data de início',
+                    'email' => 'e-mail', 'role' => 'permissão', 'admin_id' => 'administrador responsável', 'plan_id' => 'plano',
+                ];
+                $displayValue = static function (mixed $value, string $key): string {
+                    if ($value === null || $value === '') return 'vazio';
+                    if (is_bool($value)) return $value ? 'sim' : 'não';
+                    if (is_array($value)) return implode(', ', array_map(static fn ($item) => is_scalar($item) ? (string) $item : '', $value));
+                    if (in_array($key, ['amount', 'monthly_amount', 'discount_value'], true) && is_numeric($value)) return 'R$ '.number_format((float) $value, 2, ',', '.');
+                    $value = (string) $value;
+                    $value = match ($value) { 'ativa' => 'ativa', 'ativo' => 'ativo', 'paused', 'pausada', 'pausado' => 'pausado', 'archived', 'encerrada' => 'arquivado', 'cancelada' => 'cancelada', default => $value };
+                    return mb_strlen($value) > 48 ? mb_substr($value, 0, 45).'…' : $value;
+                };
+                $detail = '';
+                if ($event->action === 'backoffice.subscription_public_name_updated') {
+                    $oldPublicName = $before['public_name'] ?? null;
+                    $newPublicName = $after['public_name'] ?? null;
+                    $detail = 'Nome público alterado de “'.($oldPublicName === null || $oldPublicName === '' ? 'sem nome público' : $displayValue($oldPublicName, 'public_name')).'” para “'.($newPublicName === null || $newPublicName === '' ? 'sem nome público' : $displayValue($newPublicName, 'public_name')).'”.';
+                } else {
+                    $changes = [];
+                    foreach ($fieldLabels as $key => $label) {
+                        if (array_key_exists($key, $before) && array_key_exists($key, $after) && $before[$key] != $after[$key]) {
+                            $changes[] = ucfirst($label).' alterado de “'.$displayValue($before[$key], $key).'” para “'.$displayValue($after[$key], $key).'”.';
+                        }
                     }
+                    if ($changes !== []) $detail = implode(' ', array_slice($changes, 0, 2));
+                    elseif ($statusBefore && $statusAfter && $statusBefore !== $statusAfter) $detail = "Status alterado de {$displayValue($statusBefore, 'status')} para {$displayValue($statusAfter, 'status')}.";
                 }
-                if (! $detail && $event->reason) {
+                if (! $detail && $event->reason && ! in_array($event->action, ['backoffice.catalog_product_updated', 'backoffice.catalog_module_updated', 'backoffice.plan_updated', 'backoffice.voucher_updated'], true)) {
                     $detail = 'Motivo: '.trim((string) $event->reason);
                 }
-                $description = "{$entityLabel}: {$entityName}".($detail ? " · {$detail}" : '');
+                if (! $detail && str_contains($event->action, 'published')) $detail = isset(json_decode((string) $event->metadata, true)['version']) ? 'Versão '.json_decode((string) $event->metadata, true)['version'].' publicada.' : 'Nova versão publicada.';
+                if (! $detail && str_ends_with($event->action, '_created')) $detail = $entityLabel.' '.(in_array($entityType, ['company', 'subscription'], true) ? 'criada' : 'criado').' no sistema.';
+                if (! $detail && (str_ends_with($event->action, '_deleted') || str_ends_with($event->action, '_archived'))) $detail = $entityLabel.' '.(in_array($entityType, ['company', 'subscription'], true) ? 'removida' : 'removido').' do sistema.';
+                if (! $detail) $detail = $entityLabel.': '.$entityName;
+                $noun = match ($entityType) { 'company' => 'Empresa', 'product' => 'Produto', 'module' => 'Módulo', 'plan' => 'Plano', 'subscription' => 'Assinatura', 'voucher' => 'Voucher', 'platform_admin' => 'Administrador', 'refund_request' => 'Reembolso', default => $entityLabel };
+                $title = match (true) {
+                    $event->action === 'backoffice.subscription_public_name_updated' => 'Assinatura atualizada',
+                    $event->action === 'backoffice.company_created' => 'Empresa criada',
+                    $event->action === 'backoffice.company_updated' => 'Empresa atualizada',
+                    $event->action === 'backoffice.company_deleted' => 'Empresa excluída',
+                    $event->action === 'backoffice.company_status_changed' => 'Status da empresa alterado',
+                    str_ends_with($event->action, 'subscription_suspensao') => 'Assinatura suspensa',
+                    str_ends_with($event->action, 'subscription_reativacao') => 'Assinatura reativada',
+                    str_ends_with($event->action, 'subscription_cancelamento') => 'Cancelamento da assinatura agendado',
+                    str_ends_with($event->action, 'subscription_cancelamento_imediato') => 'Assinatura cancelada imediatamente',
+                    str_ends_with($event->action, 'subscription_upgrade'), str_ends_with($event->action, 'subscription_downgrade') => 'Plano da assinatura alterado',
+                    str_ends_with($event->action, 'subscription_override') => 'Condições comerciais da assinatura ajustadas',
+                    str_ends_with($event->action, 'subscription_free_voucher_activated') => 'Assinatura ativada com voucher gratuito',
+                    str_ends_with($event->action, 'subscription_checkout_created') => 'Assinatura criada',
+                    str_starts_with($event->action, 'backoffice.subscription_') && ! str_contains($event->action, 'viewed') => 'Assinatura atualizada',
+                    str_starts_with($event->action, 'backoffice.catalog_') || str_starts_with($event->action, 'backoffice.plan_') || str_starts_with($event->action, 'backoffice.voucher_') => $noun.' '.$operation['label'],
+                    str_starts_with($event->action, 'billing.refund_') || str_starts_with($event->action, 'backoffice.refund_') => $operation['label'],
+                    str_starts_with($event->action, 'billing.reconciliation_') => $operation['label'],
+                    default => $operation['label'],
+                };
+                $description = $entityLabel.': '.$entityName.' · '.$detail;
 
                 return [
                     'kind' => $event->action,
                     'area' => $area['label'],
                     'icon' => $area['icon'],
                     'tone' => $operation['tone'],
-                    'title' => $operation['label'].' em '.$area['label'],
+                    'title' => $title,
                     'description' => Str::limit($description, 150),
                     'created_at' => Carbon::parse((string) $event->created_at, 'UTC')->toIso8601String(),
                 ];

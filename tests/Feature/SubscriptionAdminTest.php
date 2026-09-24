@@ -365,6 +365,10 @@ class SubscriptionAdminTest extends TestCase
         $this->actingAs($superadmin, 'platform')->patchJson($url, ['public_name' => '  Empresa Alpha  '])->assertOk()->assertJsonPath('public_name', 'Empresa Alpha');
         $this->assertDatabaseHas('subscriptions', ['id' => $fixture['subscription_id'], 'public_name' => 'Empresa Alpha']);
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.subscription_public_name_updated', 'entity_id' => $fixture['subscription_id']]);
+        $this->actingAs($superadmin, 'platform')->getJson('/api/backoffice/dashboard')
+            ->assertOk()
+            ->assertJsonPath('recent_activity.0.title', 'Assinatura atualizada')
+            ->assertJsonPath('recent_activity.0.description', 'Assinatura: Advocacia · Empresa Alpha · Nome público alterado de “sem nome público” para “Empresa Alpha”.');
         $this->actingAs($superadmin, 'platform')->patchJson($url, ['public_name' => null])->assertOk()->assertJsonPath('public_name', null);
         $this->actingAs($superadmin, 'platform')->patchJson($url, ['public_name' => str_repeat('x', 121)])->assertUnprocessable();
     }
