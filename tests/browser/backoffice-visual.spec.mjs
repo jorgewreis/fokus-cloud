@@ -107,7 +107,9 @@ test('visão geral do catálogo apresenta estados vazios e permite tentar novame
     await expect(page.locator('#catalog-overview-error')).toBeVisible();
     await expect(page.locator('#catalog-overview-error-message')).toContainText('Catálogo indisponível');
     fail = false;
-    await page.getByRole('button', { name: 'Tentar novamente' }).click();
+    const retry = page.getByRole('button', { name: 'Tentar novamente' });
+    await retry.focus();
+    await retry.press('Enter');
     await expect(page.locator('#catalog-overview-content')).toBeVisible();
     await expect(page.locator('#catalog-products-total')).toHaveText('0');
     await expect(page.locator('#catalog-pending-empty')).toBeVisible();
