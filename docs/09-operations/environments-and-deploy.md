@@ -20,3 +20,5 @@
 - Processo de deploy.
 - Variaveis obrigatorias.
 - Rotina de backup.
+
+O procedimento de rotação de segredos, backup e restauração está em [Operação de segurança em produção](production-security-runbook.md). A rotina só estará comprovada após um exercício de restauração isolada com evidência registrada.

@@ -1,0 +1,93 @@
+name: Encrypted production backup and isolated restore
+
+"on":
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  backup-and-restore:
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: restore-only-${{ github.run_id }}
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot --password=restore-only-${{ github.run_id }}"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+    steps:
+      - name: Configure SSH and backup encryption
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          BACKUP_PASSPHRASE: ${{ secrets.FOKUS_BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_HOST" && test -n "$DEPLOY_PORT" && test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY" && test -n "$DEPLOY_KNOWN_HOSTS" && test -n "$BACKUP_PASSPHRASE"
+          mkdir -p ~/.ssh "$RUNNER_TEMP/fokuscloud-backup"
+          chmod 700 ~/.ssh "$RUNNER_TEMP/fokuscloud-backup"
+          printf '%s' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+          printf '%s' "$BACKUP_PASSPHRASE" > "$RUNNER_TEMP/fokuscloud-backup-passphrase"
+          chmod 600 "$RUNNER_TEMP/fokuscloud-backup-passphrase"
+
+      - name: Create encrypted database and private-storage backups
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && php deploy/export-database.php" |
+            gzip -1 |
+            gpg --batch --yes --pinentry-mode loopback --passphrase-file "$RUNNER_TEMP/fokuscloud-backup-passphrase" --symmetric --cipher-algo AES256 --output "$RUNNER_TEMP/fokuscloud-backup/database.sql.gz.gpg"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && if test -d storage/app; then tar -czf - storage/app; else tar -czf - --files-from /dev/null; fi" |
+            gpg --batch --yes --pinentry-mode loopback --passphrase-file "$RUNNER_TEMP/fokuscloud-backup-passphrase" --symmetric --cipher-algo AES256 --output "$RUNNER_TEMP/fokuscloud-backup/storage-app.tar.gz.gpg"
+          cd "$RUNNER_TEMP/fokuscloud-backup"
+          sha256sum database.sql.gz.gpg storage-app.tar.gz.gpg > manifest.sha256
+
+      - name: Restore encrypted backup into isolated MySQL
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/fokuscloud-backup"
+          sha256sum --check manifest.sha256
+          docker exec "$MYSQL_CONTAINER" mysql -uroot --password="restore-only-${{ github.run_id }}" -e 'CREATE DATABASE restore_check CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+          gpg --batch --quiet --yes --pinentry-mode loopback --passphrase-file "$RUNNER_TEMP/fokuscloud-backup-passphrase" --decrypt database.sql.gz.gpg |
+            gzip -dc |
+            docker exec -i "$MYSQL_CONTAINER" mysql -uroot --password="restore-only-${{ github.run_id }}" restore_check
+          table_count="$(docker exec "$MYSQL_CONTAINER" mysql -N -uroot --password="restore-only-${{ github.run_id }}" -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'restore_check'")"
+          test "$table_count" -gt 0
+          for table in users companies subscriptions payments platform_audit_events; do
+            docker exec "$MYSQL_CONTAINER" mysql -N -uroot --password="restore-only-${{ github.run_id }}" -e "SELECT COUNT(*) FROM restore_check.$table" >/dev/null
+          done
+          mkdir -p "$RUNNER_TEMP/restored-storage"
+          gpg --batch --quiet --yes --pinentry-mode loopback --passphrase-file "$RUNNER_TEMP/fokuscloud-backup-passphrase" --decrypt storage-app.tar.gz.gpg |
+            tar -xz -C "$RUNNER_TEMP/restored-storage"
+          printf 'Restored tables: %s\n' "$table_count" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Database and private storage restored in an isolated runner.\n' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Store encrypted backup for 30 days
+        uses: actions/upload-artifact@v4
+        with:
+          name: fokuscloud-production-backup-${{ github.run_id }}
+          path: ${{ runner.temp }}/fokuscloud-backup/
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Remove runner passphrase file
+        if: ${{ always() }}
+        run: rm -f "$RUNNER_TEMP/fokuscloud-backup-passphrase"
