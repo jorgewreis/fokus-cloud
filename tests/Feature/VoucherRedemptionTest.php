@@ -153,7 +153,7 @@ class VoucherRedemptionTest extends TestCase
 
         $first = $this->actingAs($user)->withSession(['active_company_id' => $companyId])
             ->withHeaders($headers)->postJson('/api/subscriptions/checkout', $payload)->assertCreated();
-        $second = $this->actingAs($user)->withSession(['active_company_id' => $companyId])
+        $second = $this->withoutExceptionHandling()->actingAs($user)->withSession(['active_company_id' => $companyId])
             ->withHeaders($headers)->postJson('/api/subscriptions/checkout', $payload)->assertCreated();
 
         $this->assertSame($first->json(), $second->json());

@@ -345,7 +345,7 @@ class SubscriptionAdminTest extends TestCase
         $payload = ['action' => 'override', 'reason' => 'Acordo comercial aprovado.', 'override' => ['monthly_amount' => 499.90, 'billing_cycle' => 'monthly']];
 
         $this->actingAs($commercial, 'platform')->patchJson('/api/backoffice/subscriptions/'.$fixture['subscription_id'], $payload)->assertForbidden();
-        $this->actingAs($superadmin, 'platform')->patchJson('/api/backoffice/subscriptions/'.$fixture['subscription_id'], $payload)->assertOk();
+        $this->withoutExceptionHandling()->actingAs($superadmin, 'platform')->patchJson('/api/backoffice/subscriptions/'.$fixture['subscription_id'], $payload)->assertOk();
 
         $change = DB::table('subscription_changes')->where('subscription_id', $fixture['subscription_id'])->where('type', 'override')->first();
         $this->assertNotNull($change);

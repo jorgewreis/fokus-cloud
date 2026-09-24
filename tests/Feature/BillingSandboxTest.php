@@ -81,7 +81,7 @@ class BillingSandboxTest extends TestCase
             ], 200),
         ]);
 
-        $this->withHeaders($this->signedHeaders('auth-sandbox', 'req-authorized'))
+        $this->withoutExceptionHandling()->withHeaders($this->signedHeaders('auth-sandbox', 'req-authorized'))
             ->postJson('/api/webhooks/mercado-pago?data.id=auth-sandbox', ['type' => 'subscription_authorized_payment'])
             ->assertOk();
 
