@@ -69,7 +69,7 @@ return new class extends Migration
             $table->foreign('corrected_by_platform_admin_id', 'recon_corrector_fk')->references('id')->on('platform_admins')->nullOnDelete();
             $table->foreign('audit_event_id', 'recon_audit_fk')->references('id')->on('platform_audit_events')->nullOnDelete();
             $table->index(['status', 'impact', 'opened_at']);
-            $table->index(['company_id', 'subscription_id', 'payment_id']);
+            $table->index(['company_id', 'subscription_id', 'payment_id'], 'recon_company_sub_payment_idx');
             });
         }
 
