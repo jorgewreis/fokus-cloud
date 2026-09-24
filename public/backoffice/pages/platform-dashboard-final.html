@@ -119,7 +119,7 @@
                 <div class="fs-card-header fs-u-d-flex fs-u-flex-wrap fs-u-justify-content-between fs-u-align-items-end fs-u-gap-3">
                     <div class="fs-card-header-title">
                         <h2 class="fs-card-title">Assinaturas</h2>
-                        <p class="fs-card-subtitle">Acompanhe as assinaturas mais recentes da plataforma.</p>
+                            <p class="fs-card-subtitle">Cinco assinaturas ativas de maior valor.</p>
                     </div>
                     <a class="admin-card-link" href="/backoffice/assinaturas">Ver todas</a>
                 </div>
@@ -215,14 +215,13 @@
                 activity:
                     "Single-Man-Actions-Information--Streamline-Ultimate.png",
                 actions: "Multiple-Actions-Setting--Streamline-Ultimate.png",
-            },
-            S = {
-                page: 1,
-                perPage: 15,
-                query: "",
-                status: "",
-                sort: "company",
-                direction: "asc",
+                dashboard: "Layout-Dashboard--Streamline-Ultimate.png",
+                companies: "Small-Office-Tall-Building--Streamline-Ultimate.png",
+                users: "Multiple-Actions-Setting--Streamline-Ultimate.png",
+                catalog: "Customer-Relationship-Management-List-Document-Share--Streamline-Ultimate.png",
+                subscriptions: "Seo-Search--Streamline-Ultimate.png",
+                payments: "Accounting-Coins--Streamline-Ultimate.png",
+                vouchers: "Tickets--Streamline-Ultimate.png",
             },
             notifications = [],
             N = new Intl.NumberFormat("pt-BR"),
@@ -254,6 +253,7 @@
                           year: "numeric",
                           hour: "2-digit",
                           minute: "2-digit",
+                          timeZone: "America/Fortaleza",
                       }).format(d);
             },
             status = (v) =>
@@ -388,14 +388,9 @@
             z.hidden = !!a.length;
             l.innerHTML = a
                 .map((x) => {
-                    const style = x.kind?.includes("company")
-                        ? "company"
-                        : x.kind?.includes("subscription")
-                          ? "change"
-                          : x.kind?.includes("payment")
-                            ? "warning"
-                            : "activity";
-                    return `<div class="admin-activity-item admin-activity-${style}"><span class="admin-activity-marker" aria-hidden="true"></span><span class="admin-activity-symbol">${img(style === "company" ? "company" : style === "change" ? "change" : style === "warning" ? "alert" : "activity")}</span><span><strong>${e(x.title || "Atividade registrada")}</strong><small>${e(x.description || "")}</small></span><time>${date(x.created_at)}</time></div>`;
+                    const area = x.icon && I[x.icon] ? x.icon : "dashboard";
+                    const tone = ["creation", "alteration", "pause", "deletion", "publication", "warning"].includes(x.tone) ? x.tone : "alteration";
+                    return `<div class="admin-activity-item admin-activity-${tone}"><span class="admin-activity-marker" aria-hidden="true"></span><span class="admin-activity-symbol">${img(area)}</span><span class="admin-activity-copy"><strong>${e(x.title || "Atividade no Dashboard")}</strong><small>${e(x.description || "Detalhes não informados.")}</small></span><time datetime="${e(x.created_at || "")}">${date(x.created_at)}</time></div>`;
                 })
                 .join("");
         };
@@ -410,26 +405,18 @@
                       )
                       .join("")
                 : '<tr><td colspan="6">Nenhuma assinatura encontrada.</td></tr>';
-            let from = p.total ? (p.current_page - 1) * p.per_page + 1 : 0,
-                to = p.total
-                    ? Math.min(p.current_page * p.per_page, p.total)
-                    : 0;
             document.querySelector("#subscriptions-table-summary").textContent =
                 p.total
-                    ? `Mostrando ${from} a ${to} de ${p.total} assinaturas`
-                    : "Nenhuma assinatura encontrada";
-            document.querySelector("#subscriptions-pagination").innerHTML =
-                `<ul class="fs-pagination fs-pagination-compact">${Array.from(
-                    { length: p.last_page || 1 },
-                    (_, i) =>
-                        `<li class="fs-page-item${i + 1 === p.current_page ? " is-active" : ""}"><button type="button" class="fs-page-link" data-subscription-page="${i + 1}" aria-label="Página ${i + 1}"${i + 1 === p.current_page ? ' aria-current="page"' : ""}>${i + 1}</button></li>`,
-                ).join("")}</ul>`;
+                    ? `Exibindo ${a.length} de ${p.total} assinaturas ativas por valor.`
+                    : "Nenhuma assinatura ativa encontrada.";
+            document.querySelector("#subscriptions-pagination").replaceChildren();
             window.refreshFokusDataTables?.(document.querySelector(".admin-final-dashboard"));
         };
         const loadSubscriptions = async () => {
                 let p = new URLSearchParams({
-                    page: S.page,
-                    per_page: S.perPage,
+                    dashboard_top_value: "1",
+                    per_page: "5",
+                    status: "ativa",
                 });
                 let r = await fetch(`/api/backoffice/subscriptions?${p}`, {
                     credentials: "same-origin",
@@ -459,13 +446,6 @@
                 alerts(p.alerts || []);
                 activity(p.recent_activity || []);
             };
-        document.addEventListener("click", (x) => {
-            let p = x.target.closest("[data-subscription-page]");
-            if (p) {
-                S.page = +p.dataset.subscriptionPage;
-                loadSubscriptions().catch(() => {});
-            }
-        });
         const showLoadError = () => {
             const error = document.querySelector("#dashboard-load-error");
             error.textContent = "Não foi possível carregar os dados do Dashboard. Atualize a página ou entre novamente.";

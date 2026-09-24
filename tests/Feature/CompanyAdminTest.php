@@ -87,8 +87,11 @@ class CompanyAdminTest extends TestCase
             ->assertJsonPath('metrics.active_companies', 1)
             ->assertJsonPath('metrics.active_people', 1)
             ->assertJsonPath('recent_activity.0.kind', 'backoffice.company_created')
-            ->assertJsonPath('recent_activity.0.title', 'Empresa cadastrada no backoffice')
-            ->assertJsonPath('recent_activity.0.description', 'Empresa Exibida na Atividade cadastrada com acesso administrativo.');
+            ->assertJsonPath('recent_activity.0.area', 'Empresas')
+            ->assertJsonPath('recent_activity.0.icon', 'companies')
+            ->assertJsonPath('recent_activity.0.tone', 'creation')
+            ->assertJsonPath('recent_activity.0.title', 'Criado em Empresas')
+            ->assertJsonPath('recent_activity.0.description', 'Empresa: Empresa Exibida na Atividade');
     }
 
     public function test_superadmin_can_edit_deactivate_reactivate_and_remove_company_without_subscriptions(): void

@@ -82,6 +82,9 @@ class SubscriptionAdminTest extends TestCase
             ->assertJsonPath('has_active_free_benefit', true)
             ->assertJsonPath('items.0.unit_price', 0);
         $this->assertEqualsWithDelta($originalAmount, (float) $subscriptionDetails->json('base_amount'), 0.01);
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/dashboard')
+            ->assertOk()
+            ->assertJsonPath('metrics.mrr', 0);
         $listedCompany = $this->actingAs($admin, 'platform')->getJson('/api/backoffice/companies?q=Alpha')->assertOk();
         $this->assertSame(1, $listedCompany->json('data.0.active_subscriptions'));
         $this->assertSame($plan->name, $listedCompany->json('data.0.plan_name'));
@@ -133,6 +136,31 @@ class SubscriptionAdminTest extends TestCase
             ->assertJsonPath('items.0.name', 'Gestão de Processos para Advogados')
             ->assertJsonPath('payments.0.status', 'aguardando_pagamento')
             ->assertJsonPath('history', []);
+    }
+
+    public function test_dashboard_subscription_list_returns_five_highest_value_active_items(): void
+    {
+        $admin = $this->platformAdmin();
+        foreach (range(1, 7) as $index) {
+            $fixture = $this->subscriptionFixture(['cpf' => str_pad((string) $index, 11, '0', STR_PAD_LEFT)]);
+            DB::table('companies')->where('id', $fixture['company_id'])->update([
+                'document_number' => sprintf('12345678000%03d', $index),
+                'legal_name' => "Empresa {$index}",
+            ]);
+            $amount = $index * 10;
+            DB::table('subscriptions')->where('id', $fixture['subscription_id'])->update([
+                'status' => $index === 7 ? 'encerrada' : 'ativa',
+                'commercial_snapshot' => json_encode(['plan_name' => "Plano {$index}", 'amount' => $amount, 'monthly_amount' => $amount]),
+            ]);
+        }
+
+        $response = $this->actingAs($admin, 'platform')->getJson('/api/backoffice/subscriptions?dashboard_top_value=1&status=ativa&per_page=5')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 6)
+            ->assertJsonCount(5, 'data');
+
+        $this->assertSame([60, 50, 40, 30, 20], array_map(fn (array $item): int => (int) $item['amount'], $response->json('data')));
+        $this->assertNotContains('Empresa 7', array_column($response->json('data'), 'company_name'));
     }
 
     public function test_admin_can_pause_reactivate_and_schedule_cancellation_with_audit(): void
@@ -343,7 +371,7 @@ class SubscriptionAdminTest extends TestCase
     {
         $product = DB::table('products')->where('code', 'law')->first();
         $module = DB::table('modules')->where('code', 'processos-advocacia')->first();
-        $user = User::create(['id' => PrefixedUlid::make('USR'), 'name' => 'Administrador Alpha', 'cpf' => '52998224725', 'email' => 'cliente-'.User::count().'@example.test', 'password' => Hash::make('SenhaCliente!2026'), 'status' => 'ativa', 'email_verified_at' => now()]);
+        $user = User::create(['id' => PrefixedUlid::make('USR'), 'name' => 'Administrador Alpha', 'cpf' => $options['cpf'] ?? '52998224725', 'email' => 'cliente-'.User::count().'@example.test', 'password' => Hash::make('SenhaCliente!2026'), 'status' => 'ativa', 'email_verified_at' => now()]);
         $companyId = PrefixedUlid::make('COM');
         DB::table('companies')->insert(['id' => $companyId, 'document_type' => 'cnpj', 'document_number' => '12345678000100', 'legal_name' => 'Empresa Alpha', 'status' => 'ativa', 'version' => 1, 'created_by' => $user->id, 'updated_by' => $user->id, 'created_at' => now(), 'updated_at' => now()]);
         DB::table('company_memberships')->insert(['id' => PrefixedUlid::make('MBS'), 'company_id' => $companyId, 'user_id' => $user->id, 'role_id' => DB::table('roles')->where('code', 'admin')->value('id'), 'status' => 'ativo', 'active_admin_company_id' => $companyId, 'version' => 1, 'created_by' => $user->id, 'updated_by' => $user->id, 'created_at' => now(), 'updated_at' => now()]);

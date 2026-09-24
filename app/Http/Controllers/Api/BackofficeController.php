@@ -34,6 +34,18 @@ class BackofficeController extends Controller
         $activeSubscriptions = DB::table('subscriptions')
             ->where('status', 'ativa')
             ->get(['id', 'created_at', 'commercial_snapshot']);
+        $activeFreeSubscriptionIds = DB::table('voucher_redemptions')
+            ->whereIn('subscription_id', $activeSubscriptions->pluck('id'))
+            ->get(['subscription_id', 'snapshot', 'benefit_ends_at'])
+            ->filter(function (object $redemption): bool {
+                $snapshot = json_decode((string) $redemption->snapshot, true) ?: [];
+
+                return ($snapshot['discount_type'] ?? null) === 'trial_free'
+                    && $redemption->benefit_ends_at
+                    && now()->lt($redemption->benefit_ends_at);
+            })
+            ->pluck('subscription_id')
+            ->all();
         $trendStart = now()->startOfMonth()->subMonths(5);
         $trend = collect(range(0, 5))->map(function (int $offset) use ($activeSubscriptions, $trendStart): array {
             $month = $trendStart->copy()->addMonths($offset);
@@ -44,7 +56,11 @@ class BackofficeController extends Controller
                 'value' => $activeSubscriptions->filter(fn (object $subscription): bool => Carbon::parse($subscription->created_at)->format('Y-m') === $month->format('Y-m'))->count(),
             ];
         })->values();
-        $mrr = $activeSubscriptions->sum(function (object $subscription): float {
+        $mrr = $activeSubscriptions->sum(function (object $subscription) use ($activeFreeSubscriptionIds): float {
+            if (in_array($subscription->id, $activeFreeSubscriptionIds, true)) {
+                return 0.0;
+            }
+
             $snapshot = json_decode((string) $subscription->commercial_snapshot, true) ?: [];
 
             return (float) ($snapshot['monthly_amount'] ?? 0);
@@ -85,40 +101,98 @@ class BackofficeController extends Controller
             ],
         ];
 
-        $activityLabels = [
-            'backoffice.company_created' => 'Empresa cadastrada no backoffice',
-            'backoffice.company_updated' => 'Dados da empresa atualizados',
-            'backoffice.company_status_changed' => 'Status da empresa alterado',
-            'backoffice.company_deleted' => 'Empresa removida do backoffice',
-        ];
-
         $recentActivity = DB::table('platform_audit_events')
-            ->select('action', 'created_at', 'before_masked', 'after_masked')
+            ->select('action', 'entity_type', 'entity_id', 'company_id', 'reason', 'metadata', 'created_at', 'before_masked', 'after_masked')
             ->where('action', 'not like', '%_viewed')
             ->orderByDesc('created_at')
             ->limit(5)
             ->get()
-            ->map(function (object $event) use ($activityLabels): array {
+            ->map(function (object $event): array {
                 $before = json_decode((string) $event->before_masked, true) ?: [];
                 $after = json_decode((string) $event->after_masked, true) ?: [];
-                $companyName = $after['legal_name'] ?? $before['legal_name'] ?? 'Empresa';
+                $entityLabels = [
+                    'company' => 'Empresa', 'product' => 'Produto', 'module' => 'Módulo', 'plan' => 'Plano',
+                    'subscription' => 'Assinatura', 'payment' => 'Pagamento', 'voucher' => 'Voucher',
+                    'platform_admin' => 'Administrador', 'user' => 'Usuário', 'refund_request' => 'Reembolso',
+                    'catalog_publication' => 'Publicação',
+                ];
+                $area = match (true) {
+                    str_starts_with($event->action, 'backoffice.company_') => ['label' => 'Empresas', 'icon' => 'companies'],
+                    str_starts_with($event->action, 'backoffice.catalog_'), str_starts_with($event->action, 'backoffice.plan_') => ['label' => 'Catálogo', 'icon' => 'catalog'],
+                    str_starts_with($event->action, 'backoffice.subscription_') => ['label' => 'Assinaturas', 'icon' => 'subscriptions'],
+                    str_starts_with($event->action, 'backoffice.payment'), str_starts_with($event->action, 'billing.') => ['label' => 'Pagamentos', 'icon' => 'payments'],
+                    str_starts_with($event->action, 'backoffice.voucher_') => ['label' => 'Vouchers', 'icon' => 'vouchers'],
+                    str_starts_with($event->action, 'backoffice.admin_'), str_starts_with($event->action, 'backoffice.password_') => ['label' => 'Usuários', 'icon' => 'users'],
+                    default => ['label' => 'Dashboard', 'icon' => 'dashboard'],
+                };
+                $operation = match (true) {
+                    str_contains($event->action, '_created') => ['label' => 'Criado', 'tone' => 'creation'],
+                    str_contains($event->action, '_deleted'), str_contains($event->action, '_archived') => ['label' => 'Excluído ou arquivado', 'tone' => 'deletion'],
+                    str_contains($event->action, 'paused'), str_contains($event->action, 'pausado'), str_contains($event->action, 'suspensao'), str_contains($event->action, 'deactivated'), str_contains($event->action, 'suspended') => ['label' => 'Pausado', 'tone' => 'pause'],
+                    str_contains($event->action, 'activated'), str_contains($event->action, 'reactivated'), str_contains($event->action, 'reativacao') => ['label' => 'Ativado', 'tone' => 'publication'],
+                    str_contains($event->action, 'published'), str_contains($event->action, 'catalog_published') => ['label' => 'Publicado', 'tone' => 'publication'],
+                    str_contains($event->action, 'refund_') => ['label' => 'Reembolso atualizado', 'tone' => 'warning'],
+                    str_contains($event->action, 'status_changed') => ['label' => 'Status alterado', 'tone' => 'alteration'],
+                    str_contains($event->action, '_updated'), str_contains($event->action, 'upgrade'), str_contains($event->action, 'downgrade'), str_contains($event->action, 'override') => ['label' => 'Atualizado', 'tone' => 'alteration'],
+                    str_contains($event->action, 'cancelamento') => ['label' => 'Cancelamento registrado', 'tone' => 'warning'],
+                    default => ['label' => 'Ação registrada', 'tone' => 'alteration'],
+                };
+                $entityType = (string) ($event->entity_type ?? '');
+                $entityLabel = $entityLabels[$entityType] ?? 'Registro';
                 $statusBefore = $before['status'] ?? null;
                 $statusAfter = $after['status'] ?? null;
-                $description = match ($event->action) {
-                    'backoffice.company_created' => "{$companyName} cadastrada com acesso administrativo.",
-                    'backoffice.company_updated' => "Os dados de {$companyName} foram atualizados.",
-                    'backoffice.company_status_changed' => $statusBefore && $statusAfter
-                        ? "{$companyName}: {$statusBefore} para {$statusAfter}."
-                        : "O status de {$companyName} foi alterado.",
-                    'backoffice.company_deleted' => "{$companyName} removida da listagem ativa.",
-                    default => 'Evento registrado na auditoria da plataforma.',
-                };
+                $entityName = $after['legal_name'] ?? $before['legal_name'] ?? $after['plan_name'] ?? $before['plan_name'] ?? $after['name'] ?? $before['name'] ?? $after['product_name'] ?? $before['product_name'] ?? $after['module_name'] ?? $before['module_name'] ?? null;
+
+                if (! $entityName && $event->entity_id) {
+                    $entityNames = [
+                        'company' => ['companies', 'legal_name'], 'product' => ['products', 'name'],
+                        'module' => ['modules', 'name'], 'plan' => ['plans', 'name'],
+                        'voucher' => ['vouchers', 'name'], 'platform_admin' => ['platform_admins', 'name'],
+                        'user' => ['users', 'name'],
+                    ];
+                    if (isset($entityNames[$entityType])) {
+                        [$table, $column] = $entityNames[$entityType];
+                        if (\Illuminate\Support\Facades\Schema::hasTable($table)) {
+                            $entityName = DB::table($table)->where('id', $event->entity_id)->value($column);
+                        }
+                    }
+                    if ($entityType === 'subscription') {
+                        $snapshot = DB::table('subscriptions')->where('id', $event->entity_id)->value('commercial_snapshot');
+                        $snapshot = json_decode((string) $snapshot, true) ?: [];
+                        $entityName = $snapshot['plan_name'] ?? null;
+                        if ($event->company_id) {
+                            $companyName = DB::table('companies')->where('id', $event->company_id)->value('legal_name');
+                            if ($companyName) {
+                                $entityName = ($entityName ? $entityName.' · ' : '').$companyName;
+                            }
+                        }
+                    }
+                }
+
+                $entityName ??= $entityLabel.' sem nome informado';
+                $detail = $statusBefore && $statusAfter && $statusBefore !== $statusAfter
+                    ? "Status: {$statusBefore} → {$statusAfter}"
+                    : '';
+                if (! $detail && $operation['label'] === 'Atualizado') {
+                    $fieldLabels = ['legal_name' => 'nome da empresa', 'name' => 'nome', 'status' => 'status', 'monthly_amount' => 'valor mensal', 'billing_cycle' => 'ciclo', 'segment' => 'segmento', 'module_ids' => 'módulos do plano', 'module_codes' => 'módulos', 'publication_state' => 'publicação'];
+                    $changedFields = array_values(array_filter(array_keys($after), fn (string $key): bool => array_key_exists($key, $fieldLabels) && ($before[$key] ?? null) !== $after[$key]));
+                    if ($changedFields !== []) {
+                        $detail = 'Campos: '.implode(', ', array_map(fn (string $key): string => $fieldLabels[$key], array_slice($changedFields, 0, 2)));
+                    }
+                }
+                if (! $detail && $event->reason) {
+                    $detail = 'Motivo: '.trim((string) $event->reason);
+                }
+                $description = "{$entityLabel}: {$entityName}".($detail ? " · {$detail}" : '');
 
                 return [
                     'kind' => $event->action,
-                    'title' => $activityLabels[$event->action] ?? 'Atividade registrada no backoffice',
-                    'description' => $description,
-                    'created_at' => $event->created_at,
+                    'area' => $area['label'],
+                    'icon' => $area['icon'],
+                    'tone' => $operation['tone'],
+                    'title' => $operation['label'].' em '.$area['label'],
+                    'description' => Str::limit($description, 150),
+                    'created_at' => Carbon::parse((string) $event->created_at, 'UTC')->toIso8601String(),
                 ];
             })
             ->values();
@@ -454,18 +528,34 @@ class BackofficeController extends Controller
         $status = $request->query('status');
         $productId = $request->query('product_id');
         $perPage = min(max((int) $request->query('per_page', 15), 1), 100);
-        $paginator = DB::table('subscriptions as subscription')
+        $subscriptionsQuery = DB::table('subscriptions as subscription')
             ->join('companies as company', 'company.id', '=', 'subscription.company_id')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->whereNull('company.deleted_at')
             ->when($query, fn ($builder) => $builder->where(fn ($filter) => $filter->where('company.legal_name', 'like', "%{$query}%")->orWhere('product.name', 'like', "%{$query}%")))
             ->when($status, fn ($builder) => $builder->where('subscription.status', $status))
             ->when($productId, fn ($builder) => $builder->where('subscription.product_id', $productId))
-            ->select('subscription.*', 'company.legal_name as company_name', 'product.code as product_code', 'product.name as product_name')
-            ->orderByDesc('subscription.created_at')
-            ->paginate($perPage);
+            ->select('subscription.*', 'company.legal_name as company_name', 'product.code as product_code', 'product.name as product_name');
 
         $audit->record($request->user()->id, 'backoffice.subscriptions_viewed', request: $request);
+
+        if ($request->boolean('dashboard_top_value')) {
+            $items = $subscriptionsQuery
+                ->where('subscription.status', 'ativa')
+                ->orderByDesc('subscription.created_at')
+                ->get()
+                ->map(fn (object $subscription): array => $this->subscriptionPayload($subscription))
+                ->all();
+            usort($items, fn (array $left, array $right): int => ((float) ($right['amount'] ?? 0)) <=> ((float) ($left['amount'] ?? 0)));
+            $total = count($items);
+
+            return response()->json([
+                'data' => array_slice($items, 0, 5),
+                'meta' => ['total' => $total, 'current_page' => 1, 'per_page' => 5, 'last_page' => 1],
+            ]);
+        }
+
+        $paginator = $subscriptionsQuery->orderByDesc('subscription.created_at')->paginate($perPage);
 
         return response()->json([
             'data' => collect($paginator->items())->map(fn (object $subscription): array => $this->subscriptionPayload($subscription))->values(),

@@ -33,15 +33,14 @@ const dashboardPayload = {
         { month: '2026-09', label: 'Set 2026', value: 9 },
     ],
     alerts: [{ key: 'declined_payments', label: 'Pagamentos recusados', description: 'Pagamentos que exigem acompanhamento comercial.', value: 3, href: '/backoffice/pagamentos?status=recusado', icon: 'warning' }],
-    recent_activity: [{ kind: 'backoffice.company_created', title: 'Empresa cadastrada no backoffice', description: 'Empresa Demonstração cadastrada com acesso administrativo.', created_at: '2026-09-24T12:00:00.000Z' }],
+    recent_activity: [{ kind: 'backoffice.company_created', area: 'Empresas', icon: 'companies', tone: 'creation', title: 'Criado em Empresas', description: 'Empresa: Empresa Demonstração', created_at: '2026-09-24T12:00:00.000Z' }],
 };
 
 const dashboardSubscriptions = {
     data: [
-        { id: 'SUB_DASH_01', company_name: 'Empresa Demonstração', product_name: 'Fokus Law', plan_name: 'Advocacia', status: 'ativa', current_period_ends_at: '2026-10-24T00:00:00.000Z', amount: 149 },
-        { id: 'SUB_DASH_02', company_name: 'Empresa Teste', product_name: 'Fokus Lead', plan_name: 'Essencial', status: 'aguardando_pagamento', current_period_ends_at: '2026-10-20T00:00:00.000Z', amount: 49 },
+        ...[149, 129, 99, 79, 59].map((amount, index) => ({ id: `SUB_DASH_0${index + 1}`, company_name: `Empresa ${index + 1}`, product_name: 'Fokus Law', plan_name: 'Advocacia', status: 'ativa', current_period_ends_at: '2026-10-24T00:00:00.000Z', amount })),
     ],
-    meta: { total: 2, current_page: 1, per_page: 15, last_page: 1 },
+    meta: { total: 8, current_page: 1, per_page: 5, last_page: 1 },
 };
 
 for (const [name, viewport] of viewports) {
@@ -74,6 +73,41 @@ test('navegação cancela a página anterior e mantém somente um drawer portale
     await expect(page.locator('body > #company-drawer')).toHaveCount(1);
 });
 
+test('menu lateral abre no Dashboard, mantém Catálogo como alternador e desativa destinos pendentes', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.route('**/api/backoffice/dashboard', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(dashboardPayload) }));
+    await page.route('**/api/backoffice/subscriptions?**', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(dashboardSubscriptions) }));
+
+    await page.goto('/backoffice/');
+    await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'platform-dashboard-final');
+    await expect(page.locator('#dashboard-page-title')).toHaveText('Dashboard');
+
+    const catalogToggle = page.locator('[data-sidebar-group="catalog"] .sidebar-group-toggle');
+    await expect(catalogToggle).toHaveAttribute('aria-expanded', 'true');
+    const pageBeforeToggle = page.url();
+    await catalogToggle.click();
+    await expect(catalogToggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('#catalog-subnav')).toBeHidden();
+    expect(page.url()).toBe(pageBeforeToggle);
+    await catalogToggle.click();
+    await expect(catalogToggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('#catalog-subnav')).toBeVisible();
+
+    await expect(page.locator('[data-sidebar-item="product-interests"]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Interessados' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Configurações' })).toBeDisabled();
+    const menuLayout = await page.locator('#catalog-subnav').evaluate((subnav) => {
+        const group = subnav.getBoundingClientRect();
+        const link = subnav.querySelector('.sidebar-subnav-button').getBoundingClientRect();
+        const chevron = document.querySelector('.sidebar-group-chevron');
+        const chevronStyles = getComputedStyle(chevron);
+        return { groupWidth: group.width, linkWidth: link.width, chevronVisible: chevronStyles.display !== 'none', chevronMarginLeft: chevronStyles.marginLeft };
+    });
+    expect(menuLayout.groupWidth - menuLayout.linkWidth).toBeLessThanOrEqual(1);
+    expect(menuLayout.chevronVisible).toBe(true);
+    expect(Number.parseFloat(menuLayout.chevronMarginLeft)).toBeGreaterThan(0);
+});
+
 test('dashboard usa cards e larguras responsivas sem alterar dados ou colunas', async ({ page }) => {
     await page.route('**/api/backoffice/dashboard', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(dashboardPayload) }));
     await page.route('**/api/backoffice/subscriptions?**', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(dashboardSubscriptions) }));
@@ -95,8 +129,16 @@ test('dashboard usa cards e larguras responsivas sem alterar dados ou colunas', 
         await expect(page.getByRole('img', { name: 'Gráfico de novas assinaturas ativas' })).toBeVisible();
         await expect(page.locator('.admin-chart-point')).toHaveCount(6);
         await expect(page.locator('#dashboard-alerts .admin-attention-item')).toHaveCount(1);
-        await expect(page.locator('#subscriptions-table-body tr')).toHaveCount(2);
+        await expect(page.locator('#subscriptions-table-body tr')).toHaveCount(5);
+        await expect(page.locator('#subscriptions-table-body')).toContainText('Empresa 1');
+        await expect(page.locator('#subscriptions-table-summary')).toHaveText('Exibindo 5 de 8 assinaturas ativas por valor.');
         await expect(page.locator('#dashboard-recent-activity .admin-activity-item')).toHaveCount(1);
+        await expect(page.locator('.admin-activity-item')).toHaveClass(/admin-activity-creation/);
+        await expect(page.locator('.admin-activity-item')).toContainText('Empresa: Empresa Demonstração');
+        await expect(page.locator('.admin-activity-item time')).toHaveText(/09:00/);
+        const sidebarCompanyIcon = await page.locator('[data-sidebar-item="companies"] img').getAttribute('src');
+        const activityIcon = await page.locator('.admin-activity-symbol img').getAttribute('src');
+        expect(new URL(activityIcon, page.url()).pathname).toBe(new URL(sidebarCompanyIcon, page.url()).pathname);
         await expect(page.getByRole('link', { name: 'Nova empresa' })).toBeVisible();
         await expect(page.locator('.admin-metric-card small')).toHaveCount(0);
 
@@ -179,13 +221,13 @@ test('dashboard preserva estados vazios e mostra erro de carregamento', async ({
             alerts: [],
             recent_activity: [],
         }) }));
-    await page.route('**/api/backoffice/subscriptions?**', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: [], meta: { total: 0, current_page: 1, per_page: 15, last_page: 1 } }) }));
+    await page.route('**/api/backoffice/subscriptions?**', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: [], meta: { total: 0, current_page: 1, per_page: 5, last_page: 1 } }) }));
 
     await page.goto('/backoffice/painel');
     await expect(page.locator('#subscription-chart-empty')).toBeVisible();
     await expect(page.locator('#dashboard-alerts-empty')).toBeVisible();
     await expect(page.locator('#dashboard-recent-activity-empty')).toBeVisible();
-    await expect(page.locator('#subscriptions-table-summary')).toHaveText('Nenhuma assinatura encontrada');
+    await expect(page.locator('#subscriptions-table-summary')).toHaveText('Nenhuma assinatura ativa encontrada.');
     await expect(page.locator('#dashboard-load-error')).toBeHidden();
 
     failDashboardRequest = true;

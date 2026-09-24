@@ -6,7 +6,7 @@
  * portalled overlays and release listeners before the next page is mounted.
  */
 (() => {
-    const ASSET_VERSION = "20260924-catalog-overview-v2";
+    const ASSET_VERSION = "20260924-dashboard-activity-values-v4";
 
     const pages = {
         "platform-dashboard-final": { route: "painel", fragment: "platform-dashboard-final" },
@@ -71,7 +71,7 @@
 
         pageFromLocation() {
             const route = location.pathname.split("/").filter(Boolean).pop();
-            return routeAliases[route] || "companies";
+            return routeAliases[route] || "platform-dashboard-final";
         }
 
         canAccess(page) {
@@ -201,8 +201,10 @@
         }
 
         setActivePage(pageId) {
+            const catalogPages = new Set(["catalog-overview", "products", "modules", "subscription-plans"]);
             this.sidebarButtons.forEach((button) => {
-                button.classList.toggle("active", button.dataset.sidebarItem === pageId);
+                const isCatalogGroup = button.classList.contains("sidebar-group-toggle") && catalogPages.has(pageId);
+                button.classList.toggle("active", button.dataset.sidebarItem === pageId || isCatalogGroup);
             });
         }
 

@@ -542,7 +542,15 @@ html[data-role="admin"] .sidebar-nav-group {
     display: flex;
     flex-direction: column;
     width: 100%;
-    gap: 3px;
+    gap: 0;
+}
+html[data-role="admin"] .fs-sidebar .sidebar-group-chevron {
+    width: 16px !important;
+    height: 16px !important;
+    flex: 0 0 16px !important;
+    margin: 0 8px 0 auto !important;
+    filter: none !important;
+    opacity: .9 !important;
 }
 html[data-role="admin"] .fs-sidebar.single .sidebar-group-chevron,
 html[data-role="admin"] .fs-sidebar.is-collapsing .sidebar-group-chevron {
@@ -1440,21 +1448,22 @@ html[data-role="admin"] .fs-sidebar > .sidebar-nav::-webkit-scrollbar-thumb {
    sublink buttons only. */
 html[data-role="admin"] .fs-sidebar .sidebar-subnav-button {
     box-sizing: border-box;
-    width: calc(100% - 35px) !important;
+    width: 100% !important;
     height: 30px !important;
     min-height: 30px !important;
-    padding: 0 15px !important;
-    overflow: hidden;
+    margin: 0 !important;
+    padding: 0 16px !important;
+    overflow: visible;
 }
 html[data-role="admin"] .fs-sidebar .sidebar-subnav-button .sidebar-button-label {
     display: block;
     flex: 1 1 0;
-    width: 100% !important;
+    width: auto !important;
     max-width: 100% !important;
     margin-left: 0 !important;
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis !important;
+    overflow: visible;
+    text-overflow: clip !important;
     white-space: nowrap;
 }
 
@@ -1784,8 +1793,11 @@ html[data-role="admin"] .fs-sidebar .sidebar-button {
     border-radius: 50%;
     background: var(--admin-terracotta, #c96f4a);
 }
-.admin-final-dashboard .admin-activity-company .admin-activity-marker { background: #ef8a15; }
-.admin-final-dashboard .admin-activity-change .admin-activity-marker { background: #178f9c; }
+.admin-final-dashboard .admin-activity-creation .admin-activity-marker { background: #18845b; }
+.admin-final-dashboard .admin-activity-alteration .admin-activity-marker { background: #178f9c; }
+.admin-final-dashboard .admin-activity-pause .admin-activity-marker { background: #d18b22; }
+.admin-final-dashboard .admin-activity-deletion .admin-activity-marker { background: #c53d4b; }
+.admin-final-dashboard .admin-activity-publication .admin-activity-marker { background: #5268c9; }
 .admin-final-dashboard .admin-activity-warning .admin-activity-marker { background: #c9613d; }
 .admin-final-dashboard .admin-activity-symbol {
     display: grid;
@@ -1801,6 +1813,9 @@ html[data-role="admin"] .fs-sidebar .sidebar-button {
 .admin-final-dashboard .admin-activity-item strong { color: #17345c; font-size: .85rem; line-height: 1.25; }
 .admin-final-dashboard .admin-activity-item small,
 .admin-final-dashboard .admin-activity-item time { color: #7788a1; font-size: .75rem; line-height: 1.4; }
+.admin-final-dashboard .admin-activity-copy { display: grid; min-width: 0; }
+.admin-final-dashboard .admin-activity-item strong,
+.admin-final-dashboard .admin-activity-item small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-final-dashboard .admin-activity-item small { margin-top: 2px; }
 .admin-final-dashboard .admin-activity-item time { white-space: nowrap; }
 .admin-final-dashboard .admin-quick-actions-grid {
