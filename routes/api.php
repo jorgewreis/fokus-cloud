@@ -122,6 +122,7 @@ Route::middleware(EnsurePlatformAdmin::class)->prefix('backoffice')->group(funct
     Route::post('/subscriptions/{subscription}/free-voucher', [SubscriptionController::class, 'activateWithFreeVoucher'])->middleware(EnsurePlatformPermission::class.':platform.subscriptions.manage');
     Route::get('/subscriptions/{subscription}', [BackofficeController::class, 'subscription'])->middleware(EnsurePlatformPermission::class.':platform.subscriptions.manage');
     Route::patch('/subscriptions/{subscription}', [BackofficeController::class, 'changeSubscription'])->middleware(EnsurePlatformPermission::class.':platform.subscriptions.manage');
+    Route::patch('/subscriptions/{subscription}/public-name', [BackofficeController::class, 'updateSubscriptionPublicName'])->middleware(EnsurePlatformSuperadmin::class);
     Route::get('/payments', [BackofficeController::class, 'payments'])->middleware(EnsurePlatformPermission::class.':platform.payments.view');
     Route::get('/payments/{payment}', [BackofficeController::class, 'payment'])->middleware(EnsurePlatformPermission::class.':platform.payments.view');
     Route::get('/reconciliation', [BackofficeController::class, 'reconciliation'])->middleware(EnsurePlatformPermission::class.':platform.reconciliation.view');

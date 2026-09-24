@@ -32,6 +32,7 @@
       const paymentLabels = { aguardando_pagamento: 'Aguardando pagamento', aprovado: 'Pago', recusado: 'Pagamento recusado', cancelado: 'Cancelado', estornado: 'Estornado', em_disputa: 'Em análise' };
       const conditionLabels = { usage_limit: 'Limite de utilização', plan_code: 'Plano', segment_code: 'Segmento', variant_code: 'Configuração', cycle: 'Ciclo' };
       const cycleLabels = { monthly: 'Mensal', annual: 'Anual' };
+      const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
       const hiddenConditions = ['module_code', 'selection_mode', 'context_code', 'collaboration_code', 'collaboration'];
       const formatConditions = (conditions) => Object.entries(conditions || {}).filter(([key, value]) => value !== null && value !== '' && !hiddenConditions.includes(key) && !(key === 'variant_code' && value === 'colaboracao')).map(([key, value]) => `<li>${conditionLabels[key] || key}: <b>${key === 'cycle' ? (cycleLabels[value] || value) : (Array.isArray(value) ? value.join(', ') : value)}</b></li>`).join('');
       (async () => {
@@ -51,7 +52,9 @@
             const cancel = canCancel ? `<div class="review-actions"><button class="fs-btn fs-btn-outline-primary" data-cancel="${item.id}" data-type="${item.status === 'aguardando_pagamento' ? 'cancelamento_imediato' : 'cancelamento'}">Cancelar</button></div>` : (item.cancel_at ? `<p class="fs-u-color-danger" style="color:#b42318 !important"><b>Cancelado em ${new Date(item.cancel_at).toLocaleDateString('pt-BR')}</b></p>` : '');
             const remove = canDelete ? `<div class="review-actions"><button class="fs-btn fs-btn-danger" data-delete="${item.id}">Excluir</button></div>` : '';
             const paymentStatus = isCanceled ? 'cancelado' : (item.payment?.status || 'aguardando_pagamento');
-            return `<article class="admin-list-item"><h2 style="font-size:20px !important">${item.product_name}</h2><p>Número da assinatura: <b>${item.id}</b></p><p>Status da assinatura: <b>${statusLabels[item.status] || item.status}</b></p>${period}<p>Status do pagamento: <b>${paymentLabels[paymentStatus] || paymentStatus}</b> — ${total}</p><h3 style="font-size:16px !important">Módulos e configurações</h3><ul>${item.items.map((entry) => `<li><b>${entry.name}</b> (${entry.quantity}x)${formatConditions(entry.conditions) ? `<ul>${formatConditions(entry.conditions)}</ul>` : ''}</li>`).join('')}</ul>${cancel}${remove}</article>`;
+            const title = item.display_name || item.public_name || item.product_name;
+            const product = `<p>${escapeHtml(item.product_name)}</p>`;
+            return `<article class="admin-list-item"><h2 style="font-size:20px !important">${escapeHtml(title)}</h2>${product}<p>Número da assinatura: <b>${escapeHtml(item.id)}</b></p><p>Status da assinatura: <b>${escapeHtml(statusLabels[item.status] || item.status)}</b></p>${period}<p>Status do pagamento: <b>${escapeHtml(paymentLabels[paymentStatus] || paymentStatus)}</b> — ${escapeHtml(total)}</p><h3 style="font-size:16px !important">Módulos e configurações</h3><ul>${item.items.map((entry) => `<li><b>${escapeHtml(entry.name)}</b> (${escapeHtml(entry.quantity)}x)${formatConditions(entry.conditions) ? `<ul>${formatConditions(entry.conditions)}</ul>` : ''}</li>`).join('')}</ul>${cancel}${remove}</article>`;
           }).join('');
           document.querySelectorAll('[data-cancel]').forEach((button) => button.onclick = async () => {
             const prompt = 'O sistema cancelará imediatamente se ainda não houver pagamento. Se a assinatura já estiver vigente, ela permanecerá ativa até o fim do período pago. Deseja continuar?';

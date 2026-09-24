@@ -57,7 +57,7 @@ class AuthController extends Controller
             ->whereNull('company.deleted_at')
             ->where('subscription.status', 'ativa')
             ->whereIn('product.code', ['law', 'fokus-law'])
-            ->select('company.id as company_id', 'company.legal_name as company_name', 'product.name as product_name', 'role.code as profile_code', 'role.name as profile_name', 'module_segment.segment_code')
+            ->select('company.id as company_id', 'company.legal_name as company_name', 'subscription.public_name as subscription_public_name', 'product.name as product_name', 'role.code as profile_code', 'role.name as profile_name', 'module_segment.segment_code')
             ->orderBy('company.legal_name')
             ->get();
 
@@ -75,7 +75,7 @@ class AuthController extends Controller
 
             return [
                 'value' => (string) $rows->first()->company_id,
-                'label' => $rows->first()->company_name.' — '.$rows->first()->product_name.' · '.$segmentLabel,
+                'label' => (($rows->first()->subscription_public_name ?: $rows->first()->company_name).' — '.$rows->first()->product_name.' · '.$segmentLabel),
                 'profiles' => $rows->map(fn (object $row): array => [
                     'value' => (string) $row->profile_code,
                     'label' => (string) $row->profile_name,
@@ -507,10 +507,17 @@ class AuthController extends Controller
 
     private function companiesFor(User $user): array
     {
+        $lawNames = DB::table('subscriptions as subscription')->join('products as product', 'product.id', '=', 'subscription.product_id')
+            ->where('subscription.status', 'ativa')->whereIn('product.code', ['law', 'fokus-law'])
+            ->whereNotNull('subscription.public_name')->where('subscription.public_name', '!=', '')
+            ->groupBy('subscription.company_id')->select('subscription.company_id', DB::raw('MIN(subscription.public_name) as public_name'));
+
         return DB::table('company_memberships as membership')->join('companies as company', 'company.id', '=', 'membership.company_id')
             ->join('roles as role', 'role.id', '=', 'membership.role_id')->where('membership.user_id', $user->id)
             ->where('membership.status', 'ativo')->whereNull('membership.deleted_at')->whereNull('company.deleted_at')
-            ->select('company.id', 'company.legal_name as name', 'role.code as role')->orderBy('company.legal_name')->get()->all();
+            ->leftJoinSub($lawNames, 'law_name', 'law_name.company_id', '=', 'company.id')
+            ->select('company.id', DB::raw('COALESCE(law_name.public_name, company.legal_name) as name'), 'company.legal_name as legal_name', 'role.code as role')
+            ->orderBy('company.legal_name')->get()->unique('id')->values()->all();
     }
 
     private function userPayload(User $user): array

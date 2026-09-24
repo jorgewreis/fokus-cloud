@@ -34,8 +34,9 @@ class SubscriptionController extends Controller
     {
         $companyId = $request->attributes->get('active_company_id');
         $subscriptions = DB::table('subscriptions as subscription')->join('products as product', 'product.id', '=', 'subscription.product_id')
+            ->join('companies as company', 'company.id', '=', 'subscription.company_id')
             ->where('subscription.company_id', $companyId)
-            ->select('subscription.id', 'subscription.status', 'subscription.created_at', 'subscription.billing_cycle', 'subscription.current_period_ends_at', 'subscription.cancel_at', 'product.code as product_code', 'product.name as product_name')
+            ->select('subscription.id', 'subscription.public_name', DB::raw('COALESCE(NULLIF(subscription.public_name, \'\'), company.legal_name) as display_name'), 'subscription.status', 'subscription.created_at', 'subscription.billing_cycle', 'subscription.current_period_ends_at', 'subscription.cancel_at', 'product.code as product_code', 'product.name as product_name')
             ->orderByDesc('subscription.created_at')->get();
         foreach ($subscriptions as $subscription) {
             $subscription->items = DB::table('subscription_items')->where('company_id', $companyId)->where('subscription_id', $subscription->id)

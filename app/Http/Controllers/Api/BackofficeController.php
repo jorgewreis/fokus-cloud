@@ -552,7 +552,7 @@ class BackofficeController extends Controller
             ->join('companies as company', 'company.id', '=', 'subscription.company_id')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->whereNull('company.deleted_at')
-            ->when($query, fn ($builder) => $builder->where(fn ($filter) => $filter->where('company.legal_name', 'like', "%{$query}%")->orWhere('product.name', 'like', "%{$query}%")))
+            ->when($query, fn ($builder) => $builder->where(fn ($filter) => $filter->where('company.legal_name', 'like', "%{$query}%")->orWhere('subscription.public_name', 'like', "%{$query}%")->orWhere('product.name', 'like', "%{$query}%")))
             ->when($status, fn ($builder) => $builder->where('subscription.status', $status))
             ->when($productId, fn ($builder) => $builder->where('subscription.product_id', $productId))
             ->select('subscription.*', 'company.legal_name as company_name', 'product.code as product_code', 'product.name as product_name');
@@ -595,6 +595,23 @@ class BackofficeController extends Controller
         $audit->record($request->user()->id, 'backoffice.subscription_viewed', 'subscription', $subscription, $current->company_id, request: $request);
 
         return response()->json($this->subscriptionPayload($current, true));
+    }
+
+    public function updateSubscriptionPublicName(Request $request, string $subscription, PlatformAudit $audit)
+    {
+        $data = $request->validate([
+            'public_name' => ['present', 'nullable', 'string', 'max:120'],
+        ]);
+        $publicName = isset($data['public_name']) ? trim($data['public_name']) : null;
+        $publicName = $publicName === '' ? null : $publicName;
+        $current = DB::table('subscriptions')->where('id', $subscription)->first();
+        abort_unless($current, 404, 'Assinatura não encontrada.');
+        $before = ['public_name' => $current->public_name];
+        DB::table('subscriptions')->where('id', $subscription)->update(['public_name' => $publicName, 'updated_at' => now()]);
+        $audit->record($request->user()->id, 'backoffice.subscription_public_name_updated', 'subscription', $subscription, $current->company_id,
+            before: $before, after: ['public_name' => $publicName], request: $request);
+
+        return response()->json(['message' => 'Nome público da assinatura atualizado.', 'public_name' => $publicName]);
     }
 
     public function payments(Request $request, PlatformAudit $audit)
@@ -1262,6 +1279,8 @@ class BackofficeController extends Controller
             'id' => $subscription->id,
             'company_id' => $subscription->company_id,
             'company_name' => $subscription->company_name ?? null,
+            'public_name' => $subscription->public_name ?? null,
+            'display_name' => ($subscription->public_name ?? null) ?: ($subscription->company_name ?? null),
             'product_id' => $subscription->product_id,
             'product_code' => $subscription->product_code ?? null,
             'product_name' => $subscription->product_name ?? null,

@@ -129,6 +129,10 @@
             <div class="fs-alert fs-alert-info" id="subscription-detail-loading" role="status" aria-live="polite" hidden>Carregando detalhes da assinatura...</div>
             <div class="fs-alert fs-alert-danger" id="subscription-detail-error" role="alert" hidden></div>
             <div id="subscription-detail-sections" class="fs-u-d-flex fs-u-flex-column fs-u-gap-3 backoffice-records-view-panel" hidden>
+                <section class="fs-card" id="subscription-public-name-section" aria-labelledby="subscription-public-name-title" hidden>
+                    <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-public-name-title">Nome público da assinatura</h3><p class="fs-card-subtitle">É o nome mostrado na seleção de acesso e no aplicativo. O nome legal da pessoa ou empresa permanece inalterado.</p></div></div>
+                    <form id="subscription-public-name-form"><div class="fs-card-body fs-u-d-flex fs-u-flex-column fs-u-gap-2"><label class="fs-form-label" for="subscription-public-name"><span>Nome público</span><input class="fs-form-control" id="subscription-public-name" name="public_name" type="text" maxlength="120" autocomplete="off" placeholder="Usar o nome legal" /></label><p class="fs-u-m-0 fs-u-fs-sm fs-u-color-secondary">Deixe em branco para exibir o nome legal cadastrado.</p><div class="fs-alert fs-alert-danger" id="subscription-public-name-error" role="alert" hidden></div></div><div class="fs-card-footer"><button class="fs-btn fs-btn-primary" id="subscription-public-name-submit" type="submit">Salvar nome público</button></div></form>
+                </section>
                 <section class="fs-card" aria-labelledby="subscription-detail-data-title">
                     <div class="fs-card-header"><h3 class="fs-card-title" id="subscription-detail-data-title">Dados comerciais</h3></div>
                     <div class="fs-card-body"><p class="fs-u-fs-sm fs-u-color-secondary" id="subscription-detail-summary"></p><dl class="fs-detail-list" id="subscription-detail-data"></dl></div>

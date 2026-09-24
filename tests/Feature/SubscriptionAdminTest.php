@@ -354,6 +354,21 @@ class SubscriptionAdminTest extends TestCase
         $this->assertDatabaseHas('subscriptions', ['id' => $fixture['subscription_id'], 'status' => 'ativa']);
     }
 
+    public function test_subscription_public_name_can_only_be_changed_by_superadmin_and_is_audited(): void
+    {
+        $commercial = $this->platformAdmin('administrador_comercial');
+        $superadmin = $this->platformAdmin();
+        $fixture = $this->subscriptionFixture();
+        $url = '/api/backoffice/subscriptions/'.$fixture['subscription_id'].'/public-name';
+
+        $this->actingAs($commercial, 'platform')->patchJson($url, ['public_name' => 'Empresa Alpha'])->assertForbidden();
+        $this->actingAs($superadmin, 'platform')->patchJson($url, ['public_name' => '  Empresa Alpha  '])->assertOk()->assertJsonPath('public_name', 'Empresa Alpha');
+        $this->assertDatabaseHas('subscriptions', ['id' => $fixture['subscription_id'], 'public_name' => 'Empresa Alpha']);
+        $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.subscription_public_name_updated', 'entity_id' => $fixture['subscription_id']]);
+        $this->actingAs($superadmin, 'platform')->patchJson($url, ['public_name' => null])->assertOk()->assertJsonPath('public_name', null);
+        $this->actingAs($superadmin, 'platform')->patchJson($url, ['public_name' => str_repeat('x', 121)])->assertUnprocessable();
+    }
+
     private function platformAdmin(string $role = 'superadministrador'): PlatformAdmin
     {
         return PlatformAdmin::create([

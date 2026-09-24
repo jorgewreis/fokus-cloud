@@ -199,6 +199,7 @@ export function mount(root, context = {}) {
 
     const canOverride = context.permissions?.has?.("platform.commercial.override")
         ?? Boolean(context.permissions?.includes?.("platform.commercial.override"));
+    const canEditPublicName = context.admin?.role === "superadministrador";
     const setMessage = (text, tone = "danger") => {
         const message = $("#subscription-message");
         message.textContent = text || "";
@@ -243,7 +244,7 @@ export function mount(root, context = {}) {
         const total = Number(meta.total) || 0;
         state.page = currentPage;
         list.innerHTML = rows.length ? rows.map((subscription) => `<tr>
-            <td class="fs-width-600" data-label="Empresa"><strong>${escapeHtml(subscription.company_name || "—")}</strong></td>
+            <td class="fs-width-600" data-label="Empresa"><strong>${escapeHtml(subscription.display_name || subscription.company_name || "—")}</strong>${subscription.public_name ? `<small class="fs-u-d-block fs-u-fs-sm">Nome legal: ${escapeHtml(subscription.company_name || "—")}</small>` : ""}</td>
             <td class="fs-width-400" data-label="Produto">${escapeHtml(subscription.product_name || "—")}</td>
             <td class="fs-width-400" data-label="Plano">${escapeHtml(subscription.plan_name || "—")}</td>
             <td class="fs-width-500" data-label="Status">${badge(subscription.status)}</td>
@@ -432,17 +433,21 @@ export function mount(root, context = {}) {
 
     const renderDetails = (subscription) => {
         state.current = subscription;
+        $("#subscription-public-name-section").hidden = !canEditPublicName;
+        $("#subscription-public-name").value = subscription.public_name || "";
+        $("#subscription-public-name-error").hidden = true;
         $("#subscription-free-voucher-form").hidden = subscription.status !== "aguardando_pagamento";
         $("#subscription-free-voucher-form").reset();
         $("#subscription-free-voucher-error").hidden = true;
         $("#subscription-drawer-title").textContent = "Detalhes da assinatura";
-        $("#subscription-drawer-description").textContent = `${subscription.company_name || "Empresa"} · ${subscription.product_name || "Assinatura"}`;
+        $("#subscription-drawer-description").textContent = `${subscription.display_name || subscription.company_name || "Empresa"} · ${subscription.product_name || "Assinatura"}`;
         $("#subscription-detail-summary").textContent = `${subscription.plan_name || "Plano não informado"} · ${STATUS_LABELS[subscription.status] || subscription.status} · ${valueForDisplay("billing_cycle", subscription.billing_cycle)} · ${money(subscription.amount)}`;
         const publicationVersions = subscription.commercial_snapshot?.publication_versions || {};
         const fields = [
             ["Número da assinatura", subscription.id],
             ["Revisão do contrato", `r${Number(subscription.version) || 1}`],
             ["Empresa", subscription.company_name],
+            ...(subscription.public_name ? [["Nome público", subscription.public_name]] : []),
             ["Produto", subscription.product_name],
             ["Plano contratado", subscription.plan_name],
             ...publicationVersionEntries(publicationVersions),
@@ -586,6 +591,32 @@ export function mount(root, context = {}) {
         }
     };
 
+    const savePublicName = async (event) => {
+        event.preventDefault();
+        if (!canEditPublicName || !state.current) return;
+        const subscriptionId = state.current.id;
+        const submit = $("#subscription-public-name-submit");
+        const errorBox = $("#subscription-public-name-error");
+        errorBox.hidden = true;
+        submit.disabled = true;
+        try {
+            const response = await api.request(`/backoffice/subscriptions/${encodeURIComponent(subscriptionId)}/public-name`, {
+                method: "PATCH",
+                body: { public_name: $("#subscription-public-name").value.trim() || null },
+                signal: pageAbort.signal,
+            });
+            setMessage(response.message || "Nome público atualizado.", "success");
+            await Promise.all([loadDetails(subscriptionId), loadList()]);
+        } catch (error) {
+            if (error.name !== "AbortError") {
+                errorBox.textContent = error.message || "Não foi possível salvar o nome público.";
+                errorBox.hidden = false;
+            }
+        } finally {
+            submit.disabled = false;
+        }
+    };
+
     const onFilterSubmit = (event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
@@ -664,6 +695,7 @@ export function mount(root, context = {}) {
     }
 
     $("#subscription-filter-form").addEventListener("submit", onFilterSubmit, { signal: listeners.signal });
+    $("#subscription-public-name-form").addEventListener("submit", savePublicName, { signal: listeners.signal });
     $("#subscription-create-open").addEventListener("click", () => {
         $("#subscription-create-form").reset();
         $("#subscription-create-error").hidden = true;
