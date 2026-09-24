@@ -49,6 +49,13 @@ jobs:
           printf 'disk_space:\n'; df -h . | tail -n 1
           printf 'backup_timers:\n'
           systemctl list-timers --all --no-pager 2>/dev/null | grep -Ei 'backup|restic|borg|mysql|maria' || true
+          if crontab -l 2>/dev/null | grep -Eq 'artisan[[:space:]]+schedule:run'; then
+            printf 'laravel_scheduler_cron=configured\n'
+          else
+            printf 'laravel_scheduler_cron=missing_for_deploy_user\n'
+          fi
+          printf 'scheduled_commands:\n'
+          php artisan schedule:list --no-ansi 2>/dev/null | grep -E 'fokus:expire-support-sessions|fokus:compensate-checkout-orphans' || true
           printf 'laravel_settings:\n'
           php -r '
             require "vendor/autoload.php";
