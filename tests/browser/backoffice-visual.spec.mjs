@@ -426,6 +426,37 @@ test('drawer de assinaturas organiza dados longos e mostra vazios sem pagamentos
     await expect(page.locator('#subscription-detail-history')).toContainText('Nenhuma alteração comercial registrada');
 });
 
+test('superadministrador salva o nome público da assinatura pelo drawer', async ({ page }) => {
+    await useSubscriptionCatalog(page);
+    let submittedName;
+    await page.route('**/api/backoffice/subscriptions?**', (route) => route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ data: [{ id: 'SUB_VISUAL_01', company_name: 'Empresa de Demonstração', public_name: 'Empresa Alpha', display_name: 'Empresa Alpha', product_name: 'Fokus Law', plan_name: 'Advocacia', status: 'ativa', billing_cycle: 'monthly', amount: 64.7, current_period_ends_at: '2026-10-01T00:00:00.000Z' }], meta: { total: 1, current_page: 1, per_page: 15, last_page: 1 } }),
+    }));
+    await page.route('**/api/backoffice/subscriptions/SUB_VISUAL_01', async (route) => {
+        const response = await route.fetch();
+        const subscription = await response.json();
+        await route.fulfill({ response, json: { ...subscription, public_name: submittedName || 'Empresa Alpha', display_name: submittedName || 'Empresa Alpha' } });
+    });
+    await page.route('**/api/backoffice/subscriptions/SUB_VISUAL_01/public-name', async (route) => {
+        submittedName = route.request().postDataJSON().public_name;
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ message: 'Nome público da assinatura atualizado.', public_name: submittedName }) });
+    });
+
+    await page.goto('/backoffice/assinaturas');
+    const companyCell = page.locator('#subscription-list tr').first().locator('td').first();
+    await expect(companyCell.locator('strong')).toHaveText('Empresa de Demonstração');
+    await expect(companyCell.locator('small')).toHaveText('Nome público: Empresa Alpha');
+    await page.getByRole('button', { name: /Ver detalhes da assinatura/ }).first().click();
+    await expect(page.locator('#subscription-public-name-section')).toBeVisible();
+    await expect(page.locator('#subscription-public-name-error')).toHaveCount(1);
+    await page.locator('#subscription-public-name').fill('Empresa Alpha');
+    await page.getByRole('button', { name: 'Salvar nome público' }).click();
+    await expect.poll(() => submittedName).toBe('Empresa Alpha');
+    await expect(page.locator('#subscription-message')).toContainText('Nome público da assinatura atualizado.');
+    await expect(page.locator('#subscription-public-name')).toHaveValue('Empresa Alpha');
+});
+
 test('Backoffice gera checkout assistido e atualiza a listagem', async ({ page }) => {
     await useSubscriptionCatalog(page);
     await page.route('**/api/backoffice/subscriptions/checkout-options?**', (route) => route.fulfill({

@@ -38,6 +38,18 @@ class PlatformSecurityTest extends TestCase
         $this->assertAuthenticatedAs($admin, 'platform');
     }
 
+    public function test_platform_logout_ends_the_admin_session_and_blocks_backoffice_access(): void
+    {
+        $admin = $this->admin();
+        $this->actingAs($admin, 'platform');
+
+        $this->postJson('/api/backoffice/auth/logout')->assertNoContent();
+        $this->assertGuest('platform');
+        $this->getJson('/api/backoffice/auth/me')->assertUnauthorized();
+        $this->getJson('/api/backoffice/dashboard')->assertUnauthorized();
+        $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.logout', 'platform_admin_id' => $admin->id]);
+    }
+
     public function test_platform_login_requires_mfa_before_the_final_session(): void
     {
         $admin = $this->admin();

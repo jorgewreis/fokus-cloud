@@ -244,7 +244,7 @@ export function mount(root, context = {}) {
         const total = Number(meta.total) || 0;
         state.page = currentPage;
         list.innerHTML = rows.length ? rows.map((subscription) => `<tr>
-            <td class="fs-width-600" data-label="Empresa"><strong>${escapeHtml(subscription.display_name || subscription.company_name || "—")}</strong>${subscription.public_name ? `<small class="fs-u-d-block fs-u-fs-sm">Nome legal: ${escapeHtml(subscription.company_name || "—")}</small>` : ""}</td>
+            <td class="fs-width-600" data-label="Empresa"><strong>${escapeHtml(subscription.company_name || "—")}</strong>${subscription.public_name ? `<small class="fs-u-d-block fs-u-fs-sm">Nome público: ${escapeHtml(subscription.public_name)}</small>` : ""}</td>
             <td class="fs-width-400" data-label="Produto">${escapeHtml(subscription.product_name || "—")}</td>
             <td class="fs-width-400" data-label="Plano">${escapeHtml(subscription.plan_name || "—")}</td>
             <td class="fs-width-500" data-label="Status">${badge(subscription.status)}</td>
@@ -435,7 +435,8 @@ export function mount(root, context = {}) {
         state.current = subscription;
         $("#subscription-public-name-section").hidden = !canEditPublicName;
         $("#subscription-public-name").value = subscription.public_name || "";
-        $("#subscription-public-name-error").hidden = true;
+        const publicNameError = $("#subscription-public-name-error");
+        if (publicNameError) publicNameError.hidden = true;
         $("#subscription-free-voucher-form").hidden = subscription.status !== "aguardando_pagamento";
         $("#subscription-free-voucher-form").reset();
         $("#subscription-free-voucher-error").hidden = true;
@@ -594,23 +595,31 @@ export function mount(root, context = {}) {
     const savePublicName = async (event) => {
         event.preventDefault();
         if (!canEditPublicName || !state.current) return;
+        const formElement = event.currentTarget;
         const subscriptionId = state.current.id;
-        const submit = $("#subscription-public-name-submit");
-        const errorBox = $("#subscription-public-name-error");
-        errorBox.hidden = true;
+        const submit = formElement.querySelector("#subscription-public-name-submit");
+        const errorBox = formElement.querySelector("#subscription-public-name-error");
+        if (errorBox) errorBox.hidden = true;
+        if (!submit) {
+            setMessage("Não foi possível localizar o botão para salvar o nome público.");
+            return;
+        }
         submit.disabled = true;
         try {
             const response = await api.request(`/backoffice/subscriptions/${encodeURIComponent(subscriptionId)}/public-name`, {
                 method: "PATCH",
-                body: { public_name: $("#subscription-public-name").value.trim() || null },
+                body: { public_name: formElement.elements.public_name.value.trim() || null },
                 signal: pageAbort.signal,
             });
             setMessage(response.message || "Nome público atualizado.", "success");
             await Promise.all([loadDetails(subscriptionId), loadList()]);
         } catch (error) {
             if (error.name !== "AbortError") {
-                errorBox.textContent = error.message || "Não foi possível salvar o nome público.";
-                errorBox.hidden = false;
+                if (errorBox) {
+                    errorBox.textContent = error.message || "Não foi possível salvar o nome público.";
+                    errorBox.hidden = false;
+                }
+                setMessage(error.message || "Não foi possível salvar o nome público.");
             }
         } finally {
             submit.disabled = false;

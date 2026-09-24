@@ -42,7 +42,7 @@
         <script src="/backoffice/assets/js/brazilian-documents.js?v=20260919-cnpj-alphanumeric-v2"></script>
         <script src="/backoffice/assets/js/currency-input.js?v=20260902-currency-prefix-fix"></script>
         <script src="/backoffice/assets/js/records-page.js?v=20260922-records-nested-drawer-v5"></script>
-        <script src="/backoffice/assets/js/backoffice-router.js?v=20260924-subscription-public-name-v1"></script>
+        <script src="/backoffice/assets/js/backoffice-router.js?v=20260924-backoffice-logout-v1"></script>
         <template id="backoffice-app-template">
         <div class="container-page expanded">
             <div class="fs-sidebar expanded" id="sidebar">
@@ -256,7 +256,7 @@
                 "[data-sidebar-item]",
             );
             const pagePath = "./pages";
-            const pageVersion = "20260924-subscription-public-name-v1";
+            const pageVersion = "20260924-backoffice-logout-v1";
             const routePageMap = {
                 painel: "platform-dashboard-final",
                 empresas: "companies",
@@ -626,7 +626,18 @@
             const adminHeaderUserMenu = document.querySelector("#admin-user-menu");
             adminHeaderUserDetails.addEventListener("click", () => { const open = adminHeaderUserMenu.hidden; adminHeaderUserMenu.hidden = !open; adminHeaderUserDetails.setAttribute("aria-expanded", String(open)); });
             document.addEventListener("click", (event) => { if (!event.target.closest(".admin-global-search") && !event.target.closest(".admin-global-search-results")) document.querySelector("#admin-global-search-results").hidden = true; if (!event.target.closest(".admin-header-user")) { adminHeaderUserMenu.hidden = true; adminHeaderUserDetails.setAttribute("aria-expanded", "false"); } });
-            document.querySelector("[data-dashboard-logout]").addEventListener("click", async () => { await fetch("/backoffice/auth/logout", { method: "POST", credentials: "same-origin" }); location.assign("/backoffice/login"); });
+            const adminLogoutButton = document.querySelector("[data-dashboard-logout]");
+            adminLogoutButton.addEventListener("click", async () => {
+                if (adminLogoutButton.disabled) return;
+                adminLogoutButton.disabled = true;
+                try {
+                    await FokusApi.request("/backoffice/auth/logout", { method: "POST" });
+                    location.assign("https://www.fokuscloud.com.br/");
+                } catch (error) {
+                    adminLogoutButton.disabled = false;
+                    window.alert(error?.message || "Não foi possível encerrar a sessão do Backoffice. Tente novamente.");
+                }
+            });
             window.__adminHeaderReady = true;
             const loadAdminHeaderData = async () => {
                 const response = await FokusApi.request("/backoffice/dashboard");

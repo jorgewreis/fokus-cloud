@@ -21,6 +21,16 @@ class BackofficeUiContractTest extends TestCase
         $this->assertStringContainsString('backofficeOwner', $records);
     }
 
+    public function test_backoffice_logout_uses_the_session_endpoint_and_returns_to_the_public_homepage(): void
+    {
+        $panel = file_get_contents(base_path('public/backoffice/index.html'));
+
+        $this->assertStringContainsString('FokusApi.request("/backoffice/auth/logout", { method: "POST" })', $panel);
+        $this->assertStringContainsString('location.assign("https://www.fokuscloud.com.br/")', $panel);
+        $this->assertStringNotContainsString('location.assign("/backoffice/login")', $panel);
+        $this->assertStringNotContainsString('fetch("/backoffice/auth/logout"', $panel);
+    }
+
     public function test_shared_contract_and_record_template_are_present(): void
     {
         $sync = file_get_contents(base_path('tools/sync-fokus-styles.mjs'));
