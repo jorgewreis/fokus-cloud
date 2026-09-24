@@ -126,9 +126,7 @@ jobs:
           exit 0
 
       - name: Reset isolated rate-limit cache before browser checks
-        run: |
-          php artisan cache:clear
-          redis-cli -h 127.0.0.1 -p 6379 FLUSHDB
+        run: php artisan cache:clear
 
       - name: Prepare isolated browser-test database
         env:
