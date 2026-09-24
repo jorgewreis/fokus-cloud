@@ -1,0 +1,21 @@
+.backoffice-records-page #billing-tabs {
+    box-sizing: border-box;
+    height: 40px;
+    min-height: 40px;
+    margin-bottom: -17px;
+    margin-left: 25px;
+    gap: 6px;
+    overflow: hidden;
+}
+
+.backoffice-records-page #billing-tabs .fs-nav-link {
+    border: none;
+    border-radius: 8px 8px 0 0;
+    background-color: transparent;
+    font-family: "Google Sans", sans-serif;
+}
+
+.backoffice-records-page #billing-tabs .fs-nav-link.is-active {
+    background-color: var(--color-blue-950);
+    color: var(--admin-cream);
+}

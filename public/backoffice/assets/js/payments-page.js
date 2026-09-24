@@ -103,7 +103,7 @@ export function mount(root, context = {}) {
         <td class="fs-width-400" data-label="Valor">${escapeHtml(money(item.amount, item.currency))}</td>
         <td class="fs-width-400" data-label="Status">${badge(item.status)}</td>
         <td class="fs-width-500" data-label="Período">${escapeHtml(date(item.billing_period_starts_at))} – ${escapeHtml(date(item.billing_period_ends_at))}</td>
-        <td class="fs-width-300" data-label="Ações"><button class="fs-btn fs-btn-outline-primary fs-table-action" type="button" data-billing-detail="payments:${escapeHtml(item.id)}">Detalhes</button></td>
+        <td class="fs-width-300" data-label="Ações"><button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action" type="button" data-billing-detail="payments:${escapeHtml(item.id)}" aria-label="Ver detalhes do pagamento" title="Ver detalhes do pagamento"><img src="/backoffice/assets/icons/Folder-File--Streamline-Ultimate.png" alt="" /></button></td>
     </tr>`).join("");
     const reconciliationRows = (items) => items.map((item) => `<tr>
         <td class="fs-width-600" data-label="Empresa"><strong>${escapeHtml(item.company_name || "Empresa não informada")}</strong><small class="fs-u-d-block fs-u-fs-sm fs-u-color-secondary">${escapeHtml(item.company_id || "—")}</small></td>
@@ -111,7 +111,7 @@ export function mount(root, context = {}) {
         <td class="fs-width-400" data-label="Status local">${badge(item.internal_status)}</td>
         <td class="fs-width-500" data-label="Mercado Pago">${badge(item.mercado_pago_status)}</td>
         <td class="fs-width-300" data-label="Impacto">${badge(item.impact)}</td>
-        <td class="fs-width-300" data-label="Ações"><button class="fs-btn fs-btn-outline-primary fs-table-action" type="button" data-billing-detail="reconciliation:${escapeHtml(item.id)}">Analisar</button></td>
+        <td class="fs-width-300" data-label="Ações"><button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action" type="button" data-billing-detail="reconciliation:${escapeHtml(item.id)}" aria-label="Analisar divergência" title="Analisar divergência"><img src="/backoffice/assets/icons/Folder-File--Streamline-Ultimate.png" alt="" /></button></td>
     </tr>`).join("");
     const refundRows = (items) => items.map((item) => `<tr>
         <td class="fs-width-600" data-label="Empresa"><strong>${escapeHtml(item.company_name || "Empresa não informada")}</strong><small class="fs-u-d-block fs-u-fs-sm fs-u-color-secondary">${escapeHtml(item.id)}</small></td>
@@ -119,7 +119,7 @@ export function mount(root, context = {}) {
         <td class="fs-width-400" data-label="Valor">${escapeHtml(money(item.amount))}</td>
         <td class="fs-width-500" data-label="Caso">${escapeHtml(CASE_LABELS[item.allowed_case] || item.allowed_case || "—")}</td>
         <td class="fs-width-300" data-label="Status">${badge(item.status)}</td>
-        <td class="fs-width-300" data-label="Ações"><button class="fs-btn fs-btn-outline-primary fs-table-action" type="button" data-billing-detail="refunds:${escapeHtml(item.id)}">Detalhes</button></td>
+        <td class="fs-width-300" data-label="Ações"><button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action" type="button" data-billing-detail="refunds:${escapeHtml(item.id)}" aria-label="Ver detalhes do reembolso" title="Ver detalhes do reembolso"><img src="/backoffice/assets/icons/Folder-File--Streamline-Ultimate.png" alt="" /></button></td>
     </tr>`).join("");
     const renderers = { payments: paymentRows, reconciliation: reconciliationRows, refunds: refundRows };
 
