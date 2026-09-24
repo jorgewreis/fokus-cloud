@@ -1,0 +1,125 @@
+Ajustes recomendados antes do portal do cliente
+
+1. Fechar o gate de homologação real — prioridade máxima
+Executar integralmente o roteiro em homologation-script.md:
+
+Login com MFA nos dois perfis.
+Testes reais de permissões no frontend e backend.
+Criação, publicação, pausa e arquivamento de catálogo.
+Todos os tipos de voucher.
+Upgrade, downgrade, cancelamento e override.
+Fluxo real do Mercado Pago Sandbox.
+Webhooks duplicados, inválidos, recusados e reprocessados.
+Reembolso total e parcial.
+Auditoria de todas as ações sensíveis.
+Testes responsivos e de acessibilidade no navegador.
+Esse é o principal bloqueador. O código está preparado, mas a documentação ainda registra que a homologação em navegador e com credenciais Sandbox permanece pendente.
+
+2. Implementar ou fechar o módulo operacional de alertas
+A documentação prevê:
+
+alertas por fila e severidade;
+comentários;
+incidentes;
+notificações;
+escalonamento de alertas vencidos;
+métricas operacionais.
+Porém, ainda não há evidência de tabelas próprias para platform_alerts, platform_incidents, platform_notifications e comentários. O dashboard já exibe alertas, mas isso não parece representar todo o modelo operacional documentado.
+
+Eu trataria isso como requisito antes do cliente, porque billing, segurança e suporte precisam de acompanhamento interno desde o primeiro cliente ativo.
+
+3. Validar completamente Mercado Pago em ambiente real de testes
+Ainda recomendo homologar:
+
+recorrência completa;
+pagamento recusado;
+inadimplência e reativação;
+reembolso parcial;
+repetição de webhook;
+falha temporária de consulta;
+divergência entre status local e gateway;
+retry seguro;
+webhook público com HMAC real.
+A própria documentação mantém fora da alpha a emissão fiscal e chargeback. Isso pode continuar fora, mas deve estar explicitamente registrado como risco operacional e roadmap.
+
+4. ok
+
+5. Atualizar a documentação para refletir o código atual
+Existem inconsistências importantes:
+
+technical-gap-analysis.md ainda indica que commercial_credit e snapshot de voucher estão pendentes.
+module-checklist.md já marca esses itens como concluídos.
+Billing, pagamentos, conciliação e reembolsos já possuem implementação mais avançada do que a análise técnica descreve.
+O portal do cliente já possui páginas e APIs iniciais, embora alguns documentos ainda o tratem como etapa futura.
+Antes de avançar, eu escolheria um único documento como fonte de verdade e atualizaria:
+
+status por módulo;
+pendências reais;
+evidências de testes;
+itens fora do escopo;
+riscos aceitos.
+
+6. Fazer uma revisão de segurança de produção
+Antes de clientes reais, recomendo validar:
+
+cookies Secure, HttpOnly e SameSite;
+proteção CSRF;
+expiração e revogação de sessões;
+rate limiting em autenticação e webhooks;
+headers de segurança;
+rotação de segredos;
+backup e restauração;
+acesso de suporte administrativo;
+logs sem dados sensíveis;
+comportamento em falha do gateway;
+garantia de isolamento entre web e platform.
+A separação entre users e platform_admins, com guards distintos, está correta e é um ponto forte do modelo.
+
+7. Melhorar a operação de billing
+Eu adicionaria antes do portal:
+
+comandos agendados documentados;
+fila/retry para eventos externos;
+monitoramento de falhas;
+tela ou indicador de eventos pendentes;
+prevenção de duplo processamento;
+procedimento de recuperação manual;
+alertas para webhook parado ou divergência antiga.
+O painel não deve apenas mostrar o pagamento; precisa deixar claro o que a equipe deve fazer quando algo falhar.
+
+8. Revisão final de UX, acessibilidade e responsividade
+A base visual está consistente, mas ainda vale uma rodada focada em:
+
+mobile e telas menores;
+foco por teclado;
+navegação em drawers e modais;
+estados vazios;
+estados de carregamento;
+mensagens de erro da API;
+confirmação para ações irreversíveis;
+clareza entre status local e status do Mercado Pago;
+prevenção de duplo clique em ações financeiras.
+
+9. Pequena limpeza técnica antes de congelar o contrato
+Há alguns pontos que eu revisaria:
+
+rotas duplicadas de planos em api.php;
+coerência entre permissões view e manage na conciliação;
+nomenclatura dos status financeiros;
+contratos de resposta da API;
+remoção definitiva de qualquer fallback mockado no modo autenticado;
+testes de regressão para cada permissão.
+Minha recomendação de sequência
+Eu faria apenas um hardening curto do Backoffice, sem ampliar muito o escopo:
+
+Atualizar documentação e checklist.
+Homologar navegador real com os dois perfis.
+Homologar Mercado Pago Sandbox.
+Fechar alertas, incidentes e notificações mínimas.
+Completar auditoria e revisão de segurança.
+Executar testes, build e migração limpa.
+Congelar o contrato de API.
+Então iniciar o portal do cliente.
+O portal do cliente pode começar em paralelo no desenho visual e nos contratos, mas eu evitaria construir fluxos comerciais definitivos antes de congelar billing, assinatura, permissões e estados de erro. Caso contrário, o portal provavelmente precisará ser refeito quando essas regras administrativas forem ajustadas.
+
+Conclusão: o painel está aproximadamente em fase de pré-release avançada, não mais de construção estrutural. Eu não adicionaria muitas telas novas agora; priorizaria homologação real, operação, segurança, alertas e consistência dos contratos.
