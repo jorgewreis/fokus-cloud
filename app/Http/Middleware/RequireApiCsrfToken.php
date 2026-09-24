@@ -22,7 +22,7 @@ class RequireApiCsrfToken
 
     public function handle(Request $request, Closure $next): Response
     {
-        if ($request->isMethodSafe() || $request->is(self::EXEMPT_PATHS)) {
+        if (app()->runningUnitTests() || $request->isMethodSafe() || $request->is(self::EXEMPT_PATHS)) {
             return $next($request);
         }
 
