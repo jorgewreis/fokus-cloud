@@ -55,7 +55,7 @@ test('perfil do cliente adapta as três seções a desktop, tablet e celular', a
         if (viewport.width <= 720) await page.getByRole('button', { name: 'Abrir menu' }).click();
         await page.locator('#rail-items [data-group="settings"]').click();
         await expect(page.locator('#content-region h2')).toHaveText('Configurações');
-        await expect(page.locator('.law-settings-link[href="/portal/fokus-law/perfil"]')).toBeVisible();
+        await expect(page.locator('#content-region .law-settings-link[href="/portal/fokus-law/perfil"]')).toHaveCount(0);
     }
 });
 
