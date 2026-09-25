@@ -8,13 +8,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('subscription_changes', function (Blueprint $table): void {
-            $table->unique(['company_id', 'id'], 'subscription_changes_company_id_unique');
-        });
+        if (! Schema::hasIndex('subscription_changes', 'subscription_changes_company_id_unique')) {
+            Schema::table('subscription_changes', function (Blueprint $table): void {
+                $table->unique(['company_id', 'id'], 'subscription_changes_company_id_unique');
+            });
+        }
         Schema::table('payments', function (Blueprint $table): void {
             $table->char('subscription_change_id', 30)->charset('ascii')->collation('ascii_bin')->nullable();
             $table->string('provider_preference_id', 128)->nullable()->unique();
-            $table->foreign(['company_id', 'subscription_change_id'])->references(['company_id', 'id'])->on('subscription_changes')->nullOnDelete();
+            $table->foreign(['company_id', 'subscription_change_id'])->references(['company_id', 'id'])->on('subscription_changes')->restrictOnDelete();
         });
 
         Schema::create('law_contacts', function (Blueprint $table): void {
