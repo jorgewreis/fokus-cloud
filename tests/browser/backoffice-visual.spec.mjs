@@ -137,7 +137,7 @@ test('dashboard usa cards e larguras responsivas sem alterar dados ou colunas', 
     await page.route('**/api/backoffice/subscriptions?**', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(dashboardSubscriptions) }));
 
     for (const [name, viewport, expectedColumns] of [
-        ['desktop', { width: 1440, height: 900 }, 4],
+        ['desktop', { width: 1440, height: 900 }, 5],
         ['notebook', { width: 1024, height: 768 }, 2],
         ['tablet', { width: 768, height: 1024 }, 2],
         ['mobile', { width: 375, height: 812 }, 1],
@@ -150,8 +150,10 @@ test('dashboard usa cards e larguras responsivas sem alterar dados ou colunas', 
         await expect(page.locator('#metric-active-subscriptions')).toHaveText('31');
         await expect(page.locator('#metric-mrr')).toContainText('12.450');
         await expect(page.getByRole('article', { name: 'Empresas ativas' })).toBeVisible();
-        await expect(page.getByRole('img', { name: 'Gráfico de novas assinaturas ativas' })).toBeVisible();
+        await expect(page.getByRole('img', { name: /Novas assinaturas ativas/ })).toBeVisible();
         await expect(page.locator('.admin-chart-point')).toHaveCount(6);
+        await expect(page.locator('.admin-chart-line polyline')).toHaveCount(1);
+        await expect(page.locator('#metric-mrr-subscriptions')).toHaveText('31');
         await expect(page.locator('#dashboard-alerts .admin-attention-item')).toHaveCount(1);
         await expect(page.locator('#subscriptions-table-body tr')).toHaveCount(5);
         await expect(page.locator('#subscriptions-table-body')).toContainText('Empresa 1');
@@ -183,6 +185,8 @@ test('dashboard usa cards e larguras responsivas sem alterar dados ou colunas', 
             const grid = document.querySelector('.admin-metrics-grid');
             const gridRect = grid.getBoundingClientRect();
             const metrics = [...grid.querySelectorAll('.admin-metric-card')].map((card) => card.getBoundingClientRect());
+            const icon = grid.querySelector('.admin-metric-icon').getBoundingClientRect();
+            const iconImage = grid.querySelector('.admin-metric-icon img').getBoundingClientRect();
             const metricDirection = [...grid.querySelectorAll('.admin-metric-card')].map((card) => getComputedStyle(card).flexDirection);
             const metricAlignment = [...grid.querySelectorAll('.admin-metric-card')].map((card) => {
                 const icon = card.querySelector('.admin-metric-icon').getBoundingClientRect();
@@ -204,6 +208,7 @@ test('dashboard usa cards e larguras responsivas sem alterar dados ou colunas', 
                 metricDirection,
                 metricAlignment,
                 metricCardWidths: metrics.map((card) => card.width),
+                iconSize: [icon.width, icon.height, iconImage.width, iconImage.height],
                 metricStartOffset: Math.abs(Math.min(...metrics.map((card) => card.x)) - gridRect.x),
                 metricEndOffset: Math.abs(gridRect.right - Math.max(...metrics.map((card) => card.right))),
                 metricGutter: metrics.length > 1 && metrics[1].y === metrics[0].y ? metrics[1].x - metrics[0].right : 0,
@@ -220,7 +225,8 @@ test('dashboard usa cards e larguras responsivas sem alterar dados ou colunas', 
         expect(layout.metricDirection.every((direction) => direction === 'column'), name).toBe(true);
         expect(layout.metricAlignment.every((alignment) => alignment.textAlign === 'left' && alignment.iconPosition === 'absolute' && alignment.iconAtTopRight), name).toBe(true);
         expect(layout.metricCardWidths.every((width) => width > 0), name).toBe(true);
-        expect(Math.max(...layout.metricCardWidths) - Math.min(...layout.metricCardWidths), name).toBeLessThanOrEqual(1);
+        expect(layout.metricCardWidths[3] > layout.metricCardWidths[0], name).toBe(name === 'desktop');
+        expect(layout.iconSize, name).toEqual([40, 40, 25, 25]);
         expect(layout.metricStartOffset, name).toBeLessThanOrEqual(1);
         expect(layout.metricEndOffset, `${name} ${JSON.stringify(layout)}`).toBeLessThanOrEqual(1);
         expect(layout.metricGutter, name).toBeGreaterThanOrEqual(0);
@@ -298,6 +304,8 @@ test('visão geral do catálogo resume estados, pendências e as cinco publicaç
         await expect(page.locator('#catalog-overview-content')).toBeVisible();
         await expect(page.locator('#catalog-overview-title')).toHaveText('Visao geral');
         await expect(page.locator('#catalog-products-total')).toHaveText('3');
+        await expect(page.locator('#catalog-products-publication')).toHaveText('2 produtos aguardam publicação');
+        await expect(page.locator('#catalog-products-distribution .catalog-overview-distribution-segment')).toHaveCount(2);
         await expect(page.locator('#catalog-products-statuses')).toContainText('Ativo: 2');
         await expect(page.locator('#catalog-modules-total')).toHaveText('2');
         await expect(page.locator('#catalog-modules-statuses')).toContainText('Pausado: 1');

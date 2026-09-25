@@ -1543,7 +1543,7 @@ html[data-role="admin"] .fs-sidebar .sidebar-button {
 }
 .admin-final-dashboard .admin-metrics-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 16px;
     width: 100%;
     min-width: 0;
@@ -1575,15 +1575,29 @@ html[data-role="admin"] .fs-sidebar .sidebar-button {
 .admin-final-dashboard .admin-metric-people { --admin-metric-accent: #7659a6; background: #f2eef8; }
 .admin-final-dashboard .admin-metric-subscriptions { --admin-metric-accent: #3b887b; background: #ebf6f3; }
 .admin-final-dashboard .admin-metric-mrr { --admin-metric-accent: #ad7040; background: #faf2e9; }
+.admin-final-dashboard .admin-metric-mrr {
+    grid-column: span 2;
+    background: radial-gradient(circle at 92% 90%, rgba(173, 112, 64, .12) 0 18%, transparent 18.5%),
+        radial-gradient(circle at 85% 70%, rgba(173, 112, 64, .1) 0 29%, transparent 29.5%), #faf2e9;
+}
+.admin-final-dashboard .admin-metric-mrr strong { font-size: clamp(1.5rem, 2.1vw, 2rem); }
+.admin-final-dashboard .admin-metric-context {
+    margin: 8px 0 0;
+    color: #73583d;
+    font-size: .75rem;
+    line-height: 1.35;
+}
+.admin-final-dashboard .admin-metric-context b { color: #714828; font-variant-numeric: tabular-nums; }
 .admin-final-dashboard .admin-metric-card .fs-card-body {
     display: flex;
     flex-direction: column;
     justify-content: center;
     gap: 2px;
     min-width: 0;
-    padding: 0;
+    padding: 0 44px 0 0;
     text-align: left;
 }
+.admin-final-dashboard .admin-metric-mrr .fs-card-body { padding-right: 50px; }
 .admin-final-dashboard .admin-metric-icon {
     display: grid;
     position: absolute;
@@ -1591,8 +1605,8 @@ html[data-role="admin"] .fs-sidebar .sidebar-button {
     right: 12px;
     z-index: 1;
     place-items: center;
-    width: 28px;
-    height: 28px;
+    width: 40px;
+    height: 40px;
     margin: 0;
     border-radius: 5px;
     background: #dce8f3;
@@ -1600,7 +1614,7 @@ html[data-role="admin"] .fs-sidebar .sidebar-button {
 .admin-final-dashboard .admin-metric-people .admin-metric-icon { background: #e7def4; }
 .admin-final-dashboard .admin-metric-subscriptions .admin-metric-icon { background: #d9eee8; }
 .admin-final-dashboard .admin-metric-mrr .admin-metric-icon { background: #f1e2d2; }
-.admin-final-dashboard .admin-metric-icon img { width: 16px; height: 16px; object-fit: contain; }
+.admin-final-dashboard .admin-metric-icon img { width: 25px; height: 25px; object-fit: contain; }
 .admin-final-dashboard .admin-metric-card span {
     color: #667085;
     font-size: .75rem;
@@ -1699,6 +1713,22 @@ html[data-role="admin"] .fs-sidebar .sidebar-button {
     width: 100%;
     height: 174px;
     overflow: hidden;
+}
+.admin-final-dashboard .admin-chart-line {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+}
+.admin-final-dashboard .admin-chart-line polyline {
+    fill: none;
+    stroke: var(--admin-terracotta, #c96f4a);
+    stroke-width: 2.5;
+    vector-effect: non-scaling-stroke;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 .admin-final-dashboard .admin-chart-grid-line {
     position: absolute;
@@ -1889,6 +1919,8 @@ html[data-role="admin"] .fs-sidebar .sidebar-button {
 }
 @media (max-width: 1050px) {
     .admin-final-dashboard .admin-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .admin-final-dashboard .admin-metric-mrr { grid-column: auto; }
+    .admin-final-dashboard .admin-metric-context { display: none; }
     .admin-final-dashboard .admin-dashboard-overview-grid,
     .admin-final-dashboard .admin-dashboard-workspace-grid,
     .admin-final-dashboard .admin-dashboard-activity-row { grid-template-columns: minmax(0, 1fr); }
@@ -1902,6 +1934,7 @@ html[data-role="admin"] .fs-sidebar .sidebar-button {
     .admin-final-dashboard .admin-dashboard-intro.fs-page-layout { padding: 0 8px 10px; }
     .admin-final-dashboard .admin-dashboard-intro .fs-page-header-display > h1 { font-size: 3rem; }
     .admin-final-dashboard .admin-metrics-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .admin-final-dashboard .admin-metric-mrr { grid-column: auto; }
     .admin-final-dashboard .admin-metric-card { min-height: 92px; }
     .admin-final-dashboard .admin-panel-card > .admin-card-heading,
     .admin-final-dashboard .admin-subscriptions-card > .fs-card-header { align-items: flex-start; flex-wrap: wrap; padding: 14px 16px; }

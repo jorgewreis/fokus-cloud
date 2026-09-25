@@ -35,18 +35,14 @@ publicado em `www.fokuscloud.com.br`; ele encaminha o usuário para
 `/produtos/fokus-law`, onde o login abre o shell autenticado em
 `/portal/fokus-law`. A sessão permanece no domínio canônico `www`.
 
-Para ativar o alias em produção, a equipe de infraestrutura precisa:
+O alias está configurado no Cloudflare: o registro A `law` aponta para a mesma
+origem de `www` com proxy ativo. A regra de redirecionamento
+`Fokus Law - entrada pelo subdomínio` encaminha
+`https://law.fokuscloud.com.br/*` com status 302 para
+`https://www.fokuscloud.com.br/produtos/fokus-law`, preservando a query string.
+Assim, o redirecionamento ocorre na borda antes de acessar o CloudPanel.
 
-1. Criar no DNS um registro `law` apontando para o mesmo destino público de
-   `www` (A/AAAA para a origem ou CNAME proxied para `www`, conforme a zona).
-2. Adicionar `law.fokuscloud.com.br` ao vhost HTTPS do CloudPanel e emitir um
-   certificado TLS válido para esse hostname.
-3. Aplicar a regra do alias no início do bloco HTTPS em
-   `deploy/cloudpanel-legacy-redirects.conf`, executar `nginx -t` e recarregar
-   o NGINX.
-4. Confirmar que `https://law.fokuscloud.com.br/` responde com redirecionamento
-   para `https://www.fokuscloud.com.br/produtos/fokus-law`.
-
-O deploy Laravel e o purge Cloudflare descritos acima não criam registros DNS,
-aliases de vhost nem certificados; esses passos são necessários antes que o
-subdomínio possa responder.
+O arquivo `deploy/cloudpanel-legacy-redirects.conf` mantém uma regra de alias
+para eventual roteamento direto à origem, que exige vhost HTTPS e certificado
+válido para `law.fokuscloud.com.br`. O deploy Laravel não altera o DNS nem as
+regras do Cloudflare; conferir ambos separadamente após mudanças de entrada.

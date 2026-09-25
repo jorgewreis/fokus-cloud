@@ -61,6 +61,7 @@
                     <span>Receita recorrente (MRR)</span
                     ><strong id="metric-mrr">—</strong>
                     <small>Receita mensal consolidada</small>
+                    <p class="admin-metric-context"><b id="metric-mrr-subscriptions">—</b> assinaturas ativas compõem este valor</p>
                 </div>
             </article>
         </section>
@@ -340,6 +341,7 @@
                 .join("");
             if (!v.some(Boolean)) {
                 plot.innerHTML = "";
+                plot.setAttribute("aria-label", "Não há novas assinaturas ativas nos últimos seis meses");
                 axis.innerHTML = "";
                 empty.hidden = false;
                 return;
@@ -365,7 +367,9 @@
                     `<span>${N.format(Math.round(max - (max * i) / 5))}</span>`,
             ).join("");
             const points = v.map((n, i) => ({ left: `${(x(i) / W) * 100}%`, top: `${(y(n) / H) * 100}%` }));
-            plot.innerHTML = `${grid}${points.map((point, i) => `<span class="admin-chart-point" style="left:${point.left};top:${point.top}" title="${e(series[i].label)}: ${N.format(v[i])}"></span>`).join("")}`;
+            plot.setAttribute("aria-label", `Novas assinaturas ativas: ${series.map((item, i) => `${item.label}: ${N.format(v[i])}`).join(", ")}`);
+            const line = `<svg class="admin-chart-line" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${v.map((n, i) => `${x(i)},${y(n)}`).join(" ")}" /></svg>`;
+            plot.innerHTML = `${grid}${line}${points.map((point, i) => `<span class="admin-chart-point" style="left:${point.left};top:${point.top}" title="${e(series[i].label)}: ${N.format(v[i])}"></span>`).join("")}`;
         };
         const alerts = (a) => {
             let l = document.querySelector("#dashboard-alerts"),
@@ -458,6 +462,7 @@
                 document.querySelector("#metric-mrr").textContent = C.format(
                     +p.metrics.mrr || 0,
                 );
+                document.querySelector("#metric-mrr-subscriptions").textContent = N.format(p.metrics.active_subscriptions || 0);
                 chart(p.subscription_registrations_6m || []);
                 alerts(p.alerts || []);
                 activity(p.recent_activity || []);

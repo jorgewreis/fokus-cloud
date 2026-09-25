@@ -12,13 +12,14 @@
 
 .catalog-overview-quick-links { display: flex; flex-wrap: wrap; gap: 8px; }
 #catalog-overview-content { width: 100%; min-width: 0; }
-.catalog-overview-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--fs-space-3, 16px); width: 100%; min-width: 0; margin: 0 0 var(--fs-space-3, 16px); }
+.catalog-overview-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: start; gap: var(--fs-space-3, 16px); width: 100%; min-width: 0; margin: 0 0 var(--fs-space-3, 16px); }
 .catalog-overview-metric { position: relative; overflow: hidden; border: 1px solid transparent; border-radius: 8px; box-shadow: none; }
 .catalog-overview-metric::before { position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--catalog-metric-accent, #356a9a); content: ""; }
-.catalog-overview-metric-products { --catalog-metric-accent: #356a9a; background: #edf3f9; }
+.catalog-overview-metric-products { --catalog-metric-accent: #356a9a; grid-column: span 2; background: radial-gradient(circle at 92% 10%, rgba(53, 106, 154, .1) 0 22%, transparent 22.5%), #edf3f9; }
 .catalog-overview-metric-modules { --catalog-metric-accent: #7659a6; background: #f2eef8; }
 .catalog-overview-metric-plans { --catalog-metric-accent: #3b887b; background: #ebf6f3; }
 .catalog-overview-metric .fs-card-body { display: grid; grid-template-rows: auto auto 1fr; gap: 3px; min-height: 106px; padding: 12px 14px 11px 17px; }
+.catalog-overview-metric-products .fs-card-body { grid-template-rows: auto auto auto auto 1fr; min-height: 148px; }
 .catalog-overview-metric-heading { display: flex; min-height: 20px; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .catalog-overview-metric-heading .fs-card-title { margin: 0; color: #5f6c7b; font-size: .75rem; font-weight: 500; line-height: 1.4; }
 .catalog-overview-metric-icon { display: grid; flex: 0 0 28px; width: 28px; height: 28px; place-items: center; margin: -2px 0 0; border-radius: 5px; background: #dce8f3; }
@@ -28,6 +29,15 @@
 .catalog-overview-total { color: #182b42; font-size: 1.375rem; font-weight: 650; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .catalog-overview-statuses { display: flex; flex-wrap: wrap; align-content: end; gap: 3px 8px; min-width: 0; padding-top: 4px; }
 .catalog-overview-status { color: #6a7684; font-size: .6875rem; line-height: 1.35; }
+.catalog-overview-feature-note { margin: 4px 0 0; color: #365a7d; font-size: .75rem; line-height: 1.35; }
+.catalog-overview-distribution { display: flex; height: 8px; gap: 2px; overflow: hidden; margin: 8px 0 2px; border-radius: 99px; background: #dce8f3; }
+.catalog-overview-distribution-segment { min-width: 2px; height: 100%; background: #356a9a; }
+.catalog-overview-distribution-rascunho { background: #a6b3c2; }
+.catalog-overview-distribution-inativo { background: #7b8794; }
+.catalog-overview-distribution-pausado { background: #d1994d; }
+.catalog-overview-distribution-arquivado { background: #ad6570; }
+.catalog-overview-distribution-sem_situacao { background: #b8c2cc; }
+.catalog-overview-distribution-empty { width: 100%; background: #dce8f3; }
 .catalog-overview-section { width: 100%; min-width: 0; margin: 0 0 var(--fs-space-3, 16px); }
 .catalog-overview-section .fs-table { width: 100%; min-width: 760px; }
 .catalog-overview-section[aria-labelledby="catalog-pending-title"] .fs-table thead tr,
@@ -48,10 +58,13 @@
     .catalog-overview-quick-links { width: 100%; }
     .catalog-overview-quick-links .fs-btn { flex: 1 1 auto; }
     .catalog-overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .catalog-overview-metric-products { grid-column: span 2; }
     .catalog-overview-section { width: 100%; }
     #catalog-overview-error, #catalog-overview-loading { margin-inline: 0; }
 }
 
 @media (max-width: 480px) {
     .catalog-overview-metrics { grid-template-columns: minmax(0, 1fr); }
+    .catalog-overview-metric-products { grid-column: auto; }
+    .catalog-overview-metric-products .fs-card-body { min-height: 128px; }
 }

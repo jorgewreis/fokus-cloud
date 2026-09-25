@@ -25,6 +25,19 @@ export async function mount(root, context = {}) {
         });
         $(totalTarget).textContent = String(items.length);
         const orderedStatuses = [...STATUS_ORDER.filter((status) => counts.has(status)), ...[...counts.keys()].filter((status) => !STATUS_ORDER.includes(status)).sort()];
+        if (target === "products") {
+            const pending = items.filter((item) => Boolean(item.publication_pending) || (item.status === "ativo" && Number(item.published_catalog_version || 0) === 0)).length;
+            $("#catalog-products-publication").textContent = pending
+                ? `${pending} ${pending === 1 ? "produto aguarda" : "produtos aguardam"} publicação`
+                : "Nenhuma publicação pendente";
+            const distribution = $("#catalog-products-distribution");
+            distribution.setAttribute("aria-label", items.length
+                ? `Situação dos produtos: ${orderedStatuses.map((status) => `${counts.get(status)} ${statusLabel(status)}`).join(", ")}`
+                : "Nenhum produto cadastrado");
+            distribution.innerHTML = items.length
+                ? orderedStatuses.map((status) => `<span class="catalog-overview-distribution-segment catalog-overview-distribution-${STATUS_ORDER.includes(status) ? status : "sem_situacao"}" style="width:${(counts.get(status) / items.length) * 100}%" title="${escapeHtml(statusLabel(status))}: ${counts.get(status)}"></span>`).join("")
+                : '<span class="catalog-overview-distribution-empty"></span>';
+        }
         statusNodes[target].innerHTML = orderedStatuses.length
             ? orderedStatuses.map((status) => `<span class="catalog-overview-status" role="listitem">${escapeHtml(statusLabel(status))}: <strong>${counts.get(status)}</strong></span>`).join("")
             : '<span class="catalog-overview-status" role="listitem">Nenhum cadastrado</span>';
