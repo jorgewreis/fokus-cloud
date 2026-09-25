@@ -294,8 +294,13 @@ class AuthController extends Controller
             ->select('support.id', 'support.reason', 'subscription.status as subscription_status', 'company.legal_name as company_name')
             ->first() : null;
 
+        $profile = $this->userPayload($user);
+        if (! $supportMode) {
+            $profile['phone'] = $user->phone;
+        }
+
         return response()->json([
-            'user' => $this->userPayload($user),
+            'user' => $profile,
             'companies' => $this->companiesFor($user),
             'active_company_id' => $request->session()->get('active_company_id'),
             'support_mode' => $supportMode ? ['active' => true, 'company' => $supportMode->company_name, 'subscription_status' => $supportMode->subscription_status, 'reason' => $supportMode->reason] : null,
@@ -304,42 +309,58 @@ class AuthController extends Controller
 
     public function updateProfile(Request $request, PasswordSecurity $passwordSecurity)
     {
+        $supportId = $request->session()->get('support_session_id');
+        abort_if($supportId && DB::table('platform_support_sessions')->where('id', $supportId)->whereNull('ended_at')->exists(), 403, 'Encerre o acesso de suporte antes de alterar seu perfil.');
+
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'password' => ['sometimes', 'required', 'string', 'min:12', 'confirmed'],
             'email' => ['sometimes', 'required', 'email:rfc', 'max:255'],
+            'phone' => ['sometimes', 'nullable', 'string', 'max:32'],
             'current_password' => ['nullable', 'string'],
         ]);
         abort_if(empty($data), 422, 'Informe ao menos um dado para alteração.');
         $user = $request->user();
         $changes = [];
+        $requestedEmail = isset($data['email']) ? Str::lower(trim($data['email'])) : null;
+        $emailChangeRequested = $requestedEmail !== null && $requestedEmail !== Str::lower($user->email);
 
-        if ((isset($data['password']) || isset($data['email'])) && ! Hash::check($data['current_password'] ?? '', $user->password)) {
+        if ((isset($data['password']) || $emailChangeRequested) && ! Hash::check($data['current_password'] ?? '', $user->password)) {
             throw ValidationException::withMessages(['current_password' => 'Informe sua senha atual para alterar e-mail ou senha.']);
         }
 
         if (isset($data['name'])) {
             $changes['name'] = $data['name'];
         }
+        if (array_key_exists('phone', $data)) {
+            $digits = preg_replace('/\\D+/', '', (string) ($data['phone'] ?? ''));
+            if ($digits !== '' && ! preg_match('/^(?:1[1-9]|[2-9][1-9])(?:[2-5][0-9]{7}|9[0-9]{8})$/', $digits)) {
+                throw ValidationException::withMessages(['phone' => 'Informe um telefone brasileiro válido com DDD.']);
+            }
+            $changes['phone'] = $digits === '' ? null : $digits;
+        }
         if (isset($data['password'])) {
             $passwordSecurity->validate($data['password']);
             $changes['password'] = $data['password'];
         }
-        if (isset($data['email']) && Str::lower($data['email']) !== $user->email) {
-            $email = Str::lower($data['email']);
+        if ($emailChangeRequested) {
+            $email = $requestedEmail;
             abort_if(User::where('email', $email)->where('id', '!=', $user->id)->exists(), 422, 'Este e-mail já está vinculado a outra conta.');
-            $this->sendToken($user, 'email_verification', '/verificar-email', ['new_email' => $email]);
+            $this->sendToken($user, 'email_verification', '/verificar-email', ['new_email' => $email], $email);
             Mail::raw('Foi solicitada uma alteração do e-mail da sua conta Fokus Cloud.', fn ($mail) => $mail->to($user->email)->subject('Fokus Cloud: solicitação de alteração de e-mail'));
+            app(\App\Services\AuditRecorder::class)->platform(null, 'customer.email_change.requested', 'user', $user->id, metadata: ['fields' => ['email']], after: ['requested' => ['email']], request: $request, actorType: 'customer');
         }
         if ($changes) {
+            $changedFields = array_values(array_filter(array_keys($changes), fn ($field) => $field !== 'password'));
             $user->forceFill($changes)->save();
             if (isset($changes['password'])) {
                 DB::table('sessions')->where('user_id', $user->id)->delete();
                 $request->session()->regenerate();
             }
+            app(\App\Services\AuditRecorder::class)->platform(null, 'customer.profile.updated', 'user', $user->id, metadata: ['fields' => [...$changedFields, ...(isset($changes['password']) ? ['password'] : [])]], before: ['fields' => $changedFields], after: ['fields' => [...$changedFields, ...(isset($changes['password']) ? ['password'] : [])]], request: $request, actorType: 'customer');
         }
 
-        return response()->json(['message' => isset($data['email']) ? 'Confirme o novo e-mail para concluir a alteração.' : 'Dados atualizados.', 'user' => $this->userPayload($user)]);
+        return response()->json(['message' => $emailChangeRequested ? 'Enviamos um link ao novo endereço. O e-mail atual continua ativo até a confirmação.' : 'Dados atualizados.', 'user' => [...$this->userPayload($user), 'phone' => $user->phone]]);
     }
 
     public function selectCompany(Request $request)
@@ -364,6 +385,9 @@ class AuthController extends Controller
             $changes['email'] = $payload['new_email'];
         }
         $user->forceFill($changes)->save();
+        if (! empty($payload['new_email'])) {
+            app(\App\Services\AuditRecorder::class)->platform(null, 'customer.email_change.confirmed', 'user', $user->id, metadata: ['fields' => ['email']], after: ['fields' => ['email']], request: $request, actorType: 'customer');
+        }
         if (! empty($payload['company_id'])) {
             DB::table('companies')->where('id', $payload['company_id'])->where('created_by', $user->id)
                 ->where('status', 'pendente')->update(['status' => 'ativa', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
@@ -478,7 +502,7 @@ class AuthController extends Controller
         return response()->json(['message' => 'Administração transferida com sucesso.']);
     }
 
-    public function sendToken(User $user, string $purpose, string $path, array $payload = []): void
+    public function sendToken(User $user, string $purpose, string $path, array $payload = [], ?string $recipient = null): void
     {
         $plain = Str::random(64);
         DB::table('security_tokens')->where('user_id', $user->id)->where('purpose', $purpose)->whereNull('used_at')->update(['expires_at' => now(), 'updated_at' => now()]);
@@ -495,7 +519,7 @@ class AuthController extends Controller
             'admin_transfer' => 'Fokus Cloud: aceite a administração da empresa',
             default => 'Fokus Cloud: continue seu acesso',
         };
-        Mail::raw("Use este link em até 24 horas para continuar: {$url}", fn ($mail) => $mail->to($user->email)->subject($subject));
+        Mail::raw("Use este link em até 24 horas para continuar: {$url}", fn ($mail) => $mail->to($recipient ?: $user->email)->subject($subject));
     }
 
     private function companyRegistrationData(Request $request, bool $newUser): array

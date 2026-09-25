@@ -253,7 +253,9 @@ class PlatformSecurityTest extends TestCase
         $this->assertAuthenticatedAs($customer, 'web');
         $this->assertAuthenticatedAs($admin, 'platform');
         $this->assertDatabaseHas('platform_support_sessions', ['platform_admin_id' => $admin->id, 'company_id' => $companyId, 'subscription_id' => $subscriptionId, 'target_user_id' => $customer->id, 'ended_at' => null]);
-        $this->getJson('/api/auth/me')->assertOk()->assertJsonPath('support_mode.active', true)->assertJsonPath('support_mode.company', 'Empresa para suporte');
+        $this->getJson('/api/auth/me')->assertOk()->assertJsonPath('support_mode.active', true)->assertJsonPath('support_mode.company', 'Empresa para suporte')->assertJsonMissingPath('user.phone');
+        $this->patchJson('/api/auth/profile', ['name' => 'Nome alterado em suporte'])->assertForbidden();
+        $this->assertSame('Pessoa de Teste', $customer->fresh()->name);
 
         $this->postJson('/api/backoffice/support/exit')->assertOk()->assertJsonPath('redirect_to', '/backoffice/');
         $this->assertGuest('web');

@@ -32,8 +32,15 @@ consultados; a senha, seu hash completo e o CPF não saem da aplicação.
 | Confirmação de e-mail inicial | Link válido por 24 horas; obrigatório antes de escolher a assinatura. |
 | Reenvio da confirmação | Permitido enquanto o e-mail estiver pendente, com controles contra abuso. |
 | Recuperação de senha | Usuário informa o CPF e recebe link temporário no e-mail confirmado. |
-| Alteração de e-mail | Novo e-mail só passa a valer após confirmação; endereço anterior continua ativo até então. |
+| Alteração de e-mail | Exige senha atual; o link é enviado ao novo endereço, que só passa a valer após confirmação. O endereço anterior continua ativo e recebe um aviso até então. |
 | Transferência de admin | Exige senha do admin atual e aceite do novo admin por e-mail. |
+
+No perfil autenticado, o titular pode corrigir o nome, registrar ou remover um
+telefone brasileiro com DDD e alterar a senha. O telefone é armazenado como
+dígitos nacionais, permanece privado ao titular e não é usado para autenticação,
+recuperação nem notificações sem confirmação por SMS. Alterar e-mail ou senha
+exige a senha atual; a troca de senha revoga as demais sessões e preserva a
+sessão atual. O perfil fica somente para leitura durante acesso de suporte.
 
 Mensagens de autenticação e recuperação não devem revelar se um CPF ou e-mail
 está cadastrado quando isso puder facilitar enumeração de contas.
@@ -71,7 +78,7 @@ momento da ação, a decisão sobre o antigo admin e o resultado da confirmaçã
   registrar motivo ou não aplicabilidade, estados anteriores/posteriores e
   expiração calculada a partir da data do evento.
 - Nunca persistir em auditoria, logs ou evidências senhas, tokens, códigos MFA,
-  CPF/CNPJ completo, dados de cartão ou payload bruto do provedor. Payloads e
+  CPF/CNPJ completo, e-mail ou telefone completos, dados de cartão ou payload bruto do provedor. Payloads e
   mensagens de erro técnicos devem ser allowlisted ou sanitizados antes de
   gravar.
 - Invalidar tokens anteriores da mesma finalidade ao reenviar um link e marcar
