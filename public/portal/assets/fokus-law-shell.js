@@ -610,9 +610,8 @@
     });
   }
 
-FokusApi.request('/law/shell-context').then(async (value) => {
-    const unitContext = await FokusApi.request('/law/units');
-    setContext({ ...value, ...unitContext });
+FokusApi.request('/law/shell-context').then((value) => {
+    setContext(value);
     loading.hidden = true;
     shell.hidden = false;
   }).catch((error) => {
