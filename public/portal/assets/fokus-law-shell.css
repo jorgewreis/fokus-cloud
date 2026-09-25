@@ -219,10 +219,11 @@
 .law-profile-eyebrow { margin: 0; color: var(--law-shell-muted); font-size: 11px; }
 .law-profile-badge { flex: 0 0 auto; padding: 4px 9px; border-radius: 999px; background: #f2edf5; color: var(--law-shell-panel); font-size: 10px; }
 .law-profile-form { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px; }
-.law-profile-field { display: grid; align-content: start; gap: 6px; color: var(--law-shell-ink); font-size: 11px; font-weight: 500; }
+.law-profile-field { display: grid; max-width: 100%; align-content: start; gap: 6px; color: var(--law-shell-ink); font-size: 11px; font-weight: 500; }
 .law-profile-field > span small { color: var(--law-shell-muted); font-size: 10px; font-weight: 400; }
 .law-profile-field > small, .law-profile-footnote { color: var(--law-shell-muted); font-size: 10px; font-weight: 400; line-height: 1.5; }
-.law-profile-field input { max-width: 100%; min-width: 0; }
+.law-profile-field input { box-sizing: border-box; max-width: 100%; min-width: 0; }
+.law-profile-form > #password-help { flex: 1 0 100%; }
 .law-profile-field input[readonly] { background: #f5f3f7; color: var(--law-shell-muted); }
 .law-profile-current { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 0 0 14px; color: var(--law-shell-muted); font-size: 11px; }
 .law-profile-current strong { color: var(--law-shell-ink); font-weight: 600; }
