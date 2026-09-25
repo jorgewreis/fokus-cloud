@@ -53,6 +53,13 @@ for (const [name, viewport] of viewports) {
             await page.goto(`/backoffice/${route}`);
             await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', pageId);
             await expect(page.locator('.backoffice-records-page')).toBeVisible();
+            await page.evaluate(() => document.dispatchEvent(new PointerEvent('pointerdown', {
+                bubbles: true,
+                pointerType: 'mouse',
+                clientX: window.innerWidth - 20,
+                clientY: window.innerHeight - 20,
+            })));
+            await expect(page.locator('#sidebar')).toHaveClass(/single/);
             await expect(page).toHaveScreenshot(`${pageId}-${name}.png`, {
                 fullPage: true,
                 animations: 'disabled',
@@ -62,6 +69,7 @@ for (const [name, viewport] of viewports) {
                 // cross-platform glyph antialiasing.
                 maxDiffPixelRatio: 0.08,
             });
+            await page.mouse.move(0, 0);
         });
     }
 }
