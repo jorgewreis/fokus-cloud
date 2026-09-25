@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\BackofficeController;
 use App\Http\Controllers\Api\CompanyUserController;
 use App\Http\Controllers\Api\LawHearingController;
 use App\Http\Controllers\Api\LawShellController;
+use App\Http\Controllers\Api\LawUnitController;
 use App\Http\Controllers\Api\PlatformAdminController;
 use App\Http\Controllers\Api\PlatformAuthController;
 use App\Http\Controllers\Api\PlatformSupportController;
@@ -51,6 +52,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/auth/resend-verification', [AuthController::class, 'resendVerification'])->middleware('throttle:2,10,customer-resend-verification');
     Route::middleware(EnsureCompanyContext::class)->group(function () {
         Route::get('/law/shell-context', [LawShellController::class, 'context']);
+        Route::get('/law/units', [LawUnitController::class, 'index']);
+        Route::post('/law/units', [LawUnitController::class, 'store']);
+        Route::patch('/law/units/{unitId}', [LawUnitController::class, 'update']);
+        Route::post('/law/active-unit', [LawUnitController::class, 'select']);
         Route::get('/subscriptions', [SubscriptionController::class, 'index']);
         Route::post('/subscriptions/checkout', [SubscriptionController::class, 'checkout']);
         Route::post('/subscriptions/{subscription}/change', [SubscriptionController::class, 'change']);

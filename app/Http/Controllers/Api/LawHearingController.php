@@ -17,6 +17,9 @@ class LawHearingController extends Controller
     {
         $companyId = $request->attributes->get('active_company_id');
         $query = DB::table('law_hearings')->where('company_id', $companyId)->orderBy('scheduled_at');
+        $unitId = $this->activeUnitId($request);
+        if ($unitId) $query->where('law_unit_id', $unitId);
+        elseif ($this->hasActiveUnits($companyId)) $query->whereRaw('1 = 0');
         if ($request->filled('status')) $query->where('status', $request->string('status'));
         if ($request->filled('from')) $query->where('scheduled_at', '>=', $request->date('from'));
         if ($request->filled('to')) $query->where('scheduled_at', '<=', $request->date('to')->endOfDay());
@@ -33,7 +36,15 @@ class LawHearingController extends Controller
             'responsible_user_id' => ['nullable', 'string', 'max:30'], 'is_confidential' => ['boolean'],
             'external_tracking_enabled' => ['boolean'],
         ]);
-        $id = PrefixedUlid::make('LHE'); $companyId = $request->attributes->get('active_company_id'); $userId = $request->user()->id;
+        $companyId = $request->attributes->get('active_company_id');
+        $unitId = $this->activeUnitId($request);
+        abort_if(! $unitId && $this->hasActiveUnits($companyId), 422, 'Selecione um setor ativo antes de cadastrar uma audiência.');
+        if ($unitId) {
+            $data['law_unit_id'] = $unitId;
+        } elseif (! empty($data['law_unit_id'])) {
+            abort_unless(DB::table('law_units')->where('id', $data['law_unit_id'])->where('company_id', $companyId)->where('status', 'ativo')->exists(), 422, 'O setor selecionado não pertence à empresa ativa.');
+        }
+        $id = PrefixedUlid::make('LHE'); $userId = $request->user()->id;
         DB::transaction(function () use ($data, $id, $companyId, $userId): void {
             DB::table('law_hearings')->insert([...$data, 'id' => $id, 'company_id' => $companyId, 'status' => 'scheduled', 'version' => 1, 'created_by' => $userId, 'updated_by' => $userId, 'created_at' => now(), 'updated_at' => now()]);
             DB::table('law_hearing_status_history')->insert(['id' => PrefixedUlid::make('LHS'), 'company_id' => $companyId, 'law_hearing_id' => $id, 'new_status' => 'scheduled', 'origin' => 'internal', 'created_by' => $userId, 'created_at' => now(), 'updated_at' => now()]);
@@ -100,8 +111,29 @@ class LawHearingController extends Controller
 
     private function hearing(Request $request, string $id): object
     {
-        $hearing = DB::table('law_hearings')->where('id', $id)->where('company_id', $request->attributes->get('active_company_id'))->first();
+        $query = DB::table('law_hearings')->where('id', $id)->where('company_id', $request->attributes->get('active_company_id'));
+        if ($unitId = $this->activeUnitId($request)) $query->where('law_unit_id', $unitId);
+        elseif ($this->hasActiveUnits((string) $request->attributes->get('active_company_id'))) $query->whereRaw('1 = 0');
+        $hearing = $query->first();
         abort_unless($hearing, 404, 'Audiência não encontrada.');
         return $hearing;
+    }
+
+    private function activeUnitId(Request $request): ?string
+    {
+        $unitId = DB::table('law_user_active_units as active')
+            ->join('law_units as unit', function ($join): void {
+                $join->on('unit.id', '=', 'active.law_unit_id')->on('unit.company_id', '=', 'active.company_id');
+            })
+            ->where('active.user_id', $request->user()->id)
+            ->where('active.company_id', $request->attributes->get('active_company_id'))
+            ->where('unit.status', 'ativo')
+            ->value('active.law_unit_id');
+        return $unitId ? (string) $unitId : null;
+    }
+
+    private function hasActiveUnits(string $companyId): bool
+    {
+        return DB::table('law_units')->where('company_id', $companyId)->where('status', 'ativo')->exists();
     }
 }

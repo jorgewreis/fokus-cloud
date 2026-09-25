@@ -56,6 +56,14 @@ class LawShellController extends Controller
                 ->values();
         }
 
+        $units = DB::table('law_units')->where('company_id', $companyId)->where('status', 'ativo')->orderBy('name')->get(['id', 'name']);
+        $activeUnitId = DB::table('law_user_active_units')->where('user_id', $user->id)->where('company_id', $companyId)->value('law_unit_id');
+        $activeUnit = $activeUnitId ? $units->first(fn (object $unit): bool => $unit->id === $activeUnitId) : null;
+        if (! $activeUnit && $units->count() === 1) {
+            $activeUnit = $units->first();
+            $activeUnitId = $activeUnit->id;
+        }
+
         $lawNames = DB::table('subscriptions as subscription')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->where('subscription.status', 'ativa')
@@ -126,7 +134,9 @@ class LawShellController extends Controller
             ],
             'active_company_id' => $companyId,
             'companies' => $companies->values()->all(),
-            'units' => [],
+            'units' => $units->map(fn (object $unit): array => ['id' => (string) $unit->id, 'name' => (string) $unit->name, 'status' => 'ativo'])->values()->all(),
+            'active_unit_id' => $activeUnit ? (string) $activeUnit->id : null,
+            'active_unit' => $activeUnit ? ['id' => (string) $activeUnit->id, 'name' => (string) $activeUnit->name] : null,
             'subscription' => $activeSubscription ? [
                 'product_name' => (string) $activeSubscription->product_name,
                 'plan_name' => $planName,
@@ -136,7 +146,7 @@ class LawShellController extends Controller
             ] : null,
             'permissions' => [
                 'manage_company_users' => $membership->role === 'admin',
-                'manage_settings' => true,
+                'manage_settings' => $membership->role === 'admin',
             ],
             'support_mode' => $supportMode,
             'modules' => $modules->map(fn (object $module): array => [

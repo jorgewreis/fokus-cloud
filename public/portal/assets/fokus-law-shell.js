@@ -33,8 +33,8 @@
   const preferenceKey = (userId, key) => `fokus-law:${userId}:${key}`;
   let context = null;
   const initialPage = shell.dataset.initialPage || 'overview';
-  let settingsView = initialPage === 'profile' ? 'profile' : 'settings';
-  let activeGroup = initialPage === 'profile' ? 'settings' : 'overview';
+  let settingsView = 'settings';
+  let activeGroup = 'overview';
 
   const element = (tag, className, text) => {
     const node = document.createElement(tag);
@@ -97,7 +97,7 @@
       const descriptor = getModuleDescriptor(module);
       addRailButton(`module:${module.id}`, descriptor.label, descriptor.icon);
     });
-    addRailButton('settings', 'Configurações', 'settings');
+    if (context.permissions.manage_settings) addRailButton('settings', 'Configurações', 'settings');
   }
 
   function appendNavLink(container, label, href, iconName, selected = false, disabled = false) {
@@ -134,31 +134,38 @@
     if (activeGroup === 'overview') {
       sectionTitle.textContent = 'Visão geral';
       document.querySelector('#section-icon').src = ICON_ROOT + ICONS.overview;
-      appendNavButton(pageItems, 'Resumo da empresa', 'overview', true, () => renderContent('overview'));
-      renderContent('overview');
+      appendNavButton(pageItems, 'Dashboard', 'overview', initialPage !== 'profile', () => window.location.assign('/portal/fokus-law'));
+      appendNavLink(pageItems, 'Meu perfil', '/portal/fokus-law/perfil', 'profile', initialPage === 'profile');
+      appendNavButton(pageItems, 'Preferências do Fokus Law', 'settings', settingsView === 'preferences', () => { settingsView = 'preferences'; renderContent('preferences'); });
+      renderContent(initialPage === 'profile' ? 'profile' : settingsView === 'preferences' ? 'preferences' : 'overview');
       return;
     }
 
     if (activeGroup === 'settings') {
+      if (!context.permissions.manage_settings) {
+        activeGroup = 'overview';
+        renderNavigation();
+        return;
+      }
       sectionTitle.textContent = 'Configurações';
       headingIcon = 'settings';
       document.querySelector('#section-icon').src = ICON_ROOT + ICONS[headingIcon];
       const list = element('ul');
       const entries = [
-        ['Perfil', '/portal/fokus-law/perfil', 'profile'],
         ['Empresas', '/portal/empresas', 'company'],
+        ['Assinatura', '/portal/assinaturas', 'settings'],
       ];
-      if (context.permissions.manage_company_users) entries.push(['Usuários e acessos', '/portal/usuarios', 'users']);
+      if (context.permissions.manage_company_users) entries.push(['Usuários, perfis e permissões', '/portal/usuarios', 'users']);
       entries.forEach(([label, href, iconName]) => {
         const item = element('li');
-        appendNavLink(item, label, href, iconName, label === 'Perfil' && settingsView === 'profile');
+        appendNavLink(item, label, href, iconName);
         list.append(item);
       });
-      const preferencesItem = element('li');
-      appendNavButton(preferencesItem, 'Preferências do Fokus Law', 'settings', true, () => renderContent('preferences'));
-      list.append(preferencesItem);
+      const unitsItem = element('li');
+      appendNavButton(unitsItem, 'Setores da empresa', 'company', settingsView === 'units', () => { settingsView = 'units'; renderNavigation(); });
+      list.append(unitsItem);
       pageItems.append(list);
-      renderContent(settingsView === 'profile' ? 'profile' : 'settings');
+      renderContent(settingsView === 'units' ? 'units' : 'settings');
       return;
     }
 
@@ -214,17 +221,17 @@
 
   function renderSettings() {
     const heading = element('div');
-    heading.append(element('p', 'law-page-eyebrow', 'PREFERÊNCIAS DO PRODUTO'));
+    heading.append(element('p', 'law-page-eyebrow', 'ADMINISTRAÇÃO DA EMPRESA'));
     heading.append(element('h2', '', 'Configurações'));
-    heading.append(element('p', 'law-page-lede', 'Gerencie sua conta e as preferências da sua experiência no Fokus Law.'));
+    heading.append(element('p', 'law-page-lede', 'Gerencie a empresa, a assinatura, os usuários, os perfis, as permissões e os setores do Fokus Law.'));
     contentRegion.append(heading);
 
     const list = element('div', 'law-settings-list');
     const links = [
-      ['Meu perfil', 'Atualize seus dados pessoais e credenciais de acesso.', '/portal/fokus-law/perfil', 'profile'],
-      ['Empresas', 'Consulte e escolha a empresa ativa da sua sessão.', '/portal/empresas', 'company'],
+      ['Empresa', 'Consulte e configure a empresa ativa.', '/portal/empresas', 'company'],
+      ['Assinatura', 'Consulte e gerencie a assinatura do Fokus Law.', '/portal/assinaturas', 'settings'],
     ];
-    if (context.permissions.manage_company_users) links.push(['Usuários e acessos', 'Gerencie os vínculos de usuários da empresa.', '/portal/usuarios', 'users']);
+    if (context.permissions.manage_company_users) links.push(['Usuários, perfis e permissões', 'Gerencie os vínculos e os acessos das pessoas da empresa.', '/portal/usuarios', 'users']);
     links.forEach(([title, description, href, iconName]) => {
       const link = element('a', 'law-settings-link');
       link.href = href;
@@ -236,6 +243,15 @@
       link.append(element('span', '', '›'));
       list.append(link);
     });
+    const units = element('button', 'law-settings-link law-settings-action');
+    units.type = 'button';
+    units.append(icon('company'));
+    const unitText = element('span');
+    unitText.append(element('strong', '', 'Setores da empresa'));
+    unitText.append(element('small', '', 'Cadastre os setores e escolha quais ficam ativos no Fokus Law.'));
+    units.append(unitText, element('span', '', '›'));
+    units.addEventListener('click', () => { settingsView = 'units'; renderNavigation(); });
+    list.append(units);
     contentRegion.append(list);
   }
 
@@ -276,6 +292,97 @@
     contentRegion.append(card);
   }
 
+  async function refreshUnits() {
+    const result = await FokusApi.request('/law/units');
+    context.units = result.units;
+    context.active_unit_id = result.active_unit_id;
+    context.active_unit = result.active_unit;
+    renderUnitOptions();
+    return result;
+  }
+
+  async function renderUnits() {
+    const heading = element('div');
+    heading.append(element('p', 'law-page-eyebrow', 'ORGANIZAÇÃO DA EMPRESA'));
+    heading.append(element('h2', '', 'Setores do sistema'));
+    heading.append(element('p', 'law-page-lede', 'Crie setores para organizar o espaço de trabalho. Cada pessoa escolhe seu setor ativo no seletor da navegação.'));
+    contentRegion.append(heading);
+
+    const card = element('section', 'law-units-card');
+    const form = element('form', 'law-unit-form');
+    const label = element('label', '', 'Nome do setor');
+    const input = element('input', 'fs-form-control');
+    input.name = 'name';
+    input.required = true;
+    input.maxLength = 100;
+    input.minLength = 2;
+    input.placeholder = 'Ex.: Cartório Cível';
+    label.append(input);
+    const submit = element('button', 'fs-btn fs-btn-primary', 'Adicionar setor');
+    submit.type = 'submit';
+    form.append(label, submit);
+    const status = element('p', 'law-units-status');
+    status.setAttribute('role', 'status');
+    const list = element('div', 'law-unit-list');
+    card.append(form, status, list);
+    contentRegion.append(card);
+
+    const drawList = (units) => {
+      list.replaceChildren();
+      if (!units.length) {
+        list.append(element('p', 'law-units-empty', 'Nenhum setor cadastrado.'));
+        return;
+      }
+      units.forEach((unit) => {
+        const row = element('div', 'law-unit-row');
+        const meta = element('div', 'law-unit-meta');
+        meta.append(element('strong', '', unit.name));
+        meta.append(element('span', '', unit.status === 'ativo' ? 'Ativo' : 'Inativo'));
+        const toggle = element('button', 'fs-btn fs-btn-outline-primary', unit.status === 'ativo' ? 'Desativar' : 'Reativar');
+        toggle.type = 'button';
+        toggle.addEventListener('click', async () => {
+          toggle.disabled = true;
+          try {
+            await FokusApi.request(`/law/units/${encodeURIComponent(unit.id)}`, { method: 'PATCH', body: { status: unit.status === 'ativo' ? 'inativo' : 'ativo' } });
+            const result = await refreshUnits();
+            drawList(result.units);
+            status.textContent = 'Setor atualizado.';
+          } catch (error) {
+            toggle.disabled = false;
+            status.textContent = error.message || 'Não foi possível atualizar o setor.';
+          }
+        });
+        row.append(meta, toggle);
+        list.append(row);
+      });
+    };
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      submit.disabled = true;
+      status.textContent = '';
+      try {
+        await FokusApi.request('/law/units', { method: 'POST', body: { name: input.value.trim() } });
+        input.value = '';
+        const result = await refreshUnits();
+        drawList(result.units);
+        status.textContent = 'Setor criado.';
+        input.focus();
+      } catch (error) {
+        status.textContent = error.message || 'Não foi possível criar o setor.';
+      } finally {
+        submit.disabled = false;
+      }
+    });
+
+    try {
+      const result = await refreshUnits();
+      drawList(result.units);
+    } catch (error) {
+      status.textContent = error.message || 'Não foi possível carregar os setores.';
+    }
+  }
+
   function renderModulePlaceholder(module) {
     const descriptor = getModuleDescriptor(module);
     const heading = element('div');
@@ -296,6 +403,7 @@
     else if (view === 'settings') renderSettings();
     else if (view === 'profile') renderProfile();
     else if (view === 'preferences') renderPreferences();
+    else if (view === 'units') renderUnits();
     else {
       const module = activeModule();
       if (module) renderModulePlaceholder(module);
@@ -349,6 +457,29 @@
     });
   }
 
+  function renderUnitOptions() {
+    const wrapper = document.querySelector('#unit-context');
+    const select = document.querySelector('#law-unit-select');
+    const units = (context.units || []).filter((unit) => unit.status === 'ativo');
+    wrapper.hidden = units.length === 0;
+    select.replaceChildren();
+    if (!units.length) return;
+    select.disabled = units.length === 1;
+    if (!context.active_unit_id) {
+      const placeholder = element('option', '', 'Selecione um setor');
+      placeholder.value = '';
+      placeholder.selected = true;
+      placeholder.disabled = true;
+      select.append(placeholder);
+    }
+    units.forEach((unit) => {
+      const option = element('option', '', unit.name);
+      option.value = unit.id;
+      option.selected = unit.id === context.active_unit_id;
+      select.append(option);
+    });
+  }
+
   function announceError(message) {
     contentRegion.replaceChildren();
     const alert = element('div', 'fs-alert fs-alert-danger', message);
@@ -365,6 +496,18 @@
   }
 
   function initializeInteractions() {
+    const unitSelect = document.querySelector('#law-unit-select');
+    unitSelect.addEventListener('change', async () => {
+      unitSelect.disabled = true;
+      try {
+        await FokusApi.request('/law/active-unit', { method: 'POST', body: { unit_id: unitSelect.value } });
+        window.location.reload();
+      } catch (error) {
+        unitSelect.disabled = false;
+        announceError(error.message || 'Não foi possível trocar o setor ativo.');
+      }
+    });
+
     const companySwitch = document.querySelector('#company-switch');
     const companyOptions = document.querySelector('#company-options');
     companySwitch.addEventListener('click', () => {
@@ -435,12 +578,11 @@
     document.querySelector('#user-avatar').textContent = context.user.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
     document.querySelector('#subscription-label').textContent = context.subscription?.label || 'Fokus Law';
     renderCompanyOptions();
+    renderUnitOptions();
     const remember = localStorage.getItem(preferenceKey(context.user.id, 'remember-group')) === 'true';
-    if (initialPage === 'profile') {
-      activeGroup = 'settings';
-    } else if (remember) {
+    if (initialPage !== 'profile' && remember) {
       const lastGroup = localStorage.getItem(preferenceKey(context.user.id, 'last-group'));
-      if (lastGroup === 'settings' || context.modules.some((item) => `module:${item.id}` === lastGroup)) activeGroup = lastGroup;
+      if ((lastGroup === 'settings' && context.permissions.manage_settings) || context.modules.some((item) => `module:${item.id}` === lastGroup)) activeGroup = lastGroup;
     }
     if (localStorage.getItem(preferenceKey(context.user.id, 'reduced-motion')) === 'true') document.documentElement.classList.add('law-pref-reduced-motion');
     renderRail();
@@ -468,8 +610,9 @@
     });
   }
 
-  FokusApi.request('/law/shell-context').then((value) => {
-    setContext(value);
+FokusApi.request('/law/shell-context').then(async (value) => {
+    const unitContext = await FokusApi.request('/law/units');
+    setContext({ ...value, ...unitContext });
     loading.hidden = true;
     shell.hidden = false;
   }).catch((error) => {
