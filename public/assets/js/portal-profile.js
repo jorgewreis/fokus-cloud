@@ -1,7 +1,7 @@
-(() => {
+window.initializeLawProfile = () => {
   const loading = document.querySelector('#profile-loading');
   const sections = document.querySelector('#profile-sections');
-  const supportNotice = document.querySelector('#support-notice');
+  const supportNotice = document.querySelector('#profile-support-notice');
   const personalForm = document.querySelector('#personal-form');
   const emailForm = document.querySelector('#email-form');
   const securityForm = document.querySelector('#security-form');
@@ -26,7 +26,7 @@
   }
 
   function setSupportReadOnly() {
-    supportNotice.hidden = false;
+    if (supportNotice) supportNotice.hidden = false;
     [personalForm, emailForm, securityForm].forEach((form) => {
       form.querySelectorAll('input, button').forEach((control) => { control.disabled = true; });
     });
@@ -127,4 +127,4 @@
   });
 
   loadProfile();
-})();
+};

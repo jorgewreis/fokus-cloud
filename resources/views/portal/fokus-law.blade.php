@@ -8,7 +8,7 @@
   <title>Fokus Law | Fokus Cloud</title>
   <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260923-support-mode-v1" />
   <link rel="stylesheet" href="/marketing/products/fokus-law.css?v=20260924-law-access-choice-v1" />
-  <link rel="stylesheet" href="/portal/assets/fokus-law-shell.css?v=20260925-shell-v1" />
+  <link rel="stylesheet" href="/portal/assets/fokus-law-shell.css?v=20260925-shell-v2" />
 </head>
 <body class="fokus-law-shell-page">
   <a class="law-shell-skip" href="#law-workspace">Pular para o conteúdo principal</a>
@@ -17,7 +17,7 @@
     <span>Carregando o Fokus Law…</span>
   </div>
 
-  <div class="law-shell" id="law-shell" hidden>
+  <div class="law-shell" id="law-shell" data-initial-page="{{ $initialPage ?? 'overview' }}" hidden>
     <div class="law-mobile-scrim" id="mobile-scrim" hidden></div>
     <aside class="law-sidebar" id="law-sidebar" aria-label="Navegação do Fokus Law">
       <nav class="law-rail" aria-label="Grupos e módulos">
@@ -56,7 +56,7 @@
         <footer class="law-user-footer">
           <div class="law-user-avatar" id="user-avatar" aria-hidden="true">—</div>
           <div class="law-user-meta"><strong id="user-name">—</strong><span id="user-email">—</span></div>
-          <a class="law-profile-link" href="/portal/perfil" aria-label="Meu perfil" title="Meu perfil">
+          <a class="law-profile-link" href="/portal/fokus-law/perfil" aria-label="Meu perfil" title="Meu perfil">
             <img src="/backoffice/assets/icons/Settings-User--Streamline-Ultimate.png" alt="" />
           </a>
         </footer>
@@ -100,8 +100,12 @@
       <footer class="law-workspace-footer"><span>Fokus Cloud Law</span><a href="/produtos/fokus-law">Ajuda sobre o produto</a></footer>
     </main>
   </div>
+  <template id="law-profile-template">
+    @include('portal.partials.fokus-law-profile')
+  </template>
   <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script>
   <script src="/assets/js/api-client.js"></script>
-  <script src="/portal/assets/fokus-law-shell.js?v=20260925-shell-v1" defer></script>
+  <script src="/portal/assets/fokus-law-shell.js?v=20260925-shell-v2" defer></script>
+  <script src="/assets/js/portal-profile.js?v=20260925-profile-v2" defer></script>
 </body>
 </html>

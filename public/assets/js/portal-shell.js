@@ -5,7 +5,7 @@
     ['/portal/assinaturas', 'Assinaturas'],
     ['/portal/usuarios', 'Usuários'],
     ['/portal/empresas', 'Empresas'],
-    ['/portal/perfil', 'Meu perfil']
+    ['/portal/fokus-law/perfil', 'Meu perfil']
   ];
   function mount() {
     document.documentElement.dataset.role = 'user';

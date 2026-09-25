@@ -63,6 +63,19 @@ class LawShellTest extends TestCase
         $this->get('/portal/fokus-law.html')->assertNotFound();
     }
 
+    public function test_profile_opens_inside_the_law_shell_and_legacy_route_redirects_there(): void
+    {
+        $response = $this->actingAs($this->user)->withSession(['active_company_id' => $this->companyId])
+            ->get('/portal/fokus-law/perfil');
+
+        $response->assertOk()->assertViewIs('portal.fokus-law')
+            ->assertSee('data-initial-page="profile"', false)
+            ->assertSee('law-topbar', false)
+            ->assertSee('law-profile-template', false);
+
+        $this->get('/portal/perfil')->assertRedirect('/portal/fokus-law/perfil');
+    }
+
     public function test_shell_context_returns_empty_modules_without_active_law_entitlements(): void
     {
         $this->actingAs($this->user)->withSession(['active_company_id' => $this->companyId])

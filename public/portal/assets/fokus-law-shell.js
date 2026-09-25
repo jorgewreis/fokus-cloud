@@ -32,7 +32,9 @@
   const mobileScrim = document.querySelector('#mobile-scrim');
   const preferenceKey = (userId, key) => `fokus-law:${userId}:${key}`;
   let context = null;
-  let activeGroup = 'overview';
+  const initialPage = shell.dataset.initialPage || 'overview';
+  let settingsView = initialPage === 'profile' ? 'profile' : 'settings';
+  let activeGroup = initialPage === 'profile' ? 'settings' : 'overview';
 
   const element = (tag, className, text) => {
     const node = document.createElement(tag);
@@ -76,6 +78,7 @@
     button.append(tooltip);
     button.addEventListener('click', () => {
       activeGroup = group;
+      if (group === 'settings') settingsView = 'settings';
       renderNavigation();
       closeMobileNav();
       contentRegion.focus({ preventScroll: true });
@@ -142,20 +145,20 @@
       document.querySelector('#section-icon').src = ICON_ROOT + ICONS[headingIcon];
       const list = element('ul');
       const entries = [
-        ['Perfil', '/portal/perfil', 'profile'],
+        ['Perfil', '/portal/fokus-law/perfil', 'profile'],
         ['Empresas', '/portal/empresas', 'company'],
       ];
       if (context.permissions.manage_company_users) entries.push(['Usuários e acessos', '/portal/usuarios', 'users']);
       entries.forEach(([label, href, iconName]) => {
         const item = element('li');
-        appendNavLink(item, label, href, iconName);
+        appendNavLink(item, label, href, iconName, label === 'Perfil' && settingsView === 'profile');
         list.append(item);
       });
       const preferencesItem = element('li');
       appendNavButton(preferencesItem, 'Preferências do Fokus Law', 'settings', true, () => renderContent('preferences'));
       list.append(preferencesItem);
       pageItems.append(list);
-      renderContent('settings');
+      renderContent(settingsView === 'profile' ? 'profile' : 'settings');
       return;
     }
 
@@ -218,7 +221,7 @@
 
     const list = element('div', 'law-settings-list');
     const links = [
-      ['Meu perfil', 'Atualize seus dados de acesso no portal Fokus Cloud.', '/portal/perfil', 'profile'],
+      ['Meu perfil', 'Atualize seus dados pessoais e credenciais de acesso.', '/portal/fokus-law/perfil', 'profile'],
       ['Empresas', 'Consulte e escolha a empresa ativa da sua sessão.', '/portal/empresas', 'company'],
     ];
     if (context.permissions.manage_company_users) links.push(['Usuários e acessos', 'Gerencie os vínculos de usuários da empresa.', '/portal/usuarios', 'users']);
@@ -291,12 +294,24 @@
     contentRegion.dataset.view = view;
     if (view === 'overview') renderOverview();
     else if (view === 'settings') renderSettings();
+    else if (view === 'profile') renderProfile();
     else if (view === 'preferences') renderPreferences();
     else {
       const module = activeModule();
       if (module) renderModulePlaceholder(module);
       else renderOverview();
     }
+  }
+
+  function renderProfile() {
+    document.title = 'Meu perfil | Fokus Law';
+    const template = document.querySelector('#law-profile-template');
+    if (!template) {
+      announceError('Não foi possível carregar o perfil. Atualize a página para tentar novamente.');
+      return;
+    }
+    contentRegion.append(template.content.cloneNode(true));
+    if (typeof window.initializeLawProfile === 'function') window.initializeLawProfile();
   }
 
   function renderCompanyOptions() {
@@ -414,13 +429,16 @@
 
   function setContext(value) {
     context = value;
+    if (initialPage !== 'profile') document.title = 'Fokus Law | Fokus Cloud';
     document.querySelector('#user-name').textContent = context.user.name;
     document.querySelector('#user-email').textContent = context.user.email;
     document.querySelector('#user-avatar').textContent = context.user.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
     document.querySelector('#subscription-label').textContent = context.subscription?.label || 'Fokus Law';
     renderCompanyOptions();
     const remember = localStorage.getItem(preferenceKey(context.user.id, 'remember-group')) === 'true';
-    if (remember) {
+    if (initialPage === 'profile') {
+      activeGroup = 'settings';
+    } else if (remember) {
       const lastGroup = localStorage.getItem(preferenceKey(context.user.id, 'last-group'));
       if (lastGroup === 'settings' || context.modules.some((item) => `module:${item.id}` === lastGroup)) activeGroup = lastGroup;
     }

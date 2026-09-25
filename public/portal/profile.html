@@ -4,76 +4,10 @@
     <meta name="robots" content="noindex, nofollow" />
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Meu perfil | Fokus Cloud</title>
-    <link rel="stylesheet" href="/assets/css/reset.css" />
-    <link rel="stylesheet" href="/assets/css/style.css" />
-    <link rel="stylesheet" href="/assets/css/subscription.css" />
-    <link rel="stylesheet" href="/assets/css/portal.css?v=20260925-profile-v2" />
-    <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260925-profile-v1" />
-    <link rel="stylesheet" href="/assets/css/portal-profile.css?v=20260925-profile-v1" />
+    <meta http-equiv="refresh" content="0;url=/portal/fokus-law/perfil" />
+    <title>Meu perfil | Fokus Law</title>
   </head>
-  <body class="subscription-page portal-profile-page">
-    <main class="portal-profile-wrap">
-      <header class="portal-profile-heading">
-        <p class="section-kicker">Conta Fokus Cloud</p>
-        <p>Revise seus dados pessoais e mantenha as credenciais de acesso atualizadas.</p>
-      </header>
-
-      <div id="profile-loading" class="portal-profile-loading" role="status">Carregando seus dados…</div>
-      <div id="support-notice" class="portal-profile-notice" role="status" hidden>
-        <strong>Acesso de suporte ativo</strong>
-        <span>Seu perfil está somente para leitura. Encerre o acesso de suporte pela faixa no topo para editar seus dados.</span>
-      </div>
-
-      <div id="profile-sections" class="portal-profile-sections" hidden>
-        <section class="fs-card-panel portal-profile-card" aria-labelledby="personal-title">
-          <div class="portal-profile-card-heading">
-            <div><p class="portal-profile-eyebrow">Informações da conta</p><h2 id="personal-title">Dados pessoais</h2></div>
-            <span class="portal-profile-badge">Titular</span>
-          </div>
-          <form id="personal-form" class="portal-profile-form" novalidate>
-            <label class="form-field"><span class="fs-form-label">Nome completo</span><input class="fs-form-control" id="profile-name" name="name" autocomplete="name" maxlength="255" required /></label>
-            <label class="form-field"><span class="fs-form-label">Telefone <span class="portal-profile-optional">opcional</span></span><input class="fs-form-control" id="profile-phone" name="phone" type="tel" autocomplete="tel-national" inputmode="tel" maxlength="16" placeholder="(00) 00000-0000" aria-describedby="phone-help" /><small id="phone-help">Número brasileiro com DDD. Ainda não verificado; usado apenas como contato.</small></label>
-            <label class="form-field"><span class="fs-form-label">CPF</span><input class="fs-form-control" id="profile-cpf" type="text" readonly aria-describedby="cpf-help" /><small id="cpf-help">Por segurança, a alteração do CPF é feita pelo suporte Fokus Cloud.</small></label>
-            <div class="portal-profile-form-footer"><p class="portal-profile-feedback" id="personal-status" role="status" aria-live="polite"></p><button class="fs-btn fs-btn-primary" type="submit">Salvar dados pessoais</button></div>
-          </form>
-        </section>
-
-        <section class="fs-card-panel portal-profile-card" aria-labelledby="email-title">
-          <div class="portal-profile-card-heading">
-            <div><p class="portal-profile-eyebrow">Confirmação necessária</p><h2 id="email-title">E-mail</h2></div>
-            <span id="email-verified" class="portal-profile-badge"></span>
-          </div>
-          <p class="portal-profile-current">E-mail atual <strong id="current-email">—</strong></p>
-          <form id="email-form" class="portal-profile-form" novalidate>
-            <label class="form-field"><span class="fs-form-label">Novo endereço de e-mail</span><input class="fs-form-control" name="email" type="email" autocomplete="email" maxlength="255" required /></label>
-            <label class="form-field"><span class="fs-form-label">Senha atual</span><input class="fs-form-control" name="current_password" type="password" autocomplete="current-password" required /></label>
-            <div class="portal-profile-form-footer"><p class="portal-profile-feedback" id="email-status" role="status" aria-live="polite"></p><button class="fs-btn fs-btn-primary" type="submit">Enviar confirmação</button></div>
-          </form>
-          <p class="portal-profile-footnote">O endereço atual continua ativo até você confirmar o link enviado ao novo e-mail. Também avisaremos o endereço atual.</p>
-        </section>
-
-        <section class="fs-card-panel portal-profile-card" aria-labelledby="security-title">
-          <div class="portal-profile-card-heading">
-            <div><p class="portal-profile-eyebrow">Proteção do acesso</p><h2 id="security-title">Segurança</h2></div>
-          </div>
-          <form id="security-form" class="portal-profile-form" novalidate>
-            <label class="form-field"><span class="fs-form-label">Senha atual</span><input class="fs-form-control" name="current_password" type="password" autocomplete="current-password" required /></label>
-            <div class="portal-profile-password-row">
-              <label class="form-field"><span class="fs-form-label">Nova senha</span><input class="fs-form-control" name="password" type="password" autocomplete="new-password" minlength="12" required aria-describedby="password-help" /></label>
-              <label class="form-field"><span class="fs-form-label">Confirme a nova senha</span><input class="fs-form-control" name="password_confirmation" type="password" autocomplete="new-password" minlength="12" required /></label>
-            </div>
-            <small id="password-help">Use pelo menos 12 caracteres. Senhas comuns ou encontradas em vazamentos serão recusadas.</small>
-            <div class="portal-profile-form-footer"><p class="portal-profile-feedback" id="security-status" role="status" aria-live="polite"></p><button class="fs-btn fs-btn-primary" type="submit">Alterar senha</button></div>
-          </form>
-          <p class="portal-profile-footnote">A alteração encerra suas outras sessões e mantém este acesso ativo.</p>
-        </section>
-      </div>
-    </main>
-    <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script>
-    <script src="/backoffice/assets/js/toast-notifications.js?v=20260922-backoffice-toast-v2"></script>
-    <script src="/assets/js/api-client.js?v=20260925-profile-v1"></script>
-    <script src="/assets/js/portal-shell.js?v=20260923-support-mode-v1"></script>
-    <script src="/assets/js/portal-profile.js?v=20260925-profile-v1" defer></script>
+  <body>
+    <p>Redirecionando para <a href="/portal/fokus-law/perfil">Meu perfil no Fokus Law</a>…</p>
   </body>
 </html>

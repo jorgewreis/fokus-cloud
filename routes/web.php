@@ -51,7 +51,7 @@ Route::get('/api/csrf-token', fn () => response()->json(['token' => csrf_token()
 Route::get('/acesso', fn () => redirect('/?acesso=cliente'));
 Route::get('/portal', fn () => response()->file(public_path('portal/dashboard.html')));
 Route::get('/portal/painel', fn () => response()->file(public_path('portal/dashboard.html')));
-Route::get('/portal/fokus-law', function () {
+$serveFokusLawShell = function (string $page = 'overview', bool $redirectProfile = false) {
     $user = Auth::guard('web')->user();
     if (! $user || $user->status !== 'ativa') {
         return redirect('/?acesso=cliente');
@@ -80,31 +80,15 @@ Route::get('/portal/fokus-law', function () {
         return redirect('/portal/empresas');
     }
 
-    return response()->view('portal.fokus-law');
-});
-Route::get('/portal/perfil', function () {
-    $user = Auth::guard('web')->user();
-    if (! $user || $user->status !== 'ativa') {
-        return redirect('/?acesso=cliente');
+    if ($redirectProfile) {
+        return redirect('/portal/fokus-law/perfil');
     }
-    if (! $user->email_verified_at) {
-        return redirect('/verificar-email');
-    }
-    $companyId = request()->session()->get('active_company_id');
-    if (! $companyId) {
-        return redirect('/portal/empresas');
-    }
-    $membership = DB::table('company_memberships as membership')
-        ->join('companies as company', 'company.id', '=', 'membership.company_id')
-        ->where('membership.company_id', $companyId)->where('membership.user_id', $user->id)
-        ->where('membership.status', 'ativo')->whereNull('membership.deleted_at')
-        ->where('company.status', 'ativa')->whereNull('company.deleted_at')->exists();
-    if (! $membership) {
-        request()->session()->forget('active_company_id');
-        return redirect('/portal/empresas');
-    }
-    return response()->file(public_path('portal/profile.html'));
-});
+
+    return response()->view('portal.fokus-law', ['initialPage' => $page]);
+};
+Route::get('/portal/fokus-law', fn () => $serveFokusLawShell());
+Route::get('/portal/fokus-law/perfil', fn () => $serveFokusLawShell('profile'));
+Route::get('/portal/perfil', fn () => $serveFokusLawShell('profile', true));
 Route::get('/cadastro', fn () => response()->file(public_path('auth/cadastro.html')));
 Route::get('/verificar-email', fn () => response()->file(public_path('auth/verificar-email.html')));
 Route::get('/criar-senha', fn () => response()->file(public_path('auth/criar-senha.html')));
@@ -138,7 +122,7 @@ Route::get('/privacidade', fn () => response()->file(public_path('marketing/priv
 // Development-server fallback. Production NGINX redirects these physical legacy paths before serving static files.
 Route::permanentRedirect('/admin', '/acesso');
 Route::permanentRedirect('/admin/painel', '/portal');
-Route::permanentRedirect('/admin/perfil', '/portal/perfil');
+Route::permanentRedirect('/admin/perfil', '/portal/fokus-law/perfil');
 Route::permanentRedirect('/auth/cadastro.html', '/cadastro');
 Route::permanentRedirect('/auth/verificar-email.html', '/verificar-email');
 Route::permanentRedirect('/auth/criar-senha.html', '/criar-senha');
