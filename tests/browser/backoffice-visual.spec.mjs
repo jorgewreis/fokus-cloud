@@ -746,7 +746,7 @@ test('Superadministrador MFA pode iniciar acesso de suporte a perfil real', asyn
     await page.locator('#law-support-user').selectOption('MBS_TESTE_01');
     await page.locator('#law-support-reason').fill('Investigar erro de permissões');
     await page.locator('#law-support-start').click();
-    await expect(page).toHaveURL(/\/portal$/);
+    await expect(page).toHaveURL(/\/portal\/fokus-law$/);
 });
 
 test('Superadministrador pode escolher entrar pela própria assinatura Fokus Law', async ({ page }) => {
