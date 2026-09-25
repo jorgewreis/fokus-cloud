@@ -16,6 +16,7 @@ class SubscriptionChangeManager
         return DB::transaction(function () use ($subscriptionId, $data, $admin): array {
             $subscription = DB::table('subscriptions')->where('id', $subscriptionId)->lockForUpdate()->first();
             abort_unless($subscription, 404, 'Assinatura não encontrada.');
+            abort_if(isset($data['expected_version']) && (int) $data['expected_version'] !== (int) $subscription->version, 409, 'A assinatura mudou desde que a página foi carregada. Atualize antes de continuar.');
             abort_if($subscription->status === 'encerrada', 422, 'Assinatura encerrada não pode ser alterada.');
 
             $before = $this->snapshot($subscription);
@@ -55,6 +56,8 @@ class SubscriptionChangeManager
                     $after['cancel_at'] = $effectiveAt->toISOString();
                 }
             } elseif (in_array($action, ['upgrade', 'downgrade'], true)) {
+                abort_if(DB::table('subscription_changes')->where('subscription_id', $subscriptionId)->whereIn('status', ['agendada', 'aguardando_pagamento'])->exists(), 409,
+                    'Já existe uma alteração pendente para esta assinatura. Edite ou cancele-a antes de criar outra.');
                 $target = $this->targetPlanSnapshot($subscription, $data);
                 $after = [...$before, ...$target['snapshot']];
                 $status = $action === 'upgrade' ? 'aguardando_pagamento' : 'agendada';
@@ -89,6 +92,7 @@ class SubscriptionChangeManager
             }
 
             $changeId = PrefixedUlid::make('SCH');
+            $isPlatformAdmin = DB::table('platform_admins')->where('id', $admin->id)->exists();
             DB::table('subscription_changes')->insert([
                 'id' => $changeId,
                 'company_id' => $subscription->company_id,
@@ -101,7 +105,8 @@ class SubscriptionChangeManager
                 'before_snapshot' => json_encode($before),
                 'after_snapshot' => json_encode($after),
                 'reason' => app(AuditSanitizer::class)->sanitizeText((string) $data['reason']),
-                'requested_by_platform_admin_id' => $admin->id,
+                'requested_by_user_id' => $isPlatformAdmin ? null : $admin->id,
+                'requested_by_platform_admin_id' => $isPlatformAdmin ? $admin->id : null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -115,6 +120,32 @@ class SubscriptionChangeManager
                 'after' => $after,
             ];
         });
+    }
+
+    public function quoteCustomerChange(string $subscriptionId, array $data): array
+    {
+        $subscription = DB::table('subscriptions as subscription')->join('products as product', 'product.id', '=', 'subscription.product_id')
+            ->where('subscription.id', $subscriptionId)->select('subscription.*', 'product.code as product_code')->first();
+        abort_unless($subscription, 404, 'Assinatura não encontrada.');
+        abort_if($subscription->status === 'encerrada', 422, 'Assinatura encerrada não pode ser alterada.');
+
+        $before = $this->snapshot($subscription);
+        $target = $this->targetPlanSnapshot($subscription, $data)['snapshot'];
+        $isIncrease = (float) ($target['amount'] ?? 0) > (float) ($before['amount'] ?? 0)
+            || ((float) ($target['amount'] ?? 0) === (float) ($before['amount'] ?? 0) && (float) ($target['monthly_amount'] ?? 0) > (float) ($before['monthly_amount'] ?? 0));
+        $action = $isIncrease ? 'upgrade' : 'downgrade';
+        $effectiveAt = $action === 'upgrade'
+            ? now()
+            : ($subscription->current_period_ends_at ? Carbon::parse($subscription->current_period_ends_at) : now());
+
+        return [
+            'action' => $action,
+            'current' => $before,
+            'target' => $target,
+            'effective_at' => $effectiveAt,
+            'charge_now' => $action === 'upgrade' ? $this->proration($before, $target, $effectiveAt) : 0,
+            'version' => (int) $subscription->version,
+        ];
     }
 
     public function applyApprovedChange(string $changeId, ?string $adminId = null): array
@@ -260,57 +291,126 @@ class SubscriptionChangeManager
 
     private function targetPlanSnapshot(object $subscription, array $data): array
     {
-        $planId = (string) ($data['target_plan_id'] ?? '');
-        $plan = DB::table('plans')->join('products', 'products.id', '=', 'plans.product_id')
-            ->where('plans.id', $planId)->where('plans.product_id', $subscription->product_id)
-            ->where('plans.status', 'ativo')->where('plans.publication_state', 'publicado')
-            ->select('plans.*', 'products.code as product_code', 'products.name as product_name')->first();
-        abort_unless($plan, 422, 'O plano publicado informado não está disponível para esta assinatura.');
-
-        $publishedCatalog = $this->catalog->publicCatalog($plan->product_code);
-        $publishedPlan = collect($publishedCatalog['plans'] ?? [])->firstWhere('code', $plan->code);
-        abort_unless($publishedPlan, 422, 'O plano não está presente na publicação atual do catálogo.');
-        $cycle = $data['billing_cycle'] ?? $subscription->billing_cycle ?? 'monthly';
+        $product = DB::table('products')->where('id', $subscription->product_id)->first();
+        abort_unless($product, 422, 'Produto da assinatura indisponível.');
+        $publishedCatalog = $this->catalog->publicCatalog($product->code);
         $publishedModules = collect($publishedCatalog['modules'] ?? [])->keyBy('code');
-        $moduleCodes = $publishedPlan['module_codes'] ?? [];
-        $items = collect($moduleCodes)->map(function (string $moduleCode) use ($publishedModules, $subscription, $plan, $cycle): array {
+        abort_unless($publishedModules->isNotEmpty(), 422, 'Catálogo publicado indisponível para este produto.');
+
+        $planId = (string) ($data['target_plan_id'] ?? '');
+        $plan = null;
+        $publishedPlan = null;
+        if ($planId !== '') {
+            $plan = DB::table('plans')->where('id', $planId)->where('product_id', $subscription->product_id)
+                ->where('status', 'ativo')->where('publication_state', 'publicado')->first();
+            abort_unless($plan, 422, 'O plano publicado informado não está disponível para esta assinatura.');
+            $publishedPlan = collect($publishedCatalog['plans'] ?? [])->firstWhere('code', $plan->code);
+            abort_unless($publishedPlan, 422, 'O plano não está presente na publicação atual do catálogo.');
+            $customizations = collect($data['items'] ?? [])->keyBy('module_code');
+            $requestedItems = collect($publishedPlan['module_codes'] ?? [])->map(function (string $code) use ($customizations): array {
+                $selected = $customizations->get($code, []);
+                return ['module_code' => $code, 'quantity' => 1, 'personalizations' => $selected['personalizations'] ?? []];
+            })->all();
+        } else {
+            $requestedItems = $data['items'] ?? [];
+            abort_unless(is_array($requestedItems) && $requestedItems !== [], 422, 'Selecione ao menos um módulo para a assinatura.');
+        }
+
+        $cycle = $data['billing_cycle'] ?? $subscription->billing_cycle ?? 'monthly';
+        abort_unless(in_array($cycle, ['monthly', 'annual'], true), 422, 'Ciclo de cobrança inválido.');
+        $moduleCodes = array_map(fn (array $item): string => (string) ($item['module_code'] ?? ''), $requestedItems);
+        abort_if(in_array('', $moduleCodes, true) || count($moduleCodes) !== count(array_unique($moduleCodes)), 422, 'Cada módulo pode ser selecionado somente uma vez.');
+        foreach ($moduleCodes as $code) {
+            abort_unless($publishedModules->has($code), 422, 'Há um módulo indisponível no catálogo publicado.');
+            if (! $plan) abort_unless((bool) ($publishedModules->get($code)['available_standalone'] ?? false), 422, 'Um dos módulos selecionados só pode ser contratado por meio de um plano publicado.');
+        }
+        $moduleCatalog = $publishedModules;
+        foreach ($requestedItems as $requested) {
+            $module = $moduleCatalog->get((string) $requested['module_code']);
+            $moduleDependencies = collect($module['dependencies'] ?? [])->pluck('code')->all();
+            foreach ($moduleDependencies as $dependency) abort_unless(in_array($dependency, $moduleCodes, true), 422, 'A composição precisa incluir todos os módulos dependentes.');
+            $moduleIncompatibilities = collect($module['incompatibilities'] ?? [])->pluck('code')->all();
+            foreach ($moduleIncompatibilities as $incompatible) abort_if(in_array($incompatible, $moduleCodes, true), 422, 'A composição inclui módulos incompatíveis.');
+            abort_unless((int) ($requested['quantity'] ?? 1) >= 1 && (int) ($requested['quantity'] ?? 1) <= 1000, 422, 'Quantidade de módulo inválida.');
+        }
+
+        $defaults = $publishedPlan['personalization_defaults'] ?? [];
+        $items = collect($requestedItems)->map(function (array $requested) use ($publishedModules, $subscription, $plan, $cycle, $defaults): array {
+            $moduleCode = (string) $requested['module_code'];
             $module = $publishedModules->get($moduleCode);
             abort_unless($module, 422, 'O plano publicado contém uma funcionalidade indisponível.');
+            $databaseModule = DB::table('modules')->where('product_id', $subscription->product_id)->where('code', $moduleCode)->first();
+            abort_unless($databaseModule, 422, 'Módulo não encontrado no catálogo local.');
+            [$personalizations, $delta] = $this->selectedPersonalizations($module, $requested['personalizations'] ?? [], $defaults);
+            $baseMonthly = (float) $module['monthly_amount'];
+            $unitMonthly = $baseMonthly + array_sum(array_column($personalizations, 'additional_monthly_amount'));
+            $unitPrice = $cycle === 'annual' ? $unitMonthly * 10 : $unitMonthly;
 
             return [
-                'module_id' => DB::table('modules')->where('product_id', $subscription->product_id)->where('code', $moduleCode)->value('id'),
+                'module_id' => $databaseModule->id,
                 'name' => $module['name'],
-                'quantity' => 1,
-                'unit_price' => $cycle === 'annual' ? CatalogPricing::annualFromMonthly((float) $module['monthly_amount']) : (float) $module['monthly_amount'],
+                'quantity' => (int) ($requested['quantity'] ?? 1),
+                'unit_price' => $unitPrice,
                 'conditions' => [
-                    'plan_code' => $plan->code,
+                    'cycle' => $cycle,
+                    'selection_mode' => $plan ? 'plan' : 'modules',
+                    'plan_code' => $plan->code ?? null,
                     'module_code' => $module['module_code'] ?? null,
                     'segments' => $module['segments'] ?? [],
                     'context_code' => $module['context_code'] ?? null,
-                    'personalizations' => $module['personalizations'] ?? [],
+                    'personalizations' => $personalizations,
+                    'personalization_delta' => $delta,
                 ],
             ];
         })->values()->all();
 
-        $monthlyAmount = (float) $publishedPlan['monthly_amount'];
+        $monthlyAmount = $plan
+            ? (float) $publishedPlan['monthly_amount'] + collect($items)->sum(fn (array $item): float => (float) ($item['conditions']['personalization_delta'] ?? 0))
+            : collect($items)->sum(fn (array $item): float => (float) $item['unit_price'] * $item['quantity'] / ($cycle === 'annual' ? 10 : 1));
+        $amount = $cycle === 'annual' ? CatalogPricing::annualFromMonthly($monthlyAmount) : round($monthlyAmount, 2);
 
         return [
             'monthly_amount' => $monthlyAmount,
+            'amount' => $amount,
             'snapshot' => [
-                'plan_id' => $plan->id,
-                'plan_code' => $plan->code,
-                'plan_name' => $plan->name,
+                'plan_id' => $plan->id ?? null,
+                'plan_code' => $plan->code ?? null,
+                'plan_name' => $plan->name ?? 'Personalizada',
                 'publication_versions' => [
                     'product_catalog_version' => (int) ($publishedCatalog['published_version'] ?? 0),
-                    'plan_version' => (int) ($publishedPlan['published_version'] ?? 0),
+                    'plan_version' => isset($publishedPlan['published_version']) ? (int) $publishedPlan['published_version'] : null,
                     'module_versions' => collect($moduleCodes)->mapWithKeys(fn (string $code): array => [$code => (int) ($publishedModules->get($code)['published_version'] ?? 0)])->all(),
                 ],
                 'billing_cycle' => $cycle,
                 'monthly_amount' => $monthlyAmount,
-                'amount' => $cycle === 'annual' ? CatalogPricing::annualFromMonthly($monthlyAmount) : round($monthlyAmount, 2),
+                'amount' => $amount,
                 'items' => $items,
             ],
         ];
+    }
+
+    private function selectedPersonalizations(array $module, array $requested, array $planDefaults): array
+    {
+        $requestedByType = collect($requested)->keyBy('type_code');
+        $defaultsById = collect($planDefaults)->keyBy('personalization_id');
+        $selections = [];
+        $delta = 0.0;
+        foreach ($module['personalizations'] ?? [] as $personalization) {
+            if (empty($personalization['active'])) continue;
+            $tiers = collect($personalization['tiers'] ?? [])->where('active', true)->sortBy('value')->values();
+            if ($tiers->isEmpty()) continue;
+            $planDefault = $defaultsById->get($personalization['id']);
+            $default = $planDefault ? $tiers->firstWhere('id', $planDefault['tier_id']) : ($personalization['required'] ? $tiers->first() : null);
+            $choice = $requestedByType->get($personalization['type_code']);
+            $tier = $choice ? $tiers->firstWhere('value', (int) $choice['tier_value']) : $default;
+            if ($personalization['required']) abort_unless($tier && $default, 422, 'Personalização obrigatória sem faixa padrão disponível.');
+            if (! $tier) continue;
+            if ($default) abort_if((int) $tier['value'] < (int) $default['value'], 422, 'A faixa selecionada é inferior à faixa mínima do plano.');
+            if ($default) $delta += (float) $tier['additional_monthly_amount'] - (float) $default['additional_monthly_amount'];
+            $selections[] = ['personalization_id' => $personalization['id'], 'type_code' => $personalization['type_code'], 'tier_id' => $tier['id'], 'value' => (int) $tier['value'], 'additional_monthly_amount' => (float) $tier['additional_monthly_amount']];
+        }
+        foreach ($requestedByType as $typeCode => $choice) abort_unless(collect($module['personalizations'] ?? [])->pluck('type_code')->contains($typeCode), 422, 'Personalização inválida para este módulo.');
+        return [$selections, $delta];
     }
 
     private function overrideSnapshot(array $before, array $override): array

@@ -16,7 +16,7 @@ class SubscriptionBillingManager
             }
 
             $subscription = DB::table('subscriptions')->where('id', $payment->subscription_id)->lockForUpdate()->first();
-            if ($subscription && ! $subscription->provider_subscription_id && DB::table('voucher_redemptions as redemption')
+            if (empty($payment->subscription_change_id) && $subscription && ! $subscription->provider_subscription_id && DB::table('voucher_redemptions as redemption')
                 ->join('vouchers as voucher', 'voucher.id', '=', 'redemption.voucher_id')
                 ->where('redemption.subscription_id', $subscription->id)->where('voucher.discount_type', 'trial_free')
                 ->exists()) {
@@ -46,6 +46,38 @@ class SubscriptionBillingManager
                 app(AuditRecorder::class)->platform(null, 'billing.payment_status_updated', 'payment', $payment->id, $payment->company_id,
                     'Estado confirmado pelo Mercado Pago.', metadata: ['source' => 'mercado_pago'], before: ['status' => $payment->status], after: ['status' => $status],
                     actorType: 'gateway', channel: 'webhook', originContext: '/api/webhooks/mercado-pago', correlationId: $correlationId);
+            }
+
+            if (! empty($payment->subscription_change_id)) {
+                $change = DB::table('subscription_changes')->where('id', $payment->subscription_change_id)->lockForUpdate()->first();
+                if ($change && $change->status === 'cancelada' && $status === 'aprovado') {
+                    if (! empty($remote['id'])) {
+                        app(MercadoPagoClient::class)->createRefund((string) $remote['id'], null, 'law-cancelled-change-'.$change->id);
+                        DB::table('payments')->where('id', $payment->id)->update(['status' => 'estornado', 'updated_at' => $now, 'version' => DB::raw('version + 1')]);
+                    }
+                    return $subscription;
+                }
+                if ($change && $change->status === 'aguardando_pagamento') {
+                    if ($status === 'aprovado') {
+                        $after = json_decode((string) $change->after_snapshot, true) ?: [];
+                        if ($subscription?->provider_subscription_id) {
+                            $cycle = $after['billing_cycle'] ?? $subscription->billing_cycle ?? 'monthly';
+                            app(MercadoPagoClient::class)->updatePreapproval((string) $subscription->provider_subscription_id, [
+                                'auto_recurring' => [
+                                    'frequency' => $cycle === 'annual' ? 12 : 1,
+                                    'frequency_type' => 'months',
+                                    'transaction_amount' => (float) ($after['amount'] ?? 0),
+                                    'currency_id' => 'BRL',
+                                ],
+                            ], 'law-change-'.$change->id);
+                        }
+                        app(SubscriptionChangeManager::class)->applyApprovedChange($change->id);
+                    } elseif (in_array($status, ['recusado', 'cancelado', 'estornado'], true)) {
+                        DB::table('subscription_changes')->where('id', $change->id)->update(['status' => 'falhou', 'updated_at' => $now, 'version' => DB::raw('version + 1')]);
+                    }
+                }
+
+                return $subscription;
             }
 
             if ($subscription) {

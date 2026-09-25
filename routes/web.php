@@ -94,6 +94,7 @@ $serveFokusLawShell = function (string $page = 'overview', bool $redirectProfile
 };
 Route::get('/portal/fokus-law', fn () => $serveFokusLawShell());
 Route::get('/portal/fokus-law/empresa', fn () => $serveFokusLawShell('company', false, true));
+Route::get('/portal/fokus-law/assinatura', fn () => $serveFokusLawShell('subscription', false, true));
 Route::get('/portal/fokus-law/perfil', fn () => $serveFokusLawShell('profile'));
 Route::get('/portal/perfil', fn () => $serveFokusLawShell('profile', true));
 Route::get('/cadastro', fn () => response()->file(public_path('auth/cadastro.html')));
@@ -104,7 +105,7 @@ Route::get('/aceitar-vinculo', fn () => response()->file(public_path('auth/aceit
 Route::get('/aceitar-transferencia', fn () => response()->file(public_path('auth/aceitar-transferencia.html')));
 Route::get('/portal/empresas', fn () => response()->file(public_path('portal/companies.html')));
 Route::get('/portal/usuarios', fn () => response()->file(public_path('portal/users.html')));
-Route::get('/portal/assinaturas', fn () => response()->file(public_path('portal/subscriptions.html')));
+Route::get('/portal/assinaturas', fn () => redirect('/portal/fokus-law/assinatura', 301));
 Route::get('/portal/transferir-administracao', fn () => response()->file(public_path('portal/admin-transfer.html')));
 Route::get('/backoffice/ativar', fn () => response()->file(public_path('backoffice/ativar.html')));
 Route::get('/backoffice/confirmar-email', fn () => response()->file(public_path('backoffice/confirmar-email.html')));

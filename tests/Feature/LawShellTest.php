@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Services\PrefixedUlid;
+use App\Services\LawUsageMeter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -123,6 +124,71 @@ class LawShellTest extends TestCase
             ->patchJson('/api/law/company-profile', ['version' => 1, 'legal_name' => 'Versão antiga'])
             ->assertConflict();
         $this->assertDatabaseHas('companies', ['id' => $this->companyId, 'legal_name' => $payload['legal_name'], 'version' => 2]);
+    }
+
+    public function test_subscription_management_page_is_admin_only_and_legacy_route_redirects_into_law(): void
+    {
+        $session = ['active_company_id' => $this->companyId];
+        $this->actingAs($this->user)->withSession($session)
+            ->get('/portal/fokus-law/assinatura')->assertOk()->assertSee('data-initial-page="subscription"', false);
+        $this->get('/portal/assinaturas')->assertRedirect('/portal/fokus-law/assinatura');
+
+        $manager = User::create([
+            'id' => PrefixedUlid::make('USR'), 'name' => 'Gestor', 'cpf' => '11144477736',
+            'email' => 'gestor-assinatura@example.test', 'password' => Hash::make('SenhaSegura!2026'),
+            'status' => 'ativa', 'email_verified_at' => now(),
+        ]);
+        DB::table('company_memberships')->insert([
+            'id' => PrefixedUlid::make('MEM'), 'company_id' => $this->companyId, 'user_id' => $manager->id,
+            'role_id' => DB::table('roles')->where('code', 'gestor')->value('id'), 'status' => 'ativo', 'version' => 1,
+            'created_by' => $this->user->id, 'updated_by' => $this->user->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->actingAs($manager)->withSession($session)->get('/portal/fokus-law/assinatura')->assertForbidden();
+        $this->actingAs($manager)->withSession($session)->getJson('/api/law/subscription')->assertForbidden();
+    }
+
+    public function test_contact_capacity_meter_notifies_once_on_each_crossing_of_seventy_percent(): void
+    {
+        $product = DB::table('products')->whereIn('code', ['law', 'fokus-law'])->firstOrFail();
+        $module = DB::table('modules')->where('product_id', $product->id)->where('module_code', 'contatos')->firstOrFail();
+        $subscriptionId = PrefixedUlid::make('ASS');
+        DB::table('subscriptions')->insert([
+            'id' => $subscriptionId, 'company_id' => $this->companyId, 'product_id' => $product->id,
+            'status' => 'ativa', 'open_company_product' => $this->companyId.'-'.$product->id,
+            'public_name' => 'Érica Menezes',
+            'commercial_snapshot' => json_encode(['items' => [['module_id' => $module->id, 'conditions' => ['personalizations' => [['type_code' => 'contatos_cadastrados', 'value' => 10]]]]]]),
+            'version' => 1, 'created_by' => $this->user->id, 'updated_by' => $this->user->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $contactIds = [];
+        for ($index = 0; $index < 8; $index++) {
+            $id = PrefixedUlid::make('LCO'); $contactIds[] = $id;
+            DB::table('law_contacts')->insert([
+                'id' => $id, 'company_id' => $this->companyId, 'display_name' => 'Contato '.$index,
+                'contact_type' => 'person', 'status' => $index === 0 ? 'inativo' : 'ativo',
+                'created_by' => $this->user->id, 'updated_by' => $this->user->id, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+
+        $meter = app(LawUsageMeter::class);
+        $metric = $meter->contacts($this->companyId);
+        $this->assertSame(8, $metric['used']);
+        $this->assertSame(10, $metric['limit']);
+        $this->assertTrue($metric['over_threshold']);
+        $this->assertDatabaseCount('law_notifications', 1);
+        $meter->contacts($this->companyId);
+        $this->assertDatabaseCount('law_notifications', 1);
+
+        DB::table('law_contacts')->whereIn('id', [$contactIds[0], $contactIds[1]])->update(['deleted_at' => now()]);
+        $this->assertFalse($meter->contacts($this->companyId)['over_threshold']);
+        DB::table('law_contacts')->insert([
+            'id' => PrefixedUlid::make('LCO'), 'company_id' => $this->companyId, 'display_name' => 'Contato novo A', 'contact_type' => 'person', 'status' => 'ativo', 'created_by' => $this->user->id, 'updated_by' => $this->user->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('law_contacts')->insert([
+            'id' => PrefixedUlid::make('LCO'), 'company_id' => $this->companyId, 'display_name' => 'Contato novo B', 'contact_type' => 'person', 'status' => 'ativo', 'created_by' => $this->user->id, 'updated_by' => $this->user->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $meter->contacts($this->companyId);
+        $this->assertDatabaseCount('law_notifications', 2);
     }
 
     public function test_profile_opens_inside_the_law_shell_and_legacy_route_redirects_there(): void

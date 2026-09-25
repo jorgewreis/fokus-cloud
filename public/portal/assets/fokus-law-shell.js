@@ -33,8 +33,8 @@
   const preferenceKey = (userId, key) => `fokus-law:${userId}:${key}`;
   let context = null;
   const initialPage = shell.dataset.initialPage || 'overview';
-  let settingsView = initialPage === 'company' ? 'company' : 'settings';
-  let activeGroup = initialPage === 'company' ? 'settings' : 'overview';
+  let settingsView = ['company', 'subscription'].includes(initialPage) ? initialPage : 'settings';
+  let activeGroup = ['company', 'subscription'].includes(initialPage) ? 'settings' : 'overview';
 
   const element = (tag, className, text) => {
     const node = document.createElement(tag);
@@ -159,7 +159,7 @@
       const list = element('ul');
       const entries = [
         ['Empresa', '/portal/fokus-law/empresa', 'company'],
-        ['Assinatura', '/portal/assinaturas', 'settings'],
+        ['Assinatura', '/portal/fokus-law/assinatura', 'settings'],
       ];
       if (context.permissions.manage_company_users) entries.push(['Usuários, perfis e permissões', '/portal/usuarios', 'users']);
       entries.forEach(([label, href, iconName]) => {
@@ -171,7 +171,7 @@
       appendNavButton(unitsItem, 'Setores da empresa', 'company', settingsView === 'units', () => { settingsView = 'units'; renderNavigation(); });
       list.append(unitsItem);
       pageItems.append(list);
-      renderContent(settingsView === 'units' ? 'units' : settingsView === 'company' ? 'company' : 'settings');
+      renderContent(settingsView === 'units' ? 'units' : settingsView === 'company' ? 'company' : settingsView === 'subscription' ? 'subscription' : 'settings');
       return;
     }
 
@@ -249,7 +249,7 @@
     contentRegion.append(managementHeading);
     const links = [
       ['Empresa', 'Consulte e configure a empresa ativa.', '/portal/fokus-law/empresa', 'company'],
-      ['Assinatura', 'Consulte e gerencie a assinatura do Fokus Law.', '/portal/assinaturas', 'settings'],
+      ['Assinatura', 'Consulte e gerencie a assinatura do Fokus Law.', '/portal/fokus-law/assinatura', 'settings'],
     ];
     if (context.permissions.manage_company_users) links.push(['Usuários, perfis e permissões', 'Gerencie os vínculos e os acessos das pessoas da empresa.', '/portal/usuarios', 'users']);
     links.forEach(([title, description, href, iconName]) => {
@@ -611,6 +611,10 @@
   }
 
   function renderModulePlaceholder(module) {
+    if (String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos')) {
+      renderContacts();
+      return;
+    }
     const descriptor = getModuleDescriptor(module);
     const heading = element('div');
     heading.append(element('p', 'law-page-eyebrow', 'MÓDULO HABILITADO'));
@@ -623,6 +627,170 @@
     contentRegion.append(state);
   }
 
+  async function renderContacts() {
+    document.title = 'Contatos | Fokus Law';
+    const heading = element('div'); heading.append(element('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), element('h2', '', 'Contatos'));
+    heading.append(element('p', 'law-page-lede', 'Cadastre os contatos da empresa e consulte a capacidade contratada para todos os setores.'));
+    contentRegion.append(heading);
+    const usage = element('div', 'law-subscription-usage'); usage.textContent = 'Carregando capacidade…'; contentRegion.append(usage);
+    const form = element('form', 'law-contact-form');
+    const nameField = lawSubscriptionField('Nome de exibição'); const name = element('input', 'fs-form-control'); name.required = true; name.maxLength = 180; nameField.append(name);
+    const typeField = lawSubscriptionField('Tipo de contato'); const type = element('select', 'fs-form-control'); [['person','Pessoa'],['organization','Organização'],['lawyer','Advogado(a)'],['law_firm','Escritório'],['public_body','Órgão público'],['court_unit','Unidade judiciária'],['unknown','Outro']].forEach(([value,label])=>type.append(new Option(label,value))); typeField.append(type);
+    const sectorField = lawSubscriptionField('Setor'); const sector = element('select', 'fs-form-control'); sector.append(new Option('Empresa toda', '')); (context.units || []).filter((unit)=>unit.status==='ativo').forEach((unit)=>sector.append(new Option(unit.name, unit.id))); if (context.active_unit_id) sector.value = context.active_unit_id; sectorField.append(sector);
+    const submit = element('button','fs-btn fs-btn-primary','Cadastrar contato'); submit.type='submit'; const formStatus=element('p','law-subscription-feedback'); formStatus.setAttribute('role','status');
+    form.append(nameField,typeField,sectorField,submit,formStatus); contentRegion.append(form);
+    const list = element('div','law-contact-list'); contentRegion.append(list);
+    const refresh = async () => {
+      const result = await FokusApi.request('/law/contacts');
+      if (!contentRegion.isConnected || contentRegion.dataset.view !== 'module') return;
+      if (context.permissions.manage_settings) loadLawNotifications(document.querySelector('#notifications-button'), document.querySelector('#notifications-panel'));
+      list.replaceChildren();
+      const metric = result.usage;
+      if (metric?.available) { usage.textContent=`${metric.label}: ${metric.used.toLocaleString('pt-BR')} de ${metric.limit.toLocaleString('pt-BR')} (${metric.percentage}%)`; usage.dataset.state=metric.over_threshold?'warning':'normal'; if(metric.over_threshold) usage.append(element('strong','',' Acima de 70%: avalie um upgrade em Configurações > Assinatura.')); }
+      else usage.textContent = 'A capacidade contratada para contatos não está configurada nesta assinatura.';
+      if (!result.contacts.length) { list.append(element('p','law-module-state','Nenhum contato cadastrado neste setor.')); return; }
+      result.contacts.forEach((contact)=>{ const card=element('article','law-contact-card'); const info=element('div'); info.append(element('strong','',contact.display_name),element('span','',`${contact.legal_name || contact.contact_type} · ${contact.unit_name || 'Empresa toda'} · ${contact.status}`)); const archive=element('button','fs-btn fs-btn-secondary','Remover'); archive.type='button'; archive.addEventListener('click',async()=>{ archive.disabled=true; try { await FokusApi.request(`/law/contacts/${encodeURIComponent(contact.id)}`,{method:'DELETE'}); await refresh(); } catch(error){ formStatus.dataset.state='error'; formStatus.textContent=error.message; archive.disabled=false; } }); card.append(info,archive); list.append(card); });
+    };
+    form.addEventListener('submit',async(event)=>{ event.preventDefault(); submit.disabled=true; formStatus.textContent=''; try { await FokusApi.request('/law/contacts',{method:'POST',body:{display_name:name.value.trim(),contact_type:type.value,law_unit_id:sector.value||null}}); name.value=''; formStatus.textContent='Contato cadastrado.'; await refresh(); name.focus(); } catch(error){ formStatus.dataset.state='error'; formStatus.textContent=error.message||'Não foi possível cadastrar.'; } finally{ submit.disabled=false; } });
+    try { await refresh(); } catch(error){ usage.dataset.state='error'; usage.textContent=error.message||'Não foi possível carregar os contatos.'; }
+  }
+
+  async function renderSubscription() {
+    document.title = 'Assinatura | Fokus Law';
+    const heading = element('div');
+    heading.append(element('p', 'law-page-eyebrow', 'PLANO E RECURSOS'));
+    heading.append(element('h2', '', 'Assinatura'));
+    heading.append(element('p', 'law-page-lede', 'Consulte o plano, os módulos e os limites contratados. Compare opções e solicite alterações para a empresa ativa.'));
+    contentRegion.append(heading);
+    const feedback = element('p', 'law-subscription-feedback', 'Carregando assinatura e catálogo…');
+    feedback.setAttribute('role', 'status');
+    contentRegion.append(feedback);
+    try {
+      const data = await FokusApi.request('/law/subscription');
+      if (!contentRegion.isConnected || contentRegion.dataset.view !== 'subscription') return;
+      if (context.permissions.manage_settings) loadLawNotifications(document.querySelector('#notifications-button'), document.querySelector('#notifications-panel'));
+      feedback.remove();
+      drawSubscription(data);
+    } catch (error) {
+      feedback.dataset.state = 'error';
+      feedback.textContent = error.message || 'Não foi possível carregar os dados da assinatura.';
+    }
+  }
+
+  function drawSubscription(data) {
+    const current = data.subscription;
+    const catalog = data.catalog || {};
+    const plans = catalog.plans || [];
+    const modules = catalog.modules || [];
+    if (!current) {
+      const empty = element('section', 'law-module-state');
+      empty.append(element('strong', '', 'Nenhuma assinatura aberta do Fokus Law.'));
+      empty.append(element('p', '', 'A contratação inicial pode ser feita pelo portal de assinaturas.'));
+      const link = element('a', 'fs-btn fs-btn-primary', 'Ver opções de assinatura'); link.href = '/produtos/fokus-law'; empty.append(link);
+      contentRegion.append(empty); return;
+    }
+
+    const currentItems = new Map((current.items || []).map((item) => [item.conditions?.module_code || item.module_code || item.family, item]));
+    const pendingChange = data.pending_change;
+    const summary = element('section', 'law-subscription-overview');
+    summary.append(element('p', 'law-page-eyebrow', 'ASSINATURA ATUAL'));
+    summary.append(element('h3', '', current.plan_name || 'Composição personalizada'));
+    const price = element('strong', 'law-subscription-price', formatLawMoney(current.amount));
+    price.append(element('span', '', current.billing_cycle === 'annual' ? ' / ano' : ' / mês')); summary.append(price);
+    const facts = element('div', 'law-subscription-facts');
+    [['Situação', current.status], ['Ciclo', current.billing_cycle === 'annual' ? 'Anual' : 'Mensal'], ['Período até', formatLawDate(current.current_period_ends_at)]].forEach(([label, value]) => {
+      const fact = element('div', 'law-subscription-fact'); fact.append(element('span', '', label), element('strong', '', value || '—')); facts.append(fact);
+    });
+    summary.append(facts); contentRegion.append(summary);
+
+    const form = element('form', 'law-subscription-builder');
+    form.append(element('h3', '', 'Planos, módulos e capacidades'));
+    form.append(element('p', 'law-page-lede', 'As funcionalidades são informativas. Você pode trocar o plano ou compor os módulos e limites da assinatura.'));
+    const controls = element('div', 'law-subscription-controls');
+    const planWrap = lawSubscriptionField('Plano publicado');
+    const planSelect = element('select', 'fs-form-control'); planSelect.name = 'target_plan_id'; planSelect.append(new Option('Composição personalizada', ''));
+    plans.forEach((plan) => planSelect.append(new Option(`${plan.name} · ${formatLawMoney(plan.monthly_amount)}/mês`, plan.id)));
+    planSelect.value = plans.find((plan) => plan.code === current.plan_code)?.id || '';
+    planWrap.append(planSelect); controls.append(planWrap);
+    const cycleWrap = lawSubscriptionField('Forma de cobrança');
+    const cycleSelect = element('select', 'fs-form-control'); cycleSelect.append(new Option('Mensal', 'monthly'), new Option('Anual', 'annual')); cycleSelect.value = current.billing_cycle || 'monthly'; cycleWrap.append(cycleSelect); controls.append(cycleWrap);
+    form.append(controls);
+
+    const moduleGrid = element('div', 'law-subscription-module-grid');
+    const moduleControls = new Map();
+    modules.forEach((module) => {
+      const card = element('article', 'law-subscription-module-card');
+      const label = element('label', 'law-subscription-module-title');
+      const checkbox = element('input'); checkbox.type = 'checkbox'; checkbox.value = module.code; checkbox.checked = currentItems.has(module.code);
+      label.append(checkbox, element('strong', '', module.name)); card.append(label);
+      if (module.description) card.append(element('p', 'law-subscription-module-description', module.description));
+      const capabilities = module.capability_items || (module.capabilities || []).map((name) => ({ name }));
+      if (capabilities.length) { const list = element('ul', 'law-subscription-features'); capabilities.forEach((feature) => list.append(element('li', '', feature.name))); card.append(list); }
+      const personalizationBox = element('div', 'law-subscription-personalizations');
+      (module.personalizations || []).filter((p) => p.active).forEach((p) => {
+        const selected = currentItems.get(module.code)?.conditions?.personalizations?.find((entry) => entry.type_code === p.type_code);
+        const field = lawSubscriptionField(p.name || p.label || p.type_code);
+        const select = element('select', 'fs-form-control'); select.dataset.typeCode = p.type_code;
+        (p.tiers || []).filter((tier) => tier.active).forEach((tier) => select.append(new Option(`${Number(tier.value).toLocaleString('pt-BR')} · ${formatLawMoney(tier.additional_monthly_amount)}/mês`, tier.value)));
+        if (selected?.value) select.value = String(selected.value);
+        if (!select.options.length) return;
+        field.append(select);
+        if (p.type_code === 'contatos_cadastrados' && data.usage?.contatos_cadastrados?.available) {
+          const usage = data.usage.contatos_cadastrados;
+          const note = element('p', 'law-subscription-usage');
+          const update = () => { const limit = Number(select.value); const percent = limit ? Math.round(usage.used / limit * 1000) / 10 : 100; note.replaceChildren(document.createTextNode(`Uso atual: ${usage.used.toLocaleString('pt-BR')} de ${limit.toLocaleString('pt-BR')} (${percent}%).`)); note.dataset.state = percent > 70 ? 'warning' : 'normal'; if (percent > 70) note.append(element('strong', '', ' Considere aumentar esta capacidade.')); };
+          select.addEventListener('change', update); update(); field.append(note);
+        }
+        personalizationBox.append(field);
+      });
+      card.append(personalizationBox); moduleGrid.append(card); moduleControls.set(module.code, checkbox);
+    });
+    form.append(moduleGrid);
+    planSelect.addEventListener('change', () => { const plan = plans.find((item) => item.id === planSelect.value); moduleControls.forEach((checkbox, code) => { checkbox.checked = Boolean(plan?.module_codes?.includes(code)); }); });
+    moduleControls.forEach((checkbox) => checkbox.addEventListener('change', () => { if (checkbox.checked) planSelect.value = ''; }));
+
+    const actions = element('div', 'law-subscription-actions');
+    const quoteButton = element('button', 'fs-btn fs-btn-primary', 'Calcular alteração'); quoteButton.type = 'submit';
+    const applyButton = element('button', 'fs-btn fs-btn-primary', 'Solicitar alteração'); applyButton.type = 'button'; applyButton.hidden = true;
+    const quote = element('div', 'law-subscription-quote'); actions.append(quoteButton, quote, applyButton); form.append(actions);
+    const feedback = element('p', 'law-subscription-feedback'); feedback.setAttribute('role', 'status'); form.append(feedback);
+    let payload;
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault(); quoteButton.disabled = true; applyButton.hidden = true; feedback.textContent = '';
+      const items = [];
+      moduleControls.forEach((checkbox, code) => { if (checkbox.checked) { const card = checkbox.closest('.law-subscription-module-card'); items.push({ module_code: code, quantity: 1, personalizations: [...card.querySelectorAll('[data-type-code]')].map((input) => ({ type_code: input.dataset.typeCode, tier_value: Number(input.value) })) }); } });
+      payload = { billing_cycle: cycleSelect.value, version: current.version, reason: 'Alteração solicitada pelo administrador na página Assinatura.', items };
+      if (planSelect.value) payload.target_plan_id = planSelect.value;
+      try {
+        const result = await FokusApi.request('/law/subscription/quote', { method: 'POST', body: payload });
+        quote.replaceChildren(element('strong', '', `${result.action === 'upgrade' ? 'Aumento' : 'Redução'} para ${formatLawMoney(result.target.amount)} por ${cycleSelect.value === 'annual' ? 'ano' : 'mês'}.`));
+        quote.append(element('span', '', result.action === 'upgrade' ? `Cobrança proporcional agora: ${formatLawMoney(result.charge_now)}.` : `Vigência em ${formatLawDate(result.effective_at)}.`));
+        if (pendingChange) applyButton.textContent = 'Atualizar alteração pendente';
+        applyButton.hidden = false; applyButton.focus();
+      } catch (error) { feedback.dataset.state = 'error'; feedback.textContent = error.message || 'Não foi possível calcular a alteração.'; }
+      finally { quoteButton.disabled = false; }
+    });
+    applyButton.addEventListener('click', async () => { applyButton.disabled = true; try { const result = await FokusApi.request('/law/subscription/change', { method: pendingChange ? 'PATCH' : 'POST', body: payload }); if (result.checkout_url) window.location.assign(result.checkout_url); else window.location.reload(); } catch (error) { feedback.dataset.state = 'error'; feedback.textContent = error.message || 'Não foi possível solicitar a alteração.'; applyButton.disabled = false; } });
+    contentRegion.append(form);
+
+    if (pendingChange) {
+      const pending = element('section', 'law-subscription-pending'); pending.append(element('h3', '', 'Alteração pendente'));
+      pending.append(element('p', '', pendingChange.status === 'agendada' ? `Programada para ${formatLawDate(pendingChange.effective_at)}.` : 'Aguardando confirmação do pagamento.'));
+      pending.append(element('p', '', 'Edite as seleções acima e use “Calcular alteração” para substituir esta solicitação.'));
+      const cancel = element('button', 'fs-btn fs-btn-secondary', 'Cancelar alteração'); cancel.type = 'button'; cancel.addEventListener('click', async () => { cancel.disabled = true; try { await FokusApi.request('/law/subscription/change', { method: 'DELETE' }); window.location.reload(); } catch (error) { feedback.dataset.state = 'error'; feedback.textContent = error.message; cancel.disabled = false; } }); pending.append(cancel);
+      contentRegion.append(pending);
+    }
+    const history = element('section', 'law-subscription-history'); history.append(element('h3', '', 'Histórico e pagamentos'));
+    const entries = [...(data.history || []).map((item) => ({ label: `Alteração: ${item.type} · ${item.status}`, date: item.created_at })), ...(data.payments || []).map((item) => ({ label: `Pagamento: ${formatLawMoney(item.amount)} · ${item.status}`, date: item.created_at }))].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
+    if (!entries.length) history.append(element('p', '', 'Ainda não há alterações ou pagamentos registrados.'));
+    else { const list = element('ul', 'law-subscription-history-list'); entries.forEach((entry) => { const row = element('li'); row.append(element('span', '', entry.label), element('time', '', formatLawDate(entry.date))); list.append(row); }); history.append(list); }
+    contentRegion.append(history);
+  }
+
+  function lawSubscriptionField(text) { const field = element('label', 'law-subscription-field'); field.append(element('span', '', text)); return field; }
+  function formatLawMoney(value) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0)); }
+  function formatLawDate(value) { if (!value) return '—'; const date = new Date(value); return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(date); }
+
   function renderContent(view) {
     contentRegion.replaceChildren();
     contentRegion.dataset.view = view;
@@ -632,6 +800,7 @@
     else if (view === 'preferences') renderPreferences();
     else if (view === 'units') renderUnits();
     else if (view === 'company') renderCompany();
+    else if (view === 'subscription') renderSubscription();
     else {
       const module = activeModule();
       if (module) renderModulePlaceholder(module);
@@ -747,6 +916,7 @@
     const notificationButton = document.querySelector('#notifications-button');
     const notificationPanel = document.querySelector('#notifications-panel');
     notificationButton.addEventListener('click', () => openPopover(notificationButton, notificationPanel));
+    if (context.permissions.manage_settings) loadLawNotifications(notificationButton, notificationPanel);
 
     const search = document.querySelector('#global-search');
     const searchState = document.querySelector('#search-state');
@@ -798,6 +968,23 @@
     document.querySelectorAll('.law-profile-link').forEach((link) => link.addEventListener('click', closeMobileNav));
   }
 
+  async function loadLawNotifications(button, panel) {
+    try {
+      const result = await FokusApi.request('/law/notifications');
+      const count = Number(result.unread_count || 0);
+      button.setAttribute('aria-label', count ? `Notificações, ${count} não lidas` : 'Notificações');
+      let badge = button.querySelector('.law-notification-count');
+      if (count) { if (!badge) { badge = element('span','law-notification-count'); button.append(badge); } badge.textContent = count > 99 ? '99+' : String(count); }
+      else badge?.remove();
+      const items = result.notifications || [];
+      panel.replaceChildren(element('h2','','Notificações'));
+      if (!items.length) { panel.append(element('p','','Nenhuma notificação por enquanto.'),element('span','','Os avisos dos módulos aparecerão aqui.')); return; }
+      items.forEach((item)=>{ const row=element('button','law-notification-item'); row.type='button'; if(!item.read_at) row.dataset.unread='true'; row.append(element('strong','',item.title),element('span','',item.message),element('time','',formatLawDate(item.created_at))); row.addEventListener('click',async()=>{ try { await FokusApi.request(`/law/notifications/${encodeURIComponent(item.id)}/read`,{method:'PATCH'}); } catch {} const href=String(item.payload?.href||'/portal/fokus-law/assinatura'); if(href.startsWith('/')) window.location.assign(href); }); panel.append(row); });
+    } catch (error) {
+      if (error.status === 403) return;
+    }
+  }
+
   function setContext(value) {
     context = value;
     if (initialPage !== 'profile') document.title = initialPage === 'company' ? 'Empresa | Fokus Law' : 'Fokus Law | Fokus Cloud';
@@ -808,7 +995,7 @@
     renderCompanyOptions();
     renderUnitOptions();
     const remember = localStorage.getItem(preferenceKey(context.user.id, 'remember-group')) === 'true';
-    if (!['profile', 'company'].includes(initialPage) && remember) {
+    if (!['profile', 'company', 'subscription'].includes(initialPage) && remember) {
       const lastGroup = localStorage.getItem(preferenceKey(context.user.id, 'last-group'));
       if ((lastGroup === 'settings' && context.permissions.manage_settings) || context.modules.some((item) => `module:${item.id}` === lastGroup)) activeGroup = lastGroup;
     }

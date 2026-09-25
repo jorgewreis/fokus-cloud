@@ -27,6 +27,11 @@ class MercadoPagoClient
         return $this->send('post', '/preapproval', $payload, $idempotencyKey);
     }
 
+    public function createPreference(array $payload, ?string $idempotencyKey = null): array
+    {
+        return $this->send('post', '/checkout/preferences', $payload, $idempotencyKey);
+    }
+
     public function payerEmail(string $customerEmail): string
     {
         if (config('services.mercado_pago.environment') === 'sandbox') {
