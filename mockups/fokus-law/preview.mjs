@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 const projectRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const mockupRoot = resolve(projectRoot, 'mockups/fokus-law');
 const publicRoot = resolve(projectRoot, 'public');
+const backofficeIconsRoot = resolve(projectRoot, 'public/backoffice/assets/icons');
+const googleFontsRoot = resolve(projectRoot, 'public/assets/fonts/google');
 const mountPath = '/mockups/fokus-law';
 const contentTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -40,12 +42,17 @@ const server = createServer(async (request, response) => {
 
   const isMockup = pathname === mountPath || pathname.startsWith(`${mountPath}/`);
   const isAsset = pathname.startsWith('/assets/');
-  if (!isMockup && !isAsset) {
+  const isGoogleFont = pathname.startsWith('/public/assets/fonts/google/');
+  const iconPrefix = pathname.startsWith('/public/backoffice/assets/icons/')
+    ? '/public/backoffice/assets/icons'
+    : '/backoffice/assets/icons';
+  const isBackofficeIcon = pathname.startsWith(`${iconPrefix}/`);
+  if (!isMockup && !isAsset && !isBackofficeIcon && !isGoogleFont) {
     response.writeHead(404, { 'X-Robots-Tag': 'noindex, nofollow' }).end('Not found');
     return;
   }
-  const root = isMockup ? mockupRoot : publicRoot;
-  let relative = isMockup ? pathname.slice(mountPath.length) : pathname;
+  const root = isMockup ? mockupRoot : isBackofficeIcon ? backofficeIconsRoot : isGoogleFont ? googleFontsRoot : publicRoot;
+  let relative = isMockup ? pathname.slice(mountPath.length) : isBackofficeIcon ? pathname.slice(iconPrefix.length) : isGoogleFont ? pathname.slice('/public/assets/fonts/google'.length) : pathname;
   if (!relative || relative === '/' || relative.endsWith('/')) relative = `${relative}index.html`;
   let filePath = resolve(root, `.${relative}`);
   if (filePath !== root && !filePath.startsWith(`${root}${sep}`)) {
