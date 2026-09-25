@@ -213,8 +213,8 @@
       }
       supportStatus.textContent = 'Iniciando acesso de suporte…';
       try {
-        const result = await window.FokusApi.request('/backoffice/support/access', { method: 'POST', body: { subscription_id: subscriptionSelect.value, membership_id: userSelect.value, reason } });
-        location.assign(result.redirect_to || '/portal/fokus-law');
+        await window.FokusApi.request('/backoffice/support/access', { method: 'POST', body: { subscription_id: subscriptionSelect.value, membership_id: userSelect.value, reason } });
+        location.assign('/portal/fokus-law');
       } catch (error) {
         supportStatus.textContent = error.message || 'Não foi possível iniciar o acesso de suporte.';
         showToast(supportStatus.textContent);
