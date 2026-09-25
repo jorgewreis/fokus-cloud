@@ -48,7 +48,9 @@ window.initializeLawProfile = () => {
       personalForm.elements.phone.value = formatPhone(user.phone || '');
       document.querySelector('#profile-cpf').value = formatCpf(user.cpf || '');
       document.querySelector('#current-email').textContent = user.email || '';
-      document.querySelector('#email-verified').textContent = user.email_verified ? 'Confirmado' : 'Não confirmado';
+      const emailVerified = document.querySelector('#email-verified');
+      emailVerified.textContent = user.email_verified ? 'Confirmado' : 'Não confirmado';
+      emailVerified.dataset.state = user.email_verified ? 'verified' : 'pending';
       if (result.support_mode?.active) setSupportReadOnly();
       sections.hidden = false;
       loading.hidden = true;

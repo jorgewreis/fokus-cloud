@@ -18,8 +18,8 @@
       </div>
       <form id="personal-form" class="law-profile-form" novalidate>
         <label class="law-profile-field law-profile-field-wide"><span>Nome completo</span><input class="fs-form-control fs-width-700" id="profile-name" name="name" autocomplete="name" maxlength="255" required /></label>
-        <label class="law-profile-field"><span>Telefone <small>opcional</small></span><input class="fs-form-control fs-width-400" id="profile-phone" name="phone" type="tel" autocomplete="tel-national" inputmode="tel" maxlength="16" placeholder="(00) 00000-0000" aria-describedby="phone-help" /><small id="phone-help">Número brasileiro com DDD. Ainda não verificado; usado apenas como contato.</small></label>
-        <label class="law-profile-field"><span>CPF</span><input class="fs-form-control fs-width-400" id="profile-cpf" type="text" inputmode="numeric" readonly aria-describedby="cpf-help" /><small id="cpf-help">Por segurança, a alteração do CPF é feita pelo suporte Fokus Cloud.</small></label>
+        <label class="law-profile-field"><span>Telefone <small>opcional</small></span><input class="fs-form-control fs-width-400" id="profile-phone" name="phone" type="tel" autocomplete="tel-national" inputmode="tel" maxlength="16" placeholder="(00) 00000-0000" /></label>
+        <label class="law-profile-field"><span>CPF</span><input class="fs-form-control fs-width-400" id="profile-cpf" type="text" inputmode="numeric" readonly /></label>
         <div class="law-profile-form-footer"><p class="law-profile-feedback" id="personal-status" role="status" aria-live="polite"></p><button class="law-profile-button fs-btn fs-btn-outline-primary" type="submit">Salvar dados pessoais</button></div>
       </form>
     </section>

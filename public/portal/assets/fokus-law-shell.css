@@ -218,6 +218,8 @@
 .law-profile-card-heading h3 { margin: 3px 0 0; color: var(--law-shell-ink); font-size: 15px; font-weight: 600; }
 .law-profile-eyebrow { margin: 0; color: var(--law-shell-muted); font-size: 11px; }
 .law-profile-badge { flex: 0 0 auto; padding: 4px 9px; border-radius: 999px; background: #f2edf5; color: var(--law-shell-panel); font-size: 10px; }
+.law-profile-badge#email-verified[data-state="verified"] { background-color: lime; }
+.law-profile-badge#email-verified[data-state="pending"] { background-color: gold; }
 .law-profile-form { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px; }
 .law-profile-field { display: grid; max-width: 100%; align-content: start; gap: 6px; color: var(--law-shell-ink); font-size: 11px; font-weight: 500; }
 .law-profile-field > span small { color: var(--law-shell-muted); font-size: 10px; font-weight: 400; }
