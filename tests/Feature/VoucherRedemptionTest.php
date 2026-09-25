@@ -156,7 +156,9 @@ class VoucherRedemptionTest extends TestCase
         $second = $this->withoutExceptionHandling()->actingAs($user)->withSession(['active_company_id' => $companyId])
             ->withHeaders($headers)->postJson('/api/subscriptions/checkout', $payload)->assertCreated();
 
-        $this->assertSame($first->json(), $second->json());
+        // JSON object key order is not significant and MySQL's native JSON type
+        // can return object keys in a different order on replay.
+        $this->assertEquals($first->json(), $second->json());
         $this->assertDatabaseCount('subscriptions', 1);
         $this->assertDatabaseCount('payments', 1);
         Http::assertSentCount(1);

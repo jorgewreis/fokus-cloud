@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class SubscriptionBillingManager
@@ -32,10 +33,10 @@ class SubscriptionBillingManager
                 'version' => DB::raw('version + 1'),
             ];
             if (isset($remote['date_created'])) {
-                $paymentUpdates['billing_period_starts_at'] = $remote['date_created'];
+                $paymentUpdates['billing_period_starts_at'] = Carbon::parse($remote['date_created'])->toDateTimeString();
             }
             if (isset($remote['date_approved'])) {
-                $paymentUpdates['paid_at'] = $remote['date_approved'];
+                $paymentUpdates['paid_at'] = Carbon::parse($remote['date_approved'])->toDateTimeString();
             }
             DB::table('payments')->where('id', $payment->id)->update($paymentUpdates);
             if ($payment->status !== $status) {

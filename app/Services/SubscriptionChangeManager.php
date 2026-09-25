@@ -72,8 +72,8 @@ class SubscriptionChangeManager
                 }
                 $updates = [
                     'billing_cycle' => $after['billing_cycle'],
-                    'current_period_starts_at' => $after['current_period_starts_at'],
-                    'current_period_ends_at' => $after['current_period_ends_at'],
+                    'current_period_starts_at' => $after['current_period_starts_at'] ? Carbon::parse($after['current_period_starts_at'])->toDateTimeString() : null,
+                    'current_period_ends_at' => $after['current_period_ends_at'] ? Carbon::parse($after['current_period_ends_at'])->toDateTimeString() : null,
                     'commercial_snapshot' => json_encode($after),
                     'updated_at' => now(),
                     'version' => DB::raw('version + 1'),
