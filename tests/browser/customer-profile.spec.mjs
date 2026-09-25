@@ -27,6 +27,9 @@ test('perfil do cliente adapta as três seções a desktop, tablet e celular', a
         await expect(page.getByLabel('CPF')).toHaveAttribute('readonly', '');
         await expect(page.getByRole('heading', { name: 'E-mail' })).toBeVisible();
         await expect(page.getByRole('heading', { name: 'Segurança' })).toBeVisible();
+        expect(await page.locator('.portal-shell').evaluate((element) => getComputedStyle(element).display)).toBe('grid');
+        const personalFieldWidths = await page.locator('#profile-name').evaluate((element) => [element.getBoundingClientRect().width, element.parentElement.getBoundingClientRect().width]);
+        expect(personalFieldWidths[0]).toBeGreaterThan(personalFieldWidths[1] * 0.8);
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
         expect(overflow).toBe(false);
     }

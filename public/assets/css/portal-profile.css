@@ -4,7 +4,6 @@
 }
 
 .portal-profile-heading { margin-bottom: 1.5rem; }
-.portal-profile-heading h1 { margin: .2rem 0 .45rem; font-size: clamp(1.65rem, 3vw, 2rem); }
 .portal-profile-heading > p:last-child { margin: 0; color: var(--fs-color-muted, #667085); }
 .portal-profile-loading { padding: 1rem; color: var(--fs-color-muted, #667085); }
 .portal-profile-sections { display: grid; gap: 1rem; }
@@ -14,7 +13,8 @@
 .portal-profile-eyebrow { margin: 0; color: var(--fs-color-muted, #667085); font-size: .78rem; }
 .portal-profile-badge { flex: none; border-radius: 999px; padding: .32rem .62rem; background: var(--fs-color-subtle, #f2f4f7); color: var(--fs-color-muted, #475467); font-size: .76rem; }
 .portal-profile-form { display: grid; gap: 1rem; }
-.portal-profile-form .form-field { margin: 0; }
+.portal-profile-form .form-field { display: grid; align-content: start; gap: .4rem; margin: 0; }
+.portal-profile-form .form-field input { width: 100%; box-sizing: border-box; }
 .portal-profile-form input[readonly] { background: var(--fs-color-subtle, #f2f4f7); color: var(--fs-color-muted, #475467); }
 .portal-profile-form small, .portal-profile-footnote { color: var(--fs-color-muted, #667085); font-size: .8rem; line-height: 1.5; }
 .portal-profile-form small { display: block; margin-top: .35rem; }
