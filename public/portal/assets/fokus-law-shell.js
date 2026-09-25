@@ -33,8 +33,8 @@
   const preferenceKey = (userId, key) => `fokus-law:${userId}:${key}`;
   let context = null;
   const initialPage = shell.dataset.initialPage || 'overview';
-  let settingsView = 'settings';
-  let activeGroup = 'overview';
+  let settingsView = initialPage === 'company' ? 'company' : 'settings';
+  let activeGroup = initialPage === 'company' ? 'settings' : 'overview';
 
   const element = (tag, className, text) => {
     const node = document.createElement(tag);
@@ -158,7 +158,7 @@
       document.querySelector('#section-icon').src = ICON_ROOT + ICONS[headingIcon];
       const list = element('ul');
       const entries = [
-        ['Empresas', '/portal/empresas', 'company'],
+        ['Empresa', '/portal/fokus-law/empresa', 'company'],
         ['Assinatura', '/portal/assinaturas', 'settings'],
       ];
       if (context.permissions.manage_company_users) entries.push(['Usuários, perfis e permissões', '/portal/usuarios', 'users']);
@@ -171,7 +171,7 @@
       appendNavButton(unitsItem, 'Setores da empresa', 'company', settingsView === 'units', () => { settingsView = 'units'; renderNavigation(); });
       list.append(unitsItem);
       pageItems.append(list);
-      renderContent(settingsView === 'units' ? 'units' : 'settings');
+      renderContent(settingsView === 'units' ? 'units' : settingsView === 'company' ? 'company' : 'settings');
       return;
     }
 
@@ -212,7 +212,7 @@
 
     const grid = element('div', 'law-info-grid');
     const cards = [
-      ['Empresa ativa', context.company.name],
+      ['Empresa ativa', context.company.display_name || context.company.legal_name || context.company.name],
       ['Assinatura', context.subscription?.label || 'Nenhuma assinatura ativa'],
       ['Módulos habilitados', String(context.modules.length)],
     ];
@@ -232,9 +232,23 @@
     heading.append(element('p', 'law-page-lede', 'Gerencie a empresa, a assinatura, os usuários, os perfis, as permissões e os setores do Fokus Law.'));
     contentRegion.append(heading);
 
+    const summaryHeading = element('div', 'law-settings-summary-heading');
+    summaryHeading.append(element('h3', '', 'Resumo das configurações'));
+    summaryHeading.append(element('p', '', 'Informações da empresa ativa, para consulta.'));
+    contentRegion.append(summaryHeading);
+    const summaries = element('div', 'law-settings-summary-grid');
+    summaries.setAttribute('aria-live', 'polite');
+    summaries.append(element('p', 'law-settings-summary-loading', 'Carregando resumos…'));
+    contentRegion.append(summaries);
+    loadSettingsSummaries(summaries);
+
     const list = element('div', 'law-settings-list');
+    const managementHeading = element('div', 'law-settings-summary-heading');
+    managementHeading.append(element('h3', '', 'Acessar configurações'));
+    managementHeading.append(element('p', '', 'Abra uma área para consultar ou administrar seus dados.'));
+    contentRegion.append(managementHeading);
     const links = [
-      ['Empresa', 'Consulte e configure a empresa ativa.', '/portal/empresas', 'company'],
+      ['Empresa', 'Consulte e configure a empresa ativa.', '/portal/fokus-law/empresa', 'company'],
       ['Assinatura', 'Consulte e gerencie a assinatura do Fokus Law.', '/portal/assinaturas', 'settings'],
     ];
     if (context.permissions.manage_company_users) links.push(['Usuários, perfis e permissões', 'Gerencie os vínculos e os acessos das pessoas da empresa.', '/portal/usuarios', 'users']);
@@ -259,6 +273,211 @@
     units.addEventListener('click', () => { settingsView = 'units'; renderNavigation(); });
     list.append(units);
     contentRegion.append(list);
+  }
+
+  async function loadSettingsSummaries(grid) {
+    const [companyResult, usersResult, unitsResult] = await Promise.allSettled([
+      FokusApi.request('/law/company-profile'),
+      FokusApi.request('/portal/users'),
+      FokusApi.request('/law/units'),
+    ]);
+    if (!grid.isConnected) return;
+    grid.replaceChildren();
+
+    const makeSummary = (title, iconName, className, lines) => {
+      const card = element('article', `law-settings-summary-card ${className}`);
+      const header = element('div', 'law-settings-summary-card-heading');
+      const iconBox = element('span', 'law-settings-summary-icon');
+      iconBox.append(icon(iconName));
+      header.append(iconBox, element('h4', '', title));
+      card.append(header);
+      lines.forEach((line, index) => card.append(element(index === 0 ? 'strong' : 'p', index === 0 ? 'law-settings-summary-primary' : 'law-settings-summary-secondary', line)));
+      return card;
+    };
+
+    const company = companyResult.status === 'fulfilled' ? companyResult.value.company : null;
+    grid.append(makeSummary('Dados da empresa', 'company', 'law-summary-company', company
+      ? [company.display_name || company.legal_name, company.legal_name, `${formatDocument(company.document_type, company.document_number)} · ${companyStatus(company.status)}`]
+      : ['Dados indisponíveis', 'Não foi possível carregar os dados da empresa.']));
+
+    grid.append(makeSummary('Assinatura', 'settings', 'law-summary-subscription', context.subscription
+      ? [context.subscription.label || context.subscription.plan_name || 'Fokus Law', `${context.subscription.product_name || 'Produto'} · Ativa`, `${context.modules.length} módulo(s) habilitado(s)`]
+      : ['Sem assinatura ativa', 'Nenhuma assinatura do Fokus Law está ativa.']));
+
+    const users = usersResult.status === 'fulfilled' && Array.isArray(usersResult.value) ? usersResult.value : null;
+    grid.append(makeSummary('Usuários', 'users', 'law-summary-users', users
+      ? [`${users.length} usuário(s) vinculado(s)`, `${users.filter((user) => user.status === 'ativo').length} ativo(s)`, `${users.filter((user) => user.role === 'admin').length} administrador(es)`]
+      : ['Resumo indisponível', 'Não foi possível carregar os vínculos de usuários.']));
+
+    const units = unitsResult.status === 'fulfilled' ? unitsResult.value.units : null;
+    grid.append(makeSummary('Setores da empresa', 'company', 'law-summary-units', Array.isArray(units)
+      ? [`${units.length} setor(es) cadastrado(s)`, `${units.filter((unit) => unit.status === 'ativo').length} ativo(s)`, context.active_unit?.name ? `Setor selecionado: ${context.active_unit.name}` : 'Nenhum setor selecionado']
+      : ['Resumo indisponível', 'Não foi possível carregar os setores.']));
+  }
+
+  function formatDocument(type, number) {
+    const digits = String(number || '').replace(/\D/g, '');
+    if (type === 'cpf' && digits.length === 11) return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    if (type === 'cnpj' && digits.length === 14) return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+    return digits || 'Documento não informado';
+  }
+
+  function companyStatus(status) {
+    return ({ ativa: 'Ativa', pendente: 'Pendente', suspensa: 'Suspensa', encerrando: 'Encerrando', encerrada: 'Encerrada' })[status] || status || 'Não informada';
+  }
+
+  async function renderCompany(successMessage = '') {
+    contentRegion.replaceChildren();
+    const heading = element('div', 'law-company-heading');
+    heading.append(element('p', 'law-page-eyebrow', 'ADMINISTRAÇÃO DA EMPRESA'));
+    heading.append(element('h2', '', 'Dados da empresa'));
+    heading.append(element('p', 'law-page-lede', 'Consulte e mantenha os dados institucionais da empresa ativa no Fokus Law.'));
+    contentRegion.append(heading);
+
+    const feedback = element('p', 'law-company-feedback');
+    feedback.setAttribute('role', 'status');
+    feedback.textContent = successMessage;
+    const sections = element('div', 'law-company-sections');
+    sections.setAttribute('aria-busy', 'true');
+    sections.append(element('p', 'law-profile-loading', 'Carregando dados da empresa…'));
+    contentRegion.append(feedback, sections);
+
+    let profile;
+    try {
+      profile = await FokusApi.request('/law/company-profile');
+    } catch (error) {
+      sections.replaceChildren();
+      sections.setAttribute('aria-busy', 'false');
+      const message = element('p', 'law-profile-loading', error.message || 'Não foi possível carregar os dados da empresa.');
+      message.dataset.state = 'error';
+      sections.append(message);
+      return;
+    }
+
+    const labels = {
+      legal_name: 'Razão social / nome legal', display_name: 'Nome de exibição institucional', document: 'CPF/CNPJ', status: 'Situação',
+      contact_email: 'E-mail institucional', contact_phone: 'Telefone institucional', website: 'Site',
+      address_postal_code: 'CEP', address_street: 'Logradouro', address_number: 'Número', address_complement: 'Complemento',
+      address_district: 'Bairro', address_city: 'Cidade', address_state: 'UF',
+    };
+    const groups = [
+      ['Identificação', ['legal_name', 'display_name', 'document', 'status']],
+      ['Contato institucional', ['contact_email', 'contact_phone', 'website']],
+      ['Endereço', ['address_postal_code', 'address_street', 'address_number', 'address_complement', 'address_district', 'address_city', 'address_state']],
+    ];
+    const cardNodes = [];
+    groups.forEach(([title, fields]) => {
+      const card = element('section', 'law-company-card');
+      card.append(element('h3', '', title));
+      const details = element('dl', 'law-company-details');
+      fields.forEach((field) => {
+        const row = element('div', 'law-company-detail');
+        row.append(element('dt', '', labels[field]));
+        const value = field === 'document' ? formatDocument(profile.company.document_type, profile.company.document_number)
+        : field === 'status' ? companyStatus(profile.company.status) : profile.company[field];
+        row.append(element('dd', '', value || 'Não informado'));
+        details.append(row);
+      });
+      card.append(details);
+      sections.append(card);
+      cardNodes.push(card);
+    });
+
+    const actions = element('div', 'law-company-actions');
+    const edit = element('button', 'fs-btn fs-btn-primary', 'Editar dados');
+    edit.type = 'button';
+    edit.hidden = Boolean(context.support_mode);
+    actions.append(edit);
+    sections.append(actions);
+
+    const historyCard = element('section', 'law-company-card law-company-history');
+    historyCard.append(element('h3', '', 'Histórico de alterações'));
+    const history = element('ol', 'law-company-history-list');
+    if (!profile.audit.length) history.append(element('li', '', 'Nenhuma alteração registrada.'));
+    profile.audit.forEach((entry) => {
+      const item = element('li');
+      const fields = Object.keys(entry.after || {}).map((field) => labels[field] || field).join(', ');
+      item.append(element('strong', '', `${entry.actor_name} · ${new Date(entry.created_at.replace(' ', 'T')).toLocaleString('pt-BR')}`));
+      item.append(element('span', '', `Alterou: ${fields || 'dados da empresa'}`));
+      history.append(item);
+    });
+    historyCard.append(history);
+    sections.append(historyCard);
+    sections.setAttribute('aria-busy', 'false');
+
+    edit.addEventListener('click', () => {
+      const form = element('form', 'law-company-form');
+      const fields = [
+        ['legal_name', 'Razão social / nome legal', 'text', 'fs-width-700'],
+        ['display_name', 'Nome de exibição institucional', 'text', 'fs-width-700'],
+        ['contact_email', 'E-mail institucional', 'email', 'fs-width-700'],
+        ['contact_phone', 'Telefone institucional', 'tel', 'fs-width-400'],
+        ['website', 'Site', 'url', 'fs-width-700'],
+        ['address_postal_code', 'CEP', 'text', 'fs-width-300'],
+        ['address_street', 'Logradouro', 'text', 'fs-width-700'],
+        ['address_number', 'Número', 'text', 'fs-width-300'],
+        ['address_complement', 'Complemento', 'text', 'fs-width-400'],
+        ['address_district', 'Bairro', 'text', 'fs-width-400'],
+        ['address_city', 'Cidade', 'text', 'fs-width-500'],
+        ['address_state', 'UF', 'text', 'fs-width-200'],
+      ];
+      const fieldset = element('fieldset', 'law-company-form-fields');
+      fieldset.append(element('legend', '', 'Dados institucionais'));
+      fields.forEach(([name, labelText, type, width]) => {
+        const label = element('label', 'law-company-field');
+        label.append(element('span', '', labelText));
+        const input = element('input', `fs-form-control ${width}`);
+        input.name = name;
+        input.type = type;
+        input.maxLength = name === 'address_complement' ? 100 : 255;
+        input.value = profile.company[name] || '';
+        input.autocomplete = ({ contact_email: 'email', contact_phone: 'tel', address_postal_code: 'postal-code', address_street: 'street-address', address_city: 'address-level2', address_state: 'address-level1' })[name] || 'off';
+        if (name === 'legal_name') input.required = true;
+        if (name === 'address_postal_code') { input.inputMode = 'numeric'; input.placeholder = '00000-000'; }
+        if (name === 'address_state') { input.maxLength = 2; input.placeholder = 'BA'; }
+        label.append(input);
+        label.append(element('small', 'law-company-field-error'));
+        fieldset.append(label);
+      });
+      const readonly = element('p', 'law-company-readonly', `${labels.document}: ${formatDocument(profile.company.document_type, profile.company.document_number)} · Situação: ${companyStatus(profile.company.status)}`);
+      const formFeedback = element('p', 'law-company-feedback');
+      formFeedback.setAttribute('role', 'alert');
+      const footer = element('div', 'law-company-form-footer');
+      const cancel = element('button', 'fs-btn fs-btn-outline-primary', 'Cancelar');
+      cancel.type = 'button';
+      const save = element('button', 'fs-btn fs-btn-primary', 'Salvar alterações');
+      save.type = 'submit';
+      footer.append(cancel, save);
+      form.append(fieldset, readonly, formFeedback, footer);
+      sections.replaceChildren(form, historyCard);
+      cancel.addEventListener('click', () => renderCompany());
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        save.disabled = true;
+        formFeedback.textContent = 'Salvando…';
+        const body = Object.fromEntries(new FormData(form).entries());
+        body.version = profile.company.version;
+        if (body.address_state) body.address_state = body.address_state.toUpperCase();
+        try {
+          const result = await FokusApi.request('/law/company-profile', { method: 'PATCH', body });
+          context.company.legal_name = result.company.legal_name;
+          context.company.display_name = result.company.display_name || result.company.legal_name;
+          await renderCompany(result.message || 'Dados da empresa atualizados.');
+        } catch (error) {
+          save.disabled = false;
+          formFeedback.textContent = error.status === 409 ? `${error.message} Cancele a edição para recarregar os dados atuais.` : error.message || 'Não foi possível salvar os dados.';
+          Object.entries(error.errors || {}).forEach(([field, messages]) => {
+            const input = form.elements.namedItem(field);
+            if (!input || !messages?.[0]) return;
+            input.setAttribute('aria-invalid', 'true');
+            const errorMessage = input.parentElement.querySelector('.law-company-field-error');
+            errorMessage.textContent = messages[0];
+            errorMessage.id = `law-company-error-${field}`;
+            input.setAttribute('aria-describedby', errorMessage.id);
+          });
+        }
+      });
+    });
   }
 
   function renderPreferences() {
@@ -410,6 +629,7 @@
     else if (view === 'profile') renderProfile();
     else if (view === 'preferences') renderPreferences();
     else if (view === 'units') renderUnits();
+    else if (view === 'company') renderCompany();
     else {
       const module = activeModule();
       if (module) renderModulePlaceholder(module);
@@ -578,7 +798,7 @@
 
   function setContext(value) {
     context = value;
-    if (initialPage !== 'profile') document.title = 'Fokus Law | Fokus Cloud';
+    if (initialPage !== 'profile') document.title = initialPage === 'company' ? 'Empresa | Fokus Law' : 'Fokus Law | Fokus Cloud';
     document.querySelector('#user-name').textContent = context.user.name;
     document.querySelector('#user-email').textContent = context.user.email;
     document.querySelector('#user-avatar').textContent = context.user.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
@@ -586,7 +806,7 @@
     renderCompanyOptions();
     renderUnitOptions();
     const remember = localStorage.getItem(preferenceKey(context.user.id, 'remember-group')) === 'true';
-    if (initialPage !== 'profile' && remember) {
+    if (!['profile', 'company'].includes(initialPage) && remember) {
       const lastGroup = localStorage.getItem(preferenceKey(context.user.id, 'last-group'));
       if ((lastGroup === 'settings' && context.permissions.manage_settings) || context.modules.some((item) => `module:${item.id}` === lastGroup)) activeGroup = lastGroup;
     }

@@ -51,7 +51,7 @@ Route::get('/api/csrf-token', fn () => response()->json(['token' => csrf_token()
 Route::get('/acesso', fn () => redirect('/?acesso=cliente'));
 Route::get('/portal', fn () => response()->file(public_path('portal/dashboard.html')));
 Route::get('/portal/painel', fn () => response()->file(public_path('portal/dashboard.html')));
-$serveFokusLawShell = function (string $page = 'overview', bool $redirectProfile = false) {
+$serveFokusLawShell = function (string $page = 'overview', bool $redirectProfile = false, bool $adminOnly = false) {
     $user = Auth::guard('web')->user();
     if (! $user || $user->status !== 'ativa') {
         return redirect('/?acesso=cliente');
@@ -73,11 +73,17 @@ $serveFokusLawShell = function (string $page = 'overview', bool $redirectProfile
         ->whereNull('membership.deleted_at')
         ->where('company.status', 'ativa')
         ->whereNull('company.deleted_at')
-        ->exists();
+        ->select('membership.id', 'membership.role_id')
+        ->first();
 
     if (! $membership) {
         request()->session()->forget('active_company_id');
         return redirect('/portal/empresas');
+    }
+
+    if ($adminOnly) {
+        $role = DB::table('roles')->where('id', $membership->role_id)->value('code');
+        abort_unless($role === 'admin', 403, 'Apenas o administrador da empresa pode acessar esta página.');
     }
 
     if ($redirectProfile) {
@@ -87,6 +93,7 @@ $serveFokusLawShell = function (string $page = 'overview', bool $redirectProfile
     return response()->view('portal.fokus-law', ['initialPage' => $page]);
 };
 Route::get('/portal/fokus-law', fn () => $serveFokusLawShell());
+Route::get('/portal/fokus-law/empresa', fn () => $serveFokusLawShell('company', false, true));
 Route::get('/portal/fokus-law/perfil', fn () => $serveFokusLawShell('profile'));
 Route::get('/portal/perfil', fn () => $serveFokusLawShell('profile', true));
 Route::get('/cadastro', fn () => response()->file(public_path('auth/cadastro.html')));

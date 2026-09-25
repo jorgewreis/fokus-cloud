@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BackofficeController;
 use App\Http\Controllers\Api\CompanyUserController;
 use App\Http\Controllers\Api\LawHearingController;
+use App\Http\Controllers\Api\LawCompanyProfileController;
 use App\Http\Controllers\Api\LawShellController;
 use App\Http\Controllers\Api\LawUnitController;
 use App\Http\Controllers\Api\PlatformAdminController;
@@ -52,6 +53,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/auth/resend-verification', [AuthController::class, 'resendVerification'])->middleware('throttle:2,10,customer-resend-verification');
     Route::middleware(EnsureCompanyContext::class)->group(function () {
         Route::get('/law/shell-context', [LawShellController::class, 'context']);
+        Route::get('/law/company-profile', [LawCompanyProfileController::class, 'show']);
+        Route::patch('/law/company-profile', [LawCompanyProfileController::class, 'update']);
         Route::get('/law/units', [LawUnitController::class, 'index']);
         Route::post('/law/units', [LawUnitController::class, 'store']);
         Route::patch('/law/units/{unitId}', [LawUnitController::class, 'update']);

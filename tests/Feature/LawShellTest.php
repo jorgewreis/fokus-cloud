@@ -63,6 +63,68 @@ class LawShellTest extends TestCase
         $this->get('/portal/fokus-law.html')->assertNotFound();
     }
 
+    public function test_company_profile_page_and_api_require_company_admin(): void
+    {
+        $session = ['active_company_id' => $this->companyId];
+        $this->actingAs($this->user)->withSession($session)
+            ->get('/portal/fokus-law/empresa')->assertOk()->assertSee('data-initial-page="company"', false);
+        $this->actingAs($this->user)->withSession($session)
+            ->getJson('/api/law/company-profile')->assertOk()->assertJsonPath('company.legal_name', 'Érica Menezes Advocacia');
+
+        $manager = User::create([
+            'id' => PrefixedUlid::make('USR'), 'name' => 'Gestor', 'cpf' => '11144477736',
+            'email' => 'gestor@example.test', 'password' => Hash::make('SenhaSegura!2026'),
+            'status' => 'ativa', 'email_verified_at' => now(),
+        ]);
+        DB::table('company_memberships')->insert([
+            'id' => PrefixedUlid::make('MEM'), 'company_id' => $this->companyId, 'user_id' => $manager->id,
+            'role_id' => DB::table('roles')->where('code', 'gestor')->value('id'), 'status' => 'ativo', 'version' => 1,
+            'created_by' => $this->user->id, 'updated_by' => $this->user->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->actingAs($manager)->withSession($session)
+            ->get('/portal/fokus-law/empresa')->assertForbidden();
+        $this->actingAs($manager)->withSession($session)
+            ->getJson('/api/law/company-profile')->assertForbidden();
+        $this->actingAs($manager)->withSession($session)
+            ->patchJson('/api/law/company-profile', ['version' => 1, 'legal_name' => 'Alteração indevida'])->assertForbidden();
+    }
+
+    public function test_company_admin_can_update_institutional_profile_and_audit_changes_with_version_check(): void
+    {
+        $session = ['active_company_id' => $this->companyId];
+        $payload = [
+            'version' => 1,
+            'legal_name' => 'Érica Menezes Advocacia Atualizada',
+            'display_name' => 'Escritório Menezes',
+            'contact_email' => 'contato@example.test',
+            'contact_phone' => '(71) 3333-2222',
+            'website' => 'https://example.test',
+            'address_postal_code' => '40000-000',
+            'address_street' => 'Rua Exemplo',
+            'address_number' => '10',
+            'address_complement' => 'Sala 2',
+            'address_district' => 'Centro',
+            'address_city' => 'Salvador',
+            'address_state' => 'BA',
+        ];
+
+        $this->actingAs($this->user)->withSession($session)
+            ->patchJson('/api/law/company-profile', $payload)
+            ->assertOk()->assertJsonPath('company.version', 2)->assertJsonPath('company.display_name', 'Escritório Menezes');
+        $this->assertDatabaseHas('companies', [
+            'id' => $this->companyId, 'legal_name' => $payload['legal_name'], 'display_name' => 'Escritório Menezes',
+            'contact_email' => 'contato@example.test', 'address_city' => 'Salvador', 'address_state' => 'BA', 'version' => 2,
+        ]);
+        $this->assertDatabaseHas('audit_events', [
+            'company_id' => $this->companyId, 'entity_type' => 'company_profile', 'operation' => 'update', 'actor_user_id' => $this->user->id,
+        ]);
+
+        $this->actingAs($this->user)->withSession($session)
+            ->patchJson('/api/law/company-profile', ['version' => 1, 'legal_name' => 'Versão antiga'])
+            ->assertConflict();
+        $this->assertDatabaseHas('companies', ['id' => $this->companyId, 'legal_name' => $payload['legal_name'], 'version' => 2]);
+    }
+
     public function test_profile_opens_inside_the_law_shell_and_legacy_route_redirects_there(): void
     {
         $response = $this->actingAs($this->user)->withSession(['active_company_id' => $this->companyId])

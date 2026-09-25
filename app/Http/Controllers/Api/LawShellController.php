@@ -130,6 +130,7 @@ class LawShellController extends Controller
                 'id' => (string) $company->id,
                 'name' => (string) ($activeSubscription?->public_name ?: $company->legal_name),
                 'legal_name' => (string) $company->legal_name,
+                'display_name' => (string) ($company->display_name ?: $company->legal_name),
                 'role' => (string) $membership->role,
             ],
             'active_company_id' => $companyId,
