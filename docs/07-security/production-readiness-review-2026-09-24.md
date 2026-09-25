@@ -75,3 +75,11 @@ O workflow **ainda precisa executar com sucesso** para que esses itens passem de
 | Backup e restauração | Aprovado na execução registrada acima | Manter execução recorrente e exercício trimestral dentro de RPO/RTO |
 
 **Decisão atual:** a liberação para clientes reais segue **não aprovada** até concluir e registrar as evidências pendentes desta tabela. Código e procedimento implementados não equivalem à execução operacional.
+
+## Evidência de execução — 25/09/2026
+
+O workflow [Ephemeral security homologation](https://github.com/jorgewreis/fokus-cloud/actions/runs/36075503209) concluiu com sucesso. Passaram a suíte de feature/unit contra MySQL e Redis efêmeros, as verificações dinâmicas no navegador de CSRF, cookies de sessão e rate limits, e a inspeção de logs/saídas com canários sintéticos. Durante a execução foram corrigidas gravações de timestamps ISO incompatíveis com MySQL; os testes afetados de webhook, override comercial e replay idempotente passaram na suíte MySQL.
+
+O workflow [Deploy Fokus Cloud Laravel](https://github.com/jorgewreis/fokus-cloud/actions/runs/36075503170) também concluiu com sucesso após repetição dos testes visuais que falharam de forma intermitente na primeira tentativa. A publicação, migrações, otimização, scheduler, recarga do PHP-FPM e limpeza de cache terminaram sem erro.
+
+Essas execuções comprovam os controles exercitados no ambiente efêmero e a publicação do commit `1bf5562`; não comprovam operação contra a conta real do Mercado Pago, cobertura do destino remoto de logs ou execução da rotação de credenciais externas. A liberação geral continua **não aprovada** até que essas evidências operacionais sejam anexadas, conforme a tabela acima.
