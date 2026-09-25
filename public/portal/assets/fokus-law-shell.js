@@ -228,6 +228,7 @@
 
     const list = element('div', 'law-settings-list');
     const links = [
+      ['Meu perfil', 'Atualize seus dados pessoais e credenciais de acesso.', '/portal/fokus-law/perfil', 'profile'],
       ['Empresa', 'Consulte e configure a empresa ativa.', '/portal/empresas', 'company'],
       ['Assinatura', 'Consulte e gerencie a assinatura do Fokus Law.', '/portal/assinaturas', 'settings'],
     ];
