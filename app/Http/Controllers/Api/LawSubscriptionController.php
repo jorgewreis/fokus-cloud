@@ -48,7 +48,7 @@ class LawSubscriptionController extends Controller
         $snapshot['current_period_ends_at'] = $subscription->current_period_ends_at;
         $snapshot['cancel_at'] = $subscription->cancel_at;
         $payments = DB::table('payments')->where('company_id', $companyId)->where('subscription_id', $subscription->id)
-            ->latest('created_at')->limit(6)->get(['id', 'status', 'amount', 'currency', 'created_at', 'paid_at']);
+            ->latest('created_at')->limit(6)->get(['id', 'status', 'amount', 'currency', 'created_at', 'paid_at', 'provider_checkout_url as checkout_url']);
         $history = DB::table('subscription_changes')->where('company_id', $companyId)->where('subscription_id', $subscription->id)
             ->latest('created_at')->limit(20)->get(['id', 'type', 'status', 'effective_at', 'proration_amount', 'reason', 'created_at', 'before_snapshot', 'after_snapshot'])
             ->map(function (object $item): array {
@@ -131,6 +131,7 @@ class LawSubscriptionController extends Controller
                 abort_unless(is_string($checkoutUrl) && $checkoutUrl !== '' && $preferenceId !== '', 502, 'O Mercado Pago não retornou os dados do checkout.');
                 DB::table('payments')->where('id', $paymentId)->update([
                     'provider_preference_id' => $preferenceId,
+                    'provider_checkout_url' => $checkoutUrl,
                     'provider_payload_sanitized' => json_encode($mercadoPago->sanitizePayload(['id' => $preference['id'] ?? null, 'init_point' => $checkoutUrl])),
                     'updated_at' => now(),
                 ]);

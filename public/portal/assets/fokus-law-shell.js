@@ -777,6 +777,10 @@
       const pending = element('section', 'law-subscription-pending'); pending.append(element('h3', '', 'Alteração pendente'));
       pending.append(element('p', '', pendingChange.status === 'agendada' ? `Programada para ${formatLawDate(pendingChange.effective_at)}.` : 'Aguardando confirmação do pagamento.'));
       pending.append(element('p', '', 'Edite as seleções acima e use “Calcular alteração” para substituir esta solicitação.'));
+      if (pendingChange.status === 'aguardando_pagamento') {
+        const checkout = (data.payments || []).find((payment) => payment.status === 'aguardando_pagamento' && payment.checkout_url)?.checkout_url;
+        if (checkout) { const resume = element('a', 'fs-btn fs-btn-primary', 'Continuar pagamento'); resume.href = checkout; pending.append(resume); }
+      }
       const cancel = element('button', 'fs-btn fs-btn-secondary', 'Cancelar alteração'); cancel.type = 'button'; cancel.addEventListener('click', async () => { cancel.disabled = true; try { await FokusApi.request('/law/subscription/change', { method: 'DELETE' }); window.location.reload(); } catch (error) { feedback.dataset.state = 'error'; feedback.textContent = error.message; cancel.disabled = false; } }); pending.append(cancel);
       contentRegion.append(pending);
     }

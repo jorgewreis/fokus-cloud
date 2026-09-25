@@ -23,6 +23,11 @@ return new class extends Migration
                 $table->string('provider_preference_id', 128)->nullable();
             });
         }
+        if (! Schema::hasColumn('payments', 'provider_checkout_url')) {
+            Schema::table('payments', function (Blueprint $table): void {
+                $table->string('provider_checkout_url', 512)->nullable();
+            });
+        }
         if (! Schema::hasIndex('payments', 'payments_provider_preference_id_unique')) {
             Schema::table('payments', function (Blueprint $table): void {
                 $table->unique('provider_preference_id', 'payments_provider_preference_id_unique');
@@ -99,7 +104,7 @@ return new class extends Migration
         if (Schema::hasIndex('payments', 'payments_provider_preference_id_unique')) {
             Schema::table('payments', function (Blueprint $table): void { $table->dropUnique('payments_provider_preference_id_unique'); });
         }
-        foreach (['subscription_change_id', 'provider_preference_id'] as $column) {
+        foreach (['subscription_change_id', 'provider_preference_id', 'provider_checkout_url'] as $column) {
             if (Schema::hasColumn('payments', $column)) Schema::table('payments', fn (Blueprint $table) => $table->dropColumn($column));
         }
         if (Schema::hasIndex('subscription_changes', 'subscription_changes_company_id_unique')) {
