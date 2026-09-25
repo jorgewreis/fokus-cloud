@@ -153,7 +153,12 @@ test('dashboard usa cards e larguras responsivas sem alterar dados ou colunas', 
         const activityIcon = await page.locator('.admin-activity-symbol img').getAttribute('src');
         expect(activityIcon).toBe(sidebarCompanyIcon);
         await expect(page.getByRole('link', { name: 'Nova empresa' })).toBeVisible();
-        await expect(page.locator('.admin-metric-card small')).toHaveCount(0);
+        await expect(page.locator('.admin-metric-card small')).toHaveText([
+            'Empresas na plataforma',
+            'Usuários com acesso',
+            'Planos em vigência',
+            'Receita mensal consolidada',
+        ]);
 
         const layout = await page.evaluate(() => {
             const intro = document.querySelector('.admin-dashboard-intro');
@@ -171,7 +176,11 @@ test('dashboard usa cards e larguras responsivas sem alterar dados ou colunas', 
             const metricAlignment = [...grid.querySelectorAll('.admin-metric-card')].map((card) => {
                 const icon = card.querySelector('.admin-metric-icon').getBoundingClientRect();
                 const body = card.querySelector('.fs-card-body').getBoundingClientRect();
-                return { textAlign: getComputedStyle(card.querySelector('.fs-card-body')).textAlign, iconBeforeText: icon.right <= body.left };
+                return {
+                    textAlign: getComputedStyle(card.querySelector('.fs-card-body')).textAlign,
+                    iconPosition: getComputedStyle(card.querySelector('.admin-metric-icon')).position,
+                    iconAtTopRight: icon.right <= card.getBoundingClientRect().right && icon.top >= card.getBoundingClientRect().top,
+                };
             });
             const table = document.querySelector('.admin-subscriptions-table');
             const heads = [...table.querySelectorAll('thead th')].map((cell) => cell.getBoundingClientRect());
@@ -197,8 +206,8 @@ test('dashboard usa cards e larguras responsivas sem alterar dados ou colunas', 
         expect(layout.titleInsideIntro, name).toBe(true);
         expect(layout.descriptionInsideIntro, name).toBe(true);
         expect(layout.titleDescriptionGap, name).toBeGreaterThanOrEqual(0);
-        expect(layout.metricDirection.every((direction) => direction === 'row'), name).toBe(true);
-        expect(layout.metricAlignment.every((alignment) => alignment.textAlign === 'left' && alignment.iconBeforeText), name).toBe(true);
+        expect(layout.metricDirection.every((direction) => direction === 'column'), name).toBe(true);
+        expect(layout.metricAlignment.every((alignment) => alignment.textAlign === 'left' && alignment.iconPosition === 'absolute' && alignment.iconAtTopRight), name).toBe(true);
         expect(layout.metricCardWidths.every((width) => width > 0), name).toBe(true);
         expect(Math.max(...layout.metricCardWidths) - Math.min(...layout.metricCardWidths), name).toBeLessThanOrEqual(1);
         expect(layout.metricStartOffset, name).toBeLessThanOrEqual(1);
@@ -638,6 +647,9 @@ test('diretório Usuários abre detalhes de conta e se adapta a telas menores', 
 test('Novo usuário permite convidar usuário externo vinculado a empresa Fokus Law', async ({ page }) => {
     await page.goto('/backoffice/usuarios');
     await page.locator('#user-invite').click();
+    await expect(page.locator('#user-drawer')).toBeVisible();
+    await expect(page.locator('#user-form')).toBeVisible();
+    await expect(page.locator('#user-account-type-field')).toBeVisible();
     await page.locator('#user-account-type').selectOption('empresa');
     await expect(page.locator('#user-company option[value="CMP_VISUAL"]')).toHaveText('Fokus Law - Empresa de Demonstração');
     await expect(page.locator('#user-external-role')).toBeVisible();
