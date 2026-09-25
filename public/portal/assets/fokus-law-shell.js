@@ -354,6 +354,8 @@
       return;
     }
 
+    sections.replaceChildren();
+
     const labels = {
       legal_name: 'Razão social / nome legal', display_name: 'Nome de exibição institucional', document: 'CPF/CNPJ', status: 'Situação',
       contact_email: 'E-mail institucional', contact_phone: 'Telefone institucional', website: 'Site',
