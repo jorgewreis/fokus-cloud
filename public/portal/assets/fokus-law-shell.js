@@ -690,7 +690,7 @@
       contentRegion.append(empty); return;
     }
 
-    const currentItems = new Map((current.items || []).map((item) => [item.conditions?.module_code || item.module_code || item.family, item]));
+    const currentItems = new Map((current.items || []).map((item) => [item.module_code || item.conditions?.catalog_module_code || item.conditions?.module_code || item.family, item]));
     const pendingChange = data.pending_change;
     const summary = element('section', 'law-subscription-overview');
     summary.append(element('p', 'law-page-eyebrow', 'ASSINATURA ATUAL'));
