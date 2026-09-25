@@ -13,11 +13,26 @@ return new class extends Migration
                 $table->unique(['company_id', 'id'], 'subscription_changes_company_id_unique');
             });
         }
-        Schema::table('payments', function (Blueprint $table): void {
-            $table->char('subscription_change_id', 30)->charset('ascii')->collation('ascii_bin')->nullable();
-            $table->string('provider_preference_id', 128)->nullable()->unique();
-            $table->foreign(['company_id', 'subscription_change_id'])->references(['company_id', 'id'])->on('subscription_changes')->restrictOnDelete();
-        });
+        if (! Schema::hasColumn('payments', 'subscription_change_id')) {
+            Schema::table('payments', function (Blueprint $table): void {
+                $table->char('subscription_change_id', 30)->charset('ascii')->collation('ascii_bin')->nullable();
+            });
+        }
+        if (! Schema::hasColumn('payments', 'provider_preference_id')) {
+            Schema::table('payments', function (Blueprint $table): void {
+                $table->string('provider_preference_id', 128)->nullable();
+            });
+        }
+        if (! Schema::hasIndex('payments', 'payments_provider_preference_id_unique')) {
+            Schema::table('payments', function (Blueprint $table): void {
+                $table->unique('provider_preference_id', 'payments_provider_preference_id_unique');
+            });
+        }
+        if (! Schema::hasForeignKey('payments', 'payments_company_id_subscription_change_id_foreign')) {
+            Schema::table('payments', function (Blueprint $table): void {
+                $table->foreign(['company_id', 'subscription_change_id'])->references(['company_id', 'id'])->on('subscription_changes')->restrictOnDelete();
+            });
+        }
 
         Schema::create('law_contacts', function (Blueprint $table): void {
             $table->char('id', 30)->charset('ascii')->collation('ascii_bin')->primary();
@@ -78,13 +93,17 @@ return new class extends Migration
         Schema::dropIfExists('law_notifications');
         Schema::dropIfExists('law_usage_alert_states');
         Schema::dropIfExists('law_contacts');
-        Schema::table('payments', function (Blueprint $table): void {
-            $table->dropForeign(['company_id', 'subscription_change_id']);
-            $table->dropUnique(['provider_preference_id']);
-            $table->dropColumn(['subscription_change_id', 'provider_preference_id']);
-        });
-        Schema::table('subscription_changes', function (Blueprint $table): void {
-            $table->dropUnique('subscription_changes_company_id_unique');
-        });
+        if (Schema::hasForeignKey('payments', 'payments_company_id_subscription_change_id_foreign')) {
+            Schema::table('payments', function (Blueprint $table): void { $table->dropForeign('payments_company_id_subscription_change_id_foreign'); });
+        }
+        if (Schema::hasIndex('payments', 'payments_provider_preference_id_unique')) {
+            Schema::table('payments', function (Blueprint $table): void { $table->dropUnique('payments_provider_preference_id_unique'); });
+        }
+        foreach (['subscription_change_id', 'provider_preference_id'] as $column) {
+            if (Schema::hasColumn('payments', $column)) Schema::table('payments', fn (Blueprint $table) => $table->dropColumn($column));
+        }
+        if (Schema::hasIndex('subscription_changes', 'subscription_changes_company_id_unique')) {
+            Schema::table('subscription_changes', function (Blueprint $table): void { $table->dropUnique('subscription_changes_company_id_unique'); });
+        }
     }
 };
