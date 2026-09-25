@@ -50,6 +50,10 @@ for (const [name, viewport] of viewports) {
             await page.goto(`/backoffice/${route}`);
             await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', pageId);
             await expect(page.locator('.backoffice-records-page')).toBeVisible();
+            // The responsive sidebar expands on hover; keep the pointer over
+            // the page content so snapshots capture the same collapsed state
+            // on every runner and page.
+            await page.mouse.move(viewport.width - 20, viewport.height - 20);
             await expect(page).toHaveScreenshot(`${pageId}-${name}.png`, {
                 fullPage: true,
                 animations: 'disabled',
