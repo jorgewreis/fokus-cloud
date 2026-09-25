@@ -212,8 +212,8 @@
 }
 
 .law-profile-heading { margin-bottom: 18px; }
-.law-profile-sections { display: grid; gap: 14px; }
-.law-profile-card { padding: 20px; border: 1px solid rgba(43,23,61,.09); border-radius: 10px; background: #fff; }
+.law-profile-sections { display: grid; min-width: 0; gap: 14px; }
+.law-profile-card { min-width: 0; padding: 20px; border: 1px solid rgba(43,23,61,.09); border-radius: 10px; background: #fff; }
 .law-profile-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
 .law-profile-card-heading h3 { margin: 3px 0 0; color: var(--law-shell-ink); font-size: 15px; font-weight: 600; }
 .law-profile-eyebrow { margin: 0; color: var(--law-shell-muted); font-size: 11px; }
@@ -241,6 +241,8 @@
 
 @media (max-width: 720px) {
   .law-profile-card { padding: 15px; }
+  .law-profile-field-wide { width: 100%; flex: 1 0 100%; }
+  .law-profile-field-wide input { width: 100%; }
   .law-profile-form-footer { align-items: stretch; flex: 1 0 100%; flex-direction: column; }
   .law-profile-form-footer .fs-btn { width: 100%; }
   .law-unit-form { align-items: stretch; flex-direction: column; }

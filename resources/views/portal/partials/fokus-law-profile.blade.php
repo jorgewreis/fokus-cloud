@@ -17,7 +17,7 @@
         <span class="law-profile-badge">Titular</span>
       </div>
       <form id="personal-form" class="law-profile-form" novalidate>
-        <label class="law-profile-field"><span>Nome completo</span><input class="fs-form-control fs-width-700" id="profile-name" name="name" autocomplete="name" maxlength="255" required /></label>
+        <label class="law-profile-field law-profile-field-wide"><span>Nome completo</span><input class="fs-form-control fs-width-700" id="profile-name" name="name" autocomplete="name" maxlength="255" required /></label>
         <label class="law-profile-field"><span>Telefone <small>opcional</small></span><input class="fs-form-control fs-width-400" id="profile-phone" name="phone" type="tel" autocomplete="tel-national" inputmode="tel" maxlength="16" placeholder="(00) 00000-0000" aria-describedby="phone-help" /><small id="phone-help">Número brasileiro com DDD. Ainda não verificado; usado apenas como contato.</small></label>
         <label class="law-profile-field"><span>CPF</span><input class="fs-form-control fs-width-400" id="profile-cpf" type="text" inputmode="numeric" readonly aria-describedby="cpf-help" /><small id="cpf-help">Por segurança, a alteração do CPF é feita pelo suporte Fokus Cloud.</small></label>
         <div class="law-profile-form-footer"><p class="law-profile-feedback" id="personal-status" role="status" aria-live="polite"></p><button class="law-profile-button fs-btn fs-btn-outline-primary" type="submit">Salvar dados pessoais</button></div>
@@ -31,7 +31,7 @@
       </div>
       <p class="law-profile-current">E-mail atual <strong id="current-email">—</strong></p>
       <form id="email-form" class="law-profile-form" novalidate>
-        <label class="law-profile-field"><span>Novo endereço de e-mail</span><input class="fs-form-control fs-width-700" name="email" type="email" autocomplete="email" maxlength="255" required /></label>
+        <label class="law-profile-field law-profile-field-wide"><span>Novo endereço de e-mail</span><input class="fs-form-control fs-width-700" name="email" type="email" autocomplete="email" maxlength="255" required /></label>
         <label class="law-profile-field"><span>Senha atual</span><input class="fs-form-control fs-width-400" name="current_password" type="password" autocomplete="current-password" required /></label>
         <div class="law-profile-form-footer"><p class="law-profile-feedback" id="email-status" role="status" aria-live="polite"></p><button class="law-profile-button fs-btn fs-btn-outline-primary" type="submit">Enviar confirmação</button></div>
       </form>
