@@ -25,6 +25,14 @@ window.initializeLawProfile = () => {
     return number.length > 5 ? `(${ddd}) ${number.slice(0, 5)}-${number.slice(5)}` : `(${ddd}) ${number}`;
   }
 
+  function formatCpf(value) {
+    const digits = String(value || '').replace(/\D/g, '').slice(0, 11);
+    return digits
+      .replace(/^(\d{3})(\d)/, '$1.$2')
+      .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+      .replace(/\.(\d{3})(\d)/, '.$1-$2');
+  }
+
   function setSupportReadOnly() {
     if (supportNotice) supportNotice.hidden = false;
     [personalForm, emailForm, securityForm].forEach((form) => {
@@ -38,7 +46,7 @@ window.initializeLawProfile = () => {
       const user = result.user;
       personalForm.elements.name.value = user.name || '';
       personalForm.elements.phone.value = formatPhone(user.phone || '');
-      document.querySelector('#profile-cpf').value = user.cpf || '';
+      document.querySelector('#profile-cpf').value = formatCpf(user.cpf || '');
       document.querySelector('#current-email').textContent = user.email || '';
       document.querySelector('#email-verified').textContent = user.email_verified ? 'Confirmado' : 'Não confirmado';
       if (result.support_mode?.active) setSupportReadOnly();

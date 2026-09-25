@@ -102,24 +102,30 @@
 
   function appendNavLink(container, label, href, iconName, selected = false, disabled = false) {
     const link = element('a', 'law-nav-item');
-    link.href = href;
+    if (!disabled) link.href = href;
     if (selected) link.setAttribute('aria-current', 'page');
     link.append(icon(iconName));
     link.append(element('span', '', label));
     if (disabled) {
+      link.classList.add('disabled');
       link.setAttribute('aria-disabled', 'true');
       link.addEventListener('click', (event) => event.preventDefault());
     }
     container.append(link);
   }
 
-  function appendNavButton(container, label, iconName, selected, onClick) {
+  function appendNavButton(container, label, iconName, selected, onClick, disabled = false) {
     const button = element('button', 'law-nav-item');
     button.type = 'button';
+    button.disabled = disabled;
+    if (disabled) {
+      button.classList.add('disabled');
+      button.setAttribute('aria-disabled', 'true');
+    }
     if (selected) button.setAttribute('aria-current', 'page');
     button.append(icon(iconName));
     button.append(element('span', '', label));
-    button.addEventListener('click', onClick);
+    if (!disabled) button.addEventListener('click', onClick);
     container.append(button);
   }
 
@@ -178,7 +184,7 @@
     const descriptor = getModuleDescriptor(module);
     sectionTitle.textContent = descriptor.label;
     headingIcon = descriptor.icon;
-    appendNavButton(pageItems, `Visão geral de ${descriptor.label}`, descriptor.icon, true, () => renderContent('module'));
+    appendNavButton(pageItems, `Visão geral de ${descriptor.label}`, descriptor.icon, true, () => renderContent('module'), true);
     pageItems.append(element('p', 'law-nav-description', 'As páginas funcionais deste módulo serão adicionadas aqui.'));
     renderContent('module');
     document.querySelector('#section-icon').src = ICON_ROOT + ICONS[headingIcon];
