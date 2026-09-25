@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BackofficeController;
 use App\Http\Controllers\Api\CompanyUserController;
 use App\Http\Controllers\Api\LawHearingController;
+use App\Http\Controllers\Api\LawShellController;
 use App\Http\Controllers\Api\PlatformAdminController;
 use App\Http\Controllers\Api\PlatformAuthController;
 use App\Http\Controllers\Api\PlatformSupportController;
@@ -48,6 +49,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/auth/select-company', [AuthController::class, 'selectCompany']);
     Route::post('/auth/resend-verification', [AuthController::class, 'resendVerification'])->middleware('throttle:2,10,customer-resend-verification');
     Route::middleware(EnsureCompanyContext::class)->group(function () {
+        Route::get('/law/shell-context', [LawShellController::class, 'context']);
         Route::get('/subscriptions', [SubscriptionController::class, 'index']);
         Route::post('/subscriptions/checkout', [SubscriptionController::class, 'checkout']);
         Route::post('/subscriptions/{subscription}/change', [SubscriptionController::class, 'change']);

@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\SearchDiscoveryController;
 
 // These resources must reach Laravel: both sites share the same public directory.
@@ -50,6 +51,37 @@ Route::get('/api/csrf-token', fn () => response()->json(['token' => csrf_token()
 Route::get('/acesso', fn () => redirect('/?acesso=cliente'));
 Route::get('/portal', fn () => response()->file(public_path('portal/dashboard.html')));
 Route::get('/portal/painel', fn () => response()->file(public_path('portal/dashboard.html')));
+Route::get('/portal/fokus-law', function () {
+    $user = Auth::guard('web')->user();
+    if (! $user || $user->status !== 'ativa') {
+        return redirect('/?acesso=cliente');
+    }
+    if (! $user->email_verified_at) {
+        return redirect('/verificar-email');
+    }
+
+    $companyId = request()->session()->get('active_company_id');
+    if (! $companyId) {
+        return redirect('/portal/empresas');
+    }
+
+    $membership = DB::table('company_memberships as membership')
+        ->join('companies as company', 'company.id', '=', 'membership.company_id')
+        ->where('membership.company_id', $companyId)
+        ->where('membership.user_id', $user->id)
+        ->where('membership.status', 'ativo')
+        ->whereNull('membership.deleted_at')
+        ->where('company.status', 'ativa')
+        ->whereNull('company.deleted_at')
+        ->exists();
+
+    if (! $membership) {
+        request()->session()->forget('active_company_id');
+        return redirect('/portal/empresas');
+    }
+
+    return response()->view('portal.fokus-law');
+});
 Route::get('/portal/perfil', fn () => response()->file(public_path('portal/profile.html')));
 Route::get('/cadastro', fn () => response()->file(public_path('auth/cadastro.html')));
 Route::get('/verificar-email', fn () => response()->file(public_path('auth/verificar-email.html')));
