@@ -329,9 +329,11 @@
   async function renderCompany(successMessage = '') {
     contentRegion.replaceChildren();
     const heading = element('div', 'law-company-heading');
-    heading.append(element('p', 'law-page-eyebrow', 'ADMINISTRAÇÃO DA EMPRESA'));
-    heading.append(element('h2', '', 'Dados da empresa'));
-    heading.append(element('p', 'law-page-lede', 'Consulte e mantenha os dados institucionais da empresa ativa no Fokus Law.'));
+    const headingCopy = element('div');
+    headingCopy.append(element('p', 'law-page-eyebrow', 'ADMINISTRAÇÃO DA EMPRESA'));
+    headingCopy.append(element('h2', '', 'Dados da empresa'));
+    headingCopy.append(element('p', 'law-page-lede', 'Identidade, contato e endereço da empresa ativa.'));
+    heading.append(headingCopy);
     contentRegion.append(heading);
 
     const feedback = element('p', 'law-company-feedback');
@@ -363,44 +365,64 @@
       address_district: 'Bairro', address_city: 'Cidade', address_state: 'UF',
     };
     const groups = [
-      ['Identificação', ['legal_name', 'display_name', 'document', 'status']],
-      ['Contato institucional', ['contact_email', 'contact_phone', 'website']],
-      ['Endereço', ['address_postal_code', 'address_street', 'address_number', 'address_complement', 'address_district', 'address_city', 'address_state']],
+      { title: 'Identificação', eyebrow: '01 / EMPRESA', description: 'Dados oficiais e nome usado nas comunicações.', iconName: 'company', variant: 'identity', fields: ['legal_name', 'display_name', 'document', 'status'] },
+      { title: 'Contato institucional', eyebrow: '02 / CONTATO', description: 'Canais públicos da organização.', iconName: 'users', variant: 'contact', fields: ['contact_email', 'contact_phone', 'website'] },
+      { title: 'Endereço', eyebrow: '03 / LOCALIZAÇÃO', description: 'Referência física da empresa.', iconName: 'company', variant: 'address', fields: ['address_postal_code', 'address_street', 'address_number', 'address_complement', 'address_district', 'address_city', 'address_state'] },
     ];
-    const cardNodes = [];
-    groups.forEach(([title, fields]) => {
-      const card = element('section', 'law-company-card');
-      card.append(element('h3', '', title));
+    groups.forEach((group) => {
+      const card = element('section', `law-company-card law-company-card-${group.variant}`);
+      const cardHeading = element('div', 'law-company-card-heading');
+      const cardCopy = element('div');
+      cardCopy.append(element('p', 'law-card-eyebrow', group.eyebrow), element('h3', '', group.title), element('p', 'law-card-description', group.description));
+      const symbol = element('span', 'law-company-card-symbol');
+      symbol.append(icon(group.iconName));
+      cardHeading.append(cardCopy, symbol);
+      card.append(cardHeading);
       const details = element('dl', 'law-company-details');
-      fields.forEach((field) => {
-        const row = element('div', 'law-company-detail');
+      group.fields.forEach((field) => {
+        const row = element('div', `law-company-detail law-company-detail-${field}`);
         row.append(element('dt', '', labels[field]));
         const value = field === 'document' ? formatDocument(profile.company.document_type, profile.company.document_number)
         : field === 'status' ? companyStatus(profile.company.status) : profile.company[field];
-        row.append(element('dd', '', value || 'Não informado'));
+        const display = element('dd', '', value || 'Não informado');
+        if (!value) display.classList.add('is-empty');
+        if (field === 'status') { display.classList.add('law-company-status'); display.dataset.state = profile.company.status || 'unknown'; }
+        row.append(display);
         details.append(row);
       });
       card.append(details);
       sections.append(card);
-      cardNodes.push(card);
     });
 
-    const actions = element('div', 'law-company-actions');
-    const edit = element('button', 'fs-btn fs-btn-primary', 'Editar dados');
+    const edit = element('button', 'fs-btn fs-btn-primary law-company-edit', 'Editar dados');
     edit.type = 'button';
     edit.hidden = Boolean(context.support_mode);
-    actions.append(edit);
-    sections.append(actions);
+    heading.append(edit);
 
     const historyCard = element('section', 'law-company-card law-company-history');
-    historyCard.append(element('h3', '', 'Histórico de alterações'));
+    const historyHeading = element('div', 'law-company-card-heading');
+    const historyCopy = element('div');
+    historyCopy.append(element('p', 'law-card-eyebrow', 'REGISTRO DA EMPRESA'), element('h3', '', 'Histórico de alterações'), element('p', 'law-card-description', 'Veja quem atualizou a ficha e quais dados foram alterados.'));
+    historyHeading.append(historyCopy);
+    historyCard.append(historyHeading);
     const history = element('ol', 'law-company-history-list');
-    if (!profile.audit.length) history.append(element('li', '', 'Nenhuma alteração registrada.'));
+    if (!profile.audit.length) history.append(element('li', 'law-company-history-empty', 'Nenhuma alteração registrada.'));
     profile.audit.forEach((entry) => {
-      const item = element('li');
-      const fields = Object.keys(entry.after || {}).map((field) => labels[field] || field).join(', ');
-      item.append(element('strong', '', `${entry.actor_name} · ${new Date(entry.created_at.replace(' ', 'T')).toLocaleString('pt-BR')}`));
-      item.append(element('span', '', `Alterou: ${fields || 'dados da empresa'}`));
+      const item = element('li', 'law-company-history-item');
+      const changedFields = Object.keys(entry.after || {}).map((field) => labels[field] || field);
+      const date = new Date(String(entry.created_at).replace(' ', 'T'));
+      const dateLabel = Number.isNaN(date.getTime()) ? entry.created_at : new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(date);
+      const fullDate = Number.isNaN(date.getTime()) ? entry.created_at : new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+      item.append(element('span', 'law-company-history-date', dateLabel));
+      const event = element('div', 'law-company-history-event');
+      event.append(element('strong', '', 'Dados da empresa atualizados'));
+      event.append(element('span', 'law-company-history-meta', `${entry.actor_name || 'Administrador'} · ${fullDate}`));
+      if (changedFields.length) {
+        const chips = element('div', 'law-company-history-fields');
+        changedFields.forEach((field) => chips.append(element('span', '', field)));
+        event.append(chips);
+      }
+      item.append(event);
       history.append(item);
     });
     historyCard.append(history);
@@ -408,6 +430,7 @@
     sections.setAttribute('aria-busy', 'false');
 
     edit.addEventListener('click', () => {
+      edit.hidden = true;
       const form = element('form', 'law-company-form');
       const fields = [
         ['legal_name', 'Razão social / nome legal', 'text', 'fs-width-700'],
@@ -691,10 +714,31 @@
     }
 
     const currentItems = new Map((current.items || []).map((item) => [item.module_code || item.conditions?.catalog_module_code || item.conditions?.module_code || item.family, item]));
+    const activePlan = plans.find((plan) => plan.code === current.plan_code);
+    const activeSegment = activePlan?.segment || current.segment || (current.items || []).flatMap((item) => item.conditions?.segments || [])[0] || null;
+    const activeContexts = new Set((current.items || []).map((item) => item.conditions?.context_code).filter(Boolean));
+    if (!activeContexts.size && activePlan) {
+      activePlan.module_codes?.forEach((code) => {
+        const contextCode = modules.find((module) => module.code === code)?.context_code;
+        if (contextCode) activeContexts.add(contextCode);
+      });
+    }
+    const availableModules = modules.filter((module) =>
+      (!activeSegment || !module.segments?.length || module.segments.includes(activeSegment))
+      && (!activeContexts.size || !module.context_code || activeContexts.has(module.context_code)));
+    const availableCodes = new Set(availableModules.map((module) => module.code));
+    const availablePlans = plans.filter((plan) =>
+      (!activeSegment || plan.segment === activeSegment)
+      && (plan.module_codes || []).every((code) => availableCodes.has(code)));
     const pendingChange = data.pending_change;
     const summary = element('section', 'law-subscription-overview');
-    summary.append(element('p', 'law-page-eyebrow', 'ASSINATURA ATUAL'));
+    const summaryTop = element('div', 'law-subscription-overview-top');
+    summaryTop.append(element('p', 'law-page-eyebrow', 'ASSINATURA ATUAL'));
+    summaryTop.append(element('span', 'law-subscription-status', current.status || 'Ativa'));
+    summary.append(summaryTop);
     summary.append(element('h3', '', current.plan_name || 'Composição personalizada'));
+    summary.append(element('p', 'law-subscription-current-caption', 'Plano e recursos em uso pela empresa.'));
+    summary.append(element('span', 'law-subscription-price-label', 'VALOR ATUAL'));
     const price = element('strong', 'law-subscription-price', formatLawMoney(current.amount));
     price.append(element('span', '', current.billing_cycle === 'annual' ? ' / ano' : ' / mês')); summary.append(price);
     const facts = element('div', 'law-subscription-facts');
@@ -703,23 +747,50 @@
     });
     summary.append(facts); contentRegion.append(summary);
 
+    const vouchers = data.voucher_benefits || [];
+    if (vouchers.length) {
+      const activeVoucher = vouchers.find((voucher) => !voucher.benefit_ends_at || new Date(voucher.benefit_ends_at) >= new Date()) || vouchers[0];
+      const benefitCard = element('section', 'law-voucher-card');
+      const benefitCopy = element('div');
+      benefitCopy.append(element('p', 'law-card-eyebrow', 'BENEFÍCIO DA ASSINATURA'));
+      benefitCopy.append(element('h3', '', lawVoucherLabel(activeVoucher)));
+      const voucherName = activeVoucher.name && activeVoucher.name !== activeVoucher.code ? `${activeVoucher.name} · ` : '';
+      benefitCopy.append(element('p', '', `${voucherName}Cupom ${activeVoucher.code}`));
+      const benefitMeta = element('div', 'law-voucher-meta');
+      const expired = activeVoucher.benefit_ends_at && new Date(activeVoucher.benefit_ends_at) < new Date();
+      benefitMeta.append(element('strong', '', expired ? 'Benefício encerrado' : activeVoucher.benefit_ends_at ? `Válido até ${formatLawDate(activeVoucher.benefit_ends_at)}` : 'Benefício aplicado'));
+      if (activeVoucher.discount_amount > 0) benefitMeta.append(element('span', '', `${formatLawMoney(activeVoucher.discount_amount)} de economia aplicada`));
+      benefitCard.append(benefitCopy, benefitMeta);
+      contentRegion.append(benefitCard);
+    }
+
     const form = element('form', 'law-subscription-builder');
+    form.append(element('p', 'law-card-eyebrow', 'GERENCIAR ASSINATURA'));
     form.append(element('h3', '', 'Planos, módulos e capacidades'));
-    form.append(element('p', 'law-page-lede', 'As funcionalidades são informativas. Você pode trocar o plano ou compor os módulos e limites da assinatura.'));
+    form.append(element('p', 'law-page-lede', 'Escolha o plano, o ciclo de cobrança e a capacidade dos módulos disponíveis para sua empresa.'));
     const controls = element('div', 'law-subscription-controls');
     const planWrap = lawSubscriptionField('Plano publicado');
     const planSelect = element('select', 'fs-form-control'); planSelect.name = 'target_plan_id'; planSelect.append(new Option('Composição personalizada', ''));
-    plans.forEach((plan) => planSelect.append(new Option(`${plan.name} · ${formatLawMoney(plan.monthly_amount)}/mês`, plan.id)));
-    planSelect.value = plans.find((plan) => plan.code === current.plan_code)?.id || '';
+    availablePlans.forEach((plan) => planSelect.append(new Option(`${plan.name} · ${formatLawMoney(plan.monthly_amount)}/mês`, plan.id)));
+    planSelect.value = availablePlans.find((plan) => plan.code === current.plan_code)?.id || '';
     planWrap.append(planSelect); controls.append(planWrap);
     const cycleWrap = lawSubscriptionField('Forma de cobrança');
     const cycleSelect = element('select', 'fs-form-control'); cycleSelect.append(new Option('Mensal', 'monthly'), new Option('Anual', 'annual')); cycleSelect.value = current.billing_cycle || 'monthly'; cycleWrap.append(cycleSelect); controls.append(cycleWrap);
     form.append(controls);
 
+    const scope = activeContexts.has('judiciario') ? 'Judiciário' : activeContexts.has('orgao_publico') ? 'Órgão público' : activeSegment === 'advocacia' ? 'Advocacia' : activeSegment === 'setor_publico' ? 'Setor público' : 'Sua empresa';
+    form.append(element('p', 'law-subscription-scope', `Módulos disponíveis para ${scope}`));
+
     const moduleGrid = element('div', 'law-subscription-module-grid');
     const moduleControls = new Map();
-    modules.forEach((module) => {
+    availableModules.forEach((module) => {
       const card = element('article', 'law-subscription-module-card');
+      card.dataset.selected = currentItems.has(module.code) ? 'true' : 'false';
+      const cardTop = element('div', 'law-subscription-module-top');
+      const moduleSymbol = element('span', 'law-subscription-module-symbol');
+      moduleSymbol.append(icon(MODULES[module.module_code]?.icon || 'overview'));
+      const selectionState = element('span', 'law-subscription-module-state', currentItems.has(module.code) ? 'Contratado' : 'Disponível');
+      cardTop.append(moduleSymbol, selectionState); card.append(cardTop);
       const label = element('label', 'law-subscription-module-title');
       const checkbox = element('input'); checkbox.type = 'checkbox'; checkbox.value = module.code; checkbox.checked = currentItems.has(module.code);
       label.append(checkbox, element('strong', '', module.name)); card.append(label);
@@ -729,25 +800,36 @@
       const personalizationBox = element('div', 'law-subscription-personalizations');
       (module.personalizations || []).filter((p) => p.active).forEach((p) => {
         const selected = currentItems.get(module.code)?.conditions?.personalizations?.find((entry) => entry.type_code === p.type_code);
-        const field = lawSubscriptionField(p.name || p.label || p.type_code);
+        const field = lawSubscriptionField(p.name || p.type_label || p.label || p.type_code);
         const select = element('select', 'fs-form-control'); select.dataset.typeCode = p.type_code;
         (p.tiers || []).filter((tier) => tier.active).forEach((tier) => select.append(new Option(`${Number(tier.value).toLocaleString('pt-BR')} · ${formatLawMoney(tier.additional_monthly_amount)}/mês`, tier.value)));
         if (selected?.value) select.value = String(selected.value);
         if (!select.options.length) return;
         field.append(select);
-        if (p.type_code === 'contatos_cadastrados' && data.usage?.contatos_cadastrados?.available) {
+        if (p.type_code === 'contatos_cadastrados' && currentItems.has(module.code) && data.usage?.contatos_cadastrados?.available) {
           const usage = data.usage.contatos_cadastrados;
-          const note = element('p', 'law-subscription-usage');
-          const update = () => { const limit = Number(select.value); const percent = limit ? Math.round(usage.used / limit * 1000) / 10 : 100; note.replaceChildren(document.createTextNode(`Uso atual: ${usage.used.toLocaleString('pt-BR')} de ${limit.toLocaleString('pt-BR')} (${percent}%).`)); note.dataset.state = percent > 70 ? 'warning' : 'normal'; if (percent > 70) note.append(element('strong', '', ' Considere aumentar esta capacidade.')); };
+          const note = element('div', 'law-subscription-usage');
+          const update = () => {
+            const currentLimit = Number(usage.limit || 0);
+            const percent = currentLimit ? Math.round(usage.used / currentLimit * 1000) / 10 : 0;
+            note.dataset.state = percent > 70 ? 'warning' : 'normal';
+            const caption = element('p', 'law-subscription-usage-caption');
+            caption.append(element('span', '', 'Uso da capacidade atual'), element('strong', '', `${usage.used.toLocaleString('pt-BR')} / ${currentLimit.toLocaleString('pt-BR')}`));
+            const track = element('span', 'law-subscription-usage-track');
+            const fill = element('span', 'law-subscription-usage-fill'); fill.style.width = `${Math.min(percent, 100)}%`; track.append(fill);
+            note.replaceChildren(caption, track);
+            if (percent > 70) note.append(element('p', 'law-subscription-usage-warning', 'Uso acima de 70%. Considere ampliar esta capacidade.'));
+            if (Number(select.value) !== currentLimit) note.append(element('p', 'law-subscription-usage-preview', `Nova capacidade selecionada: ${Number(select.value).toLocaleString('pt-BR')}.`));
+          };
           select.addEventListener('change', update); update(); field.append(note);
         }
         personalizationBox.append(field);
       });
       card.append(personalizationBox); moduleGrid.append(card); moduleControls.set(module.code, checkbox);
+      checkbox.addEventListener('change', () => { card.dataset.selected = checkbox.checked ? 'true' : 'false'; selectionState.textContent = checkbox.checked ? 'Selecionado' : 'Disponível'; planSelect.value = ''; });
     });
     form.append(moduleGrid);
-    planSelect.addEventListener('change', () => { const plan = plans.find((item) => item.id === planSelect.value); moduleControls.forEach((checkbox, code) => { checkbox.checked = Boolean(plan?.module_codes?.includes(code)); }); });
-    moduleControls.forEach((checkbox) => checkbox.addEventListener('change', () => { if (checkbox.checked) planSelect.value = ''; }));
+    planSelect.addEventListener('change', () => { const plan = availablePlans.find((item) => item.id === planSelect.value); if (!plan) return; moduleControls.forEach((checkbox, code) => { checkbox.checked = Boolean(plan.module_codes?.includes(code)); const card = checkbox.closest('.law-subscription-module-card'); card.dataset.selected = checkbox.checked ? 'true' : 'false'; card.querySelector('.law-subscription-module-state').textContent = checkbox.checked ? 'Selecionado' : 'Disponível'; }); });
 
     const actions = element('div', 'law-subscription-actions');
     const quoteButton = element('button', 'fs-btn fs-btn-primary', 'Calcular alteração'); quoteButton.type = 'submit';
@@ -792,6 +874,13 @@
   }
 
   function lawSubscriptionField(text) { const field = element('label', 'law-subscription-field'); field.append(element('span', '', text)); return field; }
+  function lawVoucherLabel(voucher) {
+    const value = Number(voucher.discount_value || 0);
+    if (voucher.discount_type === 'trial_free') return 'Assinatura com período gratuito';
+    if (voucher.discount_type === 'percentage') return `${value.toLocaleString('pt-BR')}% de desconto`;
+    if (voucher.discount_type === 'commercial_credit') return `Crédito de ${formatLawMoney(value)}`;
+    return `Desconto de ${formatLawMoney(value)}`;
+  }
   function formatLawMoney(value) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0)); }
   function formatLawDate(value) { if (!value) return '—'; const date = new Date(value); return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(date); }
 

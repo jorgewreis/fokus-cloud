@@ -27,7 +27,7 @@ class LawSubscriptionController extends Controller
             ->whereNotIn('status', ['encerrada', 'cancelada'])->orderByDesc('created_at')->first();
 
         if (! $subscription) {
-            return response()->json(['subscription' => null, 'catalog' => $published, 'usage' => null, 'history' => [], 'payments' => [], 'pending_change' => null]);
+            return response()->json(['subscription' => null, 'catalog' => $published, 'usage' => null, 'history' => [], 'payments' => [], 'pending_change' => null, 'voucher_benefits' => []]);
         }
 
         $snapshot = $changes->snapshot($subscription);
@@ -94,6 +94,30 @@ class LawSubscriptionController extends Controller
             $usageData = ['contatos_cadastrados' => ['available' => false, 'reason' => 'temporarily_unavailable', 'used' => null, 'limit' => null, 'percentage' => null, 'over_threshold' => false]];
         }
 
+        $voucherBenefits = DB::table('voucher_redemptions as redemption')
+            ->join('vouchers as voucher', 'voucher.id', '=', 'redemption.voucher_id')
+            ->where('redemption.company_id', $companyId)
+            ->where('redemption.subscription_id', $subscription->id)
+            ->orderByDesc('redemption.created_at')
+            ->limit(5)
+            ->get([
+                'redemption.id', 'redemption.discount_amount', 'redemption.benefit_starts_at',
+                'redemption.benefit_ends_at', 'redemption.snapshot', 'redemption.created_at',
+                'voucher.code', 'voucher.name', 'voucher.discount_type', 'voucher.discount_value',
+            ])->map(function (object $redemption): array {
+                $snapshot = json_decode((string) ($redemption->snapshot ?? ''), true) ?: [];
+                return [
+                    'code' => $snapshot['code'] ?? $redemption->code,
+                    'name' => $snapshot['name'] ?? $redemption->name,
+                    'discount_type' => $snapshot['discount_type'] ?? $redemption->discount_type,
+                    'discount_value' => (float) ($snapshot['discount_value'] ?? $redemption->discount_value),
+                    'discount_amount' => (float) $redemption->discount_amount,
+                    'benefit_starts_at' => $redemption->benefit_starts_at,
+                    'benefit_ends_at' => $redemption->benefit_ends_at,
+                    'created_at' => $redemption->created_at,
+                ];
+            });
+
         return response()->json([
             'subscription' => $snapshot,
             'catalog' => $published,
@@ -101,6 +125,7 @@ class LawSubscriptionController extends Controller
             'history' => $history,
             'payments' => $payments,
             'pending_change' => $pending,
+            'voucher_benefits' => $voucherBenefits,
         ]);
     }
 
