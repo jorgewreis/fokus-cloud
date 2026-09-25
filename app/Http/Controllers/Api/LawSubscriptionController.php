@@ -10,6 +10,7 @@ use App\Services\PrefixedUlid;
 use App\Services\SubscriptionChangeManager;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class LawSubscriptionController extends Controller
@@ -30,44 +31,73 @@ class LawSubscriptionController extends Controller
         }
 
         $snapshot = $changes->snapshot($subscription);
-        $moduleItems = collect($snapshot['items'] ?? [])->map(function (array $item): array {
-            $module = DB::table('modules')->where('id', $item['module_id'] ?? null)->first();
-            $capabilities = $module ? DB::table('module_capabilities')->where('module_id', $module->id)->orderBy('optional')->orderBy('name')->get(['code', 'name', 'optional']) : collect();
-            return [
+        try {
+            $moduleItems = collect($snapshot['items'] ?? [])->map(function (array $item): array {
+                $module = DB::table('modules')->where('id', $item['module_id'] ?? null)->first();
+                $capabilities = $module ? DB::table('module_capabilities')->where('module_id', $module->id)->orderBy('optional')->orderBy('name')->get(['code', 'name', 'optional']) : collect();
+                return [
+                    ...$item,
+                    'module_code' => $module?->code,
+                    'family' => $module?->module_code ?: $module?->code,
+                    'capabilities' => $capabilities,
+                    'personalizations' => $item['conditions']['personalizations'] ?? [],
+                ];
+            })->values();
+        } catch (\Throwable $exception) {
+            Log::warning('Fokus Law subscription module details could not be loaded.', ['exception' => $exception::class]);
+            $moduleItems = collect($snapshot['items'] ?? [])->map(fn (array $item): array => [
                 ...$item,
-                'module_code' => $module?->code,
-                'family' => $module?->module_code ?: $module?->code,
-                'capabilities' => $capabilities,
+                'module_code' => $item['conditions']['module_code'] ?? null,
+                'family' => $item['conditions']['module_code'] ?? null,
+                'capabilities' => [],
                 'personalizations' => $item['conditions']['personalizations'] ?? [],
-            ];
-        })->values();
+            ])->values();
+        }
 
         $snapshot['items'] = $moduleItems;
         $snapshot['version'] = (int) $subscription->version;
         $snapshot['current_period_starts_at'] = $subscription->current_period_starts_at;
         $snapshot['current_period_ends_at'] = $subscription->current_period_ends_at;
         $snapshot['cancel_at'] = $subscription->cancel_at;
-        $payments = DB::table('payments')->where('company_id', $companyId)->where('subscription_id', $subscription->id)
-            ->latest('created_at')->limit(6)->get(['id', 'status', 'amount', 'currency', 'created_at', 'paid_at', 'provider_checkout_url as checkout_url']);
-        $history = DB::table('subscription_changes')->where('company_id', $companyId)->where('subscription_id', $subscription->id)
-            ->latest('created_at')->limit(20)->get(['id', 'type', 'status', 'effective_at', 'proration_amount', 'reason', 'created_at', 'before_snapshot', 'after_snapshot'])
-            ->map(function (object $item): array {
-                $entry = (array) $item;
-                $entry['before_snapshot'] = json_decode((string) $item->before_snapshot, true) ?: [];
-                $entry['after_snapshot'] = json_decode((string) $item->after_snapshot, true) ?: [];
-                return $entry;
-            });
-        $pending = DB::table('subscription_changes')->where('company_id', $companyId)->where('subscription_id', $subscription->id)
-            ->whereIn('status', ['agendada', 'aguardando_pagamento'])->latest('created_at')->first();
-        if ($pending) {
-            $pending->before_snapshot = json_decode((string) $pending->before_snapshot, true) ?: [];
-            $pending->after_snapshot = json_decode((string) $pending->after_snapshot, true) ?: [];
+        try {
+            $payments = DB::table('payments')->where('company_id', $companyId)->where('subscription_id', $subscription->id)
+                ->latest('created_at')->limit(6)->get(['id', 'status', 'amount', 'currency', 'created_at', 'paid_at', 'provider_checkout_url as checkout_url']);
+        } catch (\Throwable $exception) {
+            Log::warning('Fokus Law subscription payments could not be loaded.', ['exception' => $exception::class]);
+            $payments = collect();
+        }
+        try {
+            $history = DB::table('subscription_changes')->where('company_id', $companyId)->where('subscription_id', $subscription->id)
+                ->latest('created_at')->limit(20)->get(['id', 'type', 'status', 'effective_at', 'proration_amount', 'reason', 'created_at', 'before_snapshot', 'after_snapshot'])
+                ->map(function (object $item): array {
+                    $entry = (array) $item;
+                    $entry['before_snapshot'] = json_decode((string) $item->before_snapshot, true) ?: [];
+                    $entry['after_snapshot'] = json_decode((string) $item->after_snapshot, true) ?: [];
+                    return $entry;
+                });
+            $pending = DB::table('subscription_changes')->where('company_id', $companyId)->where('subscription_id', $subscription->id)
+                ->whereIn('status', ['agendada', 'aguardando_pagamento'])->latest('created_at')->first();
+            if ($pending) {
+                $pending->before_snapshot = json_decode((string) $pending->before_snapshot, true) ?: [];
+                $pending->after_snapshot = json_decode((string) $pending->after_snapshot, true) ?: [];
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Fokus Law subscription change history could not be loaded.', ['exception' => $exception::class]);
+            $history = collect();
+            $pending = null;
+        }
+
+        try {
+            $usageData = ['contatos_cadastrados' => $usage->contacts($companyId)];
+        } catch (\Throwable $exception) {
+            Log::warning('Fokus Law subscription usage could not be loaded.', ['exception' => $exception::class]);
+            $usageData = ['contatos_cadastrados' => ['available' => false, 'reason' => 'temporarily_unavailable', 'used' => null, 'limit' => null, 'percentage' => null, 'over_threshold' => false]];
         }
 
         return response()->json([
             'subscription' => $snapshot,
             'catalog' => $published,
-            'usage' => ['contatos_cadastrados' => $usage->contacts($companyId)],
+            'usage' => $usageData,
             'history' => $history,
             'payments' => $payments,
             'pending_change' => $pending,
