@@ -27,3 +27,26 @@ O deploy limpa caches gerados em `bootstrap/cache`, executa
 servidor. O diretorio `resources/views` deve existir mesmo quando a aplicacao
 servir HTML estatico por `public/`, pois o cache de views do Laravel valida
 esse caminho durante a otimizacao.
+
+## Alias de acesso do Fokus Law
+
+`https://law.fokuscloud.com.br` é um endereço de entrada para o mesmo app
+publicado em `www.fokuscloud.com.br`; ele encaminha o usuário para
+`/produtos/fokus-law`, onde o login abre o shell autenticado em
+`/portal/fokus-law`. A sessão permanece no domínio canônico `www`.
+
+Para ativar o alias em produção, a equipe de infraestrutura precisa:
+
+1. Criar no DNS um registro `law` apontando para o mesmo destino público de
+   `www` (A/AAAA para a origem ou CNAME proxied para `www`, conforme a zona).
+2. Adicionar `law.fokuscloud.com.br` ao vhost HTTPS do CloudPanel e emitir um
+   certificado TLS válido para esse hostname.
+3. Aplicar a regra do alias no início do bloco HTTPS em
+   `deploy/cloudpanel-legacy-redirects.conf`, executar `nginx -t` e recarregar
+   o NGINX.
+4. Confirmar que `https://law.fokuscloud.com.br/` responde com redirecionamento
+   para `https://www.fokuscloud.com.br/produtos/fokus-law`.
+
+O deploy Laravel e o purge Cloudflare descritos acima não criam registros DNS,
+aliases de vhost nem certificados; esses passos são necessários antes que o
+subdomínio possa responder.

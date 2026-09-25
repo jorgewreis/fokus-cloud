@@ -215,6 +215,64 @@ class AuthController extends Controller
         return response()->json(['user' => $this->userPayload($user), 'companies' => $companies, 'active_company_id' => $companyId]);
     }
 
+    public function lawLogin(Request $request)
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email:rfc', 'max:255'],
+            'password' => ['required', 'string'],
+            'company_id' => ['required', 'string', 'max:40'],
+            'profile' => ['required', 'string', 'max:80'],
+        ]);
+
+        $user = User::whereRaw('LOWER(email) = ?', [Str::lower(trim($data['email']))])->first();
+        if (! $user || $user->status !== 'ativa' || ($user->locked_until && $user->locked_until->isFuture()) || ! Hash::check($data['password'], $user->password)) {
+            if ($user) {
+                $this->recordFailedLogin($user);
+            }
+
+            return response()->json(['message' => 'E-mail ou senha inválidos.'], 422);
+        }
+
+        $membership = DB::table('company_memberships as membership')
+            ->join('companies as company', 'company.id', '=', 'membership.company_id')
+            ->join('roles as role', 'role.id', '=', 'membership.role_id')
+            ->where('membership.company_id', $data['company_id'])
+            ->where('membership.user_id', $user->id)
+            ->where('membership.status', 'ativo')
+            ->whereNull('membership.deleted_at')
+            ->where('company.status', 'ativa')
+            ->whereNull('company.deleted_at')
+            ->where('role.code', $data['profile'])
+            ->exists();
+        $hasLawSubscription = DB::table('subscriptions as subscription')
+            ->join('products as product', 'product.id', '=', 'subscription.product_id')
+            ->where('subscription.company_id', $data['company_id'])
+            ->where('subscription.status', 'ativa')
+            ->whereIn('product.code', ['law', 'fokus-law'])
+            ->exists();
+
+        if (! $membership || ! $hasLawSubscription) {
+            return response()->json(['message' => 'A empresa, o perfil ou a assinatura selecionados não estão disponíveis para esta conta.'], 403);
+        }
+
+        $user->forceFill([
+            'failed_login_attempts' => 0,
+            'login_attempt_window_started_at' => null,
+            'locked_until' => null,
+        ])->save();
+        $this->authenticateIntoSession($request, $user, $data['company_id']);
+
+        $redirectTo = $user->email_verified_at
+            ? '/portal/fokus-law'
+            : '/verificar-email?return_to='.rawurlencode('/portal/fokus-law');
+
+        return response()->json([
+            'user' => $this->userPayload($user),
+            'active_company_id' => $data['company_id'],
+            'redirect_to' => $redirectTo,
+        ]);
+    }
+
     public function logout(Request $request, \App\Services\SupportSessionSecurity $supportSecurity)
     {
         $supportSecurity->end($request, 'Sessão encerrada ao sair do portal.');
@@ -313,7 +371,7 @@ class AuthController extends Controller
         $companyId = ! empty($payload['company_id']) ? $payload['company_id'] : $this->firstCompanyId($user);
         $this->authenticateIntoSession($request, $user, $companyId);
         $returnTo = data_get($payload, 'return_to', '/portal');
-        if (! in_array($returnTo, ['/portal', '/assinaturas/fokus-law', '/assinaturas/fokus-lead'], true)) {
+        if (! in_array($returnTo, ['/portal', '/portal/fokus-law', '/assinaturas/fokus-law', '/assinaturas/fokus-lead'], true)) {
             $returnTo = '/portal';
         }
         return response()->json(['message' => 'E-mail confirmado com sucesso.', 'return_to' => $returnTo]);
@@ -321,8 +379,12 @@ class AuthController extends Controller
 
     public function resendVerification(Request $request)
     {
+        $returnTo = $request->validate([
+            'return_to' => ['nullable', Rule::in(['/portal', '/portal/fokus-law'])],
+        ])['return_to'] ?? '/portal';
         $this->sendToken($request->user(), 'email_verification', '/verificar-email', [
             'company_id' => $request->session()->get('active_company_id'),
+            'return_to' => $returnTo,
         ]);
         return response()->json(['message' => 'Enviamos um novo link de confirmação.']);
     }

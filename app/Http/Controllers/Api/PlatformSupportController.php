@@ -80,7 +80,7 @@ class PlatformSupportController extends Controller
         $request->session()->regenerate();
         $audit->record(Auth::guard('platform')->id(), 'backoffice.support_access_started', 'platform_support_session', $id, $target->company_id, $data['reason'], metadata: ['subscription_id' => $target->subscription_id, 'membership_id' => $target->membership_id, 'target_user_id' => $target->user_id], after: ['status' => 'active', 'subscription_id' => $target->subscription_id], request: $request);
 
-        return response()->json(['redirect_to' => '/portal']);
+        return response()->json(['redirect_to' => '/portal/fokus-law']);
     }
 
     public function exit(Request $request, SupportSessionSecurity $security)

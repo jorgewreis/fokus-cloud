@@ -142,7 +142,28 @@
       status.textContent = profile.value ? `${userName ? `${userName} — ` : ''}Perfil confirmado. Digite sua senha.` : 'Escolha seu perfil para continuar.';
       if (!profile.value) password.value = '';
     });
-    form.addEventListener('submit', (event) => { event.preventDefault(); status.textContent = 'O acesso contextual será ativado junto à publicação do ambiente Fokus Law.'; });
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      submit.disabled = true;
+      status.textContent = 'Validando acesso ao Fokus Law…';
+      try {
+        const result = await window.FokusApi.request('/auth/law-login', {
+          method: 'POST',
+          body: {
+            email: email.value.trim(),
+            password: password.value,
+            company_id: system.value,
+            profile: profile.value,
+          },
+        });
+        location.assign(result.redirect_to || '/portal/fokus-law');
+      } catch (error) {
+        status.textContent = error.message || 'Não foi possível entrar no Fokus Law.';
+        showToast(status.textContent);
+        submit.disabled = false;
+      }
+    });
 
     const support = document.createElement('section');
     support.hidden = true;
@@ -193,7 +214,7 @@
       supportStatus.textContent = 'Iniciando acesso de suporte…';
       try {
         const result = await window.FokusApi.request('/backoffice/support/access', { method: 'POST', body: { subscription_id: subscriptionSelect.value, membership_id: userSelect.value, reason } });
-        location.assign(result.redirect_to || '/portal');
+        location.assign(result.redirect_to || '/portal/fokus-law');
       } catch (error) {
         supportStatus.textContent = error.message || 'Não foi possível iniciar o acesso de suporte.';
         showToast(supportStatus.textContent);

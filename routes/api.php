@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/register-company', [AuthController::class, 'registerCompany'])->middleware('throttle:5,10,customer-registration');
 Route::post('/auth/law-context', [AuthController::class, 'lawContext'])->middleware('throttle:10,1,customer-law-context');
+Route::post('/auth/law-login', [AuthController::class, 'lawLogin'])->middleware('throttle:5,1,customer-login');
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1,customer-login');
 Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth');
 Route::post('/auth/verify-email', [AuthController::class, 'verifyEmail'])->middleware('throttle:10,1,customer-email-verification');

@@ -35,7 +35,7 @@
           .catch((error) => { message.textContent = error.message; });
       }
 
-      resend.onclick = () => FokusApi.request('/auth/resend-verification', { method: 'POST' })
+      resend.onclick = () => FokusApi.request('/auth/resend-verification', { method: 'POST', body: { return_to: new URLSearchParams(location.search).get('return_to') || '/portal' } })
         .then(() => { message.textContent = 'Novo link enviado.'; })
         .catch((error) => { message.textContent = error.message; });
     </script>
