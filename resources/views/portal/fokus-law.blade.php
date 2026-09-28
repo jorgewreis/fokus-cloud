@@ -8,7 +8,7 @@
   <title>Fokus Law | Fokus Cloud</title>
   <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260923-support-mode-v1" />
   <link rel="stylesheet" href="/marketing/products/fokus-law.css?v=20260924-law-access-choice-v1" />
-  <link rel="stylesheet" href="/portal/assets/fokus-law-shell.css?v=20260928-law-permissions-v1" />
+  <link rel="stylesheet" href="/portal/assets/fokus-law-shell.css?v=20260928-law-permissions-v2" />
 </head>
 <body class="fokus-law-shell-page">
   <a class="law-shell-skip" href="#law-workspace">Pular para o conteúdo principal</a>
@@ -109,8 +109,8 @@
   </template>
   <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script>
   <script src="/assets/js/api-client.js"></script>
-  <script src="/portal/assets/fokus-law-access.js?v=20260928-law-permissions-v1" defer></script>
-  <script src="/portal/assets/fokus-law-shell.js?v=20260928-law-permissions-v1" defer></script>
+  <script src="/portal/assets/fokus-law-access.js?v=20260928-law-permissions-v2" defer></script>
+  <script src="/portal/assets/fokus-law-shell.js?v=20260928-law-permissions-v2" defer></script>
   <script src="/assets/js/portal-profile.js?v=20260925-profile-v4" defer></script>
 </body>
 </html>
