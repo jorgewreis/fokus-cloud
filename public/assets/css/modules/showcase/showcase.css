@@ -764,7 +764,7 @@
 .immersive-contact a { color: #242723; font-size: 12px; letter-spacing: .08em; }
 .showcase-page > main > :not(.immersive-hero):not(.immersive-products):not(.immersive-details):not(.immersive-contact),
 .showcase-page .showcase-skip-link { display: none; }
-@media (max-width: 1024px) {
+@media (max-width: 1100px) {
     .immersive-details { padding: 80px 24px; }
     .immersive-contact { padding: 28px 24px; }
 }
