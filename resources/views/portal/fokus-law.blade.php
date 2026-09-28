@@ -111,7 +111,7 @@
   <script src="/assets/js/api-client.js"></script>
   <script src="/portal/assets/fokus-law-access.js?v=20260928-law-permissions-v7" defer></script>
     <script src="/portal/assets/fokus-law-contacts.js?v=20260928-contacts-v3" defer></script>
-    <script src="/portal/assets/fokus-law-shell.js?v=20260928-contacts-v3" defer></script>
+    <script src="/portal/assets/fokus-law-shell.js?v=20260928-contacts-v4" defer></script>
   <script src="/assets/js/portal-profile.js?v=20260925-profile-v4" defer></script>
 </body>
 </html>

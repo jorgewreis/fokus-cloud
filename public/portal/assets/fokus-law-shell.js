@@ -198,8 +198,13 @@
     const descriptor = getModuleDescriptor(module);
     sectionTitle.textContent = descriptor.label;
     headingIcon = descriptor.icon;
-    appendNavButton(pageItems, `Visão geral de ${descriptor.label}`, descriptor.icon, true, () => renderContent('module'), true);
-    pageItems.append(element('p', 'law-nav-description', 'As páginas funcionais deste módulo serão adicionadas aqui.'));
+    const isContactsModule = String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos');
+    if (isContactsModule) {
+      appendNavButton(pageItems, 'Cadastro e consulta', descriptor.icon, true, () => renderContent('module'));
+    } else {
+      appendNavButton(pageItems, `Visão geral de ${descriptor.label}`, descriptor.icon, true, () => renderContent('module'), true);
+      pageItems.append(element('p', 'law-nav-description', 'As páginas funcionais deste módulo serão adicionadas aqui.'));
+    }
     renderContent('module');
     document.querySelector('#section-icon').src = ICON_ROOT + ICONS[headingIcon];
   }
