@@ -257,8 +257,10 @@ class CompanyUserController extends Controller
 
     public function auditHistory(Request $request, LawAuthorizationService $authorization)
     {
+        $transferHistory = $request->query('scope') === 'admin-transfer';
+        if ($transferHistory) $this->adminOnly($request);
         $unitId = $authorization->activeUnitId($request);
-        if (! $authorization->isCompanyAdmin($request)) $authorization->authorize($request, 'law.users.view', $unitId);
+        if (! $transferHistory && ! $authorization->isCompanyAdmin($request)) $authorization->authorize($request, 'law.users.view', $unitId);
         $entityIds = null;
         if (! $authorization->isCompanyAdmin($request)) {
             $entityIds = DB::table('law_unit_memberships')->where('company_id', $request->attributes->get('active_company_id'))->where('law_unit_id', $unitId)->pluck('id')
@@ -267,16 +269,27 @@ class CompanyUserController extends Controller
         }
         return response()->json(DB::table('audit_events')->where('company_id', $request->attributes->get('active_company_id'))
             ->whereIn('entity_type', ['company_membership', 'law_unit_membership', 'law_access_role'])
+            ->when($transferHistory, fn ($query) => $query->whereIn('operation', ['admin_transfer_requested', 'admin_transfer_accepted', 'admin_transfer_declined']))
             ->when($entityIds !== null, fn ($query) => $query->whereIn('entity_id', $entityIds))
-            ->orderByDesc('created_at')->select('id', 'operation', 'before_masked', 'after_masked', 'created_at')->limit(100)->get());
+            ->orderByDesc('created_at')->select('id', 'entity_id', 'operation', 'before_masked', 'after_masked', 'created_at')->limit(100)->get());
     }
 
     private function assertNotLastUnitAdmin(object $membership, string $unitId, string $companyId): void
     {
+        if ($membership->status !== 'ativo' || $membership->deleted_at !== null) return;
+        $companyMembershipActive = DB::table('company_memberships')->where('id', $membership->company_membership_id)
+            ->where('company_id', $companyId)->where('status', 'ativo')->whereNull('deleted_at')->exists();
+        if (! $companyMembershipActive) return;
+
         $roleCode = DB::table('law_access_roles')->where('id', $membership->law_access_role_id)->value('code');
         if ($roleCode !== 'unit_admin') return;
-        $remaining = DB::table('law_unit_memberships as lum')->join('law_access_roles as role', 'role.id', '=', 'lum.law_access_role_id')
+        $remaining = DB::table('law_unit_memberships as lum')
+            ->join('company_memberships as member', function ($join): void {
+                $join->on('member.id', '=', 'lum.company_membership_id')->on('member.company_id', '=', 'lum.company_id');
+            })
+            ->join('law_access_roles as role', 'role.id', '=', 'lum.law_access_role_id')
             ->where('lum.company_id', $companyId)->where('lum.law_unit_id', $unitId)->where('lum.status', 'ativo')
+            ->where('member.status', 'ativo')->whereNull('member.deleted_at')
             ->whereNull('lum.deleted_at')->where('role.code', 'unit_admin')->where('lum.id', '!=', $membership->id)->exists();
         abort_unless($remaining, 422, 'O setor precisa manter ao menos um administrador ativo.');
     }

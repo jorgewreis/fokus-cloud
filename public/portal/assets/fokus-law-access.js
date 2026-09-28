@@ -60,7 +60,7 @@
         });
       });
       form.append(assignmentSet);
-      const submit = node('button', 'fs-btn fs-btn-primary', 'Enviar convite'); submit.type = 'submit'; form.append(submit); invite.append(form); layout.append(invite);
+      const submit = node('button', 'fs-btn fs-btn-primary', 'Enviar convite'); submit.type = 'submit'; submit.style.alignSelf = 'center'; form.append(submit); invite.append(form); layout.append(invite);
       form.addEventListener('submit', async (event) => {
         event.preventDefault(); if (!form.reportValidity()) return;
         const cpfField = form.elements.namedItem('cpf'); const cpf = cpfField.value.replace(/\D/g, '');
@@ -181,14 +181,31 @@
     const historyCard = node('section', 'law-profile-card law-transfer-history'); historyCard.append(node('h3', '', 'Histórico de administração'));
     const history = node('div', 'law-users-list'); history.setAttribute('aria-busy', 'true'); history.append(node('p', 'law-profile-loading', 'Carregando histórico…')); historyCard.append(history); grid.append(historyCard); region.append(grid);
     try {
-      const [users, events] = await Promise.all([request('/portal/users'), request('/portal/audit-history')]);
+      const [users, events] = await Promise.all([request('/portal/users'), request('/portal/audit-history?scope=admin-transfer')]);
       person.replaceChildren(new Option('Selecione uma pessoa', ''));
       users.filter((user) => user.role !== 'admin' && user.status === 'ativo' && user.email_verified_at).forEach((user) => person.append(new Option(`${user.name} — ${user.email}`, user.id)));
       if (person.options.length === 1) person.options[0].textContent = 'Nenhum membro elegível para receber a administração';
       history.replaceChildren(); history.setAttribute('aria-busy', 'false');
       if (!events.length) history.append(node('p', 'law-profile-loading', 'Nenhuma transferência registrada.'));
-      const operationNames = { admin_transfer_requested: 'Transferência iniciada', admin_transfer_accepted: 'Transferência aceita', admin_transfer_declined: 'Transferência recusada' };
-      events.forEach((entry) => { const row = node('article', 'law-transfer-event'); row.append(node('strong', '', operationNames[entry.operation] || entry.operation), node('span', '', new Date(entry.created_at).toLocaleString('pt-BR')), node('p', '', entry.after_masked || entry.before_masked || 'Alteração registrada')); history.append(row); });
+      const operationNames = { admin_transfer_requested: 'Transferência iniciada', admin_transfer_accepted: 'Transferência concluída', admin_transfer_declined: 'Transferência recusada' };
+      const membersById = new Map(users.map((user) => [String(user.id), user]));
+      const readDetails = (raw) => { try { return typeof raw === 'string' ? JSON.parse(raw) : (raw || {}); } catch { return {}; } };
+      events.forEach((entry) => {
+        const member = membersById.get(String(entry.entity_id)); const name = member?.name || 'pessoa selecionada';
+        const details = readDetails(entry.after_masked); let description;
+        if (entry.operation === 'admin_transfer_requested') {
+          const access = details.keep_previous_access ? 'Seu acesso será mantido como operador nos setores ativos.' : 'Seu acesso será removido após a conclusão.';
+          description = `Pedido enviado para ${name}. Aguardando aceite. ${access}`;
+        } else if (entry.operation === 'admin_transfer_accepted') {
+          const retained = Boolean(details.previous_access_kept);
+          description = `A administração foi transferida para ${name}. ${retained ? 'O acesso anterior foi mantido como operador nos setores ativos.' : 'O acesso anterior foi removido.'}`;
+        } else {
+          description = `${name} recusou a transferência de administração.`;
+        }
+        const row = node('article', 'law-transfer-event');
+        const date = new Date(entry.created_at);
+        row.append(node('strong', '', operationNames[entry.operation] || 'Evento de administração'), node('span', '', Number.isNaN(date.getTime()) ? '' : date.toLocaleString('pt-BR')), node('p', '', description)); history.append(row);
+      });
     } catch (error) { history.replaceChildren(node('p', 'law-users-feedback', error.message || 'Não foi possível carregar o histórico.')); history.setAttribute('aria-busy', 'false'); }
     form.addEventListener('submit', async (event) => {
       event.preventDefault(); if (!form.reportValidity() || !person.value) return;
