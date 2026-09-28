@@ -399,7 +399,6 @@
 .law-users-layout .law-profile-card-heading { align-items: flex-start; margin-bottom: 15px; }
 .law-users-layout .law-profile-card-heading h3, .law-users-list-heading h3 { margin: 3px 0 0; color: var(--law-shell-ink); font-size: 15px; font-weight: 600; }
 .law-users-form { gap: 12px; }
-.law-users-form > .fs-btn { align-self: center; }
 .law-users-field { min-width: min(100%, 220px); flex: 1 1 220px; }
 .law-users-field .fs-form-control, .law-users-field .fs-form-select { box-sizing: border-box; width: 100%; min-width: 0; }
 .law-users-form-footer { justify-content: flex-end; }
@@ -439,8 +438,6 @@
 }
 @media (max-width: 720px) {
   .law-users-layout .law-profile-card, .law-users-list-card { padding: 15px; }
-  .law-users-form > .law-access-assignments { flex: 1 0 100%; }
-  .law-users-form > .fs-btn { width: 100%; }
   .law-users-list-heading { align-items: flex-start; flex-direction: column; padding: 15px; }
   .law-users-row { padding: 15px; }
   .law-users-row-details { gap: 12px; }

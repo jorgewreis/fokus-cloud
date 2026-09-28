@@ -59,8 +59,10 @@
           } catch (error) { select.append(new Option(error.message || 'Falha ao carregar perfis', '')); }
         });
       });
-      form.append(assignmentSet);
-      const submit = node('button', 'fs-btn fs-btn-primary', 'Enviar convite'); submit.type = 'submit'; form.append(submit); invite.append(form); layout.append(invite);
+      const assignmentActions = node('div', 'law-access-invite-actions');
+      assignmentActions.append(assignmentSet);
+      const submit = node('button', 'fs-btn fs-btn-primary', 'Enviar convite'); submit.type = 'submit'; assignmentActions.append(submit);
+      form.append(assignmentActions); invite.append(form); layout.append(invite);
       form.addEventListener('submit', async (event) => {
         event.preventDefault(); if (!form.reportValidity()) return;
         const cpfField = form.elements.namedItem('cpf'); const cpf = cpfField.value.replace(/\D/g, '');
