@@ -245,7 +245,7 @@
       const body = element('div', 'law-dashboard-widget-body');
       body.append(element('p', 'law-contact-loading', 'Carregando seus indicadores…'));
       card.append(header, body);
-      contentRegion.append(card);
+      grid.append(card);
       FokusApi.request('/law/contacts/dashboard').then(({ summary }) => {
         if (!card.isConnected) return;
         body.replaceChildren();
@@ -256,6 +256,7 @@
         const ring = element('div', 'law-dashboard-contact-ring');
         const classified = Math.max(1, pf + pj);
         ring.style.setProperty('--contact-pf-share', `${(pf / classified) * 100}%`);
+        ring.dataset.empty = String(total === 0);
         ring.setAttribute('role', 'img');
         ring.setAttribute('aria-label', `Distribuição de contatos: ${pf} pessoas físicas e ${pj} pessoas jurídicas`);
         const ringCenter = element('span', 'law-dashboard-ring-center'); ringCenter.append(element('strong', '', total.toLocaleString('pt-BR')), element('small', '', 'contatos'));
@@ -268,6 +269,7 @@
           const track = element('span', 'law-dashboard-breakdown-track');
           const fill = element('span', 'law-dashboard-breakdown-fill');
           fill.style.width = `${Math.min(100, (Number(value) / classified) * 100)}%`;
+          fill.dataset.zero = String(Number(value) === 0);
           track.append(fill); row.append(rowHead, track); breakdown.append(row);
         });
         distribution.append(ring, breakdown);

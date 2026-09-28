@@ -144,6 +144,7 @@
         const chartArea = $('div', 'law-contact-overview-chart');
         const ring = $('div', 'law-contact-composition-ring');
         ring.style.setProperty('--contact-pf-share', `${(pf / classified) * 100}%`);
+        ring.dataset.empty = String(total === 0);
         ring.setAttribute('role', 'img'); ring.setAttribute('aria-label', `Composição dos contatos: ${pf} pessoas físicas e ${pj} pessoas jurídicas`);
         const center = $('div', 'law-contact-ring-center'); center.append($('strong', '', total.toLocaleString('pt-BR')), $('span', '', 'CONTATOS')); ring.append(center);
         const legend = $('div', 'law-contact-chart-legend');
