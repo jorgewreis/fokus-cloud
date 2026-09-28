@@ -155,6 +155,9 @@ processo relacionado.
 | Visualizar processos nao sigilosos | Sim | Sim | Sim | Sim |
 | Criar e editar contatos | Sim | Sim | Sim | Nao |
 | Inativar ou mesclar contatos | Sim | Sim | Nao | Nao |
+| Consultar documentos, canais pessoais, residência e notas | Por permissão sensível | Por permissão sensível | Nao por padrão | Nao |
+| Consultar contatos compartilhados recebidos | Sim | Sim | Sim | Sim |
+| Configurar compartilhamento com empresas | Administrador da empresa; delegável | Conforme permissão concedida | Conforme permissão concedida | Nao |
 | Vincular contatos a processos ou expedicoes | Sim | Sim | Sim | Nao |
 | Criar e editar expedicoes | Sim | Sim | Sim | Nao |
 | Cancelar expedicoes | Sim | Sim | Nao | Nao |
@@ -172,6 +175,16 @@ processo relacionado.
 
 Permissao de perfil nao ignora assinatura, modulo contratado, unidade ativa nem
 sigilo processual.
+
+As permissões do recurso `contacts` (consulta, criação, edição, inativação,
+dados sensíveis, mesclagem, consulta compartilhada e gestão de compartilhamento)
+só aparecem no seletor de perfis quando a assinatura ativa contém o módulo
+`contatos`. As APIs repetem essa validação em cada chamada. CPF/CNPJ e demais
+documentos são cifrados; consultas sem `law.contacts.sensitive.view` recebem
+documentos mascarados, não recebem notas nem residência e não podem alterar
+esses valores indiretamente por meio de campos mascarados. O mesmo controle se
+aplica a canais pessoais. Auditoria registra a política e suas revogações na
+empresa proprietária.
 
 ## Niveis de sigilo processual
 

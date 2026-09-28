@@ -1,220 +1,135 @@
-# Modelo de dados da gestao de contatos Law
+# Modelo de dados da Gestão de Contatos Law
 
-## Objetivo
+## Propriedade e relações
 
-Definir o modelo conceitual alvo da Gestao de Contatos no Fokus Law.
+A empresa (`company_id`) é dona dos cadastros. `law_unit_id` legado é mantido
+por compatibilidade, mas novos contatos usam `NULL`: setores internos
+autorizados veem a base da empresa. `legal_nature` diferencia `pf` e `pj`;
+classificações e tags são relações separadas. Outros módulos usarão o ID
+estável de contato e guardarão seus papéis contextuais em tabelas próprias.
 
-## Principios
+```mermaid
+erDiagram
+    companies ||--o{ law_contacts : owns
+    law_contacts ||--o{ law_contact_addresses : has
+    law_contacts ||--o{ law_contact_channels : has
+    law_contacts ||--o{ law_contact_documents : identifies
+    law_contacts ||--o{ law_contact_departments : organizes
+    law_contact_departments ||--o{ law_contact_channels : has
+    law_contacts ||--o{ law_contact_classifications : classified
+    law_contacts ||--o{ law_contact_tag_assignments : tagged
+    law_contact_tags ||--o{ law_contact_tag_assignments : reused
+    law_contacts ||--o{ law_contact_activity : accessed
+    companies ||--o{ law_contact_sharing_policies : source
+    companies ||--o{ law_contact_sharing_policies : recipient
+```
 
-- Gestao de Contatos e o nome comercial do modulo.
-- `Contatos` e o rotulo interno no menu.
-- O nucleo de contatos deve substituir a ideia restrita de partes isoladas.
-- Parte processual, advogado, destinatario e instituicao sao papeis ou
-  classificacoes contextuais.
-- O contato deve ser reutilizavel por processos, expedicoes e tarefas.
-- Dados pessoais devem ser minimizados, protegidos e auditados.
-- Contatos vinculados a processo sigiloso herdam restricoes no contexto do
-  processo.
-
-## Prefixos
-
-| Prefixo | Entidade |
-| --- | --- |
-| LCO | Contato Law |
-| LDR | Endereco de contato Law |
-| LCN | Canal de contato Law |
-| LCV | Vinculo processo-contato Law |
-| LEV | Vinculo expedicao-contato Law |
-| LTV | Vinculo tarefa-contato Law |
-
-## Entidades alvo
+## Tabelas
 
 ### `law_contacts`
 
-Cadastro principal de pessoas, instituicoes, orgaos e unidades externas.
+Cadastro principal existente, ampliado com:
 
-Campos conceituais:
-
-- `id`;
-- `company_id`;
-- `law_unit_id`, quando o contato for restrito a uma unidade;
-- `display_name`;
-- `legal_name`;
-- `contact_type`;
-- `document_type`;
-- `document_number`;
-- `oab_number`;
-- `oab_state`;
-- `status`;
-- `tags`;
-- `notes`;
-- metadados de criacao, alteracao, inativacao e mesclagem.
-
-Valores iniciais de `contact_type`:
-
-- `person`;
-- `organization`;
-- `lawyer`;
-- `law_firm`;
-- `public_body`;
-- `court_unit`;
-- `police_unit`;
-- `prosecutor_office`;
-- `public_defender`;
-- `expert`;
-- `unknown`.
+| Campo | Regra |
+| --- | --- |
+| `legal_nature` | `pf` ou `pj`, padrão `pf`; indexado com empresa e status. |
+| `sharing_excluded` | Booleano que retira individualmente o contato das regras externas. |
+| `display_name`, `legal_name` | Nome principal e razão social/nome complementar; valores normalizados no servidor. |
+| `status`, `deleted_at`, `merged_into_id` | Controlam ciclo de vida e preservação da mesclagem. |
+| `law_unit_id` | Nulo para os novos registros de propriedade empresarial compartilhada. |
 
 ### `law_contact_addresses`
 
-Enderecos vinculados ao contato.
-
-Campos conceituais:
-
-- `id`;
-- `company_id`;
-- `law_contact_id`;
-- `address_type`;
-- `postal_code`;
-- `street`;
-- `number`;
-- `complement`;
-- `district`;
-- `city`;
-- `state`;
-- `country`;
-- `is_primary`;
-- `status`.
+Até dois endereços completos por contato. Inclui tipo, CEP, logradouro,
+número, complemento, bairro, município, UF, país e indicação de principal.
+Tipos: residencial, comercial, correspondência e outro. Composto
+`(company_id, law_contact_id)` referencia o cadastro de mesma empresa.
 
 ### `law_contact_channels`
 
-Telefones, e-mails e outros canais de comunicacao.
+Telefones e e-mails do contato e dos departamentos. `channel_type` aceita
+`phone`/`email`; `law_contact_department_id` é nulo no escopo do contato.
+`is_personal` marca dado sensível e `is_primary`/`sort_order` apoiam exibição.
+No escopo do contato o limite é quatro telefones e dois e-mails; aplica-se o
+mesmo limite independentemente a cada departamento.
 
-Campos conceituais:
+### `law_contact_documents`
 
-- `id`;
-- `company_id`;
-- `law_contact_id`;
-- `channel_type`;
-- `channel_value`;
-- `is_primary`;
-- `is_verified`;
-- `status`.
+Até quatro documentos por contato. `document_number_encrypted` guarda o valor
+com `Crypt`; `document_fingerprint` guarda HMAC do CPF/CNPJ normalizado com
+unicidade por empresa para detecção de duplicados sem índice sobre o texto aberto. Tipo, rótulo e UF
+emissora completam o registro. CPF/CNPJ são opcionais e validados quando
+fornecidos.
 
-Valores iniciais de `channel_type`:
+### `law_contact_departments`
 
-- `phone`;
-- `mobile`;
-- `email`;
-- `whatsapp`;
-- `website`;
-- `other`.
+Departamentos que pertencem a um contato PJ: nome, status e autoria da criação
+e alteração. Os canais próprios usam `law_contact_channels`. Cada departamento
+conta como uma unidade extra da capacidade `contatos_cadastrados`.
 
-### `law_case_contacts`
+### Classificação e tags
 
-Vinculo contextual entre contato e processo.
+- `law_contact_classifications` associa códigos do vocabulário controlado por
+  empresa/contato. A PK impede a repetição de uma classificação.
+- `law_contact_tags` contém nome e nome normalizado únicos por empresa.
+- `law_contact_tag_assignments` associa até seis tags a cada contato sem
+  duplicar associações.
 
-Substitui o conceito restrito de `law_case_parties` no modelo alvo, mantendo
-compatibilidade conceitual com papeis processuais.
+Vocabulário de classificações: `client`, `lawyer`, `law_firm`, `public_body`,
+`court_unit`, `police`, `prosecutor_office`, `public_defender`, `expert`,
+`witness`, `representative` e `other`.
 
-Campos conceituais:
+### `law_contact_activity`
 
-- `id`;
-- `company_id`;
-- `law_unit_id`;
-- `law_case_id`;
-- `law_contact_id`;
-- `case_role`;
-- `role_detail`;
-- `status`;
-- metadados de auditoria.
+Registra empresa, contato, usuário, ação e horário para os itens recentes do
+dashboard pessoal. Tipos incluem criação, edição, abertura normal e abertura
+de resultado de busca. O termo digitado na busca não é persistido.
 
-Valores iniciais de `case_role`:
+### `law_contact_sharing_policies`
 
-- `author`;
-- `defendant`;
-- `victim`;
-- `witness`;
-- `lawyer`;
-- `prosecutor`;
-- `defender`;
-- `representative`;
-- `interested`;
-- `origin_body`;
-- `other`.
+Regra entre `source_company_id` e `recipient_company_id`, única por par de
+empresas. `classification_codes` e `shared_fields` são JSON validados contra
+vocabulários fechados; `is_active` permite revogação sem apagar auditoria. A
+regra só é elegível enquanto ambas as assinaturas estiverem ativas e incluírem
+o componente Contatos.
 
-### `law_expedition_contacts`
+Campos compartilháveis: `professional_channels`, `business_addresses` e
+`documents`. A API remove canais pessoais, endereços residenciais, notas,
+tags e metadados internos; documentos também dependem de permissão sensível no
+destino. A referência compartilhada é somente leitura, não é copiada à empresa
+destinatária e não consome sua capacidade.
 
-Vinculo contextual entre contato e expedicao.
+## Capacidade e índices
 
-Campos conceituais:
+Consumo = contatos sem exclusão lógica/mesclagem + departamentos desses
+contatos. Status inativo não reduz o consumo. A contagem é feita no servidor
+durante a transação de criação/edição e validada contra o snapshot comercial da
+assinatura. Índices mantêm busca por empresa/natureza/status, escopo de canais,
+documento fingerprint, tags normalizadas, classificações e atividade recente.
 
-- `id`;
-- `company_id`;
-- `law_unit_id`;
-- `law_expedition_id`;
-- `law_contact_id`;
-- `expedition_role`;
-- `snapshot_name`;
-- `snapshot_address`;
-- `snapshot_channel`;
-- `status`;
-- metadados de auditoria.
+## Segurança e integridade
 
-Valores iniciais de `expedition_role`:
+- Tabelas filhas carregam `company_id` e FKs compostas ao contato para impedir
+  referência cruzada entre empresas.
+- APIs sempre escopam por empresa ativa e aplicam assinatura e permissões.
+- Dados sensíveis são omitidos ou mascarados sem `law.contacts.sensitive.view`;
+  alterações comuns preservam os valores sensíveis não exibidos.
+- Mesclagem transfere registros filhos dentro de transação, combina
+  classificações/tags sem duplicatas, registra motivo e marca origem como
+  mesclada.
+- Todas as ações administrativas e alterações relevantes geram auditoria.
 
-- `recipient`;
-- `destination_body`;
-- `destination_court`;
-- `external_responsible`;
-- `receiving_person`;
-- `copy_recipient`;
-- `other`.
+## Compatibilidade e rollout
 
-### `law_task_contacts`
+A migração converte tipos legados de organização para PJ, cria classificações
+iniciais a partir de tipos antigos e limpa o escopo por unidade para que a
+propriedade passe a ser da empresa. Contatos existentes passam a consumir a
+capacidade conforme a nova contagem. O desmonte da migração remove as tabelas e
+colunas novas sem alterar dados das tabelas originais.
 
-Vinculo opcional entre contato e tarefa.
+## Módulos consumidores futuros
 
-Campos conceituais:
-
-- `id`;
-- `company_id`;
-- `law_unit_id`;
-- `law_task_id`;
-- `law_contact_id`;
-- `task_contact_role`;
-- `status`;
-- metadados de auditoria.
-
-## Regras
-
-- Papeis ficam nos vinculos, nao no contato principal.
-- O mesmo contato pode ter papeis diferentes em processos, expedicoes e tarefas.
-- Expedicoes devem preservar snapshot minimo do destinatario quando o historico
-  documental exigir.
-- Inativar contato nao remove vinculos historicos.
-- Mesclar contatos deve registrar contato origem, contato destino, motivo e
-  usuario responsavel.
-- Documentos e canais devem ser mascarados em listas quando a permissao nao
-  autorizar exibicao completa.
-- Consultas em contexto de processo sigiloso devem aplicar o nivel de sigilo do
-  processo antes de retornar dados de contato.
-
-## Relacao com tabelas existentes
-
-No modelo alvo, `law_contacts` substitui o uso restrito de `law_parties` como
-cadastro principal. `law_case_contacts` substitui `law_case_parties` como vinculo
-processual mais amplo.
-
-Se houver necessidade de compatibilidade durante migracao futura,
-`law_parties` pode ser tratado como legado ou visao derivada, mas novas
-funcionalidades devem preferir o nucleo de contatos.
-
-## Criterios de aceite
-
-- O modelo possui cadastro unico de contatos reutilizaveis.
-- Partes processuais sao papeis de contato em processo.
-- Destinatarios de expedicao sao papeis de contato em expedicao.
-- Contatos podem ter multiplos enderecos e canais.
-- Sigilo processual restringe contatos quando consultados pelo contexto do
-  processo.
-- O modelo permite inativacao e mesclagem sem perder historico.
+Processos, Expedições e Tarefas devem referenciar o contato por ID e aplicar as
+permissões e o sigilo pertinentes ao contexto. O papel processual e o de
+expedição ficam em relações próprias; snapshots preservam o destino utilizado
+na emissão. Essas relações não são criadas por esta entrega.

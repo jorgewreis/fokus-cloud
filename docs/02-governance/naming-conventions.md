@@ -4,7 +4,7 @@
 
 Este documento define o padrao oficial de nomenclatura do Fokus Cloud. A regra vale para novos modulos, documentos, paginas, assets, rotas e componentes internos do projeto.
 
-O objetivo e manter o crescimento organizado desde o inicio, preservando a separacao entre plataforma, os tres projetos do portfolio e mockups.
+O objetivo e manter o crescimento organizado desde o inicio, preservando a separacao entre plataforma e os produtos do portfolio.
 
 ## Principio de decisao
 
@@ -35,7 +35,6 @@ config/               Configuracoes Laravel
 database/             Migrations, factories e seeders
 deploy/               Arquivos auxiliares de deploy
 docs/                 Documentacao do projeto
-mockups/              Prototipos e estudos visuais preservados
 public/               Entrada publica da aplicacao
 resources/            Entradas Vite e recursos Laravel
 routes/               Rotas web, API e console
@@ -156,17 +155,11 @@ As paginas comerciais de Fokus Law e Fokus Lead pertencem aos seus repositorios
 proprios. O Fokus Cloud exibe o portfolio e o status de disponibilidade, sem
 duplicar paginas de produto ou checkout.
 
-## Mockups
+## Prototipos visuais
 
-Mockups devem ficar fora de `public`, salvo quando uma tela for promovida para uso real.
-
-```text
-mockups/
-  assets/
-  pages/
-```
-
-Ao promover um mockup para a aplicacao, copie ou mova apenas o que sera usado em producao para a area correta de `public`.
+Prototipos temporarios nao sao mantidos neste repositorio. A interface de
+produto deve viver nas paginas e componentes definitivos, com estilos
+compartilhados e estados funcionais.
 
 ## Criterios para novos modulos
 
@@ -184,4 +177,5 @@ Todo novo modulo deve declarar:
 
 ## Regra de descarte
 
-Arquivos temporarios, copias antigas e experimentos que nao forem mockups devem ser removidos. Mockups relevantes devem ser preservados em `mockups/`.
+Arquivos temporarios, copias antigas, experimentos e prototipos visuais devem
+ser removidos depois que suas decisoes forem incorporadas ao produto.

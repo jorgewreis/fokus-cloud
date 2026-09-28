@@ -1,123 +1,145 @@
-# Gestao de contatos do Fokus Law
+# Gestão de Contatos do Fokus Law
 
-## Objetivo
+## Propósito
 
-Gestao de Contatos e o nome comercial do modulo do Fokus Law para cadastrar,
-organizar e reutilizar pessoas, advogados, instituicoes, orgaos, unidades,
-enderecos e meios de contato relevantes para a operacao juridica.
+O módulo independente **Gestão de Contatos**, exibido como **Contatos**, mantém
+uma base reutilizável de pessoas físicas, pessoas jurídicas, órgãos e
+instituições. O módulo atende escritórios jurídicos e organizações públicas,
+incluindo unidades judiciais, Ministério Público, Defensoria Pública e polícia.
+Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
+`contatos`.
 
-No menu interno do sistema, o modulo deve aparecer como `Contatos`.
+## Escopo entregue
 
-O objetivo e evitar duplicidade de cadastros e permitir que o mesmo contato seja
-vinculado a processos, expedicoes, tarefas e outros fluxos com papeis
-diferentes.
+- Listagem pesquisável, filtros por natureza PF/PJ, situação, classificação e
+  tag, paginação e detalhes do cadastro.
+- Criação, edição, inativação e mesclagem auditada de contatos duplicados.
+- Dashboard com totais da empresa, utilização da capacidade contratada e até
+  cinco atividades recentes do usuário atual.
+- Cadastro independente de departamentos de uma PJ, cada qual com canais
+  próprios e contabilizado como uma unidade adicional da capacidade.
+- Tags reutilizáveis pela empresa, com sugestão e filtro.
+- Regras de compartilhamento entre empresas por destinatário e classificações.
+- Endpoints próprios preparados para vínculos futuros com Processos,
+  Expedições e Tarefas; esses módulos não são pré-requisito para o cadastro.
 
-## Escopo funcional
+## Páginas e estados
 
-O modulo deve permitir registrar:
+| Página/estado | Conteúdo e ações |
+| --- | --- |
+| Visão geral | Totais PF, PJ, departamentos e cadastros contabilizados; até cinco contatos recentes da pessoa usuária. |
+| Contatos | Busca, filtros, resultados, paginação, situação, origem compartilhada e ações permitidas. |
+| Criar/editar | Formulário guiado por PF/PJ, classificações, canais, endereços, departamentos, tags e campos sensíveis autorizados. |
+| Detalhes | Identificação, classificações, tags, canais, endereços, documentos e departamentos conforme as permissões. |
+| Mesclagem | Escolha do cadastro preservado, confirmação do motivo, transferência de relações e auditoria. |
+| Compartilhamento | Seleção de empresas elegíveis, classificações e campos expostos; gravação e revogação auditadas. |
+| Estados da página | Carregamento, vazio, sem resultados, erro de API, capacidade indisponível e aviso de limite. |
 
-- pessoas fisicas;
-- pessoas juridicas;
-- advogados;
-- escritorios de advocacia;
-- orgaos publicos;
-- instituicoes privadas;
-- unidades judiciais;
-- delegacias;
-- Ministerio Publico;
-- Defensoria Publica;
-- peritos;
-- testemunhas;
-- representantes;
-- enderecos;
-- telefones;
-- e-mails;
-- observacoes operacionais;
-- tags informativas.
+## Composição visual
 
-## Diferenca para agenda
+A página reaproveita o shell autenticado do Fokus Law, os controles `fs-*`, os
+tokens `--fs-*` e o modal oficial `fs-modal` da versão instalada do Fokus
+Styles. Os seletores `law-contact-*` em
+`public/portal/assets/fokus-law-shell.css` limitam-se à composição do domínio:
+grade da listagem, grupos repetíveis de endereço/canal/documento/departamento
+e suas linhas aninhadas. Eles não recriam botões, campos, overlay, backdrop,
+foco ou comportamento de modal do Fokus Styles.
 
-O modulo nao deve ser chamado de Agenda para evitar confusao com compromissos,
-audiencias, prazos e pendencias.
+## Natureza, classificações e nomes
 
-Agenda e Compromissos deve continuar representando datas, eventos e
-compromissos. Gestao de Contatos representa cadastro reutilizavel de pessoas,
-instituicoes e canais de comunicacao.
+PF/PJ define a natureza cadastral; não restringe as classificações adicionais.
+Um contato pode acumular papéis como advogado(a), escritório, cliente,
+órgão público, unidade judiciária, policial, perito(a), testemunha ou
+representante. Papéis processuais específicos pertencem aos vínculos com
+processos, não ao contato global.
 
-## Relacao com processos
+O nome é obrigatório e normalizado para formato de nome próprio no servidor.
+Conectivos como “de”, “dos” e “e” permanecem minúsculos no meio do nome; a
+primeira palavra recebe inicial maiúscula. Sequências em caixa alta informadas
+pelo usuário são preservadas para siglas como OAB e TJBA. A normalização não
+substitui a conferência de nomes oficiais.
 
-Em Gestao de Processos, um contato pode assumir papel processual, como:
+## Campos e limites
 
-- autor;
-- reu;
-- vitima;
-- testemunha;
-- advogado;
-- defensor;
-- promotor;
-- representante legal;
-- interessado;
-- orgao de origem;
-- outro papel definido pela unidade.
+| Campo | Limite/regra |
+| --- | --- |
+| Nome | Obrigatório; PF: nome da pessoa; PJ: nome fantasia ou razão social. |
+| Razão social/complemento | Opcional. |
+| Telefones | Até quatro por contato; cada departamento PJ também aceita até quatro. |
+| E-mails | Até dois por contato; cada departamento PJ também aceita até dois. |
+| Endereços completos | Até dois por contato. |
+| Documentos | Até quatro por contato; CPF/CNPJ opcionais, dígitos validados e CPF/CNPJ únicos por empresa. |
+| Classificações | Até doze códigos do vocabulário disponível. |
+| Tags | Até seis por contato; reutilizadas dentro da empresa. |
+| Departamentos PJ | Sem teto funcional fixo; cada departamento consome uma unidade contratada adicional. |
 
-O papel nao pertence ao contato isoladamente. Ele pertence ao vinculo entre o
-contato e o processo, permitindo que o mesmo contato tenha papeis diferentes em
-processos distintos.
+Telefone/e-mail pessoal, endereço residencial e notas são dados sensíveis.
+CPF/CNPJ e demais documentos são armazenados criptografados e seu fingerprint
+é usado para deduplicação sem pesquisa em texto aberto. A API mascara os
+documentos e oculta campos sensíveis para perfis sem `law.contacts.sensitive.view`.
 
-## Relacao com expedicoes
+## Duplicidade e mesclagem
 
-Em Gestao de Expedicoes, um contato pode ser usado como:
+Nome, telefone e e-mail não bloqueiam cadastro. CPF/CNPJ válidos são
+normalizados e verificados dentro da empresa. Ao detectar duplicidade, a API
+retorna conflito para que a pessoa usuária consulte o cadastro existente; a
+mesclagem é uma ação separada, exige permissão, natureza igual, motivo e
+auditoria. O cadastro de destino é mantido e os vínculos e dados filhos são
+transferidos sem duplicar classificações ou tags já existentes.
 
-- destinatario;
-- orgao de destino;
-- comarca de destino;
-- unidade expedidora ou recebedora;
-- representante externo;
-- responsavel por recebimento;
-- canal preferencial de envio.
+## Tags e capacidade
 
-A expedicao deve guardar snapshot minimo do destinatario usado no momento da
-emissao quando isso for necessario para preservar historico.
+Tags pertencem à empresa e são sugeridas em cadastro e filtro. Espaços externos
+são removidos e caixa é normalizada para impedir tags equivalentes com nomes
+diferentes. Administradores podem acompanhar a utilização contratada no
+dashboard e no módulo. O total consumido é contatos ativos ou inativos ainda
+cadastrados mais departamentos vinculados. Inativar não libera capacidade;
+mesclar ou remover definitivamente registros libera capacidade conforme a
+contagem vigente. A criação é recusada ao exceder o limite contratado.
 
-## Relacao com tarefas
+## Compartilhamento entre empresas
 
-Em Gestao de Tarefas, um contato pode ser vinculado como envolvido externo,
-responsavel externo, interessado ou referencia operacional. O contato nao
-substitui o responsavel interno da tarefa, que continua sendo usuario ou
-vinculo da unidade.
+O administrador da origem define uma política para uma empresa destinatária
+e seleciona uma ou mais classificações. A política vale para contatos atuais
+e futuros que tenham a classificação selecionada, salvo quando o próprio
+contato estiver marcado para exclusão do compartilhamento. Só empresas ativas
+com assinatura ativa e componente Contatos publicado podem ser destinatárias.
 
-## Regras de negocio
+O destino consulta uma referência somente leitura; não recebe cópia, não
+consome sua capacidade e não ganha acesso ao histórico, tags, notas ou vínculos
+da origem. Por padrão, a origem pode expor canais profissionais/institucionais;
+endereços comerciais e documentos são campos opcionais da regra. Documentos
+continuam condicionados à permissão sensível do destino. Canais pessoais e
+endereços residenciais nunca são compartilhados. Revogar a regra ou perder a
+elegibilidade da assinatura remove o acesso na próxima consulta. A auditoria
+fica na empresa de origem.
 
-- Gestao de Contatos e modulo independente.
-- O menu interno deve usar apenas o rotulo `Contatos`.
-- O cadastro deve ser reutilizavel dentro da empresa/unidade autorizada.
-- Um contato pode ser pessoa, instituicao, orgao publico ou unidade externa.
-- Um contato pode ter multiplos enderecos e meios de contato.
-- Papeis processuais e papeis em expedicoes ficam nos vinculos, nao no cadastro
-  principal.
-- Tags de contato sao informativas e nao substituem tipo, papel ou permissao.
-- Dados pessoais devem ser minimizados, protegidos e mascarados quando o
-  contexto exigir.
-- Contatos vinculados a processo sigiloso devem respeitar o nivel de sigilo do
-  processo.
-- A inativacao ou mesclagem de contato deve preservar historico dos vinculos.
+## Permissões
 
-## Limites da v1
+As permissões `law.contacts.view`, `create`, `update`, `delete`,
+`sensitive.view`, `merge`, `shared.view` e `share.manage` são independentes.
+Elas aparecem no catálogo de perfis do Fokus Law e só têm efeito com o módulo
+habilitado. Perfis padrão: administrador e chefe/escrivão recebem consulta
+sensível e mesclagem; operador recebe criação/alteração de dados comuns; leitor
+recebe somente consulta. `shared.view` é concedida por padrão aos perfis que
+podem consultar contatos. `share.manage` fica reservada ao administrador da
+empresa, que também pode delegá-la a um perfil personalizado.
 
-Na v1, o modulo deve priorizar dados necessarios para uso processual e
-operacional. Nao faz parte do escopo inicial transformar contatos em CRM amplo,
-agenda de compromissos, disparador de comunicacao em massa ou base publica de
-terceiros.
+## Relações com outros módulos
 
-## Criterios de aceite
+Processos, Expedições e Tarefas poderão referenciar o ID estável do contato em
+endpoints próprios. Vínculos contextuais armazenam seu papel e respeitam o
+sigilo do processo. Snapshot de expedição preserva o destinatário utilizado
+na emissão. A integração operacional desses módulos é uma etapa futura.
 
-- O nome comercial e Gestao de Contatos.
-- O menu interno usa o rotulo Contatos.
-- O modulo nao e confundido com Agenda e Compromissos.
-- Pessoas, advogados, instituicoes, orgaos e unidades externas podem ser
-  cadastrados em uma base reutilizavel.
-- O mesmo contato pode ser vinculado a mais de um processo com papeis
-  diferentes.
-- O mesmo contato pode ser usado como destinatario ou orgao de destino em
-  expedicoes.
-- Contatos vinculados a processos sigilosos respeitam as regras de sigilo.
+## Critérios de aceite
+
+- Menu e dashboard exibem Contatos somente com módulo assinado e permissão de
+  consulta.
+- PF/PJ personaliza o formulário; departamentos são aceitos apenas em PJ.
+- Os limites de campos, capacidade e duplicidade são validados no servidor.
+- Perfis sem acesso sensível não leem nem sobrescrevem valores ocultos.
+- Compartilhamento não altera o cadastro de origem e é revogável/auditável.
+- Todos os endpoints verificam empresa, assinatura, permissão e propriedade.
+- Interfaces funcionam em telas desktop, tablet e celular e mostram seus
+  estados de carregamento, vazio e erro.

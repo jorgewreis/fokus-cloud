@@ -78,9 +78,14 @@ Route::middleware('auth')->group(function () {
         Route::get('/law/notifications', [LawNotificationController::class, 'index'])->middleware('law.permission:law.notifications.view');
         Route::patch('/law/notifications/{notification}/read', [LawNotificationController::class, 'read'])->middleware('law.permission:law.notifications.update');
         Route::get('/law/contacts', [LawContactController::class, 'index'])->middleware('law.permission:law.contacts.view');
+        Route::get('/law/contacts/dashboard', [LawContactController::class, 'dashboard'])->middleware('law.permission:law.contacts.view');
+        Route::get('/law/contacts/{contactId}', [LawContactController::class, 'show'])->middleware('law.permission:law.contacts.view');
         Route::post('/law/contacts', [LawContactController::class, 'store'])->middleware('law.permission:law.contacts.create');
         Route::patch('/law/contacts/{contactId}', [LawContactController::class, 'update'])->middleware('law.permission:law.contacts.update');
         Route::delete('/law/contacts/{contactId}', [LawContactController::class, 'destroy'])->middleware('law.permission:law.contacts.delete');
+        Route::post('/law/contacts/{contactId}/merge', [LawContactController::class, 'merge'])->middleware('law.permission:law.contacts.merge');
+        Route::get('/law/contact-sharing', [LawContactController::class, 'companiesForSharing'])->middleware('law.permission:law.contacts.share.manage');
+        Route::put('/law/contact-sharing', [LawContactController::class, 'saveSharing'])->middleware('law.permission:law.contacts.share.manage');
         Route::get('/subscriptions', [SubscriptionController::class, 'index']);
         Route::post('/subscriptions/checkout', [SubscriptionController::class, 'checkout']);
         Route::post('/subscriptions/{subscription}/change', [SubscriptionController::class, 'change']);

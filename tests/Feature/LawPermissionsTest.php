@@ -204,7 +204,11 @@ class LawPermissionsTest extends TestCase
         $migration->up();
         $migration->up();
 
-        $this->assertDatabaseCount('customer_permissions', 22);
+        $this->assertDatabaseCount('customer_permissions', 26);
+        $this->assertDatabaseHas('customer_permissions', ['code' => 'law.contacts.sensitive.view']);
+        $this->assertDatabaseHas('customer_permissions', ['code' => 'law.contacts.merge']);
+        $this->assertDatabaseHas('customer_permissions', ['code' => 'law.contacts.shared.view']);
+        $this->assertDatabaseHas('customer_permissions', ['code' => 'law.contacts.share.manage']);
         $this->assertDatabaseCount('law_access_roles', 4);
         $this->assertDatabaseCount('law_unit_memberships', 1);
         $roleId = DB::table('law_unit_memberships')->where('company_membership_id', $membershipId)->value('law_access_role_id');

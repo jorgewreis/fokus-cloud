@@ -87,13 +87,24 @@
   }
 
   function activeModule() {
-    return context.modules.find((item) => item.id === activeGroup.slice('module:'.length));
+    return visibleModules().find((item) => item.id === activeGroup.slice('module:'.length));
+  }
+
+  function canLawPermission(permission) {
+    return context.company?.role === 'admin' || (context.law_permissions || []).includes(permission);
+  }
+
+  function visibleModules() {
+    return (context.modules || []).filter((module) => {
+      const family = String(module.family || module.module_code || module.code || '').toLowerCase();
+      return !family.startsWith('contatos') || canLawPermission('law.contacts.view');
+    });
   }
 
   function renderRail() {
     railItems.replaceChildren();
     addRailButton('overview', 'Visão geral', 'overview');
-    context.modules.forEach((module) => {
+    visibleModules().forEach((module) => {
       const descriptor = getModuleDescriptor(module);
       addRailButton(`module:${module.id}`, descriptor.label, descriptor.icon);
     });
@@ -194,7 +205,7 @@
   }
 
   function renderOverview() {
-    const hasModules = context.modules.length > 0;
+    const hasModules = visibleModules().length > 0;
     const heading = element('div');
     heading.append(element('p', 'law-page-eyebrow', 'ESPAÇO DE TRABALHO'));
     heading.append(element('h2', '', 'Visão geral'));
@@ -226,6 +237,30 @@
       grid.append(card);
     });
     contentRegion.append(grid);
+    const contactsEnabled = visibleModules().some((module) => String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos'));
+    if (contactsEnabled && canLawPermission('law.contacts.view')) {
+      const card = element('section', 'fs-card law-dashboard-contacts');
+      const header = element('div', 'fs-card-header');
+      header.append(element('h3', 'fs-card-title', 'Gestão de Contatos'), element('p', 'fs-card-subtitle', 'Resumo da empresa e seus contatos mais recentes.'));
+      const body = element('div', 'fs-card-body');
+      body.append(element('p', 'law-contact-loading', 'Carregando resumo…'));
+      card.append(header, body);
+      contentRegion.append(card);
+      FokusApi.request('/law/contacts/dashboard').then(({ summary }) => {
+        if (!card.isConnected) return;
+        body.replaceChildren();
+        const stats = element('div', 'law-contact-metrics');
+        [['Pessoas físicas', summary.pf], ['Pessoas jurídicas', summary.pj], ['Departamentos', summary.departments], ['Cadastros contabilizados', summary.registrations_counted]].forEach(([label, value]) => { const item = element('article', 'law-contact-metric-card fs-card fs-card-sm'); const metricBody = element('div', 'fs-card-body law-contact-metric-body'); metricBody.append(element('span', '', label), element('strong', '', Number(value || 0).toLocaleString('pt-BR'))); item.append(metricBody); stats.append(item); });
+        body.append(stats);
+        const recent = element('ul', 'law-dashboard-contact-recent');
+        (summary.recent || []).slice(0, 5).forEach((contact) => { const row = element('li'); const link = element('button', 'law-contact-recent-link', contact.display_name); link.type = 'button'; link.addEventListener('click', () => { const module = visibleModules().find((item) => String(item.family || item.module_code || item.code || '').toLowerCase().startsWith('contatos')); if (module) { activeGroup = `module:${module.id}`; renderNavigation(); window.FokusLawContacts?.openContact(contentRegion, contact.id); } }); row.append(link); recent.append(row); });
+        if (!(summary.recent || []).length) recent.append(element('li', '', 'Os contatos criados ou consultados aparecerão aqui.'));
+        const recentCard = element('section', 'fs-card fs-card-sm law-contact-recent-card');
+        const recentHeader = element('div', 'fs-card-header'); recentHeader.append(element('h4', 'fs-card-title', 'Contatos recentes'));
+        const recentBody = element('div', 'fs-card-body'); recentBody.append(recent);
+        recentCard.append(recentHeader, recentBody); body.append(recentCard);
+      }).catch(() => { if (card.isConnected) body.replaceChildren(element('p', 'law-page-lede', 'Resumo indisponível no momento.')); });
+    }
   }
 
   function renderSettings() {
@@ -985,32 +1020,9 @@
     contentRegion.append(state);
   }
 
-  async function renderContacts() {
+  function renderContacts() {
     document.title = 'Contatos | Fokus Law';
-    const heading = element('div'); heading.append(element('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), element('h2', '', 'Contatos'));
-    heading.append(element('p', 'law-page-lede', 'Cadastre os contatos da empresa e consulte a capacidade contratada para todos os setores.'));
-    contentRegion.append(heading);
-    const usage = element('div', 'law-subscription-usage'); usage.textContent = 'Carregando capacidade…'; contentRegion.append(usage);
-    const form = element('form', 'law-contact-form');
-    const nameField = lawSubscriptionField('Nome de exibição'); const name = element('input', 'fs-form-control'); name.required = true; name.maxLength = 180; nameField.append(name);
-    const typeField = lawSubscriptionField('Tipo de contato'); const type = element('select', 'fs-form-control'); [['person','Pessoa'],['organization','Organização'],['lawyer','Advogado(a)'],['law_firm','Escritório'],['public_body','Órgão público'],['court_unit','Unidade judiciária'],['unknown','Outro']].forEach(([value,label])=>type.append(new Option(label,value))); typeField.append(type);
-    const sectorField = lawSubscriptionField('Setor'); const sector = element('select', 'fs-form-control'); sector.append(new Option('Empresa toda', '')); (context.units || []).filter((unit)=>unit.status==='ativo').forEach((unit)=>sector.append(new Option(unit.name, unit.id))); if (context.active_unit_id) sector.value = context.active_unit_id; sectorField.append(sector);
-    const submit = element('button','fs-btn fs-btn-primary','Cadastrar contato'); submit.type='submit'; const formStatus=element('p','law-subscription-feedback'); formStatus.setAttribute('role','status');
-    form.append(nameField,typeField,sectorField,submit,formStatus); contentRegion.append(form);
-    const list = element('div','law-contact-list'); contentRegion.append(list);
-    const refresh = async () => {
-      const result = await FokusApi.request('/law/contacts');
-      if (!contentRegion.isConnected || contentRegion.dataset.view !== 'module') return;
-      if (context.permissions.manage_settings) loadLawNotifications(document.querySelector('#notifications-button'), document.querySelector('#notifications-panel'));
-      list.replaceChildren();
-      const metric = result.usage;
-      if (metric?.available) { usage.textContent=`${metric.label}: ${metric.used.toLocaleString('pt-BR')} de ${metric.limit.toLocaleString('pt-BR')} (${metric.percentage}%)`; usage.dataset.state=metric.over_threshold?'warning':'normal'; if(metric.over_threshold) usage.append(element('strong','',' Acima de 70%: avalie um upgrade em Configurações > Assinatura.')); }
-      else usage.textContent = 'A capacidade contratada para contatos não está configurada nesta assinatura.';
-      if (!result.contacts.length) { list.append(element('p','law-module-state','Nenhum contato cadastrado neste setor.')); return; }
-      result.contacts.forEach((contact)=>{ const card=element('article','law-contact-card'); const info=element('div'); info.append(element('strong','',contact.display_name),element('span','',`${contact.legal_name || contact.contact_type} · ${contact.unit_name || 'Empresa toda'} · ${contact.status}`)); const archive=element('button','fs-btn fs-btn-secondary','Remover'); archive.type='button'; archive.addEventListener('click',async()=>{ archive.disabled=true; try { await FokusApi.request(`/law/contacts/${encodeURIComponent(contact.id)}`,{method:'DELETE'}); await refresh(); } catch(error){ formStatus.dataset.state='error'; formStatus.textContent=error.message; archive.disabled=false; } }); card.append(info,archive); list.append(card); });
-    };
-    form.addEventListener('submit',async(event)=>{ event.preventDefault(); submit.disabled=true; formStatus.textContent=''; try { await FokusApi.request('/law/contacts',{method:'POST',body:{display_name:name.value.trim(),contact_type:type.value,law_unit_id:sector.value||null}}); name.value=''; formStatus.textContent='Contato cadastrado.'; await refresh(); name.focus(); } catch(error){ formStatus.dataset.state='error'; formStatus.textContent=error.message||'Não foi possível cadastrar.'; } finally{ submit.disabled=false; } });
-    try { await refresh(); } catch(error){ usage.dataset.state='error'; usage.textContent=error.message||'Não foi possível carregar os contatos.'; }
+    window.FokusLawContacts?.render(contentRegion, context);
   }
 
   async function renderSubscription() {
@@ -1427,7 +1439,7 @@
     const remember = localStorage.getItem(preferenceKey(context.user.id, 'remember-group')) === 'true';
     if (!['profile', 'company', 'subscription', 'users', 'transfer'].includes(initialPage) && remember) {
       const lastGroup = localStorage.getItem(preferenceKey(context.user.id, 'last-group'));
-      if ((lastGroup === 'settings' && context.permissions.manage_settings) || context.modules.some((item) => `module:${item.id}` === lastGroup)) activeGroup = lastGroup;
+      if ((lastGroup === 'settings' && context.permissions.manage_settings) || visibleModules().some((item) => `module:${item.id}` === lastGroup)) activeGroup = lastGroup;
     }
     if (localStorage.getItem(preferenceKey(context.user.id, 'reduced-motion')) === 'true') document.documentElement.classList.add('law-pref-reduced-motion');
     renderRail();

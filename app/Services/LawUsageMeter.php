@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Schema;
 
 class LawUsageMeter
 {
@@ -38,22 +39,28 @@ class LawUsageMeter
         ];
     }
 
-    public function assertContactCapacityAvailable(string $companyId): void
+    public function assertContactCapacityAvailable(string $companyId, int $additional = 1): void
     {
         $subscription = $this->subscription($companyId, lock: true);
-        abort_unless($subscription && in_array($subscription->status, ['ativa', 'aguardando_pagamento'], true), 403, 'A empresa não possui uma assinatura ativa do Fokus Law.');
+        abort_unless($subscription && $subscription->status === 'ativa', 403, 'A empresa não possui uma assinatura ativa do Fokus Law.');
         $entitlement = $this->contactEntitlement($subscription);
         abort_unless($entitlement, 403, 'A assinatura não inclui uma capacidade configurada para contatos.');
 
         $used = $this->countContacts($companyId, lock: true);
-        abort_if($used >= $entitlement['limit'], 422, 'A capacidade contratada para contatos foi atingida. Faça upgrade da capacidade em Configurações > Assinatura.');
+        abort_if($used + max(1, $additional) > $entitlement['limit'], 422, 'A capacidade contratada para contatos foi atingida. Faça upgrade da capacidade em Configurações > Assinatura.');
     }
 
     public function countContacts(string $companyId, bool $lock = false): int
     {
         $query = DB::table('law_contacts')->where('company_id', $companyId)->whereNull('deleted_at')->whereNull('merged_into_id');
         if ($lock) $query->lockForUpdate();
-        return (int) $query->count();
+        $contacts = (int) $query->count();
+        $departments = Schema::hasTable('law_contact_departments')
+            ? (int) DB::table('law_contact_departments as department')->join('law_contacts as contact', function ($join): void {
+                $join->on('contact.id', '=', 'department.law_contact_id')->on('contact.company_id', '=', 'department.company_id');
+            })->where('department.company_id', $companyId)->whereNull('contact.deleted_at')->whereNull('contact.merged_into_id')->count()
+            : 0;
+        return $contacts + $departments;
     }
 
     private function syncThreshold(object $subscription, string $moduleId, string $code, int $used, int $limit, bool $overThreshold): void

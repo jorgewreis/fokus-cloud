@@ -21,10 +21,10 @@ class LawAuthorizationService
     ];
 
     private const DEFAULT_ROLES = [
-        'unit_admin' => ['Administrador do setor', 'law.company.view,law.notifications.view,law.notifications.update,law.contacts.view,law.contacts.create,law.contacts.update,law.contacts.delete,law.hearings.view,law.hearings.create,law.hearings.update,law.hearings.delete,law.hearings.status.update,law.hearings.external_access.manage,law.users.view,law.users.manage,law.roles.view,law.roles.manage'],
-        'chief_clerk' => ['Chefe / Escrivão', 'law.company.view,law.units.view,law.notifications.view,law.notifications.update,law.contacts.view,law.contacts.create,law.contacts.update,law.contacts.delete,law.hearings.view,law.hearings.create,law.hearings.update,law.hearings.delete,law.hearings.status.update,law.hearings.external_access.manage,law.users.view,law.users.manage,law.roles.view'],
-        'operator' => ['Operador', 'law.company.view,law.notifications.view,law.notifications.update,law.contacts.view,law.contacts.create,law.contacts.update,law.hearings.view,law.hearings.create,law.hearings.update,law.hearings.status.update'],
-        'viewer' => ['Somente leitura', 'law.company.view,law.notifications.view,law.contacts.view,law.hearings.view,law.roles.view'],
+        'unit_admin' => ['Administrador do setor', 'law.company.view,law.notifications.view,law.notifications.update,law.contacts.view,law.contacts.create,law.contacts.update,law.contacts.delete,law.contacts.sensitive.view,law.contacts.merge,law.contacts.shared.view,law.hearings.view,law.hearings.create,law.hearings.update,law.hearings.delete,law.hearings.status.update,law.hearings.external_access.manage,law.users.view,law.users.manage,law.roles.view,law.roles.manage'],
+        'chief_clerk' => ['Chefe / Escrivão', 'law.company.view,law.units.view,law.notifications.view,law.notifications.update,law.contacts.view,law.contacts.create,law.contacts.update,law.contacts.delete,law.contacts.sensitive.view,law.contacts.merge,law.contacts.shared.view,law.hearings.view,law.hearings.create,law.hearings.update,law.hearings.delete,law.hearings.status.update,law.hearings.external_access.manage,law.users.view,law.users.manage,law.roles.view'],
+        'operator' => ['Operador', 'law.company.view,law.notifications.view,law.notifications.update,law.contacts.view,law.contacts.create,law.contacts.update,law.contacts.shared.view,law.hearings.view,law.hearings.create,law.hearings.update,law.hearings.status.update'],
+        'viewer' => ['Somente leitura', 'law.company.view,law.notifications.view,law.contacts.view,law.contacts.shared.view,law.hearings.view,law.roles.view'],
     ];
 
     public function isCompanyAdmin(Request $request): bool

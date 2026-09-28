@@ -24,25 +24,25 @@
         transparent
     );
 }
-.styles-mockup {
+.styles-docs {
     min-height: 100vh;
     color: var(--fs-color-text);
     background: var(--fs-color-surface);
     font-family: "Google Sans", sans-serif;
     font-size: var(--fs-font-size-lg, 1rem);
 }
-.styles-mockup,
-.styles-mockup button,
-.styles-mockup input,
-.styles-mockup select,
-.styles-mockup textarea {
+.styles-docs,
+.styles-docs button,
+.styles-docs input,
+.styles-docs select,
+.styles-docs textarea {
     font-family: "Google Sans", sans-serif;
 }
-.styles-mockup a {
+.styles-docs a {
     color: inherit;
     text-decoration: none;
 }
-.styles-mockup code {
+.styles-docs code {
     color: var(--styles-green);
     font-family: var(--fs-font-mono);
 }

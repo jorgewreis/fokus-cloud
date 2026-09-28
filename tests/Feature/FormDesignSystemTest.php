@@ -211,7 +211,7 @@ class FormDesignSystemTest extends TestCase
         $catalog = file_get_contents(base_path('public/backoffice/pages/subscription-plans.html'));
         $catalogScript = file_get_contents(base_path('public/backoffice/assets/js/subscription-plans-page.js'));
         $css = file_get_contents(base_path('public/backoffice/assets/css/components/form-admin.css'));
-        $pageCss = file_get_contents(base_path('public/backoffice/assets/css/pages/mockup.css'));
+        $pageCss = file_get_contents(base_path('public/backoffice/assets/css/pages/page-overrides.css'));
 
         $this->assertSame(1, substr_count($catalog, 'data-currency-input'));
         $this->assertStringContainsString('data-currency-input', $catalog);

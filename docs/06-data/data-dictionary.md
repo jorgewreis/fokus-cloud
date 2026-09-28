@@ -45,10 +45,20 @@ Este arquivo deve descrever tabelas, colunas, tipos, obrigatoriedade e significa
 | law_cases | operational_priority | string | Nao | Prioridade operacional interna, sem substituir sigilo. |
 | law_cases | confidentiality_level | enum | Sim | Nivel de sigilo: `public_internal`, `unit_restricted`, `case_confidential` ou `enhanced_confidential`. |
 | law_cases | internal_tags | json | Nao | Tags informativas configuraveis da unidade. |
-| law_contacts | contact_type | enum | Sim | Tipo do contato: pessoa, advogado, instituicao, orgao publico, unidade judicial, perito ou outro tipo permitido. |
-| law_contacts | document_number | string | Nao | Documento normalizado e protegido quando necessario. |
-| law_contact_addresses | address_type | enum | Sim | Tipo de endereco do contato. |
-| law_contact_channels | channel_type | enum | Sim | Tipo de canal: telefone, celular, e-mail, WhatsApp, site ou outro. |
+| law_contacts | legal_nature | enum | Sim | Natureza PF/PJ que orienta o formulário. |
+| law_contacts | sharing_excluded | boolean | Sim | Retira contato individual das regras de compartilhamento externo. |
+| law_contact_addresses | address_type | enum | Sim | Tipo estruturado: residencial, comercial, correspondência ou outro. |
+| law_contact_channels | channel_type | enum | Sim | Escopo aceita telefone ou e-mail; departamento opcional identifica canal departamental. |
+| law_contact_channels | is_personal | boolean | Sim | Marca canal pessoal como dado sensível e nunca compartilhável. |
+| law_contact_documents | document_number_encrypted | text | Sim | Documento cifrado; valor aberto não é guardado. |
+| law_contact_documents | document_fingerprint | string | Nao | HMAC para comparação de CPF/CNPJ e detecção de duplicidade. |
+| law_contact_departments | name | string | Sim | Departamento de uma PJ; cada linha consome uma unidade de capacidade. |
+| law_contact_classifications | classification_code | string | Sim | Classificação profissional/operacional acumulável e filtrável. |
+| law_contact_tags | normalized_name | string | Sim | Nome normalizado e único por empresa para sugestão/reuso. |
+| law_contact_activity | activity_type | string | Sim | Ação recente do usuário sem armazenar o termo de busca. |
+| law_contact_sharing_policies | recipient_company_id | string | Sim | Empresa que recebe uma referência somente leitura. |
+| law_contact_sharing_policies | classification_codes | json | Sim | Classificações que ativam compartilhamento para contatos atuais e futuros. |
+| law_contact_sharing_policies | shared_fields | json | Sim | Campos expostos: canais profissionais, endereço comercial e, opcionalmente, documentos. |
 | law_case_contacts | case_role | enum | Sim | Papel do contato no processo: autor, reu, vitima, testemunha, advogado, defensor, promotor, representante, interessado, orgao de origem ou outro. |
 | law_expedition_contacts | expedition_role | enum | Sim | Papel do contato na expedicao: destinatario, orgao de destino, unidade externa, responsavel por recebimento, copia ou outro. |
 | law_task_contacts | task_contact_role | enum | Sim | Papel opcional do contato na tarefa como referencia ou envolvido externo. |

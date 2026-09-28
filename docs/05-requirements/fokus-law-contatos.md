@@ -1,61 +1,79 @@
-# Requisitos da gestao de contatos
-
-## Objetivo
-
-Definir requisitos do modulo comercial Gestao de Contatos do Fokus Law, cujo
-rotulo interno no menu deve ser Contatos.
+# Requisitos da Gestão de Contatos
 
 ## Requisitos funcionais
 
-| Codigo | Requisito | Criterio de aceite |
+| Código | Requisito | Critério de aceite |
 | --- | --- | --- |
-| RF-CTT-001 | O sistema deve permitir cadastrar contatos reutilizaveis por empresa e unidade autorizada. | Um contato pode ser localizado e reutilizado em processos, expedicoes e tarefas sem novo cadastro obrigatorio. |
-| RF-CTT-002 | O sistema deve permitir classificar contatos por natureza. | O contato pode ser pessoa fisica, pessoa juridica, advogado, instituicao, orgao publico, unidade judicial ou outro tipo permitido. |
-| RF-CTT-003 | O sistema deve permitir registrar documentos de identificacao quando necessarios. | CPF, CNPJ, OAB ou outro identificador podem ser informados, normalizados e protegidos conforme regra de privacidade. |
-| RF-CTT-004 | O sistema deve permitir multiplos enderecos e meios de contato. | Um contato pode possuir telefones, e-mails, enderecos e canais preferenciais. |
-| RF-CTT-005 | O sistema deve permitir vincular contato a processo com papel contextual. | O mesmo contato pode ser parte, advogado, testemunha, orgao de origem ou outro papel em processos diferentes. |
-| RF-CTT-006 | O sistema deve permitir vincular contato a expedicao. | Um contato pode ser destinatario, orgao de destino, comarca, unidade externa ou responsavel por recebimento. |
-| RF-CTT-007 | O sistema deve permitir vincular contato a tarefa. | Um contato pode ser envolvido externo ou referencia operacional sem substituir o responsavel interno. |
-| RF-CTT-008 | O sistema deve permitir pesquisar e filtrar contatos. | Busca considera nome, documento, tipo, papel vinculado, tags e meios de contato quando autorizados. |
-| RF-CTT-009 | O sistema deve permitir inativar ou mesclar contatos duplicados. | Vinculos historicos sao preservados e a operacao e auditada. |
-| RF-CTT-010 | O sistema deve registrar auditoria de alteracoes sensiveis. | Criacao, edicao, inativacao, mesclagem e alteracao de documentos ou enderecos geram auditoria. |
+| RF-CTT-001 | Disponibilizar o módulo apenas a empresas com Contatos contratado. | Menu, APIs e dashboard exigem assinatura ativa com o componente publicado. |
+| RF-CTT-002 | Criar e consultar contatos PF ou PJ. | Natureza e nome são obrigatórios; o formulário adapta os campos à natureza. |
+| RF-CTT-003 | Aplicar formatação consistente aos nomes. | Servidor normaliza iniciais, conectivos e siglas preservadas antes de gravar. |
+| RF-CTT-004 | Permitir classificações profissionais/operacionais independentes da natureza. | Contato acumula até 12 classificações filtráveis. |
+| RF-CTT-005 | Guardar canais do contato e dos departamentos PJ. | Até 4 telefones e 2 e-mails em cada escopo; validar e-mails. |
+| RF-CTT-006 | Guardar endereços completos. | Até dois endereços por contato com campos estruturados. |
+| RF-CTT-007 | Guardar documentos. | Até quatro documentos; CPF/CNPJ opcionais, validados, criptografados e únicos na empresa. |
+| RF-CTT-008 | Guardar departamentos associados à PJ. | Cada departamento tem nome e até 4 telefones e 2 e-mails próprios. |
+| RF-CTT-009 | Classificar contatos com tags. | Até seis tags por contato, reutilizadas e normalizadas na empresa. |
+| RF-CTT-010 | Pesquisar e filtrar contatos. | Filtros por texto, natureza, status, classificação e tag; documentos só pesquisáveis com permissão sensível. |
+| RF-CTT-011 | Evitar duplicidade de CPF/CNPJ. | CPF/CNPJ repetidos na empresa retornam conflito; mesclagem é fluxo separado. |
+| RF-CTT-012 | Editar e inativar contatos. | Alterações e inativação preservam auditoria e vínculos históricos. |
+| RF-CTT-013 | Mesclar duplicados. | Exige permissão, mesma natureza, destino válido e motivo; transfere relações em transação. |
+| RF-CTT-014 | Resumir atividade e volume no dashboard. | Exibe totais da empresa, utilização contratada e até cinco últimos contatos do usuário ativo. |
+| RF-CTT-015 | Contabilizar capacidade. | Cada contato e cada departamento consome uma unidade; criação excedente é bloqueada. |
+| RF-CTT-016 | Controlar acesso a dados sensíveis. | Sem a permissão, documentos são mascarados, canais pessoais/endereço residencial/notas ocultos e preservados em edição. |
+| RF-CTT-017 | Compartilhar contatos entre empresas por política. | Origem escolhe destinatários ativos e classificações; regras cobrem atuais/futuros e podem ser revogadas. |
+| RF-CTT-018 | Expor referência compartilhada somente para leitura. | Destino precisa de assinatura Contatos; não altera origem nem consome sua capacidade. |
+| RF-CTT-019 | Restringir campos de compartilhamento. | Canais pessoais e endereços residenciais nunca são expostos; documentos exigem seleção da origem e permissão sensível no destino. |
+| RF-CTT-020 | Registrar atividade e auditoria. | Ações identificam usuário, contato, tipo e data; consultas não guardam termo de busca. |
+| RF-CTT-021 | Preparar APIs de referência para outros módulos. | IDs estáveis e endpoints de consulta podem ser usados futuramente por Processos, Expedições e Tarefas. |
 
-## Regras de negocio
+## Regras de negócio
 
-- Gestao de Contatos e o nome comercial.
-- Contatos e o rotulo do menu interno.
-- O modulo nao deve ser chamado de Agenda.
-- Agenda e Compromissos controla eventos e datas; Gestao de Contatos controla
-  pessoas, instituicoes, enderecos e canais.
-- O contato principal nao define papel processual fixo.
-- Papel processual fica no vinculo entre contato e processo.
-- Papel em expedicao fica no vinculo entre contato e expedicao ou no snapshot
-  historico da expedicao.
-- Contatos vinculados a processos sigilosos devem herdar restricoes de exibicao
-  do processo no contexto de consulta.
-- Tags de contato sao informativas e nao substituem tipo, papel ou permissao.
-- Dados pessoais devem ser coletados por necessidade operacional e exibidos com
-  minimizacao.
+- Empresa é proprietária da base e os setores autorizados consultam os mesmos
+  contatos; `law_unit_id` não define propriedade.
+- PF/PJ é natureza cadastral; classificações podem acumular.
+- Departamentos só pertencem a PJ e cada um soma um cadastro à capacidade.
+- Contatos inativos continuam ocupando capacidade e preservam histórico.
+- Tags não substituem classificação ou permissão.
+- CPF/CNPJ devem passar validação dos dígitos e comparação por fingerprint.
+- Nome, telefone e e-mail podem gerar análise manual futura, mas não bloqueiam
+  o cadastro por si sós.
+- Compartilhamento exige assinatura ativa de origem e destino com Contatos
+  publicado. Contatos compartilhados continuam sob controle exclusivo da
+  origem; revogação remove o acesso na consulta seguinte.
+- Tags, notas, buscas, auditorias e vínculos internos não são compartilhados.
+- Sigilo processual também deve ser aplicado ao consultar um contato pelo
+  contexto do processo quando a integração for implementada.
 
-## Permissoes
+## Permissões
 
-| Acao | Administrador da unidade | Chefe/Escrivao | Servidor operacional | Visualizador |
-| --- | ---: | ---: | ---: | ---: |
-| Criar e editar contatos | X | X | X |  |
-| Inativar contatos | X | X |  |  |
-| Mesclar contatos duplicados | X | X |  |  |
-| Vincular contatos a processos | X | X | X |  |
-| Vincular contatos a expedicoes | X | X | X |  |
-| Consultar contatos nao sigilosos | X | X | X | X |
-| Consultar dados protegidos | X | X | Conforme autorizacao |  |
+| Código | Ação | Padrão |
+| --- | --- | --- |
+| `law.contacts.view` | Consultar lista/detalhe | Administrador, chefe/escrivão, operador, visualizador |
+| `law.contacts.create` | Criar contato | Administrador, chefe/escrivão, operador |
+| `law.contacts.update` | Alterar dados comuns | Administrador, chefe/escrivão, operador |
+| `law.contacts.delete` | Inativar/remover | Administrador e chefe/escrivão |
+| `law.contacts.sensitive.view` | Consultar/alterar documentos, dados pessoais e notas | Administrador e chefe/escrivão |
+| `law.contacts.merge` | Mesclar duplicados | Administrador e chefe/escrivão |
+| `law.contacts.shared.view` | Consultar referências compartilhadas | Perfis que têm consulta |
+| `law.contacts.share.manage` | Administrar políticas de compartilhamento | Administrador da empresa; delegável a perfil personalizado |
 
-## Criterios de aceite
+Permissões são concedidas por perfil customizável e suas opções só devem ser
+apresentadas para assinaturas que incluem Contatos. Ser usuário administrador
+da empresa não remove a checagem da assinatura do produto.
 
-- Gestao de Contatos aparece como nome comercial e Contatos como rotulo interno.
-- O modulo e documentado como independente de Agenda e Compromissos.
-- Contatos podem representar advogados, instituicoes, orgaos, partes e
-  destinatarios.
-- O mesmo contato pode assumir papeis diferentes em processos distintos.
-- Expedicoes podem usar contatos como destinatarios ou orgaos de destino.
-- Tarefas podem referenciar contatos externos sem alterar o responsavel interno.
-- Sigilo processual restringe a exibicao de contatos no contexto do processo.
+## Requisitos não funcionais e privacidade
+
+- Dados sensíveis são protegidos em trânsito e em repouso, mascarados na
+  resposta e omitidos de logs e mensagens de erro.
+- As operações que sincronizam filhos ou mesclam contatos são transacionais.
+- Todas as consultas limitam escopo pela empresa; compartilhamento é o único
+  caminho entre empresas e segue política explícita.
+- A interface apresenta estados de carregamento, sucesso, vazio, erro e limite
+  de capacidade, com layout adaptado a desktop, tablet e celular.
+- Não guardar os termos digitados na busca no histórico de atividade.
+
+## Fora do escopo desta entrega
+
+Vínculos transacionais com Processos, Expedições e Tarefas, importação em lote,
+busca externa de pessoas, notificações a terceiros, CRM e sincronização de
+agendas. As APIs e os IDs ficam preparados para integração futura.

@@ -54,26 +54,26 @@
 .styles-demo-table th, .styles-demo-table td { padding: 12px; border-bottom: 1px solid var(--fs-color-border); text-align: left; }
 .styles-demo-table th { color: var(--styles-green); font: 11px var(--fs-font-mono); text-transform: uppercase; }
 .styles-demo-card .fs-progress > span { display: block; width: 72%; height: 100%; background: var(--fs-color-success); }
-.styles-mockup .fs-tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--fs-color-border); }
-.styles-mockup .fs-tab { padding: 9px 12px; border: 0; border-bottom: 2px solid transparent; color: var(--fs-color-muted); background: transparent; font: inherit; cursor: pointer; }
-.styles-mockup .fs-tab.is-active { color: var(--fs-color-text); border-bottom-color: var(--styles-green); }
-.styles-mockup .fs-color-bg-surface, .styles-mockup .fs-color-bg-subtle { background: var(--fs-color-surface); }
-.styles-mockup .fs-color-text-primary { color: var(--fs-color-text); }
-.styles-mockup .fs-color-text-muted { color: var(--fs-color-muted); }
-.styles-mockup .fs-color-success { color: var(--fs-color-success); }
-.styles-mockup .fs-color-warning { color: var(--fs-color-warning); }
-.styles-mockup .fs-font-mono { font-family: var(--fs-font-mono); }
-.styles-mockup .fs-font-size-sm { font-size: 12px; }
-.styles-mockup .fs-font-size-md { font-size: var(--fs-font-size-md); }
-.styles-mockup .fs-font-size-h3 { font-size: var(--fs-font-size-h3); }
-.styles-mockup .fs-font-weight-semibold { font-weight: 600; }
-.styles-mockup .fs-grid { display: grid; gap: 12px; }
-.styles-mockup .fs-grid-cols-1 { grid-template-columns: 1fr; }
-.styles-mockup .fs-grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
-.styles-mockup .fs-grid-md-cols-3 { grid-template-columns: repeat(3, 1fr); }
-.styles-mockup .fs-border { border: var(--fs-border-width) solid var(--fs-color-border); }
-.styles-mockup .fs-radius-sm { border-radius: var(--fs-radius-sm); }
-.styles-mockup .fs-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-.styles-mockup .fs-hide-sm { display: inline; }
-.styles-mockup .fs-show-sm { display: none; }
+.styles-docs .fs-tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--fs-color-border); }
+.styles-docs .fs-tab { padding: 9px 12px; border: 0; border-bottom: 2px solid transparent; color: var(--fs-color-muted); background: transparent; font: inherit; cursor: pointer; }
+.styles-docs .fs-tab.is-active { color: var(--fs-color-text); border-bottom-color: var(--styles-green); }
+.styles-docs .fs-color-bg-surface, .styles-docs .fs-color-bg-subtle { background: var(--fs-color-surface); }
+.styles-docs .fs-color-text-primary { color: var(--fs-color-text); }
+.styles-docs .fs-color-text-muted { color: var(--fs-color-muted); }
+.styles-docs .fs-color-success { color: var(--fs-color-success); }
+.styles-docs .fs-color-warning { color: var(--fs-color-warning); }
+.styles-docs .fs-font-mono { font-family: var(--fs-font-mono); }
+.styles-docs .fs-font-size-sm { font-size: 12px; }
+.styles-docs .fs-font-size-md { font-size: var(--fs-font-size-md); }
+.styles-docs .fs-font-size-h3 { font-size: var(--fs-font-size-h3); }
+.styles-docs .fs-font-weight-semibold { font-weight: 600; }
+.styles-docs .fs-grid { display: grid; gap: 12px; }
+.styles-docs .fs-grid-cols-1 { grid-template-columns: 1fr; }
+.styles-docs .fs-grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.styles-docs .fs-grid-md-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.styles-docs .fs-border { border: var(--fs-border-width) solid var(--fs-color-border); }
+.styles-docs .fs-radius-sm { border-radius: var(--fs-radius-sm); }
+.styles-docs .fs-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.styles-docs .fs-hide-sm { display: inline; }
+.styles-docs .fs-show-sm { display: none; }
 @media (max-width: 760px) { .styles-reference-grid { grid-template-columns: 1fr; } .styles-utility-row { grid-template-columns: 1fr; } .styles-token-list div { grid-template-columns: 1fr; gap: 7px; } .styles-component-section { padding: 56px 0; } }

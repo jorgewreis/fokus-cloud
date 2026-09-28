@@ -61,7 +61,6 @@ Fokus Cloud
 | `public/` | Entrada publica, interfaces HTML e assets publicados. |
 | `resources/` | Entradas de CSS/JS e views Laravel. |
 | `docs/` | Documentacao funcional, comercial e tecnica. |
-| `mockups/` | Prototipos e estudos visuais preservados. |
 | `fokus-project.json` | Manifesto de identidade, URLs, tipo, versao e status do repositorio. |
 | `.github/workflows/` | Automacao de deploy. |
 

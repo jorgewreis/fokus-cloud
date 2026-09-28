@@ -1,2 +1,2 @@
-/* DEFINE MOCKUP PAGES */
-@import url("mockup.css?v=20260901-live-controls");
+/* Backoffice page-specific refinements. */
+@import url("page-overrides.css?v=20260928-page-overrides");
