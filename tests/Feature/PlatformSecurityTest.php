@@ -246,7 +246,12 @@ class PlatformSecurityTest extends TestCase
         $subscriptionId = PrefixedUlid::make('ASS');
         DB::table('subscriptions')->insert(['id' => $subscriptionId, 'company_id' => $companyId, 'product_id' => $product->id, 'status' => 'suspensa', 'open_company_product' => null, 'version' => 1, 'billing_cycle' => 'monthly', 'commercial_snapshot' => json_encode(['plan_name' => 'Essencial']), 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
 
+        $inactiveCompanyId = PrefixedUlid::make('COM');
+        DB::table('companies')->insert(['id' => $inactiveCompanyId, 'document_type' => 'cnpj', 'document_number' => '22345678000100', 'legal_name' => 'Empresa suspensa', 'status' => 'suspensa', 'version' => 1, 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('subscriptions')->insert(['id' => PrefixedUlid::make('ASS'), 'company_id' => $inactiveCompanyId, 'product_id' => $product->id, 'status' => 'ativa', 'open_company_product' => null, 'version' => 1, 'billing_cycle' => 'monthly', 'commercial_snapshot' => json_encode(['plan_name' => 'Essencial']), 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
+
         $this->actingAs($admin, 'platform')->getJson('/api/backoffice/support/law-context')->assertOk()
+            ->assertJsonCount(1, 'subscriptions')
             ->assertJsonPath('subscriptions.0.status', 'suspensa')
             ->assertJsonPath('subscriptions.0.users.0.membership_id', $membershipId);
         $this->actingAs($admin, 'platform')->postJson('/api/backoffice/support/access', ['subscription_id' => $subscriptionId, 'membership_id' => $membershipId, 'reason' => 'Investigar falha reportada'])->assertOk()->assertJsonPath('redirect_to', '/portal');

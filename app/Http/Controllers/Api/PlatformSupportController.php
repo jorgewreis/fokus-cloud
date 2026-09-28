@@ -18,7 +18,7 @@ class PlatformSupportController extends Controller
         $subscriptions = DB::table('subscriptions as subscription')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->join('companies as company', 'company.id', '=', 'subscription.company_id')
-            ->whereIn('product.code', ['law', 'fokus-law'])->whereNull('company.deleted_at')
+            ->whereIn('product.code', ['law', 'fokus-law'])->where('company.status', 'ativa')->whereNull('company.deleted_at')
             ->select('subscription.id', 'subscription.company_id', 'subscription.status', 'subscription.commercial_snapshot', 'company.legal_name')
             ->orderBy('company.legal_name')->get()
             ->map(function (object $subscription): array {
