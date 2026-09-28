@@ -177,6 +177,22 @@ class LawPermissionsTest extends TestCase
         $this->assertDatabaseHas('audit_events', ['company_id' => $this->companyId, 'entity_type' => 'company_membership', 'entity_id' => $targetMembership, 'operation' => 'admin_transfer_declined']);
     }
 
+    public function test_permissions_migration_is_safe_to_rerun_and_maps_legacy_gestores_once(): void
+    {
+        $manager = $this->user('Gestor legado', '52998224725', 'legacy-manager@example.test');
+        $membershipId = $this->membership($manager, 'gestor');
+        $migration = require database_path('migrations/2026_09_28_000100_create_customer_law_permissions.php');
+
+        $migration->up();
+        $migration->up();
+
+        $this->assertDatabaseCount('customer_permissions', 22);
+        $this->assertDatabaseCount('law_access_roles', 4);
+        $this->assertDatabaseCount('law_unit_memberships', 1);
+        $roleId = DB::table('law_unit_memberships')->where('company_membership_id', $membershipId)->value('law_access_role_id');
+        $this->assertDatabaseHas('law_access_roles', ['id' => $roleId, 'code' => 'chief_clerk', 'is_system' => true]);
+    }
+
     private function user(string $name, string $cpf, string $email): User
     {
         return User::create([
