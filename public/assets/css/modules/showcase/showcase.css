@@ -779,7 +779,7 @@
     .immersive-products { right: 20px; bottom: 86px; left: 20px; justify-content: flex-end; gap: 13px; }
     .immersive-products a { font-size: 20px; }
     .immersive-products-label { display: none; }
-    .immersive-details { padding: 52px 4px; }
+    .immersive-details { padding: 52px 20px; }
     .immersive-details h2 { font-size: 44px; }
     .immersive-product-stories { grid-template-columns: 1fr; gap: 26px; margin-top: 42px; }
     .immersive-product-story { min-height: 0; padding-right: 0; }
@@ -788,7 +788,7 @@
     .immersive-about-copy { padding-top: 0; }
     .immersive-about-principles { grid-template-columns: 1fr; gap: 26px; margin-top: 42px; }
     .immersive-about-principle { padding-right: 0; }
-    .immersive-contact { align-items: flex-start; flex-direction: column; gap: 12px; padding-inline: 4px; }
+    .immersive-contact { align-items: flex-start; flex-direction: column; gap: 12px; padding-inline: 20px; }
 }
 @media (max-width: 420px) {
     .immersive-hero { min-height: 100svh; }
