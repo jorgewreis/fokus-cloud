@@ -765,8 +765,8 @@
 .showcase-page > main > :not(.immersive-hero):not(.immersive-products):not(.immersive-details):not(.immersive-contact),
 .showcase-page .showcase-skip-link { display: none; }
 @media (max-width: 1024px) {
-    .immersive-details,
-    .immersive-contact { padding-inline: 24px; }
+    .immersive-details { padding: 80px 24px; }
+    .immersive-contact { padding: 28px 24px; }
 }
 @media (max-width: 800px) {
     .showcase-page { padding: 0; }
