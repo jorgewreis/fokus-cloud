@@ -33,8 +33,8 @@
   const preferenceKey = (userId, key) => `fokus-law:${userId}:${key}`;
   let context = null;
   const initialPage = shell.dataset.initialPage || 'overview';
-  let settingsView = ['company', 'subscription'].includes(initialPage) ? initialPage : 'settings';
-  let activeGroup = ['company', 'subscription'].includes(initialPage) ? 'settings' : 'overview';
+  let settingsView = ['company', 'subscription', 'users'].includes(initialPage) ? initialPage : 'settings';
+  let activeGroup = ['company', 'subscription', 'users'].includes(initialPage) ? 'settings' : 'overview';
 
   const element = (tag, className, text) => {
     const node = document.createElement(tag);
@@ -164,14 +164,14 @@
       if (context.permissions.manage_company_users) entries.push(['Usuários, perfis e permissões', '/portal/usuarios', 'users']);
       entries.forEach(([label, href, iconName]) => {
         const item = element('li');
-        appendNavLink(item, label, href, iconName);
+        appendNavLink(item, label, href, iconName, initialPage === 'users' && label === 'Usuários, perfis e permissões');
         list.append(item);
       });
       const unitsItem = element('li');
       appendNavButton(unitsItem, 'Setores da empresa', 'company', settingsView === 'units', () => { settingsView = 'units'; renderNavigation(); });
       list.append(unitsItem);
       pageItems.append(list);
-      renderContent(settingsView === 'units' ? 'units' : settingsView === 'company' ? 'company' : settingsView === 'subscription' ? 'subscription' : 'settings');
+      renderContent(settingsView === 'units' ? 'units' : settingsView === 'company' ? 'company' : settingsView === 'subscription' ? 'subscription' : settingsView === 'users' ? 'users' : 'settings');
       return;
     }
 
@@ -324,6 +324,325 @@
 
   function companyStatus(status) {
     return ({ ativa: 'Ativa', pendente: 'Pendente', suspensa: 'Suspensa', encerrando: 'Encerrando', encerrada: 'Encerrada' })[status] || status || 'Não informada';
+  }
+
+  function maskUserCpf(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    return digits.length === 11 ? `${digits.slice(0, 3)}.***.***-${digits.slice(-2)}` : 'CPF não informado';
+  }
+
+  function isValidUserCpf(value) {
+    const cpf = String(value || '').replace(/\D/g, '');
+    if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+    const checkDigit = (length) => {
+      const total = cpf.slice(0, length).split('').reduce((sum, digit, index) => sum + Number(digit) * (length + 1 - index), 0);
+      const digit = (total * 10) % 11;
+      return digit === 10 ? 0 : digit;
+    };
+    return checkDigit(9) === Number(cpf[9]) && checkDigit(10) === Number(cpf[10]);
+  }
+
+  function userRoleLabel(role) {
+    return ({ admin: 'Administrador', gestor: 'Gestor', usuario: 'Usuário' })[role] || role || 'Não informado';
+  }
+
+  function userStatusLabel(status) {
+    return ({ ativo: 'Ativo', pendente: 'Convite pendente', suspenso: 'Suspenso', removido: 'Removido' })[status] || status || 'Não informado';
+  }
+
+  async function renderUsers(successMessage = '') {
+    document.title = 'Usuários, perfis e permissões | Fokus Law';
+    contentRegion.replaceChildren();
+    const heading = element('header', 'law-users-heading');
+    heading.append(element('p', 'law-page-eyebrow', 'ADMINISTRAÇÃO DA EMPRESA'));
+    heading.append(element('h2', '', 'Usuários, perfis e permissões'));
+    heading.append(element('p', 'law-page-lede', 'Convide pessoas para a empresa e administre seus perfis e acessos.'));
+    contentRegion.append(heading);
+
+    const feedback = element('p', 'law-users-feedback');
+    feedback.id = 'law-users-feedback';
+    feedback.setAttribute('role', 'status');
+    feedback.setAttribute('aria-live', 'polite');
+    if (successMessage) feedback.dataset.state = 'success';
+    feedback.textContent = successMessage;
+
+    const layout = element('div', 'law-users-layout');
+    const inviteCard = element('section', 'law-profile-card law-users-invite');
+    inviteCard.setAttribute('aria-labelledby', 'law-users-invite-title');
+    const inviteHeader = element('div', 'law-profile-card-heading');
+    const inviteCopy = element('div');
+    inviteCopy.append(element('p', 'law-profile-eyebrow', 'NOVO ACESSO'), element('h3', '', 'Convidar pessoa'));
+    inviteCopy.querySelector('h3').id = 'law-users-invite-title';
+    inviteHeader.append(inviteCopy);
+    inviteCard.append(inviteHeader);
+    const form = element('form', 'law-profile-form law-users-form');
+    form.id = 'law-users-invite-form';
+    form.noValidate = true;
+    const fields = [
+      { name: 'name', label: 'Nome completo', autocomplete: 'name', type: 'text' },
+      { name: 'cpf', label: 'CPF', autocomplete: 'off', type: 'text', inputmode: 'numeric', placeholder: '000.000.000-00' },
+      { name: 'email', label: 'E-mail', autocomplete: 'email', type: 'email' },
+    ];
+    fields.forEach((field) => {
+      const id = `law-users-${field.name}`;
+      const label = element('label', 'law-profile-field law-users-field');
+      label.htmlFor = id;
+      label.append(element('span', '', field.label));
+      const input = element('input', 'fs-form-control');
+      input.id = id;
+      input.name = field.name;
+      input.type = field.type;
+      input.autocomplete = field.autocomplete;
+      input.required = true;
+      if (field.inputmode) input.inputMode = field.inputmode;
+      if (field.placeholder) input.placeholder = field.placeholder;
+      if (field.name === 'cpf') input.maxLength = 14;
+      label.append(input);
+      form.append(label);
+    });
+    const roleLabel = element('label', 'law-profile-field law-users-field');
+    roleLabel.htmlFor = 'law-users-role';
+    roleLabel.append(element('span', '', 'Perfil'));
+    const roleSelect = element('select', 'fs-form-select');
+    roleSelect.id = 'law-users-role';
+    roleSelect.name = 'role';
+    roleSelect.append(new Option('Usuário', 'usuario'), new Option('Gestor', 'gestor'));
+    roleLabel.append(roleSelect);
+    form.append(roleLabel);
+    const formFooter = element('div', 'law-profile-form-footer law-users-form-footer');
+    const submit = element('button', 'fs-btn fs-btn-primary', 'Enviar convite');
+    submit.type = 'submit';
+    formFooter.append(submit);
+    form.append(formFooter);
+    inviteCard.append(form);
+
+    const profiles = element('section', 'law-profile-card law-users-profiles');
+    profiles.setAttribute('aria-labelledby', 'law-users-profiles-title');
+    const profilesHeading = element('div', 'law-profile-card-heading');
+    const profilesCopy = element('div');
+    profilesCopy.append(element('p', 'law-profile-eyebrow', 'ACESSO À EMPRESA'), element('h3', '', 'Perfis disponíveis'));
+    profilesCopy.querySelector('h3').id = 'law-users-profiles-title';
+    profilesHeading.append(profilesCopy);
+    const profileList = element('dl', 'law-users-profile-list');
+    [['Gestor', 'Acessa as operações delegadas nos módulos disponíveis. Não administra usuários, assinatura ou administração da empresa.'], ['Usuário', 'Acessa as operações permitidas ao seu perfil, sem administrar usuários, configurações sensíveis ou permissões.']].forEach(([title, description]) => {
+      const item = element('div', 'law-users-profile-item');
+      item.append(element('dt', '', title), element('dd', '', description));
+      profileList.append(item);
+    });
+    profiles.append(profilesHeading, profileList);
+    layout.append(inviteCard, profiles);
+
+    const listCard = element('section', 'law-profile-card law-users-list-card');
+    listCard.setAttribute('aria-labelledby', 'law-users-list-title');
+    const listHeader = element('div', 'law-profile-card-heading law-users-list-heading');
+    const listCopy = element('div');
+    listCopy.append(element('p', 'law-profile-eyebrow', 'VÍNCULOS DA EMPRESA'), element('h3', '', 'Pessoas com acesso'));
+    listCopy.querySelector('h3').id = 'law-users-list-title';
+    listHeader.append(listCopy);
+    const transfer = element('a', 'fs-btn fs-btn-outline-primary law-users-transfer', 'Transferir administração');
+    transfer.href = '/portal/transferir-administracao';
+    listHeader.append(transfer);
+    const listStatus = element('p', 'law-profile-loading');
+    listStatus.setAttribute('role', 'status');
+    listStatus.setAttribute('aria-live', 'polite');
+    listStatus.textContent = 'Carregando usuários…';
+    const userList = element('div', 'law-users-list');
+    userList.setAttribute('aria-busy', 'true');
+    listCard.append(listHeader, listStatus, userList);
+
+    const removeTrigger = element('button');
+    removeTrigger.type = 'button';
+    removeTrigger.hidden = true;
+    removeTrigger.setAttribute('data-fs', 'modal');
+    removeTrigger.setAttribute('data-fs-target', '#law-users-remove-modal');
+    const removeModal = element('div', 'fs-modal');
+    removeModal.id = 'law-users-remove-modal';
+    removeModal.setAttribute('aria-hidden', 'true');
+    const modalDialog = element('div', 'fs-modal-dialog fs-modal-sm');
+    const modalContent = element('div', 'fs-modal-content');
+    const modalHeader = element('div', 'fs-modal-header');
+    const modalTitle = element('h2', 'fs-modal-title', 'Remover acesso');
+    modalHeader.append(modalTitle);
+    const modalClose = element('button', 'fs-btn-close');
+    modalClose.type = 'button';
+    modalClose.setAttribute('data-fs-dismiss', 'modal');
+    modalClose.setAttribute('aria-label', 'Fechar');
+    modalHeader.append(modalClose);
+    const modalBody = element('div', 'fs-modal-body');
+    const modalDescription = element('p');
+    modalBody.append(modalDescription);
+    const modalError = element('p', 'law-users-modal-error');
+    modalError.setAttribute('role', 'alert');
+    modalBody.append(modalError);
+    const modalFooter = element('div', 'fs-modal-footer');
+    const modalCancel = element('button', 'fs-btn fs-btn-outline-secondary', 'Cancelar');
+    modalCancel.type = 'button';
+    modalCancel.setAttribute('data-fs-dismiss', 'modal');
+    const modalConfirm = element('button', 'fs-btn fs-btn-danger', 'Remover acesso');
+    modalConfirm.type = 'button';
+    modalFooter.append(modalCancel, modalConfirm);
+    modalContent.append(modalHeader, modalBody, modalFooter);
+    modalDialog.append(modalContent);
+    removeModal.append(modalDialog);
+
+    contentRegion.append(feedback, layout, listCard, removeTrigger, removeModal);
+    const modal = window.FokusStyles?.Modal?.getOrCreateInstance(removeTrigger);
+    let pendingRemoval = null;
+
+    async function refreshUsers(message = '') {
+      userList.setAttribute('aria-busy', 'true');
+      userList.replaceChildren();
+      listStatus.hidden = false;
+      listStatus.dataset.state = '';
+      listStatus.textContent = 'Carregando usuários…';
+      try {
+        const users = await FokusApi.request('/portal/users');
+        userList.replaceChildren();
+        if (!Array.isArray(users) || users.length === 0) {
+          listStatus.textContent = 'Nenhuma pessoa está vinculada a esta empresa.';
+          userList.setAttribute('aria-busy', 'false');
+          if (message) { feedback.textContent = message; feedback.dataset.state = 'success'; }
+          return;
+        }
+        listStatus.hidden = true;
+        users.forEach((user) => {
+          const card = element('article', 'law-users-row');
+          const details = element('div', 'law-users-row-details');
+          const identity = element('div', 'law-users-identity');
+          identity.append(element('h4', '', user.name || 'Usuário'), element('p', '', user.email || 'E-mail não informado'));
+          const metadata = element('dl', 'law-users-metadata');
+          [[ 'CPF', maskUserCpf(user.cpf) ], [ 'Perfil', userRoleLabel(user.role) ], [ 'Situação', userStatusLabel(user.status) ]].forEach(([label, value]) => {
+            const field = element('div', 'law-users-meta-item');
+            field.append(element('dt', '', label), element('dd', '', value));
+            metadata.append(field);
+          });
+          details.append(identity, metadata);
+          card.append(details);
+          if (user.role !== 'admin') {
+            const actions = element('div', 'law-users-row-actions');
+            [['gestor', 'Gestor'], ['usuario', 'Usuário']].forEach(([role, label]) => {
+              const button = element('button', role === user.role ? 'fs-btn fs-btn-secondary' : 'fs-btn fs-btn-outline-secondary', role === user.role ? `${label} · atual` : `Definir perfil: ${label}`);
+              button.type = 'button';
+              button.disabled = role === user.role || user.status === 'removido';
+              button.addEventListener('click', () => updateUser(user, { role }));
+              actions.append(button);
+            });
+            if (user.status === 'removido') {
+              const restore = element('button', 'fs-btn fs-btn-outline-primary', 'Restaurar acesso');
+              restore.type = 'button';
+              restore.addEventListener('click', async () => {
+                await runUserAction(restore, async () => FokusApi.request(`/portal/users/${encodeURIComponent(user.id)}/restore`, { method: 'POST', body: { version: Number(user.version) } }), 'Acesso restaurado.');
+              });
+              actions.append(restore);
+            } else if (user.status !== 'suspenso') {
+              const suspend = element('button', 'fs-btn fs-btn-outline-secondary', 'Suspender acesso');
+              suspend.type = 'button';
+              suspend.addEventListener('click', () => updateUser(user, { status: 'suspenso' }));
+              actions.append(suspend);
+            }
+            if (user.status !== 'removido') {
+              const remove = element('button', 'fs-btn fs-btn-outline-primary law-users-remove-button', 'Remover');
+              remove.type = 'button';
+              remove.addEventListener('click', () => {
+                pendingRemoval = { user, trigger: remove };
+                remove.addEventListener('fs:hidden', () => {
+                  if (pendingRemoval?.trigger === remove) pendingRemoval = null;
+                }, { once: true });
+                modalDescription.textContent = `O vínculo de ${user.name || 'esta pessoa'} com a empresa será removido.`;
+                modalError.textContent = '';
+                if (modal) modal.triggerEl = remove;
+                modal?.show();
+              });
+              actions.append(remove);
+            }
+            card.append(actions);
+          }
+          userList.append(card);
+        });
+        userList.setAttribute('aria-busy', 'false');
+        if (message) { feedback.textContent = message; feedback.dataset.state = 'success'; }
+      } catch (error) {
+        userList.setAttribute('aria-busy', 'false');
+        listStatus.hidden = false;
+        listStatus.dataset.state = 'error';
+        listStatus.textContent = error.message || 'Não foi possível carregar os usuários.';
+        if (error.status === 401 || error.status === 403) window.location.assign(error.status === 401 ? '/acesso' : '/portal/empresas');
+      }
+    }
+
+    async function runUserAction(button, request, successMessage) {
+      button.disabled = true;
+      feedback.textContent = 'Salvando alteração…';
+      feedback.dataset.state = '';
+      try {
+        const result = await request();
+        await refreshUsers(result?.message || successMessage);
+      } catch (error) {
+        feedback.textContent = error.message || 'Não foi possível salvar a alteração.';
+        feedback.dataset.state = 'error';
+        button.disabled = false;
+      }
+    }
+
+    async function updateUser(user, changes) {
+      const button = document.activeElement;
+      await runUserAction(button, () => FokusApi.request(`/portal/users/${encodeURIComponent(user.id)}`, {
+        method: 'PATCH', body: { ...changes, version: Number(user.version) },
+      }), changes.role ? 'Perfil atualizado.' : 'Acesso suspenso.');
+    }
+
+    modalConfirm.addEventListener('click', async () => {
+      if (!pendingRemoval) return;
+      modalConfirm.disabled = true;
+      try {
+        const { user } = pendingRemoval;
+        const result = await FokusApi.request(`/portal/users/${encodeURIComponent(user.id)}`, {
+          method: 'PATCH', body: { status: 'removido', version: Number(user.version) },
+        });
+        pendingRemoval = null;
+        modal?.hide();
+        await refreshUsers(result?.message || 'Acesso removido.');
+      } catch (error) {
+        modalError.textContent = error.message || 'Não foi possível remover o acesso.';
+      } finally {
+        modalConfirm.disabled = false;
+      }
+    });
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      feedback.textContent = '';
+      feedback.dataset.state = '';
+      if (!form.reportValidity()) return;
+      const data = Object.fromEntries(new FormData(form));
+      const cpf = String(data.cpf || '').replace(/\D/g, '');
+      if (!isValidUserCpf(cpf)) {
+        const cpfInput = form.elements.namedItem('cpf');
+        cpfInput.setAttribute('aria-invalid', 'true');
+        cpfInput.setAttribute('aria-describedby', feedback.id);
+        feedback.textContent = 'Informe um CPF válido com 11 dígitos.';
+        feedback.dataset.state = 'error';
+        cpfInput.focus();
+        return;
+      }
+      form.elements.namedItem('cpf').removeAttribute('aria-invalid');
+      form.elements.namedItem('cpf').removeAttribute('aria-describedby');
+      const submitButton = form.querySelector('[type="submit"]');
+      submitButton.disabled = true;
+      submitButton.textContent = 'Enviando convite…';
+      try {
+        const result = await FokusApi.request('/portal/users', { method: 'POST', body: { ...data, cpf } });
+        form.reset();
+        await refreshUsers(result?.message || 'Convite enviado.');
+        form.querySelector('[name="name"]').focus({ preventScroll: true });
+      } catch (error) {
+        feedback.textContent = error.message || 'Não foi possível enviar o convite.';
+        feedback.dataset.state = 'error';
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Enviar convite';
+      }
+    });
+    await refreshUsers();
   }
 
   async function renderCompany(successMessage = '') {
@@ -893,6 +1212,7 @@
     else if (view === 'preferences') renderPreferences();
     else if (view === 'units') renderUnits();
     else if (view === 'company') renderCompany();
+    else if (view === 'users') renderUsers();
     else if (view === 'subscription') renderSubscription();
     else {
       const module = activeModule();
@@ -1080,7 +1400,7 @@
 
   function setContext(value) {
     context = value;
-    if (initialPage !== 'profile') document.title = initialPage === 'company' ? 'Empresa | Fokus Law' : 'Fokus Law | Fokus Cloud';
+    if (!['profile', 'users'].includes(initialPage)) document.title = initialPage === 'company' ? 'Empresa | Fokus Law' : 'Fokus Law | Fokus Cloud';
     document.querySelector('#user-name').textContent = context.user.name;
     document.querySelector('#user-email').textContent = context.user.email;
     document.querySelector('#user-avatar').textContent = context.user.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
@@ -1088,7 +1408,7 @@
     renderCompanyOptions();
     renderUnitOptions();
     const remember = localStorage.getItem(preferenceKey(context.user.id, 'remember-group')) === 'true';
-    if (!['profile', 'company', 'subscription'].includes(initialPage) && remember) {
+    if (!['profile', 'company', 'subscription', 'users'].includes(initialPage) && remember) {
       const lastGroup = localStorage.getItem(preferenceKey(context.user.id, 'last-group'));
       if ((lastGroup === 'settings' && context.permissions.manage_settings) || context.modules.some((item) => `module:${item.id}` === lastGroup)) activeGroup = lastGroup;
     }

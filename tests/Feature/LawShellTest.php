@@ -147,6 +147,31 @@ class LawShellTest extends TestCase
         $this->actingAs($manager)->withSession($session)->getJson('/api/law/subscription')->assertForbidden();
     }
 
+    public function test_company_user_management_route_uses_the_law_shell_and_remains_admin_only(): void
+    {
+        $session = ['active_company_id' => $this->companyId];
+        $this->get('/portal/usuarios')->assertRedirect('/?acesso=cliente');
+        $this->actingAs($this->user)->withSession($session)
+            ->get('/portal/usuarios')
+            ->assertOk()->assertViewIs('portal.fokus-law')
+            ->assertSee('data-initial-page="users"', false)
+            ->assertSee('law-topbar', false);
+
+        $manager = User::create([
+            'id' => PrefixedUlid::make('USR'), 'name' => 'Gestor', 'cpf' => '11144477736',
+            'email' => 'gestor-users@example.test', 'password' => Hash::make('SenhaSegura!2026'),
+            'status' => 'ativa', 'email_verified_at' => now(),
+        ]);
+        DB::table('company_memberships')->insert([
+            'id' => PrefixedUlid::make('MEM'), 'company_id' => $this->companyId, 'user_id' => $manager->id,
+            'role_id' => DB::table('roles')->where('code', 'gestor')->value('id'), 'status' => 'ativo', 'version' => 1,
+            'created_by' => $this->user->id, 'updated_by' => $this->user->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->actingAs($manager)->withSession($session)->get('/portal/usuarios')->assertForbidden();
+        $this->actingAs($manager)->withSession($session)->getJson('/api/portal/users')->assertForbidden();
+        $this->get('/portal/users.html')->assertNotFound();
+    }
+
     public function test_contact_capacity_meter_notifies_once_on_each_crossing_of_seventy_percent(): void
     {
         $product = DB::table('products')->whereIn('code', ['law', 'fokus-law'])->firstOrFail();
