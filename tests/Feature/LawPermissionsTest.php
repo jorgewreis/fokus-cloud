@@ -32,6 +32,24 @@ class LawPermissionsTest extends TestCase
             'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->membership($this->admin, 'admin');
+        $product = DB::table('products')->where('code', 'law')->firstOrFail();
+        $contactsModule = DB::table('modules')->where('product_id', $product->id)->where('module_code', 'contatos')
+            ->where('status', 'ativo')->where('publication_state', 'publicado')->firstOrFail();
+        $subscriptionId = PrefixedUlid::make('ASS');
+        DB::table('subscriptions')->insert([
+            'id' => $subscriptionId, 'company_id' => $this->companyId, 'product_id' => $product->id,
+            'status' => 'ativa', 'open_company_product' => $this->companyId.'-'.$product->id, 'version' => 1,
+            'billing_cycle' => 'monthly', 'current_period_starts_at' => now(), 'current_period_ends_at' => now()->addMonth(),
+            'commercial_snapshot' => json_encode(['segment' => 'setor_publico']), 'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('subscription_items')->insert([
+            'id' => PrefixedUlid::make('ITM'), 'company_id' => $this->companyId, 'subscription_id' => $subscriptionId,
+            'module_id' => $contactsModule->id, 'name_snapshot' => $contactsModule->name, 'quantity' => 1,
+            'unit_price_snapshot' => $contactsModule->monthly_price, 'conditions_snapshot' => json_encode(['segment_code' => 'setor_publico']),
+            'version' => 1, 'created_by' => $this->admin->id, 'updated_by' => $this->admin->id,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
         $this->unitId = PrefixedUlid::make('LUN');
         DB::table('law_units')->insert([
             'id' => $this->unitId, 'company_id' => $this->companyId, 'name' => 'Setor Central',
