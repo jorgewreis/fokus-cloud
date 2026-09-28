@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\FokusLawSystemMail;
 use App\Models\PlatformAdmin;
 use App\Services\PlatformAudit;
 use App\Services\PlatformSecurity;
@@ -130,7 +131,18 @@ class PlatformAuthController extends Controller
         $code = (string) random_int(100000, 999999);
         DB::table('platform_login_challenges')->where('platform_admin_id', $admin->id)->whereNull('used_at')->update(['used_at' => now(), 'updated_at' => now()]);
         try {
-            Mail::raw("Seu código de acesso ao backoffice Fokus Cloud é: {$code}. Ele expira em 10 minutos.", fn ($mail) => $mail->to($admin->email)->subject('Fokus Cloud: código de acesso interno'));
+            Mail::to($admin->email)->send(new FokusLawSystemMail(
+                subjectLine: 'Fokus Cloud: código de acesso interno',
+                title: 'Vamos confirmar seu acesso',
+                intro: 'Este e-mail contém o código solicitado para validar uma tentativa de entrada no Backoffice Fokus Cloud. Digite-o na tela de acesso que você acabou de abrir.',
+                preheader: 'Use o código de verificação para confirmar seu acesso.',
+                code: $code,
+                codeLabel: 'SEU CÓDIGO DE VERIFICAÇÃO',
+                expiry: '10 minutos',
+                securityTitle: 'Não reconhece esta tentativa?',
+                securityText: ' Não use nem encaminhe o código. Você pode ignorar este e-mail; nenhuma alteração será feita na sua conta.',
+                details: [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'O QUE REÚNE', 'value' => 'Processos, prazos e equipe']],
+            ));
         } catch (\Throwable) {
             $request->session()->forget('platform_pending_admin_id');
             $audit->record($admin->id, 'backoffice.mfa_delivery_failed', 'platform_admin', $admin->id, request: $request);

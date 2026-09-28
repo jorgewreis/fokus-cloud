@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\FokusLawSystemMail;
 use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
 use App\Services\PlatformAudit;
@@ -57,8 +58,26 @@ class PlatformAdminController extends Controller
 
         if ($pendingEmail) {
             $url = rtrim(config('app.url'), '/').'/backoffice/confirmar-email?token='.urlencode($pendingEmail['token']);
-            Mail::raw("Foi solicitada uma alteração do e-mail da sua conta interna Fokus Cloud. Confirme o novo endereço em até 24 horas: {$url}", fn ($mail) => $mail->to($pendingEmail['email'])->subject('Fokus Cloud: confirme seu novo e-mail interno'));
-            Mail::raw('Foi solicitada a alteração do e-mail desta conta interna. O endereço atual continuará ativo até que o novo endereço seja confirmado.', fn ($mail) => $mail->to($pendingEmail['old_email'])->subject('Fokus Cloud: alteração de e-mail solicitada'));
+            Mail::to($pendingEmail['email'])->send(new FokusLawSystemMail(
+                subjectLine: 'Fokus Cloud: confirme seu novo e-mail interno',
+                title: 'Confirme seu novo e-mail',
+                intro: 'Foi solicitada uma alteração do endereço de e-mail da sua conta interna Fokus Cloud. Confirme o novo endereço para concluir a mudança.',
+                preheader: 'Confirme o novo endereço de e-mail da sua conta interna.',
+                actionLabel: 'Confirmar novo e-mail',
+                actionUrl: $url,
+                securityTitle: 'O pedido expira em 24 horas.',
+                securityText: ' O endereço atual continua ativo até que o novo seja confirmado.',
+                details: [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'VALIDADE', 'value' => 'Link válido por 24 horas']],
+            ));
+            Mail::to($pendingEmail['old_email'])->send(new FokusLawSystemMail(
+                subjectLine: 'Fokus Cloud: alteração de e-mail solicitada',
+                title: 'Pedido de alteração de e-mail',
+                intro: 'Foi solicitada a alteração do endereço de e-mail desta conta interna Fokus Cloud.',
+                preheader: 'Uma alteração de e-mail foi solicitada para sua conta.',
+                securityTitle: 'Seu acesso continua protegido.',
+                securityText: ' O endereço atual permanecerá ativo até que o novo seja confirmado. Se não reconhece o pedido, contate o suporte.',
+                details: [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'SITUAÇÃO', 'value' => 'Aguardando confirmação']],
+            ));
         }
 
         $updated = $admin->fresh('role');
@@ -86,7 +105,15 @@ class PlatformAdminController extends Controller
             $admin->forceFill(['email' => $change->new_email, 'email_verified_at' => now()])->save();
             return ['admin' => $admin->fresh('role'), 'old_email' => $oldEmail, 'new_email' => $change->new_email];
         });
-        Mail::raw('O e-mail da conta interna Fokus Cloud foi alterado com sucesso. Se você não solicitou essa alteração, contate o suporte.', fn ($mail) => $mail->to($result['old_email'])->subject('Fokus Cloud: e-mail da conta alterado'));
+        Mail::to($result['old_email'])->send(new FokusLawSystemMail(
+            subjectLine: 'Fokus Cloud: e-mail da conta alterado',
+            title: 'E-mail da conta atualizado',
+            intro: 'O endereço de e-mail da sua conta interna Fokus Cloud foi alterado com sucesso.',
+            preheader: 'O endereço de e-mail da sua conta foi atualizado.',
+            securityTitle: 'Não solicitou esta alteração?',
+            securityText: ' Contate o suporte Fokus Cloud imediatamente para proteger sua conta.',
+            details: [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'ATUALIZAÇÃO', 'value' => 'E-mail da conta']],
+        ));
         $audit->record($result['admin']->id, 'backoffice.admin_email_changed', 'platform_admin', $result['admin']->id, before: ['email' => $result['old_email']], after: ['email' => $result['new_email']], request: $request);
         $security->revokeSessions($result['admin']->id);
 
@@ -100,7 +127,17 @@ class PlatformAdminController extends Controller
         $admin = PlatformAdmin::create(['id' => PrefixedUlid::make('PAD'), 'name' => $data['name'], 'email' => strtolower($data['email']), 'password' => Hash::make(Str::random(64)), 'status' => 'suspenso', 'platform_role_id' => $role->id]);
         $token = Str::random(64);
         DB::table('platform_admin_invitations')->insert(['id' => PrefixedUlid::make('PAI'), 'platform_admin_id' => $admin->id, 'invited_by_platform_admin_id' => $request->user()->id, 'token_hash' => hash('sha256', $token), 'expires_at' => now()->addHours(24), 'created_at' => now(), 'updated_at' => now()]);
-        Mail::raw('Você recebeu um convite para o Backoffice Fokus Cloud. Ative sua conta em '.url('/backoffice/ativar?token='.$token).'. O link expira em 24 horas.', fn ($mail) => $mail->to($admin->email)->subject('Fokus Cloud: convite para Backoffice'));
+        Mail::to($admin->email)->send(new FokusLawSystemMail(
+            subjectLine: 'Fokus Cloud: convite para Backoffice',
+            title: 'Convite para o Backoffice',
+            intro: 'Você recebeu um convite para acessar o Backoffice Fokus Cloud. Ative sua conta pelo botão abaixo.',
+            preheader: 'Ative seu acesso ao Backoffice Fokus Cloud.',
+            actionLabel: 'Ativar minha conta',
+            actionUrl: url('/backoffice/ativar?token='.$token),
+            securityTitle: 'O convite expira em 24 horas.',
+            securityText: ' Se você não esperava este convite, ignore esta mensagem e avise a pessoa responsável.',
+            details: [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'ACESSO', 'value' => 'Backoffice']],
+        ));
         $audit->record($request->user()->id, 'backoffice.admin_invited', 'platform_admin', $admin->id, after: $security->maskedAdmin($admin), request: $request);
 
         return response()->json(['id' => $admin->id, 'message' => 'Convite enviado.'], 201);

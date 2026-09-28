@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\FokusLawSystemMail;
 use App\Models\User;
 use App\Services\PasswordSecurity;
 use App\Services\PrefixedUlid;
@@ -347,7 +348,15 @@ class AuthController extends Controller
             $email = $requestedEmail;
             abort_if(User::where('email', $email)->where('id', '!=', $user->id)->exists(), 422, 'Este e-mail já está vinculado a outra conta.');
             $this->sendToken($user, 'email_verification', '/verificar-email', ['new_email' => $email], $email);
-            Mail::raw('Foi solicitada uma alteração do e-mail da sua conta Fokus Cloud.', fn ($mail) => $mail->to($user->email)->subject('Fokus Cloud: solicitação de alteração de e-mail'));
+            Mail::to($user->email)->send(new FokusLawSystemMail(
+                subjectLine: 'Fokus Cloud: solicitação de alteração de e-mail',
+                title: 'Alteração de e-mail solicitada',
+                intro: 'Recebemos um pedido para alterar o endereço de e-mail da sua conta Fokus Cloud. Enviamos uma mensagem ao novo endereço para confirmar a alteração.',
+                preheader: 'Um novo endereço de e-mail foi informado para sua conta.',
+                securityTitle: 'Você não fez esta solicitação?',
+                securityText: ' Entre em contato com o suporte e não aprove pedidos que você não reconhece.',
+                details: [['label' => 'CONTA', 'value' => 'Fokus Cloud'], ['label' => 'SITUAÇÃO', 'value' => 'Aguardando confirmação']],
+            ));
             app(\App\Services\AuditRecorder::class)->platform(null, 'customer.email_change.requested', 'user', $user->id, metadata: ['fields' => ['email']], after: ['requested' => ['email']], request: $request, actorType: 'customer');
         }
         if ($changes) {
@@ -564,9 +573,25 @@ class AuthController extends Controller
         });
         $previousAdmin = DB::table('company_memberships as membership')->join('users', 'users.id', '=', 'membership.user_id')->where('membership.id', $payload['from_membership_id'])->value('users.email');
         $newAdmin = User::findOrFail($token->user_id);
-        Mail::raw('A transferência de administração da empresa foi concluída.', fn ($mail) => $mail->to($newAdmin->email)->subject('Fokus Cloud: administração transferida'));
+        Mail::to($newAdmin->email)->send(new FokusLawSystemMail(
+            subjectLine: 'Fokus Cloud: administração transferida',
+            title: 'Administração transferida',
+            intro: 'A transferência da administração da empresa foi concluída. Sua conta agora responde pela administração da empresa no Fokus Cloud.',
+            preheader: 'A administração da empresa foi transferida para sua conta.',
+            securityTitle: 'Não reconhece esta alteração?',
+            securityText: ' Fale com o suporte Fokus Cloud para revisar o acesso da empresa.',
+            details: [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'ACESSO', 'value' => 'Administração da empresa']],
+        ));
         if ($previousAdmin) {
-            Mail::raw('A transferência de administração da empresa foi concluída.', fn ($mail) => $mail->to($previousAdmin)->subject('Fokus Cloud: administração transferida'));
+            Mail::to($previousAdmin)->send(new FokusLawSystemMail(
+                subjectLine: 'Fokus Cloud: administração transferida',
+                title: 'Administração transferida',
+                intro: 'A transferência da administração da empresa foi concluída. Seu acesso de administrador foi atualizado conforme a configuração feita durante a transferência.',
+                preheader: 'A transferência da administração da empresa foi concluída.',
+                securityTitle: 'Não reconhece esta alteração?',
+                securityText: ' Fale com o suporte Fokus Cloud para revisar o acesso da empresa.',
+                details: [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'ATUALIZAÇÃO', 'value' => 'Transferência de administração']],
+            ));
         }
         return response()->json(['message' => 'Administração transferida com sucesso.']);
     }
@@ -583,7 +608,15 @@ class AuthController extends Controller
         abort_unless($target && $from, 422, 'Esta transferência não está mais disponível.');
         $this->audit($payload['company_id'], $token->user_id, 'company_membership', $target->id, 'admin_transfer_declined', ['status' => 'pendente'], ['status' => 'recusada']);
         $previousAdmin = DB::table('users')->where('id', $from->user_id)->value('email');
-        if ($previousAdmin) Mail::raw('A pessoa indicada recusou a transferência de administração. Seu acesso de admin permanece ativo.', fn ($mail) => $mail->to($previousAdmin)->subject('Fokus Cloud: transferência recusada'));
+        if ($previousAdmin) Mail::to($previousAdmin)->send(new FokusLawSystemMail(
+            subjectLine: 'Fokus Cloud: transferência recusada',
+            title: 'Transferência recusada',
+            intro: 'A pessoa indicada recusou a transferência de administração. Seu acesso de administrador permanece ativo.',
+            preheader: 'A transferência de administração foi recusada.',
+            securityTitle: 'O que acontece agora?',
+            securityText: ' Você continua responsável pela administração da empresa. Nenhuma alteração adicional foi feita.',
+            details: [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'SITUAÇÃO', 'value' => 'Seu acesso permanece ativo']],
+        ));
         return response()->json(['message' => 'A transferência foi recusada. O admin atual permanece responsável pela empresa.']);
     }
 
@@ -597,14 +630,26 @@ class AuthController extends Controller
             'expires_at' => now()->addDay(), 'created_at' => now(), 'updated_at' => now(),
         ]);
         $url = rtrim(config('app.url'), '/').$path.'?token='.$plain;
-        $subject = match ($purpose) {
-            'email_verification' => 'Fokus Cloud: confirme seu e-mail',
-            'password_reset', 'password_creation' => 'Fokus Cloud: crie ou redefina sua senha',
-            'membership_acceptance' => 'Fokus Cloud: aceite seu vínculo',
-            'admin_transfer' => 'Fokus Cloud: aceite a administração da empresa',
-            default => 'Fokus Cloud: continue seu acesso',
+        [$subject, $title, $intro, $actionLabel, $securityTitle, $securityText] = match ($purpose) {
+            'email_verification' => ['Fokus Cloud: confirme seu e-mail', 'Confirme seu e-mail', 'Você solicitou a confirmação deste endereço para sua conta Fokus Cloud. Use o botão para validar seu e-mail e continuar.', 'Confirmar meu e-mail', 'Você não solicitou esta confirmação?', ' Ignore esta mensagem. O endereço só será atualizado depois que você confirmar o pedido.'],
+            'password_reset' => ['Fokus Cloud: crie ou redefina sua senha', 'Redefina sua senha', 'Recebemos um pedido para criar uma nova senha para sua conta Fokus Cloud. Use o botão para continuar com segurança.', 'Criar nova senha', 'Você não solicitou a redefinição?', ' Ignore esta mensagem. Sua senha atual não será alterada.'],
+            'password_creation' => ['Fokus Cloud: crie ou redefina sua senha', 'Crie sua senha', 'Sua conta Fokus Cloud está pronta para configuração. Use o botão para criar sua senha e concluir o acesso.', 'Criar minha senha', 'Não esperava este convite?', ' Ignore esta mensagem e fale com a pessoa administradora da sua empresa.'],
+            'membership_acceptance' => ['Fokus Cloud: aceite seu vínculo', 'Confirme seu vínculo', 'Você recebeu um convite para acessar uma empresa no Fokus Cloud. Revise e aceite o vínculo pelo botão abaixo.', 'Revisar convite', 'Não reconhece este convite?', ' Ignore esta mensagem ou confirme os detalhes com a pessoa administradora da empresa.'],
+            'admin_transfer' => ['Fokus Cloud: aceite a administração da empresa', 'Confirme a transferência', 'Você recebeu uma solicitação para assumir a administração de uma empresa no Fokus Cloud. Use o botão para revisar e responder ao pedido.', 'Revisar transferência', 'Não esperava esta solicitação?', ' Ignore esta mensagem e confirme com a pessoa que administra a empresa.'],
+            default => ['Fokus Cloud: continue seu acesso', 'Continue seu acesso', 'Recebemos uma solicitação relacionada à sua conta Fokus Cloud. Use o botão para continuar com segurança.', 'Continuar', 'Não reconhece esta solicitação?', ' Ignore esta mensagem.'],
         };
-        Mail::raw("Use este link em até 24 horas para continuar: {$url}", fn ($mail) => $mail->to($recipient ?: $user->email)->subject($subject));
+        Mail::to($recipient ?: $user->email)->send(new FokusLawSystemMail(
+            subjectLine: $subject,
+            title: $title,
+            intro: $intro,
+            preheader: $intro,
+            actionLabel: $actionLabel,
+            actionUrl: $url,
+            expiry: '24 horas',
+            securityTitle: $securityTitle,
+            securityText: $securityText,
+            details: [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'VALIDADE', 'value' => 'Link válido por 24 horas']],
+        ));
     }
 
     private function companyRegistrationData(Request $request, bool $newUser): array

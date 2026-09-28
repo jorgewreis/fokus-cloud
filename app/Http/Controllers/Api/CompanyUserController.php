@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\FokusLawSystemMail;
 use App\Models\User;
 use App\Services\LawAuthorizationService;
 use App\Services\PrefixedUlid;
@@ -251,7 +252,15 @@ class CompanyUserController extends Controller
             'from_membership_id' => (string) $request->attributes->get('active_membership')->id,
             'keep_previous_access' => (bool) $data['keep_previous_access'], 'status' => 'pendente',
         ]);
-        Mail::raw('Uma transferência de administração foi iniciada e aguarda o aceite do novo administrador.', fn ($mail) => $mail->to($request->user()->email)->subject('Fokus Cloud: transferência de administração iniciada'));
+        Mail::to($request->user()->email)->send(new FokusLawSystemMail(
+            subjectLine: 'Fokus Cloud: transferência de administração iniciada',
+            title: 'Transferência iniciada',
+            intro: 'Uma transferência da administração da empresa foi iniciada. A pessoa indicada recebeu um pedido para revisar e aceitar a mudança.',
+            preheader: 'A pessoa indicada recebeu o pedido de transferência de administração.',
+            securityTitle: 'O acesso atual segue ativo',
+            securityText: ' até que a transferência seja concluída pela pessoa indicada.',
+            details: [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'SITUAÇÃO', 'value' => 'Aguardando resposta']],
+        ));
         return response()->json(['message' => 'Enviamos o aceite de transferência ao novo administrador.']);
     }
 

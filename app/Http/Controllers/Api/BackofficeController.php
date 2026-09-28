@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\FokusLawSystemMail;
 use App\Models\User;
 use App\Models\PlatformAdmin;
 use App\Services\PlatformAudit;
@@ -1602,7 +1603,15 @@ class BackofficeController extends Controller
     {
         $data = $request->validate(['name' => ['required', 'string', 'max:255'], 'email' => ['required', 'email:rfc', 'max:255', 'unique:platform_admins,email'], 'password' => ['required', 'string', 'min:12', 'confirmed']]);
         $admin = PlatformAdmin::create(['id' => PrefixedUlid::make('PAD'), 'name' => $data['name'], 'email' => strtolower($data['email']), 'password' => Hash::make($data['password']), 'status' => 'ativo', 'email_verified_at' => now()]);
-        Mail::raw('Uma conta de superadministrador do backoffice Fokus Cloud foi criada para você. Use a senha entregue por canal seguro e o código enviado por e-mail para entrar.', fn ($mail) => $mail->to($admin->email)->subject('Fokus Cloud: acesso ao backoffice criado'));
+        Mail::to($admin->email)->send(new FokusLawSystemMail(
+            subjectLine: 'Fokus Cloud: acesso ao backoffice criado',
+            title: 'Seu acesso foi criado',
+            intro: 'Uma conta de superadministrador do Backoffice Fokus Cloud foi criada para você. Use a senha recebida por canal seguro; o código de acesso será enviado por e-mail durante o login.',
+            preheader: 'Sua conta de superadministrador do Backoffice está pronta.',
+            securityTitle: 'Cuide das suas credenciais.',
+            securityText: ' Nunca compartilhe sua senha ou o código de confirmação de acesso.',
+            details: [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'PERFIL', 'value' => 'Superadministrador']],
+        ));
         $audit->record($request->user()->id, 'backoffice.admin_created', 'platform_admin', $admin->id, reason: 'Criação de superadministrador', after: ['name' => $admin->name, 'email' => $admin->email, 'status' => $admin->status], request: $request);
         return response()->json(['id' => $admin->id, 'message' => 'Superadministrador criado.'], 201);
     }
@@ -1786,7 +1795,15 @@ class BackofficeController extends Controller
         $data = $request->validate(['reason' => ['required', 'string', 'max:1000'], 'support_ticket' => ['required', 'string', 'max:100']]);
         $target = User::findOrFail($user);
         $auth->sendToken($target, 'password_reset', '/criar-senha', ['forced_by_support' => true, 'support_ticket' => $data['support_ticket']]);
-        Mail::raw('Uma redefinição de senha foi solicitada pelo suporte Fokus Cloud. Use apenas o link enviado para criar uma nova senha.', fn ($mail) => $mail->to($target->email)->subject('Fokus Cloud: redefinição de senha solicitada'));
+        Mail::to($target->email)->send(new FokusLawSystemMail(
+            subjectLine: 'Fokus Cloud: redefinição de senha solicitada',
+            title: 'Redefinição de senha solicitada',
+            intro: 'O suporte Fokus Cloud solicitou uma redefinição de senha para sua conta. Use o link de criação de senha enviado em outra mensagem para concluir a alteração.',
+            preheader: 'O suporte solicitou uma redefinição da senha da sua conta.',
+            securityTitle: 'Não reconhece este pedido?',
+            securityText: ' Fale com o suporte Fokus Cloud antes de usar o link recebido.',
+            details: [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'SOLICITAÇÃO', 'value' => 'Redefinição de senha']],
+        ));
         $audit->record($request->user()->id, 'backoffice.password_reset_requested', 'user', $target->id, reason: $data['reason'], ticket: $data['support_ticket'], request: $request);
         return response()->json(['message' => 'Link de redefinição enviado ao usuário.']);
     }
