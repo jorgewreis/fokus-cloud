@@ -10,16 +10,18 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('law_contacts', function (Blueprint $table): void {
-            $table->string('legal_nature', 2)->default('pf')->after('contact_type');
-            $table->boolean('sharing_excluded')->default(false)->after('status');
-            $table->index(['company_id', 'legal_nature', 'status'], 'law_contacts_company_nature_status_idx');
-        });
+        if (! Schema::hasColumn('law_contacts', 'legal_nature')) {
+            Schema::table('law_contacts', function (Blueprint $table): void {
+                $table->string('legal_nature', 2)->default('pf')->after('contact_type');
+                $table->boolean('sharing_excluded')->default(false)->after('status');
+                $table->index(['company_id', 'legal_nature', 'status'], 'law_contacts_company_nature_status_idx');
+            });
+        }
 
         DB::table('law_contacts')->whereIn('contact_type', ['organization', 'law_firm', 'public_body', 'court_unit', 'police_unit', 'prosecutor_office', 'public_defender'])->update(['legal_nature' => 'pj']);
         DB::table('law_contacts')->update(['law_unit_id' => null]);
 
-        Schema::create('law_contact_addresses', function (Blueprint $table): void {
+        $this->createIfMissing('law_contact_addresses', function (Blueprint $table): void {
             $table->char('id', 30)->charset('ascii')->collation('ascii_bin')->primary();
             $table->char('company_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->char('law_contact_id', 30)->charset('ascii')->collation('ascii_bin');
@@ -38,7 +40,7 @@ return new class extends Migration
             $table->index(['company_id', 'law_contact_id'], 'law_contact_addresses_contact_idx');
         });
 
-        Schema::create('law_contact_departments', function (Blueprint $table): void {
+        $this->createIfMissing('law_contact_departments', function (Blueprint $table): void {
             $table->char('id', 30)->charset('ascii')->collation('ascii_bin')->primary();
             $table->char('company_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->char('law_contact_id', 30)->charset('ascii')->collation('ascii_bin');
@@ -55,7 +57,7 @@ return new class extends Migration
             $table->index(['company_id', 'law_contact_id', 'status'], 'law_contact_departments_parent_idx');
         });
 
-        Schema::create('law_contact_channels', function (Blueprint $table): void {
+        $this->createIfMissing('law_contact_channels', function (Blueprint $table): void {
             $table->char('id', 30)->charset('ascii')->collation('ascii_bin')->primary();
             $table->char('company_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->char('law_contact_id', 30)->charset('ascii')->collation('ascii_bin');
@@ -67,12 +69,12 @@ return new class extends Migration
             $table->boolean('is_primary')->default(false);
             $table->unsignedSmallInteger('sort_order')->default(0);
             $table->timestamps();
-            $table->foreign(['company_id', 'law_contact_id'])->references(['company_id', 'id'])->on('law_contacts')->cascadeOnDelete();
-            $table->foreign(['company_id', 'law_contact_department_id'])->references(['company_id', 'id'])->on('law_contact_departments')->cascadeOnDelete();
+            $table->foreign(['company_id', 'law_contact_id'], 'law_contact_channels_contact_fk')->references(['company_id', 'id'])->on('law_contacts')->cascadeOnDelete();
+            $table->foreign(['company_id', 'law_contact_department_id'], 'law_contact_channels_department_fk')->references(['company_id', 'id'])->on('law_contact_departments')->cascadeOnDelete();
             $table->index(['company_id', 'law_contact_id', 'law_contact_department_id', 'channel_type'], 'law_contact_channels_scope_idx');
         });
 
-        Schema::create('law_contact_documents', function (Blueprint $table): void {
+        $this->createIfMissing('law_contact_documents', function (Blueprint $table): void {
             $table->char('id', 30)->charset('ascii')->collation('ascii_bin')->primary();
             $table->char('company_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->char('law_contact_id', 30)->charset('ascii')->collation('ascii_bin');
@@ -86,7 +88,7 @@ return new class extends Migration
             $table->unique(['company_id', 'document_fingerprint'], 'law_contact_documents_company_fingerprint_unique');
         });
 
-        Schema::create('law_contact_classifications', function (Blueprint $table): void {
+        $this->createIfMissing('law_contact_classifications', function (Blueprint $table): void {
             $table->char('company_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->char('law_contact_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->string('classification_code', 40);
@@ -102,7 +104,7 @@ return new class extends Migration
             DB::table('law_contacts')->where('contact_type', $legacy)->get(['company_id', 'id'])->each(fn ($contact) => DB::table('law_contact_classifications')->insertOrIgnore(['company_id' => $contact->company_id, 'law_contact_id' => $contact->id, 'classification_code' => $code]));
         }
 
-        Schema::create('law_contact_tags', function (Blueprint $table): void {
+        $this->createIfMissing('law_contact_tags', function (Blueprint $table): void {
             $table->char('id', 30)->charset('ascii')->collation('ascii_bin')->primary();
             $table->char('company_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->string('name', 64);
@@ -114,7 +116,7 @@ return new class extends Migration
             $table->foreign('created_by')->references('id')->on('users')->restrictOnDelete();
         });
 
-        Schema::create('law_contact_tag_assignments', function (Blueprint $table): void {
+        $this->createIfMissing('law_contact_tag_assignments', function (Blueprint $table): void {
             $table->char('company_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->char('law_contact_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->char('law_contact_tag_id', 30)->charset('ascii')->collation('ascii_bin');
@@ -123,7 +125,7 @@ return new class extends Migration
             $table->foreign('law_contact_tag_id')->references('id')->on('law_contact_tags')->cascadeOnDelete();
         });
 
-        Schema::create('law_contact_activity', function (Blueprint $table): void {
+        $this->createIfMissing('law_contact_activity', function (Blueprint $table): void {
             $table->char('id', 30)->charset('ascii')->collation('ascii_bin')->primary();
             $table->char('company_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->char('law_contact_id', 30)->charset('ascii')->collation('ascii_bin');
@@ -135,7 +137,7 @@ return new class extends Migration
             $table->index(['company_id', 'user_id', 'created_at'], 'law_contact_activity_recent_idx');
         });
 
-        Schema::create('law_contact_sharing_policies', function (Blueprint $table): void {
+        $this->createIfMissing('law_contact_sharing_policies', function (Blueprint $table): void {
             $table->char('id', 30)->charset('ascii')->collation('ascii_bin')->primary();
             $table->char('source_company_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->char('recipient_company_id', 30)->charset('ascii')->collation('ascii_bin');
@@ -199,5 +201,12 @@ return new class extends Migration
             $table->dropIndex('law_contacts_company_nature_status_idx');
             $table->dropColumn(['legal_nature', 'sharing_excluded']);
         });
+    }
+
+    private function createIfMissing(string $name, \Closure $definition): void
+    {
+        if (! Schema::hasTable($name)) {
+            Schema::create($name, $definition);
+        }
     }
 };
