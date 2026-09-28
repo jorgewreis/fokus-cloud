@@ -7,6 +7,19 @@ use Illuminate\Support\Facades\DB;
 
 class LawAuthorizationService
 {
+    private const SYSTEM_PERMISSION_RESOURCES = ['company', 'units', 'subscription', 'notifications', 'users', 'roles'];
+
+    private const MODULE_PERMISSION_RESOURCES = [
+        'process' => 'processos',
+        'processes' => 'processos',
+        'contacts' => 'contatos',
+        'expeditions' => 'expedicoes',
+        'filings' => 'expedicoes',
+        'tasks' => 'tarefas',
+        'hearings' => 'audiencias',
+        'reports' => 'relatorios',
+    ];
+
     private const DEFAULT_ROLES = [
         'unit_admin' => ['Administrador do setor', 'law.company.view,law.notifications.view,law.notifications.update,law.contacts.view,law.contacts.create,law.contacts.update,law.contacts.delete,law.hearings.view,law.hearings.create,law.hearings.update,law.hearings.delete,law.hearings.status.update,law.hearings.external_access.manage,law.users.view,law.users.manage,law.roles.view,law.roles.manage'],
         'chief_clerk' => ['Chefe / Escrivão', 'law.company.view,law.units.view,law.notifications.view,law.notifications.update,law.contacts.view,law.contacts.create,law.contacts.update,law.contacts.delete,law.hearings.view,law.hearings.create,law.hearings.update,law.hearings.delete,law.hearings.status.update,law.hearings.external_access.manage,law.users.view,law.users.manage,law.roles.view'],
@@ -56,6 +69,7 @@ class LawAuthorizationService
 
     public function can(Request $request, string $permission, ?string $unitId = null): bool
     {
+        if (! in_array($permission, $this->availablePermissionCodes($request), true)) return false;
         if ($this->isCompanyAdmin($request)) return true;
         $unitId ??= $this->activeUnitId($request);
         if (! $unitId) return false;
@@ -76,8 +90,9 @@ class LawAuthorizationService
 
     public function permissions(Request $request, ?string $unitId = null): array
     {
+        $available = $this->availablePermissionCodes($request);
         if ($this->isCompanyAdmin($request)) {
-            return DB::table('customer_permissions')->where('product_code', 'law')->orderBy('code')->pluck('code')->all();
+            return $available;
         }
         $unitId ??= $this->activeUnitId($request);
         if (! $unitId) return [];
@@ -88,7 +103,47 @@ class LawAuthorizationService
             ->where('lum.law_unit_id', $unitId)
             ->where('lum.company_membership_id', $request->attributes->get('active_membership')->id)
             ->where('lum.status', 'ativo')->whereNull('lum.deleted_at')->orderBy('permission.code')
-            ->pluck('permission.code')->all();
+            ->pluck('permission.code')->intersect($available)->values()->all();
+    }
+
+    /**
+     * Return system permissions and permissions for modules included in an active Fokus Law subscription.
+     * This is also used by authorization checks so hiding an option in the UI is not the only control.
+     */
+    public function availablePermissionCodes(Request $request): array
+    {
+        $companyId = (string) $request->attributes->get('active_company_id');
+        if ($companyId === '') return [];
+
+        $enabledModules = DB::table('subscription_items as item')
+            ->join('subscriptions as subscription', 'subscription.id', '=', 'item.subscription_id')
+            ->join('products as product', 'product.id', '=', 'subscription.product_id')
+            ->join('modules as module', 'module.id', '=', 'item.module_id')
+            ->where('subscription.company_id', $companyId)
+            ->where('subscription.status', 'ativa')
+            ->whereIn('product.code', ['law', 'fokus-law'])
+            ->where('module.status', 'ativo')
+            ->where('module.publication_state', 'publicado')
+            ->selectRaw('COALESCE(module.module_code, module.code) as module_code')
+            ->pluck('module_code')
+            ->filter()
+            ->map(fn ($code): string => strtolower((string) $code))
+            ->unique()
+            ->all();
+
+        return DB::table('customer_permissions')
+            ->where('product_code', 'law')
+            ->orderBy('code')
+            ->get(['code', 'resource'])
+            ->filter(function (object $permission) use ($enabledModules): bool {
+                $resource = strtolower((string) $permission->resource);
+                if (in_array($resource, self::SYSTEM_PERMISSION_RESOURCES, true)) return true;
+                $moduleCode = self::MODULE_PERMISSION_RESOURCES[$resource] ?? null;
+                return $moduleCode !== null && in_array($moduleCode, $enabledModules, true);
+            })
+            ->pluck('code')
+            ->values()
+            ->all();
     }
 
     public function provisionUnitRoles(string $companyId, string $unitId, ?string $actorId = null): array
@@ -117,11 +172,12 @@ class LawAuthorizationService
         return $roleIds;
     }
 
-    public function rolePermissions(string $roleId): array
+    public function rolePermissions(string $roleId, Request $request): array
     {
-        return DB::table('law_access_role_permissions as rp')
+        $permissions = DB::table('law_access_role_permissions as rp')
             ->join('customer_permissions as permission', 'permission.id', '=', 'rp.customer_permission_id')
             ->where('rp.law_access_role_id', $roleId)->pluck('permission.code')->all();
+        return array_values(array_intersect($permissions, $this->availablePermissionCodes($request)));
     }
 
     public function actorMayAssignRole(Request $request, object $role, ?string $unitId = null): bool
@@ -129,6 +185,6 @@ class LawAuthorizationService
         if ($this->isCompanyAdmin($request)) return true;
         if ($role->code === 'unit_admin') return false;
         $actorPermissions = $this->permissions($request, $unitId);
-        return count(array_diff($this->rolePermissions((string) $role->id), $actorPermissions)) === 0;
+        return count(array_diff($this->rolePermissions((string) $role->id, $request), $actorPermissions)) === 0;
     }
 }

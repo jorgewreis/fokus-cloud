@@ -17,7 +17,8 @@ class LawAccessController extends Controller
         $unitId = $this->unitId($request, $authorization);
         $authorization->authorize($request, 'law.roles.view', $unitId);
         $granted = $authorization->permissions($request, $unitId);
-        $permissions = DB::table('customer_permissions')->where('product_code', 'law')->orderBy('resource')->orderBy('action')->get(['code', 'resource', 'action', 'description']);
+        $available = $authorization->availablePermissionCodes($request);
+        $permissions = DB::table('customer_permissions')->where('product_code', 'law')->whereIn('code', $available)->orderBy('resource')->orderBy('action')->get(['code', 'resource', 'action', 'description']);
         return response()->json(['permissions' => $permissions->map(fn ($permission): array => [
             'code' => (string) $permission->code,
             'resource' => (string) $permission->resource,
@@ -37,7 +38,7 @@ class LawAccessController extends Controller
             'id' => (string) $role->id, 'code' => (string) $role->code, 'name' => (string) $role->name,
             'is_system' => (bool) $role->is_system, 'version' => (int) $role->version,
             'assignable' => $isAdmin || $authorization->actorMayAssignRole($request, $role, $unitId),
-            'permissions' => $authorization->rolePermissions((string) $role->id),
+            'permissions' => $authorization->rolePermissions((string) $role->id, $request),
         ])->values()]);
     }
 
@@ -49,7 +50,7 @@ class LawAccessController extends Controller
         ]);
         $unitId = $this->authorizedUnit($request, $authorization, $data['law_unit_id'], 'law.roles.manage');
         $permissions = $authorization->permissions($request, $unitId);
-        abort_if(count(array_diff($data['permission_codes'], $permissions)) > 0, 403, 'O perfil não pode conceder permissões que você não possui.');
+        abort_if(count(array_diff($data['permission_codes'], $permissions)) > 0, 403, 'O perfil só pode receber permissões incluídas na assinatura e disponíveis para você.');
         $companyId = (string) $request->attributes->get('active_company_id');
         $name = trim($data['name']);
         abort_if(DB::table('law_access_roles')->where('company_id', $companyId)->where('law_unit_id', $unitId)->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])->exists(), 409, 'Já existe um perfil com esse nome neste setor.');
@@ -80,7 +81,7 @@ class LawAccessController extends Controller
         $authorization->authorize($request, 'law.roles.manage', (string) $role->law_unit_id);
         abort_if($role->is_system, 422, 'Os perfis padrão não podem ser editados.');
         if (array_key_exists('permission_codes', $data)) {
-            abort_if(count(array_diff($data['permission_codes'], $authorization->permissions($request, (string) $role->law_unit_id))) > 0, 403, 'O perfil não pode conceder permissões que você não possui.');
+            abort_if(count(array_diff($data['permission_codes'], $authorization->permissions($request, (string) $role->law_unit_id))) > 0, 403, 'O perfil só pode receber permissões incluídas na assinatura e disponíveis para você.');
         }
         $newName = trim($data['name'] ?? $role->name);
         if ($newName !== $role->name) abort_if(DB::table('law_access_roles')->where('company_id', $role->company_id)->where('law_unit_id', $role->law_unit_id)->where('id', '!=', $roleId)->whereRaw('LOWER(name) = ?', [mb_strtolower($newName)])->exists(), 409, 'Já existe um perfil com esse nome neste setor.');

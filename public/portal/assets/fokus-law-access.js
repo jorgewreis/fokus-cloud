@@ -6,20 +6,26 @@
     return item;
   };
   const request = (path, options) => window.FokusApi.request(path, options);
-  const profileLabel = (role) => ({ unit_admin: 'Administrador do setor', chief_clerk: 'Chefe / Escrivão', operator: 'Operador', viewer: 'Somente leitura' })[role] || role;
+  const profileLabel = (role, context, fallback = '') => {
+    const labels = context?.subscription?.segment === 'advocacia'
+      ? { unit_admin: 'Administrador do escritório', chief_clerk: 'Gestor do escritório', operator: 'Operador', viewer: 'Consulta' }
+      : { unit_admin: 'Administrador da unidade', chief_clerk: 'Gestor da unidade', operator: 'Operador', viewer: 'Consulta' };
+    return labels[role] || fallback || role;
+  };
+  const visibleRoleName = (role, context) => role.is_system ? profileLabel(role.code, context) : role.name;
   const statusLabel = (status) => ({ ativo: 'Ativo', pendente: 'Convite pendente', suspenso: 'Suspenso', removido: 'Removido' })[status] || status;
 
   async function render(context, region, success = '') {
     document.title = 'Usuários, perfis e permissões | Fokus Law';
     region.replaceChildren();
     const heading = node('header', 'law-users-heading');
-    heading.append(node('p', 'law-page-eyebrow', 'ACESSO POR SETOR'), node('h2', '', 'Usuários, perfis e permissões'), node('p', 'law-page-lede', 'Defina em quais setores cada pessoa atua e quais ações seu perfil pode executar.'));
+    heading.append(node('p', 'law-page-eyebrow', 'ACESSO POR SETOR'), node('h2', '', 'Usuários, perfis e permissões'), node('p', 'law-page-lede', 'Defina em quais setores ou equipes cada pessoa atua e quais ações pode executar.'));
     const feedback = node('p', 'law-users-feedback', success); feedback.setAttribute('role', 'status'); feedback.setAttribute('aria-live', 'polite'); if (success) feedback.dataset.state = 'success';
     region.append(heading, feedback);
     const units = (context.units || []).filter((unit) => unit.status === 'ativo');
     const unitId = context.active_unit_id;
     if (!units.length) {
-      const empty = node('section', 'law-profile-card law-users-empty'); empty.append(node('h3', '', 'Nenhum setor disponível'), node('p', '', 'Crie um setor ou solicite que o admin da empresa atribua seu acesso antes de convidar pessoas.')); region.append(empty); return;
+      const empty = node('section', 'law-profile-card law-users-empty'); empty.append(node('h3', '', 'Nenhum setor disponível'), node('p', '', 'Cadastre um setor ou solicite que o administrador da empresa atribua seu acesso antes de convidar pessoas.')); region.append(empty); return;
     }
     if (!unitId) { region.append(node('p', 'law-profile-loading', 'Selecione um setor no menu lateral para administrar usuários e perfis.')); return; }
 
@@ -54,7 +60,7 @@
           try {
             const result = unit.id === unitId ? { roles } : await request(`/law/access/roles?law_unit_id=${encodeURIComponent(unit.id)}`);
             const options = (result.roles || []).filter((role) => role.assignable);
-            options.forEach((role) => select.append(new Option(role.name, role.id)));
+            options.forEach((role) => select.append(new Option(visibleRoleName(role, context), role.id)));
             if (!options.length) select.append(new Option('Nenhum perfil atribuível', ''));
           } catch (error) { select.append(new Option(error.message || 'Falha ao carregar perfis', '')); }
         });
@@ -75,11 +81,11 @@
     }
 
     const roleCard = node('section', 'law-profile-card law-users-profiles');
-    roleCard.append(node('h3', '', `Perfis de ${context.active_unit?.name || 'setor'}`), node('p', '', 'Os perfis padrão são protegidos. Perfis personalizados usam somente permissões que você possui.'));
+    roleCard.append(node('h3', '', `Perfis de ${context.active_unit?.name || 'setor'}`), node('p', '', 'Os perfis padrão são protegidos. Perfis personalizados usam apenas permissões dos módulos contratados e disponíveis para seu acesso.'));
     const roleList = node('div', 'law-custom-role-list');
     roles.forEach((role) => {
       const item = node('article', 'law-custom-role'); const copy = node('div');
-      copy.append(node('strong', '', role.name), node('small', '', role.is_system ? `Perfil padrão · ${profileLabel(role.code)}` : `${role.permissions.length} permissões`)); item.append(copy);
+      copy.append(node('strong', '', visibleRoleName(role, context)), node('small', '', role.is_system ? 'Perfil padrão' : `${role.permissions.length} permissões disponíveis`)); item.append(copy);
       if (canManageRoles && !role.is_system) { const edit = node('button', 'fs-btn fs-btn-outline-primary', 'Editar'); edit.type = 'button'; edit.addEventListener('click', () => roleEditor(role)); item.append(edit); }
       roleList.append(item);
     });
@@ -95,7 +101,7 @@
       const form = node('form', 'law-role-editor law-profile-card'); form.append(node('h3', '', role ? `Editar ${role.name}` : 'Novo perfil personalizado'));
       const nameLabel = node('label', 'law-profile-field'); nameLabel.append(node('span', '', 'Nome do perfil'));
       const name = node('input', 'fs-form-control'); name.value = role?.name || ''; name.maxLength = 100; name.required = true; nameLabel.append(name); form.append(nameLabel);
-      const fieldset = node('fieldset', 'law-role-permissions'); fieldset.append(node('legend', '', 'Permissões disponíveis'));
+      const fieldset = node('fieldset', 'law-role-permissions'); fieldset.append(node('legend', '', 'Permissões do sistema e dos módulos contratados'));
       const selected = new Set(role?.permissions || []);
       catalog.filter((permission) => permission.granted_to_actor).forEach((permission) => { const label = node('label'); const input = node('input'); input.type = 'checkbox'; input.value = permission.code; input.checked = selected.has(permission.code); label.append(input, node('span', '', permission.description)); fieldset.append(label); });
       form.append(fieldset); const error = node('p', 'law-users-feedback'); error.setAttribute('role', 'alert'); form.append(error);
@@ -130,16 +136,17 @@
           const card = node('article', 'law-users-row'); const details = node('div', 'law-users-row-details');
           const identity = node('div', 'law-users-identity'); identity.append(node('h4', '', user.name || 'Usuário'), node('p', '', user.email || 'E-mail não informado'));
           const metadata = node('dl', 'law-users-metadata');
-          [[ 'Perfil neste setor', law?.role_name || (user.role === 'admin' ? 'Admin global' : 'Sem atribuição') ], [ 'Situação', statusLabel(law?.status || user.status) ]].forEach(([labelText, value]) => { const field = node('div', 'law-users-meta-item'); field.append(node('dt', '', labelText), node('dd', '', value)); metadata.append(field); });
+          const currentProfile = law ? profileLabel(law.role_code, context, law.role_name) : (user.role === 'admin' ? 'Admin global' : 'Sem atribuição');
+          [[ 'Perfil neste setor', currentProfile ], [ 'Situação', statusLabel(law?.status || user.status) ]].forEach(([labelText, value]) => { const field = node('div', 'law-users-meta-item'); field.append(node('dt', '', labelText), node('dd', '', value)); metadata.append(field); });
           details.append(identity, metadata); card.append(details);
           if (canManageUsers && !law && user.role !== 'admin') {
             const actions = node('div', 'law-users-row-actions'); const select = node('select', 'fs-form-select'); select.setAttribute('aria-label', `Perfil de ${user.name} neste setor`);
-            assignable.forEach((role) => select.append(new Option(role.name, role.id)));
+            assignable.forEach((role) => select.append(new Option(visibleRoleName(role, context), role.id)));
             const grant = node('button', 'fs-btn fs-btn-outline-primary', 'Conceder acesso'); grant.type = 'button'; grant.disabled = !select.value;
             grant.addEventListener('click', () => updateAccess(user, null, { law_access_role_id: select.value }, grant)); actions.append(select, grant); card.append(actions);
           } else if (canManageUsers && law && user.role !== 'admin') {
             const actions = node('div', 'law-users-row-actions'); const select = node('select', 'fs-form-select'); select.setAttribute('aria-label', `Perfil de ${user.name}`);
-            assignable.forEach((role) => select.append(new Option(role.name, role.id, false, role.id === law.role_id)));
+            assignable.forEach((role) => select.append(new Option(visibleRoleName(role, context), role.id, false, role.id === law.role_id)));
             const save = node('button', 'fs-btn fs-btn-outline-primary', 'Salvar perfil'); save.type = 'button'; save.disabled = !select.value || select.value === law.role_id;
             select.addEventListener('change', () => { save.disabled = select.value === law.role_id; }); save.addEventListener('click', () => updateAccess(user, law, { law_access_role_id: select.value }, save)); actions.append(select, save);
             const state = node('button', 'fs-btn fs-btn-outline-secondary', law.status === 'removido' ? 'Restaurar acesso' : law.status === 'suspenso' ? 'Reativar acesso' : 'Suspender acesso'); state.type = 'button';

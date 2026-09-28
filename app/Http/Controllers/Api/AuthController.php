@@ -476,11 +476,17 @@ class AuthController extends Controller
         abort_unless(! empty($payload['membership_id']), 422, 'Convite inválido.');
         $membership = DB::table('company_memberships as membership')->join('companies as company', 'company.id', '=', 'membership.company_id')
             ->where('membership.id', $payload['membership_id'])->where('membership.user_id', $token->user_id)->where('membership.status', 'pendente')
-            ->first(['membership.id', 'company.legal_name']);
+            ->first(['membership.id', 'company.id as company_id', 'company.legal_name']);
         abort_unless($membership, 422, 'Este convite não está mais disponível.');
         $assignments = DB::table('law_unit_memberships as lum')->join('law_units as unit', function ($join): void { $join->on('unit.id', '=', 'lum.law_unit_id')->on('unit.company_id', '=', 'lum.company_id'); })
             ->join('law_access_roles as role', 'role.id', '=', 'lum.law_access_role_id')->where('lum.company_membership_id', $membership->id)->where('lum.status', 'pendente')
-            ->orderBy('unit.name')->get(['unit.name as unit_name', 'role.name as role_name']);
+            ->orderBy('unit.name')->get(['unit.name as unit_name', 'role.code as role_code', 'role.name as role_name']);
+        $segment = $this->lawSegmentForCompany((string) $membership->company_id);
+        $assignments->transform(function (object $assignment) use ($segment): object {
+            $assignment->role_name = $this->lawRoleLabel((string) $assignment->role_code, $segment, (string) $assignment->role_name);
+            unset($assignment->role_code);
+            return $assignment;
+        });
         return response()->json(['company_name' => (string) $membership->legal_name, 'assignments' => $assignments])->header('Cache-Control', 'no-store, private');
     }
 
@@ -694,6 +700,36 @@ class AuthController extends Controller
             ->leftJoinSub($lawNames, 'law_name', 'law_name.company_id', '=', 'company.id')
             ->select('company.id', DB::raw('COALESCE(law_name.public_name, company.legal_name) as name'), 'company.legal_name as legal_name', 'role.code as role')
             ->orderBy('company.legal_name')->get()->unique('id')->values()->all();
+    }
+
+    private function lawSegmentForCompany(string $companyId): ?string
+    {
+        $subscription = DB::table('subscriptions as subscription')
+            ->join('products as product', 'product.id', '=', 'subscription.product_id')
+            ->where('subscription.company_id', $companyId)
+            ->where('subscription.status', 'ativa')
+            ->whereIn('product.code', ['law', 'fokus-law'])
+            ->orderByDesc('subscription.created_at')
+            ->first(['subscription.commercial_snapshot', 'subscription.product_id']);
+        if (! $subscription) return null;
+
+        $snapshot = json_decode((string) $subscription->commercial_snapshot, true) ?: [];
+        $plan = null;
+        if (! empty($snapshot['plan_id'])) {
+            $plan = DB::table('plans')->where('id', $snapshot['plan_id'])->first(['segment']);
+        } elseif (! empty($snapshot['plan_code'])) {
+            $plan = DB::table('plans')->where('product_id', $subscription->product_id)->where('code', $snapshot['plan_code'])->first(['segment']);
+        }
+        return $plan->segment ?? $snapshot['segment'] ?? null;
+    }
+
+    private function lawRoleLabel(string $roleCode, ?string $segment, string $fallback): string
+    {
+        $advocacy = $segment === 'advocacia';
+        $labels = $advocacy
+            ? ['unit_admin' => 'Administrador do escritório', 'chief_clerk' => 'Gestor do escritório', 'operator' => 'Operador', 'viewer' => 'Consulta']
+            : ['unit_admin' => 'Administrador da unidade', 'chief_clerk' => 'Gestor da unidade', 'operator' => 'Operador', 'viewer' => 'Consulta'];
+        return $labels[$roleCode] ?? $fallback;
     }
 
     private function userPayload(User $user): array
