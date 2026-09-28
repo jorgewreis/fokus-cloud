@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Mail\FokusLawSystemMail;
 use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -75,19 +76,9 @@ class CustomerProfileTest extends TestCase
     public function test_email_change_sends_confirmation_to_new_address_and_notice_to_old_address(): void
     {
         $user = $this->customer();
-        $recipients = [];
-        Mail::shouldReceive('raw')->twice()->andReturnUsing(function (string $body, callable $callback) use (&$recipients): void {
-            $message = new class($recipients) {
-                public array $recipients = [];
-                public function __construct(array &$recipients) { $this->recipients =& $recipients; }
-                public function to(string $address): self { $this->recipients[] = $address; return $this; }
-                public function subject(string $subject): self { return $this; }
-            };
-            $callback($message);
-        });
-
         $this->actingAs($user)->patchJson('/api/auth/profile', ['email' => 'novo@example.test', 'current_password' => 'SenhaCliente!2026'])->assertOk();
-        $this->assertSame(['novo@example.test', 'cliente@example.test'], $recipients);
+        Mail::assertSent(FokusLawSystemMail::class, fn (FokusLawSystemMail $mail) => $mail->hasTo('novo@example.test') && $mail->actionLabel === 'Confirmar meu e-mail');
+        Mail::assertSent(FokusLawSystemMail::class, fn (FokusLawSystemMail $mail) => $mail->hasTo('cliente@example.test') && $mail->title === 'Pedido de alteração de e-mail');
     }
 
     public function test_email_change_rejects_an_address_used_by_another_account(): void
