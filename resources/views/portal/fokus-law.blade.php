@@ -110,7 +110,7 @@
   </template>
   <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script>
   <script src="/assets/js/api-client.js"></script>
-  <script src="/portal/assets/fokus-law-access.js?v=20260928-law-permissions-v3" defer></script>
+  <script src="/portal/assets/fokus-law-access.js?v=20260928-law-permissions-v4" defer></script>
   <script src="/portal/assets/fokus-law-shell.js?v=20260928-law-permissions-v2" defer></script>
   <script src="/assets/js/portal-profile.js?v=20260925-profile-v4" defer></script>
 </body>

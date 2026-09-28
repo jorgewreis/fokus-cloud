@@ -150,6 +150,15 @@
               else updateAccess(user, law, { status: law.status === 'suspenso' ? 'ativo' : 'suspenso' }, state);
             }); actions.append(state);
             const remove = node('button', 'fs-btn fs-btn-outline-primary', 'Remover do setor'); remove.type = 'button'; remove.addEventListener('click', () => { if (window.confirm(`Remover ${user.name} do setor ${context.active_unit?.name || ''}?`)) updateAccess(user, law, { status: 'removido' }, remove); }); actions.append(remove); card.append(actions);
+            if (user.status === 'pendente' && context.permissions.transfer_admin) {
+              const cancelInvite = node('button', 'fs-btn fs-btn-outline-primary law-users-remove-button', 'Cancelar convite'); cancelInvite.type = 'button';
+              cancelInvite.addEventListener('click', async () => {
+                if (!window.confirm(`Cancelar o convite pendente para ${user.name}? A pessoa não poderá aceitá-lo.`)) return;
+                cancelInvite.disabled = true;
+                try { await request(`/portal/users/${encodeURIComponent(user.id)}`, { method: 'PATCH', body: { status: 'removido', version: user.version } }); await render(context, region, 'Convite cancelado. A pessoa não poderá aceitar nem acessar a empresa.'); }
+                catch (error) { feedback.dataset.state = 'error'; feedback.textContent = error.message || 'Não foi possível cancelar o convite.'; cancelInvite.disabled = false; }
+              }); actions.append(cancelInvite);
+            }
           }
           userList.append(card);
         });
