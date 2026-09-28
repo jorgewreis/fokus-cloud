@@ -85,8 +85,14 @@ class CompanyUserController extends Controller
         }
 
         $membershipId = DB::transaction(function () use ($data, $cpf, $companyId, $actor, $auth, $assignments): string {
-            $user = User::where('cpf', $cpf)->first();
+            $user = User::where('cpf', $cpf)->lockForUpdate()->first();
             $existing = (bool) $user;
+            if ($user) {
+                $canonicalName = static fn (string $name): string => mb_strtolower(preg_replace('/\s+/u', ' ', trim($name)) ?? trim($name), 'UTF-8');
+                $identityMatches = $canonicalName($user->name) === $canonicalName($data['name'])
+                    && Str::lower(trim($user->email)) === Str::lower(trim($data['email']));
+                abort_unless($identityMatches, 409, 'Não foi possível enviar o convite com esses dados. Confira nome, CPF e e-mail antes de tentar novamente.');
+            }
             if (! $user) {
                 abort_if(User::where('email', Str::lower($data['email']))->exists(), 422, 'Este e-mail já está vinculado a outra conta.');
                 $user = User::create([
