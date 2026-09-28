@@ -64,7 +64,7 @@
     let currentItems = [];
     let searchTimer;
     root.replaceChildren();
-    const heading = $('div', 'law-page-heading');
+    const heading = $('div', 'law-page-heading law-contact-page-heading');
     heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Contatos'), $('p', 'law-page-lede', 'Organize pessoas, empresas, instituições e órgãos em uma base compartilhada pelos setores autorizados.'));
     const headingActions = $('div', 'law-contact-heading-actions');
     if (can('law.contacts.share.manage')) headingActions.append(button('Compartilhamento entre empresas', 'fs-btn fs-btn-outline-primary', (event) => openSharing(root, event.currentTarget)));
@@ -72,8 +72,17 @@
     heading.append(headingActions);
     root.append(heading);
 
+    const overview = $('section', 'law-contact-overview-banner fs-card');
+    overview.setAttribute('aria-label', 'Resumo da base de contatos');
+    root.append(overview);
     const metrics = $('section', 'law-contact-metrics'); metrics.setAttribute('aria-live', 'polite'); metrics.append($('p', 'law-contact-loading', 'Carregando contatos…')); root.append(metrics);
-    const usage = $('div', 'law-subscription-usage'); usage.textContent = 'Carregando capacidade…'; root.append(usage);
+    const recentCard = $('section', 'law-contact-recent-card fs-card');
+    const recentHeader = $('div', 'fs-card-header law-contact-recent-header');
+    const recentTitle = $('div'); recentTitle.append($('span', 'law-contact-section-kicker', 'SEU FLUXO'), $('h3', 'fs-card-title', 'Acessados recentemente'));
+    recentHeader.append(recentTitle);
+    recentHeader.append($('span', 'law-contact-recent-caption', 'Até cinco contatos consultados por você'));
+    const recentBody = $('div', 'fs-card-body law-contact-recent');
+    recentCard.append(recentHeader, recentBody); root.append(recentCard);
 
     const filters = $('form', 'law-contact-filters');
     const search = input('', 'Buscar por nome, organização, documento autorizado ou classificação', 180); search.type = 'search'; search.setAttribute('aria-label', 'Buscar contatos');
@@ -111,20 +120,61 @@
         currentItems = result.contacts || [];
         metrics.replaceChildren();
         const summary = result.summary || {};
-        [['Contatos PF', summary.pf], ['Contatos PJ', summary.pj], ['Departamentos', summary.departments], ['Cadastros no limite', summary.registrations_counted]].forEach(([label, value]) => {
-          const card = $('article', 'law-contact-metric-card fs-card fs-card-sm'); const body = $('div', 'fs-card-body law-contact-metric-body'); body.append($('span', '', label), $('strong', '', Number(value || 0).toLocaleString('pt-BR'))); card.append(body); metrics.append(card);
-        });
-        const recent = $('section', 'law-contact-recent-card fs-card fs-card-sm'); const header = $('div', 'fs-card-header'); header.append($('h3', 'fs-card-title', 'Acessados recentemente'));
-        const recentBody = $('div', 'fs-card-body law-contact-recent');
-        if (summary.recent?.length) summary.recent.slice(0, 5).forEach((item) => { const link = button(item.display_name, 'law-contact-recent-link', (event) => openDetails(root, item.id, false, refresh, event.currentTarget)); recentBody.append(link); });
-        else recentBody.append($('p', '', 'Seus contatos criados ou consultados aparecerão aqui.'));
-        recent.append(header, recentBody);
-        metrics.append(recent);
         const meter = summary.usage;
+        const total = Number(summary.contacts_total || 0);
+        const pf = Number(summary.pf || 0);
+        const pj = Number(summary.pj || 0);
+        const classified = Math.max(1, pf + pj);
+        overview.replaceChildren();
+        const bannerCopy = $('div', 'law-contact-overview-copy');
+        bannerCopy.append($('span', 'law-contact-overview-kicker', 'PAINEL DE RELACIONAMENTO'));
+        bannerCopy.append($('h3', '', 'Sua rede jurídica, em uma visão.'));
+        bannerCopy.append($('p', '', 'Pessoas, instituições e equipes com os vínculos importantes sempre à mão.'));
+        const quota = $('div', 'law-contact-capacity');
         if (meter?.available) {
-          usage.replaceChildren($('span', '', `${meter.label}: ${meter.used.toLocaleString('pt-BR')} de ${meter.limit.toLocaleString('pt-BR')} (${meter.percentage}%)`));
-          usage.dataset.state = meter.over_threshold ? 'warning' : 'normal';
-        } else { usage.textContent = 'A capacidade contratada para contatos não está configurada nesta assinatura.'; }
+          const quotaHead = $('div', 'law-contact-capacity-head');
+          quotaHead.append($('span', '', meter.label), $('strong', '', `${Number(meter.used).toLocaleString('pt-BR')} / ${Number(meter.limit).toLocaleString('pt-BR')}`));
+          const track = $('div', 'law-contact-capacity-track'); track.setAttribute('role', 'progressbar'); track.setAttribute('aria-label', meter.label); track.setAttribute('aria-valuemin', '0'); track.setAttribute('aria-valuemax', String(meter.limit)); track.setAttribute('aria-valuenow', String(meter.used));
+          const fill = $('span', 'law-contact-capacity-fill'); fill.style.width = `${Math.min(100, Number(meter.percentage || 0))}%`; track.append(fill);
+          quota.append(quotaHead, track, $('small', '', `${Number(meter.percentage || 0)}% da capacidade utilizada`));
+          quota.dataset.state = meter.over_threshold ? 'warning' : 'normal';
+        } else quota.append($('small', '', 'Capacidade contratada não configurada.'));
+        bannerCopy.append(quota);
+
+        const chartArea = $('div', 'law-contact-overview-chart');
+        const ring = $('div', 'law-contact-composition-ring');
+        ring.style.setProperty('--contact-pf-share', `${(pf / classified) * 100}%`);
+        ring.setAttribute('role', 'img'); ring.setAttribute('aria-label', `Composição dos contatos: ${pf} pessoas físicas e ${pj} pessoas jurídicas`);
+        const center = $('div', 'law-contact-ring-center'); center.append($('strong', '', total.toLocaleString('pt-BR')), $('span', '', 'CONTATOS')); ring.append(center);
+        const legend = $('div', 'law-contact-chart-legend');
+        [['pf', 'Pessoa física', pf], ['pj', 'Pessoa jurídica', pj], ['dept', 'Departamentos', summary.departments]].forEach(([tone, label, value]) => {
+          const row = $('div', `law-contact-chart-legend-row law-contact-chart-${tone}`); row.append($('span', 'law-contact-chart-dot'), $('span', '', label), $('strong', '', Number(value || 0).toLocaleString('pt-BR'))); legend.append(row);
+        });
+        chartArea.append(ring, legend); overview.append(bannerCopy, chartArea);
+
+        const active = Number(summary.contacts_active || 0);
+        const inactive = Number(summary.contacts_inactive || 0);
+        const metricSpecs = [
+          ['Contatos na base', total, `${active.toLocaleString('pt-BR')} ativos · ${inactive.toLocaleString('pt-BR')} inativos`, 'violet'],
+          ['Pessoas físicas', pf, `${Math.round((pf / classified) * 100)}% da base classificada`, 'blue'],
+          ['Pessoas jurídicas', pj, `${Math.round((pj / classified) * 100)}% da base classificada`, 'teal'],
+          ['Departamentos', Number(summary.departments || 0), `${Number(summary.registrations_counted || total).toLocaleString('pt-BR')} cadastros contabilizados`, 'amber'],
+        ];
+        metricSpecs.forEach(([label, value, note, tone], index) => {
+          const card = $('article', `law-contact-metric-card fs-card law-contact-metric-${tone}`);
+          const body = $('div', 'fs-card-body law-contact-metric-body');
+          body.append($('span', 'law-contact-metric-index', String(index + 1).padStart(2, '0')), $('span', 'law-contact-metric-label', label), $('strong', '', Number(value).toLocaleString('pt-BR')), $('small', '', note));
+          card.append(body); metrics.append(card);
+        });
+        recentBody.replaceChildren();
+        if (summary.recent?.length) summary.recent.slice(0, 5).forEach((item) => {
+          const link = button('', 'law-contact-recent-item', (event) => openDetails(root, item.id, false, refresh, event.currentTarget));
+          const detail = $('span', 'law-contact-recent-meta');
+          const activityLabels = { created: 'Cadastrado', viewed: 'Consultado', search_opened: 'Aberto pela busca' };
+          detail.append($('span', '', activityLabels[item.activity] || 'Consultado'), $('time', '', item.at ? new Date(item.at).toLocaleDateString('pt-BR') : 'Agora'));
+          link.append($('strong', '', item.display_name), detail); recentBody.append(link);
+        });
+        else recentBody.append($('p', 'law-contact-recent-empty', 'Os contatos criados ou consultados aparecerão aqui.'));
         datalist.replaceChildren(...(result.tags || []).map((name) => { const option = $('option'); option.value = name; return option; }));
         tbody.replaceChildren();
         if (!currentItems.length) {
@@ -152,7 +202,8 @@
         pageLabel.textContent = `Página ${pagination.page} · ${pagination.total.toLocaleString('pt-BR')} contato(s)`;
         previous.disabled = page <= 1; next.disabled = pagination.page * pagination.per_page >= pagination.total;
       } catch (error) {
-        metrics.replaceChildren(); usage.dataset.state = 'error'; usage.textContent = error.message || 'Não foi possível carregar os contatos.';
+        metrics.replaceChildren(); overview.replaceChildren($('p', 'law-contact-overview-error', error.message || 'Não foi possível carregar o resumo da base.'));
+        recentBody.replaceChildren($('p', 'law-contact-recent-empty', 'A atividade recente ficará disponível quando a lista carregar.'));
         state.dataset.state = 'error'; state.textContent = 'Não foi possível carregar a lista. Atualize ou ajuste os filtros.';
       }
     }
@@ -364,5 +415,5 @@
     modal.body.append(form);
   }
 
-  window.FokusLawContacts = { render, openContact: (root, id) => openDetails(root, id, false, () => {}) };
+  window.FokusLawContacts = { render, openContact: (root, id, opener = null) => openDetails(root, id, false, () => {}, opener) };
 })();

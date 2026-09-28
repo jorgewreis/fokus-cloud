@@ -210,61 +210,80 @@
   }
 
   function renderOverview() {
-    const hasModules = visibleModules().length > 0;
     const heading = element('div');
     heading.append(element('p', 'law-page-eyebrow', 'ESPAÇO DE TRABALHO'));
     heading.append(element('h2', '', 'Visão geral'));
-    heading.append(element('p', 'law-page-lede', 'Acompanhe o contexto da sua empresa e acesse os módulos disponíveis no Fokus Law.'));
+    heading.append(element('p', 'law-page-lede', 'Acompanhe seu trabalho e retome suas atividades em um só lugar.'));
     contentRegion.append(heading);
 
-    const welcome = element('section', 'law-welcome-card');
-    const copy = element('div', 'law-welcome-copy');
-    copy.append(element('h3', '', hasModules ? 'Seu Fokus Law está pronto para receber seu trabalho.' : 'Seu espaço Fokus Law está pronto.'));
-    copy.append(element('p', '', hasModules
-      ? 'Os módulos habilitados para sua empresa aparecem na navegação lateral. Nesta etapa, suas áreas funcionais ainda estão sendo preparadas.'
-      : 'Quando módulos forem contratados e habilitados para sua empresa, eles aparecerão na navegação lateral.'));
-    welcome.append(copy);
-    const iconBox = element('div', 'law-welcome-icon');
-    iconBox.append(icon('overview'));
-    welcome.append(iconBox);
+    const welcome = element('section', 'law-dashboard-hero');
+    const welcomeCopy = element('div', 'law-dashboard-hero-copy');
+    welcomeCopy.append(element('span', 'law-dashboard-hero-kicker', 'FOKUS LAW · WORKSPACE'));
+    welcomeCopy.append(element('h3', '', 'Seu trabalho, em foco.'));
+    welcomeCopy.append(element('p', '', 'Acesse suas ferramentas e continue de onde parou.'));
+    const visual = element('div', 'law-dashboard-hero-art');
+    visual.setAttribute('aria-hidden', 'true');
+    visual.append(element('span', 'law-dashboard-hero-orbit law-dashboard-hero-orbit-one'), element('span', 'law-dashboard-hero-orbit law-dashboard-hero-orbit-two'));
+    visual.append(icon('overview', 'law-dashboard-hero-icon'));
+    welcome.append(welcomeCopy, visual);
     contentRegion.append(welcome);
 
-    const grid = element('div', 'law-info-grid');
-    const cards = [
-      ['Empresa ativa', context.company.display_name || context.company.legal_name || context.company.name],
-      ['Assinatura', context.subscription?.label || 'Nenhuma assinatura ativa'],
-      ['Módulos habilitados', String(context.modules.length)],
-    ];
-    cards.forEach(([label, value]) => {
-      const card = element('article', 'law-info-card');
-      card.append(element('span', '', label));
-      card.append(element('strong', '', value));
-      grid.append(card);
-    });
+    const grid = element('div', 'law-dashboard-widgets');
     contentRegion.append(grid);
     const contactsEnabled = visibleModules().some((module) => String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos'));
     if (contactsEnabled && canLawPermission('law.contacts.view')) {
-      const card = element('section', 'fs-card law-dashboard-contacts');
-      const header = element('div', 'fs-card-header');
-      header.append(element('h3', 'fs-card-title', 'Gestão de Contatos'), element('p', 'fs-card-subtitle', 'Resumo da empresa e seus contatos mais recentes.'));
-      const body = element('div', 'fs-card-body');
-      body.append(element('p', 'law-contact-loading', 'Carregando resumo…'));
+      const contactModule = visibleModules().find((module) => String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos'));
+      const card = element('article', 'fs-card law-dashboard-module-widget law-dashboard-contacts');
+      const header = element('header', 'law-dashboard-widget-header');
+      const identity = element('div', 'law-dashboard-widget-identity');
+      const mark = element('span', 'law-dashboard-widget-mark'); mark.append(icon('contacts'));
+      const title = element('div'); title.append(element('span', 'law-dashboard-widget-kicker', 'BASE JURÍDICA'), element('h3', '', 'Gestão de Contatos'));
+      identity.append(mark, title);
+      const open = element('button', 'law-dashboard-widget-open', 'Abrir módulo'); open.type = 'button'; open.append(element('span', '', '↗'));
+      open.addEventListener('click', () => { if (contactModule) { activeGroup = `module:${contactModule.id}`; renderNavigation(); closeMobileNav(); contentRegion.focus({ preventScroll: true }); } });
+      header.append(identity, open);
+      const body = element('div', 'law-dashboard-widget-body');
+      body.append(element('p', 'law-contact-loading', 'Carregando seus indicadores…'));
       card.append(header, body);
       contentRegion.append(card);
       FokusApi.request('/law/contacts/dashboard').then(({ summary }) => {
         if (!card.isConnected) return;
         body.replaceChildren();
-        const stats = element('div', 'law-contact-metrics');
-        [['Pessoas físicas', summary.pf], ['Pessoas jurídicas', summary.pj], ['Departamentos', summary.departments], ['Cadastros contabilizados', summary.registrations_counted]].forEach(([label, value]) => { const item = element('article', 'law-contact-metric-card fs-card fs-card-sm'); const metricBody = element('div', 'fs-card-body law-contact-metric-body'); metricBody.append(element('span', '', label), element('strong', '', Number(value || 0).toLocaleString('pt-BR'))); item.append(metricBody); stats.append(item); });
-        body.append(stats);
-        const recent = element('ul', 'law-dashboard-contact-recent');
-        (summary.recent || []).slice(0, 5).forEach((contact) => { const row = element('li'); const link = element('button', 'law-contact-recent-link', contact.display_name); link.type = 'button'; link.addEventListener('click', () => { const module = visibleModules().find((item) => String(item.family || item.module_code || item.code || '').toLowerCase().startsWith('contatos')); if (module) { activeGroup = `module:${module.id}`; renderNavigation(); window.FokusLawContacts?.openContact(contentRegion, contact.id); } }); row.append(link); recent.append(row); });
-        if (!(summary.recent || []).length) recent.append(element('li', '', 'Os contatos criados ou consultados aparecerão aqui.'));
-        const recentCard = element('section', 'fs-card fs-card-sm law-contact-recent-card');
-        const recentHeader = element('div', 'fs-card-header'); recentHeader.append(element('h4', 'fs-card-title', 'Contatos recentes'));
-        const recentBody = element('div', 'fs-card-body'); recentBody.append(recent);
-        recentCard.append(recentHeader, recentBody); body.append(recentCard);
-      }).catch(() => { if (card.isConnected) body.replaceChildren(element('p', 'law-page-lede', 'Resumo indisponível no momento.')); });
+        const total = Number(summary.contacts_total || 0);
+        const pf = Number(summary.pf || 0);
+        const pj = Number(summary.pj || 0);
+        const distribution = element('div', 'law-dashboard-contact-distribution');
+        const ring = element('div', 'law-dashboard-contact-ring');
+        const classified = Math.max(1, pf + pj);
+        ring.style.setProperty('--contact-pf-share', `${(pf / classified) * 100}%`);
+        ring.setAttribute('role', 'img');
+        ring.setAttribute('aria-label', `Distribuição de contatos: ${pf} pessoas físicas e ${pj} pessoas jurídicas`);
+        const ringCenter = element('span', 'law-dashboard-ring-center'); ringCenter.append(element('strong', '', total.toLocaleString('pt-BR')), element('small', '', 'contatos'));
+        ring.append(ringCenter);
+        const breakdown = element('div', 'law-dashboard-contact-breakdown');
+        [['PF', 'Pessoas físicas', pf, 'pf'], ['PJ', 'Pessoas jurídicas', pj, 'pj']].forEach(([short, label, value, tone]) => {
+          const row = element('div', `law-dashboard-breakdown-row law-dashboard-breakdown-${tone}`);
+          const rowHead = element('div', 'law-dashboard-breakdown-head');
+          rowHead.append(element('span', 'law-dashboard-breakdown-label', label), element('strong', '', Number(value).toLocaleString('pt-BR')));
+          const track = element('span', 'law-dashboard-breakdown-track');
+          const fill = element('span', 'law-dashboard-breakdown-fill');
+          fill.style.width = `${Math.min(100, (Number(value) / classified) * 100)}%`;
+          track.append(fill); row.append(rowHead, track); breakdown.append(row);
+        });
+        distribution.append(ring, breakdown);
+
+        const recentSection = element('div', 'law-dashboard-widget-recent');
+        const recentTitle = element('span', 'law-dashboard-widget-kicker', 'ACESSADOS RECENTEMENTE');
+        const recent = element('div', 'law-dashboard-recent-list');
+        (summary.recent || []).slice(0, 5).forEach((contact) => {
+          const link = element('button', 'law-dashboard-recent-link', contact.display_name); link.type = 'button';
+          link.addEventListener('click', (event) => window.FokusLawContacts?.openContact(contentRegion, contact.id, event.currentTarget));
+          recent.append(link);
+        });
+        if (!(summary.recent || []).length) recent.append(element('span', 'law-dashboard-recent-empty', 'Os contatos que você acessar aparecerão aqui.'));
+        recentSection.append(recentTitle, recent);
+        body.append(distribution, recentSection);
+      }).catch(() => { if (card.isConnected) body.replaceChildren(element('p', 'law-dashboard-widget-error', 'Não foi possível carregar este resumo agora.')); });
     }
   }
 
