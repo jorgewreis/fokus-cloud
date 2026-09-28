@@ -6,7 +6,7 @@
  * portalled overlays and release listeners before the next page is mounted.
  */
 (() => {
-    const ASSET_VERSION = "20260925-card-layout-v2";
+    const ASSET_VERSION = "20260928-minimum-loading-state-v1";
 
     const pages = {
         "platform-dashboard-final": { route: "painel", fragment: "platform-dashboard-final" },

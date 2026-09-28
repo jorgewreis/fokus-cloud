@@ -3,6 +3,8 @@
 
     const controls = "input, select, textarea";
     const requiredControls = "input[required], select[required], textarea[required]";
+    const minButtonLoadingMs = 1000;
+    const buttonLoadingStartedAt = new WeakMap();
 
     function getField(form, name) {
         return form.querySelector(`[name="${CSS.escape(name)}"]`);
@@ -117,9 +119,42 @@
     }
 
     function setLoading(form, loading, button = form.querySelector("button[type=submit]")) {
-        form.toggleAttribute("aria-busy", loading);
-        button?.classList.toggle("is-loading", loading);
-        if (button) button.disabled = loading;
+        if (!button) {
+            form.toggleAttribute("aria-busy", loading);
+            return Promise.resolve();
+        }
+
+        if (loading) {
+            if (!buttonLoadingStartedAt.has(button)) buttonLoadingStartedAt.set(button, performance.now());
+            form.setAttribute("aria-busy", "true");
+            button.classList.add("is-loading");
+            button.disabled = true;
+            return Promise.resolve();
+        }
+
+        const startedAt = buttonLoadingStartedAt.get(button);
+        const remaining = startedAt === undefined
+            ? 0
+            : Math.max(0, minButtonLoadingMs - (performance.now() - startedAt));
+        const finishLoading = () => {
+            if (startedAt !== undefined && buttonLoadingStartedAt.get(button) !== startedAt) return;
+            buttonLoadingStartedAt.delete(button);
+            form.removeAttribute("aria-busy");
+            button.classList.remove("is-loading");
+            button.disabled = false;
+        };
+
+        if (remaining === 0) {
+            finishLoading();
+            return Promise.resolve();
+        }
+
+        return new Promise((resolve) => {
+            window.setTimeout(() => {
+                finishLoading();
+                resolve();
+            }, remaining);
+        });
     }
 
     function clear(form) {

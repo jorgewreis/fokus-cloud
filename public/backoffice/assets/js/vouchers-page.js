@@ -266,7 +266,7 @@ export async function mount(root, context = {}) {
         const node = $("#voucher-form-error");
         node.textContent = errorText;
         node.hidden = !errorText;
-        if (window.FokusForm) window.FokusForm.setLoading(form, isLoading);
+        if (window.FokusForm) await window.FokusForm.setLoading(form, isLoading);
         $("#voucher-form-submit").disabled = isLoading;
     };
 
@@ -566,6 +566,7 @@ export async function mount(root, context = {}) {
             const response = action === "delete"
                 ? await api.request(`/backoffice/vouchers/${encodeURIComponent(voucher.id)}`, { method: "DELETE", body: { reason }, signal: pageSignal })
                 : await api.request(`/backoffice/vouchers/${encodeURIComponent(voucher.id)}/archive`, { method: "POST", body: { reason }, signal: pageSignal });
+            await window.FokusForm?.setLoading(actionForm, false);
             actionModal?.hide();
             await loadVouchers();
             showMessage(response?.message || (action === "delete" ? "Voucher excluído." : "Voucher arquivado."), "success");
@@ -573,8 +574,7 @@ export async function mount(root, context = {}) {
             $("#voucher-action-error").textContent = error.message || "Não foi possível concluir a ação.";
             $("#voucher-action-error").hidden = false;
         } finally {
-            window.FokusForm?.setLoading(actionForm, false);
-            $("#voucher-action-submit").disabled = false;
+            await window.FokusForm?.setLoading(actionForm, false);
         }
     };
 
@@ -623,6 +623,8 @@ export async function mount(root, context = {}) {
                 body: payload,
                 signal: pageSignal,
             });
+            await window.FokusForm?.setLoading(form, false);
+            $("#voucher-form-submit").disabled = false;
             closeDrawer();
             await loadVouchers();
             showMessage(editing ? "Voucher atualizado." : "Voucher cadastrado.", "success");
@@ -632,7 +634,7 @@ export async function mount(root, context = {}) {
             await setStatus(false, error.message || "Não foi possível salvar o voucher.");
         } finally {
             if (!pageSignal?.aborted) {
-                window.FokusForm?.setLoading(form, false);
+                await window.FokusForm?.setLoading(form, false);
                 $("#voucher-form-submit").disabled = false;
             }
         }
