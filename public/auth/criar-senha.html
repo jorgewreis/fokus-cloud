@@ -1,45 +1,42 @@
 <!doctype html>
 <html lang="pt-BR">
-  <head>
-    <meta name="robots" content="noindex, nofollow" />
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Definir senha | Fokus Cloud</title>
-    <link rel="stylesheet" href="/assets/css/reset.css" />
-    <link rel="stylesheet" href="/assets/css/style.css" />
-    <link rel="stylesheet" href="/assets/css/subscription.css" />
-  </head>
-  <body>
-    <main class="checkout-wrap">
-      <section class="auth-card">
-        <a class="brand" href="/">Fokus<span>Cloud</span></a>
-        <div class="card-heading">
-          <p class="section-kicker">Definição de senha</p>
-          <h1 class="fs-card-title">Defina sua senha.</h1>
-          <p class="card-description">Escolha uma senha com pelo menos 12 caracteres para concluir o acesso.</p>
-        </div>
-        <form id="form">
-          <label class="form-field"><span class="fs-form-label">Nova senha</span><input class="field-size-md" name="password" type="password" minlength="12" required /></label>
-          <label class="form-field"><span class="fs-form-label">Confirme a senha</span><input class="field-size-md" name="password_confirmation" type="password" minlength="12" required /></label>
-        </form>
-        <div class="login-actions"><button class="fs-btn fs-btn-success" form="form" type="submit">Salvar senha</button></div>
-        <p id="message" class="form-message" role="status"></p>
-      </section>
-    </main>
-    <script src="/assets/js/api-client.js"></script>
-    <script>
-      document.querySelector('#form').onsubmit = async (event) => {
-        event.preventDefault();
-        const data = Object.fromEntries(new FormData(event.target));
-        data.token = new URLSearchParams(location.search).get('token');
-        try {
-          const response = await window.FokusApi.request('/auth/set-password', { method: 'POST', body: data });
-          message.textContent = response.message;
-          setTimeout(() => location = '/acesso', 1000);
-        } catch (error) {
-          message.textContent = error.message;
-        }
-      };
-    </script>
-  </body>
+<head>
+  <meta name="robots" content="noindex, nofollow" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#1b1028" />
+  <title>Definir senha | Fokus Law</title>
+  <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260923-support-mode-v1" />
+  <link rel="stylesheet" href="/auth/portal-access.css?v=20260928-law-permissions-v1" />
+</head>
+<body>
+  <main class="access-page"><section class="access-card" aria-labelledby="title">
+    <a class="access-brand" href="/">FOKUS <span>LAW</span></a>
+    <p class="access-eyebrow">SEGURANÇA DA CONTA</p>
+    <h1 id="title">Defina sua senha</h1>
+    <p class="access-description">Escolha uma senha com pelo menos 12 caracteres para continuar.</p>
+    <div class="access-summary" id="invite-summary" hidden aria-live="polite"></div>
+    <form class="access-form" id="form">
+      <label class="access-field">Nova senha<input name="password" type="password" minlength="12" autocomplete="new-password" required /></label>
+      <label class="access-field">Confirme a senha<input name="password_confirmation" type="password" minlength="12" autocomplete="new-password" required /></label>
+      <button class="access-button" type="submit">Salvar senha</button>
+    </form>
+    <p id="message" class="access-message" role="status" aria-live="polite"></p>
+  </section></main>
+  <script src="/assets/js/api-client.js"></script>
+  <script>
+    const token = new URLSearchParams(location.search).get('token'); const form = document.querySelector('#form'); const message = document.querySelector('#message');
+    (async () => { try {
+      const invite = await FokusApi.request(`/auth/preview-membership?token=${encodeURIComponent(token || '')}`);
+      const summary = document.querySelector('#invite-summary'); summary.hidden = false; summary.append(Object.assign(document.createElement('strong'), { textContent: `Convite para ${invite.company_name}` }));
+      const list = document.createElement('ul'); invite.assignments.forEach((assignment) => { const item = document.createElement('li'); item.textContent = `${assignment.unit_name} · ${assignment.role_name}`; list.append(item); }); if (list.childElementCount) summary.append(list);
+    } catch (_) { /* Password-reset tokens do not contain membership details. */ } })();
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault(); if (!form.reportValidity()) return;
+      const data = Object.fromEntries(new FormData(form)); data.token = token;
+      try { const response = await FokusApi.request('/auth/set-password', { method: 'POST', body: data }); message.dataset.state = 'success'; message.textContent = response.message; setTimeout(() => location.assign('/acesso'), 1000); }
+      catch (error) { message.dataset.state = 'error'; message.textContent = error.message || 'Não foi possível salvar a senha.'; }
+    });
+  </script>
+</body>
 </html>

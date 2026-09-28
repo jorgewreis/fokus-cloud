@@ -245,6 +245,26 @@
 .law-company-form-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 4px; }
 .law-mobile-scrim { display: none; }
 
+.law-access-assignments, .law-role-permissions { display:grid; gap:9px; margin:12px 0; padding:14px; border:1px solid #e6deed; border-radius:10px; }
+.law-access-assignments legend, .law-role-permissions legend { padding:0 5px; color:var(--law-shell-panel); font-size:12px; font-weight:700; }
+.law-access-assignment { display:grid; grid-template-columns:minmax(150px,1fr) minmax(160px,1fr); align-items:center; gap:10px; }
+.law-access-assignment > label, .law-role-permissions label, .law-transfer-keep { display:flex; align-items:flex-start; gap:8px; color:#554a5c; font-size:12px; }
+.law-access-assignment input, .law-role-permissions input, .law-transfer-keep input { flex:0 0 auto; margin-top:3px; accent-color:var(--law-shell-purple); }
+.law-custom-role-list { display:grid; gap:8px; margin:15px 0; }
+.law-custom-role { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #ece6ef; border-radius:9px; background:#fff; }
+.law-custom-role > div { display:grid; gap:3px; }
+.law-custom-role strong { color:var(--law-shell-panel); font-size:13px; }
+.law-custom-role small { color:var(--law-shell-muted); font-size:11px; }
+.law-role-editor { display:grid; gap:14px; margin-top:18px; }
+.law-role-permissions { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.law-transfer-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; margin-top:18px; }
+.law-transfer-card, .law-transfer-history { display:grid; align-content:start; gap:12px; }
+.law-transfer-event { display:grid; gap:3px; padding:12px; border-bottom:1px solid #ece6ef; }
+.law-transfer-event strong { color:var(--law-shell-panel); font-size:12px; }
+.law-transfer-event span, .law-transfer-event p { margin:0; color:var(--law-shell-muted); font-size:11px; }
+.law-transfer-keep { align-items:flex-start; }
+.law-users-empty { margin-top:16px; }
+
 @media (max-width: 920px) {
   .law-shell { grid-template-columns: 286px minmax(0, 1fr); }
   .law-sidebar { grid-template-columns: 58px minmax(0, 1fr); }
@@ -253,6 +273,7 @@
   .law-info-grid { grid-template-columns: 1fr; }
   .law-company-sections { grid-template-columns: minmax(0, 1fr); }
   .law-company-history, .law-company-actions { grid-column: auto; }
+  .law-transfer-grid { grid-template-columns:minmax(0,1fr); }
 }
 
 @media (max-width: 720px) {
@@ -272,6 +293,8 @@
   .law-exit-button { width: 38px; min-width: 38px; padding: 0 !important; justify-content: center; }
   .law-exit-button span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; clip-path: inset(50%); }
   .law-content { padding: 34px 2px 26px; }
+  .law-access-assignment { grid-template-columns:minmax(0,1fr); }
+  .law-role-permissions { grid-template-columns:minmax(0,1fr); }
   .law-welcome-card { grid-template-columns: 1fr; }
   .law-welcome-icon { display: none; }
   .law-workspace-footer { flex-direction: column; gap: 5px; }

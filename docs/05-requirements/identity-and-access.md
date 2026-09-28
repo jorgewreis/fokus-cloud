@@ -9,7 +9,7 @@
 
 ## Objetivo
 
-Definir a base de identidade e autorizacao do Fokus Cloud, garantindo que usuarios, empresas, vinculos, perfis, sessoes e permissoes sejam tratados de forma consistente antes da criacao dos modulos do Fokus Law e Fokus Lead.
+Definir a base de identidade e autorizacao compartilhada. A aplicacao detalhada por unidade desta etapa atende ao Fokus Law; Fokus Cloud e Fokus Lead permanecem no modelo funcional anterior ate suas proprias etapas de migracao.
 
 ## Escopo
 
@@ -28,6 +28,7 @@ Definir a base de identidade e autorizacao do Fokus Cloud, garantindo que usuari
 - Transferencia de administracao.
 - Suspensao, remocao e restauracao de vinculos.
 - Auditoria de eventos sensiveis.
+- Para o Fokus Law, perfis protegidos e personalizados com permissoes por setor e atribuições explicitas por usuario.
 
 ### Fora do escopo
 
@@ -45,8 +46,8 @@ Definir a base de identidade e autorizacao do Fokus Cloud, garantindo que usuari
 | RF-IA-003 | Exigir e-mail confirmado para acoes sensiveis. | Transferencia de administracao e convites devem exigir e-mail confirmado quando aplicavel. |
 | RF-IA-004 | Permitir recuperacao de senha por e-mail. | O usuario deve receber link temporario para redefinir senha sem expor credenciais. |
 | RF-IA-005 | Exigir selecao de empresa ativa quando o usuario possuir mais de uma empresa. | A sessao deve guardar empresa ativa antes de liberar telas protegidas. |
-| RF-IA-006 | Permitir ao admin convidar usuarios para a empresa. | O convite deve criar ou reutilizar conta global e gerar vinculo pendente. |
-| RF-IA-007 | Permitir ao admin definir perfil `gestor` ou `usuario`. | O perfil deve valer apenas para a empresa ativa. |
+| RF-IA-006 | Permitir convidar usuarios para a empresa e, no Fokus Law, selecionar setores e perfis por setor. | O convite cria ou reutiliza conta global e mantém pendentes apenas as atribuições selecionadas até o aceite. |
+| RF-IA-007 | Manter os perfis legados da empresa e permitir perfis Law por setor. | No Law, os perfis protegidos são `unit_admin`, `chief_clerk`, `operator` e `viewer`; perfis personalizados não alteram os protegidos. |
 | RF-IA-008 | Permitir transferencia formal de administracao. | A empresa nao pode ficar sem admin nem manter dois admins ativos apos a conclusao. |
 | RF-IA-009 | Permitir suspender, remover e restaurar vinculos. | A alteracao deve afetar apenas a empresa selecionada e preservar historico. |
 | RF-IA-010 | Registrar eventos sensiveis de identidade e acesso. | Convites, alteracoes de perfil, transferencia e remocoes devem gerar trilha auditavel. |
@@ -56,6 +57,9 @@ Definir a base de identidade e autorizacao do Fokus Cloud, garantindo que usuari
 | RF-IA-014 | Permitir unidades internas com identificacao fiscal propria. | Uma filial pode ser unidade da matriz e manter CNPJ proprio sem criar outra empresa no Fokus Cloud. |
 | RF-IA-015 | Permitir vinculo do usuario a varias unidades. | O acesso deve respeitar as unidades associadas ao vinculo. |
 | RF-IA-016 | Aplicar alteracoes de acesso imediatamente. | Suspensoes, remocoes e mudancas de permissao devem reavaliar ou invalidar sessoes ativas. |
+| RF-IA-017 | Autorizar no servidor cada operacao Law por empresa, setor, módulo e permissão. | Chamadas diretas sem acesso válido são negadas por padrão, mesmo que a interface permita a navegação. |
+| RF-IA-018 | Permitir perfis personalizados Law limitados às permissões do ator. | Gestores locais não concedem permissões que não possuem nem atribuem `unit_admin`; os perfis padrão são protegidos. |
+| RF-IA-019 | Isolar perfis e vínculos Law por setor. | Alterar uma atribuição não altera acesso a outro setor; o administrador da empresa mantém acesso global ao Law. |
 
 ## Requisitos nao funcionais
 
@@ -76,18 +80,24 @@ Definir a base de identidade e autorizacao do Fokus Cloud, garantindo que usuari
 - `companies`
 - `company_memberships`
 - `company_units`
-- `membership_units`
+- `law_units`
+- `law_access_roles`
+- `law_access_role_permissions`
+- `law_unit_memberships`
+- `customer_permissions`
 - tabelas de convites ou tokens
 - tabelas de transferencia de administracao
 - tabela de auditoria
 
-## Perfis iniciais
+## Perfis legados da empresa
 
 | Perfil | Uso |
 | --- | --- |
 | `admin` | Administra empresa, usuarios, assinatura e transferencia de administracao. |
 | `gestor` | Atua em operacoes liberadas pelo produto, sem controlar administracao da empresa. |
 | `usuario` | Usa funcionalidades operacionais liberadas pelo produto. |
+
+No Fokus Law, esses perfis legados são mapeados na migração para `chief_clerk` e `operator`, respectivamente, em cada setor ativo existente. Setores futuros recebem apenas atribuições explícitas. O administrador da empresa mantém acesso global. Essa migração não altera os controles funcionais do Cloud ou Lead.
 
 ## Eventos auditaveis
 

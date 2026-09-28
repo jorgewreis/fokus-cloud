@@ -5,10 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\LawAuthorizationService;
 
 class LawShellController extends Controller
 {
-    public function context(Request $request)
+    public function context(Request $request, LawAuthorizationService $authorization)
     {
         $user = $request->user();
         abort_unless($user && $user->status === 'ativa' && $user->email_verified_at, 403, 'Confirme o e-mail da sua conta para acessar o Fokus Law.');
@@ -56,13 +57,21 @@ class LawShellController extends Controller
                 ->values();
         }
 
-        $units = DB::table('law_units')->where('company_id', $companyId)->where('status', 'ativo')->orderBy('name')->get(['id', 'name']);
+        $units = $authorization->accessibleUnits($request);
         $activeUnitId = DB::table('law_user_active_units')->where('user_id', $user->id)->where('company_id', $companyId)->value('law_unit_id');
         $activeUnit = $activeUnitId ? $units->first(fn (object $unit): bool => $unit->id === $activeUnitId) : null;
         if (! $activeUnit && $units->count() === 1) {
             $activeUnit = $units->first();
             $activeUnitId = $activeUnit->id;
+            DB::table('law_user_active_units')->updateOrInsert(
+                ['user_id' => $user->id, 'company_id' => $companyId],
+                ['law_unit_id' => $activeUnitId, 'created_at' => now(), 'updated_at' => now()],
+            );
+        } elseif (! $activeUnit) {
+            $activeUnitId = null;
+            DB::table('law_user_active_units')->where('user_id', $user->id)->where('company_id', $companyId)->delete();
         }
+        $lawPermissions = $activeUnit ? $authorization->permissions($request, (string) $activeUnit->id) : [];
 
         $lawNames = DB::table('subscriptions as subscription')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
@@ -146,9 +155,18 @@ class LawShellController extends Controller
                 'label' => trim($subscriptionLabel),
             ] : null,
             'permissions' => [
-                'manage_company_users' => $membership->role === 'admin',
+                'manage_company_users' => $membership->role === 'admin' || in_array('law.users.manage', $lawPermissions, true),
+                'view_company_users' => $membership->role === 'admin' || in_array('law.users.view', $lawPermissions, true),
+                'manage_law_roles' => $membership->role === 'admin' || in_array('law.roles.manage', $lawPermissions, true),
+                'assign_law_roles' => $membership->role === 'admin' || in_array('law.users.manage', $lawPermissions, true),
+                'transfer_admin' => $membership->role === 'admin',
                 'manage_settings' => $membership->role === 'admin',
             ],
+            'law_permissions' => $lawPermissions,
+            'active_law_role' => $activeUnit ? DB::table('law_unit_memberships as lum')->join('law_access_roles as role', 'role.id', '=', 'lum.law_access_role_id')
+                ->where('lum.company_id', $companyId)->where('lum.law_unit_id', $activeUnit->id)
+                ->where('lum.company_membership_id', $membership->id)->where('lum.status', 'ativo')->whereNull('lum.deleted_at')
+                ->value('role.code') : null,
             'support_mode' => $supportMode,
             'modules' => $modules->map(fn (object $module): array => [
                 'id' => (string) $module->id,

@@ -4,20 +4,18 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\PrefixedUlid;
+use App\Services\LawAuthorizationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class LawUnitController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, LawAuthorizationService $authorization)
     {
         $companyId = (string) $request->attributes->get('active_company_id');
-        $isAdmin = $request->attributes->get('active_membership')->role === 'admin';
-        $units = DB::table('law_units')->where('company_id', $companyId)
-            ->when(! $isAdmin, fn ($query) => $query->where('status', 'ativo'))
-            ->orderByRaw("CASE WHEN status = 'ativo' THEN 0 ELSE 1 END")
-            ->orderBy('name')->get(['id', 'name', 'status']);
+        $isAdmin = $authorization->isCompanyAdmin($request);
+        $units = $authorization->accessibleUnits($request);
 
         $activeUnitId = DB::table('law_user_active_units')
             ->where('user_id', $request->user()->id)->where('company_id', $companyId)
@@ -49,7 +47,7 @@ class LawUnitController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, LawAuthorizationService $authorization)
     {
         $companyId = (string) $request->attributes->get('active_company_id');
         $this->authorizeManagement($request);
@@ -59,7 +57,8 @@ class LawUnitController extends Controller
         abort_if($this->nameExists($companyId, $name), 409, 'Já existe um setor com esse nome nesta empresa.');
 
         $id = PrefixedUlid::make('LUN');
-        DB::table('law_units')->insert([
+        DB::transaction(function () use ($companyId, $name, $request, $id, $authorization): void {
+            DB::table('law_units')->insert([
             'id' => $id,
             'company_id' => $companyId,
             'name' => $name,
@@ -67,7 +66,9 @@ class LawUnitController extends Controller
             'created_by' => $request->user()->id,
             'created_at' => now(),
             'updated_at' => now(),
-        ]);
+            ]);
+            $authorization->provisionUnitRoles($companyId, $id, $request->user()->id);
+        });
 
         return response()->json(['id' => $id, 'name' => $name, 'status' => 'ativo'], 201);
     }
@@ -95,12 +96,17 @@ class LawUnitController extends Controller
         return response()->json(['id' => $unitId, 'name' => $name, 'status' => $status]);
     }
 
-    public function select(Request $request)
+    public function select(Request $request, LawAuthorizationService $authorization)
     {
         $companyId = (string) $request->attributes->get('active_company_id');
         $data = $request->validate(['unit_id' => ['required', 'string', 'max:30']]);
         $unit = DB::table('law_units')->where('id', $data['unit_id'])->where('company_id', $companyId)->where('status', 'ativo')->first();
         abort_unless($unit, 422, 'Selecione um setor ativo da empresa.');
+        if (! $authorization->isCompanyAdmin($request)) {
+            abort_unless(DB::table('law_unit_memberships')->where('company_id', $companyId)->where('law_unit_id', $unit->id)
+                ->where('company_membership_id', $request->attributes->get('active_membership')->id)->where('status', 'ativo')->whereNull('deleted_at')->exists(),
+                403, 'Você não tem acesso a este setor.');
+        }
 
         DB::table('law_user_active_units')->updateOrInsert(
             ['user_id' => $request->user()->id, 'company_id' => $companyId],

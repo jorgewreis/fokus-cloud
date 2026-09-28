@@ -1,2 +1,47 @@
-<!doctype html><html lang="pt-BR"><head>
-    <meta name="robots" content="noindex, nofollow" /><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aceitar administração | Fokus Cloud</title><link rel="stylesheet" href="/assets/css/reset.css"><link rel="stylesheet" href="/assets/css/style.css"></head><body><main class="checkout-wrap"><section class="auth-card"><a class="brand" href="/">Fokus<span>Cloud</span></a><h1>Aceitar administração</h1><p>Ao confirmar, você se torna o único administrador desta empresa.</p><button id="accept" class="fs-btn fs-btn-success">Aceitar transferência</button><p id="message" role="status"></p></section></main><script src="/assets/js/api-client.js"></script><script>accept.onclick=async()=>{try{const r=await FokusApi.request('/auth/accept-admin-transfer',{method:'POST',body:{token:new URLSearchParams(location.search).get('token')}});message.textContent=r.message;setTimeout(()=>location='/portal',1000)}catch(e){message.textContent=e.message}}</script></body></html>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta name="robots" content="noindex, nofollow" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#1b1028" />
+  <title>Aceitar administração | Fokus Law</title>
+  <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260923-support-mode-v1" />
+  <link rel="stylesheet" href="/auth/portal-access.css?v=20260928-law-permissions-v1" />
+</head>
+<body>
+  <main class="access-page"><section class="access-card" aria-labelledby="title">
+    <a class="access-brand" href="/">FOKUS <span>LAW</span></a>
+    <p class="access-eyebrow">TRANSFERÊNCIA DE ADMINISTRAÇÃO</p>
+    <h1 id="title">Aceitar administração</h1>
+    <p class="access-description">Ao aceitar, você se torna o único admin da empresa. Confira os detalhes antes de confirmar.</p>
+    <div class="access-summary" id="summary" aria-live="polite"><span>Validando transferência…</span></div>
+    <button class="access-button" id="accept" type="button" disabled>Aceitar transferência</button>
+    <button class="access-button access-button-secondary" id="decline" type="button" disabled>Recusar transferência</button>
+    <p class="access-message" id="message" role="status" aria-live="polite"></p>
+  </section></main>
+  <script src="/assets/js/api-client.js"></script>
+  <script>
+    const token = new URLSearchParams(location.search).get('token'); const message = document.querySelector('#message'); const accept = document.querySelector('#accept'); const decline = document.querySelector('#decline');
+    (async () => {
+      try {
+        const transfer = await FokusApi.request(`/auth/preview-admin-transfer?token=${encodeURIComponent(token || '')}`);
+        const summary = document.querySelector('#summary'); summary.replaceChildren();
+        summary.append(Object.assign(document.createElement('strong'), { textContent: transfer.company_name }));
+        summary.append(Object.assign(document.createElement('span'), { textContent: `Após a transferência, o admin anterior terá acesso ${transfer.previous_access}.` }));
+        accept.disabled = false; decline.disabled = false;
+      } catch (error) { message.dataset.state = 'error'; message.textContent = error.message || 'Não foi possível validar esta transferência.'; document.querySelector('#summary').replaceChildren(); }
+    })();
+    accept.addEventListener('click', async () => {
+      accept.disabled = true; accept.textContent = 'Confirmando…';
+      try { const result = await FokusApi.request('/auth/accept-admin-transfer', { method: 'POST', body: { token } }); message.dataset.state = 'success'; message.textContent = result.message; setTimeout(() => location.assign('/portal'), 900); }
+      catch (error) { message.dataset.state = 'error'; message.textContent = error.message || 'Não foi possível aceitar a transferência.'; accept.disabled = false; accept.textContent = 'Aceitar transferência'; }
+    });
+    decline.addEventListener('click', async () => {
+      decline.disabled = true; decline.textContent = 'Registrando recusa…'; accept.disabled = true;
+      try { const result = await FokusApi.request('/auth/decline-admin-transfer', { method: 'POST', body: { token } }); message.dataset.state = 'success'; message.textContent = result.message; accept.hidden = true; decline.hidden = true; }
+      catch (error) { message.dataset.state = 'error'; message.textContent = error.message || 'Não foi possível recusar a transferência.'; decline.disabled = false; decline.textContent = 'Recusar transferência'; accept.disabled = false; }
+    });
+  </script>
+</body>
+</html>

@@ -147,7 +147,7 @@ class LawShellTest extends TestCase
         $this->actingAs($manager)->withSession($session)->getJson('/api/law/subscription')->assertForbidden();
     }
 
-    public function test_company_user_management_route_uses_the_law_shell_and_remains_admin_only(): void
+    public function test_company_user_management_route_uses_the_law_shell_and_api_requires_a_law_membership(): void
     {
         $session = ['active_company_id' => $this->companyId];
         $this->get('/portal/usuarios')->assertRedirect('/?acesso=cliente');
@@ -167,7 +167,7 @@ class LawShellTest extends TestCase
             'role_id' => DB::table('roles')->where('code', 'gestor')->value('id'), 'status' => 'ativo', 'version' => 1,
             'created_by' => $this->user->id, 'updated_by' => $this->user->id, 'created_at' => now(), 'updated_at' => now(),
         ]);
-        $this->actingAs($manager)->withSession($session)->get('/portal/usuarios')->assertForbidden();
+        $this->actingAs($manager)->withSession($session)->get('/portal/usuarios')->assertOk()->assertSee('data-initial-page="users"', false);
         $this->actingAs($manager)->withSession($session)->getJson('/api/portal/users')->assertForbidden();
         $this->get('/portal/users.html')->assertNotFound();
     }

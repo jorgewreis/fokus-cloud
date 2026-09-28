@@ -26,7 +26,16 @@ Este arquivo deve descrever tabelas, colunas, tipos, obrigatoriedade e significa
 | refund_requests | status | enum | Sim | Estado da solicitacao de reembolso. |
 | payment_reconciliation_alerts | status | enum | Sim | Estado da divergencia de conciliacao. |
 | law_units | status | enum | Sim | Estado da unidade juridica: `active`, `suspended` ou `archived`. |
-| law_unit_memberships | role | enum | Sim | Perfil Law por unidade: `unit_admin`, `chief_clerk`, `operator` ou `viewer`. |
+| customer_permissions | code | string | Sim | Código atômico único de permissão cliente, como `law.contacts.view`; não inclui permissões `platform.*`. |
+| customer_permissions | product_code | string | Sim | Produto dono da capacidade, nesta etapa `law`. |
+| law_access_roles | code | string | Sim | Código único do perfil dentro da empresa e do setor. Perfis padrão protegidos: `unit_admin`, `chief_clerk`, `operator`, `viewer`. |
+| law_access_roles | is_system | boolean | Sim | Marca perfis padrão protegidos, que não podem ter permissões editadas ou ser removidos. |
+| law_access_roles | version | integer | Sim | Versão usada para detectar edição concorrente de perfil. |
+| law_access_role_permissions | law_access_role_id | string | Sim | Perfil Law relacionado à permissão atômica do catálogo. |
+| law_access_role_permissions | customer_permission_id | string | Sim | Permissão do catálogo concedida ao perfil. |
+| law_unit_memberships | law_access_role_id | string | Sim | Perfil associado ao vínculo usuário-empresa naquele setor. |
+| law_unit_memberships | status | enum | Sim | Estado do acesso ao setor: `pendente`, `ativo`, `suspenso` ou `removido`. |
+| law_unit_memberships | version | integer | Sim | Versão para concorrência otimista de atribuições de acesso. |
 | law_cases | operational_status | enum | Sim | Estado operacional interno do processo: `active`, `pending`, `suspended`, `archived` ou `cancelled`. |
 | law_cases | official_status_code | string | Nao | Codigo/situacao oficial sincronizada de fonte externa, sem controlar o status interno. |
 | law_cases | subjects | json | Nao | Assuntos processuais sincronizados ou informados. |

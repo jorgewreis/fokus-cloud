@@ -33,8 +33,8 @@
   const preferenceKey = (userId, key) => `fokus-law:${userId}:${key}`;
   let context = null;
   const initialPage = shell.dataset.initialPage || 'overview';
-  let settingsView = ['company', 'subscription', 'users'].includes(initialPage) ? initialPage : 'settings';
-  let activeGroup = ['company', 'subscription', 'users'].includes(initialPage) ? 'settings' : 'overview';
+  let settingsView = ['company', 'subscription', 'users', 'transfer'].includes(initialPage) ? initialPage : 'settings';
+  let activeGroup = ['company', 'subscription', 'users', 'transfer'].includes(initialPage) ? 'settings' : 'overview';
 
   const element = (tag, className, text) => {
     const node = document.createElement(tag);
@@ -97,7 +97,7 @@
       const descriptor = getModuleDescriptor(module);
       addRailButton(`module:${module.id}`, descriptor.label, descriptor.icon);
     });
-    if (context.permissions.manage_settings) addRailButton('settings', 'Configurações', 'settings');
+    if (context.permissions.manage_settings || context.permissions.manage_company_users || context.permissions.transfer_admin) addRailButton('settings', 'Configurações', 'settings');
   }
 
   function appendNavLink(container, label, href, iconName, selected = false, disabled = false) {
@@ -148,7 +148,7 @@
     }
 
     if (activeGroup === 'settings') {
-      if (!context.permissions.manage_settings) {
+      if (!context.permissions.manage_settings && !context.permissions.manage_company_users && !context.permissions.transfer_admin) {
         activeGroup = 'overview';
         renderNavigation();
         return;
@@ -157,21 +157,24 @@
       headingIcon = 'settings';
       document.querySelector('#section-icon').src = ICON_ROOT + ICONS[headingIcon];
       const list = element('ul');
-      const entries = [
+      const entries = context.permissions.manage_settings ? [
         ['Empresa', '/portal/fokus-law/empresa', 'company'],
         ['Assinatura', '/portal/fokus-law/assinatura', 'settings'],
-      ];
+      ] : [];
       if (context.permissions.manage_company_users) entries.push(['Usuários, perfis e permissões', '/portal/usuarios', 'users']);
+      if (context.permissions.transfer_admin) entries.push(['Transferir administração', '/portal/transferir-administracao', 'users']);
       entries.forEach(([label, href, iconName]) => {
         const item = element('li');
-        appendNavLink(item, label, href, iconName, initialPage === 'users' && label === 'Usuários, perfis e permissões');
+        appendNavLink(item, label, href, iconName, (initialPage === 'users' && label === 'Usuários, perfis e permissões') || (initialPage === 'transfer' && label === 'Transferir administração'));
         list.append(item);
       });
-      const unitsItem = element('li');
-      appendNavButton(unitsItem, 'Setores da empresa', 'company', settingsView === 'units', () => { settingsView = 'units'; renderNavigation(); });
-      list.append(unitsItem);
+      if (context.permissions.manage_settings) {
+        const unitsItem = element('li');
+        appendNavButton(unitsItem, 'Setores da empresa', 'company', settingsView === 'units', () => { settingsView = 'units'; renderNavigation(); });
+        list.append(unitsItem);
+      }
       pageItems.append(list);
-      renderContent(settingsView === 'units' ? 'units' : settingsView === 'company' ? 'company' : settingsView === 'subscription' ? 'subscription' : settingsView === 'users' ? 'users' : 'settings');
+      renderContent(settingsView === 'units' ? 'units' : settingsView === 'company' ? 'company' : settingsView === 'subscription' ? 'subscription' : settingsView === 'users' ? 'users' : settingsView === 'transfer' ? 'transfer' : 'settings');
       return;
     }
 
@@ -229,6 +232,13 @@
     const heading = element('div');
     heading.append(element('p', 'law-page-eyebrow', 'ADMINISTRAÇÃO DA EMPRESA'));
     heading.append(element('h2', '', 'Configurações'));
+    if (!context.permissions.manage_settings) {
+      heading.append(element('p', 'law-page-lede', 'Administre os perfis e os acessos da equipe nos setores em que você tem permissão.'));
+      contentRegion.append(heading);
+      const link = element('a', 'law-settings-link'); link.href = '/portal/usuarios'; link.append(icon('users'));
+      const text = element('span'); text.append(element('strong', '', 'Usuários, perfis e permissões'), element('small', '', 'Gerencie os vínculos da equipe no setor ativo.'));
+      link.append(text); contentRegion.append(link); return;
+    }
     heading.append(element('p', 'law-page-lede', 'Gerencie a empresa, a assinatura, os usuários, os perfis, as permissões e os setores do Fokus Law.'));
     contentRegion.append(heading);
 
@@ -341,6 +351,7 @@
     };
     return checkDigit(9) === Number(cpf[9]) && checkDigit(10) === Number(cpf[10]);
   }
+  window.FokusLawUserCpfValid = isValidUserCpf;
 
   function userRoleLabel(role) {
     return ({ admin: 'Administrador', gestor: 'Gestor', usuario: 'Usuário' })[role] || role || 'Não informado';
@@ -351,6 +362,7 @@
   }
 
   async function renderUsers(successMessage = '') {
+    if (window.FokusLawAccessUsers) return window.FokusLawAccessUsers.render(context, contentRegion, successMessage);
     document.title = 'Usuários, perfis e permissões | Fokus Law';
     contentRegion.replaceChildren();
     const heading = element('header', 'law-users-heading');
@@ -643,6 +655,10 @@
       }
     });
     await refreshUsers();
+  }
+
+  async function renderTransfer() {
+    if (window.FokusLawAccessUsers) return window.FokusLawAccessUsers.renderTransfer(context, contentRegion);
   }
 
   async function renderCompany(successMessage = '') {
@@ -1213,6 +1229,7 @@
     else if (view === 'units') renderUnits();
     else if (view === 'company') renderCompany();
     else if (view === 'users') renderUsers();
+    else if (view === 'transfer') renderTransfer();
     else if (view === 'subscription') renderSubscription();
     else {
       const module = activeModule();
@@ -1400,7 +1417,7 @@
 
   function setContext(value) {
     context = value;
-    if (!['profile', 'users'].includes(initialPage)) document.title = initialPage === 'company' ? 'Empresa | Fokus Law' : 'Fokus Law | Fokus Cloud';
+    if (!['profile', 'users', 'transfer'].includes(initialPage)) document.title = initialPage === 'company' ? 'Empresa | Fokus Law' : 'Fokus Law | Fokus Cloud';
     document.querySelector('#user-name').textContent = context.user.name;
     document.querySelector('#user-email').textContent = context.user.email;
     document.querySelector('#user-avatar').textContent = context.user.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
@@ -1408,7 +1425,7 @@
     renderCompanyOptions();
     renderUnitOptions();
     const remember = localStorage.getItem(preferenceKey(context.user.id, 'remember-group')) === 'true';
-    if (!['profile', 'company', 'subscription', 'users'].includes(initialPage) && remember) {
+    if (!['profile', 'company', 'subscription', 'users', 'transfer'].includes(initialPage) && remember) {
       const lastGroup = localStorage.getItem(preferenceKey(context.user.id, 'last-group'));
       if ((lastGroup === 'settings' && context.permissions.manage_settings) || context.modules.some((item) => `module:${item.id}` === lastGroup)) activeGroup = lastGroup;
     }

@@ -86,6 +86,33 @@ ULID ou ID dificil de adivinhar nao e controle de seguranca suficiente.
 
 ## Perfis Law
 
+### Modelo aplicado nesta etapa
+
+O acesso é avaliado a partir do administrador global da empresa ou do perfil
+associado ao vínculo ativo do usuário com o setor selecionado. O administrador
+global mantém acesso global ao Law; os perfis locais e personalizados valem
+somente para seu setor. A API reavalia permissões no servidor em cada chamada.
+
+O catálogo em `customer_permissions`, os perfis em `law_access_roles`, a
+relação `law_access_role_permissions` e os vínculos `law_unit_memberships`
+implementam o escopo por setor. Os perfis protegidos são `unit_admin`,
+`chief_clerk`, `operator` e `viewer`; somente perfis personalizados podem ter
+seu conjunto de permissões editado. Administradores locais podem conceder
+apenas permissões que possuem, e nenhum perfil local pode criar ou atribuir
+`unit_admin`. `chief_clerk` pode atribuir perfis aprovados sem editar suas
+permissões.
+
+Na migração, vínculos ativos `gestor` viram `chief_clerk` e `usuario` vira
+`operator` em todos os setores Law ativos existentes. Setores novos recebem
+somente atribuições explícitas. A administração interna do Backoffice permanece
+nas tabelas e permissões `platform_*`.
+
+Os controles de confidencialidade descritos neste documento continuam sendo
+política alvo do domínio Law. Autorização por registro confidencial não faz
+parte desta etapa de implementação.
+
+### Perfis e matriz alvo do produto
+
 Os perfis Law da v1 sao:
 
 - `unit_admin`;
@@ -93,9 +120,10 @@ Os perfis Law da v1 sao:
 - `operator`;
 - `viewer`.
 
-Administrador da unidade e chefe/escrivao podem alterar perfil Law, suspender ou
-remover vinculo da unidade. Essas acoes devem gerar auditoria e invalidacao
-imediata de permissoes.
+Administrador da unidade pode criar e editar perfis personalizados dentro das
+permissões que possui. Chefe/escrivão pode atribuir perfis permitidos, suspender
+ou remover vínculos da unidade, mas não edita permissões dos perfis. Essas ações
+devem gerar auditoria e invalidar imediatamente a autorização anterior.
 
 O sistema nao deve permitir remover ou suspender o ultimo administrador ativo da
 unidade.

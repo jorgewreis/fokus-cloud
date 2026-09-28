@@ -181,14 +181,37 @@ experiencia, mas nunca e considerada controle de seguranca.
 O modelo pode evoluir nesta ordem, conforme evidencias do produto:
 
 1. permissoes adicionais por produto e modulo;
-2. regras por equipe ou unidade dentro da empresa;
+2. regras por equipe ou unidade dentro da empresa (já aplicadas ao Fokus Law nesta etapa);
 3. escopo por registro;
-4. perfis personalizados por empresa;
+4. perfis personalizados por produto e unidade (já aplicados ao Fokus Law; demais produtos seguem pendentes);
 5. permissoes individuais, somente se os perfis e escopos anteriores nao
    resolverem o caso de negocio.
 
 Cada extensao deve preservar compatibilidade com os perfis base, registrar
 uma decisao arquitetural e incluir casos positivos e negativos de autorizacao.
+
+## Implementacao por unidade no Fokus Law
+
+O Law mantém o vínculo da empresa (`company_memberships`) e acrescenta uma
+atribuição por setor em `law_unit_memberships`. Cada atribuição aponta para um
+`law_access_role` do mesmo par empresa/setor; o perfil agrega permissões do
+catálogo compartilhado `customer_permissions` pela tabela
+`law_access_role_permissions`. O catálogo possui `product_code=law`; o RBAC
+interno do Backoffice continua isolado nas tabelas `platform_*`.
+
+Os perfis protegidos por setor são `unit_admin`, `chief_clerk`, `operator` e
+`viewer`. Podem existir perfis personalizados no escopo da empresa e do setor,
+mas os perfis protegidos não podem ser editados nem removidos. O admin global
+da empresa tem acesso global ao Law. `unit_admin` pode administrar perfis
+personalizados no setor dentro das próprias permissões; `chief_clerk` pode
+atribuir perfis que já pode conceder, sem editar conjuntos de permissões.
+Nenhum gestor local pode conceder permissões além das próprias ou criar e
+atribuir `unit_admin`.
+
+A migração associa `gestor` a `chief_clerk` e `usuario` a `operator` em cada
+setor Law ativo existente. Novos setores e usuários não recebem atribuições
+implícitas. O legado de empresa continua sendo usado por Cloud e Lead até a
+migração própria desses produtos.
 
 ## Requisitos de auditoria
 

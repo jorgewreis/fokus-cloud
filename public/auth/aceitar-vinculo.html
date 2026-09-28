@@ -1,2 +1,43 @@
-<!doctype html><html lang="pt-BR"><head>
-    <meta name="robots" content="noindex, nofollow" /><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Aceitar vínculo | Fokus Cloud</title><link rel="stylesheet" href="/assets/css/reset.css"><link rel="stylesheet" href="/assets/css/style.css"></head><body><main class="checkout-wrap"><section class="auth-card"><a class="brand" href="/">Fokus<span>Cloud</span></a><h1>Convite para empresa</h1><p>Ao aceitar, a empresa será adicionada às empresas disponíveis na sua conta.</p><button id="accept" class="fs-btn fs-btn-success">Aceitar vínculo</button><p id="message" role="status"></p></section></main><script src="/assets/js/api-client.js"></script><script>accept.onclick=async()=>{try{const r=await FokusApi.request('/auth/accept-membership',{method:'POST',body:{token:new URLSearchParams(location.search).get('token')}});message.textContent=r.message;setTimeout(()=>location='/portal',1000)}catch(e){message.textContent=e.message}}</script></body></html>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta name="robots" content="noindex, nofollow" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#1b1028" />
+  <title>Aceitar convite | Fokus Law</title>
+  <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260923-support-mode-v1" />
+  <link rel="stylesheet" href="/auth/portal-access.css?v=20260928-law-permissions-v1" />
+</head>
+<body>
+  <main class="access-page"><section class="access-card" aria-labelledby="title">
+    <a class="access-brand" href="/">FOKUS <span>LAW</span></a>
+    <p class="access-eyebrow">CONVITE DE ACESSO</p>
+    <h1 id="title">Aceitar vínculo com a empresa</h1>
+    <p class="access-description">Confira a empresa, os setores e os perfis atribuídos. O acesso será ativado após aceitar.</p>
+    <div class="access-summary" id="summary" aria-live="polite"><span>Validando convite…</span></div>
+    <button class="access-button" id="accept" type="button" disabled>Aceitar convite</button>
+    <p class="access-message" id="message" role="status" aria-live="polite"></p>
+  </section></main>
+  <script src="/assets/js/api-client.js"></script>
+  <script>
+    const token = new URLSearchParams(location.search).get('token');
+    const message = document.querySelector('#message'); const accept = document.querySelector('#accept');
+    (async () => {
+      try {
+        const invite = await FokusApi.request(`/auth/preview-membership?token=${encodeURIComponent(token || '')}`);
+        const summary = document.querySelector('#summary'); summary.replaceChildren();
+        summary.append(Object.assign(document.createElement('strong'), { textContent: invite.company_name }));
+        if (invite.assignments.length) { const list = document.createElement('ul'); invite.assignments.forEach((assignment) => { const item = document.createElement('li'); item.textContent = `${assignment.unit_name} · ${assignment.role_name}`; list.append(item); }); summary.append(list); }
+        else summary.append(Object.assign(document.createElement('span'), { textContent: 'O convite não tem atribuição Law ativa.' }));
+        accept.disabled = false;
+      } catch (error) { message.dataset.state = 'error'; message.textContent = error.message || 'Não foi possível validar este convite.'; document.querySelector('#summary').replaceChildren(); }
+    })();
+    accept.addEventListener('click', async () => {
+      accept.disabled = true; accept.textContent = 'Confirmando…';
+      try { const result = await FokusApi.request('/auth/accept-membership', { method: 'POST', body: { token } }); message.dataset.state = 'success'; message.textContent = result.message; setTimeout(() => location.assign(result.return_to || '/portal'), 900); }
+      catch (error) { message.dataset.state = 'error'; message.textContent = error.message || 'Não foi possível aceitar o convite.'; accept.disabled = false; accept.textContent = 'Aceitar convite'; }
+    });
+  </script>
+</body>
+</html>

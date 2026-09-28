@@ -114,17 +114,47 @@ Define acesso do usuario a unidade juridica e perfil especifico do Fokus Law.
 | `company_id` | char(30) | Sim | Empresa do vinculo. |
 | `law_unit_id` | char(30) | Sim | Unidade juridica. |
 | `company_membership_id` | char(30) | Sim | Vinculo usuario-empresa. |
-| `role` | enum | Sim | `unit_admin`, `chief_clerk`, `operator`, `viewer`. |
-| `status` | enum | Sim | `active`, `suspended`, `removed`. |
+| `law_access_role_id` | char(30) | Sim | Perfil do mesmo setor, protegido por chave estrangeira composta de empresa e setor. |
+| `status` | string | Sim | `pendente`, `ativo`, `suspenso` ou `removido`. Convites permanecem pendentes até o aceite. |
+| `version` | int | Sim | Controle de concorrencia otimista. |
 | `created_at`, `created_by` | audit | Sim | Metadados de criacao. |
 | `updated_at`, `updated_by` | audit | Sim | Metadados de alteracao. |
-| `deleted_at`, `deleted_by` | audit | Nao | Remocao logica. |
+| `deleted_at` | timestamp | Nao | Data de remocao logica. |
 
 Regras:
 
 - O mesmo usuario pode ter perfis diferentes em unidades diferentes.
 - Usuario so acessa uma `law_unit` se possuir vinculo ativo.
 - Permissoes comerciais nao pertencem a esta tabela.
+
+### `customer_permissions`
+
+Catálogo atômico compartilhado de permissões de produtos clientes. Nesta etapa
+os registros publicados pertencem ao produto `law`; permissões `platform.*`
+continuam fora deste catálogo.
+
+| Campo | Tipo | Obrigatorio | Regra |
+| --- | --- | --- | --- |
+| `id` | char(30) | Sim | Prefixo `CPM`. |
+| `code` | varchar(100) | Sim | Código único estável, por exemplo `law.contacts.view`. |
+| `product_code` | varchar(32) | Sim | Produto dono da permissão, atualmente `law`. |
+| `resource` | varchar(48) | Sim | Recurso funcional, como `contacts` ou `users`. |
+| `action` | varchar(48) | Sim | Ação atômica, como `view`, `create`, `update` ou `manage`. |
+| `description` | varchar(180) | Sim | Descrição legível da capacidade. |
+
+### `law_access_roles` e `law_access_role_permissions`
+
+`law_access_roles` define perfis no escopo empresa/setor. Guarda `id` (prefixo
+`LAR`), `company_id`, `law_unit_id`, `code`, `name`, `is_system`, `version`,
+`created_by` e timestamps. `code` é único dentro da empresa e setor. Os perfis
+protegidos `unit_admin`, `chief_clerk`, `operator` e `viewer` são semeados para
+cada setor e não podem ser editados ou removidos; perfis personalizados usam
+`is_system=false`.
+
+`law_access_role_permissions` associa `law_access_role_id` a
+`customer_permission_id`, com chave composta e exclusão restrita do catálogo.
+Uma atribuição não pode combinar perfis, permissões, empresa ou setor de outro
+escopo.
 
 ### `law_cases`
 

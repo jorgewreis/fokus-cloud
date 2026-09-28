@@ -439,6 +439,8 @@ class AuthController extends Controller
         if (! empty($payload['membership_id'])) {
             DB::table('company_memberships')->where('id', $payload['membership_id'])->where('user_id', $user->id)->where('status', 'pendente')
                 ->update(['status' => 'ativo', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
+            DB::table('law_unit_memberships')->where('company_membership_id', $payload['membership_id'])->where('status', 'pendente')
+                ->update(['status' => 'ativo', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
             DB::table('company_invitations')->where('membership_id', $payload['membership_id'])->whereNull('accepted_at')->update(['accepted_at' => now(), 'updated_at' => now()]);
         }
         return response()->json(['message' => 'Senha criada com sucesso. Agora você já pode entrar.']);
@@ -454,12 +456,50 @@ class AuthController extends Controller
             $changed = DB::table('company_memberships')->where('id', $membershipId)->where('user_id', $token->user_id)->where('status', 'pendente')
                 ->update(['status' => 'ativo', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
             abort_unless($changed, 422, 'Este convite não pode mais ser aceito.');
+            DB::table('law_unit_memberships')->where('company_membership_id', $membershipId)->where('status', 'pendente')
+                ->update(['status' => 'ativo', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
             DB::table('company_invitations')->where('membership_id', $membershipId)->whereNull('accepted_at')->update(['accepted_at' => now(), 'updated_at' => now()]);
         });
         $user = User::findOrFail($token->user_id);
         $companyId = DB::table('company_memberships')->where('id', $membershipId)->value('company_id');
         $this->authenticateIntoSession($request, $user, $companyId);
         return response()->json(['message' => 'Vínculo aceito. A empresa está disponível na sua conta.', 'return_to' => '/portal']);
+    }
+
+    public function previewMembership(Request $request)
+    {
+        $plain = $request->validate(['token' => ['required', 'string']])['token'];
+        $token = DB::table('security_tokens')->where('token_hash', hash('sha256', $plain))
+            ->whereIn('purpose', ['membership_acceptance', 'password_creation'])->whereNull('used_at')->where('expires_at', '>', now())->first();
+        abort_unless($token, 422, 'Link inválido ou expirado.');
+        $payload = json_decode($token->payload, true) ?: [];
+        abort_unless(! empty($payload['membership_id']), 422, 'Convite inválido.');
+        $membership = DB::table('company_memberships as membership')->join('companies as company', 'company.id', '=', 'membership.company_id')
+            ->where('membership.id', $payload['membership_id'])->where('membership.user_id', $token->user_id)->where('membership.status', 'pendente')
+            ->first(['membership.id', 'company.legal_name']);
+        abort_unless($membership, 422, 'Este convite não está mais disponível.');
+        $assignments = DB::table('law_unit_memberships as lum')->join('law_units as unit', function ($join): void { $join->on('unit.id', '=', 'lum.law_unit_id')->on('unit.company_id', '=', 'lum.company_id'); })
+            ->join('law_access_roles as role', 'role.id', '=', 'lum.law_access_role_id')->where('lum.company_membership_id', $membership->id)->where('lum.status', 'pendente')
+            ->orderBy('unit.name')->get(['unit.name as unit_name', 'role.name as role_name']);
+        return response()->json(['company_name' => (string) $membership->legal_name, 'assignments' => $assignments])->header('Cache-Control', 'no-store, private');
+    }
+
+    public function previewAdminTransfer(Request $request)
+    {
+        $plain = $request->validate(['token' => ['required', 'string']])['token'];
+        $token = DB::table('security_tokens')->where('token_hash', hash('sha256', $plain))->where('purpose', 'admin_transfer')
+            ->whereNull('used_at')->where('expires_at', '>', now())->first();
+        abort_unless($token, 422, 'Link inválido ou expirado.');
+        $payload = json_decode($token->payload, true) ?: [];
+        foreach (['company_id', 'to_membership_id'] as $key) abort_unless(isset($payload[$key]), 422, 'Transferência inválida.');
+        $company = DB::table('companies')->where('id', $payload['company_id'])->first(['legal_name']);
+        $target = DB::table('company_memberships')->where('id', $payload['to_membership_id'])->where('company_id', $payload['company_id'])
+            ->where('user_id', $token->user_id)->where('status', 'ativo')->exists();
+        abort_unless($company && $target, 422, 'Esta transferência não está mais disponível.');
+        return response()->json([
+            'company_name' => (string) $company->legal_name,
+            'previous_access' => ! empty($payload['keep_previous_access']) ? 'operador nos setores ativos' : 'removido da empresa',
+        ])->header('Cache-Control', 'no-store, private');
     }
 
     public function acceptAdminTransfer(Request $request)
@@ -476,6 +516,7 @@ class AuthController extends Controller
                 ->whereNotNull('active_admin_company_id')->lockForUpdate()->first();
             abort_unless($target && $from, 422, 'A transferência não pode mais ser concluída.');
             DB::table('company_memberships')->where('id', $from->id)->update([
+                'role_id' => ! empty($payload['keep_previous_access']) ? DB::table('roles')->where('code', 'usuario')->value('id') : $from->role_id,
                 'active_admin_company_id' => null,
                 'status' => ! empty($payload['keep_previous_access']) ? 'ativo' : 'removido',
                 'deleted_at' => ! empty($payload['keep_previous_access']) ? null : now(),
@@ -491,7 +532,29 @@ class AuthController extends Controller
                 'updated_at' => now(),
                 'version' => $target->version + 1,
             ]);
-            $this->audit($payload['company_id'], $token->user_id, 'company_membership', $target->id, 'update', ['previous_membership_id' => $from->id], ['new_admin_membership_id' => $target->id, 'previous_access_kept' => (bool) ($payload['keep_previous_access'] ?? false)]);
+            if (! empty($payload['keep_previous_access'])) {
+                $unitRoles = app(\App\Services\LawAuthorizationService::class);
+                $units = DB::table('law_units')->where('company_id', $payload['company_id'])->where('status', 'ativo')->get(['id']);
+                foreach ($units as $unit) {
+                    $roleIds = $unitRoles->provisionUnitRoles((string) $payload['company_id'], (string) $unit->id, (string) $token->user_id);
+                    $existing = DB::table('law_unit_memberships')->where('company_id', $payload['company_id'])->where('law_unit_id', $unit->id)->where('company_membership_id', $from->id)->first();
+                    if ($existing) {
+                        DB::table('law_unit_memberships')->where('id', $existing->id)->update([
+                            'law_access_role_id' => $roleIds['operator'], 'status' => 'ativo', 'deleted_at' => null,
+                            'updated_by' => $token->user_id, 'updated_at' => now(), 'version' => $existing->version + 1,
+                        ]);
+                    } else {
+                        DB::table('law_unit_memberships')->insert([
+                            'id' => \App\Services\PrefixedUlid::make('LUM'), 'company_id' => $payload['company_id'],
+                            'law_unit_id' => $unit->id, 'company_membership_id' => $from->id,
+                            'law_access_role_id' => $roleIds['operator'], 'status' => 'ativo', 'version' => 1,
+                            'created_by' => $token->user_id, 'updated_by' => $token->user_id,
+                            'created_at' => now(), 'updated_at' => now(),
+                        ]);
+                    }
+                }
+            }
+            $this->audit($payload['company_id'], $token->user_id, 'company_membership', $target->id, 'admin_transfer_accepted', ['previous_membership_id' => $from->id], ['new_admin_membership_id' => $target->id, 'previous_access_kept' => (bool) ($payload['keep_previous_access'] ?? false)]);
         });
         $previousAdmin = DB::table('company_memberships as membership')->join('users', 'users.id', '=', 'membership.user_id')->where('membership.id', $payload['from_membership_id'])->value('users.email');
         $newAdmin = User::findOrFail($token->user_id);
@@ -500,6 +563,22 @@ class AuthController extends Controller
             Mail::raw('A transferência de administração da empresa foi concluída.', fn ($mail) => $mail->to($previousAdmin)->subject('Fokus Cloud: administração transferida'));
         }
         return response()->json(['message' => 'Administração transferida com sucesso.']);
+    }
+
+    public function declineAdminTransfer(Request $request)
+    {
+        $token = $this->consumeToken($request->validate(['token' => ['required', 'string']])['token'], 'admin_transfer');
+        $payload = json_decode($token->payload, true) ?: [];
+        foreach (['company_id', 'from_membership_id', 'to_membership_id'] as $key) abort_unless(isset($payload[$key]), 422, 'Transferência inválida.');
+        $target = DB::table('company_memberships')->where('id', $payload['to_membership_id'])->where('company_id', $payload['company_id'])
+            ->where('user_id', $token->user_id)->where('status', 'ativo')->first();
+        $from = DB::table('company_memberships')->where('id', $payload['from_membership_id'])->where('company_id', $payload['company_id'])
+            ->where('active_admin_company_id', $payload['company_id'])->where('status', 'ativo')->first();
+        abort_unless($target && $from, 422, 'Esta transferência não está mais disponível.');
+        $this->audit($payload['company_id'], $token->user_id, 'company_membership', $target->id, 'admin_transfer_declined', ['status' => 'pendente'], ['status' => 'recusada']);
+        $previousAdmin = DB::table('users')->where('id', $from->user_id)->value('email');
+        if ($previousAdmin) Mail::raw('A pessoa indicada recusou a transferência de administração. Seu acesso de admin permanece ativo.', fn ($mail) => $mail->to($previousAdmin)->subject('Fokus Cloud: transferência recusada'));
+        return response()->json(['message' => 'A transferência foi recusada. O admin atual permanece responsável pela empresa.']);
     }
 
     public function sendToken(User $user, string $purpose, string $path, array $payload = [], ?string $recipient = null): void

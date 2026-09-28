@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\EnsureSupportSession::class,
         ]);
         $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : '/?acesso=cliente');
+        $middleware->alias(['law.permission' => \App\Http\Middleware\EnsureLawPermission::class]);
         // The API shares Laravel's encrypted, HttpOnly session cookie. Webhooks
         // are authenticated by their provider signature, not by a browser CSRF token.
         $middleware->validateCsrfTokens(except: ['api/webhooks/mercado-pago', 'api/integrations/usage']);
