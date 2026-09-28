@@ -1,0 +1,189 @@
+.law-recovery-page {
+  min-height: 100vh;
+  overflow-x: hidden;
+  color: #fff;
+  background-image: linear-gradient(90deg, rgb(27 16 40 / 92%), rgb(43 23 61 / 78%) 52%, rgb(43 23 61 / 58%)), url('/marketing/products/assets/fokus-law-hero.png');
+  background-position: center;
+  background-size: cover;
+}
+
+.law-recovery-skip {
+  position: absolute;
+  z-index: 5;
+  top: 1rem;
+  left: -9999px;
+  padding: .7rem 1rem;
+  background: var(--law-ivory);
+  color: var(--law-plum) !important;
+}
+
+.law-recovery-skip:focus-visible {
+  left: 1rem;
+}
+
+.law-recovery-header {
+  position: absolute;
+  z-index: 2;
+  inset: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.7rem clamp(1.25rem, 5vw, 5rem);
+}
+
+.law-recovery-brand {
+  color: #fff !important;
+  font-size: .83rem;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-decoration: none;
+}
+
+.law-recovery-brand span {
+  color: var(--law-purple-light);
+}
+
+.law-recovery-return {
+  color: var(--law-sage-light) !important;
+  font-size: .78rem;
+  text-decoration: none;
+}
+
+.law-recovery-return:hover,
+.law-recovery-return:focus-visible {
+  color: #fff !important;
+  text-decoration: underline;
+  text-underline-offset: .2em;
+}
+
+.law-recovery-main {
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: minmax(0, 1.08fr) minmax(330px, .72fr);
+  align-items: center;
+  gap: clamp(2rem, 8vw, 8rem);
+  padding: 8rem clamp(1.25rem, 8vw, 9rem) 5rem;
+}
+
+.law-recovery-intro {
+  max-width: 680px;
+}
+
+.law-recovery-intro h1 {
+  max-width: 650px;
+  margin: 0 0 1.4rem;
+  color: #fff;
+  font-family: var(--law-display);
+  font-size: clamp(4.4rem, 8.7vw, 7.4rem);
+  font-weight: 400;
+  letter-spacing: .015em;
+  line-height: .88;
+  text-transform: uppercase;
+}
+
+.law-recovery-intro > p:last-child {
+  max-width: 580px;
+  margin: 0;
+  color: rgb(255 255 255 / 82%);
+  font-size: clamp(1rem, 1.5vw, 1.2rem);
+}
+
+.law-recovery-card {
+  justify-self: end;
+}
+
+.law-recovery-form {
+  display: grid;
+  gap: .55rem;
+}
+
+.law-recovery-form label {
+  font-size: .73rem;
+  font-weight: 700;
+}
+
+.law-recovery-form input {
+  width: 100%;
+  min-height: 2.75rem;
+  border: 1px solid rgb(43 23 61 / 20%);
+  border-radius: 0;
+  background: rgb(255 255 255 / 75%);
+  padding: .65rem .72rem;
+  color: var(--law-ink);
+  font: inherit;
+  font-size: .86rem;
+}
+
+.law-recovery-form input:focus-visible,
+.law-recovery-form button:focus-visible,
+.law-recovery-back:focus-visible {
+  outline: 2px solid var(--law-sage);
+  outline-offset: 3px;
+}
+
+.law-recovery-form .law-submit {
+  width: 100%;
+  margin-top: .5rem;
+}
+
+.law-recovery-form .law-submit:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.law-recovery-message {
+  margin: .65rem 0 .25rem;
+}
+
+.law-recovery-message[data-state="success"] {
+  color: #35684a;
+}
+
+.law-recovery-message[data-state="error"] {
+  color: #a52d26;
+}
+
+.law-recovery-back {
+  display: inline-block;
+  margin-top: .35rem;
+  color: var(--law-purple) !important;
+  font-size: .75rem;
+  font-weight: 700;
+  text-underline-offset: .18em;
+}
+
+.law-recovery-back:hover {
+  color: var(--law-plum) !important;
+}
+
+@media (max-width: 900px) {
+  .law-recovery-main {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    padding-top: 8rem;
+  }
+
+  .law-recovery-card {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 560px) {
+  .law-recovery-header {
+    padding: 1.25rem 1.1rem;
+  }
+
+  .law-recovery-main {
+    gap: 1.5rem;
+    padding: 7rem 1.1rem 2rem;
+  }
+
+  .law-recovery-intro h1 {
+    font-size: 4rem;
+  }
+
+  .law-recovery-card {
+    padding: 1.35rem;
+  }
+}

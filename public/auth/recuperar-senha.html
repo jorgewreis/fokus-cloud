@@ -1,28 +1,39 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="dark">
   <head>
     <meta name="robots" content="noindex, nofollow" />
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Recuperar senha | Fokus Cloud</title>
-    <link rel="stylesheet" href="/assets/css/reset.css" />
-    <link rel="stylesheet" href="/assets/css/style.css" />
-    <link rel="stylesheet" href="/assets/css/subscription.css" />
+    <meta name="theme-color" content="#1b1028" />
+    <title>Recuperar senha | Fokus Law</title>
+    <link rel="stylesheet" href="/marketing/products/fokus-law.css?v=20260928-law-password-recovery-v2" />
+    <link rel="stylesheet" href="/auth/recuperar-senha.css?v=20260928-law-recovery-v1" />
   </head>
-  <body class="subscription-page">
-    <main class="checkout-wrap">
-      <section class="auth-card">
-        <a class="brand" href="/acesso">Fokus<span>Cloud</span></a>
-        <div class="card-heading">
-          <p class="section-kicker">Recuperação de acesso</p>
-          <h1 class="fs-card-title">Redefina sua senha.</h1>
-          <p class="card-description">Informe seu CPF. Se houver uma conta elegível, enviaremos um link ao e-mail já confirmado.</p>
+  <body class="law-page law-recovery-page">
+    <a class="law-recovery-skip" href="#reset-title">Pular para recuperação de senha</a>
+    <header class="law-recovery-header">
+      <a class="law-recovery-brand" href="/produtos/fokus-law">FOKUS CLOUD <span>LAW</span></a>
+      <a class="law-recovery-return" href="/produtos/fokus-law">Voltar ao Fokus Law</a>
+    </header>
+    <main class="law-recovery-main">
+      <section class="law-recovery-intro" aria-labelledby="recovery-page-title">
+        <p class="law-eyebrow">SEGURANÇA DA CONTA</p>
+        <h1 id="recovery-page-title">Retome seu acesso.</h1>
+        <p>Enviaremos as instruções para o e-mail confirmado da conta, quando ela estiver elegível para recuperação.</p>
+      </section>
+      <section class="law-login-card law-recovery-card" aria-labelledby="reset-title">
+        <p class="law-card-kicker">RECUPERAÇÃO DE ACESSO</p>
+        <div class="law-login-heading">
+          <h2 id="reset-title">Redefina sua senha</h2>
+          <p>Informe o CPF cadastrado. As instruções serão enviadas ao e-mail já confirmado.</p>
         </div>
-        <form id="reset-form">
-          <label class="form-field"><span class="fs-form-label">CPF</span><input class="field-size-md" name="cpf" inputmode="numeric" autocomplete="username" required /></label>
+        <form id="reset-form" class="law-recovery-form">
+          <label for="reset-cpf">CPF</label>
+          <input id="reset-cpf" name="cpf" inputmode="numeric" autocomplete="username" required />
+          <button class="law-submit" type="submit">Enviar instruções</button>
         </form>
-        <div class="login-actions"><button class="fs-btn fs-btn-success" form="reset-form" type="submit">Enviar instruções</button></div>
-        <p id="message" class="form-message" role="status"></p>
+        <p id="message" class="law-login-status law-recovery-message" role="status" aria-live="polite"></p>
+        <a class="law-recovery-back" href="/produtos/fokus-law">Voltar para o login</a>
       </section>
     </main>
     <script src="/assets/js/api-client.js"></script>
@@ -30,12 +41,23 @@
       document.querySelector('#reset-form').onsubmit = async (event) => {
         event.preventDefault();
         const form = event.currentTarget;
+        const submit = form.querySelector('button[type="submit"]');
+        const message = document.querySelector('#message');
         const cpf = form.elements.cpf.value.replace(/\D/g, '');
+        submit.disabled = true;
+        message.dataset.state = '';
+        message.textContent = 'Enviando instruções…';
         try {
           const response = await FokusApi.request('/auth/request-password-reset', { method: 'POST', body: { cpf } });
-          document.querySelector('#message').textContent = response.message;
+          message.dataset.state = 'success';
+          message.textContent = response.message;
           form.reset();
-        } catch (error) { document.querySelector('#message').textContent = error.message; }
+        } catch (error) {
+          message.dataset.state = 'error';
+          message.textContent = error.message || 'Não foi possível enviar as instruções.';
+        } finally {
+          submit.disabled = false;
+        }
       };
     </script>
   </body>
