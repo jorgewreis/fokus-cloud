@@ -73,10 +73,10 @@
         if (!window.FokusLawUserCpfValid?.(cpf)) { feedback.dataset.state = 'error'; feedback.textContent = 'Informe um CPF válido com 11 dígitos.'; cpfField.focus(); return; }
         const law_assignments = [...selections].filter(([, item]) => item.checkbox.checked).map(([selectedUnit, item]) => ({ unit_id: selectedUnit, role_id: item.select.value }));
         if (!law_assignments.length || law_assignments.some((assignment) => !assignment.role_id)) { feedback.dataset.state = 'error'; feedback.textContent = 'Selecione ao menos um setor e um perfil válido para cada setor.'; return; }
-        submit.disabled = true; submit.textContent = 'Enviando convite…';
+        submit.disabled = true; submit.classList.add('is-loading'); submit.setAttribute('aria-busy', 'true'); submit.textContent = 'Enviando convite…';
         try { const payload = Object.fromEntries(new FormData(form)); await request('/portal/users', { method: 'POST', body: { ...payload, cpf, law_assignments } }); await render(context, region, 'Convite enviado. Os acessos serão ativados quando a pessoa aceitar.'); }
         catch (error) { feedback.dataset.state = 'error'; feedback.textContent = error.message || 'Não foi possível enviar o convite.'; }
-        finally { submit.disabled = false; submit.textContent = 'Enviar convite'; }
+        finally { submit.disabled = false; submit.classList.remove('is-loading'); submit.removeAttribute('aria-busy'); submit.textContent = 'Enviar convite'; }
       });
     }
 
