@@ -78,7 +78,7 @@ class CustomerProfileTest extends TestCase
         $user = $this->customer();
         $this->actingAs($user)->patchJson('/api/auth/profile', ['email' => 'novo@example.test', 'current_password' => 'SenhaCliente!2026'])->assertOk();
         Mail::assertSent(FokusLawSystemMail::class, fn (FokusLawSystemMail $mail) => $mail->hasTo('novo@example.test') && $mail->actionLabel === 'Confirmar meu e-mail');
-        Mail::assertSent(FokusLawSystemMail::class, fn (FokusLawSystemMail $mail) => $mail->hasTo('cliente@example.test') && $mail->title === 'Pedido de alteração de e-mail');
+        Mail::assertSent(FokusLawSystemMail::class, fn (FokusLawSystemMail $mail) => $mail->hasTo('cliente@example.test') && $mail->title === 'Alteração de e-mail solicitada');
     }
 
     public function test_email_change_rejects_an_address_used_by_another_account(): void
