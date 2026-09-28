@@ -632,7 +632,7 @@ class AuthController extends Controller
         $url = rtrim(config('app.url'), '/').$path.'?token='.$plain;
         [$subject, $title, $intro, $actionLabel, $securityTitle, $securityText] = match ($purpose) {
             'email_verification' => ['Fokus Cloud: confirme seu e-mail', 'Confirme seu e-mail', 'Você solicitou a confirmação deste endereço para sua conta Fokus Cloud. Use o botão para validar seu e-mail e continuar.', 'Confirmar meu e-mail', 'Você não solicitou esta confirmação?', ' Ignore esta mensagem. O endereço só será atualizado depois que você confirmar o pedido.'],
-            'password_reset' => ['Fokus Cloud: crie ou redefina sua senha', 'Redefina sua senha', 'Recebemos um pedido para criar uma nova senha para sua conta Fokus Cloud. Use o botão para continuar com segurança.', 'Criar nova senha', 'Você não solicitou a redefinição?', ' Ignore esta mensagem. Sua senha atual não será alterada.'],
+            'password_reset' => ['Fokus Law: redefina sua senha', 'Redefina sua senha', 'Recebemos uma solicitação para criar uma nova senha para sua conta Fokus Law. Clique no botão abaixo para escolher uma senha nova e voltar a acessar sua operação jurídica.', 'Criar nova senha', 'Não solicitou a redefinição?', ' Ignore este e-mail. Sua senha atual permanece inalterada. Nunca compartilhe o link recebido.'],
             'password_creation' => ['Fokus Cloud: crie ou redefina sua senha', 'Crie sua senha', 'Sua conta Fokus Cloud está pronta para configuração. Use o botão para criar sua senha e concluir o acesso.', 'Criar minha senha', 'Não esperava este convite?', ' Ignore esta mensagem e fale com a pessoa administradora da sua empresa.'],
             'membership_acceptance' => ['Fokus Cloud: aceite seu vínculo', 'Confirme seu vínculo', 'Você recebeu um convite para acessar uma empresa no Fokus Cloud. Revise e aceite o vínculo pelo botão abaixo.', 'Revisar convite', 'Não reconhece este convite?', ' Ignore esta mensagem ou confirme os detalhes com a pessoa administradora da empresa.'],
             'admin_transfer' => ['Fokus Cloud: aceite a administração da empresa', 'Confirme a transferência', 'Você recebeu uma solicitação para assumir a administração de uma empresa no Fokus Cloud. Use o botão para revisar e responder ao pedido.', 'Revisar transferência', 'Não esperava esta solicitação?', ' Ignore esta mensagem e confirme com a pessoa que administra a empresa.'],
@@ -645,10 +645,13 @@ class AuthController extends Controller
             preheader: $intro,
             actionLabel: $actionLabel,
             actionUrl: $url,
+            actionExpiryLabel: $purpose === 'password_reset' ? 'LINK DE RECUPERAÇÃO · VÁLIDO POR 24 HORAS' : null,
             expiry: '24 horas',
             securityTitle: $securityTitle,
             securityText: $securityText,
-            details: [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'VALIDADE', 'value' => 'Link válido por 24 horas']],
+            details: $purpose === 'password_reset'
+                ? [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'O QUE REÚNE', 'value' => 'Processos, prazos e equipe']]
+                : [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'VALIDADE', 'value' => 'Link válido por 24 horas']],
         ));
     }
 

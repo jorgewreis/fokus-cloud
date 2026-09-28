@@ -48,6 +48,9 @@
               <a href="{{ $actionUrl }}" style="display:inline-block;padding:14px 21px;color:#fff;font-family:Arial,sans-serif;font-size:13px;font-weight:700;text-decoration:none">{{ $actionLabel }}</a>
             </td></tr></table>
             <p style="margin:0;color:#706675;font-family:Arial,sans-serif;font-size:10px;line-height:1.6">Se o botão não funcionar, copie este endereço no navegador:<br><a href="{{ $actionUrl }}" style="color:#7352a5;word-break:break-all">{{ $actionUrl }}</a></p>
+            @if($actionExpiryLabel)
+              <div style="margin-top:16px;padding:12px 14px;background:#f5f0e7;color:#5d5362;font-family:Arial,sans-serif;font-size:11px">{{ $actionExpiryLabel }}</div>
+            @endif
           @endif
 
           @if($securityTitle || $securityText)

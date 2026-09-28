@@ -27,6 +27,7 @@ final class FokusLawSystemMail extends Mailable
         public ?string $expiry = null,
         public ?string $actionLabel = null,
         public ?string $actionUrl = null,
+        public ?string $actionExpiryLabel = null,
         public ?string $securityTitle = null,
         public ?string $securityText = null,
         public array $details = [],
