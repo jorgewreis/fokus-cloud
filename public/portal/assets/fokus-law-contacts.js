@@ -216,13 +216,15 @@
           tr.append($('td', '', `${contact.departments?.length || 0} departamento(s)`));
           tr.append($('td', '', contact.status === 'ativo' ? 'Ativo' : 'Inativo'));
           const actions = $('td', 'law-contact-actions');
-          actions.append(iconButton('Ver detalhes', 'Folder-File--Streamline-Ultimate.png', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget)));
-          if (!contact.is_shared && can('law.contacts.update')) actions.append(iconButton('Editar contato', 'Common-File-Edit--Streamline-Ultimate.png', (event) => openEditor(root, contact, refresh, event.currentTarget, relationshipOptions)));
-          if (!contact.is_shared && can('law.contacts.delete') && contact.status === 'ativo') actions.append(iconButton('Inativar contato', 'Common-File-Subtract--Streamline-Ultimate.png', async (event) => {
+          const actionList = $('div', 'law-contact-action-list');
+          actionList.append(iconButton('Ver detalhes', 'Folder-File--Streamline-Ultimate.png', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget)));
+          if (!contact.is_shared && can('law.contacts.update')) actionList.append(iconButton('Editar contato', 'Common-File-Edit--Streamline-Ultimate.png', (event) => openEditor(root, contact, refresh, event.currentTarget, relationshipOptions)));
+          if (!contact.is_shared && can('law.contacts.delete') && contact.status === 'ativo') actionList.append(iconButton('Inativar contato', 'Common-File-Subtract--Streamline-Ultimate.png', async (event) => {
             if (!await confirmAction(root, 'Inativar contato', 'O cadastro deixará de aparecer entre os contatos ativos. Os dados históricos serão preservados.', 'Inativar contato', event.currentTarget)) return;
             try { await window.FokusApi.request(`/law/contacts/${encodeURIComponent(contact.id)}`, { method: 'DELETE' }); await refresh(); }
             catch (error) { state.dataset.state = 'error'; state.textContent = error.message || 'Não foi possível inativar o contato.'; }
           }));
+          actions.append(actionList);
           tr.append(actions); tbody.append(tr);
         });
         const pagination = result.pagination || { page, per_page: 25, total: currentItems.length };

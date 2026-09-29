@@ -389,10 +389,11 @@
 .law-contact-table tbody tr { height: 56px; }
 .law-contact-name { padding: 0; border: 0; background: transparent; color: var(--law-shell-purple); font: inherit; font-weight: 650; text-align: left; cursor: pointer; }
 .law-contact-shared-badge { display: block; margin-top: 4px; color: #655476; font-size: 10px; }
-.law-contact-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; }
-.law-contact-actions .fs-table-action { flex: 0 0 24px; width: 24px; min-width: 24px; height: 24px; min-height: 24px; border-radius: 6px; }
-.law-contact-actions .fs-table-action:hover, .law-contact-actions .fs-table-action:focus-visible { border: 1px solid #e5dcef; background: #f7f3fa; }
-.law-contact-actions .fs-table-action img { width: 20px; height: 20px; }
+.law-contact-actions { vertical-align: middle; }
+.law-contact-action-list { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; }
+.law-contact-action-list .fs-table-action { flex: 0 0 24px; width: 24px; min-width: 24px; height: 24px; min-height: 24px; border-radius: 6px; }
+.law-contact-action-list .fs-table-action:hover, .law-contact-action-list .fs-table-action:focus-visible { border: 1px solid #e5dcef; background: #f7f3fa; }
+.law-contact-action-list .fs-table-action img { width: 20px; height: 20px; }
 .law-contact-empty { padding: 30px !important; color: var(--law-shell-muted) !important; text-align: center; }
 .law-contact-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin: 12px 0; color: var(--law-shell-muted); font-size: 12px; }
 .law-contact-feedback[data-state="error"] { color: #a11b1b; }
