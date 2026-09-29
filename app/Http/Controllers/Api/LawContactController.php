@@ -304,7 +304,7 @@ class LawContactController extends Controller
             'addresses.*.complement' => ['nullable', 'string', 'max:120'],
             'addresses.*.district' => ['nullable', 'string', 'max:120'],
             'addresses.*.city' => ['required', 'string', 'max:120'],
-            'addresses.*.state' => ['nullable', 'string', 'size:2'],
+            'addresses.*.state' => ['required', 'string', Rule::in(['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'])],
             'addresses.*.country' => ['nullable', 'string', 'max:80'],
             'addresses.*.primary' => ['nullable', 'boolean'],
             'channels' => ['sometimes', 'array', 'max:6'],
@@ -403,18 +403,30 @@ class LawContactController extends Controller
             $addressDelete = DB::table('law_contact_addresses')->where('company_id', $companyId)->where('law_contact_id', $contactId);
             if (! $canSensitive) $addressDelete->where('address_type', '!=', 'residential');
             $addressDelete->delete();
-            foreach ($data['addresses'] as $address) DB::table('law_contact_addresses')->insert([
+            $primaryAddressAssigned = false;
+            foreach ($data['addresses'] as $address) {
+                $isPrimary = (bool) ($address['primary'] ?? false) && ! $primaryAddressAssigned;
+                $primaryAddressAssigned = $primaryAddressAssigned || $isPrimary;
+                DB::table('law_contact_addresses')->insert([
                 'id' => PrefixedUlid::make('LDR'), 'company_id' => $companyId, 'law_contact_id' => $contactId, 'address_type' => $address['type'],
                 'postal_code' => $address['postal_code'] ?? null, 'street' => trim($address['street']), 'number' => $address['number'] ?? null,
                 'complement' => $address['complement'] ?? null, 'district' => $address['district'] ?? null, 'city' => trim($address['city']),
-                'state' => isset($address['state']) ? strtoupper($address['state']) : null, 'country' => $address['country'] ?? 'Brasil', 'is_primary' => (bool) ($address['primary'] ?? false), 'created_at' => now(), 'updated_at' => now(),
-            ]);
+                'state' => strtoupper($address['state']), 'country' => $address['country'] ?? 'Brasil', 'is_primary' => $isPrimary, 'created_at' => now(), 'updated_at' => now(),
+            ]); }
         }
         if (array_key_exists('channels', $data)) {
             $channelDelete = DB::table('law_contact_channels')->where('company_id', $companyId)->where('law_contact_id', $contactId)->whereNull('law_contact_department_id');
             if (! $canSensitive) $channelDelete->where('is_personal', false);
             $channelDelete->delete();
-            foreach ($data['channels'] as $index => $channel) $this->insertChannel($companyId, $contactId, null, $channel, $index);
+            $primaryChannels = [];
+            foreach ($data['channels'] as $index => $channel) {
+                $group = $channel['type'] === 'email' ? 'email' : 'phone';
+                $isPrimary = (bool) ($channel['primary'] ?? $index === 0);
+                if ($isPrimary && isset($primaryChannels[$group])) $isPrimary = false;
+                if ($isPrimary) $primaryChannels[$group] = true;
+                $channel['primary'] = $isPrimary;
+                $this->insertChannel($companyId, $contactId, null, $channel, $index);
+            }
         }
         if (array_key_exists('documents', $data)) {
             DB::table('law_contact_documents')->where('company_id', $companyId)->where('law_contact_id', $contactId)->delete();

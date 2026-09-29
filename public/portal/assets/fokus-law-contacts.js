@@ -258,10 +258,21 @@
     }
     const channelSection = section('Telefones e e-mails', 'Até 4 telefones e 2 e-mails.');
     const channelRows = $('div', 'law-contact-repeat-list'); (contact?.channels || []).filter((item) => window.lawContactsCanSensitive || !item.personal).forEach((item) => channelRows.append(channelRow(item)));
-    channelSection.content.append(channelRows, button('Adicionar telefone ou e-mail', 'fs-btn fs-btn-secondary', () => { if (channelRows.children.length < 6) channelRows.append(channelRow()); }));
+    enforceSinglePrimary(channelRows, (row) => row.querySelector('[data-channel-type]').value === 'email' ? 'email' : 'phone', true);
+    channelSection.content.append(channelRows, button('Adicionar telefone ou e-mail', 'fs-btn fs-btn-secondary', () => {
+      if (channelRows.children.length >= 6) return;
+      const row = channelRow(); channelRows.append(row);
+      const group = row.querySelector('[data-channel-type]').value === 'email' ? 'email' : 'phone';
+      if (![...channelRows.children].some((other) => other !== row && (other.querySelector('[data-channel-type]').value === 'email' ? 'email' : 'phone') === group && other.querySelector('[data-primary]').value === '1')) row.querySelector('[data-primary]').value = '1';
+    }));
     const addressSection = section('Endereços', 'Até 2 endereços completos.');
     const addressRows = $('div', 'law-contact-repeat-list'); (contact?.addresses || []).forEach((item) => addressRows.append(addressRow(item)));
-    addressSection.content.append(addressRows, button('Adicionar endereço', 'fs-btn fs-btn-secondary', () => { if (addressRows.children.length < 2) addressRows.append(addressRow()); }));
+    enforceSinglePrimary(addressRows, () => 'address', true);
+    addressSection.content.append(addressRows, button('Adicionar endereço', 'fs-btn fs-btn-secondary', () => {
+      if (addressRows.children.length >= 2) return;
+      const row = addressRow(); addressRows.append(row);
+      if (![...addressRows.children].some((other) => other !== row && other.querySelector('[data-primary]').value === '1')) row.querySelector('[data-primary]').value = '1';
+    }));
     const departmentSection = section('Departamentos da empresa', 'Cada departamento é uma unidade adicional no consumo contratado e aceita até 4 telefones e 2 e-mails.');
     const departmentRows = $('div', 'law-contact-repeat-list'); (contact?.departments || []).forEach((item) => departmentRows.append(departmentRow(item)));
     departmentSection.content.append(departmentRows, button('Adicionar departamento', 'fs-btn fs-btn-secondary', () => departmentRows.append(departmentRow())));
@@ -292,8 +303,8 @@
       const body = {
         legal_nature: nature.value, display_name: name.value.trim(), legal_name: legalName.value.trim() || null,
         professions: [...professionRows.querySelectorAll('[data-profession]')].map((item) => item.dataset.profession),
-        channels: [...channelRows.children].map((row) => ({ type: row.querySelector('[data-channel-type]').value, value: row.querySelector('[data-channel-value]').value.trim(), label: row.querySelector('[data-channel-label]').value.trim() || null, personal: false })).filter((item) => item.value),
-        addresses: [...addressRows.children].map((row) => ({ type: row.querySelector('[data-address-type]').value, postal_code: row.querySelector('[data-postal]').value.trim() || null, street: row.querySelector('[data-street]').value.trim(), number: row.querySelector('[data-number]').value.trim() || null, complement: row.querySelector('[data-complement]').value.trim() || null, district: row.querySelector('[data-district]').value.trim() || null, city: row.querySelector('[data-city]').value.trim(), state: row.querySelector('[data-state]').value.trim().toUpperCase() || null, country: row.querySelector('[data-country]').value.trim() || 'Brasil', primary: row.querySelector('[data-primary]').checked })).filter((address) => address.street && address.city),
+        channels: [...channelRows.children].map((row) => ({ type: row.querySelector('[data-channel-type]').value, value: row.querySelector('[data-channel-value]').value.trim(), label: row.querySelector('[data-channel-label]').value.trim() || null, personal: false, primary: row.querySelector('[data-primary]').value === '1' })).filter((item) => item.value),
+        addresses: [...addressRows.children].map((row) => ({ type: row.querySelector('[data-address-type]').value, postal_code: row.querySelector('[data-postal]').value.trim() || null, street: row.querySelector('[data-street]').value.trim(), number: row.querySelector('[data-number]').value.trim() || null, complement: row.querySelector('[data-complement]').value.trim() || null, district: row.querySelector('[data-district]').value.trim() || null, city: row.querySelector('[data-city]').value.trim(), state: row.querySelector('[data-state]').value.trim().toUpperCase(), country: row.querySelector('[data-country]').value.trim() || 'Brasil', primary: row.querySelector('[data-primary]').value === '1' })),
         departments: nature.value === 'pj' ? [...departmentRows.children].map((row) => ({ name: row.querySelector('[data-department-name]').value.trim(), channels: [...row.querySelectorAll('.law-contact-department-channel')].map((item) => ({ type: item.querySelector('[data-channel-type]').value, value: item.querySelector('[data-channel-value]').value.trim(), label: item.querySelector('[data-channel-label]').value.trim() || null })).filter((item) => item.value) })).filter((item) => item.name) : [],
         tags: tagField.value.split(',').map((value) => value.trim()).filter(Boolean),
       };
@@ -336,7 +347,37 @@
     const labels = ['Principal','Pessoal','Profissional','Recado','Comercial','Emergência'];
     if (item.label && !labels.includes(item.label)) labels.push(item.label);
     const labelSelect = select(labels.map((value) => [value, value]), item.label || 'Principal'); labelSelect.dataset.channelLabel = '1';
-    row.append(field('Canal', type), field('Contato', value), field('Rótulo', labelSelect), button('Remover', 'law-contact-remove', () => row.remove())); return row;
+    const primary = select([['0','Não'],['1','Sim']], item.primary ? '1' : '0'); primary.dataset.primary = '1';
+    row.append(field('Canal', type), field('Contato', value), field('Rótulo', labelSelect), field('Principal', primary), button('Remover', 'law-contact-remove', () => row.remove())); return row;
+  }
+
+  function enforceSinglePrimary(rows, groupForRow, chooseFirst) {
+    const entries = [...rows.children];
+    const seen = new Set();
+    entries.forEach((row) => {
+      const primary = row.querySelector('[data-primary]');
+      const group = groupForRow(row);
+      if (primary.value === '1') {
+        if (seen.has(group)) primary.value = '0';
+        else seen.add(group);
+      }
+    });
+    if (chooseFirst) entries.forEach((row) => {
+      const primary = row.querySelector('[data-primary]');
+      const group = groupForRow(row);
+      if (!seen.has(group)) { primary.value = '1'; seen.add(group); }
+    });
+    rows.addEventListener('change', (event) => {
+      if (!event.target.matches('[data-primary], [data-channel-type]')) return;
+      const row = event.target.closest('.law-contact-repeat-row, .law-contact-address-row');
+      const primary = row.querySelector('[data-primary]');
+      if (event.target.matches('[data-channel-type]') && primary.value !== '1') return;
+      if (event.target.matches('[data-primary]') && event.target.value !== '1') return;
+      const group = groupForRow(row);
+      [...rows.children].forEach((other) => {
+        if (other !== row && groupForRow(other) === group) other.querySelector('[data-primary]').value = '0';
+      });
+    });
   }
 
   function addressRow(address = {}) {
@@ -344,16 +385,50 @@
     const addressTypes = [['business', 'Comercial/institucional'], ['correspondence', 'Correspondência'], ['other', 'Outro']];
     if (window.lawContactsCanSensitive) addressTypes.splice(1, 0, ['residential', 'Residencial']);
     const type = select(addressTypes, address.type || 'business'); type.dataset.addressType = '1';
-    const postal = input(address.postal_code, 'CEP', 16); postal.dataset.postal = '1';
+    const postal = input(address.postal_code, '00000-000', 9); postal.dataset.postal = '1'; postal.inputMode = 'numeric';
     const street = input(address.street, 'Logradouro', 180); street.required = true; street.dataset.street = '1';
     const number = input(address.number, 'Número', 32); number.dataset.number = '1';
     const complement = input(address.complement, 'Complemento', 120); complement.dataset.complement = '1';
     const district = input(address.district, 'Bairro', 120); district.dataset.district = '1';
     const city = input(address.city, 'Município', 120); city.required = true; city.dataset.city = '1';
-    const state = input(address.state, 'UF', 2); state.dataset.state = '1';
+    const state = select([['','Selecione a UF'], ...STATES], address.state || 'BA'); state.required = true; state.dataset.state = '1';
     const country = input(address.country || 'Brasil', 'País', 80); country.dataset.country = '1';
-    const primaryWrap = $('label', 'law-contact-check'); const primary = $('input'); primary.type = 'checkbox'; primary.checked = Boolean(address.primary); primary.dataset.primary = '1'; primaryWrap.append(primary, $('span', '', 'Principal'));
-    row.append(field('Tipo', type), field('CEP', postal), field('Logradouro *', street), field('Número', number), field('Complemento', complement), field('Bairro', district), field('Município *', city), field('UF', state), field('País', country), primaryWrap, button('Remover', 'law-contact-remove', () => row.remove())); return row;
+    const primary = select([['0','Não'],['1','Sim']], address.primary ? '1' : '0'); primary.dataset.primary = '1';
+    const lookupStatus = $('small', 'law-contact-help'); lookupStatus.setAttribute('aria-live', 'polite');
+    const postalField = field('CEP', postal); postalField.append(lookupStatus);
+    const setLocked = (locked) => { district.disabled = locked; city.disabled = locked; state.disabled = locked; country.disabled = locked; };
+    let lookupTimer; let lookupController; let lookupSequence = 0;
+    postal.addEventListener('input', () => {
+      const digits = postal.value.replace(/\D/g, '').slice(0, 8);
+      postal.value = digits.replace(/^(\d{5})(\d)/, '$1-$2');
+      clearTimeout(lookupTimer); lookupController?.abort(); lookupController = null;
+      const sequence = ++lookupSequence;
+      setLocked(false); lookupStatus.textContent = '';
+      if (digits.length !== 8) return;
+      lookupStatus.textContent = 'Consultando CEP…';
+      lookupTimer = setTimeout(async () => {
+        lookupController = new AbortController();
+        try {
+          const response = await fetch(`https://viacep.com.br/ws/${digits}/json/`, { signal: lookupController.signal });
+          if (!response.ok) throw new Error('Consulta indisponível');
+          const data = await response.json();
+          if (sequence !== lookupSequence) return;
+          if (data.erro) { lookupStatus.textContent = 'CEP não encontrado. Preencha o endereço manualmente.'; return; }
+          if (data.logradouro) street.value = data.logradouro;
+          if (data.complemento) complement.value = data.complemento;
+          district.value = data.bairro || '';
+          city.value = data.localidade || '';
+          if (STATES.some(([uf]) => uf === data.uf)) state.value = data.uf;
+          country.value = 'Brasil';
+          const completeLocality = Boolean(data.bairro && data.localidade && data.uf && STATES.some(([uf]) => uf === data.uf));
+          setLocked(completeLocality);
+          lookupStatus.textContent = 'Endereço encontrado.';
+        } catch (error) {
+          if (error.name !== 'AbortError' && sequence === lookupSequence) lookupStatus.textContent = 'Não foi possível consultar o CEP. Preencha o endereço manualmente.';
+        }
+      }, 350);
+    });
+    row.append(field('Tipo', type), postalField, field('Logradouro *', street), field('Número', number), field('Complemento', complement), field('Bairro', district), field('Município *', city), field('UF *', state), field('País', country), field('Principal', primary), button('Remover', 'law-contact-remove', () => row.remove())); return row;
   }
 
   function departmentRow(department = {}) {
@@ -424,7 +499,7 @@
       contact.documents.forEach((doc) => {
         const item = $('article', 'law-contact-detail-document');
         const type = DOCUMENTS[doc.type] || doc.type || 'Documento';
-        item.append($('span', 'law-contact-detail-document-type', type));
+        item.append($('span', 'law-contact-detail-document-type', Array.from(type).slice(0, 3).join('').toLocaleUpperCase('pt-BR')));
         const detail = $('div', 'law-contact-detail-document-copy');
         detail.append($('strong', '', formatContactDocument(doc)));
         detail.append($('span', '', [doc.label, doc.state].filter(Boolean).join(' · ') || 'Documento cadastrado'));
@@ -440,7 +515,6 @@
         const detail = $('div', 'law-contact-detail-channel-copy');
         const meta = $('div', 'law-contact-detail-channel-meta');
         const title = $('div', 'law-contact-detail-channel-title');
-        title.append($('span', 'law-contact-detail-channel-label', channel.label || (isEmail ? 'E-mail' : 'Telefone')));
         const channelKinds = { phone: 'TELEFONE FIXO', extension: 'RAMAL', mobile: 'CELULAR', whatsapp: 'WHATSAPP', email: 'E-MAIL' };
         title.append($('span', 'law-contact-detail-channel-kind', channelKinds[channel.type] || 'TELEFONE'));
         meta.append(title);
