@@ -22,7 +22,7 @@ class LawContactController extends Controller
         'prosecutor_office', 'public_defender', 'expert', 'witness', 'representative', 'other',
     ];
 
-    private const DOCUMENT_TYPES = ['cpf', 'cnpj', 'oab', 'rg', 'other'];
+    private const DOCUMENT_TYPES = ['cpf', 'cnpj', 'oab', 'rg', 'registration', 'cadastro', 'voter_title', 'passport', 'other'];
 
     private const SHARE_FIELDS = ['professional_channels', 'business_addresses', 'documents'];
 
@@ -68,6 +68,7 @@ class LawContactController extends Controller
             'contacts' => $contacts,
             'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total],
             'classifications' => $this->classificationLabels(),
+            'professions' => DB::table('law_contact_professions')->where('company_id', $companyId)->orderBy('name')->pluck('name'),
             'tags' => DB::table('law_contact_tags')->where('company_id', $companyId)->orderBy('name')->pluck('name'),
             'summary' => $this->summary($companyId, $usage),
         ]);
@@ -209,6 +210,8 @@ class LawContactController extends Controller
             }
             $sourceClasses = DB::table('law_contact_classifications')->where('company_id', $companyId)->where('law_contact_id', $source->id)->get();
             foreach ($sourceClasses as $classification) DB::table('law_contact_classifications')->insertOrIgnore(['company_id' => $companyId, 'law_contact_id' => $target->id, 'classification_code' => $classification->classification_code]);
+            DB::table('law_contact_profession_assignments')->where('company_id', $companyId)->where('law_contact_id', $source->id)->get()->each(fn ($profession) => DB::table('law_contact_profession_assignments')->insertOrIgnore(['company_id' => $companyId, 'law_contact_id' => $target->id, 'profession_id' => $profession->profession_id]));
+            DB::table('law_contact_profession_assignments')->where('company_id', $companyId)->where('law_contact_id', $source->id)->delete();
             DB::table('law_contact_classifications')->where('company_id', $companyId)->where('law_contact_id', $source->id)->delete();
             $tags = DB::table('law_contact_tag_assignments')->where('company_id', $companyId)->where('law_contact_id', $source->id)->get();
             foreach ($tags as $tag) DB::table('law_contact_tag_assignments')->insertOrIgnore(['company_id' => $companyId, 'law_contact_id' => $target->id, 'law_contact_tag_id' => $tag->law_contact_tag_id]);
@@ -283,6 +286,8 @@ class LawContactController extends Controller
             'legal_nature' => [$required, Rule::in(['pf', 'pj'])],
             'classifications' => ['sometimes', 'array', 'max:12'],
             'classifications.*' => ['required', 'string', 'distinct', Rule::in(self::CLASSIFICATIONS)],
+            'professions' => ['sometimes', 'array', 'max:12'],
+            'professions.*' => ['required', 'string', 'distinct', 'min:2', 'max:100'],
             'notes' => ['sometimes', 'nullable', 'string', 'max:4000'],
             'sharing_excluded' => ['sometimes', 'boolean'],
             'status' => ['sometimes', Rule::in(['ativo', 'inativo'])],
@@ -290,7 +295,7 @@ class LawContactController extends Controller
             'documents.*.type' => ['required', Rule::in(self::DOCUMENT_TYPES)],
             'documents.*.number' => ['required', 'string', 'max:120'],
             'documents.*.label' => ['nullable', 'string', 'max:80'],
-            'documents.*.state' => ['nullable', 'string', 'size:2'],
+            'documents.*.state' => ['nullable', Rule::in(['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'])],
             'addresses' => ['sometimes', 'array', 'max:2'],
             'addresses.*.type' => ['required', Rule::in(['residential', 'business', 'correspondence', 'other'])],
             'addresses.*.postal_code' => ['nullable', 'string', 'max:16'],
@@ -303,7 +308,7 @@ class LawContactController extends Controller
             'addresses.*.country' => ['nullable', 'string', 'max:80'],
             'addresses.*.primary' => ['nullable', 'boolean'],
             'channels' => ['sometimes', 'array', 'max:6'],
-            'channels.*.type' => ['required', Rule::in(['phone', 'email'])],
+            'channels.*.type' => ['required', Rule::in(['phone', 'extension', 'mobile', 'whatsapp', 'email'])],
             'channels.*.value' => ['required', 'string', 'max:255'],
             'channels.*.label' => ['nullable', 'string', 'max:80'],
             'channels.*.personal' => ['nullable', 'boolean'],
@@ -311,7 +316,7 @@ class LawContactController extends Controller
             'departments' => ['sometimes', 'array', 'max:100'],
             'departments.*.name' => ['required', 'string', 'min:2', 'max:120'],
             'departments.*.channels' => ['nullable', 'array', 'max:6'],
-            'departments.*.channels.*.type' => ['required', Rule::in(['phone', 'email'])],
+            'departments.*.channels.*.type' => ['required', Rule::in(['phone', 'extension', 'mobile', 'whatsapp', 'email'])],
             'departments.*.channels.*.value' => ['required', 'string', 'max:255'],
             'departments.*.channels.*.label' => ['nullable', 'string', 'max:80'],
             'tags' => ['sometimes', 'array', 'max:6'],
@@ -330,7 +335,7 @@ class LawContactController extends Controller
 
     private function assertChannelLimits(array $channels): void
     {
-        abort_if(collect($channels)->where('type', 'phone')->count() > 4, 422, 'Cada contato pode ter até quatro telefones.');
+        abort_if(collect($channels)->whereIn('type', ['phone', 'extension', 'mobile', 'whatsapp'])->count() > 4, 422, 'Cada contato pode ter até quatro telefones.');
         abort_if(collect($channels)->where('type', 'email')->count() > 2, 422, 'Cada contato pode ter até dois e-mails.');
     }
 
@@ -340,7 +345,7 @@ class LawContactController extends Controller
         abort_if(array_key_exists('documents', $data), 403, 'Você não tem permissão para alterar documentos sensíveis.');
         abort_if(array_key_exists('notes', $data), 403, 'Você não tem permissão para alterar notas protegidas.');
         abort_if(collect($data['addresses'] ?? [])->contains(fn ($address) => ($address['type'] ?? null) === 'residential'), 403, 'Você não tem permissão para alterar endereços residenciais.');
-        abort_if(collect($data['channels'] ?? [])->contains(fn ($channel) => (bool) ($channel['personal'] ?? false)), 403, 'Você não tem permissão para alterar canais pessoais.');
+        abort_if(collect($data['channels'] ?? [])->contains(fn ($channel) => (bool) ($channel['personal'] ?? false) || mb_strtolower((string) ($channel['label'] ?? '')) === 'pessoal'), 403, 'Você não tem permissão para alterar canais pessoais.');
     }
 
     private function assertDocumentNature(array $data, ?string $nature = null): void
@@ -379,6 +384,20 @@ class LawContactController extends Controller
         if (array_key_exists('classifications', $data)) {
             DB::table('law_contact_classifications')->where('law_contact_id', $contactId)->delete();
             foreach ($data['classifications'] as $code) DB::table('law_contact_classifications')->insert(['company_id' => $companyId, 'law_contact_id' => $contactId, 'classification_code' => $code]);
+        }
+        if (array_key_exists('professions', $data)) {
+            DB::table('law_contact_profession_assignments')->where('company_id', $companyId)->where('law_contact_id', $contactId)->delete();
+            foreach (array_unique(array_map(fn ($name) => trim($name), $data['professions'])) as $name) {
+                if ($name === '') continue;
+                $normalized = mb_strtolower($name);
+                $existing = DB::table('law_contact_professions')->where('company_id', $companyId)->where('normalized_name', $normalized)->first();
+                $professionId = $existing?->id ?: PrefixedUlid::make('LPR');
+                if (! $existing) {
+                    DB::table('law_contact_professions')->insert(['id' => $professionId, 'company_id' => $companyId, 'name' => $name, 'normalized_name' => $normalized, 'created_at' => now(), 'updated_at' => now()]);
+                    $existing = (object) ['id' => $professionId];
+                }
+                DB::table('law_contact_profession_assignments')->insertOrIgnore(['company_id' => $companyId, 'law_contact_id' => $contactId, 'profession_id' => $existing->id]);
+            }
         }
         if (array_key_exists('addresses', $data)) {
             $addressDelete = DB::table('law_contact_addresses')->where('company_id', $companyId)->where('law_contact_id', $contactId);
@@ -438,7 +457,7 @@ class LawContactController extends Controller
         DB::table('law_contact_channels')->insert([
             'id' => PrefixedUlid::make('LCN'), 'company_id' => $companyId, 'law_contact_id' => $contactId, 'law_contact_department_id' => $departmentId,
             'channel_type' => $channel['type'], 'label' => $channel['label'] ?? null, 'channel_value' => trim($channel['value']),
-            'is_personal' => (bool) ($channel['personal'] ?? false), 'is_primary' => (bool) ($channel['primary'] ?? $order === 0),
+            'is_personal' => (bool) ($channel['personal'] ?? false) || mb_strtolower((string) ($channel['label'] ?? '')) === 'pessoal', 'is_primary' => (bool) ($channel['primary'] ?? $order === 0),
             'sort_order' => $order, 'created_at' => now(), 'updated_at' => now(),
         ]);
     }
@@ -446,6 +465,7 @@ class LawContactController extends Controller
     private function contactPayload(string $companyId, object $contact, bool $canSensitive, bool $canMerge = false): array
     {
         $classifications = DB::table('law_contact_classifications')->where('law_contact_id', $contact->id)->pluck('classification_code')->all();
+        $professions = DB::table('law_contact_profession_assignments as assignment')->join('law_contact_professions as profession', 'profession.id', '=', 'assignment.profession_id')->where('assignment.company_id', $companyId)->where('assignment.law_contact_id', $contact->id)->orderBy('profession.name')->pluck('profession.name')->all();
         $tags = DB::table('law_contact_tag_assignments as assignment')->join('law_contact_tags as tag', 'tag.id', '=', 'assignment.law_contact_tag_id')->where('assignment.law_contact_id', $contact->id)->orderBy('tag.name')->pluck('tag.name')->all();
         $channels = DB::table('law_contact_channels')->where('company_id', $companyId)->where('law_contact_id', $contact->id)->whereNull('law_contact_department_id')->orderBy('sort_order')->get();
         $addresses = DB::table('law_contact_addresses')->where('company_id', $companyId)->where('law_contact_id', $contact->id)->orderByDesc('is_primary')->get();
@@ -459,6 +479,7 @@ class LawContactController extends Controller
             'legal_nature' => (string) $contact->legal_nature, 'contact_type' => (string) $contact->contact_type,
             'status' => (string) $contact->status, 'notes' => $canSensitive ? $contact->notes : null,
             'classifications' => $classifications, 'classification_labels' => array_values(array_intersect_key($this->classificationLabels(), array_flip($classifications))),
+            'professions' => $professions,
             'tags' => $tags, 'channels' => $channels->map(fn ($channel) => $this->channelPayload($channel, $canSensitive))->all(),
             'addresses' => $addresses->filter(fn ($address) => $canSensitive || $address->address_type !== 'residential')->map(fn ($address) => ['id' => $address->id, 'type' => $address->address_type, 'postal_code' => $canSensitive ? $address->postal_code : null, 'street' => $address->street, 'number' => $address->number, 'complement' => $address->complement, 'district' => $address->district, 'city' => $address->city, 'state' => $address->state, 'country' => $address->country, 'primary' => (bool) $address->is_primary])->values()->all(),
             'documents' => $canSensitive ? $documents->map(fn ($document) => ['id' => $document->id, 'type' => $document->document_type, 'label' => $document->label, 'number' => Crypt::decryptString($document->document_number_encrypted), 'state' => $document->issuing_state])->all() : $documents->map(fn ($document) => ['id' => $document->id, 'type' => $document->document_type, 'label' => $document->label, 'number' => $this->maskedDocument(Crypt::decryptString($document->document_number_encrypted)), 'state' => $document->issuing_state])->all(),
@@ -494,12 +515,12 @@ class LawContactController extends Controller
             }
         }
 
-        $contactChannels = DB::table('law_contact_channels')->where('company_id', $companyId)->where('law_contact_id', $contact->id)->where('channel_type', 'phone')->when(! $canSensitive, fn ($query) => $query->where('is_personal', false))->get(['channel_value']);
+        $contactChannels = DB::table('law_contact_channels')->where('company_id', $companyId)->where('law_contact_id', $contact->id)->whereIn('channel_type', ['phone', 'extension', 'mobile', 'whatsapp'])->when(! $canSensitive, fn ($query) => $query->where('is_personal', false))->get(['channel_value']);
         $phoneNumbers = $contactChannels->map(fn ($channel) => $this->normalizeDuplicateValue((string) $channel->channel_value, 'phone'))->filter()->unique();
         if ($phoneNumbers->isEmpty()) return false;
         $otherPhones = DB::table('law_contact_channels as channel')->join('law_contacts as owner', function ($join): void {
             $join->on('owner.company_id', '=', 'channel.company_id')->on('owner.id', '=', 'channel.law_contact_id');
-        })->where('channel.company_id', $companyId)->where('owner.legal_nature', $contact->legal_nature)->where('channel.channel_type', 'phone')->where('channel.law_contact_id', '!=', $contact->id)
+        })->where('channel.company_id', $companyId)->where('owner.legal_nature', $contact->legal_nature)->whereIn('channel.channel_type', ['phone', 'extension', 'mobile', 'whatsapp'])->where('channel.law_contact_id', '!=', $contact->id)
             ->when(! $canSensitive, fn ($query) => $query->where('channel.is_personal', false))->where('owner.status', 'ativo')->whereNull('owner.deleted_at')->whereNull('owner.merged_into_id')->pluck('channel.channel_value');
         return $otherPhones->contains(fn ($value) => $phoneNumbers->contains($this->normalizeDuplicateValue((string) $value, 'phone')));
     }
