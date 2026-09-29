@@ -115,7 +115,15 @@
 .law-search-wrap input { min-width: 0; height: 38px; border: 1px solid var(--fs-color-border); background: transparent; box-shadow: none; font-size: 13px; }
 .law-search-wrap input:focus-visible { outline: 2px solid var(--law-shell-purple); outline-offset: -2px; }
 .law-search-wrap kbd { padding: 2px 6px; border: 1px solid #e6e1e9; border-radius: 4px; color: #6f6574; font-size: 10px; white-space: nowrap; }
-.law-search-state { position: absolute; z-index: 18; top: calc(100% + 12px); left: 0; width: min(100%, 390px); padding: 14px 16px; border: 1px solid var(--law-shell-line); border-radius: 8px; background: #fff; box-shadow: var(--law-shell-shadow); color: #675d6b; }
+.law-search-state { position: absolute; z-index: 18; top: calc(100% + 12px); left: 0; width: min(560px, calc(100vw - 32px)); max-height: min(70vh, 460px); overflow-y: auto; padding: 6px; border: 1px solid var(--law-shell-line); border-radius: 8px; background: #fff; box-shadow: var(--law-shell-shadow); color: #675d6b; }
+.law-search-message { margin: 0; padding: 12px 14px; color: #675d6b; font-size: 12px; }
+.law-search-message.is-error { color: #a12d32; }
+.law-search-results-heading { margin: 0; padding: 8px 10px 6px; color: #817687; font-size: 10px; font-weight: 600; letter-spacing: .06em; }
+.law-search-result { display: flex; width: 100%; flex-direction: column; gap: 3px; padding: 10px; border: 0; border-radius: 6px; background: #fff; color: var(--law-shell-ink); text-align: left; cursor: pointer; }
+.law-search-result:hover, .law-search-result:focus-visible { outline: none; background: #f5f1f7; }
+.law-search-result strong { font-size: 12px; font-weight: 600; }
+.law-search-result span { color: #786f7d; font-size: 11px; }
+.law-search-wrap input:disabled { color: #837a88; cursor: not-allowed; }
 .law-toolbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .law-toolbar-button { border-color: transparent !important; background: transparent !important; color: var(--law-shell-ink) !important; }
 .law-toolbar-button img, .law-exit-button img { width: 18px; height: 18px; object-fit: contain; }

@@ -1388,11 +1388,117 @@
 
     const search = document.querySelector('#global-search');
     const searchState = document.querySelector('#search-state');
-    const showSearchState = () => { searchState.hidden = false; };
-    search.addEventListener('focus', showSearchState);
-    search.addEventListener('input', showSearchState);
+    const contactsModule = visibleModules().find((module) => String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos'));
+    const canSearchContacts = Boolean(contactsModule && canLawPermission('law.contacts.view'));
+    let searchTimer;
+    let searchRequest = 0;
+    search.disabled = !canSearchContacts;
+    search.placeholder = canSearchContacts ? 'Pesquisar contatos' : 'Busca de contatos indisponível';
+    search.setAttribute('role', 'combobox');
+    search.setAttribute('aria-autocomplete', 'list');
+
+    const hideSearchState = () => {
+      window.clearTimeout(searchTimer);
+      searchRequest += 1;
+      searchState.hidden = true;
+      search.setAttribute('aria-expanded', 'false');
+    };
+    const showSearchMessage = (message, state = '') => {
+      const note = element('p', `law-search-message${state ? ` is-${state}` : ''}`, message);
+      searchState.replaceChildren(note);
+      searchState.hidden = false;
+      search.setAttribute('aria-expanded', 'true');
+    };
+    const showSearchResults = (contacts) => {
+      searchState.replaceChildren();
+      if (!contacts.length) {
+        showSearchMessage('Nenhum contato encontrado.');
+        return;
+      }
+
+      const heading = element('p', 'law-search-results-heading', 'CONTATOS');
+      searchState.append(heading);
+      contacts.forEach((contact, index) => {
+        const result = element('button', 'law-search-result');
+        result.type = 'button';
+        result.setAttribute('role', 'option');
+        result.setAttribute('aria-selected', 'false');
+        result.dataset.contactSearchResult = String(index);
+        const name = element('strong', '', contact.display_name || 'Contato sem nome');
+        const professions = (contact.professions || []).slice(0, 2).join(', ');
+        const detail = [contact.legal_nature === 'pj' ? 'Pessoa jurídica' : 'Pessoa física', professions, contact.status === 'inativo' ? 'Inativo' : 'Ativo']
+          .filter(Boolean).join(' · ');
+        result.append(name, element('span', '', detail));
+        result.addEventListener('click', async () => {
+          hideSearchState();
+          activeGroup = `module:${contactsModule.id}`;
+          renderNavigation();
+          closeMobileNav();
+          contentRegion.focus({ preventScroll: true });
+          try {
+            await window.FokusLawContacts?.openSearchedContact(contentRegion, contact.id, Boolean(contact.is_shared), search);
+          } catch (error) {
+            showSearchMessage(error.message || 'Não foi possível abrir este contato.', 'error');
+            search.focus();
+          }
+        });
+        result.addEventListener('keydown', (event) => {
+          const options = [...searchState.querySelectorAll('[data-contact-search-result]')];
+          const currentIndex = options.indexOf(result);
+          if (event.key === 'ArrowDown') { event.preventDefault(); options[(currentIndex + 1) % options.length]?.focus(); }
+          if (event.key === 'ArrowUp') { event.preventDefault(); if (currentIndex === 0) search.focus(); else options[currentIndex - 1]?.focus(); }
+          if (event.key === 'Escape') { hideSearchState(); search.focus(); }
+        });
+        searchState.append(result);
+      });
+      searchState.hidden = false;
+      search.setAttribute('aria-expanded', 'true');
+    };
+
+    search.addEventListener('focus', () => {
+      if (!canSearchContacts) return;
+      if (search.value.trim().length >= 2) {
+        search.dispatchEvent(new Event('input'));
+        return;
+      }
+      showSearchMessage('Digite ao menos 2 caracteres para buscar nos contatos.');
+    });
+    search.addEventListener('input', () => {
+      window.clearTimeout(searchTimer);
+      const query = search.value.trim();
+      if (!canSearchContacts) return;
+      if (query.length < 2) {
+        searchRequest += 1;
+        showSearchMessage('Digite ao menos 2 caracteres para buscar nos contatos.');
+        return;
+      }
+      showSearchMessage('Buscando contatos…');
+      const requestId = ++searchRequest;
+      searchTimer = window.setTimeout(async () => {
+        const params = new URLSearchParams({ q: query, page: '1', per_page: '10' });
+        try {
+          const result = await FokusApi.request(`/law/contacts?${params.toString()}`);
+          if (requestId !== searchRequest || search.value.trim() !== query) return;
+          showSearchResults(result.contacts || []);
+        } catch (error) {
+          if (requestId !== searchRequest) return;
+          showSearchMessage(error.message || 'Não foi possível pesquisar contatos.', 'error');
+        }
+      }, 220);
+    });
+    search.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown') {
+        const firstResult = searchState.querySelector('[data-contact-search-result]');
+        if (firstResult && !searchState.hidden) { event.preventDefault(); firstResult.focus(); }
+      }
+      if (event.key === 'Enter' && !searchState.hidden) {
+        const firstResult = searchState.querySelector('[data-contact-search-result]');
+        if (firstResult) { event.preventDefault(); firstResult.click(); }
+      }
+      if (event.key === 'Escape') hideSearchState();
+    });
     document.addEventListener('click', (event) => {
-      if (!event.target.closest('.law-search-wrap')) searchState.hidden = true;
+      if (!event.target.closest('.law-search-wrap')) hideSearchState();
       if (!event.target.closest('.law-popover-anchor')) {
         notificationPanel.hidden = true;
         notificationButton.setAttribute('aria-expanded', 'false');
@@ -1408,7 +1514,7 @@
         search.focus();
       }
       if (event.key === 'Escape') {
-        searchState.hidden = true;
+        hideSearchState();
         notificationPanel.hidden = true;
         notificationButton.setAttribute('aria-expanded', 'false');
         companyOptions.hidden = true;

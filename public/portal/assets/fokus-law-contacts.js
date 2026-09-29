@@ -717,5 +717,9 @@
     modal.body.append(form);
   }
 
-  window.FokusLawContacts = { render, openContact: (root, id, opener = null) => openDetails(root, id, false, () => {}, opener) };
+  window.FokusLawContacts = {
+    render,
+    openContact: (root, id, opener = null) => openDetails(root, id, false, () => {}, opener),
+    openSearchedContact: (root, id, isShared, opener = null) => openDetails(root, id, isShared, () => render(root, context), opener),
+  };
 })();
