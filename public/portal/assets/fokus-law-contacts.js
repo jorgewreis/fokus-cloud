@@ -346,23 +346,117 @@
   async function openDetails(root, id, isShared, onChanged, opener = null) {
     const result = await window.FokusApi.request(`/law/contacts/${encodeURIComponent(id)}${isShared ? '' : '?from_search=1'}`);
     const contact = result.contact;
-    const modal = createModal(root, contact.display_name, 'fs-modal-xl', opener);
+    const modal = createModal(root, 'Ficha do contato', 'fs-modal-xl', opener);
     const body = $('div', 'law-contact-detail-body');
-    if (contact.is_shared) body.append($('p', 'law-contact-source', `Contato compartilhado por ${contact.source_company_name}. Dados somente para consulta.`));
-    const addCard = (title, rows) => {
-      const card = $('section', 'fs-card fs-card-sm law-contact-detail-card'); const header = $('div', 'fs-card-header'); header.append($('h3', 'fs-card-title', title));
-      const cardBody = $('div', 'fs-card-body'); const dl = $('dl'); rows.forEach(([key, value]) => { const dt = $('dt', '', key); const dd = $('dd', '', value || '—'); dl.append(dt, dd); });
-      cardBody.append(dl); card.append(header, cardBody); body.append(card);
+    const labels = { pf: 'Pessoa física', pj: 'Pessoa jurídica', ativo: 'Ativo', inativo: 'Inativo', residential: 'Residencial', business: 'Comercial / institucional' };
+    const initials = String(contact.display_name || '?').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => [...part][0]).join('').toLocaleUpperCase('pt-BR');
+    const summary = $('section', 'law-contact-detail-summary');
+    const avatar = $('span', 'law-contact-detail-avatar', initials);
+    const summaryCopy = $('div', 'law-contact-detail-summary-copy');
+    summaryCopy.append($('span', 'law-contact-detail-eyebrow', 'VISÃO GERAL'));
+    summaryCopy.append($('h3', 'law-contact-detail-name', contact.display_name));
+    summaryCopy.append($('p', 'law-contact-detail-legal-name', contact.legal_name || labels[contact.legal_nature] || 'Contato'));
+    const summaryBadges = $('div', 'law-contact-detail-summary-badges');
+    summaryBadges.append($('span', `law-contact-detail-badge law-contact-detail-nature-${contact.legal_nature}`, labels[contact.legal_nature] || 'Contato'));
+    summaryBadges.append($('span', `law-contact-detail-badge law-contact-detail-status-${contact.status}`, labels[contact.status] || contact.status || 'Situação não informada'));
+    summary.append(avatar, summaryCopy, summaryBadges);
+    const chips = $('div', 'law-contact-detail-chip-groups');
+    const addChips = (title, values, tone) => {
+      if (!values?.length) return;
+      const group = $('div', `law-contact-detail-chip-group law-contact-detail-chip-${tone}`);
+      group.append($('span', 'law-contact-detail-chip-label', title));
+      const list = $('div', 'law-contact-detail-chips');
+      values.forEach((value) => list.append($('span', 'law-contact-detail-chip', value)));
+      group.append(list); chips.append(group);
     };
-    addCard('Identificação', [['Natureza', contact.legal_nature === 'pj' ? 'Pessoa jurídica' : 'Pessoa física'], ['Razão social / nome complementar', contact.legal_name], ['Classificações', (contact.classification_labels || []).join(', ')], ['Tags', (contact.tags || []).join(', ')], ['Situação', contact.status]]);
-    if (contact.documents?.length) addCard('Documentos', contact.documents.map((doc) => [doc.label || DOCUMENTS[doc.type] || doc.type, `${doc.number}${doc.state ? ` · ${doc.state}` : ''}`]));
-    if (contact.channels?.length) addCard('Telefones e e-mails', contact.channels.map((item) => [item.label || (item.type === 'email' ? 'E-mail' : 'Telefone'), item.value]));
-    if (contact.addresses?.length) addCard('Endereços', contact.addresses.map((item) => [item.type === 'residential' ? 'Residencial' : item.type === 'business' ? 'Comercial/institucional' : 'Endereço', [item.street, item.number, item.complement, item.district, item.city, item.state, item.postal_code].filter(Boolean).join(', ')]));
-    if (contact.departments?.length) contact.departments.forEach((department) => addCard(`Departamento: ${department.name}`, department.channels.map((item) => [item.label || (item.type === 'email' ? 'E-mail' : 'Telefone'), item.value])));
-    if (contact.notes) addCard('Notas privadas', [['Observações', contact.notes]]);
-    if (contact.is_shared) body.append($('p', 'law-contact-share-notice', 'As alterações só podem ser feitas pela empresa responsável pelo cadastro.'));
+    addChips('Classificações', contact.classification_labels || [], 'classifications');
+    addChips('Tags', contact.tags || [], 'tags');
+    summaryCopy.append(chips);
+    body.append(summary);
+    if (contact.is_shared) body.append($('aside', 'law-contact-source', `Compartilhado por ${contact.source_company_name}. Este contato está disponível somente para consulta.`));
+
+    const addSection = (title, marker, count, className = '') => {
+      const card = $('section', `law-contact-detail-card ${className}`.trim());
+      const header = $('header', 'law-contact-detail-section-header');
+      header.append($('span', 'law-contact-detail-section-mark', marker));
+      const heading = $('div', 'law-contact-detail-section-heading');
+      heading.append($('h3', '', title), $('span', '', count));
+      header.append(heading); card.append(header);
+      const items = $('div', 'law-contact-detail-items'); card.append(items); body.append(card);
+      return items;
+    };
+    if (contact.documents?.length) {
+      const items = addSection('Documentos', 'ID', contact.documents.length, 'law-contact-detail-documents');
+      contact.documents.forEach((doc) => {
+        const item = $('article', 'law-contact-detail-document');
+        const type = DOCUMENTS[doc.type] || doc.type || 'Documento';
+        item.append($('span', 'law-contact-detail-document-type', type));
+        const detail = $('div', 'law-contact-detail-document-copy');
+        detail.append($('strong', '', doc.number || 'Dado protegido'));
+        detail.append($('span', '', [doc.label, doc.state].filter(Boolean).join(' · ') || 'Documento cadastrado'));
+        item.append(detail); items.append(item);
+      });
+    }
+    if (contact.channels?.length) {
+      const items = addSection('Telefones e e-mails', 'TEL', contact.channels.length, 'law-contact-detail-channels');
+      contact.channels.forEach((channel) => {
+        const isEmail = channel.type === 'email';
+        const item = $('article', `law-contact-detail-channel law-contact-detail-channel-${isEmail ? 'email' : 'phone'}`);
+        const mark = $('span', 'law-contact-detail-channel-mark', isEmail ? '@' : '☎');
+        const detail = $('div', 'law-contact-detail-channel-copy');
+        const meta = $('div', 'law-contact-detail-channel-meta');
+        meta.append($('span', 'law-contact-detail-channel-label', channel.label || (isEmail ? 'E-mail' : 'Telefone')));
+        if (channel.primary) meta.append($('span', 'law-contact-detail-primary', 'Principal'));
+        if (channel.personal) meta.append($('span', 'law-contact-detail-private', channel.value === 'Dado protegido' ? 'Acesso restrito' : 'Pessoal'));
+        meta.append($('span', 'law-contact-detail-channel-kind', isEmail ? 'E-MAIL' : 'TELEFONE'));
+        detail.append(meta, $('strong', '', channel.value || 'Dado protegido'));
+        item.append(mark, detail); items.append(item);
+      });
+    }
+    if (contact.addresses?.length) {
+      const items = addSection('Endereços', 'END', contact.addresses.length, 'law-contact-detail-addresses');
+      contact.addresses.forEach((address) => {
+        const item = $('article', 'law-contact-detail-address');
+        const meta = $('div', 'law-contact-detail-address-meta');
+        meta.append($('span', 'law-contact-detail-address-type', labels[address.type] || 'Endereço'));
+        if (address.primary) meta.append($('span', 'law-contact-detail-primary', 'Principal'));
+        const street = [address.street, address.number].filter(Boolean).join(', ');
+        const extra = [address.complement, address.district].filter(Boolean).join(' · ');
+        const locality = [address.city, address.state].filter(Boolean).join(' / ');
+        item.append(meta, $('strong', '', street || 'Endereço não informado'));
+        if (extra) item.append($('span', 'law-contact-detail-address-extra', extra));
+        if (locality) item.append($('span', 'law-contact-detail-address-locality', locality));
+        const postal = [address.postal_code ? `CEP ${address.postal_code}` : '', address.country].filter(Boolean).join(' · ');
+        if (postal) item.append($('span', 'law-contact-detail-address-postal', postal));
+        items.append(item);
+      });
+    }
+    if (contact.departments?.length) {
+      const items = addSection('Departamentos', 'SET', contact.departments.length, 'law-contact-detail-departments');
+      contact.departments.forEach((department) => {
+        const item = $('article', 'law-contact-detail-department');
+        const header = $('div', 'law-contact-detail-department-header');
+        header.append($('h4', '', department.name), $('span', `law-contact-detail-department-status law-contact-detail-status-${department.status}`, labels[department.status] || department.status));
+        item.append(header);
+        const channels = $('div', 'law-contact-detail-department-channels');
+        (department.channels || []).forEach((channel) => {
+          const row = $('div', 'law-contact-detail-department-channel');
+          row.append($('span', '', channel.label || (channel.type === 'email' ? 'E-mail' : 'Telefone')), $('strong', '', channel.value || 'Dado protegido'));
+          channels.append(row);
+        });
+        if (channels.children.length) item.append(channels);
+        else item.append($('p', 'law-contact-detail-empty', 'Nenhum telefone ou e-mail neste departamento.'));
+        items.append(item);
+      });
+    }
+    if (contact.notes) {
+      const notes = $('section', 'law-contact-detail-notes');
+      notes.append($('span', 'law-contact-detail-eyebrow', 'NOTA PRIVADA'), $('h3', '', 'Observações'), $('p', '', contact.notes));
+      body.append(notes);
+    }
+    if (contact.is_shared) body.append($('aside', 'law-contact-share-notice', 'As alterações só podem ser feitas pela empresa responsável pelo cadastro.'));
     modal.body.append(body);
-    if (!isShared && window.lawContactsCanMerge) {
+    if (!isShared && window.lawContactsCanMerge && contact.has_possible_duplicates) {
       const merge = button('Mesclar com outro contato', 'fs-btn fs-btn-outline-primary', () => openMerge(modal, root, contact, onChanged)); modal.footer.append(merge);
     }
   }

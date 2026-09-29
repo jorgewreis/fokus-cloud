@@ -78,10 +78,11 @@ class LawContactController extends Controller
         $this->assertModuleEnabled($companyId);
         $unitId = $authorization->activeUnitId($request);
         $canSensitive = $authorization->can($request, 'law.contacts.sensitive.view', $unitId);
+        $canMerge = $authorization->can($request, 'law.contacts.merge', $unitId);
         $contact = DB::table('law_contacts')->where('company_id', $companyId)->where('id', $contactId)->whereNull('deleted_at')->whereNull('merged_into_id')->first();
         if ($contact) {
             $this->recordActivity($companyId, $contactId, (string) $request->user()->id, $request->boolean('from_search') ? 'search_opened' : 'viewed');
-            return response()->json(['contact' => $this->contactPayload($companyId, $contact, $canSensitive)]);
+            return response()->json(['contact' => $this->contactPayload($companyId, $contact, $canSensitive, $canMerge)]);
         }
         abort_unless($authorization->can($request, 'law.contacts.shared.view', $unitId), 404, 'Contato não encontrado.');
         $shared = $this->findSharedContact($companyId, $contactId, $canSensitive);
@@ -441,7 +442,7 @@ class LawContactController extends Controller
         ]);
     }
 
-    private function contactPayload(string $companyId, object $contact, bool $canSensitive): array
+    private function contactPayload(string $companyId, object $contact, bool $canSensitive, bool $canMerge = false): array
     {
         $classifications = DB::table('law_contact_classifications')->where('law_contact_id', $contact->id)->pluck('classification_code')->all();
         $tags = DB::table('law_contact_tag_assignments as assignment')->join('law_contact_tags as tag', 'tag.id', '=', 'assignment.law_contact_tag_id')->where('assignment.law_contact_id', $contact->id)->orderBy('tag.name')->pluck('tag.name')->all();
@@ -461,8 +462,50 @@ class LawContactController extends Controller
             'addresses' => $addresses->filter(fn ($address) => $canSensitive || $address->address_type !== 'residential')->map(fn ($address) => ['id' => $address->id, 'type' => $address->address_type, 'postal_code' => $canSensitive ? $address->postal_code : null, 'street' => $address->street, 'number' => $address->number, 'complement' => $address->complement, 'district' => $address->district, 'city' => $address->city, 'state' => $address->state, 'country' => $address->country, 'primary' => (bool) $address->is_primary])->values()->all(),
             'documents' => $canSensitive ? $documents->map(fn ($document) => ['id' => $document->id, 'type' => $document->document_type, 'label' => $document->label, 'number' => Crypt::decryptString($document->document_number_encrypted), 'state' => $document->issuing_state])->all() : $documents->map(fn ($document) => ['id' => $document->id, 'type' => $document->document_type, 'label' => $document->label, 'number' => $this->maskedDocument(Crypt::decryptString($document->document_number_encrypted)), 'state' => $document->issuing_state])->all(),
             'departments' => $departments, 'sharing_excluded' => (bool) ($contact->sharing_excluded ?? false), 'is_shared' => false,
+            'has_possible_duplicates' => $canMerge && $this->hasPossibleDuplicates($companyId, $contact, $documents, $canSensitive),
             'updated_at' => $contact->updated_at,
         ];
+    }
+
+    private function hasPossibleDuplicates(string $companyId, object $contact, $documents, bool $canSensitive): bool
+    {
+        $base = DB::table('law_contacts')->where('company_id', $companyId)->where('legal_nature', $contact->legal_nature)->where('status', 'ativo')->whereNull('deleted_at')->whereNull('merged_into_id')->where('id', '!=', $contact->id);
+        $names = collect([$contact->display_name, $contact->legal_name])->filter()->map(fn ($name) => mb_strtolower(trim(preg_replace('/\\s+/u', ' ', (string) $name)), 'UTF-8'))->unique()->values();
+        if ($names->isNotEmpty()) {
+            $matchesName = (clone $base)->where(function ($query) use ($names): void {
+                foreach ($names as $name) $query->orWhereRaw('LOWER(display_name) = ?', [$name])->orWhereRaw('LOWER(legal_name) = ?', [$name]);
+            })->exists();
+            if ($matchesName) return true;
+        }
+
+        $documentNumbers = $canSensitive ? $documents->map(fn ($document) => [
+            'type' => (string) $document->document_type,
+            'value' => $this->normalizeDuplicateValue(Crypt::decryptString($document->document_number_encrypted), (string) $document->document_type),
+        ])->filter(fn ($document) => $document['value'] !== '')->values() : collect();
+        if ($documentNumbers->isNotEmpty()) {
+            $otherDocuments = DB::table('law_contact_documents as document')->join('law_contacts as owner', function ($join): void {
+                $join->on('owner.company_id', '=', 'document.company_id')->on('owner.id', '=', 'document.law_contact_id');
+            })->where('document.company_id', $companyId)->where('owner.legal_nature', $contact->legal_nature)->where('document.law_contact_id', '!=', $contact->id)
+                ->where('owner.status', 'ativo')->whereNull('owner.deleted_at')->whereNull('owner.merged_into_id')->get(['document.document_type', 'document.document_number_encrypted']);
+            foreach ($otherDocuments as $other) {
+                $value = $this->normalizeDuplicateValue(Crypt::decryptString($other->document_number_encrypted), (string) $other->document_type);
+                if ($documentNumbers->contains(fn ($document) => $document['type'] === $other->document_type && $document['value'] === $value)) return true;
+            }
+        }
+
+        $contactChannels = DB::table('law_contact_channels')->where('company_id', $companyId)->where('law_contact_id', $contact->id)->where('channel_type', 'phone')->when(! $canSensitive, fn ($query) => $query->where('is_personal', false))->get(['channel_value']);
+        $phoneNumbers = $contactChannels->map(fn ($channel) => $this->normalizeDuplicateValue((string) $channel->channel_value, 'phone'))->filter()->unique();
+        if ($phoneNumbers->isEmpty()) return false;
+        $otherPhones = DB::table('law_contact_channels as channel')->join('law_contacts as owner', function ($join): void {
+            $join->on('owner.company_id', '=', 'channel.company_id')->on('owner.id', '=', 'channel.law_contact_id');
+        })->where('channel.company_id', $companyId)->where('owner.legal_nature', $contact->legal_nature)->where('channel.channel_type', 'phone')->where('channel.law_contact_id', '!=', $contact->id)
+            ->when(! $canSensitive, fn ($query) => $query->where('channel.is_personal', false))->where('owner.status', 'ativo')->whereNull('owner.deleted_at')->whereNull('owner.merged_into_id')->pluck('channel.channel_value');
+        return $otherPhones->contains(fn ($value) => $phoneNumbers->contains($this->normalizeDuplicateValue((string) $value, 'phone')));
+    }
+
+    private function normalizeDuplicateValue(string $value, string $type): string
+    {
+        return $type === 'email' ? mb_strtolower(trim($value), 'UTF-8') : preg_replace('/\\D+/', '', $value);
     }
 
     private function channelPayload(object $channel, bool $canSensitive): array
