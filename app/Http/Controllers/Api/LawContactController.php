@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
 
 class LawContactController extends Controller
@@ -25,6 +26,37 @@ class LawContactController extends Controller
     private const DOCUMENT_TYPES = ['cpf', 'cnpj', 'oab', 'rg', 'registration', 'cadastro', 'voter_title', 'passport', 'other'];
 
     private const SHARE_FIELDS = ['professional_channels', 'business_addresses', 'documents'];
+
+    public function lookupCep(string $postalCode)
+    {
+        if (preg_match('/^\d{8}$/D', $postalCode) !== 1) {
+            return response()->json(['message' => 'Informe um CEP com 8 dígitos.'], 422);
+        }
+
+        try {
+            $response = Http::connectTimeout(2)->timeout(5)->acceptJson()->get("https://viacep.com.br/ws/{$postalCode}/json/");
+        } catch (\Throwable) {
+            return response()->json(['message' => 'Serviço de consulta de CEP indisponível.'], 502);
+        }
+
+        if (! $response->successful()) {
+            return response()->json(['message' => 'Serviço de consulta de CEP indisponível.'], 502);
+        }
+
+        $address = $response->json();
+        if (! is_array($address) || ($address['erro'] ?? false)) {
+            return response()->json(['erro' => true]);
+        }
+
+        return response()->json([
+            'cep' => $address['cep'] ?? null,
+            'logradouro' => $address['logradouro'] ?? '',
+            'complemento' => $address['complemento'] ?? '',
+            'bairro' => $address['bairro'] ?? '',
+            'localidade' => $address['localidade'] ?? '',
+            'uf' => $address['uf'] ?? '',
+        ]);
+    }
 
     public function index(Request $request, LawUsageMeter $usage, LawAuthorizationService $authorization)
     {

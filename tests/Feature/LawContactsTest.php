@@ -7,6 +7,7 @@ use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class LawContactsTest extends TestCase
@@ -55,6 +56,24 @@ class LawContactsTest extends TestCase
             'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->sessionCompanyId = $this->companyId;
+    }
+
+    public function test_authenticated_user_can_look_up_a_brazilian_address_by_cep(): void
+    {
+        Http::fake(['viacep.com.br/*' => Http::response([
+            'cep' => '01001-000', 'logradouro' => 'Praça da Sé', 'complemento' => 'lado ímpar',
+            'bairro' => 'Sé', 'localidade' => 'São Paulo', 'uf' => 'SP',
+        ])]);
+
+        $this->actingAs($this->admin)->withSession(['active_company_id' => $this->sessionCompanyId])
+            ->getJson('/api/law/addresses/cep/01001000')
+            ->assertOk()
+            ->assertExactJson([
+                'cep' => '01001-000', 'logradouro' => 'Praça da Sé', 'complemento' => 'lado ímpar',
+                'bairro' => 'Sé', 'localidade' => 'São Paulo', 'uf' => 'SP',
+            ]);
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://viacep.com.br/ws/01001000/json/');
     }
 
     public function test_creates_pj_departments_as_additional_capacity_and_normalizes_names_and_tags(): void

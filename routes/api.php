@@ -67,6 +67,7 @@ Route::middleware('auth')->group(function () {
         Route::patch('/law/units/{unitId}', [LawUnitController::class, 'update']);
         Route::post('/law/active-unit', [LawUnitController::class, 'select']);
         Route::get('/law/subscription', [LawSubscriptionController::class, 'show']);
+        Route::get('/law/addresses/cep/{postalCode}', [LawContactController::class, 'lookupCep'])->whereNumber('postalCode')->middleware('throttle:30,1,law-cep-lookup');
         Route::post('/law/subscription/quote', [LawSubscriptionController::class, 'quote']);
         Route::post('/law/subscription/change', [LawSubscriptionController::class, 'change']);
         Route::patch('/law/subscription/change', [LawSubscriptionController::class, 'updatePending']);

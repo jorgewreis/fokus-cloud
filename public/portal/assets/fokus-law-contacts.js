@@ -409,9 +409,7 @@
       lookupTimer = setTimeout(async () => {
         lookupController = new AbortController();
         try {
-          const response = await fetch(`https://viacep.com.br/ws/${digits}/json/`, { signal: lookupController.signal });
-          if (!response.ok) throw new Error('Consulta indisponível');
-          const data = await response.json();
+          const data = await window.FokusApi.request(`/law/addresses/cep/${digits}`, { signal: lookupController.signal });
           if (sequence !== lookupSequence) return;
           if (data.erro) { lookupStatus.textContent = 'CEP não encontrado. Preencha o endereço manualmente.'; return; }
           if (data.logradouro) street.value = data.logradouro;
