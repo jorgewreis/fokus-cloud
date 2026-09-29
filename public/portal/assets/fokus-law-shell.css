@@ -461,7 +461,7 @@
 .law-contact-detail-section-heading h3 { margin: 0; color: var(--law-shell-ink); font-size: 12px; font-weight: 700; }
 .law-contact-detail-section-heading > span { display: grid; min-width: 21px; height: 21px; place-items: center; padding: 0 5px; border-radius: 999px; background: #f3eff6; color: #675476; font-size: 10px; font-weight: 700; }
 .law-contact-detail-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px; }
-.law-contact-detail-links, .law-contact-detail-addresses { grid-column: 1 / -1; }
+.law-contact-detail-links { grid-column: 1 / -1; }
 .law-contact-detail-links .law-contact-detail-items, .law-contact-detail-addresses .law-contact-detail-items { grid-template-columns: minmax(0, 1fr); }
 .law-contact-detail-document, .law-contact-detail-channel, .law-contact-detail-address, .law-contact-detail-department { min-width: 0; padding: 10px; border: 1px solid #eeeaf1; border-radius: 9px; background: #fff; }
 .law-contact-detail-document { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: 9px; }

@@ -38,7 +38,7 @@ Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
 | Visão geral | Totais PF, PJ, departamentos e cadastros contabilizados; até cinco contatos recentes da pessoa usuária. |
 | Contatos | Busca, filtros, resultados, paginação, situação, origem compartilhada e ações permitidas. |
 | Criar/editar | Formulário guiado por PF/PJ, profissões cadastradas ou novas, sigla e empresas/pessoas vinculadas, canais, endereços, departamentos, tags e campos sensíveis autorizados. |
-| Detalhes | Identificação e sigla, profissões, empresas vinculadas em linhas completas na PF, total de pessoas vinculadas na PJ, tags, canais, endereços em linhas completas, documentos e departamentos conforme a natureza e as permissões. |
+| Detalhes | Identificação e sigla, profissões, empresas vinculadas em linhas completas na PF, total de pessoas vinculadas na PJ, tags, canais, card de endereços em meia largura com cada endereço em uma linha completa do card, documentos e departamentos conforme a natureza e as permissões. |
 | Mesclagem | Escolha do cadastro preservado, confirmação do motivo, transferência de relações e auditoria. |
 | Compartilhamento | Seleção de empresas elegíveis, classificações e campos expostos; gravação e revogação auditadas. |
 | Estados da página | Carregamento, vazio, sem resultados, erro de API, capacidade indisponível e aviso de limite. |
