@@ -137,3 +137,28 @@ Processos, Expedições e Tarefas devem referenciar o contato por ID e aplicar a
 permissões e o sigilo pertinentes ao contexto. O papel processual e o de
 expedição ficam em relações próprias; snapshots preservam o destino utilizado
 na emissão. Essas relações não são criadas por esta entrega.
+
+## Evolução do vínculo pessoa–empresa e dados institucionais
+
+`law_contact_relationship_roles` guarda vários papéis padronizados por vínculo,
+com complemento para Outro e início/término próprios. A vigência é calculada
+pelas datas e não concede permissões. `law_contact_relationship_designations`
+guarda cargos, postos, graduações ou funções em períodos independentes; uma
+relação pode ter várias designações vigentes. Os nomes livres ficam disponíveis
+como sugestões reutilizáveis pela empresa. Relações antigas continuam válidas
+sem inventar papéis ou designações.
+
+`law_contact_institutional_data` guarda bloco opcional por classificação. Para
+unidade judiciária, armazena código CNJ e competências; para órgão público,
+esfera Federal/Estadual/Distrital/Municipal e código oficial com sistema emissor.
+A sigla do contato segue representando tribunal/região. OAB continua em
+`law_contact_documents`, sem campo duplicado.
+
+## Qualidade e sugestões de duplicidade
+
+Indicadores consideram apenas contatos próprios ativos. Correspondências por
+e-mail/telefone profissional ou código institucional podem ser sugeridas;
+similaridade de nome apenas reforça um candidato já corroborado. A resposta
+expõe motivo, nunca o valor coincidente. A análise é sob demanda e paginada;
+não bloqueia gravação nem mescla automaticamente. CPF/CNPJ permanece sujeito à
+validação rígida existente.

@@ -27,6 +27,11 @@
 | RF-CTT-021 | Preparar APIs de referência para outros módulos. | IDs estáveis e endpoints de consulta podem ser usados futuramente por Processos, Expedições e Tarefas. |
 | RF-CTT-022 | Relacionar pessoas físicas e jurídicas. | Uma PF pode se vincular a várias PJs e cada PJ a várias PFs; o vínculo é recíproco e restrito à empresa proprietária. |
 | RF-CTT-023 | Identificar pessoa jurídica por sigla. | Sigla opcional é editável e aparece junto ao nome e na ficha da PJ. |
+| RF-CTT-024 | Registrar papéis em vínculos PF↔PJ. | Um vínculo aceita vários papéis padronizados, complemento em Outro e início/término por papel; vigência decorre das datas e não concede permissões. |
+| RF-CTT-025 | Manter histórico de cargo, posto, graduação ou função no vínculo. | Cada designação aceita nome livre, sugestões reutilizáveis por empresa e período independente; várias podem estar vigentes ao mesmo tempo. |
+| RF-CTT-026 | Guardar dados institucionais por classificação. | Unidade judiciária aceita CNJ e competências; órgão público aceita esfera padronizada e código mais sistema emissor; dados são opcionais. |
+| RF-CTT-027 | Sugerir possíveis duplicidades. | E-mail/telefone profissional ou código institucional coincidente gera sugestão; nome só reforça quando semelhante; não exibe valor, não bloqueia nem mescla automaticamente. CPF/CNPJ repetido continua conflito. |
+| RF-CTT-028 | Exibir qualidade cadastral na visão geral de Contatos. | Contagens de canais ausentes e dados institucionais incompletos abrangem apenas contatos próprios ativos; análise de duplicidades é acionada sob demanda e paginada. |
 
 ## Regras de negócio
 
@@ -40,6 +45,18 @@
 - Departamentos só pertencem a PJ e cada um soma um cadastro à capacidade.
 - Contatos inativos continuam ocupando capacidade e preservam histórico.
 - Tags não substituem classificação ou permissão.
+- Papéis e designações PF↔PJ guardam períodos separados; vínculos legados
+  permanecem válidos sem inferir papéis ou cargos que não foram informados.
+- A qualidade e duplicidades não incluem contatos inativos nem compartilhados;
+  consulta ao painel usa `law.contacts.view`, e a edição continua protegida pelas
+  permissões já existentes.
+
+## Evoluções futuras
+
+Visões específicas por variante, integrações com Processos/Expedições/Tarefas,
+hierarquia institucional e importação/exportação em lote serão especificadas em
+uma evolução futura do módulo. A ausência dessas integrações não impede o uso
+operacional do cadastro atual.
 - CPF/CNPJ devem passar validação dos dígitos e comparação por fingerprint.
 - Nome, telefone e e-mail podem gerar análise manual futura, mas não bloqueiam
   o cadastro por si sós.

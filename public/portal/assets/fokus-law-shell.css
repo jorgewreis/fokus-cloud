@@ -756,6 +756,19 @@
 .law-contact-metric-label { color: #726879; font-size: 9px; font-weight: 650; letter-spacing: .015em; }
 .law-contact-metric-body strong { color: #2c2034; font-size: 24px; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .law-contact-metric-body small { grid-column: 1 / -1; overflow: hidden; margin-top: 3px; color: #897f8e; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.law-contact-quality { margin: 0 0 14px; border: 1px solid #ebe7ef; border-radius: 12px; }
+.law-contact-quality-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.law-contact-quality-metric { display: grid; gap: 6px; padding: 12px; border-radius: 9px; background: #f8f6fa; color: #726879; font-size: 11px; }
+.law-contact-quality-metric strong { color: #2c2034; font-size: 20px; }
+.law-contact-quality-grid > button { justify-self: start; }
+.law-contact-duplicate-pair, .law-contact-relationship-editor { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid #eee9f1; }
+.law-contact-relationship-editor { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; padding: 12px; border: 1px solid #eee9f1; border-radius: 9px; }
+.law-contact-relationship-editor > strong { grid-column: 1 / -1; }
+.law-contact-relationship-editor select[multiple] { min-height: 92px; }
+.law-contact-relationship-entries { display: grid; grid-column: 1 / -1; gap: 7px; }
+.law-contact-relationship-entry { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: end; gap: 7px; padding: 8px; border-radius: 8px; background: #f8f6fa; }
+.law-contact-duplicate-pair span { color: #766b7c; font-size: 11px; }
+.law-contact-quality-paging { display: flex; align-items: center; justify-content: flex-end; gap: 9px; padding-top: 12px; color: #766b7c; font-size: 11px; }
 .law-contact-recent-card { min-width: 0; margin: 0 0 15px; overflow: hidden; border: 1px solid #e9e3ee; border-radius: 12px; background: #fff; box-shadow: 0 5px 14px rgba(35,20,45,.035); }
 .law-contact-recent-header { display: flex; min-height: 53px; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 16px !important; border-bottom: 1px solid #eee9f2; background: linear-gradient(90deg, #faf8fc, #fff); }
 .law-contact-recent-header .fs-card-title { margin: 2px 0 0; color: #34243d; font-size: 12px; font-weight: 650; }
@@ -780,6 +793,7 @@
   .law-dashboard-module-widget { grid-column: span 8; }
   .law-contact-overview-banner { grid-template-columns: minmax(0, 1fr) minmax(205px, .7fr); gap: 17px; padding: 18px 20px; }
   .law-contact-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .law-contact-quality-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .law-contact-recent { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 620px) {
@@ -797,6 +811,8 @@
   .law-contact-chart-legend-row { grid-template-columns: 7px 1fr; gap: 5px; font-size: 8px; }
   .law-contact-chart-legend-row strong { grid-column: 2; }
   .law-contact-metrics { gap: 8px; }
+  .law-contact-quality-grid { grid-template-columns: 1fr; }
+  .law-contact-duplicate-pair, .law-contact-relationship-editor { grid-template-columns: 1fr; }
   .law-contact-metric-card { min-height: 96px; }
   .law-contact-metric-card > .fs-card-body { padding: 11px 10px 11px 13px !important; }
   .law-contact-metric-body strong { font-size: 21px; }

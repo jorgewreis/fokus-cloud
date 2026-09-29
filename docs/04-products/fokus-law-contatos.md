@@ -2,6 +2,11 @@
 
 ## Propósito
 
+**Status do produto:** núcleo funcional e disponível. O módulo atende ao uso
+operacional atual nos segmentos Jurídico, Setor Público e Advocacia. Integrações
+com módulos que ainda serão publicados e expansões de fluxo fazem parte de uma
+evolução posterior; não indicam que o cadastro atual esteja em implementação.
+
 O módulo independente **Gestão de Contatos**, exibido como **Contatos**, mantém
 uma base reutilizável de pessoas físicas, pessoas jurídicas, órgãos e
 instituições. O módulo atende escritórios jurídicos e organizações públicas,
@@ -23,6 +28,19 @@ Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
 - Vínculos muitos-para-muitos entre pessoas físicas e empresas da mesma
   empresa proprietária, gerenciáveis nos dois cadastros. A ficha PF lista as
   empresas em linhas completas; a ficha PJ mostra somente o total de pessoas.
+- Papéis padronizados por vínculo PF↔PJ (funcionário/colaborador, servidor
+  público, representante legal, sócio, administrador/diretor, procurador ou
+  outro) com períodos próprios. Cargo, posto, graduação ou função tem histórico
+  independente, aceita várias designações simultâneas e vocabulário livre com
+  sugestões reutilizáveis pela empresa (por exemplo, DPC, IPC, CB/PM e TEN/PM).
+- Dados institucionais opcionais por classificação: unidade judiciária com
+  código CNJ e competências; órgão público com esfera, código oficial e sistema
+  emissor. Sigla identifica tribunal/região; OAB continua no documento existente.
+- Sugestões de possíveis duplicidades no cadastro e análise paginada sob demanda
+  na visão geral. A interface explica o tipo de correspondência sem exibir o
+  valor coincidente, não bloqueia gravação e não mescla automaticamente.
+- Indicadores acionáveis de contatos ativos próprios sem telefone/e-mail ou com
+  dados institucionais incompletos; inativos e contatos compartilhados ficam fora.
 - Busca automática de endereços pelo CEP usando ViaCEP, com preenchimento de
   logradouro, bairro, município e UF quando retornados; o usuário pode concluir
   manualmente quando a consulta não localizar o CEP ou estiver indisponível.
@@ -36,13 +54,24 @@ Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
 
 | Página/estado | Conteúdo e ações |
 | --- | --- |
-| Visão geral | Totais PF, PJ, departamentos e cadastros contabilizados; até cinco contatos recentes da pessoa usuária. |
+| Visão geral | Totais PF, PJ, departamentos e cadastros contabilizados; até cinco contatos recentes; pendências de qualidade e análise de duplicidades sob demanda. |
 | Contatos | Busca, filtros, resultados, paginação, situação, origem compartilhada e ações permitidas. |
-| Criar/editar | Formulário guiado por PF/PJ, profissões cadastradas ou novas, sigla e empresas/pessoas vinculadas, canais, endereços, departamentos, tags e campos sensíveis autorizados. |
+| Criar/editar | Formulário guiado por PF/PJ, classificações, profissões, sigla, vínculos com papéis e designações datadas, dados institucionais, canais, endereços, departamentos, tags e campos sensíveis autorizados. |
 | Detalhes | Identificação e sigla, profissões, empresas vinculadas em linhas completas na PF, total de pessoas vinculadas na PJ, tags, canais, card de endereços em meia largura com cada endereço em uma linha completa do card, documentos e departamentos conforme a natureza e as permissões. |
 | Mesclagem | Escolha do cadastro preservado, confirmação do motivo, transferência de relações e auditoria. |
 | Compartilhamento | Configuração bilateral por empresa, natureza, profissão de PF e campos expostos; adesão e revogação auditadas. |
 | Estados da página | Carregamento, vazio, sem resultados, erro de API, capacidade indisponível e aviso de limite. |
+
+## Evoluções futuras
+
+- Visões e preenchimentos rápidos específicos por variante de assinatura.
+- Integrações de contatos com Processos, Expedições e Tarefas quando esses
+  módulos estiverem publicados, incluindo regras de sigilo e snapshots de
+  destinatários quando aplicáveis.
+- Hierarquia entre órgãos, tribunais, comarcas e unidades, sem misturá-la aos
+  departamentos do contato PJ ou aos setores internos da empresa assinante.
+- Importação e exportação em lote após definir formato, permissões, prévia,
+  proteção de dados sensíveis e tratamento de duplicidades.
 
 ## Composição visual
 

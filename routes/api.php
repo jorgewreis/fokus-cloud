@@ -80,6 +80,9 @@ Route::middleware('auth')->group(function () {
         Route::patch('/law/notifications/{notification}/read', [LawNotificationController::class, 'read'])->middleware('law.permission:law.notifications.update');
         Route::get('/law/contacts', [LawContactController::class, 'index'])->middleware('law.permission:law.contacts.view');
         Route::get('/law/contacts/dashboard', [LawContactController::class, 'dashboard'])->middleware('law.permission:law.contacts.view');
+        Route::get('/law/contacts/quality/duplicates', [LawContactController::class, 'duplicateAnalysis'])->middleware('law.permission:law.contacts.view');
+        Route::get('/law/contacts/quality/review', [LawContactController::class, 'qualityReview'])->middleware('law.permission:law.contacts.view');
+        Route::post('/law/contacts/quality/suggestions', [LawContactController::class, 'duplicateSuggestions'])->middleware('law.permission:law.contacts.create');
         Route::get('/law/contacts/{contactId}', [LawContactController::class, 'show'])->middleware('law.permission:law.contacts.view');
         Route::post('/law/contacts', [LawContactController::class, 'store'])->middleware('law.permission:law.contacts.create');
         Route::patch('/law/contacts/{contactId}', [LawContactController::class, 'update'])->middleware('law.permission:law.contacts.update');

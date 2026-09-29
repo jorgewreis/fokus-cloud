@@ -302,3 +302,11 @@ usa `open_company_product`, preenchida apenas nos estados não encerrados, e
 Todo cadastro empresarial armazena `created_at`, `created_by`, `updated_at`,
 `updated_by`, `deleted_at`, `deleted_by`, `status` e `version`. Atualizações
 exigem a versão atual; conflitos impedem a gravação e exigem revisão.
+
+### Gestão de Contatos: relações e dados complementares
+
+| Tabela | Finalidade |
+| --- | --- |
+| `law_contact_relationship_roles` | Papéis por relação PF↔PJ, complemento e período de vigência. |
+| `law_contact_relationship_designations` | Histórico de cargos, postos, graduações ou funções por relação. |
+| `law_contact_institutional_data` | Dados opcionais de unidade judiciária ou órgão público. |

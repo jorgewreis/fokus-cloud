@@ -102,7 +102,23 @@ class LawContactsTest extends TestCase
         $company = $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
             'legal_nature' => 'pj', 'display_name' => 'Empresa Exemplo', 'acronym' => 'EX',
             'linked_contact_ids' => [$person['id']],
-        ])->assertCreated()->assertJsonPath('contact.acronym', 'EX')->assertJsonPath('contact.linked_contacts.0.id', $person['id'])->json('contact');
+            'classifications' => ['public_body', 'court_unit'],
+            'institutional_data' => [
+                ['type' => 'public_body', 'administrative_sphere' => 'Estadual', 'official_code' => 'ORG-22', 'issuing_system' => 'Cadastro Estadual'],
+                ['type' => 'court_unit', 'cnj_code' => '1234567-89.2026.8.05.0001', 'competencies' => ['Criminal', 'Fazenda Pública']],
+            ],
+            'linked_relationships' => [[
+                'contact_id' => $person['id'],
+                'roles' => [
+                    ['code' => 'public_servant', 'starts_on' => '2020-01-01'],
+                    ['code' => 'legal_representative', 'starts_on' => '2022-01-01'],
+                ],
+                'designations' => [
+                    ['name' => 'DPC', 'starts_on' => '2020-01-01', 'ends_on' => '2023-12-31'],
+                    ['name' => 'Delegado titular', 'starts_on' => '2024-01-01'],
+                ],
+            ]],
+        ])->assertCreated()->assertJsonPath('contact.acronym', 'EX')->assertJsonCount(2, 'contact.institutional_data')->assertJsonPath('contact.linked_contacts.0.id', $person['id'])->assertJsonCount(2, 'contact.linked_contacts.0.roles')->assertJsonCount(2, 'contact.linked_contacts.0.designations')->json('contact');
 
         $this->actingAs($this->admin)->withSession($session)->getJson('/api/law/contacts/'.$person['id'])
             ->assertOk()->assertJsonPath('contact.linked_contacts.0.id', $company['id'])
@@ -110,6 +126,29 @@ class LawContactsTest extends TestCase
         $this->assertDatabaseHas('law_contact_company_links', [
             'company_id' => $this->companyId, 'person_contact_id' => $person['id'], 'company_contact_id' => $company['id'],
         ]);
+        $this->assertDatabaseCount('law_contact_relationship_roles', 2);
+        $this->assertDatabaseCount('law_contact_relationship_designations', 2);
+        $this->assertDatabaseCount('law_contact_institutional_data', 2);
+        $this->assertDatabaseHas('law_contact_institutional_data', ['company_id' => $this->companyId, 'data_type' => 'court_unit', 'cnj_code' => '12345678920268050001']);
+    }
+
+    public function test_contact_quality_summary_and_duplicate_suggestions_use_professional_channels(): void
+    {
+        $session = ['active_company_id' => $this->sessionCompanyId];
+        $existing = $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'legal_nature' => 'pf', 'display_name' => 'Ana Souza',
+            'channels' => [['type' => 'email', 'value' => 'ana.souza@example.test', 'personal' => false]],
+        ])->assertCreated()->json('contact');
+
+        $this->actingAs($this->admin)->withSession($session)->getJson('/api/law/contacts')
+            ->assertOk()->assertJsonPath('summary.quality.without_phone', 1)->assertJsonPath('summary.quality.without_email', 0);
+        $this->actingAs($this->admin)->withSession($session)->getJson('/api/law/contacts/quality/review?type=without_phone')
+            ->assertOk()->assertJsonPath('contacts.0.id', $existing['id']);
+
+        $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts/quality/suggestions', [
+            'legal_nature' => 'pf', 'display_name' => 'Ana Souza',
+            'channels' => [['type' => 'email', 'value' => 'ana.souza@example.test', 'personal' => false]],
+        ])->assertOk()->assertJsonPath('candidates.0.id', $existing['id'])->assertJsonPath('candidates.0.reason', 'Nome semelhante e E-mail profissional coincidente');
     }
 
     public function test_pj_can_store_cnpj_and_state_registration_with_uf(): void
