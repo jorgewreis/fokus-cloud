@@ -23,7 +23,8 @@
   const renderBuilder = () => {
     const planSelect = $('#lp-plan');
     const plans = state.catalog.plans || [];
-    planSelect.innerHTML = '<option value="">Somente módulos avulsos</option>' + plans.map((plan) => `<option value="${esc(plan.code)}">${esc(plan.name)}</option>`).join('');
+    const hasStandaloneContacts = (state.catalog.modules || []).some((module) => module.module_code === 'contatos' && module.available_standalone);
+    planSelect.innerHTML = `<option value="">${hasStandaloneContacts ? 'Somente módulos avulsos' : 'Selecione um plano-base'}</option>` + plans.map((plan) => `<option value="${esc(plan.code)}">${esc(plan.name)}</option>`).join('');
     planSelect.value = state.plan;
     const required = new Set(planCodes());
     const avail = (state.catalog.modules || []).filter((module) => required.has(module.code) || (module.available_standalone && (state.plan || module.module_code === 'contatos')));
