@@ -3,7 +3,8 @@
     client: 'Cliente', lawyer: 'Advogado(a)', law_firm: 'Escritório de advocacia', public_body: 'Órgão público', court_unit: 'Unidade judiciária',
     police: 'Policial', prosecutor_office: 'Ministério Público', public_defender: 'Defensoria Pública', expert: 'Perito(a)', witness: 'Testemunha', representative: 'Representante', other: 'Outro',
   };
-  const DOCUMENTS = { cpf: 'CPF', cnpj: 'CNPJ', oab: 'OAB', rg: 'RG', registration: 'Matrícula', cadastro: 'Cadastro', voter_title: 'Título de eleitor', passport: 'Passaporte', other: 'Outro' };
+  const DOCUMENTS = { cpf: 'CPF', cnpj: 'CNPJ', state_registration: 'Inscrição estadual', oab: 'OAB', rg: 'RG', registration: 'Matrícula', cadastro: 'Cadastro', voter_title: 'Título de eleitor', passport: 'Passaporte', other: 'Outro' };
+  const DOCUMENT_TYPES_BY_NATURE = { pf: ['cpf', 'oab', 'rg', 'registration', 'cadastro', 'voter_title', 'passport', 'other'], pj: ['cnpj', 'state_registration', 'registration', 'cadastro', 'other'] };
   const STATES = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map((uf) => [uf, uf]);
   const CONTACT_ICONS = '/backoffice/assets/icons/';
   const $ = (tag, cls = '', text = '') => { const node = document.createElement(tag); if (cls) node.className = cls; if (text !== '') node.textContent = text; return node; };
@@ -271,10 +272,10 @@
     let documentRows;
     let documentSection;
     if (window.lawContactsCanSensitive) {
-      documentSection = section('Documentos', 'Até 4 documentos. CPF/CNPJ são opcionais e validados quando informados.');
+      documentSection = section('Documentos', 'Até 4 documentos. CPF ou CNPJ são validados quando informados; inscrição estadual exige UF.');
       documentRows = $('div', 'law-contact-repeat-list');
-      (contact?.documents || []).forEach((doc) => documentRows.append(documentRow(doc)));
-      documentSection.content.append(documentRows, button('Adicionar documento', 'fs-btn fs-btn-secondary', () => { if (documentRows.children.length < 4) documentRows.append(documentRow()); }));
+      (contact?.documents || []).filter((doc) => DOCUMENT_TYPES_BY_NATURE[nature.value].includes(doc.type)).forEach((doc) => documentRows.append(documentRow(doc, nature.value)));
+      documentSection.content.append(documentRows, button('Adicionar documento', 'fs-btn fs-btn-secondary', () => { if (documentRows.children.length < 4) documentRows.append(documentRow({}, nature.value)); }));
     }
     const channelSection = section('Telefones e e-mails', 'Até 4 telefones e 2 e-mails.');
     const channelRows = $('div', 'law-contact-repeat-list'); (contact?.channels || []).filter((item) => window.lawContactsCanSensitive || !item.personal).forEach((item) => channelRows.append(channelRow(item)));
@@ -319,7 +320,14 @@
     const updateNature = () => {
       departmentWrap.hidden = nature.value !== 'pj'; legalNameField.hidden = nature.value !== 'pj';
       acronymField.hidden = nature.value !== 'pj';
-      professionSection.hidden = nature.value === 'pj'; if (documentSection) documentSection.hidden = nature.value === 'pj';
+      professionSection.hidden = nature.value === 'pj';
+      if (documentRows) [...documentRows.children].forEach((row) => {
+        const type = row.querySelector('[data-doc-type]');
+        if (!DOCUMENT_TYPES_BY_NATURE[nature.value].includes(type.value)) { row.remove(); return; }
+        const selected = type.value;
+        type.replaceChildren(...DOCUMENT_TYPES_BY_NATURE[nature.value].map((code) => new Option(DOCUMENTS[code], code)));
+        type.value = selected; type.dispatchEvent(new Event('change'));
+      });
       const candidates = relationshipOptions.filter((item) => item.id !== contact?.id && item.legal_nature !== nature.value);
       relationshipPicker.replaceChildren(new Option('Selecione para vincular', ''), ...candidates.map((item) => new Option(`${item.display_name}${item.acronym ? ` (${item.acronym})` : ''}`, item.id)));
       relationshipSection.hidden = candidates.length === 0;
@@ -336,8 +344,8 @@
         departments: nature.value === 'pj' ? [...departmentRows.children].map((row) => ({ name: row.querySelector('[data-department-name]').value.trim(), channels: [...row.querySelectorAll('.law-contact-department-channel')].map((item) => ({ type: item.querySelector('[data-channel-type]').value, value: item.querySelector('[data-channel-value]').value.trim(), label: item.querySelector('[data-channel-label]').value.trim() || null })).filter((item) => item.value) })).filter((item) => item.name) : [],
         tags: tagField.value.split(',').map((value) => value.trim()).filter(Boolean),
       };
-      if (window.lawContactsCanSensitive && nature.value === 'pf') {
-        body.documents = [...documentRows.children].map((row) => { const type = row.querySelector('[data-doc-type]').value; const noUf = ['cpf','cnpj'].includes(type); return { type, number: row.querySelector('[data-doc-number]').value.trim(), state: noUf ? null : (row.querySelector('[data-doc-state]').value || null), label: noUf ? null : (row.querySelector('[data-doc-label]').value.trim() || null) }; }).filter((doc) => doc.number);
+      if (window.lawContactsCanSensitive) {
+        body.documents = [...documentRows.children].map((row) => { const type = row.querySelector('[data-doc-type]').value; const noUf = ['cpf','cnpj'].includes(type); const noLabel = noUf || type === 'state_registration'; return { type, number: row.querySelector('[data-doc-number]').value.trim(), state: noUf ? null : (row.querySelector('[data-doc-state]').value || null), label: noLabel ? null : (row.querySelector('[data-doc-label]').value.trim() || null) }; }).filter((doc) => doc.number);
         body.notes = notes.value.trim() || null;
       }
       if (contact) { body.status = form.elements.namedItem('status').value; body.sharing_excluded = form.elements.namedItem('sharing_excluded').checked; }
@@ -350,16 +358,16 @@
     modal.body.append(form); name.focus();
   }
 
-  function documentRow(doc = {}) {
+  function documentRow(doc = {}, nature = 'pf') {
     const row = $('div', 'law-contact-repeat-row law-contact-document-row');
-    const type = select(Object.entries(DOCUMENTS), doc.type || 'cpf'); type.dataset.docType = '1';
+    const type = select(DOCUMENT_TYPES_BY_NATURE[nature].map((code) => [code, DOCUMENTS[code]]), doc.type || (nature === 'pj' ? 'cnpj' : 'cpf')); type.dataset.docType = '1';
     const number = input(doc.number || '', 'Número do documento', 120); number.dataset.docNumber = '1';
     const state = select([['','UF'], ...STATES], doc.state || 'BA'); state.dataset.docState = '1';
     const label = input(doc.label || '', 'Identificação', 80); label.dataset.docLabel = '1';
     const stateField = field('UF de emissão', state); const labelField = field('Identificação', label);
-    const update = () => { const personal = ['cpf','cnpj'].includes(type.value); stateField.hidden = personal; labelField.hidden = personal; number.placeholder = type.value === 'cpf' ? '000.000.000-00' : type.value === 'cnpj' ? '00.000.000/0000-00' : 'Número do documento'; number.inputMode = 'numeric'; };
+    const update = () => { const noUf = ['cpf','cnpj'].includes(type.value); stateField.hidden = noUf; state.required = type.value === 'state_registration'; labelField.hidden = noUf || type.value === 'state_registration'; number.placeholder = type.value === 'cpf' ? '000.000.000-00' : type.value === 'cnpj' ? '00.000.000/0000-00' : 'Número do documento'; number.inputMode = ['cpf','cnpj'].includes(type.value) ? 'numeric' : 'text'; };
     const maskNumber = () => { if (type.value === 'cpf') number.value = number.value.replace(/\D/g,'').slice(0,11).replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2'); if (type.value === 'cnpj') number.value = number.value.replace(/\D/g,'').slice(0,14).replace(/(\d{2})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1/$2').replace(/(\d{4})(\d{1,2})$/,'$1-$2'); };
-    type.addEventListener('change', update); number.addEventListener('input', maskNumber); update(); maskNumber();
+    type.addEventListener('change', () => { update(); maskNumber(); }); number.addEventListener('input', maskNumber); update(); maskNumber();
     row.append(field('Tipo', type), field('Número', number), stateField, labelField, button('Remover', 'law-contact-remove', () => row.remove())); return row;
   }
 
@@ -531,7 +539,7 @@
         items.append(row);
       });
     }
-    if (contact.legal_nature !== 'pj' && contact.documents?.length) {
+    if (contact.documents?.length) {
       const items = addSection('Documentos', 'ID', contact.documents.length, 'law-contact-detail-documents');
       contact.documents.forEach((doc) => {
         const item = $('article', 'law-contact-detail-document');

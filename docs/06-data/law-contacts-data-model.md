@@ -59,7 +59,8 @@ Até quatro documentos por contato. `document_number_encrypted` guarda o valor
 com `Crypt`; `document_fingerprint` guarda HMAC do CPF/CNPJ normalizado com
 unicidade por empresa para detecção de duplicados sem índice sobre o texto aberto. Tipo, rótulo e UF
 emissora completam o registro. CPF/CNPJ são opcionais e validados quando
-fornecidos.
+fornecidos. CPF pertence a PF; CNPJ e inscrição estadual pertencem a PJ.
+Inscrição estadual usa o tipo `state_registration` e exige UF emissora.
 
 ### `law_contact_departments`
 

@@ -57,8 +57,9 @@ foco ou comportamento de modal do Fokus Styles.
 PF/PJ define a natureza cadastral. Pessoa física pode acumular profissões e
 vínculos profissionais selecionados do vocabulário da empresa ou adicionados
 como novas especificações (por exemplo, Policial Civil ou Guarda Municipal).
-Pessoa jurídica tem campo opcional de sigla e não apresenta profissão/vínculo
-nem documentos em seu formulário e ficha. Departamentos são exclusivos de PJ.
+Pessoa jurídica tem campo opcional de sigla e não apresenta profissão/vínculo.
+Seus documentos incluem CNPJ e inscrição estadual com UF. Departamentos são
+exclusivos de PJ.
 Vínculos entre pessoa física e pessoa jurídica são muitos-para-muitos, ficam
 restritos à mesma empresa proprietária e aparecem nos dois lados do cadastro.
 Papéis processuais específicos pertencem aos vínculos com processos, não ao
@@ -81,13 +82,13 @@ substitui a conferência de nomes oficiais.
 | Telefones | Até quatro por contato; cada departamento PJ também aceita até quatro. |
 | E-mails | Até dois por contato; cada departamento PJ também aceita até dois. |
 | Endereços completos | Até dois por contato. |
-| Documentos | Até quatro por contato; CPF/CNPJ opcionais, dígitos validados e CPF/CNPJ únicos por empresa. |
+| Documentos | Até quatro por contato; CPF para PF, CNPJ e inscrição estadual para PJ. CPF/CNPJ são opcionais, validados e únicos por empresa; inscrição estadual exige UF. |
 | Profissões/vínculos | Uma ou mais opções cadastradas pela empresa; PF. |
 | Tags | Até seis por contato; reutilizadas dentro da empresa. |
 | Departamentos PJ | Sem teto funcional fixo; cada departamento consome uma unidade contratada adicional. |
 
 Telefone/e-mail pessoal, endereço residencial e notas são dados sensíveis.
-CPF/CNPJ e demais documentos são armazenados criptografados e seu fingerprint
+Os documentos são armazenados criptografados; o fingerprint de CPF/CNPJ
 é usado para deduplicação sem pesquisa em texto aberto. A API mascara os
 documentos e oculta campos sensíveis para perfis sem `law.contacts.sensitive.view`.
 

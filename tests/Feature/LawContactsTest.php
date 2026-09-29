@@ -112,6 +112,29 @@ class LawContactsTest extends TestCase
         ]);
     }
 
+    public function test_pj_can_store_cnpj_and_state_registration_with_uf(): void
+    {
+        $session = ['active_company_id' => $this->sessionCompanyId];
+        $documents = [
+            ['type' => 'cnpj', 'number' => '11.222.333/0001-81'],
+            ['type' => 'state_registration', 'number' => '123456789', 'state' => 'BA'],
+        ];
+        $contact = $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'legal_nature' => 'pj', 'display_name' => 'Empresa Documentada', 'documents' => $documents,
+        ])->assertCreated()->json('contact');
+
+        $byType = array_column($contact['documents'], null, 'type');
+        $this->assertEqualsCanonicalizing(['cnpj', 'state_registration'], array_keys($byType));
+        $this->assertSame('11222333000181', $byType['cnpj']['number']);
+        $this->assertSame('BA', $byType['state_registration']['state']);
+        $this->actingAs($this->admin)->withSession($session)->getJson('/api/law/contacts/'.$contact['id'])
+            ->assertOk()->assertJsonFragment(['type' => 'state_registration', 'state' => 'BA']);
+        $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'legal_nature' => 'pj', 'display_name' => 'Empresa sem UF',
+            'documents' => [['type' => 'state_registration', 'number' => '987654321']],
+        ])->assertUnprocessable();
+    }
+
     public function test_blocks_invalid_or_duplicate_cpf_and_capacity_overflow(): void
     {
         $session = ['active_company_id' => $this->sessionCompanyId];

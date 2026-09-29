@@ -23,7 +23,7 @@ class LawContactController extends Controller
         'prosecutor_office', 'public_defender', 'expert', 'witness', 'representative', 'other',
     ];
 
-    private const DOCUMENT_TYPES = ['cpf', 'cnpj', 'oab', 'rg', 'registration', 'cadastro', 'voter_title', 'passport', 'other'];
+    private const DOCUMENT_TYPES = ['cpf', 'cnpj', 'state_registration', 'oab', 'rg', 'registration', 'cadastro', 'voter_title', 'passport', 'other'];
 
     private const SHARE_FIELDS = ['professional_channels', 'business_addresses', 'documents'];
 
@@ -438,6 +438,10 @@ class LawContactController extends Controller
                 abort_if($nature === 'pf', 422, 'CNPJ só pode ser vinculado a contato PJ.');
                 abort_unless(BrazilianDocuments::cnpj($number), 422, 'Informe um CNPJ válido.');
             }
+            if ($document['type'] === 'state_registration') {
+                abort_if($nature === 'pf', 422, 'Inscrição estadual só pode ser vinculada a contato PJ.');
+                abort_if(empty($document['state']), 422, 'Informe a UF da inscrição estadual.');
+            }
         }
     }
 
@@ -583,7 +587,7 @@ class LawContactController extends Controller
                 ->map(fn ($linked) => ['id' => (string) $linked->id, 'display_name' => (string) $linked->display_name, 'acronym' => $linked->acronym, 'legal_nature' => (string) $linked->legal_nature])->values()->all(),
             'tags' => $tags, 'channels' => $channels->map(fn ($channel) => $this->channelPayload($channel, $canSensitive))->all(),
             'addresses' => $addresses->filter(fn ($address) => $canSensitive || $address->address_type !== 'residential')->map(fn ($address) => ['id' => $address->id, 'type' => $address->address_type, 'postal_code' => $canSensitive ? $address->postal_code : null, 'street' => $address->street, 'number' => $address->number, 'complement' => $address->complement, 'district' => $address->district, 'city' => $address->city, 'state' => $address->state, 'country' => $address->country, 'primary' => (bool) $address->is_primary])->values()->all(),
-            'documents' => $contact->legal_nature === 'pj' ? [] : ($canSensitive ? $documents->map(fn ($document) => ['id' => $document->id, 'type' => $document->document_type, 'label' => $document->label, 'number' => Crypt::decryptString($document->document_number_encrypted), 'state' => $document->issuing_state])->all() : $documents->map(fn ($document) => ['id' => $document->id, 'type' => $document->document_type, 'label' => $document->label, 'number' => $this->maskedDocument(Crypt::decryptString($document->document_number_encrypted)), 'state' => $document->issuing_state])->all()),
+            'documents' => $canSensitive ? $documents->map(fn ($document) => ['id' => $document->id, 'type' => $document->document_type, 'label' => $document->label, 'number' => Crypt::decryptString($document->document_number_encrypted), 'state' => $document->issuing_state])->all() : $documents->map(fn ($document) => ['id' => $document->id, 'type' => $document->document_type, 'label' => $document->label, 'number' => $this->maskedDocument(Crypt::decryptString($document->document_number_encrypted)), 'state' => $document->issuing_state])->all(),
             'departments' => $departments, 'sharing_excluded' => (bool) ($contact->sharing_excluded ?? false), 'is_shared' => false,
             'has_possible_duplicates' => $canMerge && $this->hasPossibleDuplicates($companyId, $contact, $documents, $canSensitive),
             'updated_at' => $contact->updated_at,
