@@ -6,6 +6,15 @@
   const DOCUMENTS = { cpf: 'CPF', cnpj: 'CNPJ', oab: 'OAB', rg: 'RG', other: 'Outro' };
   const CONTACT_ICONS = '/backoffice/assets/icons/';
   const $ = (tag, cls = '', text = '') => { const node = document.createElement(tag); if (cls) node.className = cls; if (text !== '') node.textContent = text; return node; };
+  const formatContactDocument = (document) => {
+    const value = String(document.number || 'Dado protegido');
+    if (value === 'Dado protegido' || value.includes('•') || value.includes('*')) return value;
+    const digits = value.replace(/\D/g, '');
+    if (document.type === 'cpf' && digits.length === 11) return digits.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+    if (document.type === 'cnpj' && digits.length === 14) return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+    if (document.type === 'oab' && digits.length > 3) return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return value;
+  };
   const field = (labelText, control) => { const label = $('label', 'law-contact-field'); label.append($('span', '', labelText), control); return label; };
   const select = (items, value = '') => { const control = $('select', 'fs-form-control'); items.forEach(([v, label]) => { const option = new Option(label, v); option.selected = v === value; control.append(option); }); return control; };
   const input = (value = '', placeholder = '', maxLength = 255) => { const control = $('input', 'fs-form-control'); control.value = value || ''; control.placeholder = placeholder; control.maxLength = maxLength; return control; };
@@ -354,7 +363,11 @@
     const modal = createModal(root, 'Ficha do contato', 'fs-modal-xl', opener);
     const body = $('div', 'law-contact-detail-body');
     const labels = { pf: 'Pessoa física', pj: 'Pessoa jurídica', ativo: 'Ativo', inativo: 'Inativo', residential: 'Residencial', business: 'Comercial / institucional' };
-    const initials = String(contact.display_name || '?').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => [...part][0]).join('').toLocaleUpperCase('pt-BR');
+    const nameParts = String(contact.display_name || '?').trim().split(/\s+/).filter(Boolean);
+    const removeDiacritics = (value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const firstName = nameParts[0] || '?';
+    const lastName = nameParts[nameParts.length - 1] || firstName;
+    const initials = `${removeDiacritics([...firstName][0] || '?')}${nameParts.length > 1 ? removeDiacritics([...lastName][0] || '') : ''}`.toLocaleUpperCase('pt-BR');
     const summary = $('section', 'law-contact-detail-summary');
     const avatar = $('span', 'law-contact-detail-avatar', initials);
     const summaryCopy = $('div', 'law-contact-detail-summary-copy');
@@ -397,7 +410,7 @@
         const type = DOCUMENTS[doc.type] || doc.type || 'Documento';
         item.append($('span', 'law-contact-detail-document-type', type));
         const detail = $('div', 'law-contact-detail-document-copy');
-        detail.append($('strong', '', doc.number || 'Dado protegido'));
+        detail.append($('strong', '', formatContactDocument(doc)));
         detail.append($('span', '', [doc.label, doc.state].filter(Boolean).join(' · ') || 'Documento cadastrado'));
         item.append(detail); items.append(item);
       });
@@ -410,10 +423,14 @@
         const mark = $('span', 'law-contact-detail-channel-mark', isEmail ? '@' : '☎');
         const detail = $('div', 'law-contact-detail-channel-copy');
         const meta = $('div', 'law-contact-detail-channel-meta');
-        meta.append($('span', 'law-contact-detail-channel-label', channel.label || (isEmail ? 'E-mail' : 'Telefone')));
-        if (channel.primary) meta.append($('span', 'law-contact-detail-primary', 'Principal'));
-        if (channel.personal) meta.append($('span', 'law-contact-detail-private', channel.value === 'Dado protegido' ? 'Acesso restrito' : 'Pessoal'));
-        meta.append($('span', 'law-contact-detail-channel-kind', isEmail ? 'E-MAIL' : 'TELEFONE'));
+        const title = $('div', 'law-contact-detail-channel-title');
+        title.append($('span', 'law-contact-detail-channel-label', channel.label || (isEmail ? 'E-mail' : 'Telefone')));
+        title.append($('span', 'law-contact-detail-channel-kind', isEmail ? 'E-MAIL' : 'TELEFONE'));
+        meta.append(title);
+        const badges = $('div', 'law-contact-detail-channel-badges');
+        if (channel.primary) badges.append($('span', 'law-contact-detail-primary', 'Principal'));
+        if (channel.personal) badges.append($('span', 'law-contact-detail-private', channel.value === 'Dado protegido' ? 'Acesso restrito' : 'Pessoal'));
+        if (badges.children.length) meta.append(badges);
         detail.append(meta, $('strong', '', channel.value || 'Dado protegido'));
         item.append(mark, detail); items.append(item);
       });
