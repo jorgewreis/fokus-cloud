@@ -13,7 +13,7 @@
 | RF-CTT-007 | Guardar documentos conforme a natureza. | Até quatro por contato; PF aceita CPF e PJ aceita CNPJ e inscrição estadual com UF obrigatória. CPF/CNPJ são validados, criptografados e únicos na empresa. |
 | RF-CTT-008 | Guardar departamentos associados à PJ. | Cada departamento tem nome e até 4 telefones e 2 e-mails próprios. |
 | RF-CTT-009 | Classificar contatos com tags. | Até seis tags por contato, reutilizadas e normalizadas na empresa. |
-| RF-CTT-010 | Pesquisar e filtrar contatos. | Filtros por texto, natureza, status, classificação e tag; documentos só pesquisáveis com permissão sensível. |
+| RF-CTT-010 | Pesquisar e filtrar contatos. | Filtros por texto, natureza, status, profissão vinculada a pelo menos um contato e tag; documentos só pesquisáveis com permissão sensível. |
 | RF-CTT-011 | Evitar duplicidade de CPF/CNPJ. | CPF/CNPJ repetidos na empresa retornam conflito; mesclagem é fluxo separado. |
 | RF-CTT-012 | Editar e inativar contatos. | Alterações e inativação preservam auditoria e vínculos históricos. |
 | RF-CTT-013 | Mesclar duplicados. | Exige permissão, mesma natureza, destino válido e motivo; transfere relações em transação. |

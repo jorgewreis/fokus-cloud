@@ -11,17 +11,18 @@ Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
 
 ## Escopo entregue
 
-- Listagem pesquisável, filtros por natureza PF/PJ, situação, classificação e
-  tag, paginação e detalhes do cadastro.
+- Listagem pesquisável, filtros por natureza PF/PJ, situação, profissão
+  vinculada a pelo menos um contato e tag, paginação e detalhes do cadastro.
 - Criação, edição, inativação e mesclagem auditada de contatos duplicados.
 - Dashboard com totais da empresa, utilização da capacidade contratada e até
   cinco atividades recentes do usuário atual.
 - Cadastro independente de departamentos de uma PJ, cada qual com canais
   próprios e contabilizado como uma unidade adicional da capacidade.
-- Sigla opcional para pessoas jurídicas; profissão/vínculo profissional e
-  documentos ficam restritos a pessoas físicas no formulário e na ficha.
+- Sigla opcional para pessoas jurídicas; profissão/vínculo profissional fica
+  restrito a pessoas físicas. Documentos seguem os tipos permitidos para PF/PJ.
 - Vínculos muitos-para-muitos entre pessoas físicas e empresas da mesma
-  empresa proprietária, visíveis de forma recíproca no cadastro e na ficha.
+  empresa proprietária, gerenciáveis nos dois cadastros. A ficha PF lista as
+  empresas em linhas completas; a ficha PJ mostra somente o total de pessoas.
 - Busca automática de endereços pelo CEP usando ViaCEP, com preenchimento de
   logradouro, bairro, município e UF quando retornados; o usuário pode concluir
   manualmente quando a consulta não localizar o CEP ou estiver indisponível.
@@ -37,7 +38,7 @@ Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
 | Visão geral | Totais PF, PJ, departamentos e cadastros contabilizados; até cinco contatos recentes da pessoa usuária. |
 | Contatos | Busca, filtros, resultados, paginação, situação, origem compartilhada e ações permitidas. |
 | Criar/editar | Formulário guiado por PF/PJ, profissões cadastradas ou novas, sigla e empresas/pessoas vinculadas, canais, endereços, departamentos, tags e campos sensíveis autorizados. |
-| Detalhes | Identificação e sigla, profissões, empresas/pessoas vinculadas, tags, canais, endereços, documentos e departamentos conforme a natureza e as permissões. |
+| Detalhes | Identificação e sigla, profissões, empresas vinculadas em linhas completas na PF, total de pessoas vinculadas na PJ, tags, canais, endereços em linhas completas, documentos e departamentos conforme a natureza e as permissões. |
 | Mesclagem | Escolha do cadastro preservado, confirmação do motivo, transferência de relações e auditoria. |
 | Compartilhamento | Seleção de empresas elegíveis, classificações e campos expostos; gravação e revogação auditadas. |
 | Estados da página | Carregamento, vazio, sem resultados, erro de API, capacidade indisponível e aviso de limite. |
@@ -78,7 +79,7 @@ substitui a conferência de nomes oficiais.
 | Nome | Obrigatório; PF: nome da pessoa; PJ: nome fantasia ou razão social. |
 | Sigla | Opcional, até 32 caracteres; apresentada ao lado do nome PJ. |
 | Razão social/complemento | Opcional. |
-| Vínculos empresariais | Relação muitos-para-muitos PF↔PJ entre cadastros ativos da mesma empresa; a ficha de cada lado exibe os contatos relacionados. |
+| Vínculos empresariais | Relação muitos-para-muitos PF↔PJ entre cadastros ativos da mesma empresa; a ficha PF lista as empresas e a ficha PJ exibe somente o quantitativo de pessoas vinculadas. |
 | Telefones | Até quatro por contato; cada departamento PJ também aceita até quatro. |
 | E-mails | Até dois por contato; cada departamento PJ também aceita até dois. |
 | Endereços completos | Até dois por contato. |

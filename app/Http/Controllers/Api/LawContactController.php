@@ -68,12 +68,14 @@ class LawContactController extends Controller
         $status = $request->query('status');
         $nature = $request->query('nature');
         $classification = $request->query('classification');
+        $profession = mb_strtolower(trim((string) $request->query('profession', '')));
         $tag = $request->query('tag');
 
         $ownRows = DB::table('law_contacts')->where('company_id', $companyId)->whereNull('deleted_at')->whereNull('merged_into_id')
             ->when(in_array($status, ['ativo', 'inativo'], true), fn ($builder) => $builder->where('status', $status))
             ->when(in_array($nature, ['pf', 'pj'], true), fn ($builder) => $builder->where('legal_nature', $nature))
             ->when($classification && in_array($classification, self::CLASSIFICATIONS, true), fn ($builder) => $builder->whereExists(fn ($sub) => $sub->from('law_contact_classifications')->whereColumn('law_contact_classifications.law_contact_id', 'law_contacts.id')->where('classification_code', $classification)))
+            ->when($profession !== '', fn ($builder) => $builder->whereExists(fn ($sub) => $sub->from('law_contact_profession_assignments as assignment')->join('law_contact_professions as profession', 'profession.id', '=', 'assignment.profession_id')->whereColumn('assignment.law_contact_id', 'law_contacts.id')->whereColumn('assignment.company_id', 'law_contacts.company_id')->whereColumn('profession.company_id', 'assignment.company_id')->where('profession.normalized_name', $profession)))
             ->when($tag, fn ($builder) => $builder->whereExists(fn ($sub) => $sub->from('law_contact_tag_assignments as assignment')->join('law_contact_tags as tag', 'tag.id', '=', 'assignment.law_contact_tag_id')->whereColumn('assignment.law_contact_id', 'law_contacts.id')->where('tag.normalized_name', $this->normalizeTag((string) $tag))))
             ->when($query !== '', function ($builder) use ($query, $companyId, $canSensitive): void {
                 $builder->where(function ($search) use ($query, $companyId, $canSensitive): void {
@@ -88,7 +90,7 @@ class LawContactController extends Controller
 
         $contacts = $ownRows->map(fn ($row) => $this->contactPayload($companyId, $row, $canSensitive))->values()->all();
         if ($authorization->can($request, 'law.contacts.shared.view', $unitId)) {
-            array_push($contacts, ...$this->sharedContacts($companyId, $query, $status, $nature, $classification, $tag, $canSensitive));
+            array_push($contacts, ...$this->sharedContacts($companyId, $query, $status, $nature, $classification, $profession, $tag, $canSensitive));
         }
         usort($contacts, fn (array $a, array $b): int => strcasecmp($a['display_name'], $b['display_name']));
         $page = max(1, (int) $request->query('page', 1));
@@ -101,6 +103,7 @@ class LawContactController extends Controller
             'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total],
             'classifications' => $this->classificationLabels(),
             'professions' => DB::table('law_contact_professions')->where('company_id', $companyId)->orderBy('name')->pluck('name'),
+            'filter_professions' => DB::table('law_contact_professions as profession')->join('law_contact_profession_assignments as assignment', 'assignment.profession_id', '=', 'profession.id')->join('law_contacts as contact', 'contact.id', '=', 'assignment.law_contact_id')->where('profession.company_id', $companyId)->where('assignment.company_id', $companyId)->where('contact.company_id', $companyId)->whereNull('contact.deleted_at')->whereNull('contact.merged_into_id')->distinct()->orderBy('profession.name')->get(['profession.name', 'profession.normalized_name']),
             'relationship_options' => DB::table('law_contacts')->where('company_id', $companyId)->where('status', 'ativo')->whereNull('deleted_at')->whereNull('merged_into_id')->orderBy('display_name')->get(['id', 'display_name', 'acronym', 'legal_nature'])->map(fn ($row) => ['id' => (string) $row->id, 'display_name' => (string) $row->display_name, 'acronym' => $row->acronym, 'legal_nature' => (string) $row->legal_nature])->all(),
             'tags' => DB::table('law_contact_tags')->where('company_id', $companyId)->orderBy('name')->pluck('name'),
             'summary' => $this->summary($companyId, $usage),
@@ -656,7 +659,7 @@ class LawContactController extends Controller
         ];
     }
 
-    private function sharedContacts(string $recipientCompanyId, string $query, ?string $status, ?string $nature, ?string $classification, ?string $tag, bool $canSensitive): array
+    private function sharedContacts(string $recipientCompanyId, string $query, ?string $status, ?string $nature, ?string $classification, string $profession, ?string $tag, bool $canSensitive): array
     {
         if ($status === 'inativo' || $tag) return [];
         $policies = DB::table('law_contact_sharing_policies')->where('recipient_company_id', $recipientCompanyId)->where('is_active', true)->get();
@@ -668,6 +671,7 @@ class LawContactController extends Controller
             $rows = DB::table('law_contacts')->where('company_id', $policy->source_company_id)->whereNull('deleted_at')->whereNull('merged_into_id')->where('status', $status === 'inativo' ? 'inativo' : 'ativo')->where('sharing_excluded', false)
                 ->when(in_array($nature, ['pf', 'pj'], true), fn ($builder) => $builder->where('legal_nature', $nature))
                 ->whereExists(fn ($sub) => $sub->from('law_contact_classifications')->whereColumn('law_contact_classifications.law_contact_id', 'law_contacts.id')->whereIn('classification_code', $codes)->when($classification, fn ($q) => $q->where('classification_code', $classification)))
+                ->when($profession !== '', fn ($builder) => $builder->whereExists(fn ($sub) => $sub->from('law_contact_profession_assignments as assignment')->join('law_contact_professions as profession', 'profession.id', '=', 'assignment.profession_id')->whereColumn('assignment.law_contact_id', 'law_contacts.id')->whereColumn('assignment.company_id', 'law_contacts.company_id')->whereColumn('profession.company_id', 'assignment.company_id')->where('profession.normalized_name', $profession)))
                 ->when($query !== '', fn ($builder) => $builder->where(fn ($q) => $q->where('display_name', 'like', '%'.$this->like($query).'%')->orWhere('legal_name', 'like', '%'.$this->like($query).'%')))
                 ->orderBy('display_name')->limit(100)->get();
             $sourceName = DB::table('companies')->where('id', $policy->source_company_id)->value('display_name') ?: DB::table('companies')->where('id', $policy->source_company_id)->value('legal_name');

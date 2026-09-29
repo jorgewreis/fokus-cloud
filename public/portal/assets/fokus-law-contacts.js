@@ -99,15 +99,15 @@
     recentCard.append(recentHeader, recentBody); root.append(recentCard);
 
     const filters = $('form', 'law-contact-filters');
-    const search = input('', 'Buscar por nome, organização, documento autorizado ou classificação', 180); search.type = 'search'; search.setAttribute('aria-label', 'Buscar contatos');
+    const search = input('', 'Buscar por nome, organização ou documento autorizado', 180); search.type = 'search'; search.setAttribute('aria-label', 'Buscar contatos');
     const nature = select([['', 'Todas as naturezas'], ['pf', 'Pessoa física'], ['pj', 'Pessoa jurídica']]); nature.setAttribute('aria-label', 'Filtrar por natureza');
     const status = select([['ativo', 'Ativos'], ['inativo', 'Inativos'], ['todos', 'Todos']]); status.setAttribute('aria-label', 'Filtrar por situação');
-    const classification = select([['', 'Todas as classificações'], ...Object.entries(CLASSIFICATIONS)]); classification.setAttribute('aria-label', 'Filtrar por classificação');
+    const profession = select([['', 'Todas as profissões']]); profession.setAttribute('aria-label', 'Filtrar por profissão');
     const tagFilter = input('', 'Filtrar por tag', 64); tagFilter.setAttribute('list', 'law-contact-tags'); tagFilter.setAttribute('aria-label', 'Filtrar por tag');
     const datalist = $('datalist'); datalist.id = 'law-contact-tags'; tagFilter.setAttribute('list', datalist.id);
-    filters.append(field('Pesquisar', search), field('Natureza', nature), field('Classificação', classification), field('Tag', tagFilter), field('Situação', status), datalist);
+    filters.append(field('Pesquisar', search), field('Natureza', nature), field('Profissão', profession), field('Tag', tagFilter), field('Situação', status), datalist);
     filters.addEventListener('submit', (event) => { event.preventDefault(); page = 1; refresh(); });
-    [nature, status, classification, tagFilter].forEach((control) => control.addEventListener('change', () => { page = 1; refresh(); }));
+    [nature, status, profession, tagFilter].forEach((control) => control.addEventListener('change', () => { page = 1; refresh(); }));
     search.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { page = 1; refresh(); }, 250); });
     root.append(filters);
 
@@ -128,10 +128,13 @@
         const params = new URLSearchParams({ page: String(page), per_page: '25', status: status.value });
         if (search.value.trim()) params.set('q', search.value.trim());
         if (nature.value) params.set('nature', nature.value);
-        if (classification.value) params.set('classification', classification.value);
+        if (profession.value) params.set('profession', profession.value);
         if (tagFilter.value.trim()) params.set('tag', tagFilter.value.trim());
         const result = await window.FokusApi.request(`/law/contacts?${params.toString()}`);
         window.lawContactProfessions = result.professions || [];
+        const selectedProfession = profession.value;
+        profession.replaceChildren(new Option('Todas as profissões', ''), ...(result.filter_professions || []).map((item) => new Option(item.name, item.normalized_name)));
+        profession.value = selectedProfession;
         relationshipOptions = result.relationship_options || [];
         currentItems = result.contacts || [];
         metrics.replaceChildren();
@@ -533,10 +536,11 @@
     };
     if (contact.linked_contacts?.length) {
       const items = addSection(contact.legal_nature === 'pj' ? 'Pessoas vinculadas' : 'Empresas vinculadas', 'VÍN', contact.linked_contacts.length, 'law-contact-detail-links');
-      contact.linked_contacts.forEach((linked) => {
-        const row = $('article', 'law-contact-detail-linked-contact');
-        row.append($('strong', '', linked.display_name), $('span', '', `${linked.acronym ? `${linked.acronym} · ` : ''}${labels[linked.legal_nature] || 'Contato'}`));
-        items.append(row);
+      if (contact.legal_nature === 'pj') items.remove();
+      else contact.linked_contacts.forEach((linked) => {
+          const row = $('article', 'law-contact-detail-linked-contact');
+          row.append($('strong', '', linked.display_name), $('span', '', `${linked.acronym ? `${linked.acronym} · ` : ''}${labels[linked.legal_nature] || 'Contato'}`));
+          items.append(row);
       });
     }
     if (contact.documents?.length) {

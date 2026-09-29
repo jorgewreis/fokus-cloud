@@ -461,6 +461,8 @@
 .law-contact-detail-section-heading h3 { margin: 0; color: var(--law-shell-ink); font-size: 12px; font-weight: 700; }
 .law-contact-detail-section-heading > span { display: grid; min-width: 21px; height: 21px; place-items: center; padding: 0 5px; border-radius: 999px; background: #f3eff6; color: #675476; font-size: 10px; font-weight: 700; }
 .law-contact-detail-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px; }
+.law-contact-detail-links, .law-contact-detail-addresses { grid-column: 1 / -1; }
+.law-contact-detail-links .law-contact-detail-items, .law-contact-detail-addresses .law-contact-detail-items { grid-template-columns: minmax(0, 1fr); }
 .law-contact-detail-document, .law-contact-detail-channel, .law-contact-detail-address, .law-contact-detail-department { min-width: 0; padding: 10px; border: 1px solid #eeeaf1; border-radius: 9px; background: #fff; }
 .law-contact-detail-document { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: 9px; }
 .law-contact-detail-document-type { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 9px; background: #eef2ff; color: #4257a4; font-size: 9px; font-weight: 800; }
@@ -480,6 +482,7 @@
 .law-contact-detail-primary, .law-contact-detail-private { padding: 2px 6px; border-radius: 999px; background: #e8f6ef; color: #21714b; font-size: 8px; font-weight: 700; }
 .law-contact-detail-private { background: #fff3e7; color: #986024; }
 .law-contact-detail-address { display: grid; align-content: start; gap: 6px; }
+.law-contact-detail-linked-contact > strong, .law-contact-detail-linked-contact > span { min-width: 0; overflow-wrap: anywhere; }
 .law-contact-detail-address-extra, .law-contact-detail-address-locality, .law-contact-detail-address-postal { color: var(--law-shell-muted); font-size: 10px; line-height: 1.35; overflow-wrap: anywhere; }
 .law-contact-detail-address-locality { color: #503762; font-weight: 650; }
 .law-contact-detail-department { display: grid; align-content: start; gap: 8px; background: linear-gradient(145deg, #fff, #fcfaff); }
