@@ -38,6 +38,22 @@ class AuthenticationAndIsolationTest extends TestCase
         $this->assertDatabaseHas('company_memberships', ['status' => 'ativo']);
     }
 
+    public function test_law_offer_intent_is_preserved_in_email_verification_token(): void
+    {
+        $offer = [
+            'selection_mode' => 'modules', 'cycle' => 'annual', 'quote_version' => 7,
+            'items' => [['module_code' => 'contatos-advocacia', 'quantity' => 1, 'personalizations' => [['type_code' => 'contatos_cadastrados', 'tier_value' => 5000]]]],
+        ];
+        $this->postJson('/api/auth/register-company', $this->registration([
+            'return_to' => '/contratar/fokus-law', 'offer_intent' => $offer,
+        ]))->assertCreated();
+
+        $tokenPayload = json_decode((string) DB::table('security_tokens')->where('purpose', 'email_verification')->value('payload'), true);
+        $this->assertSame('/contratar/fokus-law', $tokenPayload['return_to']);
+        $this->assertSame($offer, $tokenPayload['offer_intent']);
+        $this->assertArrayNotHasKey('amount', $tokenPayload['offer_intent']);
+    }
+
     public function test_existing_company_document_is_not_duplicated(): void
     {
         $this->postJson('/api/auth/register-company', $this->registration())->assertCreated();

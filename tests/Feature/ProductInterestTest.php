@@ -25,12 +25,14 @@ class ProductInterestTest extends TestCase
         $payload = [
             'name' => 'Pessoa Interessada', 'email' => 'interest@example.test', 'products' => ['law'],
             'profiles' => ['Advocacia'], 'main_difficulties' => 'Perco o acompanhamento das tarefas.',
-            'modules' => ['Contatos'], 'privacy_accepted' => true, 'privacy_version' => '1.0',
+            'modules' => ['contatos-advocacia'], 'desired_capacity' => 75000, 'catalog_max_capacity' => 50000,
+            'request_context' => 'law_over_limit', 'privacy_accepted' => true, 'privacy_version' => '1.0',
         ];
         $this->postJson('/api/product-interests', $payload)->assertCreated();
         $this->postJson('/api/product-interests', [...$payload, 'products' => ['law', 'lead'], 'name' => 'Nome atualizado'])->assertCreated();
         $this->assertDatabaseCount('product_interests', 1);
         $this->assertDatabaseHas('product_interests', ['email' => 'interest@example.test', 'name' => 'Nome atualizado']);
+        $this->assertDatabaseHas('product_interests', ['email' => 'interest@example.test', 'desired_capacity' => 75000, 'catalog_max_capacity' => 50000, 'request_context' => 'law_over_limit']);
     }
 
     public function test_public_interest_requires_privacy_consent(): void

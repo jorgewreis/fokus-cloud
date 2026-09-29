@@ -10,7 +10,7 @@ class SearchVisibility
     public function handle(Request $request, Closure $next)
     {
         // Restrict canonical redirects to public GET/HEAD pages; preserve API and account flows.
-        $publicPaths = ['/', 'produtos', 'produtos/fokus-styles', 'produtos/fokus-law', 'robots.txt', 'sitemap.xml'];
+        $publicPaths = ['/', 'produtos', 'produtos/fokus-styles', 'produtos/fokus-law', 'produtos/fokus-law/planos', 'robots.txt', 'sitemap.xml'];
         if ($request->isMethod('GET') || $request->isMethod('HEAD')) {
             if ($request->getHost() === 'fokuscloud.com.br' && in_array($request->path(), $publicPaths, true)) {
                 return redirect()->away('https://www.fokuscloud.com.br'.$request->getRequestUri(), 301);

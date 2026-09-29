@@ -307,10 +307,19 @@ class SubscriptionChangeManager
             $publishedPlan = collect($publishedCatalog['plans'] ?? [])->firstWhere('code', $plan->code);
             abort_unless($publishedPlan, 422, 'O plano não está presente na publicação atual do catálogo.');
             $customizations = collect($data['items'] ?? [])->keyBy('module_code');
-            $requestedItems = collect($publishedPlan['module_codes'] ?? [])->map(function (string $code) use ($customizations): array {
-                $selected = $customizations->get($code, []);
-                return ['module_code' => $code, 'quantity' => 1, 'personalizations' => $selected['personalizations'] ?? []];
-            })->all();
+            $planCodes = $publishedPlan['module_codes'] ?? [];
+            if ($customizations->isEmpty()) {
+                // Backoffice plan changes can select a plan without sending module
+                // customizations. In that case, use the plan's published defaults.
+                $customizations = collect($planCodes)->mapWithKeys(fn (string $code): array => [
+                    $code => ['module_code' => $code, 'quantity' => 1, 'personalizations' => []],
+                ]);
+            } else {
+                abort_unless(array_diff($planCodes, $customizations->keys()->all()) === [], 422, 'A composição precisa manter todos os módulos incluídos no plano.');
+            }
+            $requestedItems = $customizations->map(fn (array $selected, string $code): array => [
+                'module_code' => $code, 'quantity' => 1, 'personalizations' => $selected['personalizations'] ?? [],
+            ])->values()->all();
         } else {
             $requestedItems = $data['items'] ?? [];
             abort_unless(is_array($requestedItems) && $requestedItems !== [], 422, 'Selecione ao menos um módulo para a assinatura.');
@@ -322,11 +331,12 @@ class SubscriptionChangeManager
         abort_if(in_array('', $moduleCodes, true) || count($moduleCodes) !== count(array_unique($moduleCodes)), 422, 'Cada módulo pode ser selecionado somente uma vez.');
         foreach ($moduleCodes as $code) {
             abort_unless($publishedModules->has($code), 422, 'Há um módulo indisponível no catálogo publicado.');
-            if (! $plan) abort_unless((bool) ($publishedModules->get($code)['available_standalone'] ?? false), 422, 'Um dos módulos selecionados só pode ser contratado por meio de um plano publicado.');
+            if (! $plan || ! in_array($code, $publishedPlan['module_codes'] ?? [], true)) abort_unless((bool) ($publishedModules->get($code)['available_standalone'] ?? false), 422, 'Um dos módulos selecionados só pode ser contratado por meio de um plano publicado.');
         }
         $moduleCatalog = $publishedModules;
         foreach ($requestedItems as $requested) {
             $module = $moduleCatalog->get((string) $requested['module_code']);
+            abort_if($plan && in_array((string) $requested['module_code'], $publishedPlan['module_codes'] ?? [], true) && (int) ($requested['quantity'] ?? 1) !== 1, 422, 'Módulos incluídos no plano devem ter quantidade unitária.');
             $moduleDependencies = collect($module['dependencies'] ?? [])->pluck('code')->all();
             foreach ($moduleDependencies as $dependency) abort_unless(in_array($dependency, $moduleCodes, true), 422, 'A composição precisa incluir todos os módulos dependentes.');
             $moduleIncompatibilities = collect($module['incompatibilities'] ?? [])->pluck('code')->all();
@@ -356,6 +366,7 @@ class SubscriptionChangeManager
                     'selection_mode' => $plan ? 'plan' : 'modules',
                     'plan_code' => $plan->code ?? null,
                     'module_code' => $module['module_code'] ?? null,
+                    'catalog_module_code' => $moduleCode,
                     'segments' => $module['segments'] ?? [],
                     'context_code' => $module['context_code'] ?? null,
                     'personalizations' => $personalizations,
@@ -364,9 +375,26 @@ class SubscriptionChangeManager
             ];
         })->values()->all();
 
-        $monthlyAmount = $plan
-            ? (float) $publishedPlan['monthly_amount'] + collect($items)->sum(fn (array $item): float => (float) ($item['conditions']['personalization_delta'] ?? 0))
-            : collect($items)->sum(fn (array $item): float => (float) $item['unit_price'] * $item['quantity'] / ($cycle === 'annual' ? 10 : 1));
+        if ($plan) {
+            $includedCodes = $publishedPlan['module_codes'] ?? [];
+            $includedCount = max(1, count($includedCodes));
+            $monthlyAmount = (float) $publishedPlan['monthly_amount'];
+            foreach ($items as &$item) {
+                $isIncluded = in_array($item['conditions']['catalog_module_code'] ?? '', $includedCodes, true);
+                $quantity = (int) $item['quantity'];
+                if ($isIncluded) {
+                    $delta = (float) ($item['conditions']['personalization_delta'] ?? 0) * $quantity;
+                    $monthlyAmount += $delta;
+                    $monthlyUnit = ((float) $publishedPlan['monthly_amount'] / $includedCount) + (float) ($item['conditions']['personalization_delta'] ?? 0);
+                    $item['unit_price'] = $cycle === 'annual' ? $monthlyUnit * 10 : $monthlyUnit;
+                } else {
+                    $monthlyAmount += (float) $item['unit_price'] * $quantity / ($cycle === 'annual' ? 10 : 1);
+                }
+            }
+            unset($item);
+        } else {
+            $monthlyAmount = collect($items)->sum(fn (array $item): float => (float) $item['unit_price'] * $item['quantity'] / ($cycle === 'annual' ? 10 : 1));
+        }
         $amount = $cycle === 'annual' ? CatalogPricing::annualFromMonthly($monthlyAmount) : round($monthlyAmount, 2);
 
         return [

@@ -96,6 +96,67 @@ class CatalogAdminTest extends TestCase
             ->assertJsonStructure(['product', 'modules', 'plans', 'published_at']);
     }
 
+    public function test_public_law_quote_uses_published_catalog_and_annual_rule(): void
+    {
+        $monthly = $this->postJson('/api/catalog/law/quote', [
+            'product_code' => 'law', 'selection_mode' => 'modules', 'cycle' => 'monthly',
+            'items' => [['module_code' => 'contatos-advocacia', 'quantity' => 1]],
+            'monthly_amount' => 0.01,
+        ])->assertOk()->assertJsonStructure(['monthly_amount', 'annual_amount', 'breakdown', 'publication_versions'])->json();
+
+        $annual = $this->postJson('/api/catalog/law/quote', [
+            'product_code' => 'law', 'selection_mode' => 'modules', 'cycle' => 'annual',
+            'items' => [['module_code' => 'contatos-advocacia', 'quantity' => 1]],
+        ])->assertOk()->json();
+
+        $this->assertEquals((float) $monthly['monthly_amount'] * 10, (float) $annual['amount']);
+        $this->assertNotEquals(0.01, (float) $monthly['amount']);
+    }
+
+    public function test_public_law_quote_refuses_missing_and_pending_catalogs(): void
+    {
+        $payload = ['product_code' => 'law', 'selection_mode' => 'modules', 'cycle' => 'monthly', 'items' => [['module_code' => 'contatos-advocacia']]];
+        $publication = DB::table('catalog_publications')->where('product_id', DB::table('products')->where('code', 'law')->value('id'))->first();
+        DB::table('catalog_publications')->where('id', $publication->id)->delete();
+        $this->postJson('/api/catalog/law/quote', $payload)->assertStatus(503);
+
+        DB::table('catalog_publications')->insert((array) $publication);
+        DB::table('products')->where('code', 'law')->update(['publication_pending' => true]);
+        $this->postJson('/api/catalog/law/quote', $payload)->assertUnprocessable();
+    }
+
+    public function test_public_law_sales_and_review_pages_are_routed(): void
+    {
+        $this->get('/produtos/fokus-law/planos')->assertOk();
+        $this->get('/')->assertOk();
+        $this->get('/contratar/fokus-law')->assertOk();
+    }
+
+    public function test_plan_quote_allows_only_published_standalone_extra_and_keeps_included_modules(): void
+    {
+        $publication = DB::table('catalog_publications')->where('product_id', DB::table('products')->where('code', 'law')->value('id'))->latest('version')->first();
+        $snapshot = json_decode($publication->snapshot, true);
+        foreach ($snapshot['modules'] as &$module) if ($module['code'] === 'processos-advocacia') $module['available_standalone'] = false;
+        unset($module);
+        DB::table('catalog_publications')->where('id', $publication->id)->update(['snapshot' => json_encode($snapshot)]);
+        $planQuote = $this->postJson('/api/catalog/law/quote', [
+            'product_code' => 'law', 'selection_mode' => 'plan', 'plan_code' => 'law-advocacia', 'cycle' => 'monthly',
+            'items' => [
+                ['module_code' => 'processos-advocacia', 'quantity' => 1],
+                ['module_code' => 'contatos-advocacia', 'quantity' => 1],
+                ['module_code' => 'tarefas-advocacia', 'quantity' => 1],
+                ['module_code' => 'audiencias-advocacia', 'quantity' => 1],
+            ],
+        ])->assertOk()->json();
+        $this->assertGreaterThan(0, (float) $planQuote['breakdown']['plan_base']);
+        $this->assertGreaterThan(0, (float) $planQuote['breakdown']['extra_modules']);
+
+        $this->postJson('/api/catalog/law/quote', [
+            'product_code' => 'law', 'selection_mode' => 'modules', 'cycle' => 'monthly',
+            'items' => [['module_code' => 'contatos-advocacia', 'quantity' => 1], ['module_code' => 'processos-advocacia', 'quantity' => 1]],
+        ])->assertUnprocessable();
+    }
+
     public function test_publication_refuses_active_plan_without_modules(): void
     {
         $admin = $this->admin();

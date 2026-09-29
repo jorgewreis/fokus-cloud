@@ -30,6 +30,7 @@
           .then((data) => {
             message.textContent = 'E-mail confirmado. Redirecionando para continuar...';
             resend.hidden = true;
+            if (data.offer_intent) localStorage.setItem('fokus-law-offer-v1', JSON.stringify(data.offer_intent));
             setTimeout(() => { location.assign(data.return_to || '/portal'); }, 900);
           })
           .catch((error) => { message.textContent = error.message; });

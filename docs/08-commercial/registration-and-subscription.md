@@ -62,14 +62,24 @@ reutilizados.
 Após o cadastro, o sistema envia um link de confirmação ao e-mail profissional
 do administrador. O link expira em 24 horas.
 
-Enquanto o e-mail não estiver confirmado, a escolha de módulos, planos e
-assinatura fica bloqueada. Depois da confirmação, o sistema cria ou mantém a
-sessão autenticada e direciona o administrador automaticamente à escolha da
-assinatura, sem exigir novo login.
+Enquanto o e-mail não estiver confirmado, o checkout fica bloqueado. A
+composição selecionada na página pública é preservada no navegador; após a
+confirmação, o sistema mantém a sessão e direciona à revisão da contratação.
+O servidor recota catálogo e preço antes de abrir o checkout. Se a composição
+já não estiver disponível, a pessoa retorna à página de ofertas atuais.
 
 A escolha deve carregar exclusivamente a versão publicada e comercializável do
-catálogo. O cliente pode selecionar um plano sugerido, ajustar limites
-permitidos ou montar uma oferta personalizada com funcionalidades compatíveis.
+catálogo. O cliente pode selecionar um plano, adicionar módulos extras
+comercializáveis de forma avulsa, ajustar limites discretos publicados ou
+montar uma composição avulsa com módulos autorizados. Um módulo já incluído no
+plano não é cobrado novamente. A página de revisão recota a composição no
+servidor e o checkout recalcula novamente antes de persistir a assinatura.
+
+O Fokus Law possui as rotas públicas `/produtos/fokus-law` para a narrativa de
+vendas e `/produtos/fokus-law/planos` para comparação e personalização. A home
+do Fokus Cloud exibe o menor preço mensal somente quando houver uma oferta
+publicada. Sem catálogo vigente, páginas e API informam indisponibilidade e não
+apresentam valores sugeridos como preços atuais.
 
 As regras de billing, status, recorrência, inadimplência, reembolso e
 conciliação com o Mercado Pago estão definidas em [Billing e conciliação com
@@ -122,6 +132,10 @@ continua sendo atualizada separadamente pelas mudanças operacionais do contrato
 - O valor exibido na revisão é recalculado no servidor a partir do catálogo,
   ciclo, plano, módulos e limites selecionados; valores vindos do navegador não
   são aceitos como preço.
+- O catálogo público oferece `POST /api/catalog/law/quote`, sem efeitos
+  colaterais, com detalhamento do plano-base, módulos adicionais, ajustes de
+  capacidade e versão cotada. O limite acima da maior faixa abre solicitação
+  comercial rastreável em `/backoffice/interesses`.
 - A assinatura e o pagamento só são persistidos depois que o checkout ou
   `preapproval` do Mercado Pago é criado.
 - A confirmação depende de webhook assinado e idempotente ou conciliação

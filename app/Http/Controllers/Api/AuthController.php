@@ -125,8 +125,10 @@ class AuthController extends Controller
         $this->sendToken($user, 'email_verification', '/verificar-email', [
             'company_id' => $companyId,
             'return_to' => $data['return_to'] ?? '/portal',
+            'offer_intent' => $data['offer_intent'] ?? null,
         ]);
         $this->authenticateIntoSession($request, $user, $companyId);
+        if (! empty($data['offer_intent'])) $request->session()->put('law_offer_intent', $data['offer_intent']);
 
         return response()->json([
             'message' => 'Cadastro criado. Confirme seu e-mail antes de escolher a assinatura.',
@@ -404,20 +406,21 @@ class AuthController extends Controller
         $companyId = ! empty($payload['company_id']) ? $payload['company_id'] : $this->firstCompanyId($user);
         $this->authenticateIntoSession($request, $user, $companyId);
         $returnTo = data_get($payload, 'return_to', '/portal');
-        if (! in_array($returnTo, ['/portal', '/portal/fokus-law', '/assinaturas/fokus-law', '/assinaturas/fokus-lead'], true)) {
+        if (! in_array($returnTo, ['/portal', '/portal/fokus-law', '/portal/fokus-law/assinatura', '/contratar/fokus-law', '/assinaturas/fokus-law', '/assinaturas/fokus-lead'], true)) {
             $returnTo = '/portal';
         }
-        return response()->json(['message' => 'E-mail confirmado com sucesso.', 'return_to' => $returnTo]);
+        return response()->json(['message' => 'E-mail confirmado com sucesso.', 'return_to' => $returnTo, 'offer_intent' => $payload['offer_intent'] ?? null]);
     }
 
     public function resendVerification(Request $request)
     {
         $returnTo = $request->validate([
-            'return_to' => ['nullable', Rule::in(['/portal', '/portal/fokus-law'])],
+            'return_to' => ['nullable', Rule::in(['/portal', '/portal/fokus-law', '/portal/fokus-law/assinatura', '/contratar/fokus-law'])],
         ])['return_to'] ?? '/portal';
         $this->sendToken($request->user(), 'email_verification', '/verificar-email', [
             'company_id' => $request->session()->get('active_company_id'),
             'return_to' => $returnTo,
+            'offer_intent' => $request->session()->get('law_offer_intent'),
         ]);
         return response()->json(['message' => 'Enviamos um novo link de confirmação.']);
     }
@@ -663,7 +666,18 @@ class AuthController extends Controller
             'legal_name' => ['required', 'string', 'max:255'],
             'terms_version' => ['required', 'string', 'max:64'],
             'privacy_version' => ['required', 'string', 'max:64'],
-            'return_to' => ['nullable', Rule::in(['/assinaturas/fokus-law', '/assinaturas/fokus-lead'])],
+            'return_to' => ['nullable', Rule::in(['/contratar/fokus-law', '/portal/fokus-law/assinatura', '/assinaturas/fokus-law', '/assinaturas/fokus-lead'])],
+            'offer_intent' => ['nullable', 'array'],
+            'offer_intent.selection_mode' => ['required_with:offer_intent', Rule::in(['modules', 'plan'])],
+            'offer_intent.plan_code' => ['nullable', 'string', 'max:64'],
+            'offer_intent.cycle' => ['required_with:offer_intent', Rule::in(['monthly', 'annual'])],
+            'offer_intent.items' => ['required_with:offer_intent', 'array', 'min:1', 'max:40'],
+            'offer_intent.items.*.module_code' => ['required', 'string', 'max:64'],
+            'offer_intent.items.*.quantity' => ['nullable', 'integer', 'min:1', 'max:1000'],
+            'offer_intent.items.*.personalizations' => ['nullable', 'array', 'max:20'],
+            'offer_intent.items.*.personalizations.*.type_code' => ['required', 'string', 'max:64'],
+            'offer_intent.items.*.personalizations.*.tier_value' => ['required', 'integer', 'min:1'],
+            'offer_intent.quote_version' => ['nullable', 'integer', 'min:0'],
         ];
         if ($newUser) {
             $rules += ['name' => ['required', 'string', 'max:255'], 'cpf' => ['required', 'string'], 'email' => ['required', 'email:rfc', 'max:255'], 'password' => ['required', 'string', 'min:12']];

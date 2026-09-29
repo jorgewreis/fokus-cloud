@@ -81,6 +81,14 @@ O endpoint publico retorna somente a ultima versao publicada:
 GET /api/catalog/{product}
 ```
 
+Para a simulação pública do Fokus Law, `POST /api/catalog/law/quote` recebe
+somente códigos publicados, ciclo, plano opcional e faixas publicadas. Retorna
+valores mensal/anual, detalhamento de plano-base, módulos extras e ajustes de
+capacidade, além da versão do catálogo. O endpoint não cria dados financeiros
+nem aceita preço enviado pelo navegador. O checkout autenticado recalcula a
+mesma composição e rejeita módulos avulsos não publicados para contratação
+independente.
+
 Contrato `0.1.0`, em forma resumida:
 
 ```json

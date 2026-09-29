@@ -30,6 +30,32 @@ class SubscriptionController extends Controller
         return response()->json($catalog->publicCatalog($productCode));
     }
 
+    public function publicQuote(Request $request, CatalogManager $catalog)
+    {
+        $data = $request->validate([
+            'product_code' => ['required', Rule::in(['law'])],
+            'items' => ['required', 'array', 'min:1', 'max:40'],
+            'items.*.module_code' => ['required', 'string', 'max:64'],
+            'items.*.quantity' => ['nullable', 'integer', 'min:1', 'max:1000'],
+            'items.*.personalizations' => ['nullable', 'array'],
+            'items.*.personalizations.*.type_code' => ['required', 'string', 'max:64'],
+            'items.*.personalizations.*.tier_value' => ['required', 'integer', 'min:1'],
+            'cycle' => ['required', Rule::in(['monthly', 'annual'])],
+            'selection_mode' => ['required', Rule::in(['modules', 'plan'])],
+            'plan_code' => ['nullable', 'required_if:selection_mode,plan', 'string', 'max:64'],
+        ]);
+        $product = DB::table('products')->where('code', 'law')->where('active', true)->where('status', 'ativo')->first();
+        abort_unless($product, 404, 'Produto não encontrado.');
+        $quote = $this->quote($product, $data, $catalog);
+        return response()->json([
+            'product_code' => 'law', 'cycle' => $data['cycle'], 'selection_mode' => $data['selection_mode'],
+            'plan_code' => $data['plan_code'] ?? null, 'monthly_amount' => $quote['monthly_amount'],
+            'annual_amount' => CatalogPricing::annualFromMonthly($quote['monthly_amount']),
+            'amount' => $quote['amount'], 'breakdown' => $quote['breakdown'],
+            'publication_versions' => $quote['publication_versions'],
+        ]);
+    }
+
     public function index(Request $request)
     {
         $companyId = $request->attributes->get('active_company_id');
@@ -311,6 +337,7 @@ class SubscriptionController extends Controller
             $commercialSnapshot['base_monthly_amount'] = $quoted['base_monthly_amount'];
             $commercialSnapshot['base_amount'] = $quoted['base_amount'];
             $commercialSnapshot['discount_amount'] = $quoted['discount_amount'];
+            $commercialSnapshot['price_breakdown'] = $quoted['breakdown'];
             DB::table('subscriptions')->where('id', $subscriptionId)->update([
                 'commercial_snapshot' => json_encode([
                     ...$commercialSnapshot,
@@ -551,10 +578,26 @@ class SubscriptionController extends Controller
         if ($data['selection_mode'] === 'plan') {
             $publishedPlan = $publishedPlans[$data['plan_code'] ?? ''] ?? null;
             abort_unless($publishedPlan, 422, 'Plano não encontrado ou indisponível.');
-            abort_unless($this->sameModules($codes, $publishedPlan['module_codes'] ?? []), 422, 'Os módulos não correspondem ao plano informado.');
+            $requiredCodes = $publishedPlan['module_codes'] ?? [];
+            abort_unless(array_diff($requiredCodes, $codes) === [], 422, 'A composição precisa manter todos os módulos incluídos no plano.');
         }
         foreach ($codes as $code) {
             abort_unless($publishedModules->has($code), 422, 'Módulo inválido para este produto.');
+            if ($publishedPlan && ! in_array($code, $publishedPlan['module_codes'] ?? [], true)) {
+                abort_unless((bool) ($publishedModules[$code]['available_standalone'] ?? false), 422, 'Este módulo não está disponível como adicional independente.');
+            } elseif (! $publishedPlan) {
+                abort_unless((bool) ($publishedModules[$code]['available_standalone'] ?? false), 422, 'Este módulo não está disponível como contratação independente.');
+            }
+        }
+        foreach ($data['items'] as $requested) {
+            $moduleCatalog = $publishedModules[$requested['module_code']];
+            abort_if($publishedPlan && in_array($requested['module_code'], $publishedPlan['module_codes'] ?? [], true) && (int) ($requested['quantity'] ?? 1) !== 1, 422, 'Módulos incluídos no plano devem ter quantidade unitária.');
+            foreach (collect($moduleCatalog['dependencies'] ?? [])->pluck('code')->all() as $dependency) {
+                abort_unless(in_array($dependency, $codes, true), 422, 'A composição precisa incluir todos os módulos dependentes.');
+            }
+            foreach (collect($moduleCatalog['incompatibilities'] ?? [])->pluck('code')->all() as $incompatible) {
+                abort_if(in_array($incompatible, $codes, true), 422, 'A composição inclui módulos incompatíveis.');
+            }
         }
 
         $modules = DB::table('modules')->where('product_id', $product->id)->whereIn('code', $codes)->get()->keyBy('code');
@@ -565,22 +608,38 @@ class SubscriptionController extends Controller
             $module = $modules[$requested['module_code']];
             $publishedModule = $publishedModules[$requested['module_code']];
             [$customizationAmount, $selections, $personalizationDelta] = $this->quotePersonalizations($publishedModule, $requested['personalizations'] ?? [], $publishedPlan['personalization_defaults'] ?? []);
+            $quantity = (int) ($requested['quantity'] ?? 1);
             $unit = (float) $publishedModule['monthly_amount'] + $customizationAmount;
-            $monthly += $unit * $requested['quantity'];
-            $items[] = ['module' => $module, 'quantity' => $requested['quantity'], 'unit_price' => $data['cycle'] === 'annual' ? $unit * 10 : $unit, 'conditions' => ['cycle' => $data['cycle'], 'personalizations' => $selections, 'personalization_delta' => $personalizationDelta, 'selection_mode' => $data['selection_mode'], 'plan_code' => $data['plan_code'] ?? null, 'module_code' => $module->module_code, 'context_code' => $module->context_code]];
+            $monthly += $unit * $quantity;
+            $items[] = ['module' => $module, 'quantity' => $quantity, 'unit_price' => $data['cycle'] === 'annual' ? $unit * 10 : $unit, 'conditions' => ['cycle' => $data['cycle'], 'personalizations' => $selections, 'personalization_delta' => $personalizationDelta, 'selection_mode' => $data['selection_mode'], 'plan_code' => $data['plan_code'] ?? null, 'module_code' => $module->module_code, 'catalog_module_code' => $module->code, 'context_code' => $module->context_code]];
         }
-        if ($data['selection_mode'] === 'plan') {
-            $planMonthly = (float) $publishedPlan['monthly_amount'];
-            $monthly = $planMonthly + collect($items)->sum(fn (array $item): float => (float) ($item['conditions']['personalization_delta'] ?? 0));
+        $breakdown = ['plan_base' => 0.0, 'extra_modules' => 0.0, 'capacity_adjustments' => 0.0];
+        if ($publishedPlan) {
+            $included = $publishedPlan['module_codes'] ?? [];
+            $breakdown['plan_base'] = (float) $publishedPlan['monthly_amount'];
+            $includedCount = max(1, count($included));
             foreach ($items as &$item) {
-                $item['unit_price'] *= 0.9;
+                $isIncluded = in_array($item['module']->code, $included, true);
+                if (! $isIncluded) {
+                    $breakdown['extra_modules'] += ((float) $item['unit_price'] / ($data['cycle'] === 'annual' ? 10 : 1)) * $item['quantity'];
+                } else {
+                    $delta = (float) ($item['conditions']['personalization_delta'] ?? 0);
+                    $breakdown['capacity_adjustments'] += $delta;
+                    $unitMonthly = ($breakdown['plan_base'] / $includedCount) + $delta;
+                    $item['unit_price'] = $data['cycle'] === 'annual' ? $unitMonthly * 10 : $unitMonthly;
+                }
             }
+            unset($item);
+            $monthly = $breakdown['plan_base'] + $breakdown['extra_modules'] + $breakdown['capacity_adjustments'];
+        } else {
+            $breakdown['extra_modules'] = round($monthly, 2);
         }
         $amount = $data['cycle'] === 'annual' ? CatalogPricing::annualFromMonthly($monthly) : round($monthly, 2);
         return [
             'items' => $items,
             'amount' => $amount,
             'monthly_amount' => round($monthly, 2),
+            'breakdown' => array_map(fn ($value) => round((float) $value, 2), $breakdown),
             'publication_versions' => [
                 'product_catalog_version' => (int) ($publishedCatalog['published_version'] ?? 0),
                 'plan_version' => isset($publishedPlan) ? (int) ($publishedPlan['published_version'] ?? 0) : null,
@@ -632,13 +691,6 @@ class SubscriptionController extends Controller
         abort_if($voucher->redemption_limit && $total >= $voucher->redemption_limit, 422, 'Voucher atingiu o limite de uso.');
         abort_if($voucher->redemption_limit_per_company && $companyTotal >= $voucher->redemption_limit_per_company, 422, 'Voucher já atingiu o limite para esta empresa.');
         return $voucher;
-    }
-
-    private function sameModules(array $actual, array $expected): bool
-    {
-        sort($actual);
-        sort($expected);
-        return $actual === $expected;
     }
 
     private function jsonArray(?string $value): array

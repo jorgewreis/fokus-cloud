@@ -102,6 +102,29 @@ class VoucherRedemptionTest extends TestCase
         $this->assertNotNull($snapshot['benefit_ends_at']);
     }
 
+    public function test_checkout_accepts_plan_with_published_extra_and_snapshots_exact_composition(): void
+    {
+        [$user, $companyId] = $this->customerContext();
+        Http::fake(['https://api.mercadopago.com/preapproval' => Http::response(['id' => 'preapproval-plan-extra', 'init_point' => 'https://mercadopago.test/checkout'], 201)]);
+        $items = [
+            ['module_code' => 'processos-advocacia', 'quantity' => 1],
+            ['module_code' => 'contatos-advocacia', 'quantity' => 1],
+            ['module_code' => 'tarefas-advocacia', 'quantity' => 1],
+            ['module_code' => 'audiencias-advocacia', 'quantity' => 1],
+        ];
+        $payload = ['product_code' => 'law', 'items' => $items, 'cycle' => 'monthly', 'selection_mode' => 'plan', 'plan_code' => 'law-advocacia'];
+        $quote = $this->postJson('/api/catalog/law/quote', $payload)->assertOk()->json();
+        $result = $this->actingAs($user)->withSession(['active_company_id' => $companyId])->postJson('/api/subscriptions/checkout', $payload)->assertCreated();
+
+        $subscriptionId = $result->json('subscription_id');
+        $snapshot = json_decode((string) DB::table('subscriptions')->where('id', $subscriptionId)->value('commercial_snapshot'), true);
+        $this->assertEquals($quote['amount'], (float) $result->json('amount'));
+        $this->assertEquals($quote['breakdown'], $snapshot['price_breakdown']);
+        $this->assertCount(4, $snapshot['items']);
+        $this->assertEqualsWithDelta($quote['amount'], collect($snapshot['items'])->sum(fn (array $item) => $item['unit_price'] * $item['quantity']), 0.01);
+        $this->assertSame('law-advocacia', $snapshot['plan_code']);
+    }
+
     public function test_failed_gateway_checkout_releases_the_voucher_reservation_without_persisting_commercial_data(): void
     {
         [$user, $companyId] = $this->customerContext();

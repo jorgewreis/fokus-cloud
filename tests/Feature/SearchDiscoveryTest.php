@@ -11,7 +11,7 @@ class SearchDiscoveryTest extends TestCase
         foreach (['www.fokuscloud.com.br', 'styles.fokuscloud.com.br'] as $host) {
             $response = $this->get("https://{$host}/sitemap.xml")->assertOk();
             $xml = simplexml_load_string($response->getContent());
-            $this->assertCount($host === 'styles.fokuscloud.com.br' ? 6 : 6, $xml->url);
+            $this->assertCount($host === 'styles.fokuscloud.com.br' ? 6 : 7, $xml->url);
             foreach ($xml->url as $page) {
                 $this->assertSame($host, parse_url((string) $page->loc, PHP_URL_HOST));
                 $this->get((string) $page->loc)->assertOk()->assertHeaderMissing('X-Robots-Tag');

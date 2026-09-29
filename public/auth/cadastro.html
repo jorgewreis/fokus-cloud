@@ -73,6 +73,7 @@
       const adminCpf = document.querySelector('#admin-cpf');
       const form = document.querySelector('#register-form');
       const feedback = document.querySelector('#feedback');
+      const returnTo = new URLSearchParams(location.search).get('return_to') === '/contratar/fokus-law' ? '/contratar/fokus-law' : undefined;
 
       const digits = (value) => value.replace(/\D/g, '');
       const repeatedDigits = (value) => /^(\d)\1+$/.test(value);
@@ -133,12 +134,14 @@
         const cpfValid = validateDocument(adminCpf, 'cpf', '#admin-cpf-error');
         if (!companyValid || !cpfValid) return;
         const values = Object.fromEntries(new FormData(event.currentTarget));
+        let offerIntent = null;
+        if (returnTo) { try { offerIntent = JSON.parse(localStorage.getItem('fokus-law-offer-v1') || 'null'); } catch {} }
         try {
           await FokusApi.request('/auth/register-company', {
             method: 'POST',
-            body: { ...values, terms_version: '1.0', privacy_version: '1.0' },
+            body: { ...values, ...(returnTo ? { return_to: returnTo, offer_intent: offerIntent } : {}), terms_version: '1.0', privacy_version: '1.0' },
           });
-          location.href = '/verificar-email';
+          location.href = returnTo ? `/verificar-email?return_to=${encodeURIComponent(returnTo)}` : '/verificar-email';
         } catch (error) {
           feedback.textContent = error.message;
         }

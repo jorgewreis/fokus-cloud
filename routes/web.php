@@ -124,6 +124,8 @@ Route::get('/backoffice/{page?}', $serveBackofficeShell)
 Route::get('/produtos', fn () => response()->file(public_path('marketing/products/index.html')));
 Route::get('/produtos/fokus-styles', fn () => response()->file(public_path('marketing/products/fokus-styles.html')));
 Route::get('/produtos/fokus-law', fn () => response()->file(public_path('marketing/products/fokus-law.html')));
+Route::get('/produtos/fokus-law/planos', fn () => response()->file(public_path('marketing/products/fokus-law-planos.html')));
+Route::get('/contratar/fokus-law', fn () => response()->file(public_path('auth/contratar-fokus-law.html')));
 Route::get('/produtos/fokus-lead', fn () => response()->file(public_path('marketing/products/fokus-lead.html')));
 Route::get('/privacidade', fn () => response()->file(public_path('marketing/privacy.html')));
 

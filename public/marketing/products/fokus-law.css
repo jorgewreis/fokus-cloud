@@ -31,3 +31,8 @@
 
 .law-support-access[hidden]{display:none}
 .law-login-card .law-password-recovery{display:block;width:fit-content;margin:.15rem 0 .35rem}
+.law-story-reveal{opacity:0;transform:translateY(28px);transition:opacity .75s ease,transform .75s cubic-bezier(.2,.65,.25,1)}
+.law-story-reveal.law-story-visible{opacity:1;transform:translateY(0)}
+.law-contact-visual[data-parallax-scene] .law-contact-number,.law-contact-visual[data-parallax-scene] .law-contact-stamp{transform:translateY(var(--law-scene-shift,0));will-change:transform}
+.law-contact-visual[data-parallax-scene] .law-contact-stamp{transform:translateY(var(--law-stamp-shift,0))}
+@media(prefers-reduced-motion:reduce){.law-story-reveal{opacity:1;transform:none;transition:none}.law-contact-visual[data-parallax-scene] .law-contact-number,.law-contact-visual[data-parallax-scene] .law-contact-stamp{transform:none;will-change:auto}}
