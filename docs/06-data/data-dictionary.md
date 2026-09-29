@@ -57,7 +57,8 @@ Este arquivo deve descrever tabelas, colunas, tipos, obrigatoriedade e significa
 | law_contact_tags | normalized_name | string | Sim | Nome normalizado e único por empresa para sugestão/reuso. |
 | law_contact_activity | activity_type | string | Sim | Ação recente do usuário sem armazenar o termo de busca. |
 | law_contact_sharing_policies | recipient_company_id | string | Sim | Empresa que recebe uma referência somente leitura. |
-| law_contact_sharing_policies | classification_codes | json | Sim | Classificações que ativam compartilhamento para contatos atuais e futuros. |
+| law_contact_sharing_policies | legal_natures | json | Sim | Naturezas PF/PJ disponibilizadas pelo lado da empresa; acordo só ativa com política recíproca. |
+| law_contact_sharing_policies | profession_names | json | Sim | Profissões vinculadas a contatos PF permitidas nesse lado do acordo bilateral. |
 | law_contact_sharing_policies | shared_fields | json | Sim | Campos expostos: canais profissionais, endereço comercial e, opcionalmente, documentos. |
 | law_case_contacts | case_role | enum | Sim | Papel do contato no processo: autor, reu, vitima, testemunha, advogado, defensor, promotor, representante, interessado, orgao de origem ou outro. |
 | law_expedition_contacts | expedition_role | enum | Sim | Papel do contato na expedicao: destinatario, orgao de destino, unidade externa, responsavel por recebimento, copia ou outro. |

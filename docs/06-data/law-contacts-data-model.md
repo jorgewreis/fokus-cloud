@@ -88,11 +88,14 @@ de resultado de busca. O termo digitado na busca não é persistido.
 
 ### `law_contact_sharing_policies`
 
-Regra entre `source_company_id` e `recipient_company_id`, única por par de
-empresas. `classification_codes` e `shared_fields` são JSON validados contra
-vocabulários fechados; `is_active` permite revogação sem apagar auditoria. A
-regra só é elegível enquanto ambas as assinaturas estiverem ativas e incluírem
-o componente Contatos.
+Regra de saída entre `source_company_id` e `recipient_company_id`, única por
+par de empresas. O compartilhamento exige políticas ativas nos dois sentidos:
+cada empresa configura e pode revogar o próprio lado do acordo. `legal_natures`
+define PF/PJ e `profession_names` limita as pessoas físicas às profissões
+selecionadas e vinculadas a contatos da origem. `shared_fields` define os
+campos adicionais expostos. `is_active` permite revogação sem apagar auditoria.
+O compartilhamento fica desativado por padrão e só vale enquanto ambas as
+assinaturas incluírem o componente Contatos.
 
 Campos compartilháveis: `professional_channels`, `business_addresses` e
 `documents`. A API remove canais pessoais, endereços residenciais, notas,

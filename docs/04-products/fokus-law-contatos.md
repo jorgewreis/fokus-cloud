@@ -27,7 +27,8 @@ Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
   logradouro, bairro, município e UF quando retornados; o usuário pode concluir
   manualmente quando a consulta não localizar o CEP ou estiver indisponível.
 - Tags reutilizáveis pela empresa, com sugestão e filtro.
-- Regras de compartilhamento entre empresas por destinatário e classificações.
+- Acordos bilaterais de compartilhamento, definidos por natureza (PF/PJ),
+  profissões atribuídas a contatos PF e campos autorizados.
 - Endpoints próprios preparados para vínculos futuros com Processos,
   Expedições e Tarefas; esses módulos não são pré-requisito para o cadastro.
 
@@ -40,7 +41,7 @@ Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
 | Criar/editar | Formulário guiado por PF/PJ, profissões cadastradas ou novas, sigla e empresas/pessoas vinculadas, canais, endereços, departamentos, tags e campos sensíveis autorizados. |
 | Detalhes | Identificação e sigla, profissões, empresas vinculadas em linhas completas na PF, total de pessoas vinculadas na PJ, tags, canais, card de endereços em meia largura com cada endereço em uma linha completa do card, documentos e departamentos conforme a natureza e as permissões. |
 | Mesclagem | Escolha do cadastro preservado, confirmação do motivo, transferência de relações e auditoria. |
-| Compartilhamento | Seleção de empresas elegíveis, classificações e campos expostos; gravação e revogação auditadas. |
+| Compartilhamento | Configuração bilateral por empresa, natureza, profissão de PF e campos expostos; adesão e revogação auditadas. |
 | Estados da página | Carregamento, vazio, sem resultados, erro de API, capacidade indisponível e aviso de limite. |
 
 ## Composição visual
@@ -126,13 +127,20 @@ contagem vigente. A criação é recusada ao exceder o limite contratado.
 
 ## Compartilhamento entre empresas
 
-O administrador da origem define uma política para uma empresa destinatária
-e seleciona uma ou mais classificações. A política vale para contatos atuais
-e futuros que tenham a classificação selecionada, salvo quando o próprio
-contato estiver marcado para exclusão do compartilhamento. Só empresas ativas
-com assinatura ativa e componente Contatos publicado podem ser destinatárias.
+Por padrão, nenhuma empresa acessa contatos de outra. O compartilhamento exige
+que as duas empresas configurem e mantenham políticas recíprocas. Cada empresa
+define o próprio escopo de saída; a relação só fica ativa quando as duas partes
+aderem e ambas têm assinatura ativa com o componente Contatos publicado.
 
-O destino consulta uma referência somente leitura; não recebe cópia, não
+Cada escopo pode incluir pessoas jurídicas, pessoas físicas ou ambas. Para
+pessoas físicas, é obrigatório selecionar profissões vinculadas a pelo menos
+um contato da empresa. Assim, a empresa pode compartilhar, por exemplo,
+somente pessoas físicas com profissão “Policial Civil” e também selecionar
+pessoas jurídicas. O acordo vale para contatos atuais e futuros que atendam
+ao escopo, salvo quando o contato estiver marcado para exclusão.
+
+Cada parte controla somente os dados que sua empresa disponibiliza. O destino
+consulta uma referência somente leitura; não recebe cópia, não
 consome sua capacidade e não ganha acesso ao histórico, tags, notas ou vínculos
 da origem. Por padrão, a origem pode expor canais profissionais/institucionais;
 endereços comerciais e documentos são campos opcionais da regra. Documentos

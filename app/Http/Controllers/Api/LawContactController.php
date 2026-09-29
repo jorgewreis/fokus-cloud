@@ -93,6 +93,15 @@ class LawContactController extends Controller
             array_push($contacts, ...$this->sharedContacts($companyId, $query, $status, $nature, $classification, $profession, $tag, $canSensitive));
         }
         usort($contacts, fn (array $a, array $b): int => strcasecmp($a['display_name'], $b['display_name']));
+        $filterProfessions = collect($this->assignedProfessionOptions($companyId))
+            ->mapWithKeys(fn (array $option) => [$option['value'] => ['name' => $option['label'], 'normalized_name' => $option['value']]]);
+        foreach ($contacts as $contact) {
+            if (! ($contact['is_shared'] ?? false)) continue;
+            foreach ($contact['professions'] ?? [] as $name) {
+                $normalized = mb_strtolower(trim((string) $name));
+                if ($normalized !== '') $filterProfessions->put($normalized, ['name' => (string) $name, 'normalized_name' => $normalized]);
+            }
+        }
         $page = max(1, (int) $request->query('page', 1));
         $perPage = min(100, max(10, (int) $request->query('per_page', 25)));
         $total = count($contacts);
@@ -103,7 +112,7 @@ class LawContactController extends Controller
             'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total],
             'classifications' => $this->classificationLabels(),
             'professions' => DB::table('law_contact_professions')->where('company_id', $companyId)->orderBy('name')->pluck('name'),
-            'filter_professions' => DB::table('law_contact_professions as profession')->join('law_contact_profession_assignments as assignment', 'assignment.profession_id', '=', 'profession.id')->join('law_contacts as contact', 'contact.id', '=', 'assignment.law_contact_id')->where('profession.company_id', $companyId)->where('assignment.company_id', $companyId)->where('contact.company_id', $companyId)->whereNull('contact.deleted_at')->whereNull('contact.merged_into_id')->distinct()->orderBy('profession.name')->get(['profession.name', 'profession.normalized_name']),
+            'filter_professions' => $filterProfessions->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values()->all(),
             'relationship_options' => DB::table('law_contacts')->where('company_id', $companyId)->where('status', 'ativo')->whereNull('deleted_at')->whereNull('merged_into_id')->orderBy('display_name')->get(['id', 'display_name', 'acronym', 'legal_nature'])->map(fn ($row) => ['id' => (string) $row->id, 'display_name' => (string) $row->display_name, 'acronym' => $row->acronym, 'legal_nature' => (string) $row->legal_nature])->all(),
             'tags' => DB::table('law_contact_tags')->where('company_id', $companyId)->orderBy('name')->pluck('name'),
             'summary' => $this->summary($companyId, $usage),
@@ -282,10 +291,24 @@ class LawContactController extends Controller
         $this->assertModuleEnabled($companyId);
         $companies = $this->eligibleCompanies($companyId);
         $policies = DB::table('law_contact_sharing_policies')->where('source_company_id', $companyId)->orderBy('recipient_company_id')->get();
+        $incoming = DB::table('law_contact_sharing_policies')->where('recipient_company_id', $companyId)->get()->keyBy('source_company_id');
+        $professions = $this->assignedProfessionOptions($companyId);
+
         return response()->json([
-            'companies' => $companies,
-            'policies' => $policies->map(fn ($policy) => ['id' => $policy->id, 'recipient_company_id' => $policy->recipient_company_id, 'classification_codes' => json_decode($policy->classification_codes, true) ?: [], 'shared_fields' => json_decode($policy->shared_fields, true) ?: [], 'is_active' => (bool) $policy->is_active]),
-            'classifications' => $this->classificationLabels(),
+            'companies' => array_map(function (array $company) use ($incoming): array {
+                $agreement = $incoming->get($company['id']);
+                return $company + ['incoming_agreement' => (bool) ($agreement?->is_active ?? false)];
+            }, $companies),
+            'policies' => $policies->map(fn ($policy) => [
+                'id' => $policy->id,
+                'recipient_company_id' => $policy->recipient_company_id,
+                'legal_natures' => json_decode($policy->legal_natures ?: '[]', true) ?: [],
+                'profession_names' => json_decode($policy->profession_names ?: '[]', true) ?: [],
+                'shared_fields' => json_decode($policy->shared_fields, true) ?: [],
+                'is_active' => (bool) $policy->is_active,
+            ]),
+            'professions' => $professions,
+            'agreement_required' => true,
             'share_fields' => ['professional_channels' => 'Telefones e e-mails profissionais/institucionais', 'business_addresses' => 'Endereços comerciais/institucionais', 'documents' => 'Documentos (exige permissão sensível no destino)'],
         ]);
     }
@@ -297,13 +320,22 @@ class LawContactController extends Controller
         $data = $request->validate([
             'policies' => ['present', 'array', 'max:50'],
             'policies.*.recipient_company_id' => ['required', 'string', 'size:30', 'distinct'],
-            'policies.*.classification_codes' => ['required', 'array', 'min:1'],
-            'policies.*.classification_codes.*' => ['required', 'string', 'distinct', Rule::in(self::CLASSIFICATIONS)],
+            'policies.*.legal_natures' => ['required', 'array', 'min:1'],
+            'policies.*.legal_natures.*' => ['required', 'string', 'distinct', Rule::in(['pf', 'pj'])],
+            'policies.*.profession_names' => ['sometimes', 'array', 'max:50'],
+            'policies.*.profession_names.*' => ['required', 'string', 'distinct', 'min:2', 'max:100'],
             'policies.*.shared_fields' => ['nullable', 'array'],
             'policies.*.shared_fields.*' => ['required', 'string', 'distinct', Rule::in(self::SHARE_FIELDS)],
         ]);
         $eligible = collect($this->eligibleCompanies($companyId))->pluck('id')->all();
         abort_if(array_diff(array_column($data['policies'], 'recipient_company_id'), $eligible), 422, 'A empresa destinatária precisa ter uma assinatura ativa com Contatos habilitado.');
+        $availableProfessions = collect($this->assignedProfessionOptions($companyId))->pluck('value')->all();
+        foreach ($data['policies'] as $policy) {
+            $selectedProfessions = array_map(fn ($name) => mb_strtolower(trim($name)), $policy['profession_names'] ?? []);
+            abort_if(in_array('pf', $policy['legal_natures'], true) && $selectedProfessions === [], 422, 'Selecione ao menos uma profissão vinculada a um contato para compartilhar pessoas físicas.');
+            abort_if(! in_array('pf', $policy['legal_natures'], true) && $selectedProfessions !== [], 422, 'As profissões só se aplicam ao compartilhamento de pessoas físicas.');
+            abort_if(array_diff($selectedProfessions, $availableProfessions), 422, 'As profissões precisam estar vinculadas a pelo menos um contato da empresa.');
+        }
         $actor = (string) $request->user()->id;
         DB::transaction(function () use ($companyId, $data, $actor, $request, $audit): void {
             $submitted = [];
@@ -311,14 +343,17 @@ class LawContactController extends Controller
                 $recipient = $policy['recipient_company_id'];
                 $submitted[] = $recipient;
                 $old = DB::table('law_contact_sharing_policies')->where('source_company_id', $companyId)->where('recipient_company_id', $recipient)->first();
+                $professionNames = array_values(array_unique(array_map(fn ($name) => mb_strtolower(trim($name)), $policy['profession_names'] ?? [])));
                 $values = [
-                    'classification_codes' => json_encode(array_values($policy['classification_codes'])),
-                    'shared_fields' => json_encode(array_values($policy['shared_fields'] ?? ['professional_channels'])),
+                    'classification_codes' => json_encode([]),
+                    'legal_natures' => json_encode(array_values($policy['legal_natures'])),
+                    'profession_names' => json_encode($professionNames),
+                    'shared_fields' => json_encode(array_values($policy['shared_fields'] ?? [])),
                     'is_active' => true, 'updated_by' => $actor, 'updated_at' => now(),
                 ];
                 if ($old) DB::table('law_contact_sharing_policies')->where('id', $old->id)->update($values);
                 else DB::table('law_contact_sharing_policies')->insert($values + ['id' => PrefixedUlid::make('LSH'), 'source_company_id' => $companyId, 'recipient_company_id' => $recipient, 'created_by' => $actor, 'created_at' => now()]);
-                $audit->company($companyId, $actor, 'law_contact_sharing_policy', $old?->id ?: $recipient, $old ? 'update' : 'create', null, ['recipient_company_id' => $recipient, 'classification_codes' => $policy['classification_codes'], 'shared_fields' => $policy['shared_fields'] ?? ['professional_channels']], request: $request);
+                $audit->company($companyId, $actor, 'law_contact_sharing_policy', $old?->id ?: $recipient, $old ? 'update' : 'create', null, ['recipient_company_id' => $recipient, 'legal_natures' => $policy['legal_natures'], 'profession_names' => $professionNames, 'shared_fields' => $policy['shared_fields'] ?? []], request: $request);
             }
             $removed = DB::table('law_contact_sharing_policies')->where('source_company_id', $companyId)->when($submitted, fn ($query) => $query->whereNotIn('recipient_company_id', $submitted))->when(! $submitted, fn ($query) => $query)->get();
             foreach ($removed as $policy) {
@@ -665,12 +700,12 @@ class LawContactController extends Controller
         $policies = DB::table('law_contact_sharing_policies')->where('recipient_company_id', $recipientCompanyId)->where('is_active', true)->get();
         $out = [];
         foreach ($policies as $policy) {
-            if (! $this->moduleEnabled($policy->source_company_id)) continue;
-            $codes = json_decode($policy->classification_codes, true) ?: [];
+            if (! $this->moduleEnabled($policy->source_company_id) || ! $this->hasBilateralSharingAgreement($policy)) continue;
             $fields = json_decode($policy->shared_fields, true) ?: [];
             $rows = DB::table('law_contacts')->where('company_id', $policy->source_company_id)->whereNull('deleted_at')->whereNull('merged_into_id')->where('status', $status === 'inativo' ? 'inativo' : 'ativo')->where('sharing_excluded', false)
                 ->when(in_array($nature, ['pf', 'pj'], true), fn ($builder) => $builder->where('legal_nature', $nature))
-                ->whereExists(fn ($sub) => $sub->from('law_contact_classifications')->whereColumn('law_contact_classifications.law_contact_id', 'law_contacts.id')->whereIn('classification_code', $codes)->when($classification, fn ($q) => $q->where('classification_code', $classification)))
+                ->when($classification && in_array($classification, self::CLASSIFICATIONS, true), fn ($builder) => $builder->whereExists(fn ($sub) => $sub->from('law_contact_classifications')->whereColumn('law_contact_classifications.law_contact_id', 'law_contacts.id')->where('classification_code', $classification)))
+                ->where(fn ($builder) => $this->applySharingScope($builder, $policy))
                 ->when($profession !== '', fn ($builder) => $builder->whereExists(fn ($sub) => $sub->from('law_contact_profession_assignments as assignment')->join('law_contact_professions as profession', 'profession.id', '=', 'assignment.profession_id')->whereColumn('assignment.law_contact_id', 'law_contacts.id')->whereColumn('assignment.company_id', 'law_contacts.company_id')->whereColumn('profession.company_id', 'assignment.company_id')->where('profession.normalized_name', $profession)))
                 ->when($query !== '', fn ($builder) => $builder->where(fn ($q) => $q->where('display_name', 'like', '%'.$this->like($query).'%')->orWhere('legal_name', 'like', '%'.$this->like($query).'%')))
                 ->orderBy('display_name')->limit(100)->get();
@@ -699,10 +734,9 @@ class LawContactController extends Controller
     {
         $policies = DB::table('law_contact_sharing_policies')->where('recipient_company_id', $recipientCompanyId)->where('is_active', true)->get();
         foreach ($policies as $policy) {
-            if (! $this->moduleEnabled($policy->source_company_id)) continue;
-            $codes = json_decode($policy->classification_codes, true) ?: [];
+            if (! $this->moduleEnabled($policy->source_company_id) || ! $this->hasBilateralSharingAgreement($policy)) continue;
             $contact = DB::table('law_contacts')->where('id', $contactId)->where('company_id', $policy->source_company_id)->whereNull('deleted_at')->whereNull('merged_into_id')->where('status', 'ativo')->where('sharing_excluded', false)
-                ->whereExists(fn ($sub) => $sub->from('law_contact_classifications')->whereColumn('law_contact_classifications.law_contact_id', 'law_contacts.id')->whereIn('classification_code', $codes))->first();
+                ->where(fn ($builder) => $this->applySharingScope($builder, $policy))->first();
             if (! $contact) continue;
             $payload = $this->contactPayload($policy->source_company_id, $contact, $canSensitive);
             $fields = json_decode($policy->shared_fields, true) ?: [];
@@ -727,6 +761,60 @@ class LawContactController extends Controller
             ->where('company.id', '!=', $sourceCompanyId)->where('company.status', 'ativa')->whereNull('company.deleted_at')->where('subscription.status', 'ativa')->whereIn('product.code', ['law', 'fokus-law'])->whereNull('item.deleted_at')
             ->where('module.status', 'ativo')->where('module.publication_state', 'publicado')->where(fn ($q) => $q->where('module.module_code', 'contatos')->orWhere('module.code', 'contatos'))
             ->select('company.id', DB::raw('COALESCE(company.display_name, company.legal_name) as name'))->distinct()->orderBy('name')->get()->map(fn ($company) => ['id' => (string) $company->id, 'name' => (string) $company->name])->all();
+    }
+
+    private function assignedProfessionOptions(string $companyId): array
+    {
+        return DB::table('law_contact_professions as profession')
+            ->join('law_contact_profession_assignments as assignment', 'assignment.profession_id', '=', 'profession.id')
+            ->join('law_contacts as contact', 'contact.id', '=', 'assignment.law_contact_id')
+            ->where('profession.company_id', $companyId)->where('assignment.company_id', $companyId)->where('contact.company_id', $companyId)
+            ->whereNull('contact.deleted_at')->whereNull('contact.merged_into_id')
+            ->distinct()->orderBy('profession.name')->get(['profession.name as label', 'profession.normalized_name as value'])
+            ->map(fn ($profession) => ['label' => (string) $profession->label, 'value' => (string) $profession->value])->all();
+    }
+
+    private function hasBilateralSharingAgreement(object $policy): bool
+    {
+        if (! (bool) $policy->is_active || ! $this->sharingPolicyHasScope($policy)) return false;
+
+        $reciprocal = DB::table('law_contact_sharing_policies')
+            ->where('source_company_id', $policy->recipient_company_id)
+            ->where('recipient_company_id', $policy->source_company_id)
+            ->where('is_active', true)->first();
+
+        return $reciprocal !== null && $this->sharingPolicyHasScope($reciprocal);
+    }
+
+    private function sharingPolicyHasScope(object $policy): bool
+    {
+        $natures = json_decode($policy->legal_natures ?: '[]', true) ?: [];
+        $professions = json_decode($policy->profession_names ?: '[]', true) ?: [];
+
+        return in_array('pj', $natures, true) || (in_array('pf', $natures, true) && $professions !== []);
+    }
+
+    private function applySharingScope($query, object $policy)
+    {
+        $natures = json_decode($policy->legal_natures ?: '[]', true) ?: [];
+        $professions = json_decode($policy->profession_names ?: '[]', true) ?: [];
+
+        return $query->where(function ($scope) use ($natures, $professions): void {
+            if (in_array('pj', $natures, true)) {
+                $scope->orWhere('legal_nature', 'pj');
+            }
+            if (in_array('pf', $natures, true) && $professions !== []) {
+                $scope->orWhere(function ($people) use ($professions): void {
+                    $people->where('legal_nature', 'pf')->whereExists(fn ($sub) => $sub
+                        ->from('law_contact_profession_assignments as assignment')
+                        ->join('law_contact_professions as profession', 'profession.id', '=', 'assignment.profession_id')
+                        ->whereColumn('assignment.law_contact_id', 'law_contacts.id')
+                        ->whereColumn('assignment.company_id', 'law_contacts.company_id')
+                        ->whereColumn('profession.company_id', 'assignment.company_id')
+                        ->whereIn('profession.normalized_name', $professions));
+                });
+            }
+        });
     }
 
     private function moduleEnabled(string $companyId): bool

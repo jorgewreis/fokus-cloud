@@ -160,7 +160,7 @@ class LawContactsTest extends TestCase
         $this->actingAs($this->admin)->withSession(['active_company_id' => $this->sessionCompanyId])->getJson('/api/law/contacts')->assertForbidden();
     }
 
-    public function test_company_can_share_selected_classifications_with_an_active_subscribed_company_and_revoke_access(): void
+    public function test_companies_must_both_opt_in_to_share_selected_natures_and_professions(): void
     {
         $recipientAdmin = User::create([
             'id' => PrefixedUlid::make('USR'), 'name' => 'Admin destino', 'cpf' => '52998224725', 'email' => 'contacts-recipient@example.test',
@@ -196,14 +196,20 @@ class LawContactsTest extends TestCase
 
         $sourceSession = ['active_company_id' => $this->sessionCompanyId];
         $contact = $this->actingAs($this->admin)->withSession($sourceSession)->postJson('/api/law/contacts', [
-            'legal_nature' => 'pf', 'display_name' => 'Advogada Compartilhada', 'classifications' => ['lawyer'],
+            'legal_nature' => 'pf', 'display_name' => 'Advogada Compartilhada', 'professions' => ['Advogada'],
             'channels' => [['type' => 'email', 'value' => 'advogada@example.test', 'personal' => false]],
         ])->assertCreated()->json('contact');
         $this->actingAs($this->admin)->withSession($sourceSession)->putJson('/api/law/contact-sharing', ['policies' => [[
-            'recipient_company_id' => $recipientCompanyId, 'classification_codes' => ['lawyer'], 'shared_fields' => ['professional_channels'],
+            'recipient_company_id' => $recipientCompanyId, 'legal_natures' => ['pf'], 'profession_names' => ['advogada'], 'shared_fields' => ['professional_channels'],
         ]]])->assertOk();
 
         $recipientSession = ['active_company_id' => $recipientCompanyId];
+        $this->actingAs($recipientAdmin)->withSession($recipientSession)->getJson('/api/law/contacts')
+            ->assertOk()->assertJsonPath('contacts', []);
+        $this->actingAs($recipientAdmin)->withSession($recipientSession)->putJson('/api/law/contact-sharing', ['policies' => [[
+            'recipient_company_id' => $this->companyId, 'legal_natures' => ['pj'], 'profession_names' => [], 'shared_fields' => [],
+        ]]])->assertOk();
+
         $this->actingAs($recipientAdmin)->withSession($recipientSession)->getJson('/api/law/contacts')
             ->assertOk()->assertJsonPath('contacts.0.is_shared', true)
             ->assertJsonPath('contacts.0.source_company_name', 'Empresa Contatos')

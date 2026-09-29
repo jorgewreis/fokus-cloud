@@ -20,7 +20,7 @@
 | RF-CTT-014 | Resumir atividade e volume no dashboard. | Exibe totais da empresa, utilização contratada e até cinco últimos contatos do usuário ativo. |
 | RF-CTT-015 | Contabilizar capacidade. | Cada contato e cada departamento consome uma unidade; criação excedente é bloqueada. |
 | RF-CTT-016 | Controlar acesso a dados sensíveis. | Sem a permissão, documentos são mascarados, canais pessoais/endereço residencial/notas ocultos e preservados em edição. |
-| RF-CTT-017 | Compartilhar contatos entre empresas por política. | Origem escolhe destinatários ativos e classificações; regras cobrem atuais/futuros e podem ser revogadas. |
+| RF-CTT-017 | Compartilhar contatos entre empresas por acordo bilateral. | Compartilhamento é desativado por padrão; as duas empresas precisam configurar regras recíprocas de saída por natureza, profissão vinculada para PF e campos permitidos. |
 | RF-CTT-018 | Expor referência compartilhada somente para leitura. | Destino precisa de assinatura Contatos; não altera origem nem consome sua capacidade. |
 | RF-CTT-019 | Restringir campos de compartilhamento. | Canais pessoais e endereços residenciais nunca são expostos; documentos exigem seleção da origem e permissão sensível no destino. |
 | RF-CTT-020 | Registrar atividade e auditoria. | Ações identificam usuário, contato, tipo e data; consultas não guardam termo de busca. |
@@ -43,9 +43,12 @@
 - CPF/CNPJ devem passar validação dos dígitos e comparação por fingerprint.
 - Nome, telefone e e-mail podem gerar análise manual futura, mas não bloqueiam
   o cadastro por si sós.
-- Compartilhamento exige assinatura ativa de origem e destino com Contatos
-  publicado. Contatos compartilhados continuam sob controle exclusivo da
-  origem; revogação remove o acesso na consulta seguinte.
+- Compartilhamento é desativado por padrão e só ocorre com políticas ativas
+  recíprocas entre as empresas, ambas com assinatura ativa de Contatos.
+- Cada empresa escolhe separadamente PF/PJ e campos que disponibiliza; PF
+  exige ao menos uma profissão vinculada a contato. Contatos compartilhados
+  continuam sob controle da origem; a revogação de qualquer lado remove o
+  acesso na consulta seguinte.
 - Tags, notas, buscas, auditorias e vínculos internos não são compartilhados.
 - Sigilo processual também deve ser aplicado ao consultar um contato pelo
   contexto do processo quando a integração for implementada.
