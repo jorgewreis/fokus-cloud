@@ -164,8 +164,8 @@ class LawContactsTest extends TestCase
                 ['type' => 'email', 'value' => 'maria@example.test', 'personal' => false],
             ],
             'addresses' => [
-                ['type' => 'residential', 'street' => 'Rua Um', 'city' => 'Salvador'],
-                ['type' => 'business', 'street' => 'Rua Dois', 'city' => 'Salvador'],
+                ['type' => 'residential', 'street' => 'Rua Um', 'city' => 'Salvador', 'state' => 'BA'],
+                ['type' => 'business', 'street' => 'Rua Dois', 'city' => 'Salvador', 'state' => 'BA'],
             ],
         ])->assertCreated()->json('contact');
 
@@ -193,7 +193,7 @@ class LawContactsTest extends TestCase
             ->assertJsonPath('contact.documents.0.number', '•••••••4725')
             ->assertJsonMissing(['street' => 'Rua Um'])->assertJsonMissing(['value' => '71999990000']);
         $this->actingAs($operator)->withSession($session)->patchJson('/api/law/contacts/'.$created['id'], [
-            'display_name' => 'Maria de Oliveira', 'addresses' => [['type' => 'residential', 'street' => 'Rua Intrusa', 'city' => 'Salvador']],
+            'display_name' => 'Maria de Oliveira', 'addresses' => [['type' => 'residential', 'street' => 'Rua Intrusa', 'city' => 'Salvador', 'state' => 'BA']],
         ])->assertForbidden();
         $this->assertDatabaseHas('law_contact_addresses', ['law_contact_id' => $created['id'], 'street' => 'Rua Um']);
         $this->assertDatabaseHas('law_contact_documents', ['law_contact_id' => $created['id']]);
