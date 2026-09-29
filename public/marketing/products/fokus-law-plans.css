@@ -11,3 +11,4 @@
 .lp-builder form #lp-plan{margin:0}
 .lp-builder form fieldset{margin:1.35rem 0 0;padding:0}
 .lp-builder form fieldset legend{margin:0 0 .55rem}
+.lp-builder .lp-standalone-unavailable{max-width:52rem;margin:.35rem 0 0;color:#655a68;line-height:1.55}

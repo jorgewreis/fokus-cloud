@@ -14,6 +14,7 @@
   const renderOffers = () => {
     const plans = state.catalog?.plans || [];
     const standalones = (state.catalog?.modules || []).filter((module) => module.available_standalone && module.module_code === 'contatos');
+    $('#lp-offers-heading').textContent = standalones.length ? 'Escolha um plano ou comece por Contatos.' : 'Escolha um plano para sua operação.';
     const cards = plans.map((plan) => `<article class="lp-offer"><p class="law-eyebrow law-eyebrow-purple">${esc(segmentNames[plan.segment] || plan.segment || 'Fokus Law')}</p><h3>${esc(plan.name)}</h3><p>${esc(plan.description || 'Composição de módulos para sua operação.')}</p><strong>${money(state.cycle === 'annual' ? plan.annual_amount : plan.monthly_amount)} <small>/ ${state.cycle === 'annual' ? 'ano' : 'mês'}</small></strong><button type="button" data-choose-plan="${esc(plan.code)}">Configurar plano</button></article>`);
     standalones.forEach((module) => cards.push(`<article class="lp-offer lp-standalone"><p class="law-eyebrow law-eyebrow-sage">GESTÃO DE CONTATOS AVULSA</p><h3>${esc(segmentNames[module.segments?.[0]] || module.segments?.[0] || 'Fokus Law')}</h3><p>${esc(module.name)}. Organize pessoas e organizações e personalize a capacidade.</p><strong>${money(Number(module.monthly_amount || 0) * (state.cycle === 'annual' ? 10 : 1))} <small>/ ${state.cycle === 'annual' ? 'ano' : 'mês'}</small></strong><button type="button" data-choose-standalone="${esc(module.code)}">Configurar Contatos</button></article>`));
     offersNode.innerHTML = cards.length ? cards.join('') : '<p class="lp-state">Não há planos ou módulos avulsos disponíveis no catálogo publicado.</p>';
@@ -30,7 +31,7 @@
       const isRequired = required.has(module.code);
       const checked = isRequired || state.selected.has(module.code);
       return `<label class="lp-module-choice"><input type="checkbox" value="${esc(module.code)}" ${checked ? 'checked' : ''} ${isRequired ? 'disabled' : ''}><span><strong>${esc(module.name)}${isRequired ? ' · incluído' : ''}</strong><small>${esc(module.description || `A partir de ${money(module.monthly_amount)}/mês`)}</small></span></label>`;
-    }).join('') : '<p>Não há módulos disponíveis para contratação nesta composição.</p>';
+    }).join('') : '<p class="lp-standalone-unavailable">A publicação atual não libera módulos para contratação avulsa. Os módulos de Contatos aparecem nos planos acima; a opção independente ficará disponível quando for habilitada e publicada no catálogo.</p>';
     $('#lp-modules').querySelectorAll('input[type=checkbox]:not(:disabled)').forEach((input) => input.addEventListener('change', () => { input.checked ? state.selected.add(input.value) : state.selected.delete(input.value); refreshCapacities(); quote(); }));
     refreshCapacities();
   };
