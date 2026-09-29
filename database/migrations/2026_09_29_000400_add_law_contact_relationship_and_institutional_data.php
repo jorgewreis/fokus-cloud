@@ -8,12 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // A failed MySQL DDL attempt can leave the first table behind without
-        // recording this migration. These tables were not yet used by the app.
-        Schema::dropIfExists('law_contact_institutional_data');
-        Schema::dropIfExists('law_contact_relationship_designations');
-        Schema::dropIfExists('law_contact_relationship_roles');
-
         Schema::create('law_contact_relationship_roles', function (Blueprint $table): void {
             $table->string('id', 30)->primary();
             $table->string('company_id', 30)->index();
