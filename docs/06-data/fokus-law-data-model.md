@@ -52,6 +52,7 @@ Este documento complementa:
 | LCS | Processo Law |
 | LCO | Contato Law |
 | LDR | Endereco de contato Law |
+| LCL | Vinculo pessoa-empresa de contatos Law |
 | LCN | Canal de contato Law |
 | LCV | Vinculo processo-contato Law |
 | LEV | Vinculo expedicao-contato Law |
@@ -215,6 +216,7 @@ O detalhamento do modelo alvo da Gestao de Contatos esta em [Modelo de dados da 
 | `company_id` | char(30) | Sim | Empresa proprietaria. |
 | `law_unit_id` | char(30) | Nao | Unidade juridica, quando o contato for restrito a uma unidade. |
 | `display_name` | varchar | Sim | Nome exibido. |
+| `acronym` | varchar(32) | Nao | Sigla exibida para pessoa juridica. |
 | `legal_name` | varchar | Nao | Nome completo ou razao social. |
 | `document_type` | enum | Nao | `cpf`, `cnpj`, `other`, quando informado. |
 | `document_number` | varchar | Nao | Normalizado e protegido quando aplicavel. |
@@ -238,6 +240,15 @@ Regras:
   processo.
 - O contato pode ser destinatario ou orgao de destino em expedicoes.
 - O contato pode ser referencia externa em tarefas.
+
+### `law_contact_company_links`
+
+Relaciona pessoas fisicas a pessoas juridicas por muitos-para-muitos dentro da
+mesma empresa proprietaria. A linha guarda `company_id`, `person_contact_id` e
+`company_contact_id`; ambos os contatos devem pertencer a essa empresa e ser
+ativos quando o vinculo e criado. A ficha consulta a relacao em ambos os
+sentidos. A relacao interna nao e incluida em referencias compartilhadas entre
+empresas.
 
 ### `law_contact_addresses` e `law_contact_channels`
 

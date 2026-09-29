@@ -10,6 +10,7 @@ Esta pasta documenta a arquitetura do Fokus Cloud, suas fronteiras, componentes,
 - [Portais e governanca](portals-and-governance.md)
 - [Decisoes arquiteturais](architecture-decisions.md)
 - [Design system de formularios](form-design-system.md)
+- [Consulta de enderecos ViaCEP no Fokus Law](fokus-law-viacep-address-lookup.md)
 - [Governanca visual com Fokus Styles](fokus-styles-ui-governance.md)
 - [Iconografia do menu lateral do Backoffice](backoffice-sidebar-icons.md)
 

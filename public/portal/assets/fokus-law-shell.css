@@ -399,6 +399,8 @@
 .law-contact-editor { display: grid; gap: 12px; }
 .law-contact-editor .law-contact-field { width: min(100%, 680px); }
 .law-contact-editor .law-contact-basic-section .law-contact-field { max-width: 680px; }
+.law-contact-name-fields { display: grid; grid-template-columns: minmax(0, 3fr) minmax(120px, 1fr); gap: 12px; max-width: 680px; }
+.law-contact-name-fields .law-contact-field { min-width: 0; }
 .law-contact-editor .law-contact-field input, .law-contact-editor .law-contact-field select, .law-contact-editor .law-contact-field textarea { width: 100%; }
 .law-contact-editor .law-contact-field input:disabled, .law-contact-editor .law-contact-field select:disabled { background: #f2f0f5; color: #746a7d; opacity: 1; cursor: not-allowed; }
 .law-contact-editor textarea { min-height: 110px; }
@@ -419,6 +421,11 @@
 .law-contacts-form-section { min-width: 0; margin: 0; }
 .law-contacts-form-section > .fs-card-body { display: grid; gap: 12px; }
 .law-contact-help { margin: 5px 0 10px; color: var(--law-shell-muted); font-size: 12px; line-height: 1.5; }
+.law-contact-address-row .law-contact-cep-status { grid-column: 1 / -1; display: block; margin: -3px 0 0; }
+.law-contact-detail-name-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.law-contact-detail-acronym { padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,.14); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+.law-contact-detail-linked-contact { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--law-shell-line); border-radius: 9px; }
+.law-contact-detail-linked-contact span { color: var(--law-shell-muted); font-size: 12px; }
 .law-contact-check-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
 .law-contact-check { display: flex; min-width: 0; align-items: flex-start; gap: 8px; color: var(--law-shell-ink); font-size: 12px; font-weight: 500; }
 .law-contact-check input { flex: 0 0 auto; margin-top: 2px; accent-color: var(--law-shell-purple); }
@@ -501,6 +508,7 @@
   .law-contact-repeat-row, .law-contact-department-row .law-contact-repeat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 620px) {
+  .law-contact-name-fields { grid-template-columns: minmax(0, 1fr); }
   .law-contact-heading-actions { flex-flow: row wrap; align-items: flex-start; }
   .law-contact-heading-actions .fs-btn { width: auto; max-width: 100%; }
   .law-contact-filters { grid-template-columns: minmax(0, 1fr); }

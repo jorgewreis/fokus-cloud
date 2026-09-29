@@ -7,10 +7,10 @@
 | RF-CTT-001 | Disponibilizar o módulo apenas a empresas com Contatos contratado. | Menu, APIs e dashboard exigem assinatura ativa com o componente publicado. |
 | RF-CTT-002 | Criar e consultar contatos PF ou PJ. | Natureza e nome são obrigatórios; o formulário adapta os campos à natureza. |
 | RF-CTT-003 | Aplicar formatação consistente aos nomes. | Servidor normaliza iniciais, conectivos e siglas preservadas antes de gravar. |
-| RF-CTT-004 | Permitir classificações profissionais/operacionais independentes da natureza. | Contato acumula até 12 classificações filtráveis. |
+| RF-CTT-004 | Gerenciar profissões e vínculos profissionais reutilizáveis. | PF pode selecionar profissões cadastradas ou incluir nova especificação; PJ não exibe esse campo. |
 | RF-CTT-005 | Guardar canais do contato e dos departamentos PJ. | Até 4 telefones e 2 e-mails em cada escopo; validar e-mails. |
-| RF-CTT-006 | Guardar endereços completos. | Até dois endereços por contato com campos estruturados. |
-| RF-CTT-007 | Guardar documentos. | Até quatro documentos; CPF/CNPJ opcionais, validados, criptografados e únicos na empresa. |
+| RF-CTT-006 | Guardar endereços completos com busca de CEP. | Até dois endereços; consulta ViaCEP preenche dados disponíveis, permite preenchimento manual se falhar e exige logradouro, município e UF. |
+| RF-CTT-007 | Guardar documentos PF. | Até quatro documentos por PF; CPF/CNPJ opcionais, validados, criptografados e únicos na empresa; PJ não exibe documentos. |
 | RF-CTT-008 | Guardar departamentos associados à PJ. | Cada departamento tem nome e até 4 telefones e 2 e-mails próprios. |
 | RF-CTT-009 | Classificar contatos com tags. | Até seis tags por contato, reutilizadas e normalizadas na empresa. |
 | RF-CTT-010 | Pesquisar e filtrar contatos. | Filtros por texto, natureza, status, classificação e tag; documentos só pesquisáveis com permissão sensível. |
@@ -25,12 +25,17 @@
 | RF-CTT-019 | Restringir campos de compartilhamento. | Canais pessoais e endereços residenciais nunca são expostos; documentos exigem seleção da origem e permissão sensível no destino. |
 | RF-CTT-020 | Registrar atividade e auditoria. | Ações identificam usuário, contato, tipo e data; consultas não guardam termo de busca. |
 | RF-CTT-021 | Preparar APIs de referência para outros módulos. | IDs estáveis e endpoints de consulta podem ser usados futuramente por Processos, Expedições e Tarefas. |
+| RF-CTT-022 | Relacionar pessoas físicas e jurídicas. | Uma PF pode se vincular a várias PJs e cada PJ a várias PFs; o vínculo é recíproco e restrito à empresa proprietária. |
+| RF-CTT-023 | Identificar pessoa jurídica por sigla. | Sigla opcional é editável e aparece junto ao nome e na ficha da PJ. |
 
 ## Regras de negócio
 
 - Empresa é proprietária da base e os setores autorizados consultam os mesmos
   contatos; `law_unit_id` não define propriedade.
 - PF/PJ é natureza cadastral; classificações podem acumular.
+- Sigla é opcional para PJ; profissão/vínculo e documentos são campos de PF.
+- Relações PF↔PJ são muitos-para-muitos, recíprocas e internas à empresa
+  proprietária; referências compartilhadas não expõem essas relações.
 - Departamentos só pertencem a PJ e cada um soma um cadastro à capacidade.
 - Contatos inativos continuam ocupando capacidade e preservam histórico.
 - Tags não substituem classificação ou permissão.

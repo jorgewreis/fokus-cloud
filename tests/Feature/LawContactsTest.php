@@ -92,6 +92,26 @@ class LawContactsTest extends TestCase
         $this->assertSame(2, app(\App\Services\LawUsageMeter::class)->countContacts($this->companyId));
     }
 
+    public function test_links_people_and_companies_bidirectionally_and_persists_company_acronym(): void
+    {
+        $session = ['active_company_id' => $this->sessionCompanyId];
+        $person = $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'legal_nature' => 'pf', 'display_name' => 'Ana de Souza',
+        ])->assertCreated()->json('contact');
+
+        $company = $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'legal_nature' => 'pj', 'display_name' => 'Empresa Exemplo', 'acronym' => 'EX',
+            'linked_contact_ids' => [$person['id']],
+        ])->assertCreated()->assertJsonPath('contact.acronym', 'EX')->assertJsonPath('contact.linked_contacts.0.id', $person['id'])->json('contact');
+
+        $this->actingAs($this->admin)->withSession($session)->getJson('/api/law/contacts/'.$person['id'])
+            ->assertOk()->assertJsonPath('contact.linked_contacts.0.id', $company['id'])
+            ->assertJsonPath('contact.linked_contacts.0.acronym', 'EX');
+        $this->assertDatabaseHas('law_contact_company_links', [
+            'company_id' => $this->companyId, 'person_contact_id' => $person['id'], 'company_contact_id' => $company['id'],
+        ]);
+    }
+
     public function test_blocks_invalid_or_duplicate_cpf_and_capacity_overflow(): void
     {
         $session = ['active_company_id' => $this->sessionCompanyId];

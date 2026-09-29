@@ -18,6 +18,13 @@ Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
   cinco atividades recentes do usuário atual.
 - Cadastro independente de departamentos de uma PJ, cada qual com canais
   próprios e contabilizado como uma unidade adicional da capacidade.
+- Sigla opcional para pessoas jurídicas; profissão/vínculo profissional e
+  documentos ficam restritos a pessoas físicas no formulário e na ficha.
+- Vínculos muitos-para-muitos entre pessoas físicas e empresas da mesma
+  empresa proprietária, visíveis de forma recíproca no cadastro e na ficha.
+- Busca automática de endereços pelo CEP usando ViaCEP, com preenchimento de
+  logradouro, bairro, município e UF quando retornados; o usuário pode concluir
+  manualmente quando a consulta não localizar o CEP ou estiver indisponível.
 - Tags reutilizáveis pela empresa, com sugestão e filtro.
 - Regras de compartilhamento entre empresas por destinatário e classificações.
 - Endpoints próprios preparados para vínculos futuros com Processos,
@@ -29,8 +36,8 @@ Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
 | --- | --- |
 | Visão geral | Totais PF, PJ, departamentos e cadastros contabilizados; até cinco contatos recentes da pessoa usuária. |
 | Contatos | Busca, filtros, resultados, paginação, situação, origem compartilhada e ações permitidas. |
-| Criar/editar | Formulário guiado por PF/PJ, classificações, canais, endereços, departamentos, tags e campos sensíveis autorizados. |
-| Detalhes | Identificação, classificações, tags, canais, endereços, documentos e departamentos conforme as permissões. |
+| Criar/editar | Formulário guiado por PF/PJ, profissões cadastradas ou novas, sigla e empresas/pessoas vinculadas, canais, endereços, departamentos, tags e campos sensíveis autorizados. |
+| Detalhes | Identificação e sigla, profissões, empresas/pessoas vinculadas, tags, canais, endereços, documentos e departamentos conforme a natureza e as permissões. |
 | Mesclagem | Escolha do cadastro preservado, confirmação do motivo, transferência de relações e auditoria. |
 | Compartilhamento | Seleção de empresas elegíveis, classificações e campos expostos; gravação e revogação auditadas. |
 | Estados da página | Carregamento, vazio, sem resultados, erro de API, capacidade indisponível e aviso de limite. |
@@ -45,13 +52,17 @@ grade da listagem, grupos repetíveis de endereço/canal/documento/departamento
 e suas linhas aninhadas. Eles não recriam botões, campos, overlay, backdrop,
 foco ou comportamento de modal do Fokus Styles.
 
-## Natureza, classificações e nomes
+## Natureza, profissões e nomes
 
-PF/PJ define a natureza cadastral; não restringe as classificações adicionais.
-Um contato pode acumular papéis como advogado(a), escritório, cliente,
-órgão público, unidade judiciária, policial, perito(a), testemunha ou
-representante. Papéis processuais específicos pertencem aos vínculos com
-processos, não ao contato global.
+PF/PJ define a natureza cadastral. Pessoa física pode acumular profissões e
+vínculos profissionais selecionados do vocabulário da empresa ou adicionados
+como novas especificações (por exemplo, Policial Civil ou Guarda Municipal).
+Pessoa jurídica tem campo opcional de sigla e não apresenta profissão/vínculo
+nem documentos em seu formulário e ficha. Departamentos são exclusivos de PJ.
+Vínculos entre pessoa física e pessoa jurídica são muitos-para-muitos, ficam
+restritos à mesma empresa proprietária e aparecem nos dois lados do cadastro.
+Papéis processuais específicos pertencem aos vínculos com processos, não ao
+contato global.
 
 O nome é obrigatório e normalizado para formato de nome próprio no servidor.
 Conectivos como “de”, “dos” e “e” permanecem minúsculos no meio do nome; a
@@ -64,12 +75,14 @@ substitui a conferência de nomes oficiais.
 | Campo | Limite/regra |
 | --- | --- |
 | Nome | Obrigatório; PF: nome da pessoa; PJ: nome fantasia ou razão social. |
+| Sigla | Opcional, até 32 caracteres; apresentada ao lado do nome PJ. |
 | Razão social/complemento | Opcional. |
+| Vínculos empresariais | Relação muitos-para-muitos PF↔PJ entre cadastros ativos da mesma empresa; a ficha de cada lado exibe os contatos relacionados. |
 | Telefones | Até quatro por contato; cada departamento PJ também aceita até quatro. |
 | E-mails | Até dois por contato; cada departamento PJ também aceita até dois. |
 | Endereços completos | Até dois por contato. |
 | Documentos | Até quatro por contato; CPF/CNPJ opcionais, dígitos validados e CPF/CNPJ únicos por empresa. |
-| Classificações | Até doze códigos do vocabulário disponível. |
+| Profissões/vínculos | Uma ou mais opções cadastradas pela empresa; PF. |
 | Tags | Até seis por contato; reutilizadas dentro da empresa. |
 | Departamentos PJ | Sem teto funcional fixo; cada departamento consome uma unidade contratada adicional. |
 
@@ -77,6 +90,18 @@ Telefone/e-mail pessoal, endereço residencial e notas são dados sensíveis.
 CPF/CNPJ e demais documentos são armazenados criptografados e seu fingerprint
 é usado para deduplicação sem pesquisa em texto aberto. A API mascara os
 documentos e oculta campos sensíveis para perfis sem `law.contacts.sensitive.view`.
+
+### Consulta de CEP (ViaCEP)
+
+O formulário consulta o ViaCEP quando o CEP contém oito dígitos. O navegador
+chama o endpoint autenticado `GET /api/law/addresses/cep/{postalCode}`; o
+servidor valida o formato, consulta `https://viacep.com.br/ws/{cep}/json/` com
+timeouts de conexão e resposta e devolve somente CEP, logradouro, complemento,
+bairro, município e UF. A rota limita chamadas por usuário. Quando a resposta
+for válida, os campos retornados são preenchidos; bairro, município, UF e país
+ficam bloqueados somente se bairro, município e UF vierem completos. CEP não
+localizado ou indisponibilidade mantém o endereço editável e orienta o
+preenchimento manual. Município, UF e logradouro continuam obrigatórios.
 
 ## Duplicidade e mesclagem
 
@@ -137,6 +162,10 @@ na emissão. A integração operacional desses módulos é uma etapa futura.
 - Menu e dashboard exibem Contatos somente com módulo assinado e permissão de
   consulta.
 - PF/PJ personaliza o formulário; departamentos são aceitos apenas em PJ.
+- PJ pode informar sigla e consultar vínculos recíprocos com várias PFs; PF pode
+  consultar vínculos com várias PJs.
+- CEP completo aciona a integração ViaCEP; endereço segue preenchível quando a
+  consulta não localiza o CEP ou está indisponível.
 - Os limites de campos, capacidade e duplicidade são validados no servidor.
 - Perfis sem acesso sensível não leem nem sobrescrevem valores ocultos.
 - Compartilhamento não altera o cadastro de origem e é revogável/auditável.

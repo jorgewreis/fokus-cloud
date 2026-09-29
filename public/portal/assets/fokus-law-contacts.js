@@ -74,13 +74,14 @@
     window.lawContactsCanMerge = can('law.contacts.merge');
     let page = 1;
     let currentItems = [];
+    let relationshipOptions = [];
     let searchTimer;
     root.replaceChildren();
     const heading = $('div', 'law-page-heading law-contact-page-heading');
     heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Contatos'), $('p', 'law-page-lede', 'Organize pessoas, empresas, instituições e órgãos em uma base compartilhada pelos setores autorizados.'));
     const headingActions = $('div', 'law-contact-heading-actions');
     if (can('law.contacts.share.manage')) headingActions.append(button('Compartilhamento entre empresas', 'fs-btn fs-btn-outline-primary', (event) => openSharing(root, event.currentTarget)));
-    if (can('law.contacts.create')) headingActions.append(button('Novo contato', 'fs-btn fs-btn-primary', (event) => openEditor(root, null, refresh, event.currentTarget)));
+    if (can('law.contacts.create')) headingActions.append(button('Novo contato', 'fs-btn fs-btn-primary', (event) => openEditor(root, null, refresh, event.currentTarget, relationshipOptions)));
     heading.append(headingActions);
     root.append(heading);
 
@@ -130,6 +131,7 @@
         if (tagFilter.value.trim()) params.set('tag', tagFilter.value.trim());
         const result = await window.FokusApi.request(`/law/contacts?${params.toString()}`);
         window.lawContactProfessions = result.professions || [];
+        relationshipOptions = result.relationship_options || [];
         currentItems = result.contacts || [];
         metrics.replaceChildren();
         const summary = result.summary || {};
@@ -201,13 +203,13 @@
           const titleCell = $('td'); const open = button(contact.display_name, 'law-contact-name', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget));
           titleCell.append(open); if (contact.is_shared) titleCell.append($('span', 'law-contact-shared-badge', `Compartilhado por ${contact.source_company_name || 'outra empresa'}`));
           tr.append(titleCell, $('td', '', contact.legal_nature === 'pj' ? 'Pessoa jurídica' : 'Pessoa física'));
-          tr.append($('td', '', (contact.professions || contact.classification_labels || []).join(', ') || '—'));
+          tr.append($('td', '', contact.legal_nature === 'pj' ? '—' : ((contact.professions || contact.classification_labels || []).join(', ') || '—')));
           tr.append($('td', '', (contact.tags || []).join(', ') || '—'));
           tr.append($('td', '', `${contact.departments?.length || 0} departamento(s)`));
           tr.append($('td', '', contact.status === 'ativo' ? 'Ativo' : 'Inativo'));
           const actions = $('td', 'law-contact-actions');
           actions.append(iconButton('Ver detalhes', 'Folder-File--Streamline-Ultimate.png', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget)));
-          if (!contact.is_shared && can('law.contacts.update')) actions.append(iconButton('Editar contato', 'Common-File-Edit--Streamline-Ultimate.png', (event) => openEditor(root, contact, refresh, event.currentTarget)));
+          if (!contact.is_shared && can('law.contacts.update')) actions.append(iconButton('Editar contato', 'Common-File-Edit--Streamline-Ultimate.png', (event) => openEditor(root, contact, refresh, event.currentTarget, relationshipOptions)));
           if (!contact.is_shared && can('law.contacts.delete') && contact.status === 'ativo') actions.append(iconButton('Inativar contato', 'Common-File-Subtract--Streamline-Ultimate.png', async (event) => {
             if (!await confirmAction(root, 'Inativar contato', 'O cadastro deixará de aparecer entre os contatos ativos. Os dados históricos serão preservados.', 'Inativar contato', event.currentTarget)) return;
             try { await window.FokusApi.request(`/law/contacts/${encodeURIComponent(contact.id)}`, { method: 'DELETE' }); await refresh(); }
@@ -228,7 +230,7 @@
     return { refresh };
   }
 
-  function openEditor(root, contact, onSaved, opener = null) {
+  function openEditor(root, contact, onSaved, opener = null, relationshipOptions = []) {
     const modal = createModal(root, contact ? 'Editar contato' : 'Novo contato', 'fs-modal-xl', opener);
     const form = $('form', 'law-contact-editor');
     form.id = `law-contact-form-${++modalSequence}`;
@@ -236,10 +238,13 @@
     const basic = section('Dados principais');
     const nature = select([['pf', 'Pessoa física'], ['pj', 'Pessoa jurídica']], contact?.legal_nature || 'pf'); nature.name = 'legal_nature';
     const name = input(contact?.display_name || '', 'Nome completo ou nome fantasia', 180); name.required = true; name.name = 'display_name';
+    const acronym = input(contact?.acronym || '', 'Ex.: TJBA', 32); acronym.name = 'acronym';
     const particles = new Set(['da','das','de','do','dos','e']);
     name.addEventListener('blur', () => { name.value = name.value.trim().toLocaleLowerCase('pt-BR').replace(/(^|[\s-])([^\s-]+)/gu, (part) => { const word = part.trimStart(); const prefix = part.slice(0, part.length - word.length); return prefix + (particles.has(word) ? word : word.charAt(0).toLocaleUpperCase('pt-BR') + word.slice(1)); }); });
     const legalName = input(contact?.legal_name || '', 'Razão social (opcional)', 180); legalName.name = 'legal_name';
-    basic.content.append(field('Natureza *', nature), field('Nome *', name)); const legalNameField = field('Razão social / nome complementar', legalName); basic.content.append(legalNameField);
+    const nameField = field('Nome *', name); const acronymField = field('Sigla', acronym);
+    const nameRow = $('div', 'law-contact-name-fields'); nameRow.append(nameField, acronymField);
+    basic.content.append(field('Natureza *', nature), nameRow); const legalNameField = field('Razão social / nome complementar', legalName); basic.content.append(legalNameField);
     const professionSection = section('Profissão / vínculo', 'Selecione uma opção cadastrada ou inclua uma nova especificação.');
     const professionRows = $('div', 'law-contact-profession-list');
     (contact?.professions || []).forEach((value) => professionRows.append(professionChip(value)));
@@ -248,6 +253,21 @@
     const addProfession = (value) => { const clean = value.trim(); if (clean && ![...professionRows.querySelectorAll('[data-profession]')].some((item) => item.dataset.profession.toLocaleLowerCase() === clean.toLocaleLowerCase())) professionRows.append(professionChip(clean)); professionSelect.value = ''; professionNew.value = ''; };
     professionSelect.addEventListener('change', () => { if (professionSelect.value) addProfession(professionSelect.value); });
     professionSection.content.append(professionRows, field('Profissões cadastradas', professionSelect), field('Nova profissão / especificação', professionNew), button('Adicionar profissão', 'fs-btn fs-btn-secondary', () => addProfession(professionNew.value)));
+    const relationshipSection = section('Vínculos empresariais', 'Associe este contato a pessoas físicas ou empresas já cadastradas.');
+    const linkedContactIds = new Set((contact?.linked_contacts || []).map((item) => item.id));
+    const relationshipPicker = select([['', 'Selecione para vincular']]);
+    const relationshipChips = $('div', 'law-contact-profession-list');
+    const renderRelationshipChips = () => {
+      relationshipChips.replaceChildren();
+      [...linkedContactIds].forEach((id) => {
+        const item = relationshipOptions.find((option) => option.id === id) || (contact?.linked_contacts || []).find((option) => option.id === id);
+        if (!item) return;
+        const chip = $('span', 'law-contact-profession-chip', `${item.display_name}${item.acronym ? ` (${item.acronym})` : ''}`);
+        chip.append(button('Remover vínculo', 'law-contact-chip-remove', () => { linkedContactIds.delete(id); renderRelationshipChips(); })); relationshipChips.append(chip);
+      });
+    };
+    relationshipPicker.addEventListener('change', () => { if (relationshipPicker.value) linkedContactIds.add(relationshipPicker.value); relationshipPicker.value = ''; renderRelationshipChips(); });
+    relationshipSection.content.append(field('Adicionar pessoa ou empresa', relationshipPicker), relationshipChips); renderRelationshipChips();
     let documentRows;
     let documentSection;
     if (window.lawContactsCanSensitive) {
@@ -288,7 +308,7 @@
     const cancel = button('Cancelar', 'fs-btn fs-btn-secondary', () => modal.close());
     const save = $('button', 'fs-btn fs-btn-primary', contact ? 'Salvar alterações' : 'Cadastrar contato'); save.type = 'submit'; save.setAttribute('form', form.id);
     modal.footer.append(cancel, save);
-    form.append(basic, professionSection);
+    form.append(basic, professionSection, relationshipSection);
     if (documentSection) form.append(documentSection);
     form.append(channelSection, addressSection);
     const departmentWrap = $('div', 'law-contact-department-wrap'); departmentWrap.append(departmentSection);
@@ -296,19 +316,27 @@
     // Notes remain editable only for a profile that can read protected personal data.
     if (window.lawContactsCanSensitive) form.append(notesSection);
     form.append(message);
-    const updateNature = () => { departmentWrap.hidden = nature.value !== 'pj'; legalNameField.hidden = nature.value !== 'pj'; };
+    const updateNature = () => {
+      departmentWrap.hidden = nature.value !== 'pj'; legalNameField.hidden = nature.value !== 'pj';
+      acronymField.hidden = nature.value !== 'pj';
+      professionSection.hidden = nature.value === 'pj'; if (documentSection) documentSection.hidden = nature.value === 'pj';
+      const candidates = relationshipOptions.filter((item) => item.id !== contact?.id && item.legal_nature !== nature.value);
+      relationshipPicker.replaceChildren(new Option('Selecione para vincular', ''), ...candidates.map((item) => new Option(`${item.display_name}${item.acronym ? ` (${item.acronym})` : ''}`, item.id)));
+      relationshipSection.hidden = candidates.length === 0;
+    };
     nature.addEventListener('change', updateNature); updateNature();
     form.addEventListener('submit', async (event) => {
       event.preventDefault(); save.disabled = true; message.textContent = '';
       const body = {
-        legal_nature: nature.value, display_name: name.value.trim(), legal_name: legalName.value.trim() || null,
-        professions: [...professionRows.querySelectorAll('[data-profession]')].map((item) => item.dataset.profession),
+        legal_nature: nature.value, display_name: name.value.trim(), acronym: acronym.value.trim() || null, legal_name: legalName.value.trim() || null,
+        professions: nature.value === 'pf' ? [...professionRows.querySelectorAll('[data-profession]')].map((item) => item.dataset.profession) : [],
+        linked_contact_ids: [...linkedContactIds],
         channels: [...channelRows.children].map((row) => ({ type: row.querySelector('[data-channel-type]').value, value: row.querySelector('[data-channel-value]').value.trim(), label: row.querySelector('[data-channel-label]').value.trim() || null, personal: false, primary: row.querySelector('[data-primary]').value === '1' })).filter((item) => item.value),
         addresses: [...addressRows.children].map((row) => ({ type: row.querySelector('[data-address-type]').value, postal_code: row.querySelector('[data-postal]').value.trim() || null, street: row.querySelector('[data-street]').value.trim(), number: row.querySelector('[data-number]').value.trim() || null, complement: row.querySelector('[data-complement]').value.trim() || null, district: row.querySelector('[data-district]').value.trim() || null, city: row.querySelector('[data-city]').value.trim(), state: row.querySelector('[data-state]').value.trim().toUpperCase(), country: row.querySelector('[data-country]').value.trim() || 'Brasil', primary: row.querySelector('[data-primary]').value === '1' })),
         departments: nature.value === 'pj' ? [...departmentRows.children].map((row) => ({ name: row.querySelector('[data-department-name]').value.trim(), channels: [...row.querySelectorAll('.law-contact-department-channel')].map((item) => ({ type: item.querySelector('[data-channel-type]').value, value: item.querySelector('[data-channel-value]').value.trim(), label: item.querySelector('[data-channel-label]').value.trim() || null })).filter((item) => item.value) })).filter((item) => item.name) : [],
         tags: tagField.value.split(',').map((value) => value.trim()).filter(Boolean),
       };
-      if (window.lawContactsCanSensitive) {
+      if (window.lawContactsCanSensitive && nature.value === 'pf') {
         body.documents = [...documentRows.children].map((row) => { const type = row.querySelector('[data-doc-type]').value; const noUf = ['cpf','cnpj'].includes(type); return { type, number: row.querySelector('[data-doc-number]').value.trim(), state: noUf ? null : (row.querySelector('[data-doc-state]').value || null), label: noUf ? null : (row.querySelector('[data-doc-label]').value.trim() || null) }; }).filter((doc) => doc.number);
         body.notes = notes.value.trim() || null;
       }
@@ -394,8 +422,8 @@
     const state = select([['','Selecione a UF'], ...STATES], address.state || 'BA'); state.required = true; state.dataset.state = '1';
     const country = input(address.country || 'Brasil', 'País', 80); country.dataset.country = '1';
     const primary = select([['0','Não'],['1','Sim']], address.primary ? '1' : '0'); primary.dataset.primary = '1';
-    const lookupStatus = $('small', 'law-contact-help'); lookupStatus.setAttribute('aria-live', 'polite');
-    const postalField = field('CEP', postal); postalField.append(lookupStatus);
+    const lookupStatus = $('small', 'law-contact-help law-contact-cep-status'); lookupStatus.setAttribute('aria-live', 'polite');
+    const postalField = field('CEP', postal);
     const setLocked = (locked) => { district.disabled = locked; city.disabled = locked; state.disabled = locked; country.disabled = locked; };
     let lookupTimer; let lookupController; let lookupSequence = 0;
     postal.addEventListener('input', () => {
@@ -426,7 +454,7 @@
         }
       }, 350);
     });
-    row.append(field('Tipo', type), postalField, field('Logradouro *', street), field('Número', number), field('Complemento', complement), field('Bairro', district), field('Município *', city), field('UF *', state), field('País', country), field('Principal', primary), button('Remover', 'law-contact-remove', () => row.remove())); return row;
+    row.append(field('Tipo', type), postalField, field('Logradouro *', street), field('Número', number), field('Complemento', complement), field('Bairro', district), field('Município *', city), field('UF *', state), field('País', country), field('Principal', primary), button('Remover', 'law-contact-remove', () => row.remove()), lookupStatus); return row;
   }
 
   function departmentRow(department = {}) {
@@ -461,7 +489,10 @@
     const avatar = $('span', 'law-contact-detail-avatar', initials);
     const summaryCopy = $('div', 'law-contact-detail-summary-copy');
     summaryCopy.append($('span', 'law-contact-detail-eyebrow', 'VISÃO GERAL'));
-    summaryCopy.append($('h3', 'law-contact-detail-name', contact.display_name));
+    const titleRow = $('div', 'law-contact-detail-name-row');
+    titleRow.append($('h3', 'law-contact-detail-name', contact.display_name));
+    if (contact.acronym) titleRow.append($('span', 'law-contact-detail-acronym', contact.acronym));
+    summaryCopy.append(titleRow);
     summaryCopy.append($('p', 'law-contact-detail-legal-name', contact.legal_name || labels[contact.legal_nature] || 'Contato'));
     const summaryBadges = $('div', 'law-contact-detail-summary-badges');
     summaryBadges.append($('span', `law-contact-detail-badge law-contact-detail-nature-${contact.legal_nature}`, labels[contact.legal_nature] || 'Contato'));
@@ -476,7 +507,7 @@
       values.forEach((value) => list.append($('span', 'law-contact-detail-chip', value)));
       group.append(list); chips.append(group);
     };
-    addChips('Profissões / vínculos', contact.professions || contact.classification_labels || [], 'classifications');
+    if (contact.legal_nature !== 'pj') addChips('Profissões / vínculos', contact.professions || contact.classification_labels || [], 'classifications');
     addChips('Tags', contact.tags || [], 'tags');
     summaryCopy.append(chips);
     body.append(summary);
@@ -492,7 +523,15 @@
       const items = $('div', 'law-contact-detail-items'); card.append(items); body.append(card);
       return items;
     };
-    if (contact.documents?.length) {
+    if (contact.linked_contacts?.length) {
+      const items = addSection(contact.legal_nature === 'pj' ? 'Pessoas vinculadas' : 'Empresas vinculadas', 'VÍN', contact.linked_contacts.length, 'law-contact-detail-links');
+      contact.linked_contacts.forEach((linked) => {
+        const row = $('article', 'law-contact-detail-linked-contact');
+        row.append($('strong', '', linked.display_name), $('span', '', `${linked.acronym ? `${linked.acronym} · ` : ''}${labels[linked.legal_nature] || 'Contato'}`));
+        items.append(row);
+      });
+    }
+    if (contact.legal_nature !== 'pj' && contact.documents?.length) {
       const items = addSection('Documentos', 'ID', contact.documents.length, 'law-contact-detail-documents');
       contact.documents.forEach((doc) => {
         const item = $('article', 'law-contact-detail-document');
