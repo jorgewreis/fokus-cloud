@@ -8,6 +8,7 @@ use App\Services\LawAuthorizationService;
 use App\Services\LawUsageMeter;
 use App\Services\PrefixedUlid;
 use App\Support\BrazilianDocuments;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Crypt;
@@ -525,7 +526,7 @@ class LawContactController extends Controller
             'contacts_total' => (int) ($counts->total ?? 0), 'contacts_active' => (int) ($counts->active ?? 0), 'contacts_inactive' => (int) ($counts->inactive ?? 0),
             'pf' => (int) ($counts->pf ?? 0), 'pj' => (int) ($counts->pj ?? 0), 'departments' => $departmentCount,
             'registrations_counted' => (int) ($counts->total ?? 0) + $departmentCount, 'usage' => $usage->contacts($companyId),
-            'recent' => $recent->map(fn ($row) => ['id' => $row->id, 'display_name' => $row->display_name, 'legal_nature' => $row->legal_nature, 'activity' => $row->activity_type, 'at' => $row->created_at])->all(),
+            'recent' => $recent->map(fn ($row) => ['id' => $row->id, 'display_name' => $row->display_name, 'legal_nature' => $row->legal_nature, 'activity' => $row->activity_type, 'at' => Carbon::parse((string) $row->created_at, 'UTC')->toIso8601String()])->all(),
         ];
     }
 

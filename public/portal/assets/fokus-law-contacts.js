@@ -4,11 +4,13 @@
     police: 'Policial', prosecutor_office: 'Ministério Público', public_defender: 'Defensoria Pública', expert: 'Perito(a)', witness: 'Testemunha', representative: 'Representante', other: 'Outro',
   };
   const DOCUMENTS = { cpf: 'CPF', cnpj: 'CNPJ', oab: 'OAB', rg: 'RG', other: 'Outro' };
+  const CONTACT_ICONS = '/backoffice/assets/icons/';
   const $ = (tag, cls = '', text = '') => { const node = document.createElement(tag); if (cls) node.className = cls; if (text !== '') node.textContent = text; return node; };
   const field = (labelText, control) => { const label = $('label', 'law-contact-field'); label.append($('span', '', labelText), control); return label; };
   const select = (items, value = '') => { const control = $('select', 'fs-form-control'); items.forEach(([v, label]) => { const option = new Option(label, v); option.selected = v === value; control.append(option); }); return control; };
   const input = (value = '', placeholder = '', maxLength = 255) => { const control = $('input', 'fs-form-control'); control.value = value || ''; control.placeholder = placeholder; control.maxLength = maxLength; return control; };
   const button = (text, cls = 'fs-btn fs-btn-secondary', fn) => { const control = $('button', cls, text); control.type = 'button'; if (fn) control.addEventListener('click', (event) => fn(event)); return control; };
+  const iconButton = (label, icon, fn) => { const control = button('', 'fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action', fn); control.setAttribute('aria-label', label); control.title = label; const image = $('img'); image.src = `${CONTACT_ICONS}${icon}`; image.alt = ''; control.append(image); return control; };
   const section = (title, copy = '') => {
     const box = $('section', 'fs-card fs-card-sm law-contacts-form-section');
     const header = $('div', 'fs-card-header'); header.append($('h3', 'fs-card-title', title));
@@ -172,7 +174,10 @@
           const link = button('', 'law-contact-recent-item', (event) => openDetails(root, item.id, false, refresh, event.currentTarget));
           const detail = $('span', 'law-contact-recent-meta');
           const activityLabels = { created: 'Cadastrado', viewed: 'Consultado', search_opened: 'Aberto pela busca' };
-          detail.append($('span', '', activityLabels[item.activity] || 'Consultado'), $('time', '', item.at ? new Date(item.at).toLocaleDateString('pt-BR') : 'Agora'));
+          const timestamp = item.at ? new Date(item.at) : null;
+          const time = $('time', '', timestamp && !Number.isNaN(timestamp.valueOf()) ? timestamp.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Agora');
+          if (timestamp && !Number.isNaN(timestamp.valueOf())) time.dateTime = timestamp.toISOString();
+          detail.append($('span', '', activityLabels[item.activity] || 'Consultado'), time);
           link.append($('strong', '', item.display_name), detail); recentBody.append(link);
         });
         else recentBody.append($('p', 'law-contact-recent-empty', 'Os contatos criados ou consultados aparecerão aqui.'));
@@ -190,9 +195,9 @@
           tr.append($('td', '', `${contact.departments?.length || 0} departamento(s)`));
           tr.append($('td', '', contact.status === 'ativo' ? 'Ativo' : 'Inativo'));
           const actions = $('td', 'law-contact-actions');
-          actions.append(button('Detalhes', 'fs-btn fs-btn-secondary', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget)));
-          if (!contact.is_shared && can('law.contacts.update')) actions.append(button('Editar', 'fs-btn fs-btn-outline-primary', (event) => openEditor(root, contact, refresh, event.currentTarget)));
-          if (!contact.is_shared && can('law.contacts.delete') && contact.status === 'ativo') actions.append(button('Inativar', 'fs-btn fs-btn-danger', async (event) => {
+          actions.append(iconButton('Ver detalhes', 'Folder-File--Streamline-Ultimate.png', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget)));
+          if (!contact.is_shared && can('law.contacts.update')) actions.append(iconButton('Editar contato', 'Common-File-Edit--Streamline-Ultimate.png', (event) => openEditor(root, contact, refresh, event.currentTarget)));
+          if (!contact.is_shared && can('law.contacts.delete') && contact.status === 'ativo') actions.append(iconButton('Inativar contato', 'Common-File-Subtract--Streamline-Ultimate.png', async (event) => {
             if (!await confirmAction(root, 'Inativar contato', 'O cadastro deixará de aparecer entre os contatos ativos. Os dados históricos serão preservados.', 'Inativar contato', event.currentTarget)) return;
             try { await window.FokusApi.request(`/law/contacts/${encodeURIComponent(contact.id)}`, { method: 'DELETE' }); await refresh(); }
             catch (error) { state.dataset.state = 'error'; state.textContent = error.message || 'Não foi possível inativar o contato.'; }
