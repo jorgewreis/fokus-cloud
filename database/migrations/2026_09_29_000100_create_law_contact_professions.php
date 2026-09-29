@@ -27,7 +27,7 @@ return new class extends Migration {
                 $table->primary(['law_contact_id', 'profession_id']);
                 $table->foreign(['company_id', 'law_contact_id'], 'law_cpa_contact_fk')->references(['company_id', 'id'])->on('law_contacts')->cascadeOnDelete();
                 $table->foreign('profession_id', 'law_cpa_profession_fk')->references('id')->on('law_contact_professions')->cascadeOnDelete();
-                $table->index(['company_id', 'profession_id']);
+                $table->index(['company_id', 'profession_id'], 'law_cpa_company_profession_idx');
             });
         } elseif (DB::getDriverName() === 'mysql') {
             $existing = DB::table('information_schema.table_constraints')
