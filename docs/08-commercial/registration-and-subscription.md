@@ -132,7 +132,7 @@ continua sendo atualizada separadamente pelas mudanças operacionais do contrato
 - O valor exibido na revisão é recalculado no servidor a partir do catálogo,
   ciclo, plano, módulos e limites selecionados; valores vindos do navegador não
   são aceitos como preço.
-- O catálogo público oferece `POST /api/catalog/law/quote`, sem efeitos
+- O catálogo público oferece `POST /api/catalog/fokus-law/quote`, sem efeitos
   colaterais, com detalhamento do plano-base, módulos adicionais, ajustes de
   capacidade e versão cotada. O limite acima da maior faixa abre solicitação
   comercial rastreável em `/backoffice/interesses`.

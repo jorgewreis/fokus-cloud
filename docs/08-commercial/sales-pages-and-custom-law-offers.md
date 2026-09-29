@@ -20,7 +20,7 @@ avulsos e faixas pelo Backoffice antes da divulgação dos preços.
 
 ## Composição e preço
 
-`POST /api/catalog/law/quote` é a cotação pública sem efeitos colaterais. Os
+`POST /api/catalog/fokus-law/quote` é a cotação pública sem efeitos colaterais. Os
 valores calculados no navegador servem apenas para selecionar códigos de
 catálogo. A API e o checkout usam os valores da última versão comercial
 publicada.

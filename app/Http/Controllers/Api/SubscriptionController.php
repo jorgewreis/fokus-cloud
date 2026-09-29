@@ -30,10 +30,10 @@ class SubscriptionController extends Controller
         return response()->json($catalog->publicCatalog($productCode));
     }
 
-    public function publicQuote(Request $request, CatalogManager $catalog)
+    public function publicQuote(Request $request, string $productCode, CatalogManager $catalog)
     {
         $data = $request->validate([
-            'product_code' => ['required', Rule::in(['law'])],
+            'product_code' => ['required', Rule::in([$productCode])],
             'items' => ['required', 'array', 'min:1', 'max:40'],
             'items.*.module_code' => ['required', 'string', 'max:64'],
             'items.*.quantity' => ['nullable', 'integer', 'min:1', 'max:1000'],
@@ -44,11 +44,11 @@ class SubscriptionController extends Controller
             'selection_mode' => ['required', Rule::in(['modules', 'plan'])],
             'plan_code' => ['nullable', 'required_if:selection_mode,plan', 'string', 'max:64'],
         ]);
-        $product = DB::table('products')->where('code', 'law')->where('active', true)->where('status', 'ativo')->first();
+        $product = DB::table('products')->where('code', $productCode)->where('active', true)->where('status', 'ativo')->first();
         abort_unless($product, 404, 'Produto não encontrado.');
         $quote = $this->quote($product, $data, $catalog);
         return response()->json([
-            'product_code' => 'law', 'cycle' => $data['cycle'], 'selection_mode' => $data['selection_mode'],
+            'product_code' => $productCode, 'cycle' => $data['cycle'], 'selection_mode' => $data['selection_mode'],
             'plan_code' => $data['plan_code'] ?? null, 'monthly_amount' => $quote['monthly_amount'],
             'annual_amount' => CatalogPricing::annualFromMonthly($quote['monthly_amount']),
             'amount' => $quote['amount'], 'breakdown' => $quote['breakdown'],
@@ -82,7 +82,7 @@ class SubscriptionController extends Controller
     {
         abort_unless($request->user()->email_verified_at, 403, 'Confirme o e-mail antes de assinar.');
         $data = $request->validate([
-            'product_code' => ['required', Rule::in(['law', 'lead'])],
+            'product_code' => ['required', Rule::in(['law', 'fokus-law', 'lead'])],
             'items' => ['required', 'array', 'min:1'],
             'items.*.module_code' => ['required', 'string', 'max:64'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:1000'],

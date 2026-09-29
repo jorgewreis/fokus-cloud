@@ -41,7 +41,7 @@ Route::get('/auth/preview-admin-transfer', [AuthController::class, 'previewAdmin
 Route::post('/webhooks/mercado-pago', [SubscriptionController::class, 'webhook'])->middleware('throttle:mercado-pago-webhook');
 Route::post('/integrations/usage', [UsageSnapshotController::class, 'store'])->middleware('throttle:60,1,usage-ingestion');
 Route::get('/catalog/{product}', [SubscriptionController::class, 'publicCatalog']);
-Route::post('/catalog/law/quote', [SubscriptionController::class, 'publicQuote'])->middleware('throttle:30,1,law-public-quote');
+Route::post('/catalog/{product}/quote', [SubscriptionController::class, 'publicQuote'])->where('product', 'law|fokus-law')->middleware('throttle:30,1,law-public-quote');
 Route::get('/analytics/config', fn () => response()->json(['measurement_id' => config('services.ga4.measurement_id')]))->middleware('throttle:30,1,analytics-config');
 Route::post('/product-interests', [ProductInterestController::class, 'store'])->middleware('throttle:5,10,product-interest');
 

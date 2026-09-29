@@ -113,6 +113,22 @@ class CatalogAdminTest extends TestCase
         $this->assertNotEquals(0.01, (float) $monthly['amount']);
     }
 
+    public function test_public_law_sales_use_the_canonical_fokus_law_catalog_code(): void
+    {
+        DB::table('products')->where('code', 'law')->update(['code' => 'fokus-law']);
+
+        $this->getJson('/api/catalog/fokus-law')
+            ->assertOk()
+            ->assertJsonPath('plans.0.code', 'law-advocacia');
+
+        $quote = $this->postJson('/api/catalog/fokus-law/quote', [
+            'product_code' => 'fokus-law', 'selection_mode' => 'modules', 'cycle' => 'monthly',
+            'items' => [['module_code' => 'contatos-advocacia', 'quantity' => 1]],
+        ])->assertOk()->assertJsonPath('product_code', 'fokus-law')->json();
+
+        $this->assertGreaterThan(0, (float) $quote['amount']);
+    }
+
     public function test_public_law_quote_refuses_missing_and_pending_catalogs(): void
     {
         $payload = ['product_code' => 'law', 'selection_mode' => 'modules', 'cycle' => 'monthly', 'items' => [['module_code' => 'contatos-advocacia']]];

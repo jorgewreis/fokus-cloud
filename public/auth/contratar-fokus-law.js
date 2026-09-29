@@ -3,7 +3,7 @@
   const message = document.querySelector('#checkout-message');
   const key = 'fokus-law-offer-v1';
   const money = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
-  const quotePayload = (selection) => ({ product_code: 'law', selection_mode: selection.selection_mode, ...(selection.plan_code ? { plan_code: selection.plan_code } : {}), cycle: selection.cycle, items: selection.items });
+  const quotePayload = (selection) => ({ product_code: 'fokus-law', selection_mode: selection.selection_mode, ...(selection.plan_code ? { plan_code: selection.plan_code } : {}), cycle: selection.cycle, items: selection.items });
   const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
   (async () => {
     let selection;
@@ -34,7 +34,7 @@
     if (!user.user?.email_verified) { location.replace('/verificar-email?return_to=%2Fcontratar%2Ffokus-law'); return; }
     if (!user.active_company_id) { content.innerHTML = '<p>Selecione ou crie uma empresa para iniciar a assinatura.</p><a class="fs-btn fs-btn-primary" href="/portal/empresas">Gerenciar empresas</a>'; return; }
     try {
-      const [catalog, publicQuote] = await Promise.all([FokusApi.request('/catalog/law'), FokusApi.request('/catalog/law/quote', { method: 'POST', body: quotePayload(selection) })]);
+      const [catalog, publicQuote] = await Promise.all([FokusApi.request('/catalog/fokus-law'), FokusApi.request('/catalog/fokus-law/quote', { method: 'POST', body: quotePayload(selection) })]);
       let existing = null;
       let canManageLaw = true;
       try { existing = await FokusApi.request('/law/subscription'); }

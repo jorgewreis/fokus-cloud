@@ -8,5 +8,5 @@
     node.innerHTML = `<span>PLANOS FOKUS LAW</span><strong>A partir de ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount)} / mês</strong><a href="/produtos/fokus-law/planos">Ver planos e configurar <span aria-hidden="true">↗</span></a>`;
     node.hidden = false;
   };
-  document.querySelectorAll('[data-law-price-summary]').forEach((node) => window.FokusApi?.request('/catalog/law').then((catalog) => show(node, catalog)).catch(() => {}));
+  document.querySelectorAll('[data-law-price-summary]').forEach((node) => window.FokusApi?.request('/catalog/fokus-law').then((catalog) => show(node, catalog)).catch(() => {}));
 })();

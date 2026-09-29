@@ -76,7 +76,7 @@
       status.textContent = 'Atualizando cotação pelo servidor…'; buy.setAttribute('aria-disabled', 'true');
       const items = codes.map((code) => ({ module_code: code, quantity: 1, personalizations: [...document.querySelectorAll(`[data-module="${CSS.escape(code)}"]`)].filter((select) => select.value).map((select) => ({ type_code: select.dataset.type, tier_value: Number(select.value) })) }));
       try {
-        const result = await window.FokusApi.request('/catalog/law/quote', { method: 'POST', body: { product_code: 'law', selection_mode: state.plan ? 'plan' : 'modules', ...(state.plan ? { plan_code: state.plan } : {}), cycle: state.cycle, items } });
+        const result = await window.FokusApi.request('/catalog/fokus-law/quote', { method: 'POST', body: { product_code: 'fokus-law', selection_mode: state.plan ? 'plan' : 'modules', ...(state.plan ? { plan_code: state.plan } : {}), cycle: state.cycle, items } });
         state.quote = result;
         $('#lp-total').textContent = money(result.amount);
         $('#lp-cycle-label').textContent = state.cycle === 'annual' ? 'Total anual' : 'Total mensal';
@@ -116,7 +116,7 @@
     const observer = new IntersectionObserver((entries) => entries.forEach((entry) => { if (entry.isIntersecting) { entry.target.classList.add('is-visible'); observer.unobserve(entry.target); } }), { threshold: .12 });
     document.querySelectorAll('[data-reveal]').forEach((node) => { node.classList.add('lp-reveal'); observer.observe(node); });
   }
-  window.FokusApi.request('/catalog/law').then((catalog) => {
+  window.FokusApi.request('/catalog/fokus-law').then((catalog) => {
     state.catalog = catalog;
     renderOffers(); renderBuilder(); quote();
     const profiles = form.elements['profiles[]'];
