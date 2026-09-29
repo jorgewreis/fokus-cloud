@@ -121,5 +121,5 @@
     renderOffers(); renderBuilder(); quote();
     const profiles = form.elements['profiles[]'];
     profiles.innerHTML = '<option value="">Selecione uma faixa acima de catálogo primeiro</option>';
-  }).catch(() => { offersNode.innerHTML = '<p class="lp-state">As ofertas do Fokus Law ainda não estão disponíveis. O catálogo comercial não foi publicado; volte mais tarde para consultar valores vigentes.</p>'; $('#lp-modules').innerHTML = '<p class="lp-state">Nenhuma composição pode ser cotada enquanto o catálogo estiver indisponível.</p>'; $('#lp-summary-status').textContent = 'Os preços não são estimados nem fixados nesta página.'; });
+  }).catch((error) => { const catalogUnavailable = [404, 422, 503].includes(error.status); offersNode.innerHTML = `<p class="lp-state">${catalogUnavailable ? 'Não há ofertas disponíveis no momento. Consulte novamente em breve.' : 'Não foi possível carregar as ofertas agora. Tente novamente em instantes.'}</p>`; $('#lp-modules').innerHTML = '<p class="lp-state">A composição será exibida assim que as ofertas estiverem disponíveis.</p>'; $('#lp-summary-status').textContent = 'A cotação usa os valores do catálogo publicado.'; });
 })();
