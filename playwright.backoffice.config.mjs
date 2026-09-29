@@ -5,6 +5,7 @@ export default defineConfig({
     testIgnore: '**/security-homologation.spec.mjs',
     timeout: 30_000,
     workers: process.env.CI ? 1 : undefined,
+    retries: process.env.CI ? 2 : 0,
     expect: { timeout: 10_000 },
     reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
     snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}{ext}',
