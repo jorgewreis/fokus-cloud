@@ -17,7 +17,7 @@ return new class extends Migration
             $table->date('starts_on')->nullable();
             $table->date('ends_on')->nullable();
             $table->timestamps();
-            $table->index(['company_id', 'link_id', 'role_code']);
+            $table->index(['company_id', 'link_id', 'role_code'], 'lcr_roles_comp_link_role_idx');
         });
         Schema::create('law_contact_relationship_designations', function (Blueprint $table): void {
             $table->string('id', 30)->primary();
@@ -28,7 +28,7 @@ return new class extends Migration
             $table->date('starts_on')->nullable();
             $table->date('ends_on')->nullable();
             $table->timestamps();
-            $table->index(['company_id', 'normalized_name']);
+            $table->index(['company_id', 'normalized_name'], 'lcr_design_company_name_idx');
         });
         Schema::create('law_contact_institutional_data', function (Blueprint $table): void {
             $table->string('id', 30)->primary();
