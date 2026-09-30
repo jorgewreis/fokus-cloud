@@ -32,7 +32,7 @@ export async function mount(root, context = {}) {
     const field = (name) => form.elements.namedItem(name);
     const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[character]));
     const money = (value) => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-    const publicationVersion = (module) => Number(module.published_version) > 0 ? `v${Number(module.published_version)}.0` : "—";
+    const publicationVersion = (module) => module.release_version || (Number(module.published_version) > 0 ? `v${Number(module.published_version)}.0` : "—");
     const labels = { ativo: "Ativo", inativo: "Inativo", rascunho: "Rascunho", pausado: "Pausado", arquivado: "Arquivado", publicado: "Publicado" };
     const showMessage = (text, tone = "danger") => { const node = $("#modules-message"); node.textContent = text || ""; node.dataset.tone = tone; node.hidden = !text; };
     const selectedValues = (selector) => [...$(selector).selectedOptions].map((option) => option.value).filter(Boolean);
@@ -229,6 +229,8 @@ export async function mount(root, context = {}) {
             $("#module-dialog-title").textContent = { archive: "Arquivar módulo", delete: "Excluir módulo", pause: "Pausar módulo", publish: "Publicar módulo" }[type];
             $("#module-dialog-description").textContent = needsReason ? "Informe o motivo para registrar esta ação." : "O catálogo do produto ficará indisponível até a nova publicação em Produtos.";
             $("#module-dialog-reason").closest("label").hidden = !needsReason;
+            $("#module-release-choice").hidden = type !== "publish";
+            $("#module-destructive-form").querySelector('[name="release_type"][value="minor"]').checked = true;
             $("#module-dialog-reason").required = needsReason;
             $("#module-dialog-reason").value = "";
             $("#module-destructive-form").querySelector('[type="submit"]').textContent = type === "pause" ? "Confirmar pausa" : type === "publish" ? "Confirmar publicação" : "Confirmar";
@@ -238,7 +240,7 @@ export async function mount(root, context = {}) {
         try { await api.request(`/backoffice/catalog/modules/${module.id}/activate`, { method: "POST" }); await load(); showMessage("Módulo ativado. Publique o módulo e o catálogo em Produtos.", "success"); } catch (error) { showMessage(error.message || "Não foi possível atualizar o módulo."); }
     });
     $("#module-pagination").addEventListener("click", (event) => { const button = event.target.closest("[data-module-page]"); if (!button || button.disabled) return; state.page = Number(button.dataset.modulePage); render(); });
-    $("#module-destructive-form").addEventListener("submit", async (event) => { event.preventDefault(); if (!state.pending) return; const { type, module } = state.pending; const reason = new FormData(event.currentTarget).get("reason"); const needsReason = ["archive", "delete"].includes(type); try { const response = await api.request(type === "delete" ? `/backoffice/catalog/modules/${module.id}` : `/backoffice/catalog/modules/${module.id}/${type}`, { method: type === "delete" ? "DELETE" : "POST", body: needsReason ? { reason } : undefined }); destructiveModal?.hide(); state.pending = null; await load(); showMessage(type === "publish" ? `Módulo publicado na versão v${Number(response.published_version)}.0. Publique também o catálogo em Produtos.` : type === "pause" ? "Módulo pausado. O catálogo está pendente de republicação." : "Ação concluída.", "success"); } catch (error) { showMessage(error.message || "Não foi possível concluir a ação."); } });
+    $("#module-destructive-form").addEventListener("submit", async (event) => { event.preventDefault(); if (!state.pending) return; const { type, module } = state.pending; const formData = new FormData(event.currentTarget); const reason = formData.get("reason"); const needsReason = ["archive", "delete"].includes(type); try { const response = await api.request(type === "delete" ? `/backoffice/catalog/modules/${module.id}` : `/backoffice/catalog/modules/${module.id}/${type}`, { method: type === "delete" ? "DELETE" : "POST", body: type === "publish" ? { release_type: formData.get("release_type") } : needsReason ? { reason } : undefined }); destructiveModal?.hide(); state.pending = null; await load(); showMessage(type === "publish" ? `Módulo publicado na versão ${response.release_version || `v${Number(response.published_version)}.0`}. Publique também o catálogo em Produtos.` : type === "pause" ? "Módulo pausado. O catálogo está pendente de republicação." : "Ação concluída.", "success"); } catch (error) { showMessage(error.message || "Não foi possível concluir a ação."); } });
 
     await load();
     return () => {

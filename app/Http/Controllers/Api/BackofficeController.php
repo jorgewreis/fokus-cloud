@@ -1017,17 +1017,17 @@ class BackofficeController extends Controller
 
     public function publishCatalog(Request $request, string $product, CatalogManager $catalog, PlatformAudit $audit)
     {
-        $data = $request->validate(['reason' => ['nullable', 'string', 'max:1000']]);
+        $data = $request->validate(['reason' => ['nullable', 'string', 'max:1000'], 'release_type' => ['sometimes', 'in:minor,major']]);
         $reason = app(\App\Services\AuditSanitizer::class)->sanitizeText(trim((string) ($data['reason'] ?? '')) ?: 'Publicação do catálogo pelo Backoffice.');
         $productBefore = DB::table('products')->where('id', $product)->first();
         abort_unless($productBefore, 404, 'Produto não encontrado.');
         $previousPublication = DB::table('catalog_publications')->where('product_id', $product)->orderByDesc('version')->first();
-        $publication = $catalog->publish($product, $request->user()->id, $reason);
+        $publication = $catalog->publish($product, $request->user()->id, $reason, $data['release_type'] ?? 'minor');
         $audit->record($request->user()->id, 'backoffice.catalog_published', 'product', $product, reason: $reason, metadata: ['version' => $publication['version']],
             before: ['published_version' => $previousPublication?->version, 'publication_pending' => (bool) $productBefore->publication_pending, 'catalog_snapshot' => $previousPublication ? json_decode($previousPublication->snapshot, true) : []],
-            after: ['published_version' => $publication['version'], 'publication_pending' => false, 'catalog_snapshot' => $publication['snapshot']], request: $request);
+            after: ['published_version' => $publication['version'], 'release_version' => $publication['release_version'], 'publication_pending' => false, 'catalog_snapshot' => $publication['snapshot']], request: $request);
 
-        return response()->json(['message' => 'Catálogo publicado.', 'version' => $publication['version']]);
+        return response()->json(['message' => 'Catálogo publicado.', 'version' => $publication['version'], 'release_version' => $publication['release_version']]);
     }
 
     public function deleteCatalogPublication(Request $request, string $publication, CatalogManager $catalog, PlatformAudit $audit)
@@ -1075,18 +1075,20 @@ class BackofficeController extends Controller
 
     public function publishModule(Request $request, string $module, CatalogManager $catalog, PlatformAudit $audit)
     {
-        [$before, $after] = $catalog->publishModule($module);
+        $data = $request->validate(['release_type' => ['sometimes', 'in:minor,major']]);
+        [$before, $after] = $catalog->publishModule($module, $data['release_type'] ?? 'minor');
         $audit->record($request->user()->id, 'backoffice.catalog_module_published', 'module', $module, before: $before, after: $after, request: $request);
 
-        return response()->json(['message' => 'Módulo publicado.', 'published_version' => $after['published_version']]);
+        return response()->json(['message' => 'Módulo publicado.', 'published_version' => $after['published_version'], 'release_version' => $after['release_version']]);
     }
 
     public function publishPlan(Request $request, string $plan, CatalogManager $catalog, PlatformAudit $audit)
     {
-        [$before, $after] = $catalog->publishPlan($plan);
+        $data = $request->validate(['release_type' => ['sometimes', 'in:minor,major']]);
+        [$before, $after] = $catalog->publishPlan($plan, $data['release_type'] ?? 'minor');
         $audit->record($request->user()->id, 'backoffice.catalog_plan_published', 'plan', $plan, before: $before, after: $after, request: $request);
 
-        return response()->json(['message' => 'Plano publicado.', 'published_version' => $after['published_version']]);
+        return response()->json(['message' => 'Plano publicado.', 'published_version' => $after['published_version'], 'release_version' => $after['release_version']]);
     }
 
     public function archiveCatalogItem(Request $request, string $type, string $id, CatalogManager $catalog, PlatformAudit $audit)

@@ -644,6 +644,9 @@ class SubscriptionController extends Controller
                 'product_catalog_version' => (int) ($publishedCatalog['published_version'] ?? 0),
                 'plan_version' => isset($publishedPlan) ? (int) ($publishedPlan['published_version'] ?? 0) : null,
                 'module_versions' => collect($codes)->mapWithKeys(fn (string $code): array => [$code => (int) ($publishedModules->get($code)['published_version'] ?? 0)])->all(),
+                'product_catalog_release_version' => $publishedCatalog['release_version'] ?? null,
+                'plan_release_version' => $publishedPlan['release_version'] ?? null,
+                'module_release_versions' => collect($codes)->mapWithKeys(fn (string $code): array => [$code => $publishedModules->get($code)['release_version'] ?? null])->all(),
             ],
         ];
     }

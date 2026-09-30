@@ -113,11 +113,13 @@ const valueForDisplay = (key, value) => {
 };
 
 const detailList = (entries) => entries.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("");
-const publishedVersionLabel = (version) => Number(version) > 0 ? `v${Number(version)}.0` : "Não registrada";
+const publishedVersionLabel = (version) => typeof version === "string" && /^\d+\.\d{1,2}$/.test(version) ? version : Number(version) > 0 ? `v${Number(version)}.0` : "Não registrada";
 const publicationVersionEntries = (versions = {}) => [
-    ["Versão do catálogo contratada", publishedVersionLabel(versions.product_catalog_version)],
-    ["Versão do plano contratado", publishedVersionLabel(versions.plan_version)],
-    ["Versões dos módulos contratados", versions.module_versions && Object.keys(versions.module_versions).length
+    ["Versão do catálogo contratada", publishedVersionLabel(versions.product_catalog_release_version || versions.product_catalog_version)],
+    ["Versão do plano contratado", publishedVersionLabel(versions.plan_release_version || versions.plan_version)],
+    ["Versões dos módulos contratados", versions.module_release_versions && Object.keys(versions.module_release_versions).length
+        ? Object.entries(versions.module_release_versions).map(([code, version]) => `${code}: ${publishedVersionLabel(version)}`).join(", ")
+        : versions.module_versions && Object.keys(versions.module_versions).length
         ? Object.entries(versions.module_versions).map(([code, version]) => `${code}: ${publishedVersionLabel(version)}`).join(", ")
         : "Não registradas"],
 ];

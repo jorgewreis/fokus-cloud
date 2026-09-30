@@ -83,9 +83,9 @@
         $('#lp-total').textContent = money(result.amount);
         $('#lp-cycle-label').textContent = state.cycle === 'annual' ? 'Total anual' : 'Total mensal';
         $('#lp-summary-items').innerHTML = `<p>Plano-base: ${money(result.breakdown.plan_base)}</p><p>Módulos adicionais: ${money(result.breakdown.extra_modules)}</p><p>Ajuste de capacidade: ${money(result.breakdown.capacity_adjustments)}</p>`;
-        status.textContent = `Cotação baseada na versão ${result.publication_versions.product_catalog_version} do catálogo.`;
+        status.textContent = `Cotação baseada na versão ${result.publication_versions.product_catalog_release_version || result.publication_versions.product_catalog_version} do catálogo.`;
         buy.setAttribute('aria-disabled', 'false');
-        localStorage.setItem('fokus-law-offer-v1', JSON.stringify({ selection_mode: state.plan ? 'plan' : 'modules', plan_code: state.plan || null, cycle: state.cycle, items, quote_version: result.publication_versions.product_catalog_version }));
+        localStorage.setItem('fokus-law-offer-v1', JSON.stringify({ selection_mode: state.plan ? 'plan' : 'modules', plan_code: state.plan || null, cycle: state.cycle, items, quote_version: result.publication_versions.product_catalog_release_version || result.publication_versions.product_catalog_version }));
       } catch (error) { state.quote = null; status.textContent = error.message || 'Não foi possível calcular esta composição.'; $('#lp-total').textContent = '—'; }
     }, 180);
   };

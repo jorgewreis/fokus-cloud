@@ -96,6 +96,25 @@ class CatalogAdminTest extends TestCase
             ->assertJsonStructure(['product', 'modules', 'plans', 'published_at']);
     }
 
+    public function test_publication_type_advances_minor_or_major_release_versions_for_items_and_catalog(): void
+    {
+        $admin = $this->admin();
+        $module = DB::table('modules')->where('code', 'processos-advocacia')->first();
+        $product = DB::table('products')->where('id', $module->product_id)->first();
+
+        $this->actingAs($admin, 'platform')
+            ->postJson("/api/backoffice/catalog/modules/{$module->id}/publish", ['release_type' => 'minor'])
+            ->assertOk()->assertJsonPath('release_version', '1.01');
+
+        $this->postJson("/api/backoffice/catalog/{$product->id}/publish", ['release_type' => 'major'])
+            ->assertOk()->assertJsonPath('release_version', '2.0');
+
+        $catalog = $this->getJson('/api/catalog/law')->assertOk();
+        $catalog->assertJsonPath('release_version', '2.0');
+        $this->assertSame('1.01', collect($catalog->json('modules'))->firstWhere('id', $module->id)['release_version']);
+        $this->assertSame('2.0', DB::table('products')->where('id', $product->id)->value('release_version'));
+    }
+
     public function test_public_law_quote_uses_published_catalog_and_annual_rule(): void
     {
         $monthly = $this->postJson('/api/catalog/law/quote', [

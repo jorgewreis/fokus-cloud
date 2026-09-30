@@ -166,9 +166,14 @@ Cada publicacao gera snapshot versionado por produto em `catalog_publications`.
 Edicoes administrativas posteriores nao alteram o catalogo publico ate nova
 publicacao.
 
-Planos e modulos possuem sua propria `published_version`, incrementada em cada
-publicacao explicita. A publicacao do produto gera `published_catalog_version`
-e congela no snapshot as versoes dos planos e modulos incluidos. Publicar um
+Planos e modulos possuem um contador tecnico `published_version` e uma
+`release_version` textual no formato `MAJOR.MINOR`, como `1.00`, `1.01` e `2.0`.
+Ao publicar, a pessoa escolhe Minor para uma mudanca compativel (incrementa a
+subversao) ou Major para uma mudanca que pode exigir adaptacao (incrementa a
+versao principal e zera a subversao). A primeira publicacao inicia em `1.00`.
+A publicacao do produto gera `published_catalog_version` tecnico e sua propria
+`release_version`, congelando no snapshot as versoes dos planos e modulos
+incluidos. Publicar um
 plano ou modulo prepara sua versao e marca o catalogo do produto como pendente;
 somente a acao manual de publicar o catalogo do produto torna o conjunto
 disponivel para novas contratacoes. A publicacao inicial tambem deve estar

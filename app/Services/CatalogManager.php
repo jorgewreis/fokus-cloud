@@ -22,6 +22,7 @@ class CatalogManager
             'products' => $products->map(fn (object $product): array => [
                 ...$this->productPayload($product),
                 'published_catalog_version' => (int) $product->published_catalog_version,
+                'release_version' => $product->release_version,
                 'publication_pending' => (bool) $product->publication_pending,
                 'modules' => $modules->where('product_id', $product->id)->values()->map(fn (object $module): array => $this->modulePayload($module))->all(),
                 'plans' => $plans->where('product_id', $product->id)->values()->all(),
@@ -88,12 +89,14 @@ class CatalogManager
                 'plan.status',
                 'plan.publication_state',
                 'plan.published_version',
+                'plan.release_version',
                 'plan.display_order',
                 'plan.featured',
                 'product.name',
                 'product.code',
                 'product.status',
                 'product.published_catalog_version',
+                'product.release_version',
             )
             ->select(
                 'plan.id',
@@ -107,12 +110,14 @@ class CatalogManager
                 'plan.status',
                 'plan.publication_state',
                 'plan.published_version',
+                'plan.release_version',
                 'plan.display_order',
                 'plan.featured',
                 'product.name as product_name',
                 'product.code as product_code',
                 'product.status as product_status',
                 'product.published_catalog_version as product_publication_version',
+                'product.release_version as product_release_version',
                 DB::raw('round(coalesce(sum(module.monthly_price), 0), 2) as module_monthly_amount'),
                 DB::raw('count(module.id) as modules_count'),
             )
@@ -135,6 +140,7 @@ class CatalogManager
                 'module.status',
                 'module.publication_state',
                 'module.published_version',
+                'module.release_version',
                 'module.price_is_estimate',
             ])
             ->groupBy('plan_id');
@@ -162,6 +168,7 @@ class CatalogManager
                 'product_status' => $plan->product_status,
                 'product_publication_version' => (int) ($plan->product_publication_version ?? 0),
                 'published_version' => (int) $plan->published_version,
+                'release_version' => $plan->release_version,
                 'code' => $plan->code,
                 'name' => $plan->name,
                 'base_name' => $plan->name,
@@ -429,39 +436,46 @@ class CatalogManager
         });
     }
 
-    public function publish(string $productId, ?string $adminId, string $reason): array
+    public function publish(string $productId, ?string $adminId, string $reason, string $releaseType = 'minor'): array
     {
         $publicationId = PrefixedUlid::make('CPB');
 
-        $publication = DB::transaction(function () use ($productId, $adminId, $reason, $publicationId): array {
+        $publication = DB::transaction(function () use ($productId, $adminId, $reason, $publicationId, $releaseType): array {
             $product = DB::table('products')->where('id', $productId)->lockForUpdate()->first();
             abort_unless($product, 404, 'Produto não encontrado.');
 
             // An item promoted as part of the product release receives its first
             // version here. Items explicitly published beforehand keep that version.
-            DB::table('modules')->where('product_id', $productId)->where('status', 'ativo')->where('publication_state', '!=', 'publicado')->increment('published_version');
-            DB::table('modules')->where('product_id', $productId)->where('status', 'ativo')->update(['publication_state' => 'publicado', 'updated_at' => now()]);
-            DB::table('plans')->where('product_id', $productId)->where('status', 'ativo')->where('publication_state', '!=', 'publicado')->increment('published_version');
-            DB::table('plans')->where('product_id', $productId)->where('status', 'ativo')->update(['publication_state' => 'publicado', 'updated_at' => now()]);
+            foreach (['modules', 'plans'] as $table) {
+                $items = DB::table($table)->where('product_id', $productId)->where('status', 'ativo')->where('publication_state', '!=', 'publicado')->get(['id', 'release_version']);
+                foreach ($items as $item) {
+                    DB::table($table)->where('id', $item->id)->increment('published_version', 1, [
+                        'release_version' => self::nextReleaseVersion($item->release_version, 'major'),
+                        'publication_state' => 'publicado', 'updated_at' => now(),
+                    ]);
+                }
+            }
 
             $snapshot = $this->buildPublicationSnapshot($productId);
             $version = ((int) DB::table('catalog_publications')->where('product_id', $productId)->max('version')) + 1;
+            $releaseVersion = self::nextReleaseVersion($product->release_version, $releaseType);
             DB::table('catalog_publications')->insert([
                 'id' => $publicationId,
                 'product_id' => $productId,
                 'version' => $version,
-                'snapshot' => json_encode([...$snapshot, 'published_version' => $version]),
+                'release_version' => $releaseVersion,
+                'snapshot' => json_encode([...$snapshot, 'published_version' => $version, 'release_version' => $releaseVersion]),
                 'published_by_platform_admin_id' => $adminId,
                 'reason' => $reason,
                 'published_at' => now(),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
-            DB::table('products')->where('id', $productId)->update(['published_catalog_version' => $version, 'publication_pending' => false, 'updated_at' => now()]);
-            return ['version' => $version, 'snapshot' => $snapshot];
+            DB::table('products')->where('id', $productId)->update(['published_catalog_version' => $version, 'release_version' => $releaseVersion, 'publication_pending' => false, 'updated_at' => now()]);
+            return ['version' => $version, 'release_version' => $releaseVersion, 'snapshot' => $snapshot];
         });
 
-        return ['id' => $publicationId, 'version' => $publication['version'], 'snapshot' => [...$publication['snapshot'], 'published_version' => $publication['version']]];
+        return ['id' => $publicationId, 'version' => $publication['version'], 'release_version' => $publication['release_version'], 'snapshot' => [...$publication['snapshot'], 'published_version' => $publication['version'], 'release_version' => $publication['release_version']]];
     }
 
     public function publicCatalog(string $productCode, bool $allowPendingPublication = false): array
@@ -482,6 +496,7 @@ class CatalogManager
         return [
             ...$snapshot,
             'published_version' => (int) $publication->version,
+            'release_version' => $publication->release_version,
             'published_at' => $publication->published_at,
         ];
     }
@@ -538,15 +553,16 @@ class CatalogManager
         return [(array) $current, (array) DB::table('plans')->where('id', $id)->first()];
     }
 
-    public function publishPlan(string $id): array
+    public function publishPlan(string $id, string $releaseType = 'minor'): array
     {
-        [$current, $published] = DB::transaction(function () use ($id): array {
+        [$current, $published] = DB::transaction(function () use ($id, $releaseType): array {
             $current = DB::table('plans')->where('id', $id)->lockForUpdate()->first();
             abort_unless($current, 404, 'Plano não encontrado.');
             abort_unless($current->status === 'ativo', 422, 'Somente planos ativos podem ser publicados.');
             abort_if($current->publication_state === 'arquivado', 422, 'Plano arquivado não pode ser publicado.');
 
             DB::table('plans')->where('id', $id)->increment('published_version', 1, [
+                'release_version' => self::nextReleaseVersion($current->release_version, $releaseType),
                 'publication_state' => 'publicado',
                 'updated_at' => now(),
             ]);
@@ -557,14 +573,15 @@ class CatalogManager
         return [(array) $current, (array) $published];
     }
 
-    public function publishModule(string $id): array
+    public function publishModule(string $id, string $releaseType = 'minor'): array
     {
-        [$current, $published] = DB::transaction(function () use ($id): array {
+        [$current, $published] = DB::transaction(function () use ($id, $releaseType): array {
             $current = DB::table('modules')->where('id', $id)->lockForUpdate()->first();
             abort_unless($current, 404, 'Módulo não encontrado.');
             abort_unless($current->status === 'ativo', 422, 'Somente módulos ativos podem ser publicados.');
 
             DB::table('modules')->where('id', $id)->increment('published_version', 1, [
+                'release_version' => self::nextReleaseVersion($current->release_version, $releaseType),
                 'publication_state' => 'publicado',
                 'updated_at' => now(),
             ]);
@@ -610,9 +627,14 @@ class CatalogManager
             $latestVersion = (int) DB::table('catalog_publications')
                 ->where('product_id', $publication->product_id)
                 ->max('version');
+            $latestPublication = DB::table('catalog_publications')
+                ->where('product_id', $publication->product_id)
+                ->orderByDesc('version')
+                ->first();
 
             DB::table('products')->where('id', $publication->product_id)->update([
                 'published_catalog_version' => $latestVersion,
+                'release_version' => $latestPublication?->release_version,
                 'updated_at' => now(),
             ]);
             if ($latestVersion === 0) {
@@ -722,6 +744,7 @@ class CatalogManager
                 'code' => $plan['code'],
                 'name' => $plan['full_name'],
                 'published_version' => (int) $plan['published_version'],
+                'release_version' => $plan['release_version'],
                 'base_name' => $plan['base_name'],
                 'segment' => $plan['segment'],
                 'featured' => (bool) $plan['featured'],
@@ -746,6 +769,7 @@ class CatalogManager
                 'publication.product_id',
                 'product.name as product_name',
                 'publication.version',
+                'publication.release_version',
                 'publication.reason',
                 'publication.published_at',
                 'admin.name as published_by',
@@ -755,6 +779,7 @@ class CatalogManager
                 'product_id' => $publication->product_id,
                 'product_name' => $publication->product_name,
                 'version' => (int) $publication->version,
+                'release_version' => $publication->release_version,
                 'reason' => $publication->reason,
                 'published_at' => $publication->published_at,
                 'published_by' => $publication->published_by,
@@ -830,6 +855,7 @@ class CatalogManager
             'status' => $module->status ?? 'rascunho',
             'publication_state' => $module->publication_state ?? 'rascunho',
             'published_version' => (int) ($module->published_version ?? 0),
+            'release_version' => $module->release_version ?? null,
             'display_order' => (int) ($module->display_order ?? 0),
             'featured' => (bool) ($module->featured ?? false),
             'available_standalone' => (bool) ($module->available_standalone ?? false),
@@ -1131,6 +1157,20 @@ class CatalogManager
             'team' => 'Fokus Cloud Lead Team',
             default => $productName,
         };
+    }
+
+    public static function nextReleaseVersion(?string $current, string $releaseType): string
+    {
+        abort_unless(in_array($releaseType, ['minor', 'major'], true), 422, 'Selecione uma atualização minor ou major.');
+        if (! preg_match('/^(\d+)\.(\d{1,2})$/', (string) $current, $matches)) {
+            return '1.00';
+        }
+
+        $major = (int) $matches[1];
+        $minor = (int) $matches[2];
+        return $releaseType === 'major'
+            ? ($major + 1).'.0'
+            : $major.'.'.str_pad((string) ($minor + 1), 2, '0', STR_PAD_LEFT);
     }
 
 }

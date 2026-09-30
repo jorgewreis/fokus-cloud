@@ -6,3 +6,11 @@
 .fs-table-responsive.fs-datatable {
     width: 100%;
 }
+
+.release-choice { display: grid; gap: 10px; margin: 0 0 18px; padding: 0; border: 0; }
+.release-choice[hidden] { display: none; }
+.release-choice legend { margin-bottom: 8px; color: var(--theme-text); font-weight: 700; }
+.release-choice label { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--theme-border-alt); border-radius: var(--radius-control); background: var(--theme-surface); cursor: pointer; }
+.release-choice input { margin: 3px 0 0; accent-color: var(--role-color-500); }
+.release-choice span { display: grid; gap: 3px; }
+.release-choice small { color: var(--theme-text-secondary); line-height: 1.4; }

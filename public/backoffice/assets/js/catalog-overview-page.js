@@ -58,7 +58,7 @@ export async function mount(root, context = {}) {
                 <td><span class="catalog-overview-product"><strong>${escapeHtml(product.name || "Produto sem nome")}</strong><small>${escapeHtml(product.code || "Código não informado")}</small></span></td>
                 <td>${statusBadge(product.status)}</td>
                 <td><span class="fs-badge fs-badge-soft-${publicationTone}">${escapeHtml(publication)}</span></td>
-                <td>${version > 0 ? `v${version}.0` : "—"}</td>
+                <td>${version > 0 ? escapeHtml(product.release_version || `v${version}.0`) : "—"}</td>
                 <td>${isPending(product) && canOpenCatalogManagement ? `<button class="fs-btn fs-btn-outline-primary fs-btn-sm" type="button" data-catalog-nav="products" aria-label="Gerenciar produto ${escapeHtml(product.name || product.code || "")}">Abrir Produtos</button>` : "—"}</td>
             </tr>`;
         }).join("");
@@ -77,7 +77,7 @@ export async function mount(root, context = {}) {
             const formattedDate = validDate ? parsed.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "Data não informada";
             return `<tr>
                 <td><strong>${escapeHtml(publication.product_name || "Produto removido")}</strong></td>
-                <td>v${escapeHtml(publication.version || "—")}.0</td>
+                <td>${escapeHtml(publication.release_version || `v${publication.version || "—"}.0`)}</td>
                 <td>${validDate ? `<time datetime="${escapeHtml(parsed.toISOString())}">${escapeHtml(formattedDate)}</time>` : escapeHtml(formattedDate)}</td>
                 <td>${escapeHtml(publication.published_by || "Responsável não informado")}</td>
                 <td class="catalog-overview-reason">${escapeHtml(publication.reason || "Motivo não informado")}</td>

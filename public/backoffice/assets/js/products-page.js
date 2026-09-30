@@ -48,7 +48,7 @@ export async function mount(root, context = {}) {
         state.page = Math.min(state.page, totalPages);
         const offset = (state.page - 1) * pageSize;
         const rows = products.slice(offset, offset + pageSize);
-        list.innerHTML = rows.length ? rows.map((product) => `<tr><td class="fs-width-600" data-label="Produto"><strong>${escapeHtml(product.name)}</strong><small class="fs-u-d-block fs-u-fs-sm">${escapeHtml(product.code)}</small></td><td class="fs-width-300" data-label="Status">${statusBadge(product.status)}</td><td class="fs-width-300" data-label="Publicação">${catalogPublicationBadge(product)}</td><td class="fs-width-300" data-label="Versão do catálogo">${Number(product.published_catalog_version) > 0 ? `v${Number(product.published_catalog_version)}.0` : "—"}</td><td class="fs-width-400" data-label="Planos cadastrados"><strong>${(product.plans || []).length}</strong></td><td class="fs-width-400" data-label="Ações"><div class="fs-u-d-flex fs-u-gap-2">${productActions(product)}</div></td></tr>`).join("") : '<tr><td colspan="6">Nenhum produto encontrado.</td></tr>';
+        list.innerHTML = rows.length ? rows.map((product) => `<tr><td class="fs-width-600" data-label="Produto"><strong>${escapeHtml(product.name)}</strong><small class="fs-u-d-block fs-u-fs-sm">${escapeHtml(product.code)}</small></td><td class="fs-width-300" data-label="Status">${statusBadge(product.status)}</td><td class="fs-width-300" data-label="Publicação">${catalogPublicationBadge(product)}</td><td class="fs-width-300" data-label="Versão do catálogo">${Number(product.published_catalog_version) > 0 ? escapeHtml(product.release_version || `v${Number(product.published_catalog_version)}.0`) : "—"}</td><td class="fs-width-400" data-label="Planos cadastrados"><strong>${(product.plans || []).length}</strong></td><td class="fs-width-400" data-label="Ações"><div class="fs-u-d-flex fs-u-gap-2">${productActions(product)}</div></td></tr>`).join("") : '<tr><td colspan="6">Nenhum produto encontrado.</td></tr>';
         $("#product-table-summary").textContent = `${products.length} registros encontrados`;
         $("#product-table-footer-summary").textContent = `Mostrando página ${state.page} de ${totalPages} com ${rows.length} registros, de um total de ${totalPages} páginas.`;
         renderPagination(state.page, totalPages);
@@ -111,7 +111,7 @@ export async function mount(root, context = {}) {
         $("#product-view-code").textContent = product.code || "-";
         $("#product-view-status").innerHTML = statusBadge(product.status);
         $("#product-view-plans").textContent = String((product.plans || []).length);
-        $("#product-view-version").textContent = Number(product.published_catalog_version) > 0 ? `v${Number(product.published_catalog_version)}.0` : "—";
+        $("#product-view-version").textContent = Number(product.published_catalog_version) > 0 ? (product.release_version || `v${Number(product.published_catalog_version)}.0`) : "—";
         $("#product-view-publication").textContent = product.publication_pending ? "Republicação pendente" : Number(product.published_catalog_version) > 0 ? "Atualizada" : "Não publicado";
         setDescription("#product-view-technical-description", product.technical_description, "Nenhuma descrição técnica informada.");
         setDescription("#product-view-commercial-content", product.commercial_content, "Nenhuma descrição comercial informada.");
@@ -129,12 +129,12 @@ export async function mount(root, context = {}) {
             if (!context.signal?.aborted) showMessage(error.message || "Não foi possível carregar os produtos.");
         }
     };
-    const runAction = async (product, type) => {
+    const runAction = async (product, type, releaseType = "minor") => {
         const endpoint = type === "publish" ? `/backoffice/catalog/${product.id}/publish` : type === "pause" ? `/backoffice/catalog/products/${product.id}/pause` : type === "activate" ? `/backoffice/catalog/products/${product.id}/activate` : `/backoffice/catalog/products/${product.id}`;
         try {
-            const response = await api.request(endpoint, { method: type === "delete" ? "DELETE" : "POST" });
+            const response = await api.request(endpoint, { method: type === "delete" ? "DELETE" : "POST", body: type === "publish" ? { release_type: releaseType } : undefined });
             await load();
-            showMessage(type === "publish" ? `Catálogo publicado na versão v${Number(response.version)}.0.` : type === "pause" ? "Produto pausado." : type === "activate" ? "Produto ativado. Publique a nova versão do catálogo." : "Produto excluído.", "success");
+            showMessage(type === "publish" ? `Catálogo publicado na versão ${response.release_version || `v${Number(response.version)}.0`}.` : type === "pause" ? "Produto pausado." : type === "activate" ? "Produto ativado. Publique a nova versão do catálogo." : "Produto excluído.", "success");
         } catch (error) {
             showMessage(error.message || "Não foi possível concluir a ação.");
         }
@@ -181,6 +181,8 @@ export async function mount(root, context = {}) {
             state.pendingAction = { product, type };
             $("#product-action-title").textContent = type === "publish" ? (Number(product.published_catalog_version) > 0 ? "Publicar nova versão" : "Publicação inicial do catálogo") : "Pausar produto";
             $("#product-action-description").textContent = type === "publish" ? "A publicação gera uma versão do catálogo com os módulos e planos publicados e libera o produto para novas contratações." : "O catálogo do produto ficará indisponível até a nova publicação.";
+            $("#product-release-choice").hidden = type !== "publish";
+            $("#product-action-form").querySelector('[name="release_type"][value="minor"]').checked = true;
             $("#product-action-submit").textContent = type === "publish" ? "Publicar catálogo" : "Confirmar pausa";
             actionModal?.show();
         }
@@ -192,7 +194,8 @@ export async function mount(root, context = {}) {
         const { product, type } = state.pendingAction;
         state.pendingAction = null;
         actionModal?.hide();
-        await runAction(product, type);
+        const releaseType = new FormData(event.currentTarget).get("release_type") || "minor";
+        await runAction(product, type, releaseType);
     });
 
     await load();

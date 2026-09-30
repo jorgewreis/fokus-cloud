@@ -59,7 +59,8 @@ cadastrada quando o plano nao possuir preco proprio.
 | `POST /api/backoffice/catalog/modules` e `PATCH /api/backoffice/catalog/modules/{module}` | Criar e editar funcionalidades. |
 | `POST /api/backoffice/catalog/plans` e `PATCH /api/backoffice/catalog/plans/{plan}` | Criar e editar planos. |
 | `PUT /api/backoffice/catalog/plans/{plan}/modules` | Atualizar composicao do plano. |
-| `POST /api/backoffice/catalog/{product}/publish` | Publicar snapshot versionado. |
+| `POST /api/backoffice/catalog/{product}/publish` | Publicar snapshot versionado; aceita `release_type: minor` ou `major` (omissao usa minor para compatibilidade). |
+| `POST /api/backoffice/catalog/modules/{module}/publish` e `POST /api/backoffice/catalog/plans/{plan}/publish` | Publicar módulo ou plano com `release_type: minor` ou `major`. |
 | `POST /api/backoffice/catalog/{type}/{id}/pause` | Pausar item publicado. |
 | `POST /api/backoffice/catalog/{type}/{id}/archive` | Arquivar item publicado. |
 
@@ -72,6 +73,11 @@ de ativar e publicar os itens alterados, o superadministrador publica uma nova
 versao pelo endpoint do produto. Enquanto a publicacao estiver pendente, o
 catalogo publico bloqueia novas contratacoes. A publicacao pode ser enviada sem
 `reason`; o Backoffice registra um motivo padrao na auditoria.
+
+As versoes tecnicas numericas continuam disponiveis para integracoes antigas.
+`release_version` e a versao comercial legivel, guardada como texto para
+preservar formatos como `1.01`; cotacoes e snapshots de assinatura registram as
+versoes comerciais de catalogo, plano e modulos.
 
 ## Catalogo publico
 
