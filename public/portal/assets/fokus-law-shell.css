@@ -70,7 +70,7 @@
 .law-system-brand b { color: var(--law-shell-lilac); font-weight: 700; }
 .law-subscription-label { overflow: hidden; margin: 0 0 14px; color: #d9cedd; font-size: 11px; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .law-company-context { display: grid; min-width: 0; gap: 2px; text-transform: uppercase; }
-.law-context-caption { color: lime; font-size: 9px; text-transform: uppercase; }
+.law-context-caption { color: #68e1ce; font-size: 9px; text-transform: uppercase; }
 .law-unit-context { display: grid; min-width: 0; gap: 2px; margin-top: 5px; }
 .law-unit-select { width: 100%; min-width: 0; padding: 5px 24px 5px 0; border: 0; border-bottom: 1px solid rgba(255,255,255,.24); border-radius: 4px; background: transparent; color: #fff; font-family: 'Google Sans', sans-serif; font-size: 12px; text-transform: uppercase; }
 .law-unit-select:focus-visible { outline: 2px solid var(--law-shell-sage); outline-offset: 2px; }
