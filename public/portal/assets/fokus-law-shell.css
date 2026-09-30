@@ -417,6 +417,7 @@
 .law-contact-editor input[name="tags"] { max-width: 420px; }
 .law-contact-editor textarea[name="notes"] { max-width: 680px; }
 .law-contact-profession-list { display: flex; flex-wrap: wrap; gap: 7px; margin: 8px 0; }
+.law-contact-institution-types { display: flex; flex-wrap: wrap; gap: 14px; margin: 4px 0 12px; }
 .law-contact-profession-chip { display: inline-flex; align-items: center; gap: 8px; padding: 5px 9px; border: 1px solid var(--law-shell-line); border-radius: 999px; background: #f7f5fb; }
 .law-contact-profession-chip .law-contact-remove { padding: 0 2px; color: #6b5a78; }
 .law-contact-editor .law-contact-profession-list + .law-contact-field { max-width: 420px; }
