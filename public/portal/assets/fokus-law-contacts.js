@@ -83,7 +83,7 @@
     const heading = $('div', 'law-page-heading law-contact-page-heading');
     heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Contatos'), $('p', 'law-page-lede', 'Organize pessoas, empresas, instituições e órgãos em uma base compartilhada pelos setores autorizados.'));
     const headingActions = $('div', 'law-contact-heading-actions');
-    if (can('law.contacts.create')) headingActions.append(button('Novo contato', 'fs-btn fs-btn-primary', (event) => openEditor(root, null, refresh, event.currentTarget, relationshipOptions)));
+    if (can('law.contacts.create')) headingActions.append(button('Novo contato', 'fs-btn fs-btn-primary', (event) => openEditor(root, null, refresh, event.currentTarget, relationshipOptions, designationOptions, competencyOptions)));
     heading.append(headingActions);
     root.append(heading);
 
@@ -221,7 +221,7 @@
           const actions = $('td', 'law-contact-actions');
           const actionList = $('div', 'law-contact-action-list');
           actionList.append(iconButton('Ver detalhes', 'Folder-File--Streamline-Ultimate.png', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget)));
-          if (!contact.is_shared && can('law.contacts.update')) actionList.append(iconButton('Editar contato', 'Common-File-Edit--Streamline-Ultimate.png', (event) => openEditor(root, contact, refresh, event.currentTarget, relationshipOptions)));
+          if (!contact.is_shared && can('law.contacts.update')) actionList.append(iconButton('Editar contato', 'Common-File-Edit--Streamline-Ultimate.png', (event) => openEditor(root, contact, refresh, event.currentTarget, relationshipOptions, designationOptions, competencyOptions)));
           if (!contact.is_shared && can('law.contacts.delete') && contact.status === 'ativo') actionList.append(iconButton('Inativar contato', 'Common-File-Subtract--Streamline-Ultimate.png', async (event) => {
             if (!await confirmAction(root, 'Inativar contato', 'O cadastro deixará de aparecer entre os contatos ativos. Os dados históricos serão preservados.', 'Inativar contato', event.currentTarget)) return;
             try { await window.FokusApi.request(`/law/contacts/${encodeURIComponent(contact.id)}`, { method: 'DELETE' }); await refresh(); }
@@ -243,7 +243,7 @@
     return { refresh };
   }
 
-  function openEditor(root, contact, onSaved, opener = null, relationshipOptions = []) {
+  function openEditor(root, contact, onSaved, opener = null, relationshipOptions = [], designationOptions = [], competencyOptions = []) {
     const modal = createModal(root, contact ? 'Editar contato' : 'Novo contato', 'fs-modal-xl', opener);
     const form = $('form', 'law-contact-editor');
     form.id = `law-contact-form-${++modalSequence}`;
@@ -954,7 +954,7 @@
             const trigger = event.currentTarget; trigger.disabled = true;
             try {
               const [detail, list] = await Promise.all([window.FokusApi.request(`/law/contacts/${encodeURIComponent(item.id)}?from_search=1`), window.FokusApi.request('/law/contacts?page=1&per_page=25&status=ativo')]);
-              openEditor(root, detail.contact, () => renderQualityPage(root, context), trigger, list.relationship_options || []);
+              openEditor(root, detail.contact, () => renderQualityPage(root, context), trigger, list.relationship_options || [], list.designation_options || [], list.competency_options || []);
             } catch (error) { window.alert(error.message || 'Não foi possível abrir o cadastro para edição.'); }
             finally { trigger.disabled = false; }
           })); row.append(action); tbody.append(row);
