@@ -33,7 +33,7 @@
     }
     if (!user.user?.email_verified) { location.replace('/verificar-email?return_to=%2Fcontratar%2Ffokus-law'); return; }
     document.querySelector('#checkout-title').textContent = 'REVISE SUA COMPOSIÇÃO.';
-    if (!user.active_company_id) { document.querySelector('#checkout-title').textContent = 'REVISE SUA COMPOSIÇÃO.'; content.innerHTML = '<p>Selecione ou cadastre uma organização para iniciar a assinatura.</p><a class="law-submit" href="/portal/empresas">Gerenciar organizações</a>'; return; }
+    if (!user.active_company_id) { content.innerHTML = '<p>Selecione ou cadastre uma organização para iniciar a assinatura.</p><a class="law-submit" href="/portal/empresas">Gerenciar organizações</a>'; return; }
     try {
       const [catalog, publicQuote] = await Promise.all([FokusApi.request('/catalog/fokus-law'), FokusApi.request('/catalog/fokus-law/quote', { method: 'POST', body: quotePayload(selection) })]);
       let existing = null;
