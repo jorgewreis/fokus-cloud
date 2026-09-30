@@ -603,10 +603,10 @@
     if (contact.legal_nature === 'pj') {
       const institutionDetails = [];
       institutions.forEach((institution) => {
-        if (institution.type === 'court_unit' && institution.cnj_code) institutionDetails.push(`Código CNJ: ${institution.cnj_code}`);
-        if (institution.official_code) institutionDetails.push(`Identificador oficial: ${institution.official_code}`);
-        if (institution.administrative_sphere) institutionDetails.push(`Esfera administrativa: ${institution.administrative_sphere}`);
-        if (institution.issuing_system) institutionDetails.push(`Sistema emissor: ${institution.issuing_system}`);
+        if (institution.type === 'court_unit' && institution.cnj_code) institutionDetails.push(institution.cnj_code);
+        if (institution.official_code) institutionDetails.push(institution.official_code);
+        if (institution.administrative_sphere) institutionDetails.push(institution.administrative_sphere);
+        if (institution.issuing_system) institutionDetails.push(institution.issuing_system);
       });
       const legalDetails = institutionDetails.length ? institutionDetails.join(' | ') : contact.legal_name;
       if (legalDetails) summaryCopy.append($('p', 'law-contact-detail-legal-name', legalDetails));
@@ -634,7 +634,7 @@
       const linkedCount = (contact.linked_contacts || []).length;
       const linkLabel = `${linkedCount} ${linkedCount === 1 ? 'vínculo ativo' : 'vínculos ativos'}`;
       const competencies = [...new Set(institutions.filter((item) => item.type === 'court_unit').flatMap((item) => item.competencies || []).filter(Boolean))];
-      addChips([linkLabel, ...competencies], 'institutional');
+      addChips([...(linkedCount ? [linkLabel] : []), ...competencies], 'institutional');
     }
     if (contact.legal_nature === 'pf') (contact.linked_contacts || []).forEach((linked) => {
       (linked.roles || []).filter((item) => item.current).forEach((item) => relationshipTags.push(item.code === 'other' && item.detail ? item.detail : roleLabels[item.code] || item.code));
@@ -659,7 +659,7 @@
       return items;
     };
     (contact.institutional_data || []).forEach((institution) => {
-      const items = addSection(institution.type === 'court_unit' ? 'Dados da unidade judiciária' : 'Dados do órgão público', 'INS', '');
+      const items = addSection(institution.type === 'court_unit' ? 'Dados da unidade judiciária' : 'Dados do órgão público', 'INS', '', 'law-contact-detail-institution');
       const values = institution.type === 'court_unit'
         ? [['Código CNJ', institution.cnj_code], ['Competências', (institution.competencies || []).join(', ')]]
         : [['Esfera administrativa', institution.administrative_sphere], ['Código oficial', institution.official_code], ['Sistema emissor', institution.issuing_system]];
