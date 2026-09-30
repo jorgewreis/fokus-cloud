@@ -827,10 +827,50 @@
       formCard.append(formHeader, form); root.append(formCard);
       renderSelected(); renderRules();
 
+      const statistics = result.statistics || {};
+      const sharingDashboard = $('section', 'fs-card law-contact-sharing-dashboard');
+      const dashboardHeader = $('div', 'fs-card-header law-contact-sharing-dashboard-header');
+      dashboardHeader.append($('div', '', ''), $('p', 'fs-card-subtitle', 'Indicadores calculados somente para acordos recíprocos ativos.'));
+      dashboardHeader.firstElementChild.append($('span', 'law-contact-section-kicker', 'PANORAMA DOS ACORDOS'), $('h3', 'fs-card-title', 'O que sua rede compartilha'));
+      const metricGrid = $('div', 'law-contact-sharing-metrics');
+      [
+        ['Acordos ativos', statistics.active_agreements, 'Com confirmação dos dois lados', 'active'],
+        ['Contatos disponibilizados', statistics.contacts_shared, `${Number(statistics.fields_shared || 0)} autorizações de campos`, 'outgoing'],
+        ['Contatos recebidos', statistics.contacts_received, `${Number(statistics.fields_received || 0)} autorizações de campos`, 'incoming'],
+      ].forEach(([label, value, note, tone]) => {
+        const metric = $('article', `law-contact-sharing-metric law-contact-sharing-metric-${tone}`);
+        metric.append($('span', '', label), $('strong', '', Number(value || 0).toLocaleString('pt-BR')), $('small', '', note)); metricGrid.append(metric);
+      });
+      const chart = $('div', 'law-contact-sharing-chart');
+      const chartHeader = $('div', 'law-contact-sharing-chart-header');
+      chartHeader.append($('h4', '', 'Contatos por empresa'), $('div', 'law-contact-sharing-chart-legend'));
+      chartHeader.lastElementChild.append($('span', '', 'Disponibilizados'), $('span', '', 'Recebidos'));
+      chart.append(chartHeader);
+      const activeCompanies = (statistics.companies || []).filter((company) => company.active)
+        .sort((a, b) => (Number(b.contacts_shared || 0) + Number(b.contacts_received || 0)) - (Number(a.contacts_shared || 0) + Number(a.contacts_received || 0))).slice(0, 5);
+      if (!activeCompanies.length) chart.append($('p', 'law-contact-sharing-chart-empty', 'O gráfico aparecerá quando houver um acordo confirmado pelas duas empresas.'));
+      else {
+        const maxCount = Math.max(1, ...activeCompanies.flatMap((company) => [Number(company.contacts_shared || 0), Number(company.contacts_received || 0)]));
+        activeCompanies.forEach((company) => {
+          const row = $('div', 'law-contact-sharing-chart-row');
+          const companyLabel = $('strong', '', company.company_name); row.append(companyLabel);
+          const bars = $('div', 'law-contact-sharing-bars');
+          [['Disponibilizados', company.contacts_shared, 'outgoing'], ['Recebidos', company.contacts_received, 'incoming']].forEach(([label, value, tone]) => {
+            const line = $('div', 'law-contact-sharing-bar-line'); const number = Number(value || 0);
+            line.append($('span', '', number.toLocaleString('pt-BR')));
+            const track = $('span', 'law-contact-sharing-bar-track'); track.setAttribute('role', 'img'); track.setAttribute('aria-label', `${company.company_name}: ${number.toLocaleString('pt-BR')} contatos ${label.toLowerCase()}`);
+            const fill = $('span', `law-contact-sharing-bar-fill is-${tone}`); fill.style.width = `${number ? Math.max(2, (number / maxCount) * 100) : 0}%`; track.append(fill); line.append(track); bars.append(line);
+          });
+          row.append(bars); chart.append(row);
+        });
+        if ((statistics.companies || []).filter((company) => company.active).length > 5) chart.append($('p', 'law-contact-sharing-chart-note', 'Exibindo os cinco acordos com maior movimentação. A tabela abaixo contém todos os acordos.'));
+      }
+      sharingDashboard.append(dashboardHeader, metricGrid, chart); root.append(sharingDashboard);
+
       const tableCard = $('section', 'fs-card law-contact-sharing-table-card');
       const tableHeader = $('div', 'fs-card-header'); tableHeader.append($('h3', 'fs-card-title', 'Políticas da empresa'), $('p', 'fs-card-subtitle', 'Acordos ativos e pendentes de confirmação recíproca.'));
       const tableWrap = $('div', 'fs-table-responsive'); const table = $('table', 'fs-table law-contact-sharing-table'); const head = $('thead'); const headRow = $('tr');
-      ['Empresa', 'Sua política', 'Acordo', 'Regras', 'Ações'].forEach((label) => headRow.append($('th', '', label))); head.append(headRow); table.append(head);
+      ['Empresa', 'Sua política', 'Acordo', 'Regras e dados por direção', 'Ações'].forEach((label) => headRow.append($('th', '', label))); head.append(headRow); table.append(head);
       const body = $('tbody');
       const rows = new Map();
       policies.forEach((policy) => {
@@ -844,14 +884,24 @@
         row.append($('td', '', companyName)); row.append($('td', '', active ? 'Configurada' : 'A configurar'));
         const state = active && incoming ? 'Ativo' : active ? 'Aguardando confirmação' : 'Pendente';
         const badge = $('span', `law-contact-sharing-status ${active && incoming ? 'is-active' : 'is-pending'}`, state); const stateCell = $('td'); stateCell.append(badge); row.append(stateCell);
-        const scopes = policy ? [...(policy.legal_natures || []).map((nature) => nature === 'pf' ? 'Pessoa física' : 'Pessoa jurídica'), ...(policy.profession_names || []).map((name) => (result.professions || []).find((item) => item.value === name)?.label || name), ...(policy.shared_fields || []).map((name) => result.share_fields?.[name] || name)] : [];
-        row.append($('td', '', scopes.join(' · ') || 'Defina as regras'));
+        const rulesCell = $('td', 'law-contact-sharing-rule-directions');
+        const appendRuleDirection = (label, directionPolicy) => {
+          if (!directionPolicy) return;
+          const direction = $('div', 'law-contact-sharing-rule-direction');
+          direction.append($('strong', '', label));
+          const details = [...(directionPolicy.legal_natures || []).map((nature) => nature === 'pf' ? 'Pessoa física' : 'Pessoa jurídica'), ...(directionPolicy.profession_names || []).map((name) => (result.professions || []).find((item) => item.value === name)?.label || name), ...(directionPolicy.shared_fields || []).map((name) => result.share_fields?.[name] || name)];
+          direction.append($('span', '', details.join(' · ') || 'Sem dados autorizados')); rulesCell.append(direction);
+        };
+        appendRuleDirection('Disponibiliza', policy?.is_active ? policy : null);
+        appendRuleDirection('Recebe', company?.incoming_policy || null);
+        if (!rulesCell.children.length) rulesCell.textContent = 'Defina os dois lados do acordo';
+        row.append(rulesCell);
         const actionsCell = $('td', 'law-contact-actions'); const actionList = $('div', 'law-contact-action-list');
         actionList.append(iconButton('Editar política', 'Common-File-Edit--Streamline-Ultimate.png', () => {
           editingId = recipientId; selectedIds = new Set([recipientId]); rules = { legal_natures: policy?.legal_natures?.length ? [...policy.legal_natures] : ['pj'], profession_names: [...(policy?.profession_names || [])], shared_fields: [...(policy?.shared_fields || ['professional_channels'])] };
           formTitle.textContent = `Editar política · ${companyName}`; cancelEdit.hidden = false; companySelect.disabled = true; renderSelected(); renderRules(); formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }));
-        if (active) actionList.append(iconButton('Remover política', 'Common-File-Subtract--Streamline-Ultimate.png', async (event) => {
+        if (active) actionList.append(iconButton('Remover política', 'Common-File-Remove--Streamline-Ultimate.png', async (event) => {
           if (!await confirmAction(root, 'Remover política', `A empresa “${companyName}” deixará de receber os contatos abrangidos por este acordo.`, 'Remover política', event.currentTarget)) return;
           try { await window.FokusApi.request(`/law/contact-sharing/${encodeURIComponent(recipientId)}`, { method: 'DELETE' }); await renderSharingPage(root, context); }
           catch (error) { window.alert(error.message || 'Não foi possível remover a política.'); }

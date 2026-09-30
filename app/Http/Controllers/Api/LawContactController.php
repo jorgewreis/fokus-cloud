@@ -393,11 +393,36 @@ class LawContactController extends Controller
         $incoming = DB::table('law_contact_sharing_policies')->where('recipient_company_id', $companyId)->get()->keyBy('source_company_id');
         $professions = $this->assignedProfessionOptions($companyId);
         $companyNames = DB::table('companies')->whereIn('id', $policies->pluck('recipient_company_id')->all())->get(['id', DB::raw('COALESCE(display_name, legal_name) as name')])->keyBy('id');
+        $shareFields = ['professional_channels' => 'Telefones e e-mails profissionais/institucionais', 'business_addresses' => 'Endereços comerciais/institucionais', 'documents' => 'Documentos (exige permissão sensível no destino)'];
+        $relationships = [];
+        foreach ($companies as $company) {
+            $outgoing = $policies->firstWhere('recipient_company_id', $company['id']);
+            $received = $incoming->get($company['id']);
+            if (! $outgoing && ! $received) continue;
+            $bilateral = $outgoing !== null && $received !== null && (bool) $outgoing->is_active && (bool) $received->is_active && $this->sharingPolicyHasScope($outgoing) && $this->sharingPolicyHasScope($received);
+            $outgoingCount = $bilateral ? $this->shareableContactCount($outgoing) : 0;
+            $incomingCount = $bilateral ? $this->shareableContactCount($received) : 0;
+            $outgoingFields = $bilateral ? (json_decode($outgoing->shared_fields, true) ?: []) : [];
+            $incomingFields = $bilateral ? (json_decode($received->shared_fields, true) ?: []) : [];
+            $relationships[] = [
+                'company_id' => $company['id'], 'company_name' => $company['name'], 'active' => $bilateral,
+                'contacts_shared' => $outgoingCount, 'contacts_received' => $incomingCount,
+                'fields_shared' => count($outgoingFields), 'fields_received' => count($incomingFields),
+            ];
+        }
+        $activeRelationships = array_values(array_filter($relationships, fn (array $item): bool => $item['active']));
 
         return response()->json([
             'companies' => array_map(function (array $company) use ($incoming): array {
                 $agreement = $incoming->get($company['id']);
-                return $company + ['incoming_agreement' => (bool) ($agreement?->is_active ?? false) && $agreement !== null && $this->sharingPolicyHasScope($agreement)];
+                return $company + [
+                    'incoming_agreement' => (bool) ($agreement?->is_active ?? false) && $agreement !== null && $this->sharingPolicyHasScope($agreement),
+                    'incoming_policy' => $agreement && (bool) $agreement->is_active ? [
+                        'legal_natures' => json_decode($agreement->legal_natures ?: '[]', true) ?: [],
+                        'profession_names' => json_decode($agreement->profession_names ?: '[]', true) ?: [],
+                        'shared_fields' => json_decode($agreement->shared_fields, true) ?: [],
+                    ] : null,
+                ];
             }, $companies),
             'policies' => $policies->map(function ($policy) use ($companyNames, $incoming): array {
                 $agreement = $incoming->get($policy->recipient_company_id);
@@ -414,7 +439,15 @@ class LawContactController extends Controller
             }),
             'professions' => $professions,
             'agreement_required' => true,
-            'share_fields' => ['professional_channels' => 'Telefones e e-mails profissionais/institucionais', 'business_addresses' => 'Endereços comerciais/institucionais', 'documents' => 'Documentos (exige permissão sensível no destino)'],
+            'share_fields' => $shareFields,
+            'statistics' => [
+                'active_agreements' => count($activeRelationships),
+                'contacts_shared' => array_sum(array_column($activeRelationships, 'contacts_shared')),
+                'contacts_received' => array_sum(array_column($activeRelationships, 'contacts_received')),
+                'fields_shared' => array_sum(array_column($activeRelationships, 'fields_shared')),
+                'fields_received' => array_sum(array_column($activeRelationships, 'fields_received')),
+                'companies' => $relationships,
+            ],
         ]);
     }
 
@@ -995,6 +1028,13 @@ class LawContactController extends Controller
         $professions = json_decode($policy->profession_names ?: '[]', true) ?: [];
 
         return in_array('pj', $natures, true) || (in_array('pf', $natures, true) && $professions !== []);
+    }
+
+    private function shareableContactCount(object $policy): int
+    {
+        return (int) DB::table('law_contacts')->where('company_id', $policy->source_company_id)
+            ->whereNull('deleted_at')->whereNull('merged_into_id')->where('status', 'ativo')->where('sharing_excluded', false)
+            ->where(fn ($query) => $this->applySharingScope($query, $policy))->count();
     }
 
     private function applySharingScope($query, object $policy)

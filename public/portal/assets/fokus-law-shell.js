@@ -12,6 +12,9 @@
     profile: 'Settings-User--Streamline-Ultimate.png',
     company: 'Small-Office-Tall-Building--Streamline-Ultimate.png',
     users: 'Programming-User-Chat--Streamline-Ultimate.png',
+    contactsCreate: 'Single-Neutral-Actions-Add--Streamline-Ultimate-Regular.png',
+    contactsShare: 'Common-File-Text-Share--Streamline-Ultimate-Regular.png',
+    contactsQuality: 'Like-Ribbon-1--Streamline-Ultimate-Regular.png',
   };
   const MODULES = {
     processos: { label: 'Processos', icon: 'processes' },
@@ -201,9 +204,9 @@
     headingIcon = descriptor.icon;
     const isContactsModule = String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos');
     if (isContactsModule) {
-      appendNavButton(pageItems, 'Cadastro e consulta', descriptor.icon, contactsView === 'module', () => { contactsView = 'module'; renderContent('module'); });
-      if (canLawPermission('law.contacts.share.manage')) appendNavLink(pageItems, 'Compartilhamentos', '/portal/fokus-law/contatos/compartilhamentos', 'contacts', contactsView === 'contacts-sharing');
-      if (canLawPermission('law.contacts.view')) appendNavLink(pageItems, 'Revisão e qualidade', '/portal/fokus-law/contatos/revisao-e-qualidade', 'reports', contactsView === 'contacts-quality');
+      appendNavButton(pageItems, 'Cadastro e consulta', 'contactsCreate', contactsView === 'module', () => { contactsView = 'module'; renderContent('module'); });
+      if (canLawPermission('law.contacts.share.manage')) appendNavLink(pageItems, 'Compartilhamentos', '/portal/fokus-law/contatos/compartilhamentos', 'contactsShare', contactsView === 'contacts-sharing');
+      if (canLawPermission('law.contacts.view')) appendNavLink(pageItems, 'Revisão e qualidade', '/portal/fokus-law/contatos/revisao-e-qualidade', 'contactsQuality', contactsView === 'contacts-quality');
     } else {
       appendNavButton(pageItems, `Visão geral de ${descriptor.label}`, descriptor.icon, true, () => renderContent('module'), true);
       pageItems.append(element('p', 'law-nav-description', 'As páginas funcionais deste módulo serão adicionadas aqui.'));
