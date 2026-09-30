@@ -597,10 +597,22 @@
     summaryCopy.append($('span', 'law-contact-detail-eyebrow', (labels[contact.legal_nature] || 'Contato').toLocaleUpperCase('pt-BR')));
     const titleRow = $('div', 'law-contact-detail-name-row');
     titleRow.append($('h3', 'law-contact-detail-name', contact.display_name));
-    if (contact.acronym) titleRow.append($('span', 'law-contact-detail-acronym', contact.acronym));
+    if (contact.acronym && contact.legal_nature !== 'pj') titleRow.append($('span', 'law-contact-detail-acronym', contact.acronym));
     summaryCopy.append(titleRow);
-    if (contact.legal_name) summaryCopy.append($('p', 'law-contact-detail-legal-name', contact.legal_name));
+    const institutions = Array.isArray(contact.institutional_data) ? contact.institutional_data : [];
+    if (contact.legal_nature === 'pj') {
+      const institutionDetails = [];
+      institutions.forEach((institution) => {
+        if (institution.type === 'court_unit' && institution.cnj_code) institutionDetails.push(`Código CNJ: ${institution.cnj_code}`);
+        if (institution.official_code) institutionDetails.push(`Identificador oficial: ${institution.official_code}`);
+        if (institution.administrative_sphere) institutionDetails.push(`Esfera administrativa: ${institution.administrative_sphere}`);
+        if (institution.issuing_system) institutionDetails.push(`Sistema emissor: ${institution.issuing_system}`);
+      });
+      const legalDetails = institutionDetails.length ? institutionDetails.join(' | ') : contact.legal_name;
+      if (legalDetails) summaryCopy.append($('p', 'law-contact-detail-legal-name', legalDetails));
+    } else if (contact.legal_name) summaryCopy.append($('p', 'law-contact-detail-legal-name', contact.legal_name));
     const summaryBadges = $('div', 'law-contact-detail-summary-badges');
+    if (contact.legal_nature === 'pj' && contact.acronym) summaryBadges.append($('span', 'law-contact-detail-acronym', contact.acronym));
     const statusText = labels[contact.status] || contact.status || 'Situação não informada';
     const statusBadge = $('span', `law-contact-detail-badge law-contact-detail-status-${contact.status}`);
     statusBadge.setAttribute('role', 'img');
@@ -618,6 +630,12 @@
     };
     const roleLabels = { employee: 'Funcionário/colaborador', public_servant: 'Servidor público', legal_representative: 'Representante legal', partner: 'Sócio', administrator: 'Administrador/diretor', attorney_in_fact: 'Procurador', other: 'Outro' };
     const relationshipTags = [];
+    if (contact.legal_nature === 'pj') {
+      const linkedCount = (contact.linked_contacts || []).length;
+      const linkLabel = `${linkedCount} ${linkedCount === 1 ? 'vínculo ativo' : 'vínculos ativos'}`;
+      const competencies = [...new Set(institutions.filter((item) => item.type === 'court_unit').flatMap((item) => item.competencies || []).filter(Boolean))];
+      addChips([linkLabel, ...competencies], 'institutional');
+    }
     if (contact.legal_nature === 'pf') (contact.linked_contacts || []).forEach((linked) => {
       (linked.roles || []).filter((item) => item.current).forEach((item) => relationshipTags.push(item.code === 'other' && item.detail ? item.detail : roleLabels[item.code] || item.code));
       (linked.designations || []).filter((item) => item.current && item.name).forEach((item) => relationshipTags.push(item.name));
