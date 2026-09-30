@@ -20,6 +20,10 @@
     height: 940px;
     min-height: 940px;
 }
+.law-page .law-hero.law-support-mode {
+    height: auto;
+    min-height: 940px;
+}
 
 @media (max-width: 900px) {
     .law-page .law-hero {

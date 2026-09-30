@@ -15,6 +15,7 @@
     const accessStatus = form.querySelector('[data-law-access-status]');
     const subscriptionLogin = form.querySelector('[data-law-subscription-login]');
     const profileField = profile.closest('div');
+    const hero = form.closest('.law-hero');
     let lookupTimer;
     let systems = [];
     let userName = '';
@@ -74,6 +75,7 @@
     email.addEventListener('input', () => {
       clearTimeout(lookupTimer);
       support.hidden = true;
+      hero?.classList.remove('law-support-mode');
       accessChoice.hidden = true;
       accessType.value = '';
       accessStatus.textContent = '';
@@ -115,6 +117,7 @@
     accessType.addEventListener('change', () => {
       const value = email.value.trim();
       support.hidden = true;
+      hero?.classList.remove('law-support-mode');
       if (accessType.value === 'subscription') {
         subscriptionLogin.hidden = false;
         accessStatus.textContent = 'Consultando as assinaturas vinculadas ao e-mail…';
@@ -125,6 +128,7 @@
       } else if (accessType.value === 'support') {
         subscriptionLogin.hidden = true;
         support.hidden = false;
+        hero?.classList.add('law-support-mode');
         support.querySelector('[data-support-email]').textContent = `${supportAdmin.name} — ${supportAdmin.email}`;
         supportStatus.textContent = 'Carregando assinaturas Fokus Law…';
         accessStatus.textContent = 'Acesso interno para suporte. Cada sessão será registrada em auditoria.';
@@ -170,7 +174,7 @@
     support.className = 'law-support-access';
     support.setAttribute('aria-labelledby', 'law-support-title');
     support.innerHTML = '<h2 id="law-support-title">Acesso de suporte</h2><p data-support-email></p><p>Escolha uma assinatura e um usuário real da empresa. O acesso será registrado em auditoria.</p><label for="law-support-subscription">Assinatura</label><select id="law-support-subscription" required></select><label for="law-support-user">Usuário e perfil</label><select id="law-support-user" required></select><label for="law-support-reason">Motivo do acesso</label><textarea id="law-support-reason" minlength="10" maxlength="1000" required></textarea><button class="law-submit" type="button" id="law-support-start">Acessar em modo de suporte</button><p role="status" aria-live="polite" id="law-support-status"></p>';
-    form.append(support);
+    form.after(support);
     const subscriptionSelect = support.querySelector('#law-support-subscription');
     const userSelect = support.querySelector('#law-support-user');
     const supportStatus = support.querySelector('#law-support-status');
