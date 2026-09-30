@@ -1,6 +1,8 @@
 (() => {
   const DOCUMENTS = { cpf: 'CPF', cnpj: 'CNPJ', state_registration: 'Inscrição estadual', oab: 'OAB', rg: 'RG', registration: 'Matrícula', cadastro: 'Cadastro', voter_title: 'Título de eleitor', passport: 'Passaporte', other: 'Outro' };
-  const DOCUMENT_TYPES_BY_NATURE = { pf: ['cpf', 'oab', 'rg', 'registration', 'cadastro', 'voter_title', 'passport', 'other'], pj: ['cnpj', 'state_registration', 'registration', 'cadastro', 'other'] };
+  const DOCUMENT_TYPES_BY_NATURE = { pf: ['cpf', 'oab', 'rg', 'registration', 'cadastro', 'voter_title', 'passport', 'other'], pj: ['cnpj', 'state_registration', 'other'] };
+  const DOCUMENT_TYPES_WITHOUT_STATE = ['cpf', 'cnpj', 'registration', 'cadastro', 'passport', 'voter_title'];
+  const DOCUMENT_TYPES_WITHOUT_LABEL = [...DOCUMENT_TYPES_WITHOUT_STATE, 'state_registration'];
   const STATES = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map((uf) => [uf, uf]);
   const CONTACT_ICONS = '/backoffice/assets/icons/';
   const $ = (tag, cls = '', text = '') => { const node = document.createElement(tag); if (cls) node.className = cls; if (text !== '') node.textContent = text; return node; };
@@ -14,6 +16,7 @@
     return value;
   };
   const field = (labelText, control) => { const label = $('label', 'law-contact-field'); label.append($('span', '', labelText), control); return label; };
+  const setWidth = (control, width) => { control.classList.add(`fs-width-${width}`); return control; };
   const select = (items, value = '') => { const control = $('select', 'fs-form-control'); items.forEach(([v, label]) => { const option = new Option(label, v); option.selected = v === value; control.append(option); }); return control; };
   const input = (value = '', placeholder = '', maxLength = 255) => { const control = $('input', 'fs-form-control'); control.value = value || ''; control.placeholder = placeholder; control.maxLength = maxLength; return control; };
   const button = (text, cls = 'fs-btn fs-btn-secondary', fn) => { const control = $('button', cls, text); control.type = 'button'; if (fn) control.addEventListener('click', (event) => fn(event)); return control; };
@@ -245,8 +248,8 @@
     form.id = `law-contact-form-${++modalSequence}`;
     const status = $('p', 'law-contact-feedback'); status.setAttribute('role', 'status');
     const basic = section('Dados principais');
-    const nature = select([['pf', 'Pessoa física'], ['pj', 'Pessoa jurídica']], contact?.legal_nature || 'pf'); nature.name = 'legal_nature';
-    const name = input(contact?.display_name || '', 'Nome completo ou nome fantasia', 180); name.required = true; name.name = 'display_name';
+    const nature = setWidth(select([['pf', 'Pessoa física'], ['pj', 'Pessoa jurídica']], contact?.legal_nature || 'pf'), 800); nature.name = 'legal_nature';
+    const name = setWidth(input(contact?.display_name || '', 'Nome completo ou nome fantasia', 180), 800); name.required = true; name.name = 'display_name';
     const acronym = input(contact?.acronym || '', 'Ex.: TJBA', 32); acronym.name = 'acronym';
     const particles = new Set(['da','das','de','do','dos','e']);
     name.addEventListener('blur', () => { name.value = name.value.trim().toLocaleLowerCase('pt-BR').replace(/(^|[\s-])([^\s-]+)/gu, (part) => { const word = part.trimStart(); const prefix = part.slice(0, part.length - word.length); return prefix + (particles.has(word) ? word : word.charAt(0).toLocaleUpperCase('pt-BR') + word.slice(1)); }); });
@@ -258,7 +261,7 @@
     const professionRows = $('div', 'law-contact-profession-list');
     (contact?.professions || []).forEach((value) => professionRows.append(professionChip(value)));
     const professionSelect = select([['', 'Selecione uma profissão'], ...(window.lawContactProfessions || []).map((value) => [value, value])]);
-    const professionNew = input('', 'Ex.: Policial Civil, Guarda Municipal, Agente penitenciário', 100);
+    const professionNew = setWidth(input('', 'Ex.: Policial Civil, Guarda Municipal, Agente penitenciário', 100), 800);
     const addProfession = (value) => { const clean = value.trim(); if (clean && ![...professionRows.querySelectorAll('[data-profession]')].some((item) => item.dataset.profession.toLocaleLowerCase() === clean.toLocaleLowerCase())) professionRows.append(professionChip(clean)); professionSelect.value = ''; professionNew.value = ''; };
     professionSelect.addEventListener('change', () => { if (professionSelect.value) addProfession(professionSelect.value); });
     professionSection.content.append(professionRows, field('Profissões cadastradas', professionSelect), field('Nova profissão / especificação', professionNew), button('Adicionar profissão', 'fs-btn fs-btn-secondary', () => addProfession(professionNew.value)));
@@ -279,36 +282,58 @@
     institutionalSection.content.append(institutionTypes, field('Código CNJ da unidade judiciária', cnj), field('Competências (separadas por vírgula)', competencies), competencyList, field('Esfera administrativa', sphere), field('Identificador oficial', officialCode), field('Sistema emissor', issuingSystem));
     const updateInstitutional = () => { institutionalSection.hidden = nature.value !== 'pj'; cnj.parentElement.hidden = !courtType.checked; competencies.parentElement.hidden = !courtType.checked; sphere.parentElement.hidden = !publicType.checked; officialCode.parentElement.hidden = !publicType.checked; issuingSystem.parentElement.hidden = !publicType.checked; };
     courtType.addEventListener('change', updateInstitutional); publicType.addEventListener('change', updateInstitutional); updateInstitutional();
-    const relationshipSection = section('Vínculos empresariais', 'Associe este contato a pessoas físicas ou empresas já cadastradas.');
+    const relationshipSection = section('Vínculos empresariais', 'Associe este contato a empresas já cadastradas.');
     const linkedContactIds = new Set((contact?.linked_contacts || []).map((item) => item.id));
     const linkMetadata = new Map((contact?.linked_contacts || []).map((item) => [item.id, { roles: item.roles || [], designations: item.designations || [] }]));
-    const relationshipPicker = select([['', 'Selecione para vincular']]);
+    const relationshipPicker = setWidth(select([['', 'Selecione para vincular']]), 900);
+    const relationshipPickerField = field('Adicionar empresa', relationshipPicker);
     const relationshipChips = $('div', 'law-contact-profession-list');
+    const relationshipStats = $('div', 'law-contact-relationship-stats');
+    const relationshipStat = (label, value) => { const stat = $('div', 'law-contact-relationship-stat'); stat.append($('strong', '', Number(value).toLocaleString('pt-BR')), $('span', '', label)); return stat; };
+    const renderRelationshipStats = () => {
+      const roles = [...linkMetadata.values()].reduce((total, value) => total + value.roles.length, 0);
+      const designations = [...linkMetadata.values()].reduce((total, value) => total + value.designations.length, 0);
+      relationshipStats.replaceChildren(
+        relationshipStat('Pessoas vinculadas', linkedContactIds.size),
+        relationshipStat('Papéis atribuídos', roles),
+        relationshipStat('Designações registradas', designations),
+      );
+    };
     const renderRelationshipChips = () => {
       relationshipChips.replaceChildren();
       [...linkedContactIds].forEach((id) => {
         const item = relationshipOptions.find((option) => option.id === id) || (contact?.linked_contacts || []).find((option) => option.id === id);
         if (!item) return;
         const row = $('div', 'law-contact-relationship-editor');
-        row.append($('strong', '', `${item.display_name}${item.acronym ? ` (${item.acronym})` : ''}`));
+        const header = $('div', 'law-contact-relationship-header');
+        header.append($('strong', '', `${item.display_name}${item.acronym ? ` (${item.acronym})` : ''}`));
+        const removeLink = button('Remover vínculo', 'fs-btn fs-btn-danger', () => { linkedContactIds.delete(id); linkMetadata.delete(id); renderRelationshipChips(); renderRelationshipStats(); });
+        header.append(removeLink); row.append(header);
         const metadata = linkMetadata.get(id) || { roles: [], designations: [] };
+        const roleGroup = $('div', 'law-contact-relationship-group');
+        roleGroup.append($('h4', 'law-contact-relationship-title', 'Papéis'));
         const roleRows = $('div', 'law-contact-relationship-entries');
         const roleOptions = [['', 'Selecione um papel'], ['employee', 'Funcionário/colaborador'], ['public_servant', 'Servidor público'], ['legal_representative', 'Representante legal'], ['partner', 'Sócio'], ['administrator', 'Administrador/diretor'], ['attorney_in_fact', 'Procurador'], ['other', 'Outro']];
-        const addRoleRow = (role = {}) => { const entry = $('div', 'law-contact-relationship-entry'); const selectRole = select(roleOptions, role.code || ''); const detail = input(role.detail || '', 'Complemento para Outro', 160); const starts = input(role.starts_on || '', '', 10); starts.type = 'date'; const ends = input(role.ends_on || '', '', 10); ends.type = 'date'; entry.append(field('Papel', selectRole), field('Complemento (Outro)', detail), field('Início', starts), field('Término', ends), button('Remover papel', 'law-contact-chip-remove', () => entry.remove())); entry.getMetadata = () => ({ code: selectRole.value, detail: selectRole.value === 'other' ? detail.value.trim() || null : null, starts_on: starts.value || null, ends_on: ends.value || null }); roleRows.append(entry); };
+        const addRoleRow = (role = {}) => { const entry = $('div', 'law-contact-relationship-entry law-contact-role-entry'); const selectRole = setWidth(select(roleOptions, role.code || ''), 400); const detail = setWidth(input(role.detail || '', 'Complemento para Outro', 160), 500); const starts = setWidth(input(role.starts_on || '', '', 10), 300); starts.type = 'date'; const ends = setWidth(input(role.ends_on || '', '', 10), 300); ends.type = 'date'; entry.append(field('Papel', selectRole), field('Complemento (Outro)', detail), field('Início', starts), field('Término', ends), button('Remover papel', 'fs-btn fs-btn-danger law-contact-chip-remove', () => entry.remove())); entry.getMetadata = () => ({ code: selectRole.value, detail: selectRole.value === 'other' ? detail.value.trim() || null : null, starts_on: starts.value || null, ends_on: ends.value || null }); roleRows.append(entry); };
         metadata.roles.forEach(addRoleRow);
+        const addRole = button('Adicionar papel', 'fs-btn fs-btn-secondary', () => addRoleRow());
+        roleGroup.append(roleRows, addRole);
+        const designationGroup = $('div', 'law-contact-relationship-group');
+        designationGroup.append($('h4', 'law-contact-relationship-title', 'Designações'));
         const designationRows = $('div', 'law-contact-relationship-entries');
         const designationList = $('datalist'); designationList.id = `${form.id}-designations-${id}`; designationOptions.forEach((value) => { const option = $('option'); option.value = value; designationList.append(option); });
-        const addDesignationRow = (designation = {}) => { const entry = $('div', 'law-contact-relationship-entry'); const title = input(designation.name || '', 'Ex.: DPC, IPC, CB/PM, SD/PM, TEN/PM', 120); title.setAttribute('list', designationList.id); const starts = input(designation.starts_on || '', '', 10); starts.type = 'date'; const ends = input(designation.ends_on || '', '', 10); ends.type = 'date'; entry.append(field('Cargo/posto/graduação/função', title), field('Início', starts), field('Término', ends), button('Remover designação', 'law-contact-chip-remove', () => entry.remove())); entry.getMetadata = () => title.value.trim() ? { name: title.value.trim(), starts_on: starts.value || null, ends_on: ends.value || null } : null; designationRows.append(entry); };
+        const addDesignationRow = (designation = {}) => { const entry = $('div', 'law-contact-relationship-entry law-contact-designation-entry'); const title = setWidth(input(designation.name || '', 'Ex.: DPC, IPC, CB/PM, SD/PM, TEN/PM', 120), 500); title.setAttribute('list', designationList.id); const starts = setWidth(input(designation.starts_on || '', '', 10), 300); starts.type = 'date'; const ends = setWidth(input(designation.ends_on || '', '', 10), 300); ends.type = 'date'; entry.append(field('Cargo/posto/graduação/função', title), field('Início', starts), field('Término', ends), button('Remover designação', 'fs-btn fs-btn-danger law-contact-chip-remove', () => entry.remove())); entry.getMetadata = () => title.value.trim() ? { name: title.value.trim(), starts_on: starts.value || null, ends_on: ends.value || null } : null; designationRows.append(entry); };
         metadata.designations.forEach(addDesignationRow);
-        row.append(roleRows, button('Adicionar papel', 'fs-btn fs-btn-secondary', () => addRoleRow()), designationRows, button('Adicionar designação', 'fs-btn fs-btn-secondary', () => addDesignationRow()), designationList);
-        row.append(button('Remover vínculo', 'law-contact-chip-remove', () => { linkedContactIds.delete(id); linkMetadata.delete(id); renderRelationshipChips(); }));
+        const addDesignation = button('Adicionar designação', 'fs-btn fs-btn-secondary', () => addDesignationRow());
+        designationGroup.append(designationRows, addDesignation);
+        row.append(roleGroup, designationGroup, designationList);
         row.dataset.linkId = id;
         row.getMetadata = () => ({ contact_id: id, roles: [...roleRows.children].map((entry) => entry.getMetadata()).filter((role) => role.code), designations: [...designationRows.children].map((entry) => entry.getMetadata()).filter(Boolean) });
         relationshipChips.append(row);
       });
     };
-    relationshipPicker.addEventListener('change', () => { if (relationshipPicker.value) linkedContactIds.add(relationshipPicker.value); relationshipPicker.value = ''; renderRelationshipChips(); });
-    relationshipSection.content.append(field('Adicionar pessoa ou empresa', relationshipPicker), relationshipChips); renderRelationshipChips();
+    relationshipPicker.addEventListener('change', () => { if (relationshipPicker.value) linkedContactIds.add(relationshipPicker.value); relationshipPicker.value = ''; renderRelationshipChips(); renderRelationshipStats(); });
+    relationshipSection.content.append(relationshipPickerField, relationshipChips, relationshipStats); renderRelationshipChips(); renderRelationshipStats();
     let documentRows;
     let documentSection;
     if (window.lawContactsCanSensitive) {
@@ -342,19 +367,9 @@
     const notes = document.createElement('textarea'); notes.className = 'fs-form-control'; notes.maxLength = 4000; notes.value = contact?.notes || ''; notes.name = 'notes';
     const notesSection = section('Notas privadas', 'Visíveis somente a perfis com acesso a dados sensíveis.'); notesSection.content.append(field('Notas', notes));
     const message = $('p', 'law-contact-feedback'); message.setAttribute('role', 'status');
-    const duplicateSuggestions = $('div', 'law-contact-duplicate-suggestions');
-    const checkDuplicates = button('Verificar possíveis duplicidades', 'fs-btn fs-btn-outline-primary', async () => {
-      checkDuplicates.disabled = true; duplicateSuggestions.replaceChildren($('p', 'law-contact-help', 'Buscando cadastros semelhantes…'));
-      try {
-        const result = await window.FokusApi.request('/law/contacts/quality/suggestions', { method: 'POST', body: { display_name: name.value.trim(), legal_name: legalName.value.trim() || null, legal_nature: nature.value, channels: [...channelRows.children].map((row) => ({ type: row.querySelector('[data-channel-type]').value, value: row.querySelector('[data-channel-value]').value.trim(), personal: false })).filter((channel) => channel.value), institutional_code: officialCode.value.trim() || null } });
-        duplicateSuggestions.replaceChildren();
-        if (!result.candidates?.length) duplicateSuggestions.append($('p', 'law-contact-help', 'Nenhum candidato encontrado.'));
-        else { duplicateSuggestions.append($('p', 'law-contact-help', 'Confira os candidatos antes de salvar. A correspondência é explicada sem expor os valores coincidentes.')); result.candidates.forEach((candidate) => { const row = $('div', 'law-contact-duplicate-pair'); row.append($('strong', '', candidate.display_name), $('span', '', candidate.reason), button('Ver cadastro', 'fs-btn fs-btn-secondary', (event) => openDetails(root, candidate.id, false, onSaved, event.currentTarget))); duplicateSuggestions.append(row); }); }
-      } catch (error) { duplicateSuggestions.replaceChildren($('p', 'law-contact-feedback', error.message || 'Não foi possível verificar duplicidades.')); }
-      finally { checkDuplicates.disabled = false; }
-    });
-    if (contact) {
-      const statusSelect = select([['ativo', 'Ativo'], ['inativo', 'Inativo']], contact.status); statusSelect.name = 'status'; basic.content.append(field('Situação', statusSelect));
+    const statusSelect = contact ? select([['ativo', 'Ativo'], ['inativo', 'Inativo']], contact.status) : null;
+    if (statusSelect) {
+      statusSelect.name = 'status'; basic.content.append(field('Situação', statusSelect));
       const excludedWrap = $('label', 'law-contact-check'); const excluded = $('input'); excluded.type = 'checkbox'; excluded.checked = Boolean(contact.sharing_excluded); excluded.name = 'sharing_excluded'; excludedWrap.append(excluded, $('span', '', 'Excluir dos compartilhamentos configurados')); basic.content.append(excludedWrap);
     }
     const cancel = button('Cancelar', 'fs-btn fs-btn-secondary', () => modal.close());
@@ -367,10 +382,12 @@
     form.append(departmentWrap, tags);
     // Notes remain editable only for a profile that can read protected personal data.
     if (window.lawContactsCanSensitive) form.append(notesSection);
-    if (!contact) form.append(checkDuplicates, duplicateSuggestions);
     form.append(message);
     const updateNature = () => {
       departmentWrap.hidden = nature.value !== 'pj'; legalNameField.hidden = nature.value !== 'pj';
+      name.classList.toggle('fs-width-800', nature.value !== 'pj'); name.classList.toggle('fs-width-900', nature.value === 'pj');
+      legalName.classList.toggle('fs-width-900', nature.value === 'pj');
+      if (statusSelect) statusSelect.classList.toggle('fs-width-400', nature.value === 'pj');
       acronymField.hidden = nature.value !== 'pj';
       professionSection.hidden = nature.value === 'pj';
       updateInstitutional();
@@ -383,7 +400,10 @@
       });
       const candidates = relationshipOptions.filter((item) => item.id !== contact?.id && item.legal_nature !== nature.value);
       relationshipPicker.replaceChildren(new Option('Selecione para vincular', ''), ...candidates.map((item) => new Option(`${item.display_name}${item.acronym ? ` (${item.acronym})` : ''}`, item.id)));
-      relationshipSection.hidden = candidates.length === 0;
+      relationshipSection.querySelector('.fs-card-title').textContent = nature.value === 'pj' ? 'Vínculos institucionais' : 'Vínculos empresariais';
+      relationshipSection.querySelector('.fs-card-subtitle').textContent = nature.value === 'pj' ? 'Estatísticas quantitativas dos vínculos, sem exibir nomes pessoais.' : 'Associe este contato a empresas já cadastradas.';
+      relationshipPickerField.hidden = nature.value === 'pj'; relationshipChips.hidden = nature.value === 'pj'; relationshipStats.hidden = nature.value !== 'pj';
+      relationshipSection.hidden = nature.value === 'pj' ? false : candidates.length === 0;
     };
     nature.addEventListener('change', updateNature); updateNature();
     form.addEventListener('submit', async (event) => {
@@ -412,7 +432,7 @@
       if (nature.value === 'pj' && courtType.checked) body.institutional_data.push({ type: 'court_unit', cnj_code: cnj.value.trim() || null, competencies: competencies.value.split(',').map((value) => value.trim()).filter(Boolean) });
       if (nature.value === 'pj' && publicType.checked) body.institutional_data.push({ type: 'public_body', administrative_sphere: sphere.value || null, official_code: officialCode.value.trim() || null, issuing_system: issuingSystem.value.trim() || null });
       if (window.lawContactsCanSensitive) {
-        body.documents = [...documentRows.children].map((row) => { const type = row.querySelector('[data-doc-type]').value; const noUf = ['cpf','cnpj'].includes(type); const noLabel = noUf || type === 'state_registration'; return { type, number: row.querySelector('[data-doc-number]').value.trim(), state: noUf ? null : (row.querySelector('[data-doc-state]').value || null), label: noLabel ? null : (row.querySelector('[data-doc-label]').value.trim() || null) }; }).filter((doc) => doc.number);
+        body.documents = [...documentRows.children].map((row) => { const type = row.querySelector('[data-doc-type]').value; const noUf = DOCUMENT_TYPES_WITHOUT_STATE.includes(type); const noLabel = DOCUMENT_TYPES_WITHOUT_LABEL.includes(type); return { type, number: row.querySelector('[data-doc-number]').value.trim(), state: noUf ? null : (row.querySelector('[data-doc-state]').value || null), label: noLabel ? null : (row.querySelector('[data-doc-label]').value.trim() || null) }; }).filter((doc) => doc.number);
         body.notes = notes.value.trim() || null;
       }
       if (contact) { body.status = form.elements.namedItem('status').value; body.sharing_excluded = form.elements.namedItem('sharing_excluded').checked; }
@@ -427,31 +447,31 @@
 
   function documentRow(doc = {}, nature = 'pf') {
     const row = $('div', 'law-contact-repeat-row law-contact-document-row');
-    const type = select(DOCUMENT_TYPES_BY_NATURE[nature].map((code) => [code, DOCUMENTS[code]]), doc.type || (nature === 'pj' ? 'cnpj' : 'cpf')); type.dataset.docType = '1';
-    const number = input(doc.number || '', 'Número do documento', 120); number.dataset.docNumber = '1';
-    const state = select([['','UF'], ...STATES], doc.state || 'BA'); state.dataset.docState = '1';
-    const label = input(doc.label || '', 'Identificação', 80); label.dataset.docLabel = '1';
+    const type = setWidth(select(DOCUMENT_TYPES_BY_NATURE[nature].map((code) => [code, DOCUMENTS[code]]), doc.type || (nature === 'pj' ? 'cnpj' : 'cpf')), 300); type.dataset.docType = '1';
+    const number = setWidth(input(doc.number || '', 'Número do documento', 120), 500); number.dataset.docNumber = '1';
+    const state = setWidth(select([['','UF'], ...STATES], doc.state || 'BA'), 300); state.dataset.docState = '1';
+    const label = setWidth(input(doc.label || '', 'Identificação', 80), 400); label.dataset.docLabel = '1';
     const stateField = field('UF de emissão', state); const labelField = field('Identificação', label);
     const numberMask = window.FokusDocuments?.bind(number, () => type.value);
-    const update = () => { const noUf = ['cpf','cnpj'].includes(type.value); stateField.hidden = noUf; state.required = type.value === 'state_registration'; labelField.hidden = noUf || type.value === 'state_registration'; number.placeholder = type.value === 'cpf' ? '000.000.000-00' : type.value === 'cnpj' ? '00.000.000/0000-00' : 'Número do documento'; number.inputMode = type.value === 'cpf' ? 'numeric' : type.value === 'cnpj' ? 'text' : 'text'; number.maxLength = type.value === 'cpf' ? 14 : type.value === 'cnpj' ? 18 : 120; numberMask?.apply(); };
+    const update = () => { const noUf = DOCUMENT_TYPES_WITHOUT_STATE.includes(type.value); const noLabel = DOCUMENT_TYPES_WITHOUT_LABEL.includes(type.value); stateField.hidden = noUf; state.required = type.value === 'state_registration'; labelField.hidden = noLabel; number.placeholder = type.value === 'cpf' ? '000.000.000-00' : type.value === 'cnpj' ? '00.000.000/0000-00' : 'Número do documento'; number.inputMode = type.value === 'cpf' ? 'numeric' : type.value === 'cnpj' ? 'text' : 'text'; number.maxLength = type.value === 'cpf' ? 14 : type.value === 'cnpj' ? 18 : 120; numberMask?.apply(); };
     type.addEventListener('change', update); update();
-    row.append(field('Tipo', type), field('Número', number), stateField, labelField, button('Remover', 'law-contact-remove', () => row.remove())); return row;
+    row.append(field('Tipo', type), field('Número', number), stateField, labelField, button('Remover', 'fs-btn fs-btn-danger law-contact-remove', () => row.remove())); return row;
   }
 
   function professionChip(value) {
     const chip = $('span', 'law-contact-profession-chip', value); chip.dataset.profession = value;
-    chip.append(button('×', 'law-contact-remove', () => chip.remove())); return chip;
+    chip.append(button('×', 'fs-btn fs-btn-danger law-contact-remove', () => chip.remove())); return chip;
   }
 
   function channelRow(item = {}) {
     const row = $('div', 'law-contact-repeat-row law-contact-channel-row');
-    const type = select([['phone', 'Telefone fixo'], ['extension', 'Ramal'], ['mobile', 'Celular'], ['whatsapp', 'WhatsApp'], ['email', 'E-mail']], item.type || 'phone'); type.dataset.channelType = '1';
-    const value = input(item.value || '', 'Telefone ou e-mail', 255); value.dataset.channelValue = '1';
+    const type = setWidth(select([['phone', 'Telefone fixo'], ['extension', 'Ramal'], ['mobile', 'Celular'], ['whatsapp', 'WhatsApp'], ['email', 'E-mail']], item.type || 'phone'), 300); type.dataset.channelType = '1';
+    const value = setWidth(input(item.value || '', 'Telefone ou e-mail', 255), 500); value.dataset.channelValue = '1';
     const labels = ['Principal','Pessoal','Profissional','Recado','Comercial','Emergência'];
     if (item.label && !labels.includes(item.label)) labels.push(item.label);
-    const labelSelect = select(labels.map((value) => [value, value]), item.label || 'Principal'); labelSelect.dataset.channelLabel = '1';
-    const primary = select([['0','Não'],['1','Sim']], item.primary ? '1' : '0'); primary.dataset.primary = '1';
-    row.append(field('Canal', type), field('Contato', value), field('Rótulo', labelSelect), field('Principal', primary), button('Remover', 'law-contact-remove', () => row.remove())); return row;
+    const labelSelect = setWidth(select(labels.map((value) => [value, value]), item.label || 'Principal'), 400); labelSelect.dataset.channelLabel = '1';
+    const primary = setWidth(select([['0','Não'],['1','Sim']], item.primary ? '1' : '0'), 300); primary.dataset.primary = '1';
+    row.append(field('Canal', type), field('Contato', value), field('Rótulo', labelSelect), field('Principal', primary), button('Remover', 'fs-btn fs-btn-danger law-contact-remove', () => row.remove())); return row;
   }
 
   function enforceSinglePrimary(rows, groupForRow, chooseFirst) {
@@ -487,16 +507,16 @@
     const row = $('fieldset', 'law-contact-address-row'); row.append($('legend', '', 'Endereço'));
     const addressTypes = [['business', 'Comercial/institucional'], ['correspondence', 'Correspondência'], ['other', 'Outro']];
     if (window.lawContactsCanSensitive) addressTypes.splice(1, 0, ['residential', 'Residencial']);
-    const type = select(addressTypes, address.type || 'business'); type.dataset.addressType = '1';
-    const postal = input(address.postal_code, '00000-000', 9); postal.dataset.postal = '1'; postal.inputMode = 'numeric';
-    const street = input(address.street, 'Logradouro', 180); street.required = true; street.dataset.street = '1';
-    const number = input(address.number, 'Número', 32); number.dataset.number = '1';
+    const type = setWidth(select(addressTypes, address.type || 'business'), 400); type.dataset.addressType = '1';
+    const postal = setWidth(input(address.postal_code, '00000-000', 9), 400); postal.dataset.postal = '1'; postal.inputMode = 'numeric';
+    const street = setWidth(input(address.street, 'Logradouro', 180), 800); street.required = true; street.dataset.street = '1';
+    const number = setWidth(input(address.number, 'Número', 32), 300); number.dataset.number = '1';
     const complement = input(address.complement, 'Complemento', 120); complement.dataset.complement = '1';
     const district = input(address.district, 'Bairro', 120); district.dataset.district = '1';
     const city = input(address.city, 'Município', 120); city.required = true; city.dataset.city = '1';
-    const state = select([['','Selecione a UF'], ...STATES], address.state || 'BA'); state.required = true; state.dataset.state = '1';
-    const country = input(address.country || 'Brasil', 'País', 80); country.dataset.country = '1';
-    const primary = select([['0','Não'],['1','Sim']], address.primary ? '1' : '0'); primary.dataset.primary = '1';
+    const state = setWidth(select([['','Selecione a UF'], ...STATES], address.state || 'BA'), 300); state.required = true; state.dataset.state = '1';
+    const country = setWidth(input(address.country || 'Brasil', 'País', 80), 500); country.dataset.country = '1';
+    const primary = setWidth(select([['0','Não'],['1','Sim']], address.primary ? '1' : '0'), 300); primary.dataset.primary = '1';
     const lookupStatus = $('small', 'law-contact-help law-contact-cep-status'); lookupStatus.setAttribute('aria-live', 'polite');
     const postalField = field('CEP', postal);
     const setLocked = (locked) => { district.disabled = locked; city.disabled = locked; state.disabled = locked; country.disabled = locked; };
@@ -529,7 +549,7 @@
         }
       }, 350);
     });
-    row.append(field('Tipo', type), postalField, field('Logradouro *', street), field('Número', number), field('Complemento', complement), field('Bairro', district), field('Município *', city), field('UF *', state), field('País', country), field('Principal', primary), button('Remover', 'law-contact-remove', () => row.remove()), lookupStatus); return row;
+    row.append(field('Tipo', type), postalField, field('Logradouro *', street), field('Número', number), field('Complemento', complement), field('Bairro', district), field('Município *', city), field('UF *', state), field('País', country), field('Principal', primary), button('Remover', 'fs-btn fs-btn-danger law-contact-remove', () => row.remove()), lookupStatus); return row;
   }
 
   function departmentRow(department = {}) {
@@ -538,15 +558,15 @@
     const channels = $('div', 'law-contact-repeat-list');
     (department.channels || []).forEach((channel) => channels.append(departmentChannelRow(channel)));
     const add = button('Adicionar telefone ou e-mail', 'fs-btn fs-btn-secondary', () => { if (channels.children.length < 6) channels.append(departmentChannelRow()); });
-    row.append(field('Nome do departamento *', name), channels, add, button('Remover departamento', 'law-contact-remove', () => row.remove())); return row;
+    row.append(field('Nome do departamento *', name), channels, add, button('Remover departamento', 'fs-btn fs-btn-danger law-contact-remove', () => row.remove())); return row;
   }
 
   function departmentChannelRow(channel = {}) {
     const row = $('div', 'law-contact-repeat-row law-contact-department-channel');
-    const type = select([['phone', 'Telefone'], ['email', 'E-mail']], channel.type || 'phone'); type.dataset.channelType = '1';
-    const value = input(channel.value || '', 'Canal institucional do departamento'); value.dataset.channelValue = '1';
-    const label = input(channel.label || '', 'Rótulo', 80); label.dataset.channelLabel = '1';
-    row.append(field('Tipo', type), field('Contato', value), field('Rótulo', label), button('Remover', 'law-contact-remove', () => row.remove())); return row;
+    const type = setWidth(select([['phone', 'Telefone'], ['email', 'E-mail']], channel.type || 'phone'), 300); type.dataset.channelType = '1';
+    const value = setWidth(input(channel.value || '', 'Canal institucional do departamento'), 500); value.dataset.channelValue = '1';
+    const label = setWidth(input(channel.label || '', 'Rótulo', 80), 400); label.dataset.channelLabel = '1';
+    row.append(field('Tipo', type), field('Contato', value), field('Rótulo', label), button('Remover', 'fs-btn fs-btn-danger law-contact-remove', () => row.remove())); return row;
   }
 
   async function openDetails(root, id, isShared, onChanged, opener = null) {
