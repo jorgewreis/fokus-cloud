@@ -936,7 +936,7 @@
       if (!grid.children.length) {
         const clear = $('div', 'law-contact-quality-clear'); clear.append($('strong', '', 'Tudo em dia'), $('span', '', 'Nenhum cadastro precisa de atenção nos critérios prioritários.')); grid.append(clear);
       }
-      sectionNode.append(header, grid); root.append(sectionNode);
+      sectionNode.append(header, grid);
       const tableCard = $('section', 'law-contact-quality-table-card fs-card');
       const tableHeader = $('div', 'fs-card-header'); tableHeader.append($('h3', 'fs-card-title', 'Cadastros para complementar'), $('p', 'fs-card-subtitle law-contact-help', `${Number(result.pagination?.total || 0).toLocaleString('pt-BR')} contatos com pelo menos uma informação prioritária pendente.`));
       const wrap = $('div', 'law-contact-quality-table-wrap'); const table = $('table', 'law-contact-quality-table');
@@ -954,7 +954,7 @@
         paging.replaceChildren(button('Anterior', 'fs-btn fs-btn-secondary', async () => drawTable(await window.FokusApi.request(`/law/contacts/quality/review?type=action_required&page=${current - 1}`))), $('span', '', `Página ${current} de ${pages}`), button('Próxima', 'fs-btn fs-btn-secondary', async () => drawTable(await window.FokusApi.request(`/law/contacts/quality/review?type=action_required&page=${current + 1}`))));
         paging.firstElementChild.disabled = current <= 1; paging.lastElementChild.disabled = current >= pages;
       };
-      table.append(thead, tbody); wrap.append(table); tableCard.append(tableHeader, wrap, paging); root.append(tableCard); drawTable(result);
+      table.append(thead, tbody); wrap.append(table); tableCard.append(tableHeader, wrap, paging);
       const duplicates = button('Analisar possíveis duplicidades', 'fs-btn fs-btn-outline-primary', async (event) => {
         const trigger = event.currentTarget; trigger.disabled = true; trigger.textContent = 'Analisando…';
         try {
@@ -972,7 +972,7 @@
         } catch (error) { window.alert(error.message || 'Não foi possível analisar duplicidades.'); }
         finally { trigger.disabled = false; trigger.textContent = 'Analisar possíveis duplicidades'; }
       });
-      grid.append(duplicates); sectionNode.append(header, grid); root.append(sectionNode);
+      grid.append(duplicates); root.append(sectionNode, tableCard); drawTable(result);
     } catch (error) { feedback.dataset.state = 'error'; feedback.textContent = error.message || 'Não foi possível analisar a qualidade dos cadastros.'; }
   }
 
