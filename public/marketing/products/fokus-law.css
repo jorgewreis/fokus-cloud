@@ -36,3 +36,13 @@
 .law-contact-visual[data-parallax-scene] .law-contact-number,.law-contact-visual[data-parallax-scene] .law-contact-stamp{transform:translateY(var(--law-scene-shift,0));will-change:transform}
 .law-contact-visual[data-parallax-scene] .law-contact-stamp{transform:translateY(var(--law-stamp-shift,0))}
 @media(prefers-reduced-motion:reduce){.law-story-reveal{opacity:1;transform:none;transition:none}.law-contact-visual[data-parallax-scene] .law-contact-number,.law-contact-visual[data-parallax-scene] .law-contact-stamp{transform:none;will-change:auto}}
+
+.law-hero-offer-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:.75rem 1.5rem;margin-top:2.1rem;padding:1.1rem 1.25rem 1.2rem;background:var(--law-ivory);border-top:4px solid var(--law-sage);color:var(--law-ink);box-shadow:0 18px 42px rgba(16,7,24,.24)}
+.law-hero-offer-kicker{margin:0 0 .25rem;color:var(--law-sage);font-size:.68rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase}
+.law-hero-offer-copy h2{margin:0;color:var(--law-plum);font:400 clamp(1.9rem,3vw,2.45rem)/.95 var(--law-display)}
+.law-hero-offer-action{grid-column:2;grid-row:1/3;display:flex;flex-direction:column;align-items:flex-start;gap:.55rem}
+.law-hero-offer-button{display:inline-flex;min-height:3.1rem;align-items:center;justify-content:center;padding:.85rem 1.1rem;background:var(--law-plum);color:#fff!important;font:700 .9rem/1.2 var(--law-body);text-decoration:none;transition:background-color .18s ease}
+.law-hero-offer-button:hover,.law-hero-offer-button:focus-visible{background:var(--law-purple)}
+.law-hero-offer-button:focus-visible{outline:2px solid var(--law-sage);outline-offset:3px}
+.law-hero-offer-action p{margin:0;color:#655c68;font-size:.68rem;line-height:1.35}
+@media(max-width:640px){.law-hero-offer-card{grid-template-columns:1fr;gap:.8rem;padding:1rem 1.05rem 1.1rem}.law-hero-offer-copy h2{font-size:2rem}.law-hero-offer-action{grid-column:1;grid-row:auto;gap:.5rem}.law-hero-offer-button{width:100%}}
