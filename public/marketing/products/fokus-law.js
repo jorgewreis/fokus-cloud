@@ -161,7 +161,7 @@
             profile: profile.value,
           },
         });
-        location.assign(localStorage.getItem('fokus-law-offer-v1') ? '/contratar/fokus-law' : (result.redirect_to || '/portal/fokus-law'));
+        location.assign(result.redirect_to || '/portal/fokus-law');
       } catch (error) {
         status.textContent = error.message || 'Não foi possível entrar no Fokus Law.';
         showToast(status.textContent);
