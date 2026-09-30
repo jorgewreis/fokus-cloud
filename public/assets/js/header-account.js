@@ -45,7 +45,7 @@
             <p class="card-description">Use seu CPF ou CNPJ e sua senha para continuar.</p>
           </div>
           <form data-client-login>
-            <label class="form-field"><span class="fs-form-label" data-client-document-label>CPF ou CNPJ</span><input class="fs-form-control field-size-md" data-client-document name="document" inputmode="numeric" autocomplete="username" maxlength="18" required></label>
+            <label class="form-field"><span class="fs-form-label" data-client-document-label>CPF ou CNPJ</span><input class="fs-form-control field-size-md" data-client-document name="document" inputmode="text" autocomplete="username" maxlength="18" required></label>
             <label class="form-field"><span class="fs-form-label">Senha</span><input class="fs-form-control field-size-md" name="password" type="password" autocomplete="current-password" required></label>
             <div class="login-actions"><button class="fs-btn fs-btn-success" type="submit">Entrar</button><a class="fs-btn fs-btn-outline-primary" href="/cadastro">Criar conta</a></div>
           </form>
@@ -63,26 +63,27 @@
     let opener = null;
     let csrfToken = null;
 
-    const digits = (value) => String(value || "").replace(/\D/g, "").slice(0, 14);
-    const validCpf = (value) => value.length === 11 && !/^(\d)\1+$/.test(value) && [9, 10].every((length) => {
+    const compact = (value) => String(value || "").toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 14);
+    const validCpf = (value) => window.FokusDocuments?.cpf(value) || (value.length === 11 && !/^(\d)\1+$/.test(value) && [9, 10].every((length) => {
       const total = [...value.slice(0, length)].reduce((sum, digit, index) => sum + Number(digit) * (length + 1 - index), 0);
       return (total * 10) % 11 % 10 === Number(value[length]);
-    });
-    const validCnpj = (value) => value.length === 14 && !/^(\d)\1+$/.test(value) && [[12, 5], [13, 6]].every(([length, factor]) => {
-      const total = [...value.slice(0, length)].reduce((sum, digit) => {
-        const result = sum + Number(digit) * factor;
+    }));
+    const validCnpj = (value) => window.FokusDocuments?.cnpj(value) || (value.length === 14 && !/^(.)\1+$/.test(value) && [[12, 5], [13, 6]].every(([length, factor]) => {
+      const total = [...value.slice(0, length)].reduce((sum, character) => {
+        const result = sum + (character.charCodeAt(0) - 48) * factor;
         factor = factor === 2 ? 9 : factor - 1;
         return result;
       }, 0);
       return (total % 11 < 2 ? 0 : 11 - total % 11) === Number(value[length]);
-    });
+    }));
+    const formatCpf = (value) => value.slice(0, 11).replace(/^(\d{3})(\d)/, "$1.$2").replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3").replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d{1,2})$/, "$1.$2.$3-$4");
+    const formatCnpj = (value) => value.slice(0, 14).replace(/^([0-9A-Z]{2})([0-9A-Z])/, "$1.$2").replace(/^([0-9A-Z]{2})\.([0-9A-Z]{3})([0-9A-Z])/, "$1.$2.$3").replace(/^([0-9A-Z]{2})\.([0-9A-Z]{3})\.([0-9A-Z]{3})([0-9A-Z])/, "$1.$2.$3/$4").replace(/^([0-9A-Z]{2})\.([0-9A-Z]{3})\.([0-9A-Z]{3})\/([0-9A-Z]{4})([0-9]{1,2})$/, "$1.$2.$3/$4-$5");
     const updateDocument = (format = false) => {
-      const value = digits(documentInput.value);
-      const type = validCpf(value) ? "CPF" : validCnpj(value) ? "CNPJ" : "CPF ou CNPJ";
-      documentLabel.textContent = type;
-      documentInput.value = format && type !== "CPF ou CNPJ"
-        ? (type === "CPF" ? value.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") : value.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5"))
-        : value;
+      const value = compact(documentInput.value);
+      const documentType = value.length > 11 || /[A-Z]/.test(value) ? "cnpj" : "cpf";
+      const isValid = documentType === "cpf" ? validCpf(value) : validCnpj(value);
+      documentLabel.textContent = isValid ? documentType.toUpperCase() : "CPF ou CNPJ";
+      documentInput.value = format ? (documentType === "cpf" ? formatCpf(value) : formatCnpj(value)) : value;
     };
     const request = async (path, body) => {
       if (!csrfToken) {
@@ -127,14 +128,21 @@
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !modal.hidden) close();
     });
-    documentInput.addEventListener("input", () => updateDocument());
+    documentInput.addEventListener("input", () => updateDocument(true));
     documentInput.addEventListener("blur", () => updateDocument(true));
     login.addEventListener("submit", async (event) => {
       event.preventDefault();
       try {
         updateDocument(true);
         const data = Object.fromEntries(new FormData(login));
-        data.document = digits(data.document);
+        const normalized = compact(data.document);
+        const documentType = normalized.length > 11 || /[A-Z]/.test(normalized) ? "cnpj" : "cpf";
+        if (!(documentType === "cpf" ? validCpf(normalized) : validCnpj(normalized))) {
+          documentInput.setAttribute("aria-invalid", "true");
+          return showMessage("Informe um CPF ou CNPJ válido, com os dígitos verificadores corretos.", "error");
+        }
+        documentInput.removeAttribute("aria-invalid");
+        data.document = normalized;
         const result = await request("/auth/login", data);
         if (!result.user.email_verified) return window.location.assign("/verificar-email");
         if (!result.companies.length) return showMessage("Sua conta não possui uma empresa ativa. Solicite o vínculo ao administrador da empresa.", "error");

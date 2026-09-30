@@ -26,21 +26,21 @@
             </select>
           </label>
           <label class="form-field">
-            <span class="fs-form-label">CPF ou CNPJ</span>
-            <input class="field-size-md" id="company-document" name="document_number" inputmode="numeric" required aria-describedby="company-document-error" />
+            <span class="fs-form-label" id="company-document-label">CNPJ</span>
+            <input class="field-size-md" id="company-document" name="document_number" inputmode="text" maxlength="18" autocomplete="off" required aria-describedby="company-document-error" />
             <span id="company-document-error" class="field-error" role="alert"></span>
           </label>
           <label class="form-field" id="company-name-label">
             <span class="fs-form-label" id="company-name-label-text">Razão social</span>
-            <input class="field-size-md" name="legal_name" required />
+            <input class="field-size-md" id="legal-name" name="legal_name" autocomplete="organization" required />
           </label>
           <label class="form-field">
             <span class="fs-form-label">Nome completo do administrador</span>
-            <input class="field-size-md" name="name" required />
+            <input class="field-size-md" id="admin-name" name="name" autocomplete="name" required />
           </label>
           <label class="form-field">
             <span class="fs-form-label">CPF do administrador</span>
-            <input class="field-size-md" id="admin-cpf" name="cpf" inputmode="numeric" required aria-describedby="admin-cpf-error" />
+            <input class="field-size-md" id="admin-cpf" name="cpf" inputmode="numeric" maxlength="14" autocomplete="off" required aria-describedby="admin-cpf-error" />
             <span id="admin-cpf-error" class="field-error" role="alert"></span>
           </label>
           <label class="form-field">
@@ -65,66 +65,62 @@
       </section>
     </main>
     <script src="/assets/js/api-client.js"></script>
+    <script src="/assets/js/brazilian-documents.js?v=20260930-document-validation-v1"></script>
     <script>
       const type = document.querySelector('#document-type');
       const companyNameLabel = document.querySelector('#company-name-label-text');
+      const companyDocumentLabel = document.querySelector('#company-document-label');
       const companyDocument = document.querySelector('#company-document');
+      const legalName = document.querySelector('#legal-name');
+      const adminName = document.querySelector('#admin-name');
       const adminCpf = document.querySelector('#admin-cpf');
       const form = document.querySelector('#register-form');
       const feedback = document.querySelector('#feedback');
       const returnTo = new URLSearchParams(location.search).get('return_to') === '/contratar/fokus-law' ? '/contratar/fokus-law' : undefined;
 
-      const digits = (value) => value.replace(/\D/g, '');
-      const repeatedDigits = (value) => /^(\d)\1+$/.test(value);
-      const validCpf = (value) => {
-        const cpf = digits(value);
-        if (cpf.length !== 11 || repeatedDigits(cpf)) return false;
-        const digit = (length) => {
-          const sum = cpf.slice(0, length).split('').reduce((total, number, index) => total + Number(number) * (length + 1 - index), 0);
-          const remainder = (sum * 10) % 11;
-          return remainder === 10 ? 0 : remainder;
-        };
-        return digit(9) === Number(cpf[9]) && digit(10) === Number(cpf[10]);
-      };
-      const validCnpj = (value) => {
-        const cnpj = digits(value);
-        if (cnpj.length !== 14 || repeatedDigits(cnpj)) return false;
-        const digit = (length) => {
-          let factor = length === 12 ? 5 : 6;
-          const sum = cnpj.slice(0, length).split('').reduce((total, number) => {
-            const result = total + Number(number) * factor;
-            factor = factor === 2 ? 9 : factor - 1;
-            return result;
-          }, 0);
-          const remainder = sum % 11;
-          return remainder < 2 ? 0 : 11 - remainder;
-        };
-        return digit(12) === Number(cnpj[12]) && digit(13) === Number(cnpj[13]);
-      };
+      const documents = window.FokusDocuments;
+      const companyMask = documents.bind(companyDocument, () => type.value);
+      const adminCpfMask = documents.bind(adminCpf, 'cpf');
       const validateDocument = (input, documentType, errorId) => {
         const error = document.querySelector(errorId);
-        const value = digits(input.value);
-        const valid = documentType === 'cnpj' ? validCnpj(value) : validCpf(value);
-        if (!value || valid) {
-          input.value = value;
+        const value = documents.normalize(input.value, documentType);
+        const valid = documents.valid(value, documentType);
+        if (valid) {
           input.removeAttribute('aria-invalid');
           error.textContent = '';
           error.classList.remove('is-visible');
           return true;
         }
-        input.value = '';
+        if (!value) return false;
         input.setAttribute('aria-invalid', 'true');
         error.textContent = `${documentType.toUpperCase()} inválido. Confira os dígitos e informe novamente.`;
         error.classList.add('is-visible');
         return false;
       };
 
+      const syncCpfIdentity = () => {
+        const isCpf = type.value === 'cpf';
+        companyNameLabel.textContent = isCpf ? 'Nome completo' : 'Razão social';
+        companyDocumentLabel.textContent = isCpf ? 'CPF' : 'CNPJ';
+        companyDocument.placeholder = isCpf ? '000.000.000-00' : '00.000.000/0000-00';
+        adminName.readOnly = isCpf;
+        adminCpf.readOnly = isCpf;
+        if (isCpf) {
+          adminName.value = legalName.value;
+          adminCpf.value = companyDocument.value;
+          adminCpfMask.apply();
+        }
+      };
       type.onchange = () => {
-        companyNameLabel.textContent = type.value === 'cpf' ? 'Nome completo' : 'Razão social';
         companyDocument.value = '';
         companyDocument.removeAttribute('aria-invalid');
         document.querySelector('#company-document-error').classList.remove('is-visible');
+        syncCpfIdentity();
       };
+      companyDocument.addEventListener('input', () => { if (type.value === 'cpf') { adminCpf.value = companyDocument.value; adminCpfMask.apply(); } });
+      legalName.addEventListener('input', () => { if (type.value === 'cpf') adminName.value = legalName.value; });
+      companyDocument.addEventListener('input', () => { companyDocument.removeAttribute('aria-invalid'); document.querySelector('#company-document-error').classList.remove('is-visible'); });
+      adminCpf.addEventListener('input', () => { adminCpf.removeAttribute('aria-invalid'); document.querySelector('#admin-cpf-error').classList.remove('is-visible'); });
       companyDocument.onblur = () => validateDocument(companyDocument, type.value, '#company-document-error');
       adminCpf.onblur = () => validateDocument(adminCpf, 'cpf', '#admin-cpf-error');
       form.onsubmit = async (event) => {
@@ -132,7 +128,10 @@
         const companyValid = validateDocument(companyDocument, type.value, '#company-document-error');
         const cpfValid = validateDocument(adminCpf, 'cpf', '#admin-cpf-error');
         if (!companyValid || !cpfValid) return;
+        syncCpfIdentity();
         const values = Object.fromEntries(new FormData(event.currentTarget));
+        values.document_number = documents.normalize(companyDocument.value, type.value);
+        values.cpf = documents.normalize(adminCpf.value, 'cpf');
         let offerIntent = null;
         if (returnTo) { try { offerIntent = JSON.parse(localStorage.getItem('fokus-law-offer-v1') || 'null'); } catch {} }
         try {

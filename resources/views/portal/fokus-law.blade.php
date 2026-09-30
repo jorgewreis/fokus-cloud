@@ -109,9 +109,10 @@
   </template>
   <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script>
   <script src="/assets/js/api-client.js"></script>
-  <script src="/portal/assets/fokus-law-access.js?v=20260928-law-permissions-v7" defer></script>
-    <script src="/portal/assets/fokus-law-contacts.js?v=20260929-contact-quality-v1" defer></script>
-    <script src="/portal/assets/fokus-law-shell.js?v=20260929-contact-global-search-v1" defer></script>
+  <script src="/assets/js/brazilian-documents.js?v=20260930-document-validation-v1"></script>
+  <script src="/portal/assets/fokus-law-access.js?v=20260930-document-validation-v1" defer></script>
+  <script src="/portal/assets/fokus-law-contacts.js?v=20260930-document-validation-v1" defer></script>
+  <script src="/portal/assets/fokus-law-shell.js?v=20260930-document-validation-v1" defer></script>
   <script src="/assets/js/portal-profile.js?v=20260925-profile-v4" defer></script>
 </body>
 </html>

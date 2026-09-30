@@ -387,10 +387,9 @@
   }
 
   function formatDocument(type, number) {
-    const digits = String(number || '').replace(/\D/g, '');
-    if (type === 'cpf' && digits.length === 11) return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-    if (type === 'cnpj' && digits.length === 14) return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-    return digits || 'Documento não informado';
+    if (type === 'cpf') return window.FokusDocuments?.formatCpf(number) || 'Documento não informado';
+    if (type === 'cnpj') return window.FokusDocuments?.formatCnpj(number) || 'Documento não informado';
+    return String(number || '').replace(/\D/g, '') || 'Documento não informado';
   }
 
   function companyStatus(status) {
@@ -469,7 +468,7 @@
       input.required = true;
       if (field.inputmode) input.inputMode = field.inputmode;
       if (field.placeholder) input.placeholder = field.placeholder;
-      if (field.name === 'cpf') input.maxLength = 14;
+      if (field.name === 'cpf') { input.maxLength = 14; window.FokusDocuments?.bind(input, 'cpf'); }
       label.append(input);
       form.append(label);
     });
@@ -687,8 +686,8 @@
       feedback.dataset.state = '';
       if (!form.reportValidity()) return;
       const data = Object.fromEntries(new FormData(form));
-      const cpf = String(data.cpf || '').replace(/\D/g, '');
-      if (!isValidUserCpf(cpf)) {
+      const cpf = window.FokusDocuments?.normalize(data.cpf, 'cpf') || String(data.cpf || '').replace(/\D/g, '');
+      if (!(window.FokusDocuments?.cpf(cpf) ?? isValidUserCpf(cpf))) {
         const cpfInput = form.elements.namedItem('cpf');
         cpfInput.setAttribute('aria-invalid', 'true');
         cpfInput.setAttribute('aria-describedby', feedback.id);

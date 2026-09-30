@@ -20,10 +20,6 @@ export async function mount(root, context = {}) {
     const icons = { edit: "Common-File-Edit--Streamline-Ultimate.png", deactivate: "Common-File-Subtract--Streamline-Ultimate.png", activate: "Common-File-Quill--Streamline-Ultimate.png", remove: "Common-File-Remove--Streamline-Ultimate.png", details: "Folder-File--Streamline-Ultimate.png" };
     const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#039;","\"":"&quot;"}[char]));
     const documents = window.FokusDocuments;
-    const digits = (value) => String(value || "").replace(/\D/g, "");
-    const repeatedDigits = (value) => /^(\d)\1+$/.test(value);
-    const validCpf = (value) => { const cpf = digits(value); if (cpf.length !== 11 || repeatedDigits(cpf)) return false; const digit = (length) => { const sum = cpf.slice(0, length).split("").reduce((total, number, index) => total + Number(number) * (length + 1 - index), 0); const remainder = (sum * 10) % 11; return remainder === 10 ? 0 : remainder; }; return digit(9) === Number(cpf[9]) && digit(10) === Number(cpf[10]); };
-    const validCnpj = (value) => { const cnpj = digits(value); if (cnpj.length !== 14 || repeatedDigits(cnpj)) return false; const digit = (length) => { let factor = length === 12 ? 5 : 6; const sum = cnpj.slice(0, length).split("").reduce((total, number) => { const result = total + Number(number) * factor; factor = factor === 2 ? 9 : factor - 1; return result; }, 0); const remainder = sum % 11; return remainder < 2 ? 0 : 11 - remainder; }; return digit(12) === Number(cnpj[12]) && digit(13) === Number(cnpj[13]); };
     const formatDocument = (value, type) => type === "cpf" ? documents.formatCpf(value) || "-" : documents.formatCnpj(value) || "-";
     const moneyStatus = { pendente: "Pendente", ativa: "Ativa", suspensa: "Suspensa", encerrando: "Em encerramento", encerrada: "Encerrada" };
     const statusBadge = (value) => { const tone = { ativa: "success", suspensa: "warning", pendente: "info", encerrando: "warning", encerrada: "secondary" }[value] || "secondary"; return `<span class="fs-badge fs-badge-width-80 fs-badge-soft-${tone}">${escapeHtml(moneyStatus[value] || value || "Sem status")}</span>`; };
@@ -46,8 +42,10 @@ export async function mount(root, context = {}) {
     $("#company-drawer-close").addEventListener("click", closeDrawer);
     $("#company-form-cancel").addEventListener("click", closeDrawer);
     form.addEventListener("submit", submit);
-    $("#company-document-type").addEventListener("change", (event) => { const input = $("#company-document-number"); $("#company-name-label").textContent = event.target.value === "cpf" ? "Nome completo" : "Razão social"; input.placeholder = event.target.value === "cpf" ? "000.000.000-00" : "00.000.000/0000-00"; input.value = ""; window.FokusForm?.clearField(input); });
-    $("#company-document-number").addEventListener("input", (event) => { const type = $("#company-document-type").value; event.target.value = type === "cpf" ? documents.formatCpf(event.target.value) : documents.formatCnpj(event.target.value); });
+    const syncIndividualCompany = () => { if ($("#company-document-type").value !== "cpf") return; $("#company-admin-name").value = $("#company-legal-name").value; $("#company-admin-cpf").value = documents.formatCpf($("#company-document-number").value); };
+    $("#company-document-type").addEventListener("change", (event) => { const input = $("#company-document-number"); $("#company-name-label").textContent = event.target.value === "cpf" ? "Nome completo" : "Razão social"; input.placeholder = event.target.value === "cpf" ? "000.000.000-00" : "00.000.000/0000-00"; input.value = ""; window.FokusForm?.clearField(input); syncIndividualCompany(); });
+    $("#company-document-number").addEventListener("input", (event) => { const type = $("#company-document-type").value; event.target.value = type === "cpf" ? documents.formatCpf(event.target.value) : documents.formatCnpj(event.target.value); syncIndividualCompany(); });
+    $("#company-legal-name").addEventListener("input", syncIndividualCompany);
     $("#company-document-number").addEventListener("blur", (event) => { if (!event.target.readOnly && !event.target.disabled) validateDocument(event.target, $("#company-document-type").value, "#company-document-error"); });
     $("#company-admin-cpf").addEventListener("input", (event) => { event.target.value = documents.formatCpf(event.target.value); });
     $("#company-admin-cpf").addEventListener("blur", (event) => validateDocument(event.target, "cpf", "#company-admin-cpf-error"));

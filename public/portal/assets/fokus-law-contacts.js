@@ -12,8 +12,8 @@
     const value = String(document.number || 'Dado protegido');
     if (value === 'Dado protegido' || value.includes('•') || value.includes('*')) return value;
     const digits = value.replace(/\D/g, '');
-    if (document.type === 'cpf' && digits.length === 11) return digits.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
-    if (document.type === 'cnpj' && digits.length === 14) return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+    if (document.type === 'cpf') return window.FokusDocuments?.formatCpf(value) || value;
+    if (document.type === 'cnpj') return window.FokusDocuments?.formatCnpj(value) || value;
     if (document.type === 'oab' && digits.length > 3) return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     return value;
   };
@@ -434,7 +434,17 @@
     };
     nature.addEventListener('change', updateNature); updateNature();
     form.addEventListener('submit', async (event) => {
-      event.preventDefault(); save.disabled = true; message.textContent = '';
+      event.preventDefault(); message.textContent = '';
+      const invalidDocument = [...(documentRows?.children || [])].find((row) => {
+        const type = row.querySelector('[data-doc-type]').value;
+        const number = row.querySelector('[data-doc-number]');
+        if (!['cpf', 'cnpj'].includes(type) || !number.value.trim()) return false;
+        const valid = window.FokusDocuments?.valid(number.value, type) || false;
+        if (valid) number.removeAttribute('aria-invalid'); else number.setAttribute('aria-invalid', 'true');
+        return !valid;
+      });
+      if (invalidDocument) { message.dataset.state = 'error'; message.textContent = `Informe um ${invalidDocument.querySelector('[data-doc-type]').value.toUpperCase()} válido, com os dígitos verificadores corretos.`; invalidDocument.querySelector('[data-doc-number]').focus(); return; }
+      save.disabled = true;
       const body = {
         legal_nature: nature.value, display_name: name.value.trim(), acronym: acronym.value.trim() || null, legal_name: legalName.value.trim() || null,
         professions: nature.value === 'pf' ? [...professionRows.querySelectorAll('[data-profession]')].map((item) => item.dataset.profession) : [],
@@ -470,9 +480,9 @@
     const state = select([['','UF'], ...STATES], doc.state || 'BA'); state.dataset.docState = '1';
     const label = input(doc.label || '', 'Identificação', 80); label.dataset.docLabel = '1';
     const stateField = field('UF de emissão', state); const labelField = field('Identificação', label);
-    const update = () => { const noUf = ['cpf','cnpj'].includes(type.value); stateField.hidden = noUf; state.required = type.value === 'state_registration'; labelField.hidden = noUf || type.value === 'state_registration'; number.placeholder = type.value === 'cpf' ? '000.000.000-00' : type.value === 'cnpj' ? '00.000.000/0000-00' : 'Número do documento'; number.inputMode = ['cpf','cnpj'].includes(type.value) ? 'numeric' : 'text'; };
-    const maskNumber = () => { if (type.value === 'cpf') number.value = number.value.replace(/\D/g,'').slice(0,11).replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2'); if (type.value === 'cnpj') number.value = number.value.replace(/\D/g,'').slice(0,14).replace(/(\d{2})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1/$2').replace(/(\d{4})(\d{1,2})$/,'$1-$2'); };
-    type.addEventListener('change', () => { update(); maskNumber(); }); number.addEventListener('input', maskNumber); update(); maskNumber();
+    const numberMask = window.FokusDocuments?.bind(number, () => type.value);
+    const update = () => { const noUf = ['cpf','cnpj'].includes(type.value); stateField.hidden = noUf; state.required = type.value === 'state_registration'; labelField.hidden = noUf || type.value === 'state_registration'; number.placeholder = type.value === 'cpf' ? '000.000.000-00' : type.value === 'cnpj' ? '00.000.000/0000-00' : 'Número do documento'; number.inputMode = type.value === 'cpf' ? 'numeric' : type.value === 'cnpj' ? 'text' : 'text'; number.maxLength = type.value === 'cpf' ? 14 : type.value === 'cnpj' ? 18 : 120; numberMask?.apply(); };
+    type.addEventListener('change', update); update();
     row.append(field('Tipo', type), field('Número', number), stateField, labelField, button('Remover', 'law-contact-remove', () => row.remove())); return row;
   }
 

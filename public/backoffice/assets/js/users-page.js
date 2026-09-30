@@ -150,6 +150,12 @@ export async function mount(root, context = {}) {
         if (!form.reportValidity()) return;
         const values = Object.fromEntries(new FormData(form));
         const mode = drawerController.getState().mode;
+        if (mode === "invite" && values.account_type === "empresa") {
+            const cpfInput = $("#user-cpf");
+            const cpf = window.FokusDocuments?.normalize(cpfInput.value, "cpf") || cpfInput.value.replace(/\D/g, "");
+            if (!window.FokusDocuments?.cpf(cpf)) { showMessage("Informe um CPF válido, com os dígitos verificadores corretos."); cpfInput.focus(); return; }
+            values.cpf = cpf;
+        }
         try {
             if (mode === "invite") {
                 if (values.account_type === "empresa") {

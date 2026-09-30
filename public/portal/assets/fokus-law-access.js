@@ -45,7 +45,7 @@
       [['name', 'Nome completo', 'text'], ['cpf', 'CPF', 'text'], ['email', 'E-mail', 'email']].forEach(([name, labelText, type]) => {
         const label = node('label', 'law-profile-field law-users-field'); label.htmlFor = `invite-${name}`; label.append(node('span', '', labelText));
         const input = node('input', 'fs-form-control'); input.id = `invite-${name}`; input.name = name; input.type = type; input.required = true;
-        if (name === 'cpf') { input.inputMode = 'numeric'; input.maxLength = 14; input.placeholder = '000.000.000-00'; }
+        if (name === 'cpf') { input.inputMode = 'numeric'; input.maxLength = 14; input.placeholder = '000.000.000-00'; window.FokusDocuments?.bind(input, 'cpf'); }
         if (name === 'email') input.autocomplete = 'email'; label.append(input); form.append(label);
       });
       const assignmentSet = node('fieldset', 'law-access-assignments'); assignmentSet.append(node('legend', '', 'Setores e perfis'));
@@ -70,11 +70,12 @@
       form.addEventListener('submit', async (event) => {
         event.preventDefault(); if (!form.reportValidity()) return;
         const cpfField = form.elements.namedItem('cpf'); const cpf = cpfField.value.replace(/\D/g, '');
-        if (!window.FokusLawUserCpfValid?.(cpf)) { feedback.dataset.state = 'error'; feedback.textContent = 'Informe um CPF válido com 11 dígitos.'; cpfField.focus(); return; }
+        const normalizedCpf = window.FokusDocuments?.normalize(cpf, 'cpf') || cpf;
+        if (!(window.FokusDocuments?.cpf(normalizedCpf) ?? window.FokusLawUserCpfValid?.(normalizedCpf))) { feedback.dataset.state = 'error'; feedback.textContent = 'Informe um CPF válido com 11 dígitos.'; cpfField.focus(); return; }
         const law_assignments = [...selections].filter(([, item]) => item.checkbox.checked).map(([selectedUnit, item]) => ({ unit_id: selectedUnit, role_id: item.select.value }));
         if (!law_assignments.length || law_assignments.some((assignment) => !assignment.role_id)) { feedback.dataset.state = 'error'; feedback.textContent = 'Selecione ao menos um setor e um perfil válido para cada setor.'; return; }
         submit.disabled = true; submit.classList.add('is-loading'); submit.setAttribute('aria-busy', 'true'); submit.textContent = 'Enviando convite…';
-        try { const payload = Object.fromEntries(new FormData(form)); await request('/portal/users', { method: 'POST', body: { ...payload, cpf, law_assignments } }); await render(context, region, 'Convite enviado. Os acessos serão ativados quando a pessoa aceitar.'); }
+        try { const payload = Object.fromEntries(new FormData(form)); await request('/portal/users', { method: 'POST', body: { ...payload, cpf: normalizedCpf, law_assignments } }); await render(context, region, 'Convite enviado. Os acessos serão ativados quando a pessoa aceitar.'); }
         catch (error) { feedback.dataset.state = 'error'; feedback.textContent = error.message || 'Não foi possível enviar o convite.'; }
         finally { submit.disabled = false; submit.classList.remove('is-loading'); submit.removeAttribute('aria-busy'); submit.textContent = 'Enviar convite'; }
       });

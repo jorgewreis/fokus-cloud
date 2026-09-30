@@ -12,12 +12,15 @@
     let user;
     try { user = await FokusApi.request('/auth/me'); } catch { user = null; }
     if (!user) {
-      content.innerHTML = '<p>Entre na sua conta ou cadastre-se para continuar. A composição não contém preços e será recotada pelo servidor.</p><form id="offer-login" class="lp-login"><label>CPF ou CNPJ<input name="document" autocomplete="username" inputmode="numeric" required /></label><label>Senha<input name="password" type="password" autocomplete="current-password" required /></label><button class="law-submit" type="submit">Entrar</button><p id="offer-login-status" role="status" aria-live="polite"></p></form><p><a class="law-submit checkout-register-link" href="/cadastro?return_to=%2Fcontratar%2Ffokus-law">Cadastre-se</a></p>';
+      content.innerHTML = '<p>Entre na sua conta ou cadastre-se para continuar. A composição não contém preços e será recotada pelo servidor.</p><form id="offer-login" class="lp-login"><label>CPF ou CNPJ<input name="document" autocomplete="username" inputmode="text" maxlength="18" required /></label><label>Senha<input name="password" type="password" autocomplete="current-password" required /></label><button class="law-submit" type="submit">Entrar</button><p id="offer-login-status" role="status" aria-live="polite"></p></form><p><a class="law-submit checkout-register-link" href="/cadastro?return_to=%2Fcontratar%2Ffokus-law">Cadastre-se</a></p>';
       const login = document.querySelector('#offer-login');
+      const documentInput = login.elements.namedItem('document');
+      const documentMask = window.FokusDocuments.bind(documentInput, () => window.FokusDocuments.typeOf(documentInput.value));
       login.addEventListener('submit', async (event) => {
-        event.preventDefault(); const button = login.querySelector('button'); const status = document.querySelector('#offer-login-status'); button.disabled = true; status.textContent = 'Validando acesso…';
+        event.preventDefault(); const button = login.querySelector('button'); const status = document.querySelector('#offer-login-status'); const documentType = window.FokusDocuments.typeOf(documentInput.value); documentMask.apply(); if (!window.FokusDocuments.valid(documentInput.value, documentType)) { status.textContent = 'Informe um CPF ou CNPJ válido, com os dígitos verificadores corretos.'; documentInput.setAttribute('aria-invalid', 'true'); documentInput.focus(); return; } documentInput.removeAttribute('aria-invalid'); button.disabled = true; status.textContent = 'Validando acesso…';
         try {
-          const response = await FokusApi.request('/auth/login', { method: 'POST', body: Object.fromEntries(new FormData(login)) });
+          const values = Object.fromEntries(new FormData(login)); values.document = window.FokusDocuments.normalize(documentInput.value, documentType);
+          const response = await FokusApi.request('/auth/login', { method: 'POST', body: values });
           if (!response.user?.email_verified) { location.assign('/verificar-email?return_to=%2Fcontratar%2Ffokus-law'); return; }
           if (response.active_company_id) { location.reload(); return; }
           if (!response.companies?.length) { status.innerHTML = 'Esta conta ainda não tem uma empresa ativa. <a href="/portal/empresas">Gerenciar empresas</a>'; button.disabled = false; return; }

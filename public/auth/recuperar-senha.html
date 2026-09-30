@@ -29,7 +29,7 @@
         </div>
         <form id="reset-form" class="law-recovery-form">
           <label for="reset-cpf">CPF</label>
-          <input id="reset-cpf" name="cpf" inputmode="numeric" autocomplete="username" required />
+          <input id="reset-cpf" name="cpf" inputmode="numeric" maxlength="14" autocomplete="username" placeholder="000.000.000-00" aria-describedby="message" required />
           <button class="law-submit" type="submit">Enviar instruções</button>
         </form>
         <p id="message" class="law-login-status law-recovery-message" role="status" aria-live="polite"></p>
@@ -37,13 +37,26 @@
       </section>
     </main>
     <script src="/assets/js/api-client.js"></script>
+    <script src="/assets/js/brazilian-documents.js?v=20260930-document-validation-v1"></script>
     <script>
+      const cpfInput = document.querySelector('#reset-cpf');
+      const cpfMask = window.FokusDocuments.bind(cpfInput, 'cpf');
+      cpfInput.addEventListener('input', () => { cpfInput.removeAttribute('aria-invalid'); document.querySelector('#message').textContent = ''; });
       document.querySelector('#reset-form').onsubmit = async (event) => {
         event.preventDefault();
         const form = event.currentTarget;
         const submit = form.querySelector('button[type="submit"]');
         const message = document.querySelector('#message');
-        const cpf = form.elements.cpf.value.replace(/\D/g, '');
+        const cpf = window.FokusDocuments.normalize(cpfInput.value, 'cpf');
+        if (!window.FokusDocuments.cpf(cpf)) {
+          submit.disabled = false;
+          message.dataset.state = 'error';
+          message.textContent = 'Informe um CPF válido, com os dígitos verificadores corretos.';
+          cpfInput.setAttribute('aria-invalid', 'true');
+          cpfInput.focus();
+          return;
+        }
+        cpfInput.removeAttribute('aria-invalid');
         submit.disabled = true;
         message.dataset.state = '';
         message.textContent = 'Enviando instruções…';
