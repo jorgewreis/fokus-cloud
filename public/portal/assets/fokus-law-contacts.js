@@ -306,7 +306,10 @@
         if (!item) return;
         const row = $('div', 'law-contact-relationship-editor');
         const header = $('div', 'law-contact-relationship-header');
-        header.append($('strong', '', `${item.display_name}${item.acronym ? ` (${item.acronym})` : ''}`));
+        const identity = $('div', 'law-contact-relationship-identity');
+        identity.append($('strong', 'law-contact-relationship-name', item.display_name));
+        if (item.acronym) identity.append($('span', 'law-contact-relationship-acronym', item.acronym));
+        header.append(identity);
         const removeLink = button('Remover vínculo', 'fs-btn fs-btn-danger', () => { linkedContactIds.delete(id); linkMetadata.delete(id); renderRelationshipChips(); renderRelationshipStats(); });
         header.append(removeLink); row.append(header);
         const metadata = linkMetadata.get(id) || { roles: [], designations: [] };
@@ -314,7 +317,7 @@
         roleGroup.append($('h4', 'law-contact-relationship-title', 'Papéis'));
         const roleRows = $('div', 'law-contact-relationship-entries');
         const roleOptions = [['', 'Selecione um papel'], ['employee', 'Funcionário/colaborador'], ['public_servant', 'Servidor público'], ['legal_representative', 'Representante legal'], ['partner', 'Sócio'], ['administrator', 'Administrador/diretor'], ['attorney_in_fact', 'Procurador'], ['other', 'Outro']];
-        const addRoleRow = (role = {}) => { const entry = $('div', 'law-contact-relationship-entry law-contact-role-entry'); const selectRole = setWidth(select(roleOptions, role.code || ''), 400); const detail = setWidth(input(role.detail || '', 'Complemento para Outro', 160), 500); const starts = setWidth(input(role.starts_on || '', '', 10), 300); starts.type = 'date'; const ends = setWidth(input(role.ends_on || '', '', 10), 300); ends.type = 'date'; entry.append(field('Papel', selectRole), field('Complemento (Outro)', detail), field('Início', starts), field('Término', ends), button('Remover papel', 'fs-btn fs-btn-danger law-contact-chip-remove', () => entry.remove())); entry.getMetadata = () => ({ code: selectRole.value, detail: selectRole.value === 'other' ? detail.value.trim() || null : null, starts_on: starts.value || null, ends_on: ends.value || null }); roleRows.append(entry); };
+        const addRoleRow = (role = {}) => { const entry = $('div', 'law-contact-relationship-entry law-contact-role-entry'); const selectRole = setWidth(select(roleOptions, role.code || ''), 400); const detail = setWidth(input(role.detail || '', 'Complemento para Outro', 160), 500); entry.append(field('Papel', selectRole), field('Complemento (Outro)', detail), button('Remover papel', 'fs-btn fs-btn-danger law-contact-chip-remove', () => entry.remove())); entry.getMetadata = () => ({ code: selectRole.value, detail: selectRole.value === 'other' ? detail.value.trim() || null : null }); roleRows.append(entry); };
         metadata.roles.forEach(addRoleRow);
         const addRole = button('Adicionar papel', 'fs-btn fs-btn-secondary', () => addRoleRow());
         roleGroup.append(roleRows, addRole);
@@ -322,7 +325,7 @@
         designationGroup.append($('h4', 'law-contact-relationship-title', 'Designações'));
         const designationRows = $('div', 'law-contact-relationship-entries');
         const designationList = $('datalist'); designationList.id = `${form.id}-designations-${id}`; designationOptions.forEach((value) => { const option = $('option'); option.value = value; designationList.append(option); });
-        const addDesignationRow = (designation = {}) => { const entry = $('div', 'law-contact-relationship-entry law-contact-designation-entry'); const title = setWidth(input(designation.name || '', 'Ex.: DPC, IPC, CB/PM, SD/PM, TEN/PM', 120), 500); title.setAttribute('list', designationList.id); const starts = setWidth(input(designation.starts_on || '', '', 10), 300); starts.type = 'date'; const ends = setWidth(input(designation.ends_on || '', '', 10), 300); ends.type = 'date'; entry.append(field('Cargo/posto/graduação/função', title), field('Início', starts), field('Término', ends), button('Remover designação', 'fs-btn fs-btn-danger law-contact-chip-remove', () => entry.remove())); entry.getMetadata = () => title.value.trim() ? { name: title.value.trim(), starts_on: starts.value || null, ends_on: ends.value || null } : null; designationRows.append(entry); };
+        const addDesignationRow = (designation = {}) => { const entry = $('div', 'law-contact-relationship-entry law-contact-designation-entry'); const title = setWidth(input(designation.name || '', 'Ex.: DPC, IPC, CB/PM, SD/PM, TEN/PM', 120), 500); title.setAttribute('list', designationList.id); entry.append(field('Cargo/posto/graduação/função', title), button('Remover designação', 'fs-btn fs-btn-danger law-contact-chip-remove', () => entry.remove())); entry.getMetadata = () => title.value.trim() ? { name: title.value.trim() } : null; designationRows.append(entry); };
         metadata.designations.forEach(addDesignationRow);
         const addDesignation = button('Adicionar designação', 'fs-btn fs-btn-secondary', () => addDesignationRow());
         designationGroup.append(designationRows, addDesignation);

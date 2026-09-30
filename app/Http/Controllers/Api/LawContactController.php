@@ -323,8 +323,14 @@ class LawContactController extends Controller
                 if (! array_key_exists($field, $data)) continue;
                 $changes[$field] = in_array($field, ['display_name', 'legal_name'], true) && $data[$field] !== null ? $this->normalizeName($data[$field]) : ($field === 'acronym' && $data[$field] !== null ? trim($data[$field]) : $data[$field]);
             }
+            if (array_key_exists('status', $data)) {
+                $changes['inactivated_at'] = $data['status'] === 'inativo'
+                    ? ($contact->inactivated_at ?? now()->toDateString())
+                    : null;
+            }
             if (isset($data['legal_nature'])) $changes['contact_type'] = $data['legal_nature'] === 'pj' ? 'organization' : 'person';
             DB::table('law_contacts')->where('id', $contactId)->where('company_id', $companyId)->update($changes);
+            if (array_key_exists('status', $data)) $this->syncRelationshipLifecycleForPerson($companyId, $contactId, $changes['inactivated_at']);
             $this->syncChildren($companyId, $contactId, (string) $request->user()->id, $data, creating: false, canSensitive: $canSensitive);
             if (array_key_exists('linked_contact_ids', $data)) $this->syncContactLinks($companyId, $contactId, $nature, $data['linked_contact_ids']);
             if (array_key_exists('linked_relationships', $data)) $this->syncRelationshipMetadata($companyId, $contactId, $nature, $data['linked_relationships']);
@@ -346,7 +352,9 @@ class LawContactController extends Controller
         $this->assertModuleEnabled($companyId);
         $contact = DB::table('law_contacts')->where('company_id', $companyId)->where('id', $contactId)->whereNull('deleted_at')->whereNull('merged_into_id')->first();
         abort_unless($contact, 404, 'Contato não encontrado.');
-        DB::table('law_contacts')->where('id', $contactId)->where('company_id', $companyId)->update(['status' => 'inativo', 'updated_by' => $request->user()->id, 'updated_at' => now()]);
+        $inactivatedAt = $contact->inactivated_at ?? now()->toDateString();
+        DB::table('law_contacts')->where('id', $contactId)->where('company_id', $companyId)->update(['status' => 'inativo', 'inactivated_at' => $inactivatedAt, 'updated_by' => $request->user()->id, 'updated_at' => now()]);
+        $this->syncRelationshipLifecycleForPerson($companyId, $contactId, $inactivatedAt);
         $audit->company($companyId, $request->user()->id, 'law_contact', $contactId, 'inactivate', ['status' => $contact->status], ['status' => 'inativo'], request: $request);
         $usage->contacts($companyId);
         return response()->noContent();
@@ -696,18 +704,31 @@ class LawContactController extends Controller
                 $linkId = PrefixedUlid::make('LCL');
                 DB::table('law_contact_company_links')->insert(['id' => $linkId, 'company_id' => $companyId, 'person_contact_id' => $personId, 'company_contact_id' => $companyContactId, 'created_at' => now(), 'updated_at' => now()]);
             } else $linkId = $link->id;
+            $person = DB::table('law_contacts')->where('company_id', $companyId)->where('id', $personId)->first(['created_at', 'inactivated_at']);
+            $startsOn = $person?->created_at ? Carbon::parse($person->created_at)->toDateString() : null;
+            $endsOn = $person?->inactivated_at;
             if (array_key_exists('roles', $relationship)) {
                 DB::table('law_contact_relationship_roles')->where('company_id', $companyId)->where('link_id', $linkId)->delete();
-                foreach ($relationship['roles'] as $role) DB::table('law_contact_relationship_roles')->insert(['id' => PrefixedUlid::make('LRL'), 'company_id' => $companyId, 'link_id' => $linkId, 'role_code' => $role['code'], 'custom_detail' => $role['detail'] ?? null, 'starts_on' => $role['starts_on'] ?? null, 'ends_on' => $role['ends_on'] ?? null, 'created_at' => now(), 'updated_at' => now()]);
+                foreach ($relationship['roles'] as $role) DB::table('law_contact_relationship_roles')->insert(['id' => PrefixedUlid::make('LRL'), 'company_id' => $companyId, 'link_id' => $linkId, 'role_code' => $role['code'], 'custom_detail' => $role['detail'] ?? null, 'starts_on' => $startsOn, 'ends_on' => $endsOn, 'created_at' => now(), 'updated_at' => now()]);
             }
             if (array_key_exists('designations', $relationship)) {
                 DB::table('law_contact_relationship_designations')->where('company_id', $companyId)->where('link_id', $linkId)->delete();
                 foreach ($relationship['designations'] as $designation) {
                     $label = trim($designation['name']); $normalized = mb_strtolower($label);
-                    DB::table('law_contact_relationship_designations')->insert(['id' => PrefixedUlid::make('LDS'), 'company_id' => $companyId, 'link_id' => $linkId, 'name' => $label, 'normalized_name' => $normalized, 'starts_on' => $designation['starts_on'] ?? null, 'ends_on' => $designation['ends_on'] ?? null, 'created_at' => now(), 'updated_at' => now()]);
+                    DB::table('law_contact_relationship_designations')->insert(['id' => PrefixedUlid::make('LDS'), 'company_id' => $companyId, 'link_id' => $linkId, 'name' => $label, 'normalized_name' => $normalized, 'starts_on' => $startsOn, 'ends_on' => $endsOn, 'created_at' => now(), 'updated_at' => now()]);
                 }
             }
         }
+    }
+
+    private function syncRelationshipLifecycleForPerson(string $companyId, string $personId, ?string $inactivatedAt): void
+    {
+        $linkIds = DB::table('law_contact_company_links')->where('company_id', $companyId)->where('person_contact_id', $personId)->pluck('id');
+        if ($linkIds->isEmpty()) return;
+        $startsOn = DB::table('law_contacts')->where('company_id', $companyId)->where('id', $personId)->value('created_at');
+        $startsOn = $startsOn ? Carbon::parse($startsOn)->toDateString() : null;
+        DB::table('law_contact_relationship_roles')->where('company_id', $companyId)->whereIn('link_id', $linkIds)->update(['starts_on' => $startsOn, 'ends_on' => $inactivatedAt, 'updated_at' => now()]);
+        DB::table('law_contact_relationship_designations')->where('company_id', $companyId)->whereIn('link_id', $linkIds)->update(['starts_on' => $startsOn, 'ends_on' => $inactivatedAt, 'updated_at' => now()]);
     }
 
     private function assertSensitiveFields(array $data, bool $canSensitive): void

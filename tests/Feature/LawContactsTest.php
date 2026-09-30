@@ -130,6 +130,15 @@ class LawContactsTest extends TestCase
         $this->assertDatabaseCount('law_contact_relationship_designations', 2);
         $this->assertDatabaseCount('law_contact_institutional_data', 2);
         $this->assertDatabaseHas('law_contact_institutional_data', ['company_id' => $this->companyId, 'data_type' => 'court_unit', 'cnj_code' => '12345678920268050001']);
+        $registrationDate = \Illuminate\Support\Carbon::parse(DB::table('law_contacts')->where('id', $person['id'])->value('created_at'))->toDateString();
+        $this->assertSame([$registrationDate, $registrationDate], DB::table('law_contact_relationship_roles')->orderBy('role_code')->pluck('starts_on')->all());
+        $this->assertSame([$registrationDate, $registrationDate], DB::table('law_contact_relationship_designations')->orderBy('name')->pluck('starts_on')->all());
+        $this->assertDatabaseMissing('law_contact_relationship_roles', ['link_id' => DB::table('law_contact_company_links')->where('person_contact_id', $person['id'])->value('id'), 'ends_on' => today()->toDateString()]);
+
+        $this->actingAs($this->admin)->withSession($session)->patchJson('/api/law/contacts/'.$person['id'], ['status' => 'inativo'])->assertOk();
+        $this->assertSame([today()->toDateString(), today()->toDateString()], DB::table('law_contact_relationship_roles')->orderBy('role_code')->pluck('ends_on')->all());
+        $this->actingAs($this->admin)->withSession($session)->patchJson('/api/law/contacts/'.$person['id'], ['status' => 'ativo'])->assertOk();
+        $this->assertSame([null, null], DB::table('law_contact_relationship_roles')->orderBy('role_code')->pluck('ends_on')->all());
     }
 
     public function test_contact_quality_summary_and_duplicate_suggestions_use_professional_channels(): void
