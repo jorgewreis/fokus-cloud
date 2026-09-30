@@ -15,6 +15,14 @@
     if (document.type === 'oab' && digits.length > 3) return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     return value;
   };
+  const formatContactPhone = (value) => {
+    const original = String(value || 'Dado protegido');
+    if (original === 'Dado protegido' || original.includes('•') || original.includes('*')) return original;
+    const digits = original.replace(/\D/g, '');
+    if (digits.length === 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    if (digits.length === 11) return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+    return original;
+  };
   const field = (labelText, control) => { const label = $('label', 'law-contact-field'); label.append($('span', '', labelText), control); return label; };
   const setWidth = (control, width) => { control.classList.add(`fs-width-${width}`); return control; };
   const select = (items, value = '') => { const control = $('select', 'fs-form-control'); items.forEach(([v, label]) => { const option = new Option(label, v); option.selected = v === value; control.append(option); }); return control; };
@@ -593,8 +601,12 @@
     summaryCopy.append(titleRow);
     summaryCopy.append($('p', 'law-contact-detail-legal-name', contact.legal_name || labels[contact.legal_nature] || 'Contato'));
     const summaryBadges = $('div', 'law-contact-detail-summary-badges');
-    summaryBadges.append($('span', `law-contact-detail-badge law-contact-detail-nature-${contact.legal_nature}`, labels[contact.legal_nature] || 'Contato'));
-    summaryBadges.append($('span', `law-contact-detail-badge law-contact-detail-status-${contact.status}`, labels[contact.status] || contact.status || 'Situação não informada'));
+    const statusText = labels[contact.status] || contact.status || 'Situação não informada';
+    const statusBadge = $('span', `law-contact-detail-badge law-contact-detail-status-${contact.status}`);
+    statusBadge.setAttribute('role', 'img');
+    statusBadge.setAttribute('aria-label', statusText);
+    statusBadge.title = statusText;
+    summaryBadges.append(statusBadge);
     summary.append(avatar, summaryCopy, summaryBadges);
     const chips = $('div', 'law-contact-detail-chip-groups');
     const addChips = (title, values, tone) => {
@@ -647,7 +659,7 @@
       contact.documents.forEach((doc) => {
         const item = $('article', 'law-contact-detail-document');
         const type = DOCUMENTS[doc.type] || doc.type || 'Documento';
-        item.append($('span', 'law-contact-detail-document-type', Array.from(type).slice(0, 3).join('').toLocaleUpperCase('pt-BR')));
+        item.append($('span', 'law-contact-detail-document-type', Array.from(type).slice(0, 4).join('').toLocaleUpperCase('pt-BR')));
         const detail = $('div', 'law-contact-detail-document-copy');
         detail.append($('strong', '', formatContactDocument(doc)));
         detail.append($('span', '', [doc.label, doc.state].filter(Boolean).join(' · ') || 'Documento cadastrado'));
@@ -665,12 +677,13 @@
         const title = $('div', 'law-contact-detail-channel-title');
         const channelKinds = { phone: 'TELEFONE FIXO', extension: 'RAMAL', mobile: 'CELULAR', whatsapp: 'WHATSAPP', email: 'E-MAIL' };
         title.append($('span', 'law-contact-detail-channel-kind', channelKinds[channel.type] || 'TELEFONE'));
-        meta.append(title);
         const badges = $('div', 'law-contact-detail-channel-badges');
         if (channel.primary) badges.append($('span', 'law-contact-detail-primary', 'Principal'));
         if (channel.personal) badges.append($('span', 'law-contact-detail-private', channel.value === 'Dado protegido' ? 'Acesso restrito' : 'Pessoal'));
-        if (badges.children.length) meta.append(badges);
-        detail.append(meta, $('strong', '', channel.value || 'Dado protegido'));
+        if (badges.children.length) title.append(badges);
+        meta.append(title);
+        const value = isEmail ? (channel.value || 'Dado protegido') : formatContactPhone(channel.value);
+        detail.append(meta, $('strong', '', value));
         item.append(mark, detail); items.append(item);
       });
     }
