@@ -594,12 +594,12 @@
     const summary = $('section', 'law-contact-detail-summary');
     const avatar = $('span', 'law-contact-detail-avatar', initials);
     const summaryCopy = $('div', 'law-contact-detail-summary-copy');
-    summaryCopy.append($('span', 'law-contact-detail-eyebrow', 'VISÃO GERAL'));
+    summaryCopy.append($('span', 'law-contact-detail-eyebrow', (labels[contact.legal_nature] || 'Contato').toLocaleUpperCase('pt-BR')));
     const titleRow = $('div', 'law-contact-detail-name-row');
     titleRow.append($('h3', 'law-contact-detail-name', contact.display_name));
     if (contact.acronym) titleRow.append($('span', 'law-contact-detail-acronym', contact.acronym));
     summaryCopy.append(titleRow);
-    summaryCopy.append($('p', 'law-contact-detail-legal-name', contact.legal_name || labels[contact.legal_nature] || 'Contato'));
+    if (contact.legal_name) summaryCopy.append($('p', 'law-contact-detail-legal-name', contact.legal_name));
     const summaryBadges = $('div', 'law-contact-detail-summary-badges');
     const statusText = labels[contact.status] || contact.status || 'Situação não informada';
     const statusBadge = $('span', `law-contact-detail-badge law-contact-detail-status-${contact.status}`);
@@ -609,16 +609,23 @@
     summaryBadges.append(statusBadge);
     summary.append(avatar, summaryCopy, summaryBadges);
     const chips = $('div', 'law-contact-detail-chip-groups');
-    const addChips = (title, values, tone) => {
+    const addChips = (values, tone) => {
       if (!values?.length) return;
       const group = $('div', `law-contact-detail-chip-group law-contact-detail-chip-${tone}`);
-      group.append($('span', 'law-contact-detail-chip-label', title));
       const list = $('div', 'law-contact-detail-chips');
       values.forEach((value) => list.append($('span', 'law-contact-detail-chip', value)));
       group.append(list); chips.append(group);
     };
-    if (contact.legal_nature !== 'pj') addChips('Profissões', contact.professions || [], 'professions');
-    addChips('Tags', contact.tags || [], 'tags');
+    const roleLabels = { employee: 'Funcionário/colaborador', public_servant: 'Servidor público', legal_representative: 'Representante legal', partner: 'Sócio', administrator: 'Administrador/diretor', attorney_in_fact: 'Procurador', other: 'Outro' };
+    const relationshipTags = [];
+    if (contact.legal_nature === 'pf') (contact.linked_contacts || []).forEach((linked) => {
+      (linked.roles || []).filter((item) => item.current).forEach((item) => relationshipTags.push(item.code === 'other' && item.detail ? item.detail : roleLabels[item.code] || item.code));
+      (linked.designations || []).filter((item) => item.current && item.name).forEach((item) => relationshipTags.push(item.name));
+      if (linked.display_name) relationshipTags.push(`${linked.display_name}${linked.acronym ? ` · ${linked.acronym}` : ''}`);
+    });
+    if (contact.legal_nature === 'pf') addChips(contact.professions || [], 'professions');
+    addChips(relationshipTags, 'relationships');
+    addChips(contact.tags || [], 'tags');
     summaryCopy.append(chips);
     body.append(summary);
     if (contact.is_shared) body.append($('aside', 'law-contact-source', `Compartilhado por ${contact.source_company_name}. Este contato está disponível somente para consulta.`));
@@ -644,13 +651,16 @@
       const items = addSection(contact.legal_nature === 'pj' ? 'Pessoas vinculadas' : 'Empresas vinculadas', 'VÍN', contact.linked_contacts.length, 'law-contact-detail-links');
       if (contact.legal_nature === 'pj') items.remove();
       else contact.linked_contacts.forEach((linked) => {
-          const row = $('article', 'law-contact-detail-linked-contact');
-          row.append($('strong', '', linked.display_name), $('span', '', `${linked.acronym ? `${linked.acronym} · ` : ''}${labels[linked.legal_nature] || 'Contato'}`));
-          const roleLabels = { employee: 'Funcionário/colaborador', public_servant: 'Servidor público', legal_representative: 'Representante legal', partner: 'Sócio', administrator: 'Administrador/diretor', attorney_in_fact: 'Procurador', other: 'Outro' };
+          const row = $('article', 'law-contact-detail-linked-contact law-contact-detail-linked-company');
+          const identity = $('div', 'law-contact-detail-link-identity');
+          identity.append($('strong', 'law-contact-detail-link-name', linked.display_name));
+          if (linked.acronym) identity.append($('span', 'law-contact-detail-link-acronym', linked.acronym));
+          row.append(identity);
           const activeRoles = (linked.roles || []).filter((item) => item.current).map((item) => `${roleLabels[item.code] || item.code}${item.code === 'other' && item.detail ? `: ${item.detail}` : ''}`);
           const activeDesignations = (linked.designations || []).filter((item) => item.current).map((item) => item.name);
-          if (activeRoles.length) row.append($('span', '', `Papéis vigentes: ${activeRoles.join(', ')}`));
-          if (activeDesignations.length) row.append($('span', '', `Cargo/posto/função: ${activeDesignations.join(', ')}`));
+          const metadataTags = $('div', 'law-contact-detail-linked-tags');
+          [...activeRoles, ...activeDesignations].forEach((value) => metadataTags.append($('span', 'law-contact-detail-linked-tag', value)));
+          if (metadataTags.children.length) row.append(metadataTags);
           items.append(row);
       });
     }

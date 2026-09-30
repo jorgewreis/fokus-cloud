@@ -435,6 +435,12 @@
 .law-contact-detail-acronym { padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,.14); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
 .law-contact-detail-linked-contact { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--law-shell-line); border-radius: 9px; }
 .law-contact-detail-linked-contact span { color: var(--law-shell-muted); font-size: 12px; }
+.law-contact-detail-linked-company { display: grid; grid-template-columns: minmax(180px, .9fr) minmax(0, 1.6fr); align-items: center; justify-content: initial; }
+.law-contact-detail-link-identity { display: grid; min-width: 0; gap: 3px; }
+.law-contact-detail-link-name { min-width: 0; color: #2f243a; font-size: 11px; font-weight: 650; overflow-wrap: anywhere; }
+.law-contact-detail-link-acronym { color: var(--law-shell-muted); font-size: 10px !important; line-height: 1.3; }
+.law-contact-detail-linked-tags { display: flex; min-width: 0; flex-wrap: wrap; gap: 6px; }
+.law-contact-detail-linked-tag { padding: 4px 7px; border: 1px solid #e9e1ee; border-radius: 6px; background: #f8f5fa; color: #493657 !important; font-size: 10px !important; line-height: 1.3; overflow-wrap: anywhere; }
 .law-contact-check-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
 .law-contact-check { display: flex; min-width: 0; align-items: flex-start; gap: 8px; color: var(--law-shell-ink); font-size: 12px; font-weight: 500; }
 .law-contact-check input { flex: 0 0 auto; margin-top: 2px; accent-color: var(--law-shell-purple); }
@@ -465,9 +471,8 @@
 .law-contact-detail-status-inativo { border-color: rgba(250, 204, 151, .68); background: #e7a45e; box-shadow: 0 0 0 3px rgba(231, 164, 94, .16); }
 .law-contact-detail-chip-groups { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 11px; }
 .law-contact-detail-chip-group { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 5px; }
-.law-contact-detail-chip-label { margin-right: 2px; color: #d3c0e5; font-size: 10px; font-weight: 650; }
 .law-contact-detail-chips { display: flex; flex-wrap: wrap; gap: 5px; }
-.law-contact-detail-chip { padding: 3px 7px; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; background: rgba(255,255,255,.1); color: #fff; font-size: 10px; }
+.law-contact-detail-chip { padding: 3px 7px; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; background: rgba(255,255,255,.1); color: #fff; font-size: 10px; overflow-wrap: anywhere; }
 .law-contact-detail-chip-tags .law-contact-detail-chip { border-color: rgba(249, 213, 139, .32); background: rgba(183, 132, 38, .18); }
 .law-contact-detail-card { min-width: 0; margin: 0; overflow: hidden; border: 1px solid #e6dfeb; border-radius: 12px; background: #fff; box-shadow: 0 4px 14px rgba(40, 20, 59, .035); }
 .law-contact-detail-section-header { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-bottom: 1px solid #eee8f2; background: linear-gradient(100deg, #fbf9fd, #fff); }
@@ -599,6 +604,7 @@
   .law-contact-detail-avatar { width: 46px; height: 46px; border-radius: 14px; font-size: 17px; }
   .law-contact-detail-name { font-size: 17px; }
   .law-contact-detail-summary-badges { top: 12px; right: 12px; grid-column: auto; }
+  .law-contact-detail-linked-company { grid-template-columns: minmax(0, 1fr); }
   .law-contact-detail-items { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 8px; }
   .law-contact-detail-card, .law-contact-detail-notes { grid-column: 1; }
 }
