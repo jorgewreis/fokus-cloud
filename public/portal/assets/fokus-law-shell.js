@@ -33,6 +33,7 @@
   const preferenceKey = (userId, key) => `fokus-law:${userId}:${key}`;
   let context = null;
   const initialPage = shell.dataset.initialPage || 'overview';
+  let contactsView = ['contacts-sharing', 'contacts-quality'].includes(initialPage) ? initialPage : 'module';
   let settingsView = ['company', 'subscription', 'users', 'transfer'].includes(initialPage) ? initialPage : 'settings';
   let activeGroup = ['company', 'subscription', 'users', 'transfer'].includes(initialPage) ? 'settings' : 'overview';
 
@@ -200,12 +201,14 @@
     headingIcon = descriptor.icon;
     const isContactsModule = String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos');
     if (isContactsModule) {
-      appendNavButton(pageItems, 'Cadastro e consulta', descriptor.icon, true, () => renderContent('module'));
+      appendNavButton(pageItems, 'Cadastro e consulta', descriptor.icon, contactsView === 'module', () => { contactsView = 'module'; renderContent('module'); });
+      if (canLawPermission('law.contacts.share.manage')) appendNavLink(pageItems, 'Compartilhamentos', '/portal/fokus-law/contatos/compartilhamentos', 'contacts', contactsView === 'contacts-sharing');
+      if (canLawPermission('law.contacts.view')) appendNavLink(pageItems, 'Revisão e qualidade', '/portal/fokus-law/contatos/revisao-e-qualidade', 'reports', contactsView === 'contacts-quality');
     } else {
       appendNavButton(pageItems, `Visão geral de ${descriptor.label}`, descriptor.icon, true, () => renderContent('module'), true);
       pageItems.append(element('p', 'law-nav-description', 'As páginas funcionais deste módulo serão adicionadas aqui.'));
     }
-    renderContent('module');
+    renderContent(contactsView);
     document.querySelector('#section-icon').src = ICON_ROOT + ICONS[headingIcon];
   }
 
@@ -1030,7 +1033,9 @@
 
   function renderModulePlaceholder(module) {
     if (String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos')) {
-      renderContacts();
+      if (contactsView === 'contacts-sharing') window.FokusLawContacts?.renderSharingPage(contentRegion, context);
+      else if (contactsView === 'contacts-quality') window.FokusLawContacts?.renderQualityPage(contentRegion, context);
+      else renderContacts();
       return;
     }
     const descriptor = getModuleDescriptor(module);
@@ -1568,9 +1573,13 @@
     renderCompanyOptions();
     renderUnitOptions();
     const remember = localStorage.getItem(preferenceKey(context.user.id, 'remember-group')) === 'true';
-    if (!['profile', 'company', 'subscription', 'users', 'transfer'].includes(initialPage) && remember) {
+    if (!['profile', 'company', 'subscription', 'users', 'transfer', 'contacts-sharing', 'contacts-quality'].includes(initialPage) && remember) {
       const lastGroup = localStorage.getItem(preferenceKey(context.user.id, 'last-group'));
       if ((lastGroup === 'settings' && context.permissions.manage_settings) || visibleModules().some((item) => `module:${item.id}` === lastGroup)) activeGroup = lastGroup;
+    }
+    if (['contacts-sharing', 'contacts-quality'].includes(initialPage)) {
+      const contactsModule = visibleModules().find((item) => String(item.family || item.module_code || item.code || '').toLowerCase().startsWith('contatos'));
+      if (contactsModule) activeGroup = `module:${contactsModule.id}`;
     }
     if (localStorage.getItem(preferenceKey(context.user.id, 'reduced-motion')) === 'true') document.documentElement.classList.add('law-pref-reduced-motion');
     renderRail();
