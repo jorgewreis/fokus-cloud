@@ -392,20 +392,26 @@ class LawContactController extends Controller
         $policies = DB::table('law_contact_sharing_policies')->where('source_company_id', $companyId)->orderBy('recipient_company_id')->get();
         $incoming = DB::table('law_contact_sharing_policies')->where('recipient_company_id', $companyId)->get()->keyBy('source_company_id');
         $professions = $this->assignedProfessionOptions($companyId);
+        $companyNames = DB::table('companies')->whereIn('id', $policies->pluck('recipient_company_id')->all())->get(['id', DB::raw('COALESCE(display_name, legal_name) as name')])->keyBy('id');
 
         return response()->json([
             'companies' => array_map(function (array $company) use ($incoming): array {
                 $agreement = $incoming->get($company['id']);
-                return $company + ['incoming_agreement' => (bool) ($agreement?->is_active ?? false)];
+                return $company + ['incoming_agreement' => (bool) ($agreement?->is_active ?? false) && $agreement !== null && $this->sharingPolicyHasScope($agreement)];
             }, $companies),
-            'policies' => $policies->map(fn ($policy) => [
-                'id' => $policy->id,
-                'recipient_company_id' => $policy->recipient_company_id,
-                'legal_natures' => json_decode($policy->legal_natures ?: '[]', true) ?: [],
-                'profession_names' => json_decode($policy->profession_names ?: '[]', true) ?: [],
-                'shared_fields' => json_decode($policy->shared_fields, true) ?: [],
-                'is_active' => (bool) $policy->is_active,
-            ]),
+            'policies' => $policies->map(function ($policy) use ($companyNames, $incoming): array {
+                $agreement = $incoming->get($policy->recipient_company_id);
+                return [
+                    'id' => $policy->id,
+                    'recipient_company_id' => $policy->recipient_company_id,
+                    'recipient_company_name' => $companyNames->get($policy->recipient_company_id)?->name,
+                    'legal_natures' => json_decode($policy->legal_natures ?: '[]', true) ?: [],
+                    'profession_names' => json_decode($policy->profession_names ?: '[]', true) ?: [],
+                    'shared_fields' => json_decode($policy->shared_fields, true) ?: [],
+                    'is_active' => (bool) $policy->is_active,
+                    'reciprocal_active' => (bool) $policy->is_active && $agreement !== null && (bool) $agreement->is_active && $this->sharingPolicyHasScope($policy) && $this->sharingPolicyHasScope($agreement),
+                ];
+            }),
             'professions' => $professions,
             'agreement_required' => true,
             'share_fields' => ['professional_channels' => 'Telefones e e-mails profissionais/institucionais', 'business_addresses' => 'Endereços comerciais/institucionais', 'documents' => 'Documentos (exige permissão sensível no destino)'],
@@ -417,7 +423,8 @@ class LawContactController extends Controller
         $companyId = (string) $request->attributes->get('active_company_id');
         $this->assertModuleEnabled($companyId);
         $data = $request->validate([
-            'policies' => ['present', 'array', 'max:50'],
+            'policies' => ['present', 'array', 'max:500'],
+            'replace_all' => ['sometimes', 'boolean'],
             'policies.*.recipient_company_id' => ['required', 'string', 'size:30', 'distinct'],
             'policies.*.legal_natures' => ['required', 'array', 'min:1'],
             'policies.*.legal_natures.*' => ['required', 'string', 'distinct', Rule::in(['pf', 'pj'])],
@@ -437,10 +444,8 @@ class LawContactController extends Controller
         }
         $actor = (string) $request->user()->id;
         DB::transaction(function () use ($companyId, $data, $actor, $request, $audit): void {
-            $submitted = [];
             foreach ($data['policies'] as $policy) {
                 $recipient = $policy['recipient_company_id'];
-                $submitted[] = $recipient;
                 $old = DB::table('law_contact_sharing_policies')->where('source_company_id', $companyId)->where('recipient_company_id', $recipient)->first();
                 $professionNames = array_values(array_unique(array_map(fn ($name) => mb_strtolower(trim($name)), $policy['profession_names'] ?? [])));
                 $values = [
@@ -454,13 +459,30 @@ class LawContactController extends Controller
                 else DB::table('law_contact_sharing_policies')->insert($values + ['id' => PrefixedUlid::make('LSH'), 'source_company_id' => $companyId, 'recipient_company_id' => $recipient, 'created_by' => $actor, 'created_at' => now()]);
                 $audit->company($companyId, $actor, 'law_contact_sharing_policy', $old?->id ?: $recipient, $old ? 'update' : 'create', null, ['recipient_company_id' => $recipient, 'legal_natures' => $policy['legal_natures'], 'profession_names' => $professionNames, 'shared_fields' => $policy['shared_fields'] ?? []], request: $request);
             }
+            if (! ($data['replace_all'] ?? true)) return;
+            $submitted = array_column($data['policies'], 'recipient_company_id');
             $removed = DB::table('law_contact_sharing_policies')->where('source_company_id', $companyId)->when($submitted, fn ($query) => $query->whereNotIn('recipient_company_id', $submitted))->when(! $submitted, fn ($query) => $query)->get();
             foreach ($removed as $policy) {
+                if (! (bool) $policy->is_active) continue;
                 DB::table('law_contact_sharing_policies')->where('id', $policy->id)->update(['is_active' => false, 'updated_by' => $actor, 'updated_at' => now()]);
                 $audit->company($companyId, $actor, 'law_contact_sharing_policy', $policy->id, 'revoke', ['is_active' => true], ['is_active' => false], request: $request);
             }
         });
         return response()->json(['message' => 'Compartilhamento atualizado.']);
+    }
+
+    public function revokeSharing(Request $request, string $recipientCompanyId, AuditRecorder $audit)
+    {
+        $companyId = (string) $request->attributes->get('active_company_id');
+        $this->assertModuleEnabled($companyId);
+        $policy = DB::table('law_contact_sharing_policies')->where('source_company_id', $companyId)->where('recipient_company_id', $recipientCompanyId)->first();
+        abort_unless($policy, 404, 'Política de compartilhamento não encontrada.');
+        $actor = (string) $request->user()->id;
+        if ((bool) $policy->is_active) {
+            DB::table('law_contact_sharing_policies')->where('id', $policy->id)->update(['is_active' => false, 'updated_by' => $actor, 'updated_at' => now()]);
+            $audit->company($companyId, $actor, 'law_contact_sharing_policy', $policy->id, 'revoke', ['is_active' => true], ['is_active' => false], request: $request);
+        }
+        return response()->json(['message' => 'Política de compartilhamento removida.']);
     }
 
     private function validated(Request $request, bool $partial = false): array

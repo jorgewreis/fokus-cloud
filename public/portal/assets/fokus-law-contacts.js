@@ -716,95 +716,155 @@
     modal.body.append(form);
   }
 
-  async function openSharing(root, opener = null) {
-    const result = await window.FokusApi.request('/law/contact-sharing');
-    const modal = createModal(root, 'Compartilhamento entre empresas', 'fs-modal-xl', opener); const form = $('form', 'law-contact-editor'); form.id = `law-contact-form-${++modalSequence}`;
-    form.append($('p', 'law-contact-help', 'Por padrão, nenhuma empresa acessa os contatos de outra. O compartilhamento só fica ativo quando as duas empresas configuram um acordo recíproco; cada uma define o escopo que disponibiliza.'));
-    const policies = new Map((result.policies || []).map((policy) => [policy.recipient_company_id, policy]));
-    const items = $('div', 'law-contact-sharing-list');
-    (result.companies || []).forEach((company) => {
-      const policy = policies.get(company.id);
-      const card = $('fieldset', 'fs-card fs-card-sm law-contact-share-card');
-      const legend = $('legend', '', company.name); card.append(legend);
-      const agreementStatus = company.incoming_agreement && policy?.is_active
-        ? 'Acordo bilateral ativo.'
-        : policy?.is_active
-          ? 'Aguardando a outra empresa configurar o acordo.'
-          : company.incoming_agreement
-            ? 'A outra empresa propôs compartilhar. Configure seu escopo para aceitar.'
-            : 'Sem acordo de compartilhamento.';
-      card.append($('p', 'law-contact-help law-contact-share-status', agreementStatus));
-      const enabledWrap = $('label', 'law-contact-check');
-      const enabled = $('input'); enabled.type = 'checkbox'; enabled.checked = Boolean(policy?.is_active); enabled.dataset.shareCompany = company.id;
-      enabledWrap.append(enabled, $('span', '', 'Configurar meu lado do acordo bilateral')); card.append(enabledWrap);
-
-      const natures = $('div', 'law-contact-check-grid');
-      [['pj', 'Pessoas jurídicas'], ['pf', 'Pessoas físicas']].forEach(([value, label]) => {
-        const wrap = $('label', 'law-contact-check'); const check = $('input');
-        check.type = 'checkbox'; check.value = value; check.checked = (policy?.legal_natures || []).includes(value); check.dataset.shareNature = '1';
-        wrap.append(check, $('span', '', label)); natures.append(wrap);
-      });
-      card.append($('p', 'law-contact-help', 'Naturezas que minha empresa disponibiliza'), natures);
-
-      const professionGroup = $('div', 'law-contact-share-professions');
-      professionGroup.append($('p', 'law-contact-help', 'Profissões de pessoas físicas que minha empresa disponibiliza'));
-      const professions = $('div', 'law-contact-check-grid');
-      (result.professions || []).forEach((profession) => {
-        const wrap = $('label', 'law-contact-check'); const check = $('input');
-        check.type = 'checkbox'; check.value = profession.value; check.checked = (policy?.profession_names || []).includes(profession.value); check.dataset.shareProfession = '1';
-        wrap.append(check, $('span', '', profession.label)); professions.append(wrap);
-      });
-      professionGroup.append(professions);
-      const pfNature = natures.querySelector('[data-share-nature][value="pf"]');
-      professionGroup.hidden = !pfNature.checked;
-      pfNature.addEventListener('change', () => { professionGroup.hidden = !pfNature.checked; });
-      card.append(professionGroup);
-
-      const fields = $('div', 'law-contact-check-grid');
-      (result.share_fields && Object.entries(result.share_fields) || []).forEach(([code, label]) => { const wrap = $('label', 'law-contact-check'); const check = $('input'); check.type = 'checkbox'; check.value = code; check.checked = (policy?.shared_fields || []).includes(code); check.dataset.shareField = '1'; wrap.append(check, $('span', '', label)); fields.append(wrap); });
-      card.append($('p', 'law-contact-help', 'Campos autorizados'), fields); items.append(card);
-    });
-    const message = $('p', 'law-contact-feedback'); message.setAttribute('role', 'status');
-    modal.footer.append(button('Cancelar', 'fs-btn fs-btn-secondary', () => modal.close())); const save = $('button', 'fs-btn fs-btn-primary', 'Salvar regras'); save.type = 'submit'; save.setAttribute('form', form.id); modal.footer.append(save);
-    form.append(items, message);
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault(); save.disabled = true;
-      const policiesToSave = [...items.querySelectorAll('[data-share-company]:checked')].map((enabled) => {
-        const card = enabled.closest('fieldset'); return {
-          recipient_company_id: enabled.dataset.shareCompany,
-          legal_natures: [...card.querySelectorAll('[data-share-nature]:checked')].map((check) => check.value),
-          profession_names: card.querySelector('[data-share-nature][value="pf"]:checked')
-            ? [...card.querySelectorAll('[data-share-profession]:checked')].map((check) => check.value)
-            : [],
-          shared_fields: [...card.querySelectorAll('[data-share-field]:checked')].map((check) => check.value),
-        };
-      });
-      const incompleteScope = policiesToSave.some((policy) => policy.legal_natures.length === 0 || (policy.legal_natures.includes('pf') && policy.profession_names.length === 0));
-      if (incompleteScope) {
-        message.dataset.state = 'error'; message.textContent = 'Escolha ao menos uma natureza e, para pessoas físicas, uma profissão vinculada a um contato.'; save.disabled = false; return;
-      }
-      try { await window.FokusApi.request('/law/contact-sharing', { method: 'PUT', body: { policies: policiesToSave } }); modal.close(); }
-      catch (error) { message.dataset.state = 'error'; message.textContent = error.message || 'Não foi possível salvar as regras de compartilhamento.'; }
-      finally { save.disabled = false; }
-    });
-    modal.body.append(form);
-  }
-
   async function renderSharingPage(root, context) {
+    document.title = 'Compartilhamentos | Fokus Law';
     root.replaceChildren();
     const heading = $('div', 'law-page-heading law-contact-page-heading');
-    heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Compartilhamentos'), $('p', 'law-page-lede', 'Defina quais contatos e informações sua empresa pode compartilhar com outras empresas do Fokus Law.'));
+    heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Compartilhamentos'), $('p', 'law-page-lede', 'Escolha as empresas e defina, em uma única política, quais contatos e informações ficam disponíveis para esse grupo.'));
     root.append(heading);
-    const card = $('section', 'fs-card fs-card-sm law-contacts-form-section');
-    const body = $('div', 'fs-card-body');
-    body.append($('h3', 'fs-card-title', 'Acordos entre empresas'), $('p', 'law-contact-help', 'O compartilhamento só fica ativo quando as duas empresas configuram um acordo recíproco. Você controla as naturezas, profissões e campos disponibilizados.'));
-    if (context.company?.role === 'admin' || (context.law_permissions || []).includes('law.contacts.share.manage')) {
-      body.append(button('Configurar compartilhamentos', 'fs-btn fs-btn-primary', (event) => openSharing(root, event.currentTarget)));
-    }
-    card.append(body); root.append(card);
+    const feedback = $('p', 'law-contact-feedback'); feedback.setAttribute('role', 'status'); feedback.textContent = 'Carregando políticas…'; root.append(feedback);
+    try {
+      const result = await window.FokusApi.request('/law/contact-sharing');
+      if (!root.isConnected) return;
+      feedback.remove();
+      const companies = result.companies || [];
+      const policies = result.policies || [];
+      const companiesById = new Map(companies.map((company) => [company.id, company]));
+      const policiesById = new Map(policies.map((policy) => [policy.recipient_company_id, policy]));
+      policies.forEach((policy) => { if (!companiesById.has(policy.recipient_company_id)) companiesById.set(policy.recipient_company_id, { id: policy.recipient_company_id, name: policy.recipient_company_name || 'Empresa' }); });
+      let selectedIds = new Set();
+      let editingId = null;
+      let rules = { legal_natures: ['pj'], profession_names: [], shared_fields: ['professional_channels'] };
+
+      const formCard = $('section', 'fs-card law-contact-sharing-form-card');
+      const formHeader = $('div', 'fs-card-header');
+      const formTitle = $('h3', 'fs-card-title', 'Criar política de compartilhamento');
+      formHeader.append(formTitle, $('p', 'fs-card-subtitle', 'A mesma seleção de regras será aplicada às empresas escolhidas. Cada empresa precisa configurar o acordo recíproco para que o compartilhamento fique ativo.'));
+      const form = $('form', 'law-contact-sharing-form');
+      const status = $('p', 'law-contact-feedback'); status.setAttribute('role', 'status');
+      const companySelect = select([['', 'Selecione uma empresa com Contatos ativo'], ...companies.map((company) => [company.id, company.name])]);
+      companies.forEach((company, index) => { if (policiesById.get(company.id)?.is_active) companySelect.options[index + 1].disabled = true; });
+      companySelect.setAttribute('aria-label', 'Empresa para incluir na política');
+      const addCompany = button('Adicionar empresa', 'fs-btn fs-btn-outline-primary');
+      const selectedWrap = $('div', 'law-contact-sharing-recipients');
+      const ruleGroups = $('div', 'law-contact-sharing-rule-groups');
+      const actions = $('div', 'law-contact-sharing-actions');
+      const cancelEdit = button('Cancelar edição', 'fs-btn fs-btn-secondary', () => renderSharingPage(root, context)); cancelEdit.hidden = true;
+      const submit = $('button', 'fs-btn fs-btn-primary', 'Criar política para 0 empresas'); submit.type = 'submit';
+      actions.append(cancelEdit, submit);
+
+      const choice = $('div', 'law-contact-sharing-company-choice');
+      choice.append(field('Empresa participante', companySelect), addCompany);
+      const selectedSection = $('section', 'law-contact-sharing-selected');
+      selectedSection.append($('h4', '', 'Empresas selecionadas'), selectedWrap);
+      const renderSelected = () => {
+        selectedWrap.replaceChildren();
+        selectedIds.forEach((id) => {
+          const company = companiesById.get(id);
+          if (!company) return;
+          const chip = $('span', 'law-contact-sharing-chip', company.name);
+          if (!editingId) {
+            const remove = button('×', 'law-contact-sharing-chip-remove', () => { selectedIds.delete(id); renderSelected(); });
+            remove.setAttribute('aria-label', `Remover ${company.name}`); chip.append(remove);
+          }
+          selectedWrap.append(chip);
+        });
+        if (!selectedIds.size) selectedWrap.append($('p', 'law-contact-sharing-empty', 'Adicione uma ou mais empresas para aplicar as regras.'));
+        submit.textContent = editingId ? 'Salvar alterações' : `Criar política para ${selectedIds.size} empresa${selectedIds.size === 1 ? '' : 's'}`;
+        addCompany.disabled = !companySelect.value || selectedIds.has(companySelect.value);
+      };
+      addCompany.addEventListener('click', () => {
+        if (!companySelect.value) return;
+        selectedIds.add(companySelect.value); companySelect.value = ''; renderSelected();
+      });
+      companySelect.addEventListener('change', renderSelected);
+
+      const renderRules = () => {
+        ruleGroups.replaceChildren();
+        const natureGroup = $('fieldset', 'law-contact-sharing-rule-group');
+        natureGroup.append($('legend', '', 'Cadastros incluídos'));
+        const natureChecks = $('div', 'law-contact-check-grid');
+        [['pj', 'Pessoas jurídicas'], ['pf', 'Pessoas físicas']].forEach(([value, label]) => {
+          const wrap = $('label', 'law-contact-check'); const check = $('input'); check.type = 'checkbox'; check.value = value; check.checked = rules.legal_natures.includes(value);
+          check.addEventListener('change', () => { rules.legal_natures = check.checked ? [...new Set([...rules.legal_natures, value])] : rules.legal_natures.filter((item) => item !== value); renderRules(); });
+          wrap.append(check, $('span', '', label)); natureChecks.append(wrap);
+        });
+        natureGroup.append(natureChecks); ruleGroups.append(natureGroup);
+
+        if (rules.legal_natures.includes('pf')) {
+          const professionGroup = $('fieldset', 'law-contact-sharing-rule-group'); professionGroup.append($('legend', '', 'Profissões disponibilizadas'));
+          const professionChecks = $('div', 'law-contact-check-grid');
+          (result.professions || []).forEach((profession) => {
+            const wrap = $('label', 'law-contact-check'); const check = $('input'); check.type = 'checkbox'; check.value = profession.value; check.checked = rules.profession_names.includes(profession.value);
+            check.addEventListener('change', () => { rules.profession_names = check.checked ? [...new Set([...rules.profession_names, profession.value])] : rules.profession_names.filter((item) => item !== profession.value); });
+            wrap.append(check, $('span', '', profession.label)); professionChecks.append(wrap);
+          });
+          if (!(result.professions || []).length) professionChecks.append($('p', 'law-contact-sharing-empty', 'Cadastre profissões e vincule-as a contatos antes de compartilhar pessoas físicas.'));
+          professionGroup.append(professionChecks); ruleGroups.append(professionGroup);
+        }
+
+        const fieldsGroup = $('fieldset', 'law-contact-sharing-rule-group'); fieldsGroup.append($('legend', '', 'Informações autorizadas'));
+        const fieldChecks = $('div', 'law-contact-check-grid');
+        Object.entries(result.share_fields || {}).forEach(([value, label]) => {
+          const wrap = $('label', 'law-contact-check'); const check = $('input'); check.type = 'checkbox'; check.value = value; check.checked = rules.shared_fields.includes(value);
+          check.addEventListener('change', () => { rules.shared_fields = check.checked ? [...new Set([...rules.shared_fields, value])] : rules.shared_fields.filter((item) => item !== value); });
+          wrap.append(check, $('span', '', label)); fieldChecks.append(wrap);
+        });
+        fieldsGroup.append(fieldChecks); ruleGroups.append(fieldsGroup);
+      };
+
+      const submitForm = async (event) => {
+        event.preventDefault();
+        if (!selectedIds.size) { status.dataset.state = 'error'; status.textContent = 'Adicione ao menos uma empresa à política.'; return; }
+        if (!rules.legal_natures.length || (rules.legal_natures.includes('pf') && !rules.profession_names.length)) { status.dataset.state = 'error'; status.textContent = 'Escolha ao menos uma natureza e, para pessoas físicas, uma profissão.'; return; }
+        submit.disabled = true; status.textContent = '';
+        const payload = [...selectedIds].map((recipient_company_id) => ({ recipient_company_id, legal_natures: rules.legal_natures, profession_names: rules.legal_natures.includes('pf') ? rules.profession_names : [], shared_fields: rules.shared_fields }));
+        try { await window.FokusApi.request('/law/contact-sharing', { method: 'PUT', body: { policies: payload, replace_all: false } }); await renderSharingPage(root, context); }
+        catch (error) { status.dataset.state = 'error'; status.textContent = error.message || 'Não foi possível salvar a política.'; submit.disabled = false; }
+      };
+      form.addEventListener('submit', submitForm);
+      form.append(choice, selectedSection, ruleGroups, status, actions);
+      formCard.append(formHeader, form); root.append(formCard);
+      renderSelected(); renderRules();
+
+      const tableCard = $('section', 'fs-card law-contact-sharing-table-card');
+      const tableHeader = $('div', 'fs-card-header'); tableHeader.append($('h3', 'fs-card-title', 'Políticas da empresa'), $('p', 'fs-card-subtitle', 'Acordos ativos e pendentes de confirmação recíproca.'));
+      const tableWrap = $('div', 'fs-table-responsive'); const table = $('table', 'fs-table law-contact-sharing-table'); const head = $('thead'); const headRow = $('tr');
+      ['Empresa', 'Sua política', 'Acordo', 'Regras', 'Ações'].forEach((label) => headRow.append($('th', '', label))); head.append(headRow); table.append(head);
+      const body = $('tbody');
+      const rows = new Map();
+      policies.forEach((policy) => {
+        const company = companiesById.get(policy.recipient_company_id);
+        if (policy.is_active || company?.incoming_agreement) rows.set(policy.recipient_company_id, { policy, company, incoming: Boolean(policy.reciprocal_active) });
+      });
+      companies.filter((company) => company.incoming_agreement && !rows.has(company.id)).forEach((company) => rows.set(company.id, { policy: null, company, incoming: true }));
+      [...rows.values()].sort((a, b) => (a.company?.name || a.policy?.recipient_company_name || '').localeCompare(b.company?.name || b.policy?.recipient_company_name || '', 'pt-BR')).forEach(({ policy, company, incoming }) => {
+        const recipientId = policy?.recipient_company_id || company.id; const companyName = company?.name || policy?.recipient_company_name || 'Empresa';
+        const active = Boolean(policy?.is_active); const row = $('tr');
+        row.append($('td', '', companyName)); row.append($('td', '', active ? 'Configurada' : 'A configurar'));
+        const state = active && incoming ? 'Ativo' : active ? 'Aguardando confirmação' : 'Pendente';
+        const badge = $('span', `law-contact-sharing-status ${active && incoming ? 'is-active' : 'is-pending'}`, state); const stateCell = $('td'); stateCell.append(badge); row.append(stateCell);
+        const scopes = policy ? [...(policy.legal_natures || []).map((nature) => nature === 'pf' ? 'Pessoa física' : 'Pessoa jurídica'), ...(policy.profession_names || []).map((name) => (result.professions || []).find((item) => item.value === name)?.label || name), ...(policy.shared_fields || []).map((name) => result.share_fields?.[name] || name)] : [];
+        row.append($('td', '', scopes.join(' · ') || 'Defina as regras'));
+        const actionsCell = $('td', 'law-contact-actions'); const actionList = $('div', 'law-contact-action-list');
+        actionList.append(iconButton('Editar política', 'Common-File-Edit--Streamline-Ultimate.png', () => {
+          editingId = recipientId; selectedIds = new Set([recipientId]); rules = { legal_natures: policy?.legal_natures?.length ? [...policy.legal_natures] : ['pj'], profession_names: [...(policy?.profession_names || [])], shared_fields: [...(policy?.shared_fields || ['professional_channels'])] };
+          formTitle.textContent = `Editar política · ${companyName}`; cancelEdit.hidden = false; companySelect.disabled = true; renderSelected(); renderRules(); formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }));
+        if (active) actionList.append(iconButton('Remover política', 'Common-File-Subtract--Streamline-Ultimate.png', async (event) => {
+          if (!await confirmAction(root, 'Remover política', `A empresa “${companyName}” deixará de receber os contatos abrangidos por este acordo.`, 'Remover política', event.currentTarget)) return;
+          try { await window.FokusApi.request(`/law/contact-sharing/${encodeURIComponent(recipientId)}`, { method: 'DELETE' }); await renderSharingPage(root, context); }
+          catch (error) { window.alert(error.message || 'Não foi possível remover a política.'); }
+        }));
+        actionsCell.append(actionList); row.append(actionsCell); body.append(row);
+      });
+      if (!body.children.length) { const row = $('tr'); const cell = $('td', 'law-contact-empty', 'Ainda não há políticas ativas ou pendentes.'); cell.colSpan = 5; row.append(cell); body.append(row); }
+      table.append(body); tableWrap.append(table); tableCard.append(tableHeader, tableWrap); root.append(tableCard);
+    } catch (error) { feedback.dataset.state = 'error'; feedback.textContent = error.message || 'Não foi possível carregar as políticas de compartilhamento.'; }
   }
 
   async function renderQualityPage(root, context) {
+    document.title = 'Revisão e qualidade | Fokus Law';
     root.replaceChildren();
     const heading = $('div', 'law-page-heading law-contact-page-heading');
     heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Revisão e qualidade'), $('p', 'law-page-lede', 'Encontre cadastros que precisam de atenção e revise possíveis duplicidades. Os dados pessoais permanecem protegidos nesta visão.'));

@@ -91,6 +91,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/law/contacts/{contactId}/merge', [LawContactController::class, 'merge'])->middleware('law.permission:law.contacts.merge');
         Route::get('/law/contact-sharing', [LawContactController::class, 'companiesForSharing'])->middleware('law.permission:law.contacts.share.manage');
         Route::put('/law/contact-sharing', [LawContactController::class, 'saveSharing'])->middleware('law.permission:law.contacts.share.manage');
+        Route::delete('/law/contact-sharing/{recipientCompanyId}', [LawContactController::class, 'revokeSharing'])->middleware('law.permission:law.contacts.share.manage');
         Route::get('/subscriptions', [SubscriptionController::class, 'index']);
         Route::post('/subscriptions/checkout', [SubscriptionController::class, 'checkout']);
         Route::post('/subscriptions/{subscription}/change', [SubscriptionController::class, 'change']);
