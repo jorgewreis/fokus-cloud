@@ -48,9 +48,9 @@ class AuthenticationAndIsolationTest extends TestCase
             'return_to' => '/contratar/fokus-law', 'offer_intent' => $offer,
         ]))->assertCreated();
 
-        $tokenPayload = json_decode((string) DB::table('security_tokens')->where('purpose', 'email_verification')->value('payload'), true);
+        $tokenPayload = json_decode((string) DB::table('security_tokens')->where('purpose', 'email_verification')->latest('created_at')->value('payload'), true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame('/contratar/fokus-law', $tokenPayload['return_to']);
-        $this->assertSame($offer, $tokenPayload['offer_intent']);
+        $this->assertEquals($offer, $tokenPayload['offer_intent']);
         $this->assertArrayNotHasKey('amount', $tokenPayload['offer_intent']);
     }
 
