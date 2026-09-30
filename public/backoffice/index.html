@@ -172,6 +172,20 @@
                             >Vouchers</span
                         >
                     </button>
+                    <div class="sidebar-nav-group" data-sidebar-group="audit">
+                        <button class="sidebar-button sidebar-group-toggle" type="button" data-sidebar-item="audit-overview" aria-expanded="true" aria-controls="audit-subnav">
+                            <img src="/backoffice/assets/icons/Lock-1--Streamline-Ultimate.png?v=20260930-audit" alt="" />
+                            <span class="sidebar-button-label text-subtitle-sm">Auditoria</span>
+                            <img class="sidebar-group-chevron" src="/backoffice/assets/icons/Arrow-Down-1--Streamline-Ultimate.png?v=20260916-catalog-arrow-v2" alt="" aria-hidden="true" />
+                        </button>
+                        <div class="sidebar-subnav" id="audit-subnav" role="group" aria-label="Seções da auditoria">
+                            <button class="sidebar-button sidebar-subnav-button" type="button" data-sidebar-item="audit-activity"><span class="sidebar-button-label text-subtitle-sm">Atividade recente</span></button>
+                            <button class="sidebar-button sidebar-subnav-button" type="button" data-sidebar-item="audit-access"><span class="sidebar-button-label text-subtitle-sm">Controle de acessos</span></button>
+                            <button class="sidebar-button sidebar-subnav-button" type="button" data-sidebar-item="audit-sessions"><span class="sidebar-button-label text-subtitle-sm">Sessões ativas</span></button>
+                            <button class="sidebar-button sidebar-subnav-button" type="button" data-sidebar-item="audit-events"><span class="sidebar-button-label text-subtitle-sm">Eventos do sistema</span></button>
+                            <button class="sidebar-button sidebar-subnav-button" type="button" data-sidebar-item="audit-reports"><span class="sidebar-button-label text-subtitle-sm">Relatórios</span></button>
+                        </div>
+                    </div>
                     <button
                         class="sidebar-button"
                         type="button"
@@ -273,6 +287,12 @@
                 seguranca: "users",
                 interesses: "product-interests",
                 "product-interests": "product-interests",
+                auditoria: "audit-overview",
+                "atividade-recente": "audit-activity",
+                "controle-de-acessos": "audit-access",
+                "sessoes-ativas": "audit-sessions",
+                "eventos-do-sistema": "audit-events",
+                "relatorios-de-auditoria": "audit-reports",
                 componentes: "ui-components",
             };
             const nameParticles = new Set([
@@ -392,6 +412,10 @@
                 if (compactCatalogSubnav) {
                     compactCatalogSubnav.hidden = true;
                 }
+                const compactAuditToggle = document.querySelector('[data-sidebar-group="audit"] .sidebar-group-toggle');
+                const compactAuditSubnav = document.querySelector('[data-sidebar-group="audit"] .sidebar-subnav');
+                compactAuditToggle?.setAttribute("aria-expanded", "false");
+                if (compactAuditSubnav) compactAuditSubnav.hidden = true;
 
                 window.clearTimeout(sidebarFooterRevealTimer);
                 window.clearTimeout(sidebarFooterOpacityTimer);
@@ -671,6 +695,16 @@
                 const nextExpanded = !expanded;
                 catalogToggle.setAttribute("aria-expanded", String(nextExpanded));
                 catalogSubnav.hidden = expanded;
+            });
+            const auditGroup = document.querySelector("[data-sidebar-group=\"audit\"]");
+            const auditToggle = auditGroup?.querySelector(".sidebar-group-toggle");
+            const auditSubnav = auditGroup?.querySelector(".sidebar-subnav");
+            auditToggle?.addEventListener("click", (event) => {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                const expanded = auditToggle.getAttribute("aria-expanded") === "true";
+                auditToggle.setAttribute("aria-expanded", String(!expanded));
+                auditSubnav.hidden = expanded;
             });
 
             async function hydrateAdmin() {

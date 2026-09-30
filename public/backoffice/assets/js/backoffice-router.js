@@ -6,7 +6,7 @@
  * portalled overlays and release listeners before the next page is mounted.
  */
 (() => {
-    const ASSET_VERSION = "20260930-semantic-catalog-version-v1";
+    const ASSET_VERSION = "20261001-audit-access-control-v1";
 
     const pages = {
         "platform-dashboard-final": { route: "painel", fragment: "platform-dashboard-final" },
@@ -20,6 +20,12 @@
         vouchers: { route: "vouchers", fragment: "vouchers", module: "/backoffice/assets/js/vouchers-page.js", permission: "platform.vouchers.manage" },
         users: { route: "usuarios", fragment: "users", module: "/backoffice/assets/js/users-page.js", permission: "platform.users.view" },
         "product-interests": { route: "interesses", fragment: "product-interests" },
+        "audit-overview": { route: "auditoria", fragment: "audit-overview", module: "/backoffice/assets/js/audit-page.js", role: "superadministrador" },
+        "audit-activity": { route: "atividade-recente", fragment: "audit-activity", module: "/backoffice/assets/js/audit-page.js", role: "superadministrador" },
+        "audit-access": { route: "controle-de-acessos", fragment: "audit-access", module: "/backoffice/assets/js/audit-page.js", role: "superadministrador" },
+        "audit-sessions": { route: "sessoes-ativas", fragment: "audit-sessions", module: "/backoffice/assets/js/audit-page.js", role: "superadministrador" },
+        "audit-events": { route: "eventos-do-sistema", fragment: "audit-events", module: "/backoffice/assets/js/audit-page.js", role: "superadministrador" },
+        "audit-reports": { route: "relatorios-de-auditoria", fragment: "audit-reports", module: "/backoffice/assets/js/audit-page.js", role: "superadministrador" },
         "ui-components": { route: "componentes", fragment: "ui-components" },
     };
 
@@ -40,6 +46,12 @@
         seguranca: "users",
         interesses: "product-interests",
         "product-interests": "product-interests",
+        auditoria: "audit-overview",
+        "atividade-recente": "audit-activity",
+        "controle-de-acessos": "audit-access",
+        "sessoes-ativas": "audit-sessions",
+        "eventos-do-sistema": "audit-events",
+        "relatorios-de-auditoria": "audit-reports",
         componentes: "ui-components",
     };
 
@@ -202,9 +214,11 @@
 
         setActivePage(pageId) {
             const catalogPages = new Set(["catalog-overview", "products", "modules", "subscription-plans"]);
+            const auditPages = new Set(["audit-overview", "audit-activity", "audit-access", "audit-sessions", "audit-events", "audit-reports"]);
             this.sidebarButtons.forEach((button) => {
                 const isCatalogGroup = button.classList.contains("sidebar-group-toggle") && catalogPages.has(pageId);
-                button.classList.toggle("active", button.dataset.sidebarItem === pageId || isCatalogGroup);
+                const isAuditGroup = button.classList.contains("sidebar-group-toggle") && auditPages.has(pageId);
+                button.classList.toggle("active", button.dataset.sidebarItem === pageId || isCatalogGroup || isAuditGroup);
             });
         }
 

@@ -1823,4 +1823,58 @@ class BackofficeController extends Controller
 
         return response()->json($query->get());
     }
+
+    public function accessControl(Request $request)
+    {
+        $perPage = min(max((int) $request->input('per_page', 20), 1), 100);
+        $page = max((int) $request->input('page', 1), 1);
+        $query = DB::table('platform_audit_events as event')
+            ->leftJoin('users as customer_user', 'customer_user.id', '=', 'event.entity_id')
+            ->leftJoin('platform_admins as admin', 'admin.id', '=', 'event.entity_id')
+            ->leftJoin('companies as company', 'company.id', '=', 'event.company_id')
+            ->where('event.expires_at', '>', now())
+            ->whereIn('event.action', [
+                'customer.login_succeeded', 'customer.login_failed', 'customer.logout',
+                'backoffice.login_succeeded', 'backoffice.login_failed', 'backoffice.logout',
+                'backoffice.mfa_failed', 'backoffice.mfa_requested', 'backoffice.login_origin_locked',
+            ])
+            ->orderByDesc('event.created_at')
+            ->select('event.*', 'customer_user.name as customer_name', 'customer_user.email as customer_email', 'admin.name as admin_name', 'admin.email as admin_email', 'company.legal_name as company_name');
+
+        if ($request->filled('user')) {
+            $term = '%'.mb_strtolower(trim((string) $request->input('user'))).'%';
+            $query->where(function ($builder) use ($term): void {
+                $builder->whereRaw('LOWER(customer_user.name) LIKE ?', [$term])->orWhereRaw('LOWER(customer_user.email) LIKE ?', [$term])->orWhereRaw('LOWER(admin.name) LIKE ?', [$term])->orWhereRaw('LOWER(admin.email) LIKE ?', [$term]);
+            });
+        }
+        if ($request->filled('company_id')) $query->where('event.company_id', $request->input('company_id'));
+        if ($request->filled('from')) $query->whereDate('event.created_at', '>=', $request->input('from'));
+        if ($request->filled('to')) $query->whereDate('event.created_at', '<=', $request->input('to'));
+
+        $rows = $query->limit(2000)->get()->map(function (object $event): array {
+            $metadata = json_decode((string) $event->metadata, true) ?: [];
+            $isCustomer = $event->actor_type === 'customer';
+            return [
+                'id' => $event->id,
+                'user' => $isCustomer ? ($event->customer_name ?: $metadata['user_name'] ?? 'Usuário não identificado') : ($event->admin_name ?: $metadata['user_name'] ?? 'Administrador não identificado'),
+                'email' => $isCustomer ? ($event->customer_email ?: $metadata['user_email'] ?? null) : ($event->admin_email ?: $metadata['user_email'] ?? null),
+                'user_type' => $isCustomer ? 'cliente' : 'interno',
+                'company' => $event->company_name,
+                'product' => $metadata['product_name'] ?? null,
+                'subscription_id' => $metadata['subscription_id'] ?? null,
+                'event' => $event->action,
+                'status' => $metadata['status'] ?? (str_contains($event->action, 'failed') || str_contains($event->action, 'locked') ? 'failed' : 'success'),
+                'ip_address' => $event->ip_address,
+                'user_agent' => $event->user_agent,
+                'created_at' => $event->created_at,
+            ];
+        });
+        if ($request->filled('status')) {
+            $rows = $rows->filter(fn (array $row): bool => $row['status'] === $request->input('status'))->values();
+        }
+        $total = $rows->count();
+        $items = $rows->forPage($page, $perPage)->values();
+
+        return response()->json(['data' => $items, 'meta' => ['total' => $total, 'per_page' => $perPage, 'current_page' => $page, 'last_page' => max((int) ceil($total / $perPage), 1), 'retention_days' => 30]]);
+    }
 }

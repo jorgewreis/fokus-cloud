@@ -25,7 +25,7 @@ class PlatformAuthController extends Controller
 
         if ($security->originIsBlocked($request)) {
             $security->recordAttempt($admin, $email, $request, 'origin_locked');
-            $audit->record($admin?->id, 'backoffice.login_origin_locked', 'platform_admin', $admin?->id, request: $request);
+            $audit->record($admin?->id, 'backoffice.login_origin_locked', 'platform_admin', $admin?->id, request: $request, expiresInDays: 30);
 
             return response()->json(['message' => 'Origem temporariamente bloqueada. Tente novamente mais tarde.'], 429);
         }
@@ -35,7 +35,7 @@ class PlatformAuthController extends Controller
             if ($admin && ! $admin->manual_blocked_at && ! $admin->deactivated_at) {
                 $security->applyFailurePolicy($admin, $request, $audit);
             }
-            $audit->record($admin?->id, 'backoffice.login_failed', 'platform_admin', $admin?->id, request: $request);
+            $audit->record($admin?->id, 'backoffice.login_failed', 'platform_admin', $admin?->id, request: $request, expiresInDays: 30);
 
             return $this->denied();
         }
@@ -66,7 +66,7 @@ class PlatformAuthController extends Controller
                 $attempts = $challenge->attempt_count + 1;
                 DB::table('platform_login_challenges')->where('id', $challenge->id)->update(['attempt_count' => $attempts, 'used_at' => $attempts >= 5 ? now() : null, 'updated_at' => now()]);
             }
-            $audit->record($adminId, 'backoffice.mfa_failed', 'platform_admin', $adminId, request: $request);
+            $audit->record($adminId, 'backoffice.mfa_failed', 'platform_admin', $adminId, request: $request, expiresInDays: 30);
 
             return response()->json(['message' => 'Código inválido ou expirado.'], 422);
         }
@@ -78,7 +78,7 @@ class PlatformAuthController extends Controller
         $request->session()->forget('platform_pending_admin_id');
         $request->session()->regenerate();
         $admin->forceFill(['last_login_at' => now()])->save();
-        $audit->record($admin->id, 'backoffice.login_succeeded', 'platform_admin', $admin->id, request: $request);
+        $audit->record($admin->id, 'backoffice.login_succeeded', 'platform_admin', $admin->id, request: $request, expiresInDays: 30);
 
         return response()->json(['admin' => $this->adminPayload($admin)]);
     }
@@ -118,7 +118,7 @@ class PlatformAuthController extends Controller
     {
         $adminId = Auth::guard('platform')->id();
         $supportSecurity->end($request, 'Sessão encerrada ao sair do Backoffice.');
-        $audit->record($adminId, 'backoffice.logout', request: $request);
+        $audit->record($adminId, 'backoffice.logout', request: $request, expiresInDays: 30);
         Auth::guard('platform')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
@@ -145,13 +145,13 @@ class PlatformAuthController extends Controller
             ));
         } catch (\Throwable) {
             $request->session()->forget('platform_pending_admin_id');
-            $audit->record($admin->id, 'backoffice.mfa_delivery_failed', 'platform_admin', $admin->id, request: $request);
+            $audit->record($admin->id, 'backoffice.mfa_delivery_failed', 'platform_admin', $admin->id, request: $request, expiresInDays: 30);
 
             return response()->json(['message' => 'Não foi possível enviar o código de acesso. Tente novamente em alguns minutos.'], 503);
         }
         DB::table('platform_login_challenges')->insert(['id' => PrefixedUlid::make('MFA'), 'platform_admin_id' => $admin->id, 'code_hash' => Hash::make($code), 'attempt_count' => 0, 'expires_at' => now()->addMinutes(10), 'resend_available_at' => now()->addMinute(), 'created_at' => now(), 'updated_at' => now()]);
         $request->session()->put('platform_pending_admin_id', $admin->id);
-        $audit->record($admin->id, 'backoffice.mfa_requested', 'platform_admin', $admin->id, request: $request);
+        $audit->record($admin->id, 'backoffice.mfa_requested', 'platform_admin', $admin->id, request: $request, expiresInDays: 30);
         $response = response()->json(['mfa_required' => true, 'message' => 'Enviamos um código de acesso ao seu e-mail.']);
         if (! $request->cookie('platform_device_id')) {
             $response->withCookie(cookie('platform_device_id', Str::random(64), 60 * 24 * 365, '/', null, $request->isSecure(), true, false, 'Lax'));

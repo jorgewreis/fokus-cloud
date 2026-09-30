@@ -202,6 +202,7 @@ class AuthController extends Controller
             if ($user) {
                 $this->recordFailedLogin($user);
             }
+            $this->recordAccessEvent($user, $companyId, 'customer.login_failed', 'failed');
             return response()->json(['message' => 'CPF/CNPJ ou senha inválidos.'], 422);
         }
 
@@ -214,6 +215,7 @@ class AuthController extends Controller
         $companies = $this->companiesFor($user);
         $companyId ??= count($companies) === 1 ? $companies[0]->id : null;
         $this->authenticateIntoSession($request, $user, $companyId);
+        $this->recordAccessEvent($user, $companyId, 'customer.login_succeeded', 'success');
 
         return response()->json(['user' => $this->userPayload($user), 'companies' => $companies, 'active_company_id' => $companyId]);
     }
@@ -232,6 +234,7 @@ class AuthController extends Controller
             if ($user) {
                 $this->recordFailedLogin($user);
             }
+            $this->recordAccessEvent($user, $data['company_id'], 'customer.login_failed', 'failed');
 
             return response()->json(['message' => 'E-mail ou senha inválidos.'], 422);
         }
@@ -264,6 +267,7 @@ class AuthController extends Controller
             'locked_until' => null,
         ])->save();
         $this->authenticateIntoSession($request, $user, $data['company_id']);
+        $this->recordAccessEvent($user, $data['company_id'], 'customer.login_succeeded', 'success');
 
         $redirectTo = $user->email_verified_at
             ? '/portal/fokus-law'
@@ -278,6 +282,8 @@ class AuthController extends Controller
 
     public function logout(Request $request, \App\Services\SupportSessionSecurity $supportSecurity)
     {
+        $user = Auth::guard('web')->user();
+        $this->recordAccessEvent($user, $request->session()->get('active_company_id'), 'customer.logout', 'success');
         $supportSecurity->end($request, 'Sessão encerrada ao sair do portal.');
         Auth::logout();
         $request->session()->invalidate();
@@ -826,6 +832,37 @@ class AuthController extends Controller
             'locked_until' => $attempts >= 5 ? now()->addMinutes(30) : null,
             'status' => $attempts >= 5 ? 'bloqueada' : $user->status,
         ])->save();
+    }
+
+    private function recordAccessEvent(?User $user, ?string $companyId, string $action, string $status): void
+    {
+        $subscription = $companyId ? DB::table('subscriptions as subscription')
+            ->join('products as product', 'product.id', '=', 'subscription.product_id')
+            ->where('subscription.company_id', $companyId)
+            ->where('subscription.status', 'ativa')
+            ->orderByDesc('subscription.created_at')
+            ->select('subscription.id as subscription_id', 'subscription.product_id', 'product.name as product_name', 'product.code as product_code')
+            ->first() : null;
+
+        app(\App\Services\PlatformAudit::class)->record(
+            null,
+            $action,
+            'user',
+            $user?->id,
+            $companyId,
+            metadata: [
+                'status' => $status,
+                'user_name' => $user?->name,
+                'user_email' => $user?->email,
+                'subscription_id' => $subscription?->subscription_id,
+                'product_id' => $subscription?->product_id,
+                'product_name' => $subscription?->product_name,
+                'product_code' => $subscription?->product_code,
+            ],
+            request: request(),
+            actorType: 'customer',
+            expiresInDays: 30,
+        );
     }
 
     private function audit(string $companyId, ?string $actorId, string $entityType, string $entityId, string $operation, ?array $before, ?array $after): void

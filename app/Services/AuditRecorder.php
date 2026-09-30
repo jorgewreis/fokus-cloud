@@ -9,7 +9,7 @@ class AuditRecorder
 {
     public function __construct(private readonly AuditSanitizer $sanitizer) {}
 
-    public function platform(?string $adminId, string $action, ?string $entityType = null, ?string $entityId = null, ?string $companyId = null, ?string $reason = null, ?string $ticket = null, ?array $metadata = null, ?array $before = null, ?array $after = null, ?Request $request = null, ?string $actorType = null, ?string $channel = null, ?string $originContext = null, ?string $correlationId = null): void
+    public function platform(?string $adminId, string $action, ?string $entityType = null, ?string $entityId = null, ?string $companyId = null, ?string $reason = null, ?string $ticket = null, ?array $metadata = null, ?array $before = null, ?array $after = null, ?Request $request = null, ?string $actorType = null, ?string $channel = null, ?string $originContext = null, ?string $correlationId = null, int $expiresInDays = 180): void
     {
         $createdAt = now();
         $source = $this->source($request, $channel, $originContext, $correlationId);
@@ -30,7 +30,7 @@ class AuditRecorder
             'before_masked' => $this->encodeObject($before ?? []),
             'after_masked' => $this->encodeObject($after ?? []),
             ...$source, 'ip_address' => $request?->ip(), 'user_agent' => $request ? $this->sanitizer->sanitizeText((string) $request->userAgent()) : null,
-            'created_at' => $createdAt, 'expires_at' => $createdAt->copy()->addDays(180),
+            'created_at' => $createdAt, 'expires_at' => $createdAt->copy()->addDays($expiresInDays),
         ]);
     }
 
