@@ -925,6 +925,7 @@
       const result = await window.FokusApi.request('/law/contacts/quality/review?type=action_required');
       if (!root.isConnected) return;
       feedback.remove();
+      const canEdit = context.company?.role === 'admin' || (context.law_permissions || []).includes('law.contacts.update');
       const labels = { without_phone: 'Sem telefone', lawyer_without_oab: 'Advogado sem número de OAB', police_without_company: 'Policial sem empresa vinculada' };
       const summary = result.summary || {};
       const sectionNode = $('section', 'law-contact-quality fs-card');
@@ -948,7 +949,15 @@
         (pageResult.contacts || []).forEach((item) => {
           const row = $('tr'); row.append($('th', '', item.display_name), $('td', '', item.legal_nature === 'pj' ? 'Pessoa jurídica' : 'Pessoa física'));
           const issues = $('td', 'law-contact-quality-issues'); (item.issues || []).forEach((issue) => issues.append($('span', 'law-contact-quality-tag', labels[issue] || issue))); row.append(issues);
-          const action = $('td', 'law-contact-quality-action'); action.append(button('Revisar cadastro', 'fs-btn fs-btn-secondary', (event) => openDetails(root, item.id, false, () => renderQualityPage(root, context), event.currentTarget))); row.append(action); tbody.append(row);
+          const action = $('td', 'law-contact-quality-action'); action.append(button(canEdit ? 'Completar cadastro' : 'Ver cadastro', 'fs-btn fs-btn-secondary', async (event) => {
+            if (!canEdit) { openDetails(root, item.id, false, () => renderQualityPage(root, context), event.currentTarget); return; }
+            const trigger = event.currentTarget; trigger.disabled = true;
+            try {
+              const [detail, list] = await Promise.all([window.FokusApi.request(`/law/contacts/${encodeURIComponent(item.id)}?from_search=1`), window.FokusApi.request('/law/contacts?page=1&per_page=25&status=ativo')]);
+              openEditor(root, detail.contact, () => renderQualityPage(root, context), trigger, list.relationship_options || []);
+            } catch (error) { window.alert(error.message || 'Não foi possível abrir o cadastro para edição.'); }
+            finally { trigger.disabled = false; }
+          })); row.append(action); tbody.append(row);
         });
         if (!tbody.children.length) { const row = $('tr'); const cell = $('td', 'law-contact-empty', 'Não há cadastros pendentes.'); cell.colSpan = 4; row.append(cell); tbody.append(row); }
         paging.replaceChildren(button('Anterior', 'fs-btn fs-btn-secondary', async () => drawTable(await window.FokusApi.request(`/law/contacts/quality/review?type=action_required&page=${current - 1}`))), $('span', '', `Página ${current} de ${pages}`), button('Próxima', 'fs-btn fs-btn-secondary', async () => drawTable(await window.FokusApi.request(`/law/contacts/quality/review?type=action_required&page=${current + 1}`))));
