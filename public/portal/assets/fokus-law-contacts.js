@@ -739,7 +739,7 @@
       const formCard = $('section', 'fs-card law-contact-sharing-form-card');
       const formHeader = $('div', 'fs-card-header');
       const formTitle = $('h3', 'fs-card-title', 'Criar política de compartilhamento');
-      formHeader.append(formTitle, $('p', 'fs-card-subtitle', 'A mesma seleção de regras será aplicada às empresas escolhidas. Cada empresa precisa configurar o acordo recíproco para que o compartilhamento fique ativo.'));
+      formHeader.append(formTitle);
       const form = $('form', 'law-contact-sharing-form');
       const status = $('p', 'law-contact-feedback'); status.setAttribute('role', 'status');
       const companySelect = select([['', 'Selecione uma empresa com Contatos ativo'], ...companies.map((company) => [company.id, company.name])]);
@@ -771,6 +771,7 @@
         });
         if (!selectedIds.size) selectedWrap.append($('p', 'law-contact-sharing-empty', 'Adicione uma ou mais empresas para aplicar as regras.'));
         submit.textContent = editingId ? 'Salvar alterações' : `Criar política para ${selectedIds.size} empresa${selectedIds.size === 1 ? '' : 's'}`;
+        submit.disabled = !editingId && selectedIds.size === 0;
         addCompany.disabled = !companySelect.value || selectedIds.has(companySelect.value);
       };
       addCompany.addEventListener('click', () => {
@@ -917,36 +918,43 @@
     document.title = 'Revisão e qualidade | Fokus Law';
     root.replaceChildren();
     const heading = $('div', 'law-page-heading law-contact-page-heading');
-    heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Revisão e qualidade'), $('p', 'law-page-lede', 'Encontre cadastros que precisam de atenção e revise possíveis duplicidades. Os dados pessoais permanecem protegidos nesta visão.'));
+    heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Revisão e qualidade'), $('p', 'law-page-lede', 'Priorize os dados essenciais para localizar e relacionar seus contatos.'));
     root.append(heading);
     const feedback = $('p', 'law-contact-feedback'); feedback.setAttribute('role', 'status'); feedback.textContent = 'Analisando a qualidade dos cadastros…'; root.append(feedback);
     try {
-      const { summary = {} } = await window.FokusApi.request('/law/contacts/dashboard');
+      const result = await window.FokusApi.request('/law/contacts/quality/review?type=action_required');
       if (!root.isConnected) return;
       feedback.remove();
-      const quality = summary.quality || {};
+      const labels = { without_phone: 'Sem telefone', lawyer_without_oab: 'Advogado sem número de OAB', police_without_company: 'Policial sem empresa vinculada' };
+      const summary = result.summary || {};
       const sectionNode = $('section', 'law-contact-quality fs-card');
-      const header = $('div', 'fs-card-header'); header.append($('h3', 'fs-card-title', 'Pendências nos contatos ativos'), $('p', 'fs-card-subtitle law-contact-help', 'Cadastros próprios com informações de contato ou dados institucionais incompletos.'));
+      const header = $('div', 'fs-card-header'); header.append($('h3', 'fs-card-title', 'Pontos de atenção'), $('p', 'fs-card-subtitle law-contact-help', 'Os alertas aparecem somente quando há cadastros que precisam de complementação.'));
       const grid = $('div', 'fs-card-body law-contact-quality-grid');
-      [['Sem telefone', quality.without_phone, 'without_phone'], ['Sem e-mail', quality.without_email, 'without_email'], ['Dados institucionais incompletos', quality.institutional_incomplete, 'institutional_incomplete']].forEach(([label, value, type]) => {
-        const card = $('div', 'law-contact-quality-metric'); card.append($('span', '', label), $('strong', '', Number(value || 0).toLocaleString('pt-BR')));
-        card.append(button('Revisar cadastros', 'fs-btn fs-btn-secondary', async (event) => {
-          const trigger = event.currentTarget; trigger.disabled = true;
-          try {
-            const result = await window.FokusApi.request(`/law/contacts/quality/review?type=${encodeURIComponent(type)}`);
-            const modal = createModal(root, label, 'fs-modal-lg', trigger); const rows = $('div'); const paging = $('div', 'law-contact-quality-paging'); modal.body.append(rows, paging);
-            const drawPage = (pageResult) => {
-              const current = Number(pageResult.pagination?.page || 1); const perPage = Number(pageResult.pagination?.per_page || 25); const pages = Math.max(1, Math.ceil(Number(pageResult.pagination?.total || 0) / perPage));
-              rows.replaceChildren(); (pageResult.contacts || []).forEach((item) => { const row = $('div', 'law-contact-duplicate-pair'); row.append($('strong', '', item.display_name), $('span', '', item.legal_nature === 'pj' ? 'Pessoa jurídica' : 'Pessoa física'), button('Abrir ficha', 'fs-btn fs-btn-secondary', (openEvent) => { modal.close(); openDetails(root, item.id, false, () => renderQualityPage(root, context), openEvent.currentTarget); })); rows.append(row); });
-              if (!pageResult.contacts?.length) rows.append($('p', '', 'Nenhum cadastro pendente nesta categoria.'));
-              paging.replaceChildren(button('Anterior', 'fs-btn fs-btn-secondary', async () => drawPage(await window.FokusApi.request(`/law/contacts/quality/review?type=${encodeURIComponent(type)}&page=${current - 1}`))), $('span', '', `Página ${current}/${pages}`), button('Próxima', 'fs-btn fs-btn-secondary', async () => drawPage(await window.FokusApi.request(`/law/contacts/quality/review?type=${encodeURIComponent(type)}&page=${current + 1}`))));
-              paging.firstElementChild.disabled = current <= 1; paging.lastElementChild.disabled = current >= pages;
-            };
-            drawPage(result); modal.footer.append(button('Fechar', 'fs-btn fs-btn-secondary', () => modal.close()));
-          } catch (error) { window.alert(error.message || 'Não foi possível carregar os cadastros para revisão.'); }
-          finally { trigger.disabled = false; }
-        })); grid.append(card);
+      Object.entries(labels).filter(([type]) => Number(summary[type] || 0) > 0).forEach(([type, label]) => {
+        const card = $('article', 'law-contact-quality-metric'); card.append($('span', 'law-contact-quality-label', label), $('strong', '', Number(summary[type]).toLocaleString('pt-BR')), $('small', '', 'cadastros para revisar')); grid.append(card);
       });
+      if (!grid.children.length) {
+        const clear = $('div', 'law-contact-quality-clear'); clear.append($('strong', '', 'Tudo em dia'), $('span', '', 'Nenhum cadastro precisa de atenção nos critérios prioritários.')); grid.append(clear);
+      }
+      sectionNode.append(header, grid); root.append(sectionNode);
+      const tableCard = $('section', 'law-contact-quality-table-card fs-card');
+      const tableHeader = $('div', 'fs-card-header'); tableHeader.append($('h3', 'fs-card-title', 'Cadastros para complementar'), $('p', 'fs-card-subtitle law-contact-help', `${Number(result.pagination?.total || 0).toLocaleString('pt-BR')} contatos com pelo menos uma informação prioritária pendente.`));
+      const wrap = $('div', 'law-contact-quality-table-wrap'); const table = $('table', 'law-contact-quality-table');
+      const thead = $('thead'); const headerRow = $('tr'); ['Contato', 'Tipo de cadastro', 'Informação a revisar', ''].forEach((text) => headerRow.append($('th', '', text))); thead.append(headerRow);
+      const tbody = $('tbody'); const paging = $('div', 'law-contact-quality-paging');
+      const drawTable = (pageResult) => {
+        const current = Number(pageResult.pagination?.page || 1); const perPage = Number(pageResult.pagination?.per_page || 25); const pages = Math.max(1, Math.ceil(Number(pageResult.pagination?.total || 0) / perPage));
+        tbody.replaceChildren();
+        (pageResult.contacts || []).forEach((item) => {
+          const row = $('tr'); row.append($('th', '', item.display_name), $('td', '', item.legal_nature === 'pj' ? 'Pessoa jurídica' : 'Pessoa física'));
+          const issues = $('td', 'law-contact-quality-issues'); (item.issues || []).forEach((issue) => issues.append($('span', 'law-contact-quality-tag', labels[issue] || issue))); row.append(issues);
+          const action = $('td', 'law-contact-quality-action'); action.append(button('Revisar cadastro', 'fs-btn fs-btn-secondary', (event) => openDetails(root, item.id, false, () => renderQualityPage(root, context), event.currentTarget))); row.append(action); tbody.append(row);
+        });
+        if (!tbody.children.length) { const row = $('tr'); const cell = $('td', 'law-contact-empty', 'Não há cadastros pendentes.'); cell.colSpan = 4; row.append(cell); tbody.append(row); }
+        paging.replaceChildren(button('Anterior', 'fs-btn fs-btn-secondary', async () => drawTable(await window.FokusApi.request(`/law/contacts/quality/review?type=action_required&page=${current - 1}`))), $('span', '', `Página ${current} de ${pages}`), button('Próxima', 'fs-btn fs-btn-secondary', async () => drawTable(await window.FokusApi.request(`/law/contacts/quality/review?type=action_required&page=${current + 1}`))));
+        paging.firstElementChild.disabled = current <= 1; paging.lastElementChild.disabled = current >= pages;
+      };
+      table.append(thead, tbody); wrap.append(table); tableCard.append(tableHeader, wrap, paging); root.append(tableCard); drawTable(result);
       const duplicates = button('Analisar possíveis duplicidades', 'fs-btn fs-btn-outline-primary', async (event) => {
         const trigger = event.currentTarget; trigger.disabled = true; trigger.textContent = 'Analisando…';
         try {

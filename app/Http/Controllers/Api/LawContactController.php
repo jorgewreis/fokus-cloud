@@ -187,6 +187,28 @@ class LawContactController extends Controller
         $companyId = (string) $request->attributes->get('active_company_id');
         $this->assertModuleEnabled($companyId);
         $type = (string) $request->query('type');
+        if ($type === 'action_required') {
+            $base = fn () => DB::table('law_contacts as contact')->where('contact.company_id', $companyId)->where('contact.status', 'ativo')->whereNull('contact.deleted_at')->whereNull('contact.merged_into_id');
+            $withoutPhone = fn ($query) => $query->whereNotExists(fn ($sub) => $sub->from('law_contact_channels')->whereColumn('law_contact_channels.law_contact_id', 'contact.id')->where('law_contact_channels.company_id', $companyId)->whereIn('channel_type', ['phone', 'mobile', 'whatsapp']));
+            $lawyerWithoutOab = fn ($query) => $query->where('contact.legal_nature', 'pf')->whereExists(fn ($sub) => $sub->from('law_contact_classifications')->whereColumn('law_contact_classifications.law_contact_id', 'contact.id')->where('classification_code', 'lawyer'))->whereNotExists(fn ($sub) => $sub->from('law_contact_documents')->whereColumn('law_contact_documents.law_contact_id', 'contact.id')->where('law_contact_documents.company_id', $companyId)->where('document_type', 'oab'));
+            $policeWithoutCompany = fn ($query) => $query->where('contact.legal_nature', 'pf')->whereExists(fn ($sub) => $sub->from('law_contact_classifications')->whereColumn('law_contact_classifications.law_contact_id', 'contact.id')->where('classification_code', 'police'))->whereNotExists(fn ($sub) => $sub->from('law_contact_company_links')->whereColumn('law_contact_company_links.person_contact_id', 'contact.id')->where('law_contact_company_links.company_id', $companyId));
+            $counts = [
+                'without_phone' => $withoutPhone($base())->count(),
+                'lawyer_without_oab' => $lawyerWithoutOab($base())->count(),
+                'police_without_company' => $policeWithoutCompany($base())->count(),
+            ];
+            $items = collect();
+            foreach ([['without_phone', $withoutPhone], ['lawyer_without_oab', $lawyerWithoutOab], ['police_without_company', $policeWithoutCompany]] as [$issue, $filter]) {
+                $filter($base())->get(['contact.id', 'contact.display_name', 'contact.legal_nature'])->each(function ($contact) use ($items, $issue): void {
+                    $item = $items->get($contact->id, ['id' => $contact->id, 'display_name' => $contact->display_name, 'legal_nature' => $contact->legal_nature, 'issues' => []]);
+                    $item['issues'][] = $issue;
+                    $items->put($contact->id, $item);
+                });
+            }
+            $sorted = $items->sortBy(fn ($item) => mb_strtolower($item['display_name']))->values();
+            $page = max(1, (int) $request->query('page', 1)); $perPage = min(50, max(10, (int) $request->query('per_page', 25)));
+            return response()->json(['summary' => $counts, 'contacts' => $sorted->slice(($page - 1) * $perPage, $perPage)->values(), 'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $sorted->count()]]);
+        }
         abort_unless(in_array($type, ['without_phone', 'without_email', 'institutional_incomplete'], true), 422, 'Tipo de revisão inválido.');
         $query = DB::table('law_contacts as contact')->where('contact.company_id', $companyId)->where('contact.status', 'ativo')->whereNull('contact.deleted_at')->whereNull('contact.merged_into_id');
         if ($type === 'without_phone' || $type === 'without_email') {

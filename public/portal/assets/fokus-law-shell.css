@@ -511,6 +511,7 @@
 .law-contact-share-notice { border-color: #eee2c8; background: #fffaf0; color: #76603c; }
 .law-contact-sharing-form-card, .law-contact-sharing-table-card { margin-bottom: 18px; overflow: hidden; }
 .law-contact-sharing-form { display: grid; gap: 18px; padding: 18px; }
+.law-contact-sharing-form button:disabled { cursor: not-allowed; opacity: .52; }
 .law-contact-sharing-company-choice { display: grid; grid-template-columns: minmax(220px, 1fr) auto; gap: 10px; align-items: end; }
 .law-contact-sharing-company-choice .law-contact-field { margin: 0; }
 .law-contact-sharing-company-choice .fs-btn { min-height: 40px; }
@@ -815,8 +816,22 @@
 .law-contact-metric-body small { grid-column: 1 / -1; overflow: hidden; margin-top: 3px; color: #897f8e; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .law-contact-quality { margin: 0 0 14px; border: 1px solid #ebe7ef; border-radius: 12px; }
 .law-contact-quality-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.law-contact-quality-metric { display: grid; gap: 6px; padding: 12px; border-radius: 9px; background: #f8f6fa; color: #726879; font-size: 11px; }
-.law-contact-quality-metric strong { color: #2c2034; font-size: 20px; }
+.law-contact-quality-metric { display: grid; gap: 5px; min-height: 92px; padding: 14px; border: 1px solid #ece5ed; border-left: 3px solid #9875a6; border-radius: 9px; background: #faf8fb; color: #726879; font-size: 11px; }
+.law-contact-quality-metric strong { color: #2c2034; font-size: 25px; line-height: 1.05; }
+.law-contact-quality-label { color: #403348; font-size: 12px; font-weight: 650; }
+.law-contact-quality-metric small { color: #807586; font-size: 10px; }
+.law-contact-quality-clear { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid #dce9df; border-radius: 9px; background: #f5faf6; color: #52685a; font-size: 12px; }
+.law-contact-quality-clear strong { color: #315c41; font-size: 14px; }
+.law-contact-quality-table-card { margin-top: 14px; border: 1px solid #ebe7ef; border-radius: 12px; }
+.law-contact-quality-table-wrap { overflow-x: auto; }
+.law-contact-quality-table { width: 100%; min-width: 700px; border-collapse: collapse; font-size: 12px; }
+.law-contact-quality-table th, .law-contact-quality-table td { padding: 11px 14px; border-top: 1px solid #eeeaf0; text-align: left; vertical-align: middle; }
+.law-contact-quality-table thead th { border-top: 0; color: #766b7c; font-size: 10px; font-weight: 650; white-space: nowrap; }
+.law-contact-quality-table tbody th { color: #34283a; font-weight: 650; }
+.law-contact-quality-issues { display: flex; flex-wrap: wrap; gap: 5px; }
+.law-contact-quality-tag { display: inline-flex; padding: 4px 7px; border-radius: 99px; background: #f4edf6; color: #61466d; font-size: 10px; white-space: nowrap; }
+.law-contact-quality-action { text-align: right !important; white-space: nowrap; }
+.law-contact-quality-action .fs-btn { min-height: 32px; }
 .law-contact-quality-grid > button { justify-self: start; }
 .law-contact-duplicate-pair, .law-contact-relationship-editor { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid #eee9f1; }
 .law-contact-relationship-editor { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; padding: 12px; border: 1px solid #eee9f1; border-radius: 9px; }
