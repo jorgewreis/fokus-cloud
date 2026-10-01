@@ -75,6 +75,32 @@
     });
   }
 
+  async function openContactContextSettings(root, opener, onSaved) {
+    const feedback = $('p', 'law-contact-feedback'); feedback.setAttribute('role', 'status');
+    try {
+      const initial = await window.FokusApi.request('/law/contacts/context');
+      const modal = createModal(root, 'Contexto da base de Contatos', 'fs-modal-md', opener);
+      const options = initial.available_contexts || [];
+      const choice = setWidth(select(options.map((item) => [item.context_code, item.label]), initial.context.context_code), 800);
+      const preview = $('div', 'law-contact-context-preview fs-alert fs-alert-info');
+      const message = $('p', 'law-contact-feedback'); message.setAttribute('role', 'status');
+      const renderPreview = () => {
+        const item = options.find((option) => option.context_code === choice.value);
+        preview.replaceChildren($('strong', '', `Prévia: ${item?.label || 'Contexto selecionado'}`), $('p', '', `A configuração ajustará os rótulos para “${item?.organization_label || 'Organização'}” e “${item?.unit_label || 'Unidade'}”, além das sugestões de cadastro. ${Number(initial.preview?.contacts || 0).toLocaleString('pt-BR')} registros e seus vínculos serão preservados.`));
+      };
+      choice.addEventListener('change', renderPreview); renderPreview();
+      modal.body.append(field('Segmento e contexto', choice), preview, message);
+      modal.footer.append(button('Cancelar', 'fs-btn fs-btn-secondary', () => modal.close()));
+      const save = button('Aplicar contexto', 'fs-btn fs-btn-primary', async () => {
+        save.disabled = true;
+        try { await window.FokusApi.request('/law/contacts/context', { method: 'PUT', body: { context_code: choice.value } }); modal.close(); await onSaved?.(); }
+        catch (error) { message.dataset.state = 'error'; message.textContent = error.message || 'Não foi possível atualizar o contexto.'; }
+        finally { save.disabled = false; }
+      });
+      modal.footer.append(save);
+    } catch (error) { feedback.dataset.state = 'error'; feedback.textContent = error.message || 'Não foi possível carregar os contextos disponíveis.'; root.append(feedback); }
+  }
+
   function render(root, context) {
     const permissions = new Set(context.law_permissions || []);
     if (context.company?.role === 'admin') ['law.contacts.view', 'law.contacts.create', 'law.contacts.update', 'law.contacts.delete', 'law.contacts.merge', 'law.contacts.sensitive.view', 'law.contacts.shared.view', 'law.contacts.share.manage'].forEach((p) => permissions.add(p));
@@ -93,7 +119,6 @@
     const heading = $('div', 'law-page-heading law-contact-page-heading');
     heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Contatos'), $('p', 'law-page-lede', 'Organize pessoas, organizações e unidades em uma base compartilhada pelos setores autorizados.'));
     const headingActions = $('div', 'law-contact-heading-actions');
-    if (context.company?.role === 'admin') headingActions.append(button('Contexto da base', 'fs-btn fs-btn-secondary', (event) => openContextSettings(event.currentTarget)));
     if (can('law.contacts.create')) {
       headingActions.append(button('Novo contato', 'fs-btn fs-btn-primary', (event) => openEditor(root, null, refresh, event.currentTarget, relationshipOptions, designationOptions, competencyOptions)));
       headingActions.append(button('Cadastrar unidade', 'fs-btn fs-btn-secondary', (event) => openEditor(root, null, refresh, event.currentTarget, relationshipOptions, designationOptions, competencyOptions, 'unit')));
@@ -130,37 +155,12 @@
     const tableWrap = $('div', 'fs-table-responsive law-contact-table-wrap');
     const table = $('table', 'fs-table law-contact-table');
     const thead = $('thead'); const headerRow = $('tr');
-    ['Nome', 'Cadastro', 'Profissão / vínculo', 'Categorias', 'Hierarquia', 'Ações'].forEach((label) => headerRow.append($('th', '', label)));
+    ['Nome', 'Cadastro', 'Profissão / vínculo', 'Categorias', 'Ações'].forEach((label) => headerRow.append($('th', '', label)));
     thead.append(headerRow); table.append(thead); const tbody = $('tbody'); table.append(tbody); tableWrap.append(table); root.append(tableWrap);
     const footer = $('div', 'law-contact-pagination'); const pageLabel = $('span');
     const previous = button('Anterior', 'fs-btn fs-btn-secondary', () => { if (page > 1) { page--; refresh(); } });
     const next = button('Próxima', 'fs-btn fs-btn-secondary', () => { page++; refresh(); });
     footer.append(previous, pageLabel, next); root.append(footer);
-
-    async function openContextSettings(opener) {
-      try {
-        const initial = await window.FokusApi.request('/law/contacts/context');
-        const modal = createModal(root, 'Contexto da base de Contatos', 'fs-modal-md', opener);
-        const options = initial.available_contexts || [];
-        const choice = setWidth(select(options.map((item) => [item.context_code, item.label]), initial.context.context_code), 800);
-        const preview = $('div', 'law-contact-context-preview fs-alert fs-alert-info');
-        const message = $('p', 'law-contact-feedback'); message.setAttribute('role', 'status');
-        const renderPreview = () => {
-          const item = options.find((option) => option.context_code === choice.value);
-          preview.replaceChildren($('strong', '', `Prévia: ${item?.label || 'Contexto selecionado'}`), $('p', '', `A configuração ajustará os rótulos para “${item?.organization_label || 'Organização'}” e “${item?.unit_label || 'Unidade'}”, além das sugestões de cadastro. ${Number(initial.preview?.contacts || 0).toLocaleString('pt-BR')} registros e seus vínculos serão preservados.`));
-        };
-        choice.addEventListener('change', renderPreview); renderPreview();
-        modal.body.append(field('Segmento e contexto', choice), preview, message);
-        modal.footer.append(button('Cancelar', 'fs-btn fs-btn-secondary', () => modal.close()));
-        const save = button('Aplicar contexto', 'fs-btn fs-btn-primary', async () => {
-          save.disabled = true;
-          try { await window.FokusApi.request('/law/contacts/context', { method: 'PUT', body: { context_code: choice.value } }); modal.close(); await refresh(); }
-          catch (error) { message.dataset.state = 'error'; message.textContent = error.message || 'Não foi possível atualizar o contexto.'; }
-          finally { save.disabled = false; }
-        });
-        modal.footer.append(save);
-      } catch (error) { state.dataset.state = 'error'; state.textContent = error.message || 'Não foi possível carregar os contextos disponíveis.'; }
-    }
 
     async function refresh() {
       state.textContent = '';
@@ -254,7 +254,7 @@
         datalist.replaceChildren(...(result.tags || []).map((name) => { const option = $('option'); option.value = name; return option; }));
         tbody.replaceChildren();
         if (!currentItems.length) {
-          const tr = $('tr'); const td = $('td', 'law-contact-empty', 'Nenhum contato encontrado com estes filtros.'); td.colSpan = 6; tr.append(td); tbody.append(tr);
+          const tr = $('tr'); const td = $('td', 'law-contact-empty', 'Nenhum contato encontrado com estes filtros.'); td.colSpan = 5; tr.append(td); tbody.append(tr);
         } else currentItems.forEach((contact) => {
           const tr = $('tr');
           const titleCell = $('td'); const open = button(contact.display_name, 'law-contact-name', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget));
@@ -265,8 +265,6 @@
           const reviewCodes = new Set(contact.classification_review || []);
           const categories = (contact.classifications || []).map((code) => `${reviewCodes.has(code) ? 'Revisar: ' : ''}${classificationLabels[code] || CLASSIFICATION_LABELS[code] || code}`).join(', ');
           tr.append($('td', '', [categories, (contact.tags || []).join(', ')].filter(Boolean).join(' · ') || '—'));
-          const hierarchyLabel = contact.parent ? `Vinculada a ${contact.parent.display_name}` : contact.children?.length ? `${contact.children.length} ${contact.children.length === 1 ? 'filho' : 'filhos'}` : '—';
-          tr.append($('td', '', hierarchyLabel));
           const actions = $('td', 'law-contact-actions');
           const actionList = $('div', 'law-contact-action-list');
           actionList.append(iconButton('Ver detalhes', 'Folder-File--Streamline-Ultimate.png', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget)));
@@ -1108,6 +1106,11 @@
     root.replaceChildren();
     const heading = $('div', 'law-page-heading law-contact-page-heading');
     heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Revisão e qualidade'), $('p', 'law-page-lede', 'Priorize os dados essenciais para localizar e relacionar seus contatos.'));
+    if (context.company?.role === 'admin') {
+      const actions = $('div', 'law-contact-heading-actions');
+      actions.append(button('Contexto da base', 'fs-btn fs-btn-secondary', (event) => openContactContextSettings(root, event.currentTarget, () => renderQualityPage(root, context))));
+      heading.append(actions);
+    }
     root.append(heading);
     const feedback = $('p', 'law-contact-feedback'); feedback.setAttribute('role', 'status'); feedback.textContent = 'Analisando a qualidade dos cadastros…'; root.append(feedback);
     try {
@@ -1142,7 +1145,7 @@
             if (!canEdit) { openDetails(root, item.id, false, () => renderQualityPage(root, context), event.currentTarget); return; }
             const trigger = event.currentTarget; trigger.disabled = true;
             try {
-              const [detail, list] = await Promise.all([window.FokusApi.request(`/law/contacts/${encodeURIComponent(item.id)}?from_search=1`), window.FokusApi.request('/law/contacts?page=1&per_page=25&status=ativo')]);
+              const [detail, list] = await Promise.all([window.FokusApi.request(`/law/contacts/${encodeURIComponent(item.id)}?from_search=1`), window.FokusApi.request('/law/contacts?page=1&per_page=25')]);
               openEditor(root, detail.contact, () => renderQualityPage(root, context), trigger, list.relationship_options || [], list.designation_options || [], list.competency_options || []);
             } catch (error) { window.alert(error.message || 'Não foi possível abrir o cadastro para edição.'); }
             finally { trigger.disabled = false; }
