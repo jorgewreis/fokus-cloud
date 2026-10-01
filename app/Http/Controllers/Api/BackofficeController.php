@@ -1285,6 +1285,8 @@ class BackofficeController extends Controller
 
     private function companyListPayload(object $row): array
     {
+        $databaseSizeBytes = $this->databaseSizeBytes();
+
         return [
             'id' => $row->id,
             'legal_name' => $row->legal_name,
@@ -1352,13 +1354,14 @@ class BackofficeController extends Controller
             'created_at' => $company->created_at,
             'data_volume' => [
                 'contacts' => $contactUsage,
-                'database_size_mb' => $this->databaseSizeMb(),
+                'database_size_bytes' => $databaseSizeBytes,
+                'database_size_mb' => $databaseSizeBytes === null ? null : round($databaseSizeBytes / 1024 / 1024, 2),
                 'database_size_scope' => 'Banco físico total da aplicação',
             ],
         ];
     }
 
-    private function databaseSizeMb(): ?float
+    private function databaseSizeBytes(): ?int
     {
         try {
             $driver = DB::connection()->getDriverName();
@@ -1369,7 +1372,7 @@ class BackofficeController extends Controller
                 'sqlite' => is_file((string) config('database.connections.sqlite.database')) ? (int) filesize((string) config('database.connections.sqlite.database')) : 0,
                 default => 0,
             };
-            return $bytes > 0 ? round($bytes / 1024 / 1024, 2) : 0.0;
+            return max(0, $bytes);
         } catch (\Throwable) {
             return null;
         }
