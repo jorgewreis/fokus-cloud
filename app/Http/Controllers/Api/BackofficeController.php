@@ -1343,7 +1343,7 @@ class BackofficeController extends Controller
             ->whereNull('deleted_at')
             ->whereNull('merged_into_id')
             ->count();
-        $databaseSizeBytes = $this->databaseSizeBytes();
+        $contactDataSizeBytes = $this->lawContactsDataSizeBytes((string) $company->id);
 
         return [
             'id' => $company->id,
@@ -1358,36 +1358,34 @@ class BackofficeController extends Controller
             'created_at' => $company->created_at,
             'data_volume' => [
                 'contacts' => [...$contactUsage, 'registered_count' => $registeredContacts],
-                'database_size_bytes' => $databaseSizeBytes,
-                'database_size_mb' => $databaseSizeBytes === null ? null : round($databaseSizeBytes / 1024 / 1024, 2),
-                'database_size_scope' => 'Banco físico total da aplicação',
+                'contact_data_size_bytes' => $contactDataSizeBytes,
+                'contact_data_size_scope' => 'Estimativa do conteúdo das linhas em law_contacts vinculadas a esta empresa; inclui contatos inativos, excluídos logicamente e unificados ainda armazenados. Não inclui índices, overhead do banco nem outras tabelas.',
             ],
         ];
     }
 
-    private function databaseSizeBytes(): ?int
+    private function lawContactsDataSizeBytes(string $companyId): ?int
     {
         try {
             $driver = DB::connection()->getDriverName();
-            $databaseName = DB::connection()->getDatabaseName();
-            $bytes = match ($driver) {
-                'mysql', 'mariadb' => (int) DB::selectOne("SELECT COALESCE(SUM(data_length + index_length), 0) AS bytes FROM information_schema.tables WHERE table_schema = COALESCE(?, DATABASE())", [$databaseName])->bytes,
-                'pgsql' => (int) DB::selectOne('SELECT pg_database_size(current_database()) AS bytes')->bytes,
-                'sqlsrv' => (int) DB::selectOne('SELECT COALESCE(SUM(size) * 8192, 0) AS bytes FROM sys.database_files')->bytes,
-                'sqlite' => $this->sqliteSizeBytes((string) $databaseName),
+            $grammar = DB::connection()->getQueryGrammar();
+            $measureColumn = match ($driver) {
+                'mysql', 'mariadb' => fn (string $column): string => "OCTET_LENGTH(COALESCE(CAST(".$grammar->wrap($column).' AS CHAR), \'\'))',
+                'pgsql' => fn (string $column): string => "OCTET_LENGTH(COALESCE(CAST(".$grammar->wrap($column)." AS TEXT), ''))",
+                'sqlsrv' => fn (string $column): string => "DATALENGTH(COALESCE(CONVERT(nvarchar(max), ".$grammar->wrap($column)."), N''))",
+                'sqlite' => fn (string $column): string => "LENGTH(CAST(COALESCE(".$grammar->wrap($column).", '') AS BLOB))",
                 default => null,
             };
-            return $bytes !== null && $bytes > 0 ? $bytes : null;
+            if ($measureColumn === null) return null;
+
+            $columns = ['id', 'company_id', 'law_unit_id', 'merged_into_id', 'display_name', 'legal_name', 'acronym', 'contact_type', 'legal_nature', 'notes', 'status', 'sharing_excluded', 'inactivated_at', 'created_by', 'updated_by', 'created_at', 'updated_at', 'deleted_at'];
+            $expression = implode(' + ', array_map($measureColumn, $columns));
+            $bytes = DB::table('law_contacts')->where('company_id', $companyId)->selectRaw("COALESCE(SUM($expression), 0) AS bytes")->value('bytes');
+
+            return (int) $bytes;
         } catch (\Throwable) {
             return null;
         }
-    }
-
-    private function sqliteSizeBytes(string $database): ?int
-    {
-        if ($database === '' || $database === ':memory:') return null;
-        $path = realpath($database) ?: realpath(base_path($database));
-        return $path && is_file($path) ? (int) filesize($path) : null;
     }
 
     private function subscriptionPayload(object $subscription, bool $details = false): array
