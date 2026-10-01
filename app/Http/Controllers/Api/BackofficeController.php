@@ -16,6 +16,7 @@ use App\Services\MercadoPagoClient;
 use App\Services\BillingReconciliationManager;
 use App\Services\RefundManager;
 use App\Services\PasswordSecurity;
+use App\Services\LawUsageMeter;
 use App\Support\BrazilianDocuments;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -621,14 +622,14 @@ class BackofficeController extends Controller
         ]]);
     }
 
-    public function company(Request $request, string $company, PlatformAudit $audit)
+    public function company(Request $request, string $company, PlatformAudit $audit, LawUsageMeter $usage)
     {
         $entity = DB::table('companies')->where('id', $company)->first();
         abort_unless($entity, 404, 'Empresa não encontrada.');
         $audit->record($request->user()->id, 'backoffice.company_viewed', 'company', $company, $company, request: $request);
         $subscriptions = DB::table('subscriptions as subscription')->join('products as product', 'product.id', '=', 'subscription.product_id')->where('subscription.company_id', $company)->select('subscription.*', 'product.code as product_code', 'product.name as product_name')->orderByDesc('subscription.created_at')->get();
         return response()->json([
-            'company' => $this->companyDetailPayload($entity),
+            'company' => $this->companyDetailPayload($entity, $usage),
             'subscriptions' => $subscriptions->map(fn (object $subscription): array => $this->subscriptionPayload($subscription, true))->values(),
             'usage' => DB::table('usage_snapshots as usage')->join('products as product', 'product.id', '=', 'usage.product_id')->where('usage.company_id', $company)->select('usage.*', 'product.name as product_name')->latest('reported_on')->limit(30)->get(),
         ]);
@@ -1321,7 +1322,7 @@ class BackofficeController extends Controller
         ];
     }
 
-    private function companyDetailPayload(object $company): array
+    private function companyDetailPayload(object $company, ?LawUsageMeter $usage = null): array
     {
         $admin = DB::table('company_memberships as membership')
             ->join('users as user', 'user.id', '=', 'membership.user_id')
@@ -1330,6 +1331,13 @@ class BackofficeController extends Controller
             ->orderByRaw("case when membership.status = 'ativo' then 0 else 1 end")
             ->select('user.name', 'user.email', 'user.cpf')
             ->first();
+
+        $contactUsage = null;
+        try {
+            $contactUsage = $usage?->contacts((string) $company->id);
+        } catch (\Throwable) {
+            $contactUsage = ['available' => false, 'reason' => 'temporarily_unavailable', 'used' => null, 'limit' => null, 'percentage' => null];
+        }
 
         return [
             'id' => $company->id,
@@ -1342,7 +1350,29 @@ class BackofficeController extends Controller
             'subscriptions_count' => (int) DB::table('subscriptions')->where('company_id', $company->id)->count(),
             'admin' => $admin ? ['name' => $admin->name, 'cpf' => $admin->cpf, 'email' => $admin->email, 'email_masked' => $this->maskEmail($admin->email)] : null,
             'created_at' => $company->created_at,
+            'data_volume' => [
+                'contacts' => $contactUsage,
+                'database_size_mb' => $this->databaseSizeMb(),
+                'database_size_scope' => 'Banco físico total da aplicação',
+            ],
         ];
+    }
+
+    private function databaseSizeMb(): ?float
+    {
+        try {
+            $driver = DB::connection()->getDriverName();
+            $bytes = match ($driver) {
+                'mysql', 'mariadb' => (int) DB::selectOne("SELECT COALESCE(SUM(data_length + index_length), 0) AS bytes FROM information_schema.tables WHERE table_schema = DATABASE()")->bytes,
+                'pgsql' => (int) DB::selectOne('SELECT pg_database_size(current_database()) AS bytes')->bytes,
+                'sqlsrv' => (int) DB::selectOne('SELECT COALESCE(SUM(size) * 8192, 0) AS bytes FROM sys.database_files')->bytes,
+                'sqlite' => is_file((string) config('database.connections.sqlite.database')) ? (int) filesize((string) config('database.connections.sqlite.database')) : 0,
+                default => 0,
+            };
+            return $bytes > 0 ? round($bytes / 1024 / 1024, 2) : 0.0;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function subscriptionPayload(object $subscription, bool $details = false): array
