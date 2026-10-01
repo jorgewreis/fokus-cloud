@@ -775,12 +775,7 @@
       if (contact.parent) { const row = $('article', 'law-contact-detail-linked-contact'); row.append($('strong', '', 'Vinculada a'), $('span', '', contact.parent.display_name)); hierarchyItems.append(row); }
       children.forEach((child) => {
         const row = $('article', 'law-contact-detail-linked-contact');
-        row.append(
-          $('strong', '', child.display_name),
-          $('span', '', child.record_kind === 'unit'
-            ? (window.lawContactContext?.unit_label || 'Unidade')
-            : (child.legal_nature === 'pj' ? 'Pessoa jurídica' : 'Pessoa física')),
-        );
+        row.append($('strong', '', child.display_name));
         hierarchyItems.append(row);
       });
     }
