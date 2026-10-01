@@ -50,6 +50,12 @@ Migrations ja existentes relacionadas ao modelo:
   contexto da base por empresa, hierarquia de registros, classificação/tipo
   institucional principal e promove departamentos legados a unidades sem
   descartar os registros históricos.
+- `2026_10_01_000200_replace_law_contact_inactivation_with_deletion.php`:
+  converte registros inativos existentes em exclusões lógicas, preservando a
+  auditoria e liberando a capacidade de Contatos.
+- `2026_10_01_000300_flag_retired_law_contact_classifications.php`: preserva e
+  sinaliza para revisão a classificação legada de órgão judiciário, substituída
+  por Órgão público mais o tipo institucional de unidade judiciária.
 
 Em produção, executar migrations com `php artisan migrate --force
 --no-interaction`; não executar `db:seed`, pois o catálogo é gerenciado pelo

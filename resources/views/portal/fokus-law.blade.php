@@ -111,7 +111,7 @@
   <script src="/assets/js/api-client.js"></script>
   <script src="/assets/js/brazilian-documents.js?v=20260930-document-validation-v1"></script>
   <script src="/portal/assets/fokus-law-access.js?v=20260930-document-validation-v1" defer></script>
-  <script src="/portal/assets/fokus-law-contacts.js?v=20261001-context-hierarchy-v1" defer></script>
+  <script src="/portal/assets/fokus-law-contacts.js?v=20261001-contact-types-v2" defer></script>
   <script src="/portal/assets/fokus-law-shell.js?v=20260930-contact-quality-priorities-v7" defer></script>
   <script src="/assets/js/portal-profile.js?v=20260925-profile-v4" defer></script>
 </body>

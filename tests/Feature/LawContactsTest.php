@@ -82,7 +82,7 @@ class LawContactsTest extends TestCase
         $organization = $this->actingAs($this->admin)->withSession($session)
             ->postJson('/api/law/contacts', [
                 'legal_nature' => 'pj', 'display_name' => 'SECRETARIA DE JUSTIÇA', 'legal_name' => 'SECRETARIA DE JUSTIÇA DO ESTADO',
-                'classifications' => ['public_body', 'court_unit'], 'tags' => [' Setor público ', 'SETOR   PÚBLICO'],
+                'classifications' => ['public_body'], 'tags' => [' Setor público ', 'SETOR   PÚBLICO'],
             ])->assertCreated()->assertJsonPath('contact.display_name', 'Secretaria de Justiça')->json('contact');
         $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
             'record_kind' => 'unit', 'display_name' => 'Contabilidade', 'parent_contact_id' => $organization['id'],
@@ -106,7 +106,7 @@ class LawContactsTest extends TestCase
         $company = $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
             'legal_nature' => 'pj', 'display_name' => 'Empresa Exemplo', 'acronym' => 'EX',
             'linked_contact_ids' => [$person['id']],
-            'classifications' => ['public_body', 'court_unit'],
+            'classifications' => ['public_body'],
             'institutional_data' => [
                 ['type' => 'public_body', 'administrative_sphere' => 'Estadual', 'official_code' => 'ORG-22', 'issuing_system' => 'Cadastro Estadual'],
                 ['type' => 'court_unit', 'cnj_code' => '1234567-89.2026.8.05.0001', 'competencies' => ['Criminal', 'Fazenda Pública']],
@@ -139,10 +139,9 @@ class LawContactsTest extends TestCase
         $this->assertSame([$registrationDate, $registrationDate], DB::table('law_contact_relationship_designations')->orderBy('name')->pluck('starts_on')->all());
         $this->assertDatabaseMissing('law_contact_relationship_roles', ['link_id' => DB::table('law_contact_company_links')->where('person_contact_id', $person['id'])->value('id'), 'ends_on' => today()->toDateString()]);
 
-        $this->actingAs($this->admin)->withSession($session)->patchJson('/api/law/contacts/'.$person['id'], ['status' => 'inativo'])->assertOk();
+        $this->actingAs($this->admin)->withSession($session)->deleteJson('/api/law/contacts/'.$person['id'])->assertNoContent();
+        $this->assertDatabaseHas('law_contacts', ['id' => $person['id'], 'status' => 'excluido']);
         $this->assertSame([today()->toDateString(), today()->toDateString()], DB::table('law_contact_relationship_roles')->orderBy('role_code')->pluck('ends_on')->all());
-        $this->actingAs($this->admin)->withSession($session)->patchJson('/api/law/contacts/'.$person['id'], ['status' => 'ativo'])->assertOk();
-        $this->assertSame([null, null], DB::table('law_contact_relationship_roles')->orderBy('role_code')->pluck('ends_on')->all());
     }
 
     public function test_contact_quality_summary_and_duplicate_suggestions_use_professional_channels(): void

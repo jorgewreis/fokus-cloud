@@ -20,7 +20,7 @@ Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
 
 - Listagem pesquisável, filtros por tipo de registro, natureza PF/PJ, situação, profissão
   vinculada a pelo menos um contato e tag, paginação e detalhes do cadastro.
-- Criação, edição, inativação e mesclagem auditada de contatos duplicados.
+- Criação, edição, exclusão lógica e mesclagem auditada de contatos duplicados.
 - Dashboard com totais da empresa, utilização da capacidade contratada e até
   cinco atividades recentes do usuário atual.
 - Cadastro de organizações e unidades hierárquicas como registros próprios;
@@ -44,15 +44,15 @@ Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
   na visão geral. A interface explica o tipo de correspondência sem exibir o
   valor coincidente, não bloqueia gravação e não mescla automaticamente.
 - Indicadores acionáveis de contatos ativos próprios sem telefone/e-mail ou com
-  dados institucionais incompletos; inativos e contatos compartilhados ficam fora.
+  dados institucionais incompletos; contatos excluídos e compartilhados ficam fora.
 - Busca automática de endereços pelo CEP usando ViaCEP, com preenchimento de
   logradouro, bairro, município e UF quando retornados; o usuário pode concluir
   manualmente quando a consulta não localizar o CEP ou estiver indisponível.
 - Tags reutilizáveis pela empresa, com sugestão e filtro.
 - Acordos bilaterais de compartilhamento, definidos por natureza (PF/PJ),
   profissões atribuídas a contatos PF e campos autorizados.
-- Uma unidade pode permanecer ativa quando sua organização-pai for inativada;
-  o vínculo com pai inativo fica oculto na apresentação da unidade.
+- A exclusão de organização ou unidade exige que seus filhos sejam antes
+  realocados ou excluídos, preservando a integridade da hierarquia.
 
 ## Páginas e estados
 
@@ -82,10 +82,10 @@ grade da listagem, grupos repetíveis de endereço/canal/documento
 e suas linhas aninhadas. Eles não recriam botões, campos, overlay, backdrop,
 foco ou comportamento de modal do Fokus Styles.
 
-## Natureza, profissões e nomes
+## Tipo de contato, profissões e nomes
 
 O contexto ativo define termos, rótulos e sugestões, sem alterar os dados
-salvos. Pessoa / contato corresponde a PF; Organização corresponde a PJ.
+salvos. O tipo de contato é sempre Pessoa física (PF) ou Pessoa jurídica (PJ).
 Advocacia usa Escritório / Filial; Poder Público usa Órgão / Unidade; Judiciário
 usa Órgão judiciário / Unidade judiciária. Unidade é um registro próprio,
 distinto de PF e PJ, com nome, canais e endereço próprios. Organizações e
@@ -96,6 +96,14 @@ Classificações de referência, como parte, testemunha ou perito, descrevem o
 cadastro e não definem papéis transacionais. Papéis como cliente,
 servidor, colaborador e usuário do serviço pertencem ao vínculo entre pessoa e
 organização e servem somente ao cadastro.
+
+Para Pessoa jurídica, a categoria principal descreve a organização cadastrada:
+empresa privada, instituição financeira, instituição de ensino, organização da
+sociedade civil, entidade de classe, cartório extrajudicial, órgão público,
+polícia, Ministério Público, Defensoria Pública, escritório de advocacia ou
+outra organização. Órgão público é uma dessas opções; não representa empresas,
+bancos, escolas ou as demais pessoas jurídicas. Unidade judiciária não é
+categoria: é um tipo dos dados institucionais e pode receber código CNJ.
 
 PF/PJ define a natureza cadastral. Pessoa física pode acumular profissões e
 vínculos profissionais selecionados do catálogo da empresa ou das sugestões do
@@ -157,8 +165,8 @@ transferidos sem duplicar classificações ou tags já existentes.
 Tags pertencem à empresa e são sugeridas em cadastro e filtro. Espaços externos
 são removidos e caixa é normalizada para impedir tags equivalentes com nomes
 diferentes. Administradores podem acompanhar a utilização contratada no
-dashboard e no módulo. O total consumido é cada registro ativo ou inativo ainda
-cadastrado, incluindo unidades. Inativar não libera capacidade;
+dashboard e no módulo. O total consumido é cada registro disponível, incluindo
+unidades. Excluir libera capacidade;
 mesclar ou remover definitivamente registros libera capacidade conforme a
 contagem vigente. A criação é recusada ao exceder o limite contratado.
 

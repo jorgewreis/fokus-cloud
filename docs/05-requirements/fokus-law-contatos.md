@@ -13,9 +13,9 @@
 | RF-CTT-007 | Guardar documentos conforme a natureza. | Até quatro por contato; PF aceita CPF e PJ aceita CNPJ e inscrição estadual com UF obrigatória. CPF/CNPJ são validados, criptografados e únicos na empresa. |
 | RF-CTT-008 | Manter unidades e hierarquia organizacional. | Organização/unidade pode ter um pai imediato da mesma empresa, pai pode ter vários filhos e níveis são ilimitados; unidade possui canais e endereço próprios. |
 | RF-CTT-009 | Classificar contatos com tags. | Até seis tags por contato, reutilizadas e normalizadas na empresa. |
-| RF-CTT-010 | Pesquisar e filtrar contatos. | Filtros por texto, natureza, status, profissão vinculada a pelo menos um contato e tag; documentos só pesquisáveis com permissão sensível. |
+| RF-CTT-010 | Pesquisar e filtrar contatos. | Filtros por texto, tipo de cadastro, PF/PJ, profissão vinculada a pelo menos um contato e tag; documentos só pesquisáveis com permissão sensível. |
 | RF-CTT-011 | Evitar duplicidade de CPF/CNPJ. | CPF/CNPJ repetidos na empresa retornam conflito; mesclagem é fluxo separado. |
-| RF-CTT-012 | Editar e inativar contatos. | Alterações e inativação preservam auditoria e vínculos históricos. |
+| RF-CTT-012 | Editar e excluir contatos. | A exclusão é lógica, preserva auditoria e encerra os vínculos históricos da PF. |
 | RF-CTT-013 | Mesclar duplicados. | Exige permissão, mesma natureza, destino válido e motivo; transfere relações em transação. |
 | RF-CTT-014 | Resumir atividade e volume no dashboard. | Exibe totais da empresa, utilização contratada e até cinco últimos contatos do usuário ativo. |
 | RF-CTT-015 | Contabilizar capacidade. | Cada registro, inclusive unidade, consome uma unidade; criação excedente é bloqueada. |
@@ -40,20 +40,20 @@
 - Empresa é proprietária da base e os setores autorizados consultam os mesmos
   contatos; `law_unit_id` não define propriedade.
 - Contexto ativo por empresa: Advocacia/Escritório (`escritorio`), Poder Público/Órgão Público (`orgao_publico`) ou Poder Público jurídico/Judiciário (`judiciario`).
-- Pessoa / contato é PF; Organização é PJ. Os rótulos de organização e unidade variam pelo contexto.
+- O tipo de contato é sempre Pessoa física ou Pessoa jurídica. Os rótulos de organização e unidade variam pelo contexto, mas não substituem PF/PJ.
 - Unidade é registro independente, não PF nem PJ. Organização/unidade aceita um pai imediato e vários filhos; somente a mesma empresa pode ser relacionada.
 - Valores legados sem correspondência ficam preservados e marcados para revisão.
-- PF/PJ é natureza cadastral; classificações podem acumular com uma principal editável e secundárias.
+- PF/PJ é natureza cadastral. Para PJ, a categoria principal descreve a organização: empresa privada, instituição financeira, instituição de ensino, organização da sociedade civil, entidade de classe, cartório extrajudicial, órgão público, polícia, Ministério Público, Defensoria Pública, escritório de advocacia ou outra organização. Unidade judiciária é tipo institucional, não categoria principal.
 - Sigla é opcional para PJ; profissão/vínculo é campo de PF. CNPJ e inscrição
   estadual são documentos de PJ; a inscrição estadual exige UF.
 - Relações PF↔PJ são muitos-para-muitos, recíprocas e internas à empresa
   proprietária; referências compartilhadas não expõem essas relações.
-- Unidades não são departamentos embutidos: cada uma soma um cadastro à capacidade. Pai inativo continua relacionado internamente, mas seu vínculo não é exibido para a unidade ativa.
-- Contatos inativos continuam ocupando capacidade e preservam histórico.
+- Unidades não são departamentos embutidos: cada uma soma um cadastro à capacidade. A exclusão de um pai exige realocar ou excluir seus filhos antes.
+- Exclusão lógica remove o registro da base ativa e libera capacidade, preservando a trilha de auditoria.
 - Tags não substituem classificação ou permissão.
 - Papéis e designações PF↔PJ guardam períodos separados; vínculos legados
   permanecem válidos sem inferir papéis ou cargos que não foram informados.
-- A qualidade e duplicidades não incluem contatos inativos nem compartilhados;
+- A qualidade e duplicidades não incluem contatos excluídos nem compartilhados;
   consulta ao painel usa `law.contacts.view`, e a edição continua protegida pelas
   permissões já existentes.
 
@@ -82,7 +82,7 @@ módulo.
 | `law.contacts.view` | Consultar lista/detalhe | Administrador, chefe/escrivão, operador, visualizador |
 | `law.contacts.create` | Criar contato | Administrador, chefe/escrivão, operador |
 | `law.contacts.update` | Alterar dados comuns | Administrador, chefe/escrivão, operador |
-| `law.contacts.delete` | Inativar/remover | Administrador e chefe/escrivão |
+| `law.contacts.delete` | Excluir | Administrador e chefe/escrivão |
 | `law.contacts.sensitive.view` | Consultar/alterar documentos, dados pessoais e notas | Administrador e chefe/escrivão |
 | `law.contacts.merge` | Mesclar duplicados | Administrador e chefe/escrivão |
 | `law.contacts.shared.view` | Consultar referências compartilhadas | Perfis que têm consulta |

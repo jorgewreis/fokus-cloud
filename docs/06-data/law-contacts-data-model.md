@@ -38,7 +38,7 @@ Cadastro principal existente, ampliado com:
 | `parent_contact_id` | Pai imediato opcional com FK composta por empresa; PF não pode ser pai nem filho. |
 | `sharing_excluded` | Booleano que retira individualmente o contato das regras externas. |
 | `display_name`, `legal_name` | Nome principal e razão social/nome complementar; valores normalizados no servidor. |
-| `status`, `deleted_at`, `merged_into_id` | Controlam ciclo de vida e preservação da mesclagem. |
+| `status`, `deleted_at`, `merged_into_id` | Controlam ciclo de vida. Exclusão lógica usa `status=excluido` e `deleted_at`; mesclagem preserva o destino. |
 | `law_unit_id` | Nulo para os novos registros de propriedade empresarial compartilhada. |
 
 ### `law_contact_addresses`
@@ -82,11 +82,15 @@ linha histórica. Novos registros hierárquicos não são gravados como departam
 - `law_contact_tag_assignments` associa até seis tags a cada contato sem
   duplicar associações.
 
-Vocabulário de classificações: `client`, `lawyer`, `law_firm`, `public_body`,
-`court_unit`, `police`, `prosecutor_office`, `public_defender`, `expert`,
-`witness`, `representative`, `party` e `other`. `client` é mantido como
-classificação legada e marcado para revisão, pois papéis cadastrais passam a
-pertencer ao vínculo PF–organização.
+Vocabulário de classificações: `lawyer`, `law_firm`, `private_company`,
+`financial_institution`, `educational_institution`,
+`civil_society_organization`, `professional_entity`, `notary_office`,
+`public_body`, `police`, `prosecutor_office`, `public_defender`,
+`other_organization`, `expert`, `witness`, `representative`, `party` e
+`other`. `client` e `court_unit` são valores legados preservados e marcados
+para revisão. `public_body` identifica somente órgão público; empresas,
+bancos, escolas e outras organizações recebem sua categoria própria. Unidade
+judiciária é tipo institucional, com dados e código CNJ próprios.
 
 Categorias como parte, testemunha e perito são referências cadastrais. Não são
 papéis de atuação contextual. Papéis como cliente, servidor, colaborador e
@@ -124,8 +128,8 @@ destinatária e não consome sua capacidade.
 
 ## Capacidade e índices
 
-Consumo = registros sem exclusão lógica/mesclagem, incluindo unidades. Status
-inativo não reduz o consumo. A contagem é feita no servidor
+Consumo = registros sem exclusão lógica/mesclagem, incluindo unidades. A
+exclusão lógica reduz o consumo. A contagem é feita no servidor
 durante a transação de criação/edição e validada contra o snapshot comercial da
 assinatura. Índices mantêm busca por empresa/natureza/status, escopo de canais,
 documento fingerprint, tags normalizadas, classificações e atividade recente.
