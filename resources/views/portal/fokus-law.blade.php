@@ -8,7 +8,7 @@
   <title>Fokus Law | Fokus Cloud</title>
   <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260923-support-mode-v1" />
   <link rel="stylesheet" href="/marketing/products/fokus-law.css?v=20260924-law-access-choice-v1" />
-  <link rel="stylesheet" href="/portal/assets/fokus-law-shell.css?v=20261001-contact-layout-v2" />
+  <link rel="stylesheet" href="/portal/assets/fokus-law-shell.css?v=20261001-quality-spacing-v3" />
 </head>
 <body class="fokus-law-shell-page">
   <a class="law-shell-skip" href="#law-workspace">Pular para o conteúdo principal</a>

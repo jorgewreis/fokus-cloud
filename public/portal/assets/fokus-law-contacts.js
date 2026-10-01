@@ -1086,7 +1086,7 @@
   async function renderQualityPage(root, context) {
     document.title = 'Revisão e qualidade | Fokus Law';
     root.replaceChildren();
-    const heading = $('div', 'law-page-heading law-contact-page-heading');
+    const heading = $('div', 'law-page-heading law-contact-page-heading law-contact-quality-heading');
     heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Revisão e qualidade'), $('p', 'law-page-lede', 'Priorize os dados essenciais para localizar e relacionar seus contatos.'));
     if (context.company?.role === 'admin') {
       const actions = $('div', 'law-contact-heading-actions');
