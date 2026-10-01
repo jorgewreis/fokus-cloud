@@ -127,7 +127,7 @@ class AuthController extends Controller
             'return_to' => $data['return_to'] ?? '/portal',
             'offer_intent' => $data['offer_intent'] ?? null,
         ]);
-        $this->authenticateIntoSession($request, $user, $companyId);
+        $this->authenticateIntoSession($request, $user, $companyId, false);
         if (! empty($data['offer_intent'])) $request->session()->put('law_offer_intent', $data['offer_intent']);
 
         return response()->json([
@@ -215,7 +215,6 @@ class AuthController extends Controller
         $companies = $this->companiesFor($user);
         $companyId ??= count($companies) === 1 ? $companies[0]->id : null;
         $this->authenticateIntoSession($request, $user, $companyId);
-        $this->recordAccessEvent($user, $companyId, 'customer.login_succeeded', 'success');
 
         return response()->json(['user' => $this->userPayload($user), 'companies' => $companies, 'active_company_id' => $companyId]);
     }
@@ -267,7 +266,6 @@ class AuthController extends Controller
             'locked_until' => null,
         ])->save();
         $this->authenticateIntoSession($request, $user, $data['company_id']);
-        $this->recordAccessEvent($user, $data['company_id'], 'customer.login_succeeded', 'success');
 
         $redirectTo = $user->email_verified_at
             ? '/portal/fokus-law'
@@ -810,7 +808,7 @@ class AuthController extends Controller
         return DB::table('company_memberships')->where('user_id', $user->id)->where('status', 'ativo')->whereNull('deleted_at')->value('company_id');
     }
 
-    private function authenticateIntoSession(Request $request, User $user, ?string $companyId = null): void
+    private function authenticateIntoSession(Request $request, User $user, ?string $companyId = null, bool $recordAccess = true): void
     {
         app(\App\Services\SupportSessionSecurity::class)->end($request, 'Acesso de suporte encerrado por novo login de cliente.', true);
         $request->session()->regenerate();
@@ -820,6 +818,9 @@ class AuthController extends Controller
             $request->session()->put('active_company_id', $companyId);
         }
         $request->session()->save();
+        if ($recordAccess) {
+            $this->recordAccessEvent($user, $companyId, 'customer.login_succeeded', 'success');
+        }
     }
 
     private function recordFailedLogin(User $user): void
