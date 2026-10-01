@@ -1,4 +1,5 @@
 (() => {
+  const CLASSIFICATION_LABELS = { client: 'Cliente (categoria legada)', lawyer: 'Advogado(a)', law_firm: 'Escritório de advocacia', public_body: 'Órgão público', court_unit: 'Órgão judiciário', police: 'Polícia', prosecutor_office: 'Ministério Público', public_defender: 'Defensoria Pública', expert: 'Perito', witness: 'Testemunha', representative: 'Representante', party: 'Parte (categoria de referência)', other: 'Outra categoria' };
   const DOCUMENTS = { cpf: 'CPF', cnpj: 'CNPJ', state_registration: 'Inscrição estadual', oab: 'OAB', rg: 'RG', registration: 'Matrícula', cadastro: 'Cadastro', voter_title: 'Título de eleitor', passport: 'Passaporte', other: 'Outro' };
   const DOCUMENT_TYPES_BY_NATURE = { pf: ['cpf', 'oab', 'rg', 'registration', 'cadastro', 'voter_title', 'passport', 'other'], pj: ['cnpj', 'state_registration', 'other'] };
   const DOCUMENT_TYPES_WITHOUT_STATE = ['cpf', 'cnpj', 'registration', 'cadastro', 'passport', 'voter_title'];
@@ -82,14 +83,17 @@
     window.lawContactsCanMerge = can('law.contacts.merge');
     let page = 1;
     let currentItems = [];
+    let currentContext = null;
+    let hierarchyOptions = [];
     let relationshipOptions = [];
     let designationOptions = [];
     let competencyOptions = [];
     let searchTimer;
     root.replaceChildren();
     const heading = $('div', 'law-page-heading law-contact-page-heading');
-    heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Contatos'), $('p', 'law-page-lede', 'Organize pessoas, empresas, instituições e órgãos em uma base compartilhada pelos setores autorizados.'));
+    heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Contatos'), $('p', 'law-page-lede', 'Organize pessoas, organizações e unidades em uma base compartilhada pelos setores autorizados.'));
     const headingActions = $('div', 'law-contact-heading-actions');
+    if (context.company?.role === 'admin') headingActions.append(button('Contexto da base', 'fs-btn fs-btn-secondary', (event) => openContextSettings(event.currentTarget)));
     if (can('law.contacts.create')) headingActions.append(button('Novo contato', 'fs-btn fs-btn-primary', (event) => openEditor(root, null, refresh, event.currentTarget, relationshipOptions, designationOptions, competencyOptions)));
     heading.append(headingActions);
     root.append(heading);
@@ -109,13 +113,14 @@
     const filters = $('form', 'law-contact-filters');
     const search = input('', 'Buscar por nome, organização ou documento autorizado', 180); search.type = 'search'; search.setAttribute('aria-label', 'Buscar contatos');
     const nature = select([['', 'Todas as naturezas'], ['pf', 'Pessoa física'], ['pj', 'Pessoa jurídica']]); nature.setAttribute('aria-label', 'Filtrar por natureza');
+    const recordKind = select([['', 'Todos os registros'], ['contact', 'Pessoas e organizações'], ['unit', 'Unidades']]); recordKind.setAttribute('aria-label', 'Filtrar por tipo de registro');
     const status = select([['ativo', 'Ativos'], ['inativo', 'Inativos'], ['todos', 'Todos']]); status.setAttribute('aria-label', 'Filtrar por situação');
     const profession = select([['', 'Todas as profissões']]); profession.setAttribute('aria-label', 'Filtrar por profissão');
     const tagFilter = input('', 'Filtrar por tag', 64); tagFilter.setAttribute('list', 'law-contact-tags'); tagFilter.setAttribute('aria-label', 'Filtrar por tag');
     const datalist = $('datalist'); datalist.id = 'law-contact-tags'; tagFilter.setAttribute('list', datalist.id);
-    filters.append(field('Pesquisar', search), field('Natureza', nature), field('Profissão', profession), field('Tag', tagFilter), field('Situação', status), datalist);
+    filters.append(field('Pesquisar', search), field('Tipo de registro', recordKind), field('Natureza', nature), field('Profissão / vínculo', profession), field('Tag', tagFilter), field('Situação', status), datalist);
     filters.addEventListener('submit', (event) => { event.preventDefault(); page = 1; refresh(); });
-    [nature, status, profession, tagFilter].forEach((control) => control.addEventListener('change', () => { page = 1; refresh(); }));
+    [recordKind, nature, status, profession, tagFilter].forEach((control) => control.addEventListener('change', () => { page = 1; refresh(); }));
     search.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { page = 1; refresh(); }, 250); });
     root.append(filters);
 
@@ -123,12 +128,37 @@
     const tableWrap = $('div', 'fs-table-responsive law-contact-table-wrap');
     const table = $('table', 'fs-table law-contact-table');
     const thead = $('thead'); const headerRow = $('tr');
-    ['Contato', 'Natureza', 'Profissão / vínculo', 'Tags', 'Setores', 'Situação', 'Ações'].forEach((label) => headerRow.append($('th', '', label)));
+    ['Pessoa / organização / unidade', 'Natureza', 'Profissão / vínculo', 'Categorias', 'Hierarquia', 'Situação', 'Ações'].forEach((label) => headerRow.append($('th', '', label)));
     thead.append(headerRow); table.append(thead); const tbody = $('tbody'); table.append(tbody); tableWrap.append(table); root.append(tableWrap);
     const footer = $('div', 'law-contact-pagination'); const pageLabel = $('span');
     const previous = button('Anterior', 'fs-btn fs-btn-secondary', () => { if (page > 1) { page--; refresh(); } });
     const next = button('Próxima', 'fs-btn fs-btn-secondary', () => { page++; refresh(); });
     footer.append(previous, pageLabel, next); root.append(footer);
+
+    async function openContextSettings(opener) {
+      try {
+        const initial = await window.FokusApi.request('/law/contacts/context');
+        const modal = createModal(root, 'Contexto da base de Contatos', 'fs-modal-md', opener);
+        const options = initial.available_contexts || [];
+        const choice = setWidth(select(options.map((item) => [item.context_code, item.label]), initial.context.context_code), 800);
+        const preview = $('div', 'law-contact-context-preview fs-alert fs-alert-info');
+        const message = $('p', 'law-contact-feedback'); message.setAttribute('role', 'status');
+        const renderPreview = () => {
+          const item = options.find((option) => option.context_code === choice.value);
+          preview.replaceChildren($('strong', '', `Prévia: ${item?.label || 'Contexto selecionado'}`), $('p', '', `A configuração ajustará os rótulos para “${item?.organization_label || 'Organização'}” e “${item?.unit_label || 'Unidade'}”, além das sugestões de cadastro. ${Number(initial.preview?.contacts || 0).toLocaleString('pt-BR')} registros e seus vínculos serão preservados.`));
+        };
+        choice.addEventListener('change', renderPreview); renderPreview();
+        modal.body.append(field('Segmento e contexto', choice), preview, message);
+        modal.footer.append(button('Cancelar', 'fs-btn fs-btn-secondary', () => modal.close()));
+        const save = button('Aplicar contexto', 'fs-btn fs-btn-primary', async () => {
+          save.disabled = true;
+          try { await window.FokusApi.request('/law/contacts/context', { method: 'PUT', body: { context_code: choice.value } }); modal.close(); await refresh(); }
+          catch (error) { message.dataset.state = 'error'; message.textContent = error.message || 'Não foi possível atualizar o contexto.'; }
+          finally { save.disabled = false; }
+        });
+        modal.footer.append(save);
+      } catch (error) { state.dataset.state = 'error'; state.textContent = error.message || 'Não foi possível carregar os contextos disponíveis.'; }
+    }
 
     async function refresh() {
       state.textContent = '';
@@ -136,9 +166,16 @@
         const params = new URLSearchParams({ page: String(page), per_page: '25', status: status.value });
         if (search.value.trim()) params.set('q', search.value.trim());
         if (nature.value) params.set('nature', nature.value);
+        if (recordKind.value) params.set('record_kind', recordKind.value);
         if (profession.value) params.set('profession', profession.value);
         if (tagFilter.value.trim()) params.set('tag', tagFilter.value.trim());
         const result = await window.FokusApi.request(`/law/contacts?${params.toString()}`);
+        currentContext = result.context || currentContext;
+        hierarchyOptions = result.hierarchy_options || [];
+        window.lawContactContext = currentContext;
+        window.lawContactHierarchyOptions = hierarchyOptions;
+        window.lawContactClassificationCatalog = result.classification_catalog || {};
+        if (currentContext) heading.children[2].textContent = `${currentContext.label} · Base compartilhada entre setores autorizados.`;
         window.lawContactProfessions = result.professions || [];
         const selectedProfession = profession.value;
         const filterProfessions = result.filter_professions || [];
@@ -157,12 +194,13 @@
         const total = Number(summary.contacts_total || 0);
         const pf = Number(summary.pf || 0);
         const pj = Number(summary.pj || 0);
-        const natureTotal = Math.max(1, pf + pj);
+        const units = Number(summary.units || summary.departments || 0);
+        const natureTotal = Math.max(1, pf + pj + units);
         overview.replaceChildren();
         const bannerCopy = $('div', 'law-contact-overview-copy');
         bannerCopy.append($('span', 'law-contact-overview-kicker', 'PAINEL DE RELACIONAMENTO'));
-        bannerCopy.append($('h3', '', 'Sua rede jurídica, em uma visão.'));
-        bannerCopy.append($('p', '', 'Pessoas, instituições e equipes com os vínculos importantes sempre à mão.'));
+        bannerCopy.append($('h3', '', 'Sua rede de contatos, em uma visão.'));
+        bannerCopy.append($('p', '', `Pessoas, organizações e ${currentContext?.unit_label?.toLocaleLowerCase('pt-BR') || 'unidades'} com seus vínculos institucionais sempre à mão.`));
         const quota = $('div', 'law-contact-capacity');
         if (meter?.available) {
           const quotaHead = $('div', 'law-contact-capacity-head');
@@ -178,10 +216,10 @@
         const ring = $('div', 'law-contact-composition-ring');
         ring.style.setProperty('--contact-pf-share', `${(pf / natureTotal) * 100}%`);
         ring.dataset.empty = String(total === 0);
-        ring.setAttribute('role', 'img'); ring.setAttribute('aria-label', `Composição dos contatos: ${pf} pessoas físicas e ${pj} pessoas jurídicas`);
+        ring.setAttribute('role', 'img'); ring.setAttribute('aria-label', `Composição da base: ${pf} pessoas, ${pj} organizações e ${units} unidades`);
         const center = $('div', 'law-contact-ring-center'); center.append($('strong', '', total.toLocaleString('pt-BR')), $('span', '', 'CONTATOS')); ring.append(center);
         const legend = $('div', 'law-contact-chart-legend');
-        [['pf', 'Pessoa física', pf], ['pj', 'Pessoa jurídica', pj], ['dept', 'Departamentos', summary.departments]].forEach(([tone, label, value]) => {
+        [['pf', 'Pessoa / contato', pf], ['pj', 'Organização', pj], ['dept', currentContext?.unit_label || 'Unidades', units]].forEach(([tone, label, value]) => {
           const row = $('div', `law-contact-chart-legend-row law-contact-chart-${tone}`); row.append($('span', 'law-contact-chart-dot'), $('span', '', label), $('strong', '', Number(value || 0).toLocaleString('pt-BR'))); legend.append(row);
         });
         chartArea.append(ring, legend); overview.append(bannerCopy, chartArea);
@@ -190,9 +228,9 @@
         const inactive = Number(summary.contacts_inactive || 0);
         const metricSpecs = [
           ['Contatos na base', total, `${active.toLocaleString('pt-BR')} ativos · ${inactive.toLocaleString('pt-BR')} inativos`, 'violet'],
-          ['Pessoas físicas', pf, `${Math.round((pf / natureTotal) * 100)}% da base de contatos`, 'blue'],
-          ['Pessoas jurídicas', pj, `${Math.round((pj / natureTotal) * 100)}% da base de contatos`, 'teal'],
-          ['Departamentos', Number(summary.departments || 0), `${Number(summary.registrations_counted || total).toLocaleString('pt-BR')} cadastros contabilizados`, 'amber'],
+          ['Pessoas / contatos', pf, `${Math.round((pf / natureTotal) * 100)}% da base de contatos`, 'blue'],
+          ['Organizações', pj, `${Math.round((pj / natureTotal) * 100)}% da base de contatos`, 'teal'],
+          [currentContext?.unit_label || 'Unidades', units, `${Number(summary.registrations_counted || total).toLocaleString('pt-BR')} registros contabilizados`, 'amber'],
         ];
         metricSpecs.forEach(([label, value, note, tone], index) => {
           const card = $('article', `law-contact-metric-card fs-card law-contact-metric-${tone}`);
@@ -220,10 +258,14 @@
           const tr = $('tr');
           const titleCell = $('td'); const open = button(contact.display_name, 'law-contact-name', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget));
           titleCell.append(open); if (contact.is_shared) titleCell.append($('span', 'law-contact-shared-badge', `Compartilhado por ${contact.source_company_name || 'outra empresa'}`));
-          tr.append(titleCell, $('td', '', contact.legal_nature === 'pj' ? 'Pessoa jurídica' : 'Pessoa física'));
-          tr.append($('td', '', contact.legal_nature === 'pj' ? '—' : ((contact.professions || []).join(', ') || '—')));
-          tr.append($('td', '', (contact.tags || []).join(', ') || '—'));
-          tr.append($('td', '', `${contact.departments?.length || 0} departamento(s)`));
+          tr.append(titleCell, $('td', '', contact.record_kind === 'unit' ? (currentContext?.unit_label || 'Unidade') : contact.legal_nature === 'pj' ? 'Organização' : 'Pessoa / contato'));
+          tr.append($('td', '', contact.legal_nature === 'pj' || contact.record_kind === 'unit' ? '—' : ((contact.professions || []).join(', ') || '—')));
+          const classificationLabels = Object.values(window.lawContactClassificationCatalog || {}).flat().reduce((map, item) => { map[item.code] = item.label; return map; }, {});
+          const reviewCodes = new Set(contact.classification_review || []);
+          const categories = (contact.classifications || []).map((code) => `${reviewCodes.has(code) ? 'Revisar: ' : ''}${classificationLabels[code] || CLASSIFICATION_LABELS[code] || code}`).join(', ');
+          tr.append($('td', '', [categories, (contact.tags || []).join(', ')].filter(Boolean).join(' · ') || '—'));
+          const hierarchyLabel = contact.parent ? `Vinculada a ${contact.parent.display_name}` : contact.children?.length ? `${contact.children.length} ${contact.children.length === 1 ? 'filho' : 'filhos'}` : '—';
+          tr.append($('td', '', hierarchyLabel));
           tr.append($('td', '', contact.status === 'ativo' ? 'Ativo' : 'Inativo'));
           const actions = $('td', 'law-contact-actions');
           const actionList = $('div', 'law-contact-action-list');
@@ -256,7 +298,9 @@
     form.id = `law-contact-form-${++modalSequence}`;
     const status = $('p', 'law-contact-feedback'); status.setAttribute('role', 'status');
     const basic = section('Dados principais');
-    const nature = setWidth(select([['pf', 'Pessoa física'], ['pj', 'Pessoa jurídica']], contact?.legal_nature || 'pf'), 800); nature.name = 'legal_nature';
+    const contextData = window.lawContactContext || { context_code: 'judiciario', organization_label: 'Organização', unit_label: 'Unidade' };
+    const recordKind = setWidth(select([['contact', 'Pessoa ou organização'], ['unit', contextData.unit_label]], contact?.record_kind || 'contact'), 800); recordKind.name = 'record_kind';
+    const nature = setWidth(select([['pf', 'Pessoa / contato'], ['pj', contextData.organization_label]], contact?.legal_nature || 'pf'), 800); nature.name = 'legal_nature';
     const name = setWidth(input(contact?.display_name || '', 'Nome completo ou nome fantasia', 180), 800); name.required = true; name.name = 'display_name';
     const acronym = input(contact?.acronym || '', 'Ex.: TJBA', 32); acronym.name = 'acronym';
     const particles = new Set(['da','das','de','do','dos','e']);
@@ -264,15 +308,51 @@
     const legalName = input(contact?.legal_name || '', 'Razão social (opcional)', 180); legalName.name = 'legal_name';
     const nameField = field('Nome *', name); const acronymField = field('Sigla', acronym);
     const nameRow = $('div', 'law-contact-name-fields'); nameRow.append(nameField, acronymField);
-    basic.content.append(field('Natureza *', nature), nameRow); const legalNameField = field('Razão social / nome complementar', legalName); basic.content.append(legalNameField);
+    const natureField = field('Natureza *', nature);
+    const hierarchyParent = setWidth(select([['', `Selecione ${contextData.organization_label.toLocaleLowerCase('pt-BR')} ou unidade superior`], ...(window.lawContactHierarchyOptions || []).filter((item) => item.id !== contact?.id).map((item) => [item.id, `${item.display_name}${item.record_kind === 'unit' ? ` · ${contextData.unit_label}` : ''}`])], contact?.parent_contact_id || ''), 800);
+    hierarchyParent.name = 'parent_contact_id';
+    const parentField = field('Registro superior', hierarchyParent);
+    const preserveHiddenParent = Boolean(contact?.parent_contact_id && !contact?.parent);
+    if (preserveHiddenParent) parentField.hidden = true;
+    basic.content.append(field('Tipo de registro', recordKind), natureField, parentField, nameRow);
+    const legalNameField = field('Razão social / nome complementar', legalName); basic.content.append(legalNameField);
+    const catalog = window.lawContactClassificationCatalog || {};
+    const classificationSection = section('Classificação', 'Escolha a categoria principal sugerida para este contexto e, se necessário, acrescente categorias de referência.');
+    const classificationsWrap = $('div', 'law-contact-classification-options');
+    const selectedClassificationCodes = new Set(contact?.classifications || []);
+    const primaryClassification = setWidth(select([['', 'Selecione a categoria principal']], contact?.primary_classification || ''), 800);
+    const initialKinds = contact?.record_kind === 'unit' ? 'unit' : contact?.legal_nature === 'pj' ? 'organization' : 'contact';
+    const renderClassificationOptions = () => {
+      const kind = recordKind.value === 'unit' ? 'unit' : nature.value === 'pj' ? 'organization' : 'contact';
+      const options = catalog[kind] || catalog.contact || [];
+      const currentPrimary = primaryClassification.value || contact?.primary_classification || options[0]?.code || '';
+      if (currentPrimary) selectedClassificationCodes.add(currentPrimary);
+      classificationsWrap.replaceChildren();
+      primaryClassification.replaceChildren(new Option('Selecione a categoria principal', ''), ...options.map((item) => new Option(item.label, item.code)));
+      primaryClassification.value = options.some((item) => item.code === currentPrimary) ? currentPrimary : (options[0]?.code || '');
+      options.forEach((item) => {
+        const label = $('label', 'law-contact-check'); const checkbox = $('input'); checkbox.type = 'checkbox'; checkbox.value = item.code;
+        checkbox.checked = selectedClassificationCodes.has(item.code) || item.code === primaryClassification.value;
+        checkbox.addEventListener('change', () => { if (checkbox.checked) selectedClassificationCodes.add(item.code); else selectedClassificationCodes.delete(item.code); });
+        label.append(checkbox, $('span', '', item.label)); classificationsWrap.append(label);
+      });
+      if (options.length && !options.some((item) => item.code === primaryClassification.value)) primaryClassification.value = options[0].code;
+    };
+    primaryClassification.addEventListener('change', renderClassificationOptions);
+    classificationSection.content.append(field('Categoria principal', primaryClassification), classificationsWrap);
+    renderClassificationOptions();
     const professionSection = section('Profissão / vínculo', 'Selecione uma opção cadastrada ou inclua uma nova especificação.');
     const professionRows = $('div', 'law-contact-profession-list');
     (contact?.professions || []).forEach((value) => professionRows.append(professionChip(value)));
     const professionSelect = select([['', 'Selecione uma profissão'], ...(window.lawContactProfessions || []).map((value) => [value, value])]);
     const professionNew = setWidth(input('', 'Ex.: Policial Civil, Guarda Municipal, Agente penitenciário', 100), 800);
+    const professionSuggestions = $('datalist'); professionSuggestions.id = `${form.id}-profession-suggestions`;
+    const professionExamples = contextData.context_code === 'escritorio' ? ['Advogado(a)', 'Estagiário(a) de Direito', 'Correspondente jurídico'] : contextData.context_code === 'orgao_publico' ? ['Servidor(a) público(a)', 'Agente público(a)', 'Conselheiro(a)'] : ['Magistrado(a)', 'Servidor(a) público(a)', 'Oficial de justiça', 'Defensor(a) público(a)'];
+    professionExamples.forEach((value) => { const option = $('option'); option.value = value; professionSuggestions.append(option); });
+    professionNew.setAttribute('list', professionSuggestions.id);
     const addProfession = (value) => { const clean = value.trim(); if (clean && ![...professionRows.querySelectorAll('[data-profession]')].some((item) => item.dataset.profession.toLocaleLowerCase() === clean.toLocaleLowerCase())) professionRows.append(professionChip(clean)); professionSelect.value = ''; professionNew.value = ''; };
     professionSelect.addEventListener('change', () => { if (professionSelect.value) addProfession(professionSelect.value); });
-    professionSection.content.append(professionRows, field('Profissões cadastradas', professionSelect), field('Nova profissão / especificação', professionNew), button('Adicionar profissão', 'fs-btn fs-btn-secondary', () => addProfession(professionNew.value)));
+    professionSection.content.append(professionRows, field('Profissões cadastradas', professionSelect), field('Nova profissão / especificação', professionNew), professionSuggestions, button('Adicionar profissão', 'fs-btn fs-btn-secondary', () => addProfession(professionNew.value)));
     const institutionalSection = section('Dados institucionais', 'Complementos para órgãos públicos e unidades judiciárias.');
     const institutionalData = Array.isArray(contact?.institutional_data) ? contact.institutional_data : (contact?.institutional_data ? [contact.institutional_data] : []);
     const courtData = institutionalData.find((item) => item.type === 'court_unit') || {};
@@ -281,14 +361,22 @@
     const courtTypeWrap = $('label', 'law-contact-check'); const courtType = $('input'); courtType.type = 'checkbox'; courtType.checked = Boolean(institutionalData.find((item) => item.type === 'court_unit')) || legacyInstitutionTypes.has('court_unit'); courtTypeWrap.append(courtType, $('span', '', 'Unidade judiciária'));
     const publicTypeWrap = $('label', 'law-contact-check'); const publicType = $('input'); publicType.type = 'checkbox'; publicType.checked = Boolean(institutionalData.find((item) => item.type === 'public_body')) || legacyInstitutionTypes.has('public_body'); publicTypeWrap.append(publicType, $('span', '', 'Órgão público'));
     const institutionTypes = $('div', 'law-contact-institution-types'); institutionTypes.append(courtTypeWrap, publicTypeWrap);
+    const primaryInstitutional = setWidth(select([['', 'Selecione o tipo institucional principal']], institutionalData.find((item) => item.primary)?.type || institutionalData[0]?.type || ''), 800);
+    const updateInstitutionalPrimary = () => {
+      const enabled = [['court_unit', 'Unidade judiciária'], ['public_body', 'Órgão público']].filter(([code]) => code === 'court_unit' ? courtType.checked : publicType.checked);
+      const previous = primaryInstitutional.value;
+      primaryInstitutional.replaceChildren(new Option('Selecione o tipo institucional principal', ''), ...enabled.map(([code, label]) => new Option(label, code)));
+      primaryInstitutional.value = enabled.some(([code]) => code === previous) ? previous : (enabled[0]?.[0] || '');
+    };
     const cnj = input(courtData.cnj_code || '', 'Código CNJ (20 dígitos)', 25);
     const competencies = input((courtData.competencies || []).join(', '), 'Ex.: Criminal, Família, Fazenda Pública', 500);
     const competencyList = $('datalist'); competencyList.id = `${form.id}-competencies`; competencyOptions.forEach((value) => { const option = $('option'); option.value = value; competencyList.append(option); }); competencies.setAttribute('list', competencyList.id);
     const sphere = select([['', 'Selecione a esfera'], ['Federal', 'Federal'], ['Estadual', 'Estadual'], ['Distrital', 'Distrital'], ['Municipal', 'Municipal']], publicData.administrative_sphere || '');
     const officialCode = input(publicData.official_code || '', 'Código oficial', 80);
     const issuingSystem = input(publicData.issuing_system || '', 'Sistema emissor', 80);
-    institutionalSection.content.append(institutionTypes, field('Código CNJ da unidade judiciária', cnj), field('Competências (separadas por vírgula)', competencies), competencyList, field('Esfera administrativa', sphere), field('Identificador oficial', officialCode), field('Sistema emissor', issuingSystem));
-    const updateInstitutional = () => { institutionalSection.hidden = nature.value !== 'pj'; cnj.parentElement.hidden = !courtType.checked; competencies.parentElement.hidden = !courtType.checked; sphere.parentElement.hidden = !publicType.checked; officialCode.parentElement.hidden = !publicType.checked; issuingSystem.parentElement.hidden = !publicType.checked; };
+    institutionalSection.content.append(institutionTypes, field('Tipo institucional principal', primaryInstitutional), $('small', 'law-contact-help', 'Identificadores institucionais são opcionais; a ausência gera apenas um aviso de completude.'));
+    institutionalSection.content.append(field('Código CNJ da unidade judiciária', cnj), field('Competências (separadas por vírgula)', competencies), competencyList, field('Esfera administrativa', sphere), field('Identificador oficial', officialCode), field('Sistema emissor', issuingSystem));
+    const updateInstitutional = () => { institutionalSection.hidden = recordKind.value === 'unit' ? false : nature.value !== 'pj'; cnj.parentElement.hidden = !courtType.checked; competencies.parentElement.hidden = !courtType.checked; sphere.parentElement.hidden = !publicType.checked; officialCode.parentElement.hidden = !publicType.checked; issuingSystem.parentElement.hidden = !publicType.checked; updateInstitutionalPrimary(); };
     courtType.addEventListener('change', updateInstitutional); publicType.addEventListener('change', updateInstitutional); updateInstitutional();
     const relationshipSection = section('Vínculos empresariais', 'Associe este contato a empresas já cadastradas.');
     const linkedContactIds = new Set((contact?.linked_contacts || []).map((item) => item.id));
@@ -324,7 +412,12 @@
         const roleGroup = $('div', 'law-contact-relationship-group');
         roleGroup.append($('h4', 'law-contact-relationship-title', 'Papéis'));
         const roleRows = $('div', 'law-contact-relationship-entries');
-        const roleOptions = [['', 'Selecione um papel'], ['employee', 'Funcionário/colaborador'], ['public_servant', 'Servidor público'], ['legal_representative', 'Representante legal'], ['partner', 'Sócio'], ['administrator', 'Administrador/diretor'], ['attorney_in_fact', 'Procurador'], ['other', 'Outro']];
+        const roleSets = {
+          escritorio: [['client', 'Cliente (cadastro)'], ['collaborator', 'Colaborador'], ['employee', 'Funcionário'], ['legal_representative', 'Representante legal'], ['partner', 'Sócio'], ['administrator', 'Administrador/diretor'], ['attorney_in_fact', 'Procurador'], ['public_servant', 'Servidor público'], ['interested_party', 'Interessado (cadastro)'], ['service_user', 'Usuário do serviço (cadastro)'], ['other', 'Outro']],
+          orgao_publico: [['public_servant', 'Servidor público'], ['service_user', 'Usuário do serviço (cadastro)'], ['interested_party', 'Interessado (cadastro)'], ['collaborator', 'Colaborador'], ['employee', 'Funcionário'], ['legal_representative', 'Representante legal'], ['client', 'Cliente (cadastro)'], ['partner', 'Sócio'], ['administrator', 'Administrador/diretor'], ['attorney_in_fact', 'Procurador'], ['other', 'Outro']],
+          judiciario: [['public_servant', 'Servidor público'], ['interested_party', 'Interessado (cadastro)'], ['client', 'Cliente (cadastro)'], ['service_user', 'Usuário do serviço (cadastro)'], ['collaborator', 'Colaborador'], ['employee', 'Funcionário'], ['legal_representative', 'Representante legal'], ['partner', 'Sócio'], ['administrator', 'Administrador/diretor'], ['attorney_in_fact', 'Procurador'], ['other', 'Outro']],
+        };
+        const roleOptions = [['', 'Selecione um papel'], ...(roleSets[contextData.context_code] || roleSets.judiciario)];
         const addRoleRow = (role = {}) => { const entry = $('div', 'law-contact-relationship-entry law-contact-role-entry'); const selectRole = setWidth(select(roleOptions, role.code || ''), 400); const detail = setWidth(input(role.detail || '', 'Complemento para Outro', 160), 500); entry.append(field('Papel', selectRole), field('Complemento (Outro)', detail), button('Remover papel', 'fs-btn fs-btn-danger law-contact-chip-remove', () => entry.remove())); entry.getMetadata = () => ({ code: selectRole.value, detail: selectRole.value === 'other' ? detail.value.trim() || null : null }); roleRows.append(entry); };
         metadata.roles.forEach(addRoleRow);
         const addRole = button('Adicionar papel', 'fs-btn fs-btn-secondary', () => addRoleRow());
@@ -348,12 +441,13 @@
     let documentRows;
     let documentSection;
     if (window.lawContactsCanSensitive) {
-      documentSection = section('Documentos', 'Até 4 documentos. CPF ou CNPJ são validados quando informados; inscrição estadual exige UF.');
+      const documentHighlight = contextData.context_code === 'escritorio' ? 'Na Advocacia, OAB recebe destaque para pessoas; o CPF segue disponível.' : 'Nos setores públicos, Matrícula e Cadastro recebem destaque; os demais documentos seguem disponíveis.';
+      documentSection = section('Documentos', `Até 4 documentos. ${documentHighlight} CPF ou CNPJ são validados quando informados; inscrição estadual exige UF.`);
       documentRows = $('div', 'law-contact-repeat-list');
       (contact?.documents || []).filter((doc) => DOCUMENT_TYPES_BY_NATURE[nature.value].includes(doc.type)).forEach((doc) => documentRows.append(documentRow(doc, nature.value)));
       documentSection.content.append(documentRows, button('Adicionar documento', 'fs-btn fs-btn-secondary', () => { if (documentRows.children.length < 4) documentRows.append(documentRow({}, nature.value)); }));
     }
-    const channelSection = section('Telefones e e-mails', 'Até 4 telefones e 2 e-mails.');
+    const channelSection = section('Telefones e e-mails', 'Até quatro telefones e dois e-mails. Marque canais pessoais como sensíveis; o acesso continua restrito por permissão.');
     const channelRows = $('div', 'law-contact-repeat-list'); (contact?.channels || []).filter((item) => window.lawContactsCanSensitive || !item.personal).forEach((item) => channelRows.append(channelRow(item)));
     enforceSinglePrimary(channelRows, (row) => row.querySelector('[data-channel-type]').value === 'email' ? 'email' : 'phone', true);
     channelSection.content.append(channelRows, button('Adicionar telefone ou e-mail', 'fs-btn fs-btn-secondary', () => {
@@ -370,9 +464,6 @@
       const row = addressRow(); addressRows.append(row);
       if (![...addressRows.children].some((other) => other !== row && other.querySelector('[data-primary]').value === '1')) row.querySelector('[data-primary]').value = '1';
     }));
-    const departmentSection = section('Departamentos da empresa', 'Cada departamento é uma unidade adicional no consumo contratado e aceita até 4 telefones e 2 e-mails.');
-    const departmentRows = $('div', 'law-contact-repeat-list'); (contact?.departments || []).forEach((item) => departmentRows.append(departmentRow(item)));
-    departmentSection.content.append(departmentRows, button('Adicionar departamento', 'fs-btn fs-btn-secondary', () => departmentRows.append(departmentRow())));
     const tagField = input((contact?.tags || []).join(', '), 'Ex.: testemunha, urgente, comarca', 400); tagField.name = 'tags';
     const tags = section('Tags', 'Separe por vírgula; até 6 por contato. As tags são reutilizadas pela empresa.'); tags.content.append(field('Tags', tagField));
     const notes = document.createElement('textarea'); notes.className = 'fs-form-control'; notes.maxLength = 4000; notes.value = contact?.notes || ''; notes.name = 'notes';
@@ -386,22 +477,28 @@
     const cancel = button('Cancelar', 'fs-btn fs-btn-secondary', () => modal.close());
     const save = $('button', 'fs-btn fs-btn-primary', contact ? 'Salvar alterações' : 'Cadastrar contato'); save.type = 'submit'; save.setAttribute('form', form.id);
     modal.footer.append(cancel, save);
-    form.append(basic, professionSection, institutionalSection, relationshipSection);
+    form.append(basic, classificationSection, professionSection, institutionalSection, relationshipSection);
     if (documentSection) form.append(documentSection);
     form.append(channelSection, addressSection);
-    const departmentWrap = $('div', 'law-contact-department-wrap'); departmentWrap.append(departmentSection);
-    form.append(departmentWrap, tags);
+    form.append(tags);
     // Notes remain editable only for a profile that can read protected personal data.
     if (window.lawContactsCanSensitive) form.append(notesSection);
     form.append(message);
     const updateNature = () => {
-      departmentWrap.hidden = nature.value !== 'pj'; legalNameField.hidden = nature.value !== 'pj';
+      const isUnit = recordKind.value === 'unit';
+      natureField.hidden = isUnit; parentField.hidden = preserveHiddenParent || (isUnit ? false : nature.value === 'pf');
+      nature.disabled = isUnit;
+      legalNameField.hidden = isUnit || nature.value !== 'pj';
       name.classList.toggle('fs-width-800', nature.value !== 'pj'); name.classList.toggle('fs-width-900', nature.value === 'pj');
       legalName.classList.toggle('fs-width-900', nature.value === 'pj');
       if (statusSelect) statusSelect.classList.toggle('fs-width-400', nature.value === 'pj');
-      acronymField.hidden = nature.value !== 'pj';
-      professionSection.hidden = nature.value === 'pj';
+      acronymField.hidden = isUnit || nature.value !== 'pj';
+      professionSection.hidden = isUnit || nature.value === 'pj';
+      relationshipSection.hidden = isUnit;
+      if (documentSection) documentSection.hidden = isUnit;
+      if (window.lawContactsCanSensitive) notesSection.hidden = false;
       updateInstitutional();
+      renderClassificationOptions();
       if (documentRows) [...documentRows.children].forEach((row) => {
         const type = row.querySelector('[data-doc-type]');
         if (!DOCUMENT_TYPES_BY_NATURE[nature.value].includes(type.value)) { row.remove(); return; }
@@ -416,7 +513,7 @@
       relationshipPickerField.hidden = nature.value === 'pj'; relationshipChips.hidden = nature.value === 'pj'; relationshipStats.hidden = nature.value !== 'pj';
       relationshipSection.hidden = nature.value === 'pj' ? false : candidates.length === 0;
     };
-    nature.addEventListener('change', updateNature); updateNature();
+    nature.addEventListener('change', updateNature); recordKind.addEventListener('change', updateNature); hierarchyParent.addEventListener('change', updateNature); updateNature();
     form.addEventListener('submit', async (event) => {
       event.preventDefault(); message.textContent = '';
       const invalidDocument = [...(documentRows?.children || [])].find((row) => {
@@ -429,19 +526,24 @@
       });
       if (invalidDocument) { message.dataset.state = 'error'; message.textContent = `Informe um ${invalidDocument.querySelector('[data-doc-type]').value.toUpperCase()} válido, com os dígitos verificadores corretos.`; invalidDocument.querySelector('[data-doc-number]').focus(); return; }
       save.disabled = true;
+      const allowedClassifications = new Set([...Object.values(catalog).flat().map((item) => item.code), ...Object.keys(CLASSIFICATION_LABELS)]);
+      const selectedClassifications = [...new Set([...selectedClassificationCodes, ...[...classificationsWrap.querySelectorAll('input[type="checkbox"]:checked')].map((item) => item.value), primaryClassification.value].filter((code) => code && allowedClassifications.has(code)))];
       const body = {
-        legal_nature: nature.value, display_name: name.value.trim(), acronym: acronym.value.trim() || null, legal_name: legalName.value.trim() || null,
-        professions: nature.value === 'pf' ? [...professionRows.querySelectorAll('[data-profession]')].map((item) => item.dataset.profession) : [],
+        record_kind: recordKind.value, legal_nature: recordKind.value === 'unit' ? null : nature.value,
+        parent_contact_id: recordKind.value === 'unit' || nature.value === 'pj' ? (hierarchyParent.value || (preserveHiddenParent ? contact.parent_contact_id : null)) : null,
+        display_name: name.value.trim(), acronym: acronym.value.trim() || null, legal_name: legalName.value.trim() || null,
+        classifications: selectedClassifications,
+        primary_classification: primaryClassification.value || null,
+        professions: nature.value === 'pf' && recordKind.value !== 'unit' ? [...professionRows.querySelectorAll('[data-profession]')].map((item) => item.dataset.profession) : [],
         linked_contact_ids: [...linkedContactIds],
         linked_relationships: [...relationshipChips.children].map((row) => row.getMetadata()),
-        channels: [...channelRows.children].map((row) => ({ type: row.querySelector('[data-channel-type]').value, value: row.querySelector('[data-channel-value]').value.trim(), label: row.querySelector('[data-channel-label]').value.trim() || null, personal: false, primary: row.querySelector('[data-primary]').value === '1' })).filter((item) => item.value),
+        channels: [...channelRows.children].map((row) => ({ type: row.querySelector('[data-channel-type]').value, value: row.querySelector('[data-channel-value]').value.trim(), label: row.querySelector('[data-channel-label]').value.trim() || null, personal: row.querySelector('[data-personal]').checked, primary: row.querySelector('[data-primary]').value === '1' })).filter((item) => item.value && (window.lawContactsCanSensitive || !item.personal)),
         addresses: [...addressRows.children].map((row) => ({ type: row.querySelector('[data-address-type]').value, postal_code: row.querySelector('[data-postal]').value.trim() || null, street: row.querySelector('[data-street]').value.trim(), number: row.querySelector('[data-number]').value.trim() || null, complement: row.querySelector('[data-complement]').value.trim() || null, district: row.querySelector('[data-district]').value.trim() || null, city: row.querySelector('[data-city]').value.trim(), state: row.querySelector('[data-state]').value.trim().toUpperCase(), country: row.querySelector('[data-country]').value.trim() || 'Brasil', primary: row.querySelector('[data-primary]').value === '1' })),
-        departments: nature.value === 'pj' ? [...departmentRows.children].map((row) => ({ name: row.querySelector('[data-department-name]').value.trim(), channels: [...row.querySelectorAll('.law-contact-department-channel')].map((item) => ({ type: item.querySelector('[data-channel-type]').value, value: item.querySelector('[data-channel-value]').value.trim(), label: item.querySelector('[data-channel-label]').value.trim() || null })).filter((item) => item.value) })).filter((item) => item.name) : [],
         tags: tagField.value.split(',').map((value) => value.trim()).filter(Boolean),
       };
       body.institutional_data = [];
-      if (nature.value === 'pj' && courtType.checked) body.institutional_data.push({ type: 'court_unit', cnj_code: cnj.value.trim() || null, competencies: competencies.value.split(',').map((value) => value.trim()).filter(Boolean) });
-      if (nature.value === 'pj' && publicType.checked) body.institutional_data.push({ type: 'public_body', administrative_sphere: sphere.value || null, official_code: officialCode.value.trim() || null, issuing_system: issuingSystem.value.trim() || null });
+      if ((nature.value === 'pj' || recordKind.value === 'unit') && courtType.checked) body.institutional_data.push({ type: 'court_unit', primary: primaryInstitutional.value === 'court_unit', cnj_code: cnj.value.trim() || null, competencies: competencies.value.split(',').map((value) => value.trim()).filter(Boolean) });
+      if ((nature.value === 'pj' || recordKind.value === 'unit') && publicType.checked) body.institutional_data.push({ type: 'public_body', primary: primaryInstitutional.value === 'public_body', administrative_sphere: sphere.value || null, official_code: officialCode.value.trim() || null, issuing_system: issuingSystem.value.trim() || null });
       if (window.lawContactsCanSensitive) {
         body.documents = [...documentRows.children].map((row) => { const type = row.querySelector('[data-doc-type]').value; const noUf = DOCUMENT_TYPES_WITHOUT_STATE.includes(type); const noLabel = DOCUMENT_TYPES_WITHOUT_LABEL.includes(type); return { type, number: row.querySelector('[data-doc-number]').value.trim(), state: noUf ? null : (row.querySelector('[data-doc-state]').value || null), label: noLabel ? null : (row.querySelector('[data-doc-label]').value.trim() || null) }; }).filter((doc) => doc.number);
         body.notes = notes.value.trim() || null;
@@ -458,7 +560,10 @@
 
   function documentRow(doc = {}, nature = 'pf') {
     const row = $('div', 'law-contact-repeat-row law-contact-document-row');
-    const type = setWidth(select(DOCUMENT_TYPES_BY_NATURE[nature].map((code) => [code, DOCUMENTS[code]]), doc.type || (nature === 'pj' ? 'cnpj' : 'cpf')), 300); type.dataset.docType = '1';
+    const types = [...DOCUMENT_TYPES_BY_NATURE[nature]];
+    const highlighted = window.lawContactContext?.context_code === 'escritorio' ? 'oab' : 'registration';
+    if (types.includes(highlighted)) types.splice(types.indexOf(highlighted), 1), types.unshift(highlighted);
+    const type = setWidth(select(types.map((code) => [code, DOCUMENTS[code]]), doc.type || (nature === 'pj' ? 'cnpj' : 'cpf')), 300); type.dataset.docType = '1';
     const number = setWidth(input(doc.number || '', 'Número do documento', 120), 500); number.dataset.docNumber = '1';
     const state = setWidth(select([['','UF'], ...STATES], doc.state || 'BA'), 300); state.dataset.docState = '1';
     const label = setWidth(input(doc.label || '', 'Identificação', 80), 400); label.dataset.docLabel = '1';
@@ -478,11 +583,15 @@
     const row = $('div', 'law-contact-repeat-row law-contact-channel-row');
     const type = setWidth(select([['phone', 'Telefone fixo'], ['extension', 'Ramal'], ['mobile', 'Celular'], ['whatsapp', 'WhatsApp'], ['email', 'E-mail']], item.type || 'phone'), 300); type.dataset.channelType = '1';
     const value = setWidth(input(item.value || '', 'Telefone ou e-mail', 255), 500); value.dataset.channelValue = '1';
-    const labels = ['Principal','Pessoal','Profissional','Recado','Comercial','Emergência'];
-    if (item.label && !labels.includes(item.label)) labels.push(item.label);
-    const labelSelect = setWidth(select(labels.map((value) => [value, value]), item.label || 'Principal'), 400); labelSelect.dataset.channelLabel = '1';
+    const labelInput = setWidth(input(item.label || '', 'Ex.: Recepção, gabinete, pessoal', 80), 400); labelInput.dataset.channelLabel = '1';
+    const personal = $('input'); personal.type = 'checkbox'; personal.checked = Boolean(item.personal); personal.dataset.personal = '1';
+    const personalField = $('label', 'law-contact-check'); personalField.append(personal, $('span', '', 'Canal pessoal / sensível'));
+    personalField.hidden = !window.lawContactsCanSensitive;
     const primary = setWidth(select([['0','Não'],['1','Sim']], item.primary ? '1' : '0'), 300); primary.dataset.primary = '1';
-    row.append(field('Canal', type), field('Contato', value), field('Rótulo', labelSelect), field('Principal', primary), button('Remover', 'fs-btn fs-btn-danger law-contact-remove', () => row.remove())); return row;
+    const sensitiveNote = $('small', 'law-contact-help', 'O valor de um canal pessoal fica oculto sem a permissão de dados sensíveis e não é compartilhado.');
+    sensitiveNote.hidden = !window.lawContactsCanSensitive;
+    const privacy = $('div', 'law-contact-channel-privacy'); privacy.hidden = !window.lawContactsCanSensitive; privacy.append(personalField, sensitiveNote);
+    row.append(field('Canal', type), field('Contato', value), field('Rótulo', labelInput), privacy, field('Principal', primary), button('Remover', 'fs-btn fs-btn-danger law-contact-remove', () => row.remove())); return row;
   }
 
   function enforceSinglePrimary(rows, groupForRow, chooseFirst) {
@@ -516,7 +625,7 @@
 
   function addressRow(address = {}) {
     const row = $('fieldset', 'law-contact-address-row'); row.append($('legend', '', 'Endereço'));
-    const addressTypes = [['business', 'Comercial/institucional'], ['correspondence', 'Correspondência'], ['other', 'Outro']];
+    const addressTypes = [['business', window.lawContactContext?.segment_code === 'advocacia' ? 'Comercial' : 'Institucional/comercial'], ['correspondence', 'Correspondência'], ['other', 'Outro']];
     if (window.lawContactsCanSensitive) addressTypes.splice(1, 0, ['residential', 'Residencial']);
     const type = setWidth(select(addressTypes, address.type || 'business'), 400); type.dataset.addressType = '1';
     const postal = setWidth(input(address.postal_code, '00000-000', 9), 400); postal.dataset.postal = '1'; postal.inputMode = 'numeric';
@@ -585,7 +694,7 @@
     const contact = result.contact;
     const modal = createModal(root, 'Ficha do contato', 'fs-modal-xl', opener);
     const body = $('div', 'law-contact-detail-body');
-    const labels = { pf: 'Pessoa física', pj: 'Pessoa jurídica', ativo: 'Ativo', inativo: 'Inativo', residential: 'Residencial', business: 'Comercial / institucional' };
+    const labels = { pf: 'Pessoa / contato', pj: window.lawContactContext?.organization_label || 'Organização', ativo: 'Ativo', inativo: 'Inativo', residential: 'Residencial', business: window.lawContactContext?.segment_code === 'advocacia' ? 'Comercial' : 'Institucional / comercial' };
     const nameParts = String(contact.display_name || '?').trim().split(/\s+/).filter(Boolean);
     const removeDiacritics = (value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const firstName = nameParts[0] || '?';
@@ -594,13 +703,14 @@
     const summary = $('section', 'law-contact-detail-summary');
     const avatar = $('span', 'law-contact-detail-avatar', initials);
     const summaryCopy = $('div', 'law-contact-detail-summary-copy');
-    summaryCopy.append($('span', 'law-contact-detail-eyebrow', (labels[contact.legal_nature] || 'Contato').toLocaleUpperCase('pt-BR')));
+    const recordLabel = contact.record_kind === 'unit' ? (window.lawContactContext?.unit_label || 'Unidade') : (labels[contact.legal_nature] || 'Contato');
+    summaryCopy.append($('span', 'law-contact-detail-eyebrow', recordLabel.toLocaleUpperCase('pt-BR')));
     const titleRow = $('div', 'law-contact-detail-name-row');
     titleRow.append($('h3', 'law-contact-detail-name', contact.display_name));
     if (contact.acronym && contact.legal_nature !== 'pj') titleRow.append($('span', 'law-contact-detail-acronym', contact.acronym));
     summaryCopy.append(titleRow);
     const institutions = Array.isArray(contact.institutional_data) ? contact.institutional_data : [];
-    if (contact.legal_nature === 'pj') {
+    if (contact.legal_nature === 'pj' || contact.record_kind === 'unit') {
       const institutionDetails = [];
       institutions.forEach((institution) => {
         if (institution.type === 'court_unit' && institution.cnj_code) institutionDetails.push(institution.cnj_code);
@@ -628,9 +738,9 @@
       values.forEach((value) => list.append($('span', 'law-contact-detail-chip', value)));
       group.append(list); chips.append(group);
     };
-    const roleLabels = { employee: 'Funcionário/colaborador', public_servant: 'Servidor público', legal_representative: 'Representante legal', partner: 'Sócio', administrator: 'Administrador/diretor', attorney_in_fact: 'Procurador', other: 'Outro' };
+    const roleLabels = { employee: 'Funcionário/colaborador', public_servant: 'Servidor público', legal_representative: 'Representante legal', partner: 'Sócio', administrator: 'Administrador/diretor', attorney_in_fact: 'Procurador', client: 'Cliente (cadastro)', service_user: 'Usuário do serviço (cadastro)', interested_party: 'Interessado (cadastro)', collaborator: 'Colaborador', other: 'Outro' };
     const relationshipTags = [];
-    if (contact.legal_nature === 'pj') {
+    if (contact.legal_nature === 'pj' || contact.record_kind === 'unit') {
       const linkedCount = (contact.linked_contacts || []).length;
       const linkLabel = `${linkedCount} ${linkedCount === 1 ? 'vínculo ativo' : 'vínculos ativos'}`;
       const competencies = [...new Set(institutions.filter((item) => item.type === 'court_unit').flatMap((item) => item.competencies || []).filter(Boolean))];
@@ -642,6 +752,10 @@
       if (linked.display_name) relationshipTags.push(`${linked.display_name}${linked.acronym ? ` · ${linked.acronym}` : ''}`);
     });
     if (contact.legal_nature === 'pf') addChips(contact.professions || [], 'professions');
+    const contextCatalog = window.lawContactClassificationCatalog || {};
+    const contextLabels = Object.values(contextCatalog).flat().reduce((map, item) => { map[item.code] = item.label; return map; }, {});
+    const reviewCodes = new Set(contact.classification_review || []);
+    addChips((contact.classifications || []).map((code) => `${reviewCodes.has(code) ? 'Revisar: ' : ''}${code === contact.primary_classification ? 'Principal · ' : ''}${contextLabels[code] || CLASSIFICATION_LABELS[code] || code}`), 'classifications');
     addChips(relationshipTags, 'relationships');
     addChips(contact.tags || [], 'tags');
     summaryCopy.append(chips);
@@ -658,8 +772,14 @@
       const items = $('div', 'law-contact-detail-items'); card.append(items); body.append(card);
       return items;
     };
+    if (contact.parent || contact.children?.length) {
+      const children = contact.children || [];
+      const hierarchyItems = addSection('Hierarquia', 'ORG', `${children.length} filho(s)`, 'law-contact-detail-hierarchy');
+      if (contact.parent) { const row = $('article', 'law-contact-detail-linked-contact'); row.append($('strong', '', 'Vinculada a'), $('span', '', contact.parent.display_name)); hierarchyItems.append(row); }
+      children.forEach((child) => { const row = $('article', 'law-contact-detail-linked-contact'); row.append($('strong', '', child.display_name), $('span', '', child.status === 'ativo' ? 'Ativa' : 'Inativa')); hierarchyItems.append(row); });
+    }
     (contact.institutional_data || []).forEach((institution) => {
-      const items = addSection(institution.type === 'court_unit' ? 'Dados da unidade judiciária' : 'Dados do órgão público', 'INS', '', 'law-contact-detail-institution');
+      const items = addSection(`${institution.primary ? 'Tipo institucional principal · ' : ''}${institution.type === 'court_unit' ? 'Dados da unidade judiciária' : 'Dados do órgão público'}`, 'INS', '', 'law-contact-detail-institution');
       const values = institution.type === 'court_unit'
         ? [['Código CNJ', institution.cnj_code], ['Competências', (institution.competencies || []).join(', ')]]
         : [['Esfera administrativa', institution.administrative_sphere], ['Código oficial', institution.official_code], ['Sistema emissor', institution.issuing_system]];

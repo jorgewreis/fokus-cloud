@@ -3,7 +3,11 @@
 ## Papel
 
 Fokus Law e o produto derivado do ecossistema Fokus Cloud voltado a rotinas
-juridicas, cartorarias e de advocacia.
+jurídicas, cartorárias e de advocacia, além de organizações do Poder Público.
+Os termos e dados cadastrais devem respeitar o segmento e o contexto ativos da
+empresa. No módulo de Contatos, os contextos disponíveis são Advocacia /
+Escritório, Poder Público / Órgão Público e Poder Público jurídico / Judiciário;
+eles compartilham a base empresarial e alteram rótulos e sugestões.
 
 Na v1, o produto deve nascer como uma solucao cartoraria para organizar e
 controlar o fluxo operacional de unidades judiciais, com foco inicial em

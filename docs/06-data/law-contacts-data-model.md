@@ -3,25 +3,26 @@
 ## Propriedade e relações
 
 A empresa (`company_id`) é dona dos cadastros. `law_unit_id` legado é mantido
-por compatibilidade, mas novos contatos usam `NULL`: setores internos
-autorizados veem a base da empresa. `legal_nature` diferencia `pf` e `pj`;
-classificações e tags são relações separadas. Outros módulos usarão o ID
-estável de contato e guardarão seus papéis contextuais em tabelas próprias.
+por compatibilidade, mas novos registros usam `NULL`: setores internos
+autorizados veem a base da empresa. `record_kind` diferencia contato e unidade;
+`legal_nature` diferencia PF e PJ e é nulo para unidade. `parent_contact_id`
+forma uma hierarquia na mesma empresa, com um pai por filho e vários filhos por
+pai. Contexto, classificações e tags ficam em estruturas separadas.
 
 ```mermaid
 erDiagram
     companies ||--o{ law_contacts : owns
+    law_contacts ||--o{ law_contacts : parent_of
     law_contacts ||--o{ law_contact_addresses : has
     law_contacts ||--o{ law_contact_channels : has
     law_contacts ||--o{ law_contact_documents : identifies
-    law_contacts ||--o{ law_contact_departments : organizes
-    law_contact_departments ||--o{ law_contact_channels : has
     law_contacts ||--o{ law_contact_classifications : classified
     law_contacts ||--o{ law_contact_tag_assignments : tagged
     law_contact_tags ||--o{ law_contact_tag_assignments : reused
     law_contacts ||--o{ law_contact_activity : accessed
     companies ||--o{ law_contact_sharing_policies : source
     companies ||--o{ law_contact_sharing_policies : recipient
+    companies ||--o| law_contact_company_settings : configures
 ```
 
 ## Tabelas
@@ -33,6 +34,8 @@ Cadastro principal existente, ampliado com:
 | Campo | Regra |
 | --- | --- |
 | `legal_nature` | `pf` ou `pj`, padrão `pf`; indexado com empresa e status. |
+| `record_kind` | `contact` para pessoa PF/PJ ou organização PJ; `unit` para unidade autônoma, cuja `legal_nature` é nula. |
+| `parent_contact_id` | Pai imediato opcional com FK composta por empresa; PF não pode ser pai nem filho. |
 | `sharing_excluded` | Booleano que retira individualmente o contato das regras externas. |
 | `display_name`, `legal_name` | Nome principal e razão social/nome complementar; valores normalizados no servidor. |
 | `status`, `deleted_at`, `merged_into_id` | Controlam ciclo de vida e preservação da mesclagem. |
@@ -47,11 +50,11 @@ Tipos: residencial, comercial, correspondência e outro. Composto
 
 ### `law_contact_channels`
 
-Telefones e e-mails do contato e dos departamentos. `channel_type` aceita
-`phone`/`email`; `law_contact_department_id` é nulo no escopo do contato.
-`is_personal` marca dado sensível e `is_primary`/`sort_order` apoiam exibição.
-No escopo do contato o limite é quatro telefones e dois e-mails; aplica-se o
-mesmo limite independentemente a cada departamento.
+Telefones e e-mails do contato ou unidade. `channel_type` aceita `phone`/`email`;
+`label` descreve o canal e `is_personal` marca separadamente o dado sensível.
+`is_primary`/`sort_order` apoiam exibição. O limite por registro é quatro
+telefones e dois e-mails. Canais pessoais são protegidos por permissão e não
+são compartilhados.
 
 ### `law_contact_documents`
 
@@ -64,21 +67,37 @@ Inscrição estadual usa o tipo `state_registration` e exige UF emissora.
 
 ### `law_contact_departments`
 
-Departamentos que pertencem a um contato PJ: nome, status e autoria da criação
-e alteração. Os canais próprios usam `law_contact_channels`. Cada departamento
-conta como uma unidade extra da capacidade `contatos_cadastrados`.
+Tabela legada preservada para reversibilidade da migração. Cada departamento
+existente é promovido a um registro `law_contacts` do tipo `unit`; o campo
+`migrated_contact_id` aponta para esse registro e mantém a correspondência com a
+linha histórica. Novos registros hierárquicos não são gravados como departamento.
 
 ### Classificação e tags
 
 - `law_contact_classifications` associa códigos do vocabulário controlado por
-  empresa/contato. A PK impede a repetição de uma classificação.
+  empresa/contato e marca uma classificação principal (`is_primary`); as demais
+  são secundárias. `requires_review` preserva e sinaliza códigos legados sem
+  correspondência no catálogo atual. A PK impede repetição.
 - `law_contact_tags` contém nome e nome normalizado únicos por empresa.
 - `law_contact_tag_assignments` associa até seis tags a cada contato sem
   duplicar associações.
 
 Vocabulário de classificações: `client`, `lawyer`, `law_firm`, `public_body`,
 `court_unit`, `police`, `prosecutor_office`, `public_defender`, `expert`,
-`witness`, `representative` e `other`.
+`witness`, `representative`, `party` e `other`. `client` é mantido como
+classificação legada e marcado para revisão, pois papéis cadastrais passam a
+pertencer ao vínculo PF–organização.
+
+Categorias como parte, testemunha e perito são referências cadastrais. Não são
+papéis de atuação contextual. Papéis como cliente, servidor, colaborador e
+usuário do serviço ficam na relação PF–organização e não produzem registros
+transacionais ou financeiros.
+
+### `law_contact_company_settings`
+
+Uma linha por empresa armazena `segment_code` e `context_code` ativos e o último
+administrador que alterou a configuração. A troca de contexto muda rótulos e
+sugestões da interface, mas não converte, apaga ou recria contatos e vínculos.
 
 ### `law_contact_activity`
 
@@ -105,8 +124,8 @@ destinatária e não consome sua capacidade.
 
 ## Capacidade e índices
 
-Consumo = contatos sem exclusão lógica/mesclagem + departamentos desses
-contatos. Status inativo não reduz o consumo. A contagem é feita no servidor
+Consumo = registros sem exclusão lógica/mesclagem, incluindo unidades. Status
+inativo não reduz o consumo. A contagem é feita no servidor
 durante a transação de criação/edição e validada contra o snapshot comercial da
 assinatura. Índices mantêm busca por empresa/natureza/status, escopo de canais,
 documento fingerprint, tags normalizadas, classificações e atividade recente.
@@ -125,18 +144,13 @@ documento fingerprint, tags normalizadas, classificações e atividade recente.
 
 ## Compatibilidade e rollout
 
-A migração converte tipos legados de organização para PJ, cria classificações
-iniciais a partir de tipos antigos e limpa o escopo por unidade para que a
-propriedade passe a ser da empresa. Contatos existentes passam a consumir a
-capacidade conforme a nova contagem. O desmonte da migração remove as tabelas e
-colunas novas sem alterar dados das tabelas originais.
-
-## Módulos consumidores futuros
-
-Processos, Expedições e Tarefas devem referenciar o contato por ID e aplicar as
-permissões e o sigilo pertinentes ao contexto. O papel processual e o de
-expedição ficam em relações próprias; snapshots preservam o destino utilizado
-na emissão. Essas relações não são criadas por esta entrega.
+A migração `2026_10_01_000100_add_context_and_hierarchy_to_law_contacts.php`
+promove departamentos existentes a unidades independentes e preserva as linhas
+legadas com `migrated_contact_id`. Os canais acompanham a unidade promovida.
+Também cria configuração contextual por empresa, marcadores de classificação
+principal e avisos para códigos legados sem correspondência. Na reversão,
+unidades existentes são mantidas como organizações PJ para não apagar dados
+criados após a migração.
 
 ## Evolução do vínculo pessoa–empresa e dados institucionais
 
@@ -148,9 +162,12 @@ relação pode ter várias designações vigentes. Os nomes livres ficam dispon�
 como sugestões reutilizáveis pela empresa. Relações antigas continuam válidas
 sem inventar papéis ou designações.
 
-`law_contact_institutional_data` guarda bloco opcional por classificação. Para
-unidade judiciária, armazena código CNJ e competências; para órgão público,
-esfera Federal/Estadual/Distrital/Municipal e código oficial com sistema emissor.
+`law_contact_institutional_data` guarda blocos opcionais; `is_primary` marca o
+tipo institucional principal e permite tipos secundários. Para unidade
+judiciária, armazena código CNJ e competências; para órgão público, esfera
+Federal/Estadual/Distrital/Municipal e código oficial com sistema emissor.
+Identificadores são opcionais e sua ausência gera aviso de completude, sem
+bloquear o cadastro.
 A sigla do contato segue representando tribunal/região. OAB continua em
 `law_contact_documents`, sem campo duplicado.
 

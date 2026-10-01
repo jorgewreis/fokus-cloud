@@ -45,15 +45,22 @@ Este arquivo deve descrever tabelas, colunas, tipos, obrigatoriedade e significa
 | law_cases | operational_priority | string | Nao | Prioridade operacional interna, sem substituir sigilo. |
 | law_cases | confidentiality_level | enum | Sim | Nivel de sigilo: `public_internal`, `unit_restricted`, `case_confidential` ou `enhanced_confidential`. |
 | law_cases | internal_tags | json | Nao | Tags informativas configuraveis da unidade. |
-| law_contacts | legal_nature | enum | Sim | Natureza PF/PJ que orienta o formulário. |
+| law_contacts | legal_nature | enum/null | Sim | Natureza PF/PJ; nula em unidade independente. |
+| law_contacts | record_kind | string | Sim | `contact` para PF/PJ ou `unit` para unidade independente. |
+| law_contacts | parent_contact_id | ULID/null | Sim | Pai imediato do registro; FK composta limita vínculo à mesma empresa. |
 | law_contacts | sharing_excluded | boolean | Sim | Retira contato individual das regras de compartilhamento externo. |
 | law_contact_addresses | address_type | enum | Sim | Tipo estruturado: residencial, comercial, correspondência ou outro. |
 | law_contact_channels | channel_type | enum | Sim | Escopo aceita telefone ou e-mail; departamento opcional identifica canal departamental. |
 | law_contact_channels | is_personal | boolean | Sim | Marca canal pessoal como dado sensível e nunca compartilhável. |
 | law_contact_documents | document_number_encrypted | text | Sim | Documento cifrado; valor aberto não é guardado. |
 | law_contact_documents | document_fingerprint | string | Nao | HMAC para comparação de CPF/CNPJ e detecção de duplicidade. |
-| law_contact_departments | name | string | Sim | Departamento de uma PJ; cada linha consome uma unidade de capacidade. |
-| law_contact_classifications | classification_code | string | Sim | Classificação profissional/operacional acumulável e filtrável. |
+| law_contact_departments | migrated_contact_id | ULID/null | Sim | Registro `unit` que recebeu o departamento legado; nulo para linhas ainda não promovidas. |
+| law_contact_classifications | classification_code | string | Sim | Classificação de referência acumulável e filtrável. |
+| law_contact_classifications | is_primary | boolean | Sim | Marca a classificação principal; demais classificações são secundárias. |
+| law_contact_classifications | requires_review | boolean | Sim | Sinaliza classificação legada sem correspondência no vocabulário atual; o valor original é preservado. |
+| law_contact_institutional_data | is_primary | boolean | Sim | Marca o tipo institucional principal; identificadores seguem opcionais. |
+| law_contact_company_settings | context_code | string | Não | Contexto único da base de Contatos da empresa: `escritorio`, `orgao_publico` ou `judiciario`. |
+| law_contact_company_settings | segment_code | string | Não | Segmento associado ao contexto ativo da empresa. |
 | law_contact_tags | normalized_name | string | Sim | Nome normalizado e único por empresa para sugestão/reuso. |
 | law_contact_activity | activity_type | string | Sim | Ação recente do usuário sem armazenar o termo de busca. |
 | law_contact_sharing_policies | recipient_company_id | string | Sim | Empresa que recebe uma referência somente leitura. |

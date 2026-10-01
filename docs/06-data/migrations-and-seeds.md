@@ -46,6 +46,10 @@ Migrations ja existentes relacionadas ao modelo:
   do provedor, tentativas de checkout e eventos idempotentes.
 - `2026_09_02_000800_create_refunds_and_reconciliation.php`: cria reembolsos,
   divergências e permissões financeiras.
+- `2026_10_01_000100_add_context_and_hierarchy_to_law_contacts.php`: adiciona o
+  contexto da base por empresa, hierarquia de registros, classificação/tipo
+  institucional principal e promove departamentos legados a unidades sem
+  descartar os registros históricos.
 
 Em produção, executar migrations com `php artisan migrate --force
 --no-interaction`; não executar `db:seed`, pois o catálogo é gerenciado pelo

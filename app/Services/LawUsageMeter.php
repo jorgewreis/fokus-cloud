@@ -58,7 +58,7 @@ class LawUsageMeter
         $departments = Schema::hasTable('law_contact_departments')
             ? (int) DB::table('law_contact_departments as department')->join('law_contacts as contact', function ($join): void {
                 $join->on('contact.id', '=', 'department.law_contact_id')->on('contact.company_id', '=', 'department.company_id');
-            })->where('department.company_id', $companyId)->whereNull('contact.deleted_at')->whereNull('contact.merged_into_id')->count()
+            })->where('department.company_id', $companyId)->whereNull('department.migrated_contact_id')->whereNull('contact.deleted_at')->whereNull('contact.merged_into_id')->count()
             : 0;
         return $contacts + $departments;
     }

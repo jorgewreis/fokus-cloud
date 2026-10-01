@@ -2,27 +2,30 @@
 
 ## Propósito
 
-**Status do produto:** núcleo funcional e disponível. O módulo atende ao uso
-operacional atual nos segmentos Jurídico, Setor Público e Advocacia. Integrações
-com módulos que ainda serão publicados e expansões de fluxo fazem parte de uma
-evolução posterior; não indicam que o cadastro atual esteja em implementação.
+**Status do produto:** núcleo funcional e disponível. A base de Contatos é
+compartilhada pela empresa e opera em um contexto ativo por vez: Advocacia /
+Escritório (`escritorio`), Poder Público / Órgão Público (`orgao_publico`) ou
+Poder Público jurídico / Judiciário (`judiciario`). Um administrador pode
+alterar o contexto após conferir a prévia dos rótulos e sugestões; registros e
+vínculos existentes são preservados.
 
 O módulo independente **Gestão de Contatos**, exibido como **Contatos**, mantém
-uma base reutilizável de pessoas físicas, pessoas jurídicas, órgãos e
-instituições. O módulo atende escritórios jurídicos e organizações públicas,
-incluindo unidades judiciais, Ministério Público, Defensoria Pública e polícia.
+uma base reutilizável de pessoas / contatos (PF), organizações (PJ) e unidades
+independentes. O módulo atende escritórios jurídicos e organizações públicas,
+incluindo unidades judiciárias, Ministério Público, Defensoria Pública e polícia.
 Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
 `contatos`.
 
 ## Escopo entregue
 
-- Listagem pesquisável, filtros por natureza PF/PJ, situação, profissão
+- Listagem pesquisável, filtros por tipo de registro, natureza PF/PJ, situação, profissão
   vinculada a pelo menos um contato e tag, paginação e detalhes do cadastro.
 - Criação, edição, inativação e mesclagem auditada de contatos duplicados.
 - Dashboard com totais da empresa, utilização da capacidade contratada e até
   cinco atividades recentes do usuário atual.
-- Cadastro independente de departamentos de uma PJ, cada qual com canais
-  próprios e contabilizado como uma unidade adicional da capacidade.
+- Cadastro de organizações e unidades hierárquicas como registros próprios;
+  cada registro pertence à mesma empresa, pode ter um pai imediato e vários
+  filhos, sem limite de níveis. Unidades têm nome, canais e endereço próprios.
 - Sigla opcional para pessoas jurídicas; profissão/vínculo profissional fica
   restrito a pessoas físicas. Documentos seguem os tipos permitidos para PF/PJ.
 - Vínculos muitos-para-muitos entre pessoas físicas e empresas da mesma
@@ -33,9 +36,10 @@ Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
   outro) com períodos próprios. Cargo, posto, graduação ou função tem histórico
   independente, aceita várias designações simultâneas e vocabulário livre com
   sugestões reutilizáveis pela empresa (por exemplo, DPC, IPC, CB/PM e TEN/PM).
-- Dados institucionais opcionais por classificação: unidade judiciária com
-  código CNJ e competências; órgão público com esfera, código oficial e sistema
-  emissor. Sigla identifica tribunal/região; OAB continua no documento existente.
+- Classificação principal sugerida pelo contexto e classificações secundárias;
+  classificação e tipo institucional principal são editáveis. Identificadores
+  institucionais, inclusive CNJ, são opcionais e a ausência gera aviso não
+  bloqueante. OAB continua no documento existente.
 - Sugestões de possíveis duplicidades no cadastro e análise paginada sob demanda
   na visão geral. A interface explica o tipo de correspondência sem exibir o
   valor coincidente, não bloqueia gravação e não mescla automaticamente.
@@ -47,17 +51,17 @@ Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
 - Tags reutilizáveis pela empresa, com sugestão e filtro.
 - Acordos bilaterais de compartilhamento, definidos por natureza (PF/PJ),
   profissões atribuídas a contatos PF e campos autorizados.
-- Endpoints próprios preparados para vínculos futuros com Processos,
-  Expedições e Tarefas; esses módulos não são pré-requisito para o cadastro.
+- Uma unidade pode permanecer ativa quando sua organização-pai for inativada;
+  o vínculo com pai inativo fica oculto na apresentação da unidade.
 
 ## Páginas e estados
 
 | Página/estado | Conteúdo e ações |
 | --- | --- |
-| Visão geral | Totais PF, PJ, departamentos e cadastros contabilizados; até cinco contatos recentes; pendências de qualidade e análise de duplicidades sob demanda. |
+| Visão geral | Totais de pessoas, organizações e unidades; até cinco contatos recentes; pendências de qualidade e análise de duplicidades sob demanda. |
 | Contatos | Busca, filtros, resultados, paginação, situação, origem compartilhada e ações permitidas. |
-| Criar/editar | Formulário guiado por PF/PJ, classificações, profissões, sigla, vínculos com papéis e designações datadas, dados institucionais, canais, endereços, departamentos, tags e campos sensíveis autorizados. |
-| Detalhes | Identificação e sigla, profissões, empresas vinculadas em linhas completas na PF, total de pessoas vinculadas na PJ, tags, canais, card de endereços em meia largura com cada endereço em uma linha completa do card, documentos e departamentos conforme a natureza e as permissões. |
+| Criar/editar | Formulário guiado por pessoa, organização ou unidade; contexto; classificações; profissões; vínculos e designações; dados institucionais; canais; endereços; hierarquia; tags e campos sensíveis autorizados. |
+| Detalhes | Identificação contextual, profissões, vínculos, hierarquia, tags, canais, endereços, documentos e dados institucionais conforme a natureza e as permissões. |
 | Mesclagem | Escolha do cadastro preservado, confirmação do motivo, transferência de relações e auditoria. |
 | Compartilhamento | Configuração bilateral por empresa, natureza, profissão de PF e campos expostos; adesão e revogação auditadas. |
 | Estados da página | Carregamento, vazio, sem resultados, erro de API, capacidade indisponível e aviso de limite. |
@@ -65,11 +69,6 @@ Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
 ## Evoluções futuras
 
 - Visões e preenchimentos rápidos específicos por variante de assinatura.
-- Integrações de contatos com Processos, Expedições e Tarefas quando esses
-  módulos estiverem publicados, incluindo regras de sigilo e snapshots de
-  destinatários quando aplicáveis.
-- Hierarquia entre órgãos, tribunais, comarcas e unidades, sem misturá-la aos
-  departamentos do contato PJ ou aos setores internos da empresa assinante.
 - Importação e exportação em lote após definir formato, permissões, prévia,
   proteção de dados sensíveis e tratamento de duplicidades.
 
@@ -79,22 +78,31 @@ A página reaproveita o shell autenticado do Fokus Law, os controles `fs-*`, os
 tokens `--fs-*` e o modal oficial `fs-modal` da versão instalada do Fokus
 Styles. Os seletores `law-contact-*` em
 `public/portal/assets/fokus-law-shell.css` limitam-se à composição do domínio:
-grade da listagem, grupos repetíveis de endereço/canal/documento/departamento
+grade da listagem, grupos repetíveis de endereço/canal/documento
 e suas linhas aninhadas. Eles não recriam botões, campos, overlay, backdrop,
 foco ou comportamento de modal do Fokus Styles.
 
 ## Natureza, profissões e nomes
 
+O contexto ativo define termos, rótulos e sugestões, sem alterar os dados
+salvos. Pessoa / contato corresponde a PF; Organização corresponde a PJ.
+Advocacia usa Escritório / Filial; Poder Público usa Órgão / Unidade; Judiciário
+usa Órgão judiciário / Unidade judiciária. Unidade é um registro próprio,
+distinto de PF e PJ, com nome, canais e endereço próprios. Organizações e
+unidades formam árvores com um pai imediato por registro filho e vários filhos
+por pai, limitadas à empresa proprietária.
+
+Classificações de referência, como parte, testemunha ou perito, descrevem o
+cadastro e não definem papéis transacionais. Papéis como cliente,
+servidor, colaborador e usuário do serviço pertencem ao vínculo entre pessoa e
+organização e servem somente ao cadastro.
+
 PF/PJ define a natureza cadastral. Pessoa física pode acumular profissões e
-vínculos profissionais selecionados do vocabulário da empresa ou adicionados
-como novas especificações (por exemplo, Policial Civil ou Guarda Municipal).
-Pessoa jurídica tem campo opcional de sigla e não apresenta profissão/vínculo.
-Seus documentos incluem CNPJ e inscrição estadual com UF. Departamentos são
-exclusivos de PJ.
+vínculos profissionais selecionados do catálogo da empresa ou das sugestões do
+contexto. Pessoa jurídica tem campo opcional de sigla e não apresenta
+profissão/vínculo. Seus documentos incluem CNPJ e inscrição estadual com UF.
 Vínculos entre pessoa física e pessoa jurídica são muitos-para-muitos, ficam
 restritos à mesma empresa proprietária e aparecem nos dois lados do cadastro.
-Papéis processuais específicos pertencem aos vínculos com processos, não ao
-contato global.
 
 O nome é obrigatório e normalizado para formato de nome próprio no servidor.
 Conectivos como “de”, “dos” e “e” permanecem minúsculos no meio do nome; a
@@ -106,17 +114,17 @@ substitui a conferência de nomes oficiais.
 
 | Campo | Limite/regra |
 | --- | --- |
-| Nome | Obrigatório; PF: nome da pessoa; PJ: nome fantasia ou razão social. |
+| Nome | Obrigatório; pessoa: nome; organização: nome fantasia ou razão social; unidade: nome da unidade. |
 | Sigla | Opcional, até 32 caracteres; apresentada ao lado do nome PJ. |
 | Razão social/complemento | Opcional. |
 | Vínculos empresariais | Relação muitos-para-muitos PF↔PJ entre cadastros ativos da mesma empresa; a ficha PF lista as empresas e a ficha PJ exibe somente o quantitativo de pessoas vinculadas. |
-| Telefones | Até quatro por contato; cada departamento PJ também aceita até quatro. |
-| E-mails | Até dois por contato; cada departamento PJ também aceita até dois. |
-| Endereços completos | Até dois por contato. |
+| Telefones | Até quatro por registro, inclusive unidade. |
+| E-mails | Até dois por registro, inclusive unidade. |
+| Endereços completos | Até dois por registro, inclusive unidade. |
 | Documentos | Até quatro por contato; CPF para PF, CNPJ e inscrição estadual para PJ. CPF/CNPJ são opcionais, validados e únicos por empresa; inscrição estadual exige UF. |
 | Profissões/vínculos | Uma ou mais opções cadastradas pela empresa; PF. |
 | Tags | Até seis por contato; reutilizadas dentro da empresa. |
-| Departamentos PJ | Sem teto funcional fixo; cada departamento consome uma unidade contratada adicional. |
+| Hierarquia | Um pai imediato por organização/unidade, vários filhos por pai e níveis ilimitados; relação restrita à empresa proprietária. |
 
 Telefone/e-mail pessoal, endereço residencial e notas são dados sensíveis.
 Os documentos são armazenados criptografados; o fingerprint de CPF/CNPJ
@@ -149,8 +157,8 @@ transferidos sem duplicar classificações ou tags já existentes.
 Tags pertencem à empresa e são sugeridas em cadastro e filtro. Espaços externos
 são removidos e caixa é normalizada para impedir tags equivalentes com nomes
 diferentes. Administradores podem acompanhar a utilização contratada no
-dashboard e no módulo. O total consumido é contatos ativos ou inativos ainda
-cadastrados mais departamentos vinculados. Inativar não libera capacidade;
+dashboard e no módulo. O total consumido é cada registro ativo ou inativo ainda
+cadastrado, incluindo unidades. Inativar não libera capacidade;
 mesclar ou remover definitivamente registros libera capacidade conforme a
 contagem vigente. A criação é recusada ao exceder o limite contratado.
 
@@ -189,18 +197,15 @@ recebe somente consulta. `shared.view` é concedida por padrão aos perfis que
 podem consultar contatos. `share.manage` fica reservada ao administrador da
 empresa, que também pode delegá-la a um perfil personalizado.
 
-## Relações com outros módulos
-
-Processos, Expedições e Tarefas poderão referenciar o ID estável do contato em
-endpoints próprios. Vínculos contextuais armazenam seu papel e respeitam o
-sigilo do processo. Snapshot de expedição preserva o destinatário utilizado
-na emissão. A integração operacional desses módulos é uma etapa futura.
-
 ## Critérios de aceite
 
 - Menu e dashboard exibem Contatos somente com módulo assinado e permissão de
   consulta.
-- PF/PJ personaliza o formulário; departamentos são aceitos apenas em PJ.
+- Os três contextos exibem rótulos e sugestões correspondentes; a troca mostra
+  prévia e preserva registros e vínculos.
+- Pessoas, organizações e unidades têm formulários adequados; unidades aceitam
+  um pai da mesma empresa e a hierarquia suporta vários filhos e níveis.
+- Categorias de referência permanecem distintas dos papéis dos vínculos.
 - PJ pode informar sigla e consultar vínculos recíprocos com várias PFs; PF pode
   consultar vínculos com várias PJs.
 - CEP completo aciona a integração ViaCEP; endereço segue preenchível quando a

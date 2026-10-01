@@ -444,12 +444,16 @@
 .law-contact-check-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
 .law-contact-check { display: flex; min-width: 0; align-items: flex-start; gap: 8px; color: var(--law-shell-ink); font-size: 12px; font-weight: 500; }
 .law-contact-check input { flex: 0 0 auto; margin-top: 2px; accent-color: var(--law-shell-purple); }
+.law-contact-classification-options { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-top: 12px; }
+.law-contact-context-preview { margin: 0; }
+.law-contact-context-preview p { margin: 6px 0 0; }
 .law-contact-repeat-list { display: grid; gap: 10px; margin: 11px 0; }
 .law-contact-repeat-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; align-items: end; gap: 9px; min-width: 0; padding: 0; border: 0; }
 .law-contact-repeat-row .law-contact-field { width: 100%; min-width: 0; gap: 4px; }
 .law-contact-repeat-row .law-contact-field input, .law-contact-repeat-row .law-contact-field select { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; }
 .law-contact-repeat-row.law-contact-document-row { grid-template-columns: minmax(110px, .9fr) minmax(190px, 1.6fr) minmax(85px, .7fr) minmax(130px, 1.1fr) auto; }
-.law-contact-repeat-row.law-contact-channel-row { grid-template-columns: minmax(100px, .9fr) minmax(180px, 1.5fr) minmax(130px, 1.15fr) minmax(100px, .8fr) auto; }
+.law-contact-repeat-row.law-contact-channel-row { grid-template-columns: minmax(100px, .9fr) minmax(180px, 1.5fr) minmax(130px, 1.15fr) minmax(140px, 1fr) minmax(80px, .6fr) auto; }
+.law-contact-channel-privacy { display: grid; gap: 4px; align-content: end; min-width: 0; }
 .law-contact-remove { flex: 0 0 auto; white-space: nowrap; }
 .law-contact-address-row, .law-contact-department-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; padding: 12px; border: 1px solid var(--law-shell-line); border-radius: 10px; }
 .law-contact-address-row > .law-contact-field { width: 100%; min-width: 0; }
