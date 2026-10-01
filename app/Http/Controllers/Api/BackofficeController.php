@@ -1857,7 +1857,11 @@ class BackofficeController extends Controller
 
     public function audit(Request $request)
     {
-        $query = DB::table('platform_audit_events')->orderByDesc('created_at')->limit(200);
+        $perPage = min(max((int) $request->input('per_page', 20), 1), 100);
+        $query = DB::table('platform_audit_events as event')
+            ->leftJoin('platform_admins as admin', 'admin.id', '=', 'event.platform_admin_id')
+            ->orderByDesc('event.created_at')
+            ->select('event.*', 'admin.name as actor_name');
         if (! $request->user()->hasPermission('platform.audit.view_all')) {
             $query->where(function ($commercial) {
                 foreach (['backoffice.dashboard_%', 'backoffice.compan%', 'backoffice.plan_%', 'backoffice.subscription_%', 'backoffice.voucher_%'] as $action) {
@@ -1866,7 +1870,17 @@ class BackofficeController extends Controller
             });
         }
 
-        return response()->json($query->get());
+        $events = $query->paginate($perPage);
+
+        return response()->json([
+            'data' => $events->items(),
+            'meta' => [
+                'current_page' => $events->currentPage(),
+                'per_page' => $events->perPage(),
+                'total' => $events->total(),
+                'last_page' => $events->lastPage(),
+            ],
+        ]);
     }
 
     public function accessControl(Request $request)
