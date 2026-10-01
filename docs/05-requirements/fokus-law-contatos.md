@@ -33,7 +33,7 @@
 | RF-CTT-027 | Sugerir possíveis duplicidades. | E-mail/telefone profissional ou código institucional coincidente gera sugestão; nome só reforça quando semelhante; não exibe valor, não bloqueia nem mescla automaticamente. CPF/CNPJ repetido continua conflito. |
 | RF-CTT-028 | Exibir qualidade cadastral na visão geral de Contatos. | Contagens de canais ausentes e dados institucionais incompletos abrangem apenas contatos próprios ativos; análise de duplicidades é acionada sob demanda e paginada. |
 | RF-CTT-029 | Configurar contexto cadastral da empresa. | Há um contexto ativo por empresa; administrador confere prévia dos rótulos/sugestões antes de trocar, sem perda ou recriação de registros e vínculos. |
-| RF-CTT-030 | Distinguir classificação de referência e papel do vínculo. | Parte, testemunha e perito são classificações descritivas; cliente, servidor, colaborador e usuário do serviço são papéis cadastrais PF–organização, sem efeitos transacionais ou financeiros. |
+| RF-CTT-030 | Classificar opcionalmente o cadastro. | Um select opcional guarda uma categoria descritiva; papéis do vínculo PF–organização permanecem separados e não produzem efeitos transacionais ou financeiros. |
 
 ## Regras de negócio
 
@@ -43,7 +43,7 @@
 - O tipo de contato é sempre Pessoa física ou Pessoa jurídica. Os rótulos de organização e unidade variam pelo contexto, mas não substituem PF/PJ.
 - Unidade é registro independente, não PF nem PJ. Organização/unidade aceita um pai imediato e vários filhos; somente a mesma empresa pode ser relacionada.
 - Valores legados sem correspondência ficam preservados e marcados para revisão.
-- PF/PJ é natureza cadastral. Para PJ, a categoria principal descreve a organização: empresa privada, instituição financeira, instituição de ensino, organização da sociedade civil, entidade de classe, cartório extrajudicial, órgão público, polícia, Ministério Público, Defensoria Pública, escritório de advocacia ou outra organização. Unidade judiciária é tipo institucional, não categoria principal.
+- PF/PJ é natureza cadastral. A categoria é opcional e única. Para PJ, pode descrever empresa privada, instituição financeira, instituição de ensino, instituição de saúde, organização da sociedade civil, entidade de classe, cartório extrajudicial, órgão público, polícia, Ministério Público, Defensoria Pública, escritório de advocacia, sindicato, associação, cooperativa, condomínio, organização religiosa, concessionária de serviço público ou outra organização. Unidade judiciária é tipo institucional, não categoria.
 - Sigla é opcional para PJ; profissão/vínculo é campo de PF. CNPJ e inscrição
   estadual são documentos de PJ; a inscrição estadual exige UF.
 - Relações PF↔PJ são muitos-para-muitos, recíprocas e internas à empresa

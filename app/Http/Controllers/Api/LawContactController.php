@@ -23,7 +23,11 @@ class LawContactController extends Controller
         'educational_institution', 'civil_society_organization', 'professional_entity',
         'notary_office', 'public_body', 'court_unit', 'police', 'prosecutor_office',
         'public_defender', 'other_organization', 'expert', 'witness', 'representative',
-        'party', 'other',
+        'party', 'public_servant', 'authority', 'service_user', 'interested_party',
+        'supplier', 'service_provider', 'collaborator', 'law_correspondent',
+        'magistrate', 'justice_officer', 'prosecutor', 'health_institution',
+        'religious_organization', 'union', 'association', 'cooperative', 'condominium',
+        'utility_provider', 'other',
     ];
 
     private const SELECTABLE_CLASSIFICATIONS = [
@@ -31,7 +35,11 @@ class LawContactController extends Controller
         'educational_institution', 'civil_society_organization', 'professional_entity',
         'notary_office', 'public_body', 'police', 'prosecutor_office',
         'public_defender', 'other_organization', 'expert', 'witness', 'representative',
-        'party', 'other',
+        'party', 'public_servant', 'authority', 'service_user', 'interested_party',
+        'supplier', 'service_provider', 'collaborator', 'law_correspondent',
+        'magistrate', 'justice_officer', 'prosecutor', 'health_institution',
+        'religious_organization', 'union', 'association', 'cooperative', 'condominium',
+        'utility_provider', 'other',
     ];
 
     private const EDITABLE_CLASSIFICATIONS = [
@@ -39,7 +47,11 @@ class LawContactController extends Controller
         'educational_institution', 'civil_society_organization', 'professional_entity',
         'notary_office', 'public_body', 'police', 'prosecutor_office',
         'public_defender', 'other_organization', 'expert', 'witness', 'representative',
-        'party', 'other',
+        'party', 'public_servant', 'authority', 'service_user', 'interested_party',
+        'supplier', 'service_provider', 'collaborator', 'law_correspondent',
+        'magistrate', 'justice_officer', 'prosecutor', 'health_institution',
+        'religious_organization', 'union', 'association', 'cooperative', 'condominium',
+        'utility_provider', 'other',
     ];
 
     private const CONTACT_CONTEXTS = [
@@ -141,11 +153,18 @@ class LawContactController extends Controller
 
     private function classificationCatalog(array $context): array
     {
-        $references = [
-            ['code' => 'party', 'label' => 'Parte (categoria de referência)'],
-            ['code' => 'witness', 'label' => 'Testemunha (categoria de referência)'],
-            ['code' => 'expert', 'label' => 'Perito (categoria de referência)'],
+        $people = [
+            ['code' => 'party', 'label' => 'Parte'],
+            ['code' => 'witness', 'label' => 'Testemunha'],
+            ['code' => 'expert', 'label' => 'Perito'],
             ['code' => 'representative', 'label' => 'Representante'],
+            ['code' => 'authority', 'label' => 'Autoridade'],
+            ['code' => 'public_servant', 'label' => 'Servidor(a) público(a)'],
+            ['code' => 'service_user', 'label' => 'Usuário(a) do serviço'],
+            ['code' => 'interested_party', 'label' => 'Interessado(a)'],
+            ['code' => 'supplier', 'label' => 'Fornecedor(a)'],
+            ['code' => 'service_provider', 'label' => 'Prestador(a) de serviço'],
+            ['code' => 'collaborator', 'label' => 'Colaborador(a)'],
             ['code' => 'other', 'label' => 'Outra categoria'],
         ];
         $privateOrganizations = [
@@ -155,6 +174,13 @@ class LawContactController extends Controller
             ['code' => 'civil_society_organization', 'label' => 'Organização da sociedade civil'],
             ['code' => 'professional_entity', 'label' => 'Entidade de classe'],
             ['code' => 'notary_office', 'label' => 'Cartório extrajudicial'],
+            ['code' => 'health_institution', 'label' => 'Instituição de saúde'],
+            ['code' => 'religious_organization', 'label' => 'Organização religiosa'],
+            ['code' => 'union', 'label' => 'Sindicato'],
+            ['code' => 'association', 'label' => 'Associação'],
+            ['code' => 'cooperative', 'label' => 'Cooperativa'],
+            ['code' => 'condominium', 'label' => 'Condomínio'],
+            ['code' => 'utility_provider', 'label' => 'Concessionária de serviço público'],
         ];
         $publicOrganizations = [
             ['code' => 'public_body', 'label' => 'Órgão público'],
@@ -167,7 +193,11 @@ class LawContactController extends Controller
             'orgao_publico' => [...$publicOrganizations, ...$privateOrganizations, ['code' => 'law_firm', 'label' => 'Escritório de advocacia'], ['code' => 'other_organization', 'label' => 'Outra organização']],
             default => [...$publicOrganizations, ...$privateOrganizations, ['code' => 'law_firm', 'label' => 'Escritório de advocacia'], ['code' => 'other_organization', 'label' => 'Outra organização']],
         };
-        $people = $context['context_code'] === 'escritorio' ? [['code' => 'lawyer', 'label' => 'Advogado(a)'], ...$references] : $references;
+        $people = match ($context['context_code']) {
+            'escritorio' => [['code' => 'lawyer', 'label' => 'Advogado(a)'], ['code' => 'law_correspondent', 'label' => 'Correspondente jurídico'], ...$people],
+            'judiciario' => [['code' => 'magistrate', 'label' => 'Magistrado(a)'], ['code' => 'justice_officer', 'label' => 'Oficial de justiça'], ['code' => 'prosecutor', 'label' => 'Membro do Ministério Público'], ['code' => 'lawyer', 'label' => 'Advogado(a)'], ...$people],
+            default => $people,
+        };
         return ['contact' => $people, 'organization' => $organizations, 'unit' => $organizations];
     }
 

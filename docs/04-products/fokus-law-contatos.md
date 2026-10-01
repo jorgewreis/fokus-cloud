@@ -92,10 +92,10 @@ distinto de PF e PJ, com nome, canais e endereço próprios. Organizações e
 unidades formam árvores com um pai imediato por registro filho e vários filhos
 por pai, limitadas à empresa proprietária.
 
-Classificações de referência, como parte, testemunha ou perito, descrevem o
-cadastro e não definem papéis transacionais. Papéis como cliente,
-servidor, colaborador e usuário do serviço pertencem ao vínculo entre pessoa e
-organização e servem somente ao cadastro.
+A categoria é opcional e usa uma única seleção para descrever o cadastro.
+Ela não define papéis de vínculo. Papéis como cliente, servidor, colaborador e
+usuário do serviço pertencem ao vínculo entre pessoa e organização e servem
+somente ao cadastro.
 
 Para Pessoa jurídica, a categoria principal descreve a organização cadastrada:
 empresa privada, instituição financeira, instituição de ensino, organização da
@@ -105,7 +105,10 @@ outra organização. Órgão público é uma dessas opções; não representa em
 bancos, escolas ou as demais pessoas jurídicas. Unidade judiciária não é
 categoria: é um tipo dos dados institucionais e pode receber código CNJ.
 
-PF/PJ define a natureza cadastral. Pessoa física pode acumular profissões e
+PF/PJ define a natureza cadastral. Pessoa física pode receber categorias como
+parte, testemunha, perito, representante, autoridade, servidor público,
+fornecedor, prestador de serviço ou colaborador, além das sugestões próprias do
+contexto. Pessoa física pode acumular profissões e
 vínculos profissionais selecionados do catálogo da empresa ou das sugestões do
 contexto. Pessoa jurídica tem campo opcional de sigla e não apresenta
 profissão/vínculo. Seus documentos incluem CNPJ e inscrição estadual com UF.

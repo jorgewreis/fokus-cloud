@@ -74,10 +74,11 @@ linha histórica. Novos registros hierárquicos não são gravados como departam
 
 ### Classificação e tags
 
-- `law_contact_classifications` associa códigos do vocabulário controlado por
-  empresa/contato e marca uma classificação principal (`is_primary`); as demais
-  são secundárias. `requires_review` preserva e sinaliza códigos legados sem
-  correspondência no catálogo atual. A PK impede repetição.
+- `law_contact_classifications` associa o código opcional de categoria ao
+  contato e marca a seleção principal (`is_primary`). A interface grava no
+  máximo uma categoria; valores múltiplos legados permanecem preservados até a
+  próxima edição. `requires_review` sinaliza códigos legados sem correspondência
+  no catálogo atual. A PK impede repetição.
 - `law_contact_tags` contém nome e nome normalizado únicos por empresa.
 - `law_contact_tag_assignments` associa até seis tags a cada contato sem
   duplicar associações.
@@ -85,17 +86,20 @@ linha histórica. Novos registros hierárquicos não são gravados como departam
 Vocabulário de classificações: `lawyer`, `law_firm`, `private_company`,
 `financial_institution`, `educational_institution`,
 `civil_society_organization`, `professional_entity`, `notary_office`,
-`public_body`, `police`, `prosecutor_office`, `public_defender`,
-`other_organization`, `expert`, `witness`, `representative`, `party` e
-`other`. `client` e `court_unit` são valores legados preservados e marcados
-para revisão. `public_body` identifica somente órgão público; empresas,
-bancos, escolas e outras organizações recebem sua categoria própria. Unidade
-judiciária é tipo institucional, com dados e código CNJ próprios.
+`health_institution`, `religious_organization`, `union`, `association`,
+`cooperative`, `condominium`, `utility_provider`, `public_body`, `police`,
+`prosecutor_office`, `public_defender`, `other_organization`, `expert`,
+`witness`, `representative`, `party`, `public_servant`, `authority`,
+`service_user`, `interested_party`, `supplier`, `service_provider`,
+`collaborator`, `law_correspondent`, `magistrate`, `justice_officer`,
+`prosecutor` e `other`. `client` e `court_unit` são valores legados preservados
+e marcados para revisão. `public_body` identifica somente órgão público;
+empresas, bancos, escolas e outras organizações recebem sua categoria própria.
+Unidade judiciária é tipo institucional, com dados e código CNJ próprios.
 
-Categorias como parte, testemunha e perito são referências cadastrais. Não são
-papéis de atuação contextual. Papéis como cliente, servidor, colaborador e
-usuário do serviço ficam na relação PF–organização e não produzem registros
-transacionais ou financeiros.
+Categoria descreve o cadastro e não é obrigatória. Papéis de atuação e de
+vínculo são mantidos separadamente na relação PF–organização e não produzem
+registros transacionais ou financeiros.
 
 ### `law_contact_company_settings`
 

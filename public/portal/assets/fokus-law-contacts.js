@@ -1,5 +1,5 @@
 (() => {
-  const CLASSIFICATION_LABELS = { client: 'Cliente (categoria legada)', lawyer: 'Advogado(a)', law_firm: 'Escritório de advocacia', private_company: 'Empresa privada', financial_institution: 'Instituição financeira', educational_institution: 'Instituição de ensino', civil_society_organization: 'Organização da sociedade civil', professional_entity: 'Entidade de classe', notary_office: 'Cartório extrajudicial', public_body: 'Órgão público', court_unit: 'Órgão judiciário (categoria legada)', police: 'Polícia', prosecutor_office: 'Ministério Público', public_defender: 'Defensoria Pública', other_organization: 'Outra organização', expert: 'Perito', witness: 'Testemunha', representative: 'Representante', party: 'Parte (categoria de referência)', other: 'Outra categoria' };
+  const CLASSIFICATION_LABELS = { client: 'Cliente (categoria legada)', lawyer: 'Advogado(a)', law_firm: 'Escritório de advocacia', private_company: 'Empresa privada', financial_institution: 'Instituição financeira', educational_institution: 'Instituição de ensino', civil_society_organization: 'Organização da sociedade civil', professional_entity: 'Entidade de classe', notary_office: 'Cartório extrajudicial', health_institution: 'Instituição de saúde', religious_organization: 'Organização religiosa', union: 'Sindicato', association: 'Associação', cooperative: 'Cooperativa', condominium: 'Condomínio', utility_provider: 'Concessionária de serviço público', public_body: 'Órgão público', court_unit: 'Órgão judiciário (categoria legada)', police: 'Polícia', prosecutor_office: 'Ministério Público', public_defender: 'Defensoria Pública', other_organization: 'Outra organização', expert: 'Perito', witness: 'Testemunha', representative: 'Representante', party: 'Parte', public_servant: 'Servidor(a) público(a)', authority: 'Autoridade', service_user: 'Usuário(a) do serviço', interested_party: 'Interessado(a)', supplier: 'Fornecedor(a)', service_provider: 'Prestador(a) de serviço', collaborator: 'Colaborador(a)', law_correspondent: 'Correspondente jurídico', magistrate: 'Magistrado(a)', justice_officer: 'Oficial de justiça', prosecutor: 'Membro do Ministério Público', other: 'Outra categoria' };
   const DOCUMENTS = { cpf: 'CPF', cnpj: 'CNPJ', state_registration: 'Inscrição estadual', oab: 'OAB', rg: 'RG', registration: 'Matrícula', cadastro: 'Cadastro', voter_title: 'Título de eleitor', passport: 'Passaporte', other: 'Outro' };
   const DOCUMENT_TYPES_BY_NATURE = { pf: ['cpf', 'oab', 'rg', 'registration', 'cadastro', 'voter_title', 'passport', 'other'], pj: ['cnpj', 'state_registration', 'other'] };
   const DOCUMENT_TYPES_WITHOUT_STATE = ['cpf', 'cnpj', 'registration', 'cadastro', 'passport', 'voter_title'];
@@ -318,28 +318,16 @@
     else basic.content.append(natureField, parentField, nameRow);
     const legalNameField = field('Razão social / nome complementar', legalName); basic.content.append(legalNameField);
     const catalog = window.lawContactClassificationCatalog || {};
-    const classificationSection = section('Classificação', 'Escolha a categoria principal sugerida para este contexto e, se necessário, acrescente categorias de referência.');
-    const classificationsWrap = $('div', 'law-contact-classification-options');
-    const selectedClassificationCodes = new Set(contact?.classifications || []);
-    const primaryClassification = setWidth(select([['', 'Selecione a categoria principal']], contact?.primary_classification || ''), 800);
+    const classificationSection = section('Categoria', 'Opcional. Selecione a categoria que melhor descreve este cadastro.');
+    const primaryClassification = setWidth(select([['', 'Sem categoria']], contact?.primary_classification || ''), 800);
     const renderClassificationOptions = () => {
       const kind = recordKind.value === 'unit' ? 'unit' : nature.value === 'pj' ? 'organization' : 'contact';
       const options = catalog[kind] || catalog.contact || [];
-      const currentPrimary = primaryClassification.value || contact?.primary_classification || options[0]?.code || '';
-      if (currentPrimary) selectedClassificationCodes.add(currentPrimary);
-      classificationsWrap.replaceChildren();
-      primaryClassification.replaceChildren(new Option('Selecione a categoria principal', ''), ...options.map((item) => new Option(item.label, item.code)));
-      primaryClassification.value = options.some((item) => item.code === currentPrimary) ? currentPrimary : (options[0]?.code || '');
-      options.forEach((item) => {
-        const label = $('label', 'law-contact-check'); const checkbox = $('input'); checkbox.type = 'checkbox'; checkbox.value = item.code;
-        checkbox.checked = selectedClassificationCodes.has(item.code) || item.code === primaryClassification.value;
-        checkbox.addEventListener('change', () => { if (checkbox.checked) selectedClassificationCodes.add(item.code); else selectedClassificationCodes.delete(item.code); });
-        label.append(checkbox, $('span', '', item.label)); classificationsWrap.append(label);
-      });
-      if (options.length && !options.some((item) => item.code === primaryClassification.value)) primaryClassification.value = options[0].code;
+      const currentPrimary = primaryClassification.value || contact?.primary_classification || '';
+      primaryClassification.replaceChildren(new Option('Sem categoria', ''), ...options.map((item) => new Option(item.label, item.code)));
+      primaryClassification.value = options.some((item) => item.code === currentPrimary) ? currentPrimary : '';
     };
-    primaryClassification.addEventListener('change', renderClassificationOptions);
-    classificationSection.content.append(field('Categoria principal', primaryClassification), classificationsWrap);
+    classificationSection.content.append(field('Categoria', primaryClassification));
     renderClassificationOptions();
     const professionSection = section('Profissão / vínculo', 'Selecione uma opção cadastrada ou inclua uma nova especificação.');
     const professionRows = $('div', 'law-contact-profession-list');
@@ -523,8 +511,7 @@
       });
       if (invalidDocument) { message.dataset.state = 'error'; message.textContent = `Informe um ${invalidDocument.querySelector('[data-doc-type]').value.toUpperCase()} válido, com os dígitos verificadores corretos.`; invalidDocument.querySelector('[data-doc-number]').focus(); return; }
       save.disabled = true;
-      const allowedClassifications = new Set([...Object.values(catalog).flat().map((item) => item.code), 'client']);
-      const selectedClassifications = [...new Set([...selectedClassificationCodes, ...[...classificationsWrap.querySelectorAll('input[type="checkbox"]:checked')].map((item) => item.value), primaryClassification.value].filter((code) => code && allowedClassifications.has(code)))];
+      const selectedClassifications = primaryClassification.value ? [primaryClassification.value] : [];
       const body = {
         record_kind: recordKind.value, legal_nature: recordKind.value === 'unit' ? null : nature.value,
         parent_contact_id: recordKind.value === 'unit' || nature.value === 'pj' ? (hierarchyParent.value || (preserveHiddenParent ? contact.parent_contact_id : null)) : null,
