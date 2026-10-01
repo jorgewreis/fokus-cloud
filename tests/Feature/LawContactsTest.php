@@ -76,17 +76,21 @@ class LawContactsTest extends TestCase
         Http::assertSent(fn ($request) => $request->url() === 'https://viacep.com.br/ws/01001000/json/');
     }
 
-    public function test_creates_pj_departments_as_additional_capacity_and_normalizes_names_and_tags(): void
+    public function test_creates_standalone_hierarchy_units_as_additional_capacity_and_normalizes_names_and_tags(): void
     {
-        $this->actingAs($this->admin)->withSession(['active_company_id' => $this->sessionCompanyId])
+        $session = ['active_company_id' => $this->sessionCompanyId];
+        $organization = $this->actingAs($this->admin)->withSession($session)
             ->postJson('/api/law/contacts', [
                 'legal_nature' => 'pj', 'display_name' => 'SECRETARIA DE JUSTIÇA', 'legal_name' => 'SECRETARIA DE JUSTIÇA DO ESTADO',
                 'classifications' => ['public_body', 'court_unit'], 'tags' => [' Setor público ', 'SETOR   PÚBLICO'],
-                'departments' => [['name' => 'Contabilidade', 'channels' => [['type' => 'email', 'value' => 'contabilidade@example.test']]]],
-            ])->assertCreated()->assertJsonPath('contact.display_name', 'Secretaria de Justiça');
+            ])->assertCreated()->assertJsonPath('contact.display_name', 'Secretaria de Justiça')->json('contact');
+        $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'record_kind' => 'unit', 'display_name' => 'Contabilidade', 'parent_contact_id' => $organization['id'],
+            'channels' => [['type' => 'email', 'value' => 'contabilidade@example.test', 'label' => 'Recepção']],
+        ])->assertCreated()->assertJsonPath('contact.record_kind', 'unit')->assertJsonPath('contact.parent.id', $organization['id']);
 
-        $this->assertDatabaseCount('law_contacts', 1);
-        $this->assertDatabaseCount('law_contact_departments', 1);
+        $this->assertDatabaseCount('law_contacts', 2);
+        $this->assertDatabaseCount('law_contact_departments', 0);
         $this->assertDatabaseCount('law_contact_tags', 1);
         $this->assertDatabaseCount('law_contact_tag_assignments', 1);
         $this->assertSame(2, app(\App\Services\LawUsageMeter::class)->countContacts($this->companyId));

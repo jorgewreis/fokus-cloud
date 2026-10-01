@@ -682,6 +682,7 @@ class LawContactController extends Controller
             'record_kind' => ['sometimes', Rule::in(['contact', 'unit'])],
             'legal_nature' => ['sometimes', 'nullable', Rule::in(['pf', 'pj'])],
             'parent_contact_id' => ['sometimes', 'nullable', 'string', 'size:30'],
+            'departments' => ['prohibited'],
             'linked_contact_ids' => ['sometimes', 'array', 'max:200'],
             'linked_contact_ids.*' => ['required', 'string', 'size:30', 'distinct'],
             'linked_relationships' => ['sometimes', 'array', 'max:200'],
@@ -915,7 +916,6 @@ class LawContactController extends Controller
 
     private function syncChildren(string $companyId, string $contactId, string $userId, array $data, bool $creating, bool $canSensitive = true): void
     {
-        abort_if(array_key_exists('departments', $data), 422, 'Cadastre unidades como registros próprios na hierarquia.');
         if (array_key_exists('classifications', $data)) {
             abort_if(! empty($data['primary_classification']) && ! in_array($data['primary_classification'], $data['classifications'], true), 422, 'A classificação principal deve fazer parte das classificações selecionadas.');
             DB::table('law_contact_classifications')->where('company_id', $companyId)->where('law_contact_id', $contactId)->whereIn('classification_code', self::EDITABLE_CLASSIFICATIONS)->delete();
