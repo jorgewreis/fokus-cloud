@@ -11,6 +11,7 @@ const EVENT_LABELS = {
     "backoffice.login_succeeded": "Login do administrador realizado", "backoffice.login_failed": "Falha no login do administrador", "backoffice.logout": "Logout do administrador",
     "backoffice.mfa_failed": "Falha na validação MFA", "backoffice.mfa_requested": "MFA solicitado", "backoffice.login_origin_locked": "Origem bloqueada",
     "backoffice.subscriptions_viewed": "Página de assinaturas visualizada", "backoffice.dashboard_viewed": "Painel visualizado", "backoffice.company_viewed": "Empresa visualizada",
+    "backoffice.companies viewed": "Empresas visualizadas", "backoffice.companies_viewed": "Empresas visualizadas",
 };
 const eventLabel = (value) => {
     if (!value) return "Evento de acesso";
