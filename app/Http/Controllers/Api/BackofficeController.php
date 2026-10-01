@@ -1869,6 +1869,11 @@ class BackofficeController extends Controller
         }
 
         $events = $query->paginate($perPage);
+        $events->getCollection()->transform(function (object $event): object {
+            $event->created_at = Carbon::parse((string) $event->created_at, 'UTC')->toIso8601String();
+
+            return $event;
+        });
 
         return response()->json([
             'data' => $events->items(),
