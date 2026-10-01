@@ -44,17 +44,10 @@ export async function mount(root, context = {}) {
         const message = root.querySelector("#access-message");
         const state = { page: 1, filters: {} };
         const showMessage = (text, tone = "danger") => { message.textContent = text || ""; message.dataset.tone = tone; message.hidden = !text; };
-        const renderPagination = (meta) => {
-            pagination.replaceChildren();
-            for (let page = 1; page <= (meta?.last_page || 1); page += 1) {
-                if ((meta?.last_page || 1) <= 1) break;
-                const button = document.createElement("button");
-                button.type = "button";
-                button.className = `fs-pagination-button${page === meta.current_page ? " is-active" : ""}`;
-                button.textContent = String(page);
-                button.addEventListener("click", () => { state.page = page; load(); });
-                pagination.append(button);
-            }
+        const renderPagination = (meta = {}) => {
+            const current = Math.max(1, Number(meta.current_page || 1));
+            const last = Math.max(1, Number(meta.last_page || 1));
+            pagination.innerHTML = `<ul class="fs-pagination fs-pagination-compact"><li class="fs-page-item"><button class="fs-page-link" type="button" data-access-page="${current - 1}" aria-label="Página anterior" ${current <= 1 ? "disabled" : ""}>‹</button></li><li class="fs-page-item is-active" aria-current="page"><span class="fs-page-link" aria-label="Página ${current} de ${last}">${current}</span></li><li class="fs-page-item"><button class="fs-page-link" type="button" data-access-page="${current + 1}" aria-label="Próxima página" ${current >= last ? "disabled" : ""}>›</button></li></ul>`;
         };
         const showDetail = (item) => {
             const detail = root.querySelector("#access-detail");
@@ -75,10 +68,18 @@ export async function mount(root, context = {}) {
                 showMessage("");
             } catch (error) { if (error?.name !== "AbortError") showMessage(error.message || "Não foi possível carregar o controle de acessos."); }
         };
+        const onAccessPageClick = (event) => {
+            const button = event.target.closest("[data-access-page]");
+            if (!button || button.disabled) return;
+            state.page = Number(button.dataset.accessPage);
+            load();
+        };
         const submit = (event) => { event.preventDefault(); state.page = 1; state.filters = Object.fromEntries([...new FormData(filters)].filter(([, value]) => value)); load(); };
         filters.addEventListener("submit", submit);
+        pagination.addEventListener("click", onAccessPageClick);
         root.querySelector("#access-clear").addEventListener("click", () => { filters.reset(); state.page = 1; state.filters = {}; load(); });
         disposers.push(() => filters.removeEventListener("submit", submit));
+        disposers.push(() => pagination.removeEventListener("click", onAccessPageClick));
         await load();
     }
     if (mode === "activity") {
