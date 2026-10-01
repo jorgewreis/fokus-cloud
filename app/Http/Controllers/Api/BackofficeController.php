@@ -1285,8 +1285,6 @@ class BackofficeController extends Controller
 
     private function companyListPayload(object $row): array
     {
-        $databaseSizeBytes = $this->databaseSizeBytes();
-
         return [
             'id' => $row->id,
             'legal_name' => $row->legal_name,
@@ -1340,6 +1338,7 @@ class BackofficeController extends Controller
         } catch (\Throwable) {
             $contactUsage = ['available' => false, 'reason' => 'temporarily_unavailable', 'used' => null, 'limit' => null, 'percentage' => null];
         }
+        $databaseSizeBytes = $this->databaseSizeBytes();
 
         return [
             'id' => $company->id,
