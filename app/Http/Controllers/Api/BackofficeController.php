@@ -1338,6 +1338,11 @@ class BackofficeController extends Controller
         } catch (\Throwable) {
             $contactUsage = ['available' => false, 'reason' => 'temporarily_unavailable', 'used' => null, 'limit' => null, 'percentage' => null];
         }
+        $registeredContacts = (int) DB::table('law_contacts')
+            ->where('company_id', $company->id)
+            ->whereNull('deleted_at')
+            ->whereNull('merged_into_id')
+            ->count();
         $databaseSizeBytes = $this->databaseSizeBytes();
 
         return [
@@ -1352,7 +1357,7 @@ class BackofficeController extends Controller
             'admin' => $admin ? ['name' => $admin->name, 'cpf' => $admin->cpf, 'email' => $admin->email, 'email_masked' => $this->maskEmail($admin->email)] : null,
             'created_at' => $company->created_at,
             'data_volume' => [
-                'contacts' => $contactUsage,
+                'contacts' => [...$contactUsage, 'registered_count' => $registeredContacts],
                 'database_size_bytes' => $databaseSizeBytes,
                 'database_size_mb' => $databaseSizeBytes === null ? null : round($databaseSizeBytes / 1024 / 1024, 2),
                 'database_size_scope' => 'Banco físico total da aplicação',
@@ -1364,17 +1369,25 @@ class BackofficeController extends Controller
     {
         try {
             $driver = DB::connection()->getDriverName();
+            $databaseName = DB::connection()->getDatabaseName();
             $bytes = match ($driver) {
-                'mysql', 'mariadb' => (int) DB::selectOne("SELECT COALESCE(SUM(data_length + index_length), 0) AS bytes FROM information_schema.tables WHERE table_schema = DATABASE()")->bytes,
+                'mysql', 'mariadb' => (int) DB::selectOne("SELECT COALESCE(SUM(data_length + index_length), 0) AS bytes FROM information_schema.tables WHERE table_schema = COALESCE(?, DATABASE())", [$databaseName])->bytes,
                 'pgsql' => (int) DB::selectOne('SELECT pg_database_size(current_database()) AS bytes')->bytes,
                 'sqlsrv' => (int) DB::selectOne('SELECT COALESCE(SUM(size) * 8192, 0) AS bytes FROM sys.database_files')->bytes,
-                'sqlite' => is_file((string) config('database.connections.sqlite.database')) ? (int) filesize((string) config('database.connections.sqlite.database')) : 0,
-                default => 0,
+                'sqlite' => $this->sqliteSizeBytes((string) $databaseName),
+                default => null,
             };
-            return max(0, $bytes);
+            return $bytes !== null && $bytes > 0 ? $bytes : null;
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function sqliteSizeBytes(string $database): ?int
+    {
+        if ($database === '' || $database === ':memory:') return null;
+        $path = realpath($database) ?: realpath(base_path($database));
+        return $path && is_file($path) ? (int) filesize($path) : null;
     }
 
     private function subscriptionPayload(object $subscription, bool $details = false): array
