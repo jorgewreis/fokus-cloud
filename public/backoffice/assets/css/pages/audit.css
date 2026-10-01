@@ -1,0 +1,29 @@
+[data-audit-mode] .fs-table-records thead tr,
+[data-audit-mode] .fs-table-records tbody tr {
+    height: auto;
+    min-height: 52px;
+    align-items: stretch;
+}
+
+[data-audit-mode] .fs-table-records th,
+[data-audit-mode] .fs-table-records td {
+    height: auto;
+    min-height: 52px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+[data-audit-mode] .fs-table-records td strong,
+[data-audit-mode] .fs-table-records td small {
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+}
+
+[data-audit-mode] .fs-table-records td small {
+    line-height: 1.35;
+}
