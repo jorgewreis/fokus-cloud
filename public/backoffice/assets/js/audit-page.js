@@ -1,5 +1,6 @@
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[character]);
-const dateTime = (value) => value ? new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—";
+const AUDIT_TIME_ZONE = "America/Bahia";
+const dateTime = (value) => value ? new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: AUDIT_TIME_ZONE }) : "—";
 const eventLabel = (value) => ({ "customer.login_succeeded": "Login do cliente", "customer.login_failed": "Falha no login do cliente", "customer.logout": "Logout do cliente", "backoffice.login_succeeded": "Login do administrador", "backoffice.login_failed": "Falha no login do administrador", "backoffice.logout": "Logout do administrador", "backoffice.mfa_failed": "Falha na validação MFA", "backoffice.mfa_requested": "MFA solicitado", "backoffice.login_origin_locked": "Origem bloqueada" }[value] || value || "Evento de acesso");
 const statusBadge = (value) => value === "success" ? '<span class="fs-badge fs-badge-soft-success">Sucesso</span>' : '<span class="fs-badge fs-badge-soft-danger">Falha</span>';
 

@@ -1866,7 +1866,7 @@ class BackofficeController extends Controller
                 'status' => $metadata['status'] ?? (str_contains($event->action, 'failed') || str_contains($event->action, 'locked') ? 'failed' : 'success'),
                 'ip_address' => $event->ip_address,
                 'user_agent' => $event->user_agent,
-                'created_at' => $event->created_at,
+                'created_at' => Carbon::parse((string) $event->created_at, 'UTC')->setTimezone('America/Bahia')->toIso8601String(),
             ];
         });
         if ($request->filled('status')) {
