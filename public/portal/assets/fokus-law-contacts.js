@@ -23,54 +23,16 @@
     if (digits.length === 11) return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
     return original;
   };
-  const field = (labelText, control) => { const label = $('label', 'law-contact-field'); label.append($('span', '', labelText), control); return label; };
+  const field = (labelText, control) => { const label = $('label', 'law-record-field'); label.append($('span', '', labelText), control); return label; };
   const setWidth = (control, width) => { control.classList.add(`fs-width-${width}`); return control; };
   const select = (items, value = '') => { const control = $('select', 'fs-form-control'); items.forEach(([v, label]) => { const option = new Option(label, v); option.selected = v === value; control.append(option); }); return control; };
   const input = (value = '', placeholder = '', maxLength = 255) => { const control = $('input', 'fs-form-control'); control.value = value || ''; control.placeholder = placeholder; control.maxLength = maxLength; return control; };
   const button = (text, cls = 'fs-btn fs-btn-secondary', fn) => { const control = $('button', cls, text); control.type = 'button'; if (fn) control.addEventListener('click', (event) => fn(event)); return control; };
   const CONTACT_PAGE_SIZE = 15;
-  function renderPagination(container, pagination, onPage, label = 'contatos') {
-    const current = Number(pagination.page || 1);
-    const perPage = Number(pagination.per_page || CONTACT_PAGE_SIZE);
-    const total = Number(pagination.total || 0);
-    const last = Math.max(1, Math.ceil(total / perPage));
-    const summary = $('span', 'fs-u-fs-sm fs-u-color-secondary', total ? `Mostrando ${(current - 1) * perPage + 1} a ${Math.min(current * perPage, total)} de ${total.toLocaleString('pt-BR')} ${label}` : 'Nenhum registro encontrado');
-    summary.setAttribute('role', 'status');
-    const nav = $('nav'); nav.setAttribute('aria-label', `Paginação de ${label}`);
-    const list = $('ul', 'fs-pagination fs-pagination-compact');
-    const addPage = (text, target, ariaLabel, disabled, active = false) => {
-      const item = $('li', `fs-page-item${active ? ' is-active' : ''}`);
-      const control = button(text, 'fs-page-link', async () => {
-        if (disabled || active || container.getAttribute('aria-busy') === 'true') return;
-        container.setAttribute('aria-busy', 'true');
-        const buttons = [...list.querySelectorAll('button')];
-        const disabledStates = buttons.map((button) => button.disabled);
-        buttons.forEach((button) => { button.disabled = true; });
-        try { await onPage(target); }
-        catch (error) { window.alert(error.message || 'Não foi possível carregar a página.'); }
-        finally { container.removeAttribute('aria-busy'); buttons.forEach((button, index) => { button.disabled = disabledStates[index]; }); }
-      });
-      control.setAttribute('aria-label', ariaLabel); control.disabled = disabled;
-      if (active) { item.setAttribute('aria-current', 'page'); control.setAttribute('aria-current', 'page'); }
-      item.append(control); list.append(item);
-    };
-    addPage('‹', current - 1, 'Página anterior', current <= 1);
-    const pages = last <= 7
-      ? Array.from({ length: last }, (_, index) => index + 1)
-      : [...new Set([1, current - 1, current, current + 1, last])].filter((page) => page >= 1 && page <= last).sort((a, b) => a - b);
-    pages.forEach((page, index) => {
-      if (index > 0 && page - pages[index - 1] > 1) {
-        const gap = $('li', 'fs-page-item'); gap.setAttribute('aria-hidden', 'true');
-        gap.append($('span', 'fs-page-link', '…')); list.append(gap);
-      }
-      addPage(String(page), page, `Página ${page} de ${last}`, false, page === current);
-    });
-    addPage('›', current + 1, 'Próxima página', current >= last);
-    nav.append(list); container.replaceChildren(summary, nav);
-  }
+  const renderPagination = (...args) => window.FokusLawRecordUI.renderPagination(...args);
   const iconButton = (label, icon, fn) => { const control = button('', 'fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action', fn); control.setAttribute('aria-label', label); control.title = label; const image = $('img'); image.src = `${CONTACT_ICONS}${icon}`; image.alt = ''; control.append(image); return control; };
   const section = (title) => {
-    const box = $('section', 'fs-card fs-card-sm law-contacts-form-section');
+    const box = $('section', 'fs-card fs-card-sm law-record-form-section');
     const header = $('div', 'fs-card-header fs-u-p-3'); header.append($('h3', 'fs-card-title', title));
     const body = $('div', 'fs-card-body'); box.append(header, body); box.content = body; return box;
   };
@@ -78,17 +40,17 @@
   function createModal(root, title, size = 'fs-modal-xl', opener = null) {
     const focusTarget = opener instanceof HTMLElement ? opener : root instanceof HTMLElement ? root : document.getElementById('content-region');
     const oldTabindex = focusTarget.getAttribute('tabindex'); focusTarget.setAttribute('tabindex', '-1');
-    const id = `law-contact-modal-${++modalSequence}`;
+    const id = `law-record-modal-${++modalSequence}`;
     const trigger = $('button'); trigger.type = 'button'; trigger.tabIndex = -1; trigger.setAttribute('aria-hidden', 'true');
     trigger.setAttribute('data-fs-target', `#${id}`); trigger.style.position = 'fixed'; trigger.style.left = '-10000px'; trigger.style.width = '1px'; trigger.style.height = '1px'; trigger.style.opacity = '0';
     const overlay = $('div', 'fs-modal fs-modal-scrollable'); overlay.id = id; overlay.setAttribute('aria-hidden', 'true');
     const frame = $('div', `fs-modal-dialog ${size}`);
-    const content = $('div', 'fs-modal-content law-contact-modal-content');
-    const header = $('header', 'fs-modal-header law-contact-dialog-header');
+    const content = $('div', 'fs-modal-content law-record-modal-content');
+    const header = $('header', 'fs-modal-header law-record-dialog-header');
     const heading = $('h2', 'fs-modal-title', title); header.append(heading);
     const close = $('button', 'fs-btn-close'); close.type = 'button'; close.setAttribute('aria-label', 'Fechar'); close.setAttribute('data-fs-dismiss', 'modal'); header.append(close);
-    const body = $('div', 'fs-modal-body law-contact-modal-body');
-    const footer = $('footer', 'fs-modal-footer law-contact-dialog-footer');
+    const body = $('div', 'fs-modal-body law-record-modal-body');
+    const footer = $('footer', 'fs-modal-footer law-record-dialog-footer');
     content.append(header, body, footer); frame.append(content); overlay.append(frame); document.body.append(trigger, overlay);
     const api = window.FokusStyles?.Modal;
     if (!api) { overlay.remove(); trigger.remove(); throw new Error('O componente modal do Fokus Styles não está disponível.'); }
@@ -154,9 +116,9 @@
     let competencyOptions = [];
     let searchTimer;
     root.replaceChildren();
-    const heading = $('div', 'law-page-heading law-contact-page-heading');
+    const heading = $('div', 'law-page-heading law-record-page-heading');
     heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Contatos'), $('p', 'law-page-lede', 'Organize pessoas, organizações e unidades em uma base compartilhada pelos setores autorizados.'));
-    const headingActions = $('div', 'law-contact-heading-actions');
+    const headingActions = $('div', 'law-record-heading-actions');
     if (can('law.contacts.create')) {
       headingActions.append(button('Novo contato', 'fs-btn fs-btn-primary', (event) => openEditor(root, null, refresh, event.currentTarget, relationshipOptions, designationOptions, competencyOptions)));
       headingActions.append(button('Cadastrar unidade', 'fs-btn fs-btn-secondary', (event) => openEditor(root, null, refresh, event.currentTarget, relationshipOptions, designationOptions, competencyOptions, 'unit')));
@@ -164,17 +126,17 @@
     heading.append(headingActions);
     root.append(heading);
 
-    const overview = $('section', 'law-contact-overview-banner fs-card');
+    const overview = $('section', 'law-record-overview-banner fs-card');
     overview.setAttribute('aria-label', 'Resumo da base de contatos');
     root.append(overview);
-    const metrics = $('section', 'law-contact-metrics'); metrics.setAttribute('aria-live', 'polite'); metrics.append($('p', 'law-contact-loading', 'Carregando contatos…')); root.append(metrics);
-    const recentCard = $('section', 'law-contact-recent-card fs-card');
-    const recentHeader = $('div', 'fs-card-header fs-u-p-3 law-contact-recent-header');
+    const metrics = $('section', 'law-record-metrics'); metrics.setAttribute('aria-live', 'polite'); metrics.append($('p', 'law-contact-loading', 'Carregando contatos…')); root.append(metrics);
+    const recentCard = $('section', 'law-record-recent-card fs-card');
+    const recentHeader = $('div', 'fs-card-header fs-u-p-3 law-record-recent-header');
     recentHeader.append($('h3', 'fs-card-title', 'Acessados recentemente'));
-    const recentBody = $('div', 'fs-card-body law-contact-recent');
+    const recentBody = $('div', 'fs-card-body law-record-recent');
     recentCard.append(recentHeader, recentBody); root.append(recentCard);
 
-    const filters = $('form', 'law-contact-filters');
+    const filters = $('form', 'law-record-filters');
     const search = input('', 'Buscar por nome, organização ou documento autorizado', 180); search.type = 'search'; search.setAttribute('aria-label', 'Buscar contatos');
     const nature = select([['', 'Todos'], ['pf', 'Pessoa física'], ['pj', 'Pessoa jurídica']]); nature.setAttribute('aria-label', 'Filtrar por pessoa física ou jurídica');
     const recordKind = select([['', 'Todos os registros'], ['contact', 'Contatos (PF/PJ)'], ['unit', 'Unidades']]); recordKind.setAttribute('aria-label', 'Filtrar por tipo de registro');
@@ -188,12 +150,12 @@
     root.append(filters);
 
     const state = $('p', 'law-contact-feedback'); state.setAttribute('role', 'status'); root.append(state);
-    const tableWrap = $('div', 'fs-table-responsive law-contact-table-wrap');
-    const table = $('table', 'fs-table law-contact-table');
+    const tableWrap = $('div', 'fs-table-responsive law-record-table-wrap');
+    const table = $('table', 'fs-table law-record-table');
     const thead = $('thead'); const headerRow = $('tr');
     ['Nome', 'Cadastro', 'Profissão / vínculo', 'Tags', 'Ações'].forEach((label) => headerRow.append($('th', '', label)));
     thead.append(headerRow); table.append(thead); const tbody = $('tbody'); table.append(tbody); tableWrap.append(table); root.append(tableWrap);
-    const footer = $('div', 'law-contact-pagination'); root.append(footer);
+    const footer = $('div', 'law-record-pagination'); root.append(footer);
 
     async function refresh() {
       state.textContent = '';
@@ -231,30 +193,30 @@
         const units = Number(summary.units || summary.departments || 0);
         const natureTotal = Math.max(1, pf + pj + units);
         overview.replaceChildren();
-        const bannerCopy = $('div', 'law-contact-overview-copy');
-        bannerCopy.append($('span', 'law-contact-overview-kicker', 'PAINEL DE RELACIONAMENTO'));
+        const bannerCopy = $('div', 'law-record-overview-copy');
+        bannerCopy.append($('span', 'law-record-overview-kicker', 'PAINEL DE RELACIONAMENTO'));
         bannerCopy.append($('h3', '', 'Sua rede de contatos, em uma visão.'));
         bannerCopy.append($('p', '', `Pessoas, organizações e ${currentContext?.unit_label?.toLocaleLowerCase('pt-BR') || 'unidades'} com seus vínculos institucionais sempre à mão.`));
-        const quota = $('div', 'law-contact-capacity');
+        const quota = $('div', 'law-record-capacity');
         if (meter?.available) {
-          const quotaHead = $('div', 'law-contact-capacity-head');
+          const quotaHead = $('div', 'law-record-capacity-head');
           quotaHead.append($('span', '', meter.label), $('strong', '', `${Number(meter.used).toLocaleString('pt-BR')} / ${Number(meter.limit).toLocaleString('pt-BR')}`));
-          const track = $('div', 'law-contact-capacity-track'); track.setAttribute('role', 'progressbar'); track.setAttribute('aria-label', meter.label); track.setAttribute('aria-valuemin', '0'); track.setAttribute('aria-valuemax', String(meter.limit)); track.setAttribute('aria-valuenow', String(meter.used));
-          const fill = $('span', 'law-contact-capacity-fill'); fill.style.width = `${Math.min(100, Number(meter.percentage || 0))}%`; track.append(fill);
+          const track = $('div', 'law-record-capacity-track'); track.setAttribute('role', 'progressbar'); track.setAttribute('aria-label', meter.label); track.setAttribute('aria-valuemin', '0'); track.setAttribute('aria-valuemax', String(meter.limit)); track.setAttribute('aria-valuenow', String(meter.used));
+          const fill = $('span', 'law-record-capacity-fill'); fill.style.width = `${Math.min(100, Number(meter.percentage || 0))}%`; track.append(fill);
           quota.append(quotaHead, track, $('small', '', `${Number(meter.percentage || 0)}% da capacidade utilizada`));
           quota.dataset.state = meter.over_threshold ? 'warning' : 'normal';
         } else quota.append($('small', '', 'Capacidade contratada não configurada.'));
         bannerCopy.append(quota);
 
-        const chartArea = $('div', 'law-contact-overview-chart');
-        const ring = $('div', 'law-contact-composition-ring');
+        const chartArea = $('div', 'law-record-overview-chart');
+        const ring = $('div', 'law-record-composition-ring');
         ring.style.setProperty('--contact-pf-share', `${(pf / natureTotal) * 100}%`);
         ring.dataset.empty = String(total === 0);
         ring.setAttribute('role', 'img'); ring.setAttribute('aria-label', `Composição da base: ${pf} pessoas, ${pj} organizações e ${units} unidades`);
-        const center = $('div', 'law-contact-ring-center'); center.append($('strong', '', total.toLocaleString('pt-BR')), $('span', '', 'CONTATOS')); ring.append(center);
-        const legend = $('div', 'law-contact-chart-legend');
+        const center = $('div', 'law-record-ring-center'); center.append($('strong', '', total.toLocaleString('pt-BR')), $('span', '', 'CONTATOS')); ring.append(center);
+        const legend = $('div', 'law-record-chart-legend');
         [['pf', 'Pessoa física', pf], ['pj', 'Pessoa jurídica', pj], ['dept', currentContext?.unit_label || 'Unidades', units]].forEach(([tone, label, value]) => {
-          const row = $('div', `law-contact-chart-legend-row law-contact-chart-${tone}`); row.append($('span', 'law-contact-chart-dot'), $('span', '', label), $('strong', '', Number(value || 0).toLocaleString('pt-BR'))); legend.append(row);
+          const row = $('div', `law-record-chart-legend-row law-record-chart-${tone}`); row.append($('span', 'law-record-chart-dot'), $('span', '', label), $('strong', '', Number(value || 0).toLocaleString('pt-BR'))); legend.append(row);
         });
         chartArea.append(ring, legend); overview.append(bannerCopy, chartArea);
 
@@ -265,16 +227,11 @@
           ['Organizações', pj, `${Math.round((pj / natureTotal) * 100)}% da base de contatos`, 'teal'],
           [currentContext?.unit_label || 'Unidades', units, `${Number(summary.registrations_counted || total).toLocaleString('pt-BR')} registros contabilizados`, 'amber'],
         ];
-        metricSpecs.forEach(([label, value, note, tone], index) => {
-          const card = $('article', `law-contact-metric-card fs-card law-contact-metric-${tone}`);
-          const body = $('div', 'fs-card-body law-contact-metric-body');
-          body.append($('span', 'law-contact-metric-index', String(index + 1).padStart(2, '0')), $('span', 'law-contact-metric-label', label), $('strong', '', Number(value).toLocaleString('pt-BR')), $('small', '', note));
-          card.append(body); metrics.append(card);
-        });
+        metrics.append(...window.FokusLawRecordUI.metricCards(metricSpecs));
         recentBody.replaceChildren();
         if (summary.recent?.length) summary.recent.slice(0, 5).forEach((item) => {
-          const link = button('', 'law-contact-recent-item', (event) => openDetails(root, item.id, false, refresh, event.currentTarget));
-          const detail = $('span', 'law-contact-recent-meta');
+          const link = button('', 'law-record-recent-item', (event) => openDetails(root, item.id, false, refresh, event.currentTarget));
+          const detail = $('span', 'law-record-recent-meta');
           const activityLabels = { created: 'Cadastrado', viewed: 'Consultado', search_opened: 'Consultado' };
           const timestamp = item.at ? new Date(item.at) : null;
           const time = $('time', '', timestamp && !Number.isNaN(timestamp.valueOf()) ? timestamp.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Agora');
@@ -282,20 +239,20 @@
           detail.append($('span', '', activityLabels[item.activity] || 'Consultado'), time);
           link.append($('strong', '', item.display_name), detail); recentBody.append(link);
         });
-        else recentBody.append($('p', 'law-contact-recent-empty', 'Os contatos criados ou consultados aparecerão aqui.'));
+        else recentBody.append($('p', 'law-record-recent-empty', 'Os contatos criados ou consultados aparecerão aqui.'));
         datalist.replaceChildren(...(result.tags || []).map((name) => { const option = $('option'); option.value = name; return option; }));
         tbody.replaceChildren();
         if (!currentItems.length) {
-          const tr = $('tr'); const td = $('td', 'law-contact-empty', 'Nenhum contato encontrado com estes filtros.'); td.colSpan = 5; tr.append(td); tbody.append(tr);
+          const tr = $('tr'); const td = $('td', 'law-record-empty', 'Nenhum contato encontrado com estes filtros.'); td.colSpan = 5; tr.append(td); tbody.append(tr);
         } else currentItems.forEach((contact) => {
           const tr = $('tr');
-          const titleCell = $('td'); const open = button(contact.display_name, 'law-contact-name', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget));
+          const titleCell = $('td'); const open = button(contact.display_name, 'law-record-name', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget));
           titleCell.append(open); if (contact.is_shared) titleCell.append($('span', 'law-contact-shared-badge', `Compartilhado por ${contact.source_company_name || 'outra empresa'}`));
           tr.append(titleCell, $('td', '', contact.record_kind === 'unit' ? (currentContext?.unit_label || 'Unidade') : contact.legal_nature === 'pj' ? 'Pessoa jurídica' : 'Pessoa física'));
           tr.append($('td', '', contact.legal_nature === 'pj' || contact.record_kind === 'unit' ? '—' : ((contact.professions || []).join(', ') || '—')));
           tr.append($('td', '', (contact.tags || []).join(', ') || '—'));
-          const actions = $('td', 'law-contact-actions');
-          const actionList = $('div', 'law-contact-action-list');
+          const actions = $('td', 'law-record-actions');
+          const actionList = $('div', 'law-record-action-list');
           actionList.append(iconButton('Ver detalhes', 'Folder-File--Streamline-Ultimate.png', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget)));
           if (!contact.is_shared && can('law.contacts.update')) actionList.append(iconButton('Editar contato', 'Common-File-Edit--Streamline-Ultimate.png', (event) => openEditor(root, contact, refresh, event.currentTarget, relationshipOptions, designationOptions, competencyOptions)));
           if (!contact.is_shared && can('law.contacts.delete')) actionList.append(iconButton('Excluir contato', 'Common-File-Remove--Streamline-Ultimate.png', async (event) => {
@@ -309,8 +266,8 @@
         const pagination = result.pagination || { page, per_page: CONTACT_PAGE_SIZE, total: currentItems.length };
         renderPagination(footer, pagination, async (target) => { page = target; await refresh(); });
       } catch (error) {
-        metrics.replaceChildren(); overview.replaceChildren($('p', 'law-contact-overview-error', error.message || 'Não foi possível carregar o resumo da base.'));
-        recentBody.replaceChildren($('p', 'law-contact-recent-empty', 'A atividade recente ficará disponível quando a lista carregar.'));
+        metrics.replaceChildren(); overview.replaceChildren($('p', 'law-record-overview-error', error.message || 'Não foi possível carregar o resumo da base.'));
+        recentBody.replaceChildren($('p', 'law-record-recent-empty', 'A atividade recente ficará disponível quando a lista carregar.'));
         state.dataset.state = 'error'; state.textContent = 'Não foi possível carregar a lista. Atualize ou ajuste os filtros.';
       }
     }
@@ -321,7 +278,7 @@
   function openEditor(root, contact, onSaved, opener = null, relationshipOptions = [], designationOptions = [], competencyOptions = [], initialRecordKind = null) {
     const isUnitRecord = contact?.record_kind === 'unit' || initialRecordKind === 'unit';
     const modal = createModal(root, contact ? 'Editar contato' : isUnitRecord ? `Cadastrar ${window.lawContactContext?.unit_label || 'Unidade'}` : 'Novo contato', 'fs-modal-xl', opener);
-    const form = $('form', 'law-contact-editor');
+    const form = $('form', 'law-record-editor');
     form.id = `law-contact-form-${++modalSequence}`;
     const status = $('p', 'law-contact-feedback'); status.setAttribute('role', 'status');
     const basic = section('Dados principais');
@@ -334,7 +291,7 @@
     name.addEventListener('blur', () => { name.value = name.value.trim().toLocaleLowerCase('pt-BR').replace(/(^|[\s-])([^\s-]+)/gu, (part) => { const word = part.trimStart(); const prefix = part.slice(0, part.length - word.length); return prefix + (particles.has(word) ? word : word.charAt(0).toLocaleUpperCase('pt-BR') + word.slice(1)); }); });
     const legalName = input(contact?.legal_name || '', 'Informe a razão social ou um complemento do nome', 180); legalName.name = 'legal_name';
     const nameField = field('Nome *', name); const acronymField = field('Sigla', acronym);
-    const nameRow = $('div', 'law-contact-name-fields'); nameRow.append(nameField, acronymField);
+    const nameRow = $('div', 'law-record-name-fields'); nameRow.append(nameField, acronymField);
     const natureField = field('Natureza do contato *', nature);
     const recordKindField = field('Cadastro', recordKind);
     const parentPlaceholder = contextData.context_code === 'escritorio' ? 'Selecione o escritório ou a filial' : 'Selecione o órgão ou a unidade';
@@ -378,7 +335,7 @@
     const sphere = select([['', 'Selecione a esfera'], ['Federal', 'Federal'], ['Estadual', 'Estadual'], ['Distrital', 'Distrital'], ['Municipal', 'Municipal']], publicData.administrative_sphere || '');
     const officialCode = input(publicData.official_code || '', 'Código oficial', 80);
     const issuingSystem = input(publicData.issuing_system || '', 'Sistema emissor', 80);
-    institutionalSection.content.append(institutionTypes, field('Tipo institucional principal', primaryInstitutional), $('small', 'law-contact-help', 'Identificadores institucionais são opcionais; a ausência gera apenas um aviso de completude.'));
+    institutionalSection.content.append(institutionTypes, field('Tipo institucional principal', primaryInstitutional), $('small', 'law-record-help', 'Identificadores institucionais são opcionais; a ausência gera apenas um aviso de completude.'));
     institutionalSection.content.append(field('Código CNJ da unidade judiciária', cnj), field('Competências (separadas por vírgula)', competencies), competencyList, field('Esfera administrativa', sphere), field('Identificador oficial', officialCode), field('Sistema emissor', issuingSystem));
     const updateInstitutional = () => { institutionalSection.hidden = recordKind.value === 'unit' ? false : nature.value !== 'pj'; cnj.parentElement.hidden = !courtType.checked; competencies.parentElement.hidden = !courtType.checked; sphere.parentElement.hidden = !publicType.checked; officialCode.parentElement.hidden = !publicType.checked; issuingSystem.parentElement.hidden = !publicType.checked; updateInstitutionalPrimary(); };
     courtType.addEventListener('change', updateInstitutional); publicType.addEventListener('change', updateInstitutional); updateInstitutional();
@@ -582,7 +539,7 @@
     const personalField = $('label', 'law-contact-check'); personalField.append(personal, $('span', '', 'Canal pessoal / sensível'));
     personalField.hidden = !window.lawContactsCanSensitive;
     const primary = setWidth(select([['0','Não'],['1','Sim']], item.primary ? '1' : '0'), 300); primary.dataset.primary = '1';
-    const sensitiveNote = $('small', 'law-contact-help', 'O valor de um canal pessoal fica oculto sem a permissão de dados sensíveis e não é compartilhado.');
+    const sensitiveNote = $('small', 'law-record-help', 'O valor de um canal pessoal fica oculto sem a permissão de dados sensíveis e não é compartilhado.');
     sensitiveNote.hidden = !window.lawContactsCanSensitive;
     const privacy = $('div', 'law-contact-channel-privacy'); privacy.hidden = !window.lawContactsCanSensitive; privacy.append(personalField, sensitiveNote);
     row.append(field('Canal', type), field('Contato', value), field('Rótulo', labelInput), privacy, field('Principal', primary), button('Remover', 'fs-btn fs-btn-danger law-contact-remove', () => row.remove())); return row;
@@ -631,7 +588,7 @@
     const state = setWidth(select([['','Selecione a UF'], ...STATES], address.state || 'BA'), 300); state.required = true; state.dataset.state = '1';
     const country = setWidth(input(address.country || 'Brasil', 'País', 80), 500); country.dataset.country = '1';
     const primary = setWidth(select([['0','Não'],['1','Sim']], address.primary ? '1' : '0'), 300); primary.dataset.primary = '1';
-    const lookupStatus = $('small', 'law-contact-help law-contact-cep-status'); lookupStatus.setAttribute('aria-live', 'polite');
+    const lookupStatus = $('small', 'law-record-help law-contact-cep-status'); lookupStatus.setAttribute('aria-live', 'polite');
     const postalField = field('CEP', postal);
     const setLocked = (locked) => { district.disabled = locked; city.disabled = locked; state.disabled = locked; country.disabled = locked; };
     let lookupTimer; let lookupController; let lookupSequence = 0;
@@ -687,21 +644,21 @@
     const result = await window.FokusApi.request(`/law/contacts/${encodeURIComponent(id)}${isShared ? '' : '?from_search=1'}`);
     const contact = result.contact;
     const modal = createModal(root, 'Ficha do contato', 'fs-modal-xl', opener);
-    const body = $('div', 'law-contact-detail-body');
+    const body = $('div', 'law-record-detail-body');
     const labels = { pf: 'Pessoa física', pj: 'Pessoa jurídica', residential: 'Residencial', business: window.lawContactContext?.segment_code === 'advocacia' ? 'Comercial' : 'Institucional / comercial' };
     const nameParts = String(contact.display_name || '?').trim().split(/\s+/).filter(Boolean);
     const removeDiacritics = (value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const firstName = nameParts[0] || '?';
     const lastName = nameParts[nameParts.length - 1] || firstName;
     const initials = `${removeDiacritics([...firstName][0] || '?')}${nameParts.length > 1 ? removeDiacritics([...lastName][0] || '') : ''}`.toLocaleUpperCase('pt-BR');
-    const summary = $('section', 'law-contact-detail-summary');
-    const avatar = $('span', 'law-contact-detail-avatar', initials);
-    const summaryCopy = $('div', 'law-contact-detail-summary-copy');
+    const summary = $('section', 'law-record-detail-summary');
+    const avatar = $('span', 'law-record-detail-avatar', initials);
+    const summaryCopy = $('div', 'law-record-detail-summary-copy');
     const recordLabel = contact.record_kind === 'unit' ? (window.lawContactContext?.unit_label || 'Unidade') : (labels[contact.legal_nature] || 'Contato');
-    summaryCopy.append($('span', 'law-contact-detail-eyebrow', recordLabel.toLocaleUpperCase('pt-BR')));
-    const titleRow = $('div', 'law-contact-detail-name-row');
-    titleRow.append($('h3', 'law-contact-detail-name', contact.display_name));
-    if (contact.acronym && contact.legal_nature !== 'pj') titleRow.append($('span', 'law-contact-detail-acronym', contact.acronym));
+    summaryCopy.append($('span', 'law-record-detail-eyebrow', recordLabel.toLocaleUpperCase('pt-BR')));
+    const titleRow = $('div', 'law-record-detail-name-row');
+    titleRow.append($('h3', 'law-record-detail-name', contact.display_name));
+    if (contact.acronym && contact.legal_nature !== 'pj') titleRow.append($('span', 'law-record-detail-acronym', contact.acronym));
     summaryCopy.append(titleRow);
     const institutions = Array.isArray(contact.institutional_data) ? contact.institutional_data : [];
     if (contact.legal_nature === 'pj' || contact.record_kind === 'unit') {
@@ -713,23 +670,23 @@
         if (institution.issuing_system) institutionDetails.push(institution.issuing_system);
       });
       const legalDetails = institutionDetails.length ? institutionDetails.join(' | ') : contact.legal_name;
-      if (legalDetails) summaryCopy.append($('p', 'law-contact-detail-legal-name', legalDetails));
-    } else if (contact.legal_name) summaryCopy.append($('p', 'law-contact-detail-legal-name', contact.legal_name));
-    const summaryBadges = $('div', 'law-contact-detail-summary-badges');
-    if (contact.legal_nature === 'pj' && contact.acronym) summaryBadges.append($('span', 'law-contact-detail-acronym', contact.acronym));
+      if (legalDetails) summaryCopy.append($('p', 'law-record-detail-legal-name', legalDetails));
+    } else if (contact.legal_name) summaryCopy.append($('p', 'law-record-detail-legal-name', contact.legal_name));
+    const summaryBadges = $('div', 'law-record-detail-summary-badges');
+    if (contact.legal_nature === 'pj' && contact.acronym) summaryBadges.append($('span', 'law-record-detail-acronym', contact.acronym));
     const statusText = labels[contact.status] || contact.status || 'Situação não informada';
-    const statusBadge = $('span', `law-contact-detail-badge law-contact-detail-status-${contact.status}`);
+    const statusBadge = $('span', `law-record-detail-badge law-record-detail-status-${contact.status}`);
     statusBadge.setAttribute('role', 'img');
     statusBadge.setAttribute('aria-label', statusText);
     statusBadge.title = statusText;
     summaryBadges.append(statusBadge);
     summary.append(avatar, summaryCopy, summaryBadges);
-    const chips = $('div', 'law-contact-detail-chip-groups');
+    const chips = $('div', 'law-record-detail-chip-groups');
     const addChips = (values, tone) => {
       if (!values?.length) return;
-      const group = $('div', `law-contact-detail-chip-group law-contact-detail-chip-${tone}`);
-      const list = $('div', 'law-contact-detail-chips');
-      values.forEach((value) => list.append($('span', 'law-contact-detail-chip', value)));
+      const group = $('div', `law-record-detail-chip-group law-record-detail-chip-${tone}`);
+      const list = $('div', 'law-record-detail-chips');
+      values.forEach((value) => list.append($('span', 'law-record-detail-chip', value)));
       group.append(list); chips.append(group);
     };
     const roleLabels = { employee: 'Funcionário/colaborador', public_servant: 'Servidor público', legal_representative: 'Representante legal', partner: 'Sócio', administrator: 'Administrador/diretor', attorney_in_fact: 'Procurador', client: 'Cliente (cadastro)', service_user: 'Usuário do serviço (cadastro)', interested_party: 'Interessado (cadastro)', collaborator: 'Colaborador', other: 'Outro' };
@@ -753,75 +710,75 @@
     if (contact.is_shared) body.append($('aside', 'law-contact-source', `Compartilhado por ${contact.source_company_name}. Este contato está disponível somente para consulta.`));
 
     const addSection = (title, marker, count, className = '') => {
-      const card = $('section', `law-contact-detail-card ${className}`.trim());
-      const header = $('header', 'law-contact-detail-section-header');
-      header.append($('span', 'law-contact-detail-section-mark', marker));
-      const heading = $('div', 'law-contact-detail-section-heading');
+      const card = $('section', `law-record-detail-card ${className}`.trim());
+      const header = $('header', 'law-record-detail-section-header');
+      header.append($('span', 'law-record-detail-section-mark', marker));
+      const heading = $('div', 'law-record-detail-section-heading');
       heading.append($('h3', '', title), $('span', '', count));
       header.append(heading); card.append(header);
-      const items = $('div', 'law-contact-detail-items'); card.append(items); body.append(card);
+      const items = $('div', 'law-record-detail-items'); card.append(items); body.append(card);
       return items;
     };
     if (contact.parent || contact.children?.length) {
       const children = contact.children || [];
-      const hierarchyItems = addSection('Hierarquia', 'ORG', `${children.length} filho(s)`, 'law-contact-detail-hierarchy');
-      if (contact.parent) { const row = $('article', 'law-contact-detail-linked-contact'); row.append($('strong', '', 'Vinculada a'), $('span', '', contact.parent.display_name)); hierarchyItems.append(row); }
+      const hierarchyItems = addSection('Hierarquia', 'ORG', `${children.length} filho(s)`, 'law-record-detail-hierarchy');
+      if (contact.parent) { const row = $('article', 'law-record-detail-linked-contact'); row.append($('strong', '', 'Vinculada a'), $('span', '', contact.parent.display_name)); hierarchyItems.append(row); }
       children.forEach((child) => {
-        const row = $('article', 'law-contact-detail-linked-contact');
+        const row = $('article', 'law-record-detail-linked-contact');
         row.append($('strong', '', child.display_name));
         hierarchyItems.append(row);
       });
     }
     (contact.institutional_data || []).forEach((institution) => {
-      const items = addSection(`${institution.primary ? 'Tipo institucional principal · ' : ''}${institution.type === 'court_unit' ? 'Dados da unidade judiciária' : 'Dados do órgão público'}`, 'INS', '', 'law-contact-detail-institution');
+      const items = addSection(`${institution.primary ? 'Tipo institucional principal · ' : ''}${institution.type === 'court_unit' ? 'Dados da unidade judiciária' : 'Dados do órgão público'}`, 'INS', '', 'law-record-detail-institution');
       const values = institution.type === 'court_unit'
         ? [['Código CNJ', institution.cnj_code], ['Competências', (institution.competencies || []).join(', ')]]
         : [['Esfera administrativa', institution.administrative_sphere], ['Código oficial', institution.official_code], ['Sistema emissor', institution.issuing_system]];
-      values.filter(([, value]) => value).forEach(([label, value]) => { const item = $('article', 'law-contact-detail-linked-contact'); item.append($('strong', '', label), $('span', '', value)); items.append(item); });
+      values.filter(([, value]) => value).forEach(([label, value]) => { const item = $('article', 'law-record-detail-linked-contact'); item.append($('strong', '', label), $('span', '', value)); items.append(item); });
     });
     if (contact.linked_contacts?.length) {
-      const items = addSection(contact.legal_nature === 'pj' ? 'Pessoas vinculadas' : 'Empresas vinculadas', 'VÍN', contact.linked_contacts.length, 'law-contact-detail-links');
+      const items = addSection(contact.legal_nature === 'pj' ? 'Pessoas vinculadas' : 'Empresas vinculadas', 'VÍN', contact.linked_contacts.length, 'law-record-detail-links');
       if (contact.legal_nature === 'pj') items.remove();
       else contact.linked_contacts.forEach((linked) => {
-          const row = $('article', 'law-contact-detail-linked-contact law-contact-detail-linked-company');
-          const identity = $('div', 'law-contact-detail-link-identity');
-          identity.append($('strong', 'law-contact-detail-link-name', linked.display_name));
-          if (linked.acronym) identity.append($('span', 'law-contact-detail-link-acronym', linked.acronym));
+          const row = $('article', 'law-record-detail-linked-contact law-record-detail-linked-company');
+          const identity = $('div', 'law-record-detail-link-identity');
+          identity.append($('strong', 'law-record-detail-link-name', linked.display_name));
+          if (linked.acronym) identity.append($('span', 'law-record-detail-link-acronym', linked.acronym));
           row.append(identity);
           const activeRoles = (linked.roles || []).filter((item) => item.current).map((item) => `${roleLabels[item.code] || item.code}${item.code === 'other' && item.detail ? `: ${item.detail}` : ''}`);
           const activeDesignations = (linked.designations || []).filter((item) => item.current).map((item) => item.name);
-          const metadataTags = $('div', 'law-contact-detail-linked-tags');
-          [...activeRoles, ...activeDesignations].forEach((value) => metadataTags.append($('span', 'law-contact-detail-linked-tag', value)));
+          const metadataTags = $('div', 'law-record-detail-linked-tags');
+          [...activeRoles, ...activeDesignations].forEach((value) => metadataTags.append($('span', 'law-record-detail-linked-tag', value)));
           if (metadataTags.children.length) row.append(metadataTags);
           items.append(row);
       });
     }
     if (contact.documents?.length) {
-      const items = addSection('Documentos', 'ID', contact.documents.length, 'law-contact-detail-documents');
+      const items = addSection('Documentos', 'ID', contact.documents.length, 'law-record-detail-documents');
       contact.documents.forEach((doc) => {
-        const item = $('article', 'law-contact-detail-document');
+        const item = $('article', 'law-record-detail-document');
         const type = DOCUMENTS[doc.type] || doc.type || 'Documento';
-        item.append($('span', 'law-contact-detail-document-type', Array.from(type).slice(0, 4).join('').toLocaleUpperCase('pt-BR')));
-        const detail = $('div', 'law-contact-detail-document-copy');
+        item.append($('span', 'law-record-detail-document-type', Array.from(type).slice(0, 4).join('').toLocaleUpperCase('pt-BR')));
+        const detail = $('div', 'law-record-detail-document-copy');
         detail.append($('strong', '', formatContactDocument(doc)));
         detail.append($('span', '', [doc.label, doc.state].filter(Boolean).join(' · ') || 'Documento cadastrado'));
         item.append(detail); items.append(item);
       });
     }
     if (contact.channels?.length) {
-      const items = addSection('Telefones e e-mails', 'TEL', contact.channels.length, 'law-contact-detail-channels');
+      const items = addSection('Telefones e e-mails', 'TEL', contact.channels.length, 'law-record-detail-channels');
       contact.channels.forEach((channel) => {
         const isEmail = channel.type === 'email';
-        const item = $('article', `law-contact-detail-channel law-contact-detail-channel-${isEmail ? 'email' : 'phone'}`);
-        const mark = $('span', 'law-contact-detail-channel-mark', isEmail ? '@' : '☎');
-        const detail = $('div', 'law-contact-detail-channel-copy');
-        const meta = $('div', 'law-contact-detail-channel-meta');
-        const title = $('div', 'law-contact-detail-channel-title');
+        const item = $('article', `law-record-detail-channel law-record-detail-channel-${isEmail ? 'email' : 'phone'}`);
+        const mark = $('span', 'law-record-detail-channel-mark', isEmail ? '@' : '☎');
+        const detail = $('div', 'law-record-detail-channel-copy');
+        const meta = $('div', 'law-record-detail-channel-meta');
+        const title = $('div', 'law-record-detail-channel-title');
         const channelKinds = { phone: 'TELEFONE FIXO', extension: 'RAMAL', mobile: 'CELULAR', whatsapp: 'WHATSAPP', email: 'E-MAIL' };
-        title.append($('span', 'law-contact-detail-channel-kind', channelKinds[channel.type] || 'TELEFONE'));
-        const badges = $('div', 'law-contact-detail-channel-badges');
-        if (channel.primary) badges.append($('span', 'law-contact-detail-primary', 'Principal'));
-        if (channel.personal) badges.append($('span', 'law-contact-detail-private', channel.value === 'Dado protegido' ? 'Acesso restrito' : 'Pessoal'));
+        title.append($('span', 'law-record-detail-channel-kind', channelKinds[channel.type] || 'TELEFONE'));
+        const badges = $('div', 'law-record-detail-channel-badges');
+        if (channel.primary) badges.append($('span', 'law-record-detail-primary', 'Principal'));
+        if (channel.personal) badges.append($('span', 'law-record-detail-private', channel.value === 'Dado protegido' ? 'Acesso restrito' : 'Pessoal'));
         if (badges.children.length) title.append(badges);
         meta.append(title);
         const value = isEmail ? (channel.value || 'Dado protegido') : formatContactPhone(channel.value);
@@ -830,44 +787,44 @@
       });
     }
     if (contact.addresses?.length) {
-      const items = addSection('Endereços', 'END', contact.addresses.length, 'law-contact-detail-addresses');
+      const items = addSection('Endereços', 'END', contact.addresses.length, 'law-record-detail-addresses');
       contact.addresses.forEach((address) => {
-        const item = $('article', 'law-contact-detail-address');
-        const meta = $('div', 'law-contact-detail-address-meta');
-        meta.append($('span', 'law-contact-detail-address-type', labels[address.type] || 'Endereço'));
-        if (address.primary) meta.append($('span', 'law-contact-detail-primary', 'Principal'));
+        const item = $('article', 'law-record-detail-address');
+        const meta = $('div', 'law-record-detail-address-meta');
+        meta.append($('span', 'law-record-detail-address-type', labels[address.type] || 'Endereço'));
+        if (address.primary) meta.append($('span', 'law-record-detail-primary', 'Principal'));
         const street = [address.street, address.number].filter(Boolean).join(', ');
         const extra = [address.complement, address.district].filter(Boolean).join(' · ');
         const locality = [address.city, address.state].filter(Boolean).join(' / ');
         item.append(meta, $('strong', '', street || 'Endereço não informado'));
-        if (extra) item.append($('span', 'law-contact-detail-address-extra', extra));
-        if (locality) item.append($('span', 'law-contact-detail-address-locality', locality));
+        if (extra) item.append($('span', 'law-record-detail-address-extra', extra));
+        if (locality) item.append($('span', 'law-record-detail-address-locality', locality));
         const postal = [address.postal_code ? `CEP ${address.postal_code}` : '', address.country].filter(Boolean).join(' · ');
-        if (postal) item.append($('span', 'law-contact-detail-address-postal', postal));
+        if (postal) item.append($('span', 'law-record-detail-address-postal', postal));
         items.append(item);
       });
     }
     if (contact.departments?.length) {
-      const items = addSection('Departamentos', 'SET', contact.departments.length, 'law-contact-detail-departments');
+      const items = addSection('Departamentos', 'SET', contact.departments.length, 'law-record-detail-departments');
       contact.departments.forEach((department) => {
-        const item = $('article', 'law-contact-detail-department');
-        const header = $('div', 'law-contact-detail-department-header');
-        header.append($('h4', '', department.name), $('span', `law-contact-detail-department-status law-contact-detail-status-${department.status}`, labels[department.status] || department.status));
+        const item = $('article', 'law-record-detail-department');
+        const header = $('div', 'law-record-detail-department-header');
+        header.append($('h4', '', department.name), $('span', `law-record-detail-department-status law-record-detail-status-${department.status}`, labels[department.status] || department.status));
         item.append(header);
-        const channels = $('div', 'law-contact-detail-department-channels');
+        const channels = $('div', 'law-record-detail-department-channels');
         (department.channels || []).forEach((channel) => {
-          const row = $('div', 'law-contact-detail-department-channel');
+          const row = $('div', 'law-record-detail-department-channel');
           row.append($('span', '', channel.label || (channel.type === 'email' ? 'E-mail' : 'Telefone')), $('strong', '', channel.value || 'Dado protegido'));
           channels.append(row);
         });
         if (channels.children.length) item.append(channels);
-        else item.append($('p', 'law-contact-detail-empty', 'Nenhum telefone ou e-mail neste departamento.'));
+        else item.append($('p', 'law-record-detail-empty', 'Nenhum telefone ou e-mail neste departamento.'));
         items.append(item);
       });
     }
     if (contact.notes) {
-      const notes = $('section', 'law-contact-detail-notes');
-      notes.append($('span', 'law-contact-detail-eyebrow', 'NOTA PRIVADA'), $('h3', '', 'Observações'), $('p', '', contact.notes));
+      const notes = $('section', 'law-record-detail-notes');
+      notes.append($('span', 'law-record-detail-eyebrow', 'NOTA PRIVADA'), $('h3', '', 'Observações'), $('p', '', contact.notes));
       body.append(notes);
     }
     if (contact.is_shared) body.append($('aside', 'law-contact-share-notice', 'As alterações só podem ser feitas pela empresa responsável pelo cadastro.'));
@@ -882,7 +839,7 @@
     const choices = [['', 'Selecione o contato que será mantido'], ...(result.contacts || []).filter((item) => item.id !== contact.id && !item.is_shared && item.legal_nature === contact.legal_nature).map((item) => [item.id, item.display_name])];
     parent.close();
     const modal = createModal(root, 'Mesclar contatos', 'fs-modal-lg');
-    const form = $('form', 'law-contact-editor'); form.id = `law-contact-form-${++modalSequence}`;
+    const form = $('form', 'law-record-editor'); form.id = `law-contact-form-${++modalSequence}`;
     const target = select(choices); target.required = true; const reason = document.createElement('textarea'); reason.className = 'fs-form-control'; reason.minLength = 5; reason.maxLength = 500; reason.required = true; reason.placeholder = 'Explique por que estes cadastros representam o mesmo contato.';
     const message = $('p', 'law-contact-feedback'); message.setAttribute('role', 'status');
     modal.footer.append(button('Cancelar', 'fs-btn fs-btn-secondary', () => modal.close())); const submit = $('button', 'fs-btn fs-btn-primary', 'Mesclar cadastros'); submit.type = 'submit'; submit.setAttribute('form', form.id); modal.footer.append(submit);
@@ -894,7 +851,7 @@
   async function renderSharingPage(root, context) {
     document.title = 'Compartilhamentos | Fokus Law';
     root.replaceChildren();
-    const heading = $('div', 'law-page-heading law-contact-page-heading');
+    const heading = $('div', 'law-page-heading law-record-page-heading');
     heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Compartilhamentos'), $('p', 'law-page-lede', 'Escolha as empresas e defina, em uma única política, quais contatos e informações ficam disponíveis para esse grupo.'));
     root.append(heading);
     const feedback = $('p', 'law-contact-feedback'); feedback.setAttribute('role', 'status'); feedback.textContent = 'Carregando políticas…'; root.append(feedback);
@@ -1075,7 +1032,7 @@
           appendRuleDirection('Recebe', company?.incoming_policy || null);
           if (!rulesCell.children.length) rulesCell.textContent = 'Defina os dois lados do acordo';
           row.append(rulesCell);
-          const actionsCell = $('td', 'law-contact-actions'); const actionList = $('div', 'law-contact-action-list');
+          const actionsCell = $('td', 'law-record-actions'); const actionList = $('div', 'law-record-action-list');
           actionList.append(iconButton('Editar política', 'Common-File-Edit--Streamline-Ultimate.png', () => {
             editingId = recipientId; selectedIds = new Set([recipientId]); rules = { legal_natures: policy?.legal_natures?.length ? [...policy.legal_natures] : ['pj'], profession_names: [...(policy?.profession_names || [])], shared_fields: [...(policy?.shared_fields || ['professional_channels'])] };
             formTitle.textContent = `Editar política · ${companyName}`; cancelEdit.hidden = false; companySelect.disabled = true; renderSelected(); renderRules(); formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1087,7 +1044,7 @@
           }));
           actionsCell.append(actionList); row.append(actionsCell); body.append(row);
         });
-        if (!body.children.length) { const row = $('tr'); const cell = $('td', 'law-contact-empty', 'Ainda não há políticas ativas ou pendentes.'); cell.colSpan = 5; row.append(cell); body.append(row); }
+        if (!body.children.length) { const row = $('tr'); const cell = $('td', 'law-record-empty', 'Ainda não há políticas ativas ou pendentes.'); cell.colSpan = 5; row.append(cell); body.append(row); }
         renderPagination(paging, { page, per_page: CONTACT_PAGE_SIZE, total: sharingRows.length }, drawSharingPage, 'políticas');
       };
       table.append(body); tableWrap.append(table); tableCard.append(tableHeader, tableWrap, paging); root.append(tableCard); drawSharingPage();
@@ -1097,10 +1054,10 @@
   async function renderQualityPage(root, context) {
     document.title = 'Revisão e qualidade | Fokus Law';
     root.replaceChildren();
-    const heading = $('div', 'law-page-heading law-contact-page-heading law-contact-quality-heading');
+    const heading = $('div', 'law-page-heading law-record-page-heading law-contact-quality-heading');
     heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Revisão e qualidade'), $('p', 'law-page-lede', 'Priorize os dados essenciais para localizar e relacionar seus contatos.'));
     if (context.company?.role === 'admin') {
-      const actions = $('div', 'law-contact-heading-actions');
+      const actions = $('div', 'law-record-heading-actions');
       actions.append(button('Contexto da base', 'fs-btn fs-btn-secondary', (event) => openContactContextSettings(root, event.currentTarget, () => renderQualityPage(root, context))));
       heading.append(actions);
     }
@@ -1143,7 +1100,7 @@
             finally { trigger.disabled = false; }
           })); row.append(action); tbody.append(row);
         });
-        if (!tbody.children.length) { const row = $('tr'); const cell = $('td', 'law-contact-empty', 'Não há cadastros pendentes.'); cell.colSpan = 4; row.append(cell); tbody.append(row); }
+        if (!tbody.children.length) { const row = $('tr'); const cell = $('td', 'law-record-empty', 'Não há cadastros pendentes.'); cell.colSpan = 4; row.append(cell); tbody.append(row); }
         renderPagination(paging, pageResult.pagination || {}, async (page) => drawTable(await window.FokusApi.request(`/law/contacts/quality/review?type=action_required&page=${page}&per_page=${CONTACT_PAGE_SIZE}`)), 'cadastros');
       };
       table.append(thead, tbody); wrap.append(table); tableCard.append(tableHeader, wrap, paging);
@@ -1151,7 +1108,7 @@
         const trigger = event.currentTarget; trigger.disabled = true; trigger.textContent = 'Analisando…';
         try {
           const result = await window.FokusApi.request(`/law/contacts/quality/duplicates?per_page=${CONTACT_PAGE_SIZE}`); const modal = createModal(root, 'Possíveis duplicidades', 'fs-modal-lg');
-          const intro = $('p', 'law-contact-help'); const rows = $('div'); const paging = $('div', 'law-contact-quality-paging'); modal.body.append(intro, rows, paging);
+          const intro = $('p', 'law-record-help'); const rows = $('div'); const paging = $('div', 'law-contact-quality-paging'); modal.body.append(intro, rows, paging);
           const drawPage = (pageResult) => {
             intro.textContent = `${Number(pageResult.pagination?.total || 0).toLocaleString('pt-BR')} par(es) para revisão. Os valores coincidentes ficam ocultos; esta análise não altera cadastros.`;
             rows.replaceChildren(); (pageResult.pairs || []).forEach((pair) => { const row = $('div', 'law-contact-duplicate-pair'); row.append($('strong', '', `${pair.contact.display_name} · ${pair.candidate.display_name}`), $('span', '', pair.reason), button('Revisar primeiro contato', 'fs-btn fs-btn-secondary', () => { modal.close(); openDetails(root, pair.contact.id, false, () => renderQualityPage(root, context)); })); rows.append(row); });

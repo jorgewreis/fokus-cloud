@@ -305,7 +305,7 @@
     const header = element('header', 'law-dashboard-widget-header');
     const identity = element('div', 'law-dashboard-widget-identity');
     const mark = element('span', 'law-dashboard-widget-mark'); mark.append(icon('processes'));
-    const title = element('div'); title.append(element('span', 'law-dashboard-widget-kicker', 'GESTÃO PROCESSUAL'), element('h3', '', 'Gestão de Processos'));
+    const title = element('div'); title.append(element('span', 'law-dashboard-widget-kicker', 'GESTÃO DE PROCESSOS'), element('h3', '', 'Gestão de Processos'));
     identity.append(mark, title);
     const open = element('button', 'law-dashboard-widget-open', 'Abrir módulo'); open.type = 'button'; open.append(element('span', '', '↗'));
     open.addEventListener('click', () => { activeGroup = `module:${module.id}`; contactsView = 'module'; renderNavigation(); closeMobileNav(); contentRegion.focus({ preventScroll: true }); });
@@ -314,22 +314,8 @@
     card.append(header, body); grid.append(card);
     FokusApi.request('/law/cases/dashboard').then(({ summary }) => {
       if (!card.isConnected) return;
-      const total = Number(summary.cases_total || 0); const distribution = element('div', 'law-dashboard-contact-distribution');
-      const ring = element('div', 'law-dashboard-contact-ring'); ring.style.setProperty('--contact-pf-share', '100%'); ring.dataset.empty = String(total === 0);
-      ring.setAttribute('role', 'img'); ring.setAttribute('aria-label', `${total} processos acessíveis não arquivados`);
-      const center = element('span', 'law-dashboard-ring-center'); center.append(element('strong', '', total.toLocaleString('pt-BR')), element('small', '', 'processos')); ring.append(center);
-      const breakdown = element('div', 'law-dashboard-contact-breakdown');
-      const classes = (summary.by_class || []).slice(0, 3);
-      const others = (summary.by_class || []).slice(3).reduce((sum, item) => sum + Number(item.total), 0);
-      if (others) classes.push({ label: 'Outras classes', total: others });
-      classes.forEach((item, index) => {
-        const row = element('div', `law-dashboard-breakdown-row law-dashboard-breakdown-${index % 2 ? 'pj' : 'pf'}`);
-        const head = element('div', 'law-dashboard-breakdown-head'); head.append(element('span', 'law-dashboard-breakdown-label', item.label), element('strong', '', Number(item.total).toLocaleString('pt-BR')));
-        const track = element('span', 'law-dashboard-breakdown-track'); const fill = element('span', 'law-dashboard-breakdown-fill'); fill.style.width = `${Math.min(100, Number(item.total) / Math.max(1, total) * 100)}%`; track.append(fill);
-        row.append(head, track); breakdown.append(row);
-      });
-      if (!classes.length) breakdown.append(element('span', 'law-dashboard-recent-empty', 'Cadastre o primeiro processo para acompanhar a distribuição por classe.'));
-      distribution.append(ring, breakdown);
+      const total = Number(summary.cases_total || 0);
+      const distribution = window.FokusLawRecordUI.compositionChart(summary.by_class || [], total, 'processos', true);
       const recent = element('div', 'law-dashboard-widget-recent'); recent.append(element('span', 'law-dashboard-widget-kicker', 'CADASTRADOS RECENTEMENTE'));
       const links = element('div', 'law-dashboard-recent-list');
       (summary.recent || []).forEach((item) => {

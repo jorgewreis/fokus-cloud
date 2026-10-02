@@ -15,6 +15,28 @@ uso por outras páginas do portal. O dashboard amplia a composição compartilha
 de largura dos cards no CSS do shell; as cores, a tipografia e os componentes
 existentes são reutilizados, sem alteração do pacote Fokus Styles.
 
+### Composição visual compartilhada com Contatos
+
+Processos adota a composição aprovada de Contatos: cabeçalho com ações, painel
+roxo de resumo, gráfico de composição, quatro indicadores compactos, registros
+recentes, filtros, tabela e paginação. Fonte, paleta, bordas e espaçamentos vêm
+do mesmo contrato `law-record-*` no shell. Indicadores e paginação também usam
+os mesmos renderizadores em `law-record-ui.js`, consumidos pelos dois módulos.
+
+O gráfico de Processos representa as classes judiciais; quando há mais de quatro
+classes, as menores são agrupadas em Outras classes somente na visualização.
+Os quatro indicadores mostram processos da consulta, classes, unidades e
+processos restritos aos quais o usuário tem acesso. Todos são calculados sobre
+a mesma consulta autorizada da lista, incluindo a pesquisa e a opção de
+arquivados. O resumo nunca contabiliza processos restritos sem autorização.
+
+A ficha mantém dados processuais e organização interna em cards separados,
+com cabeçalho de identificação, vínculos e histórico. Formulários reutilizam
+a anatomia dos diálogos de Contatos. O dashboard usa o mesmo cabeçalho, largura,
+paleta e tipografia dos cards de módulos, com distribuição por classe e atalhos
+para os cadastros recentes. As diferenças de conteúdo respeitam o contexto
+judiciário criminal; não incluem movimentações, tarefas ou prazos.
+
 ## Cadastro e consulta oficial
 
 O cadastro exige CNJ completo válido e unidade ativa da empresa. Autuação e

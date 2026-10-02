@@ -45,6 +45,9 @@ class LawCaseController extends Controller
             ->map(fn (object $row): array => ['label' => (string) $row->label, 'total' => (int) $row->total])->values();
 
         $page = max(1, (int) $request->query('page', 1));
+        $counts = (clone $query)->selectRaw("COUNT(DISTINCT law_cases.law_unit_id) as units, SUM(CASE WHEN law_cases.confidentiality_level = 'restricted' THEN 1 ELSE 0 END) as restricted")->first();
+        $recent = (clone $query)->select('law_cases.id', 'law_cases.case_number', 'law_cases.case_class', 'law_cases.created_at')->orderByDesc('law_cases.created_at')->orderByDesc('law_cases.id')->limit(5)->get()
+            ->map(fn ($row) => ['id' => $row->id, 'case_number_formatted' => $cases->formatCaseNumber($row->case_number), 'case_class' => $row->case_class, 'created_at' => $row->created_at]);
         $perPage = min(50, max(1, (int) $request->query('per_page', 20)));
         $paginator = $query->select('law_cases.*', 'unit.name as unit_name', 'responsible_user.name as responsible_name')
             ->orderByDesc('law_cases.created_at')->orderByDesc('law_cases.id')
@@ -54,6 +57,7 @@ class LawCaseController extends Controller
             'cases' => $paginator->getCollection()->map(fn (object $row): array => $cases->caseArray($row))->values(),
             'pagination' => ['page' => $paginator->currentPage(), 'per_page' => $paginator->perPage(), 'total' => $paginator->total()],
             'summary_by_class' => $summary,
+            'summary' => ['units' => (int) ($counts->units ?? 0), 'restricted' => (int) ($counts->restricted ?? 0), 'recent' => $recent],
             'include_archived' => $request->boolean('include_archived'),
         ]);
     }
