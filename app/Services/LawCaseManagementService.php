@@ -100,15 +100,16 @@ class LawCaseManagementService
 
             $title = match ($result['status']) {
                 'synced' => 'Metadados do Datajud atualizados',
-                'not_found' => 'Datajud não encontrou dados públicos para o processo',
+                'not_found' => ($result['code'] ?? '') === 'no_metadata' ? 'Processo localizado no Datajud sem metadados disponíveis' : 'Datajud não encontrou dados públicos para o processo',
                 default => 'Consulta ao Datajud não concluída',
             };
             $before['datajud_sync_status'] = $current->datajud_sync_status;
             $after['datajud_sync_status'] = $result['status'];
+            $after['datajud_result_code'] = $result['code'] ?? $result['status'];
             DB::table('law_case_events')->insert([
                 'id' => PrefixedUlid::make('LCE'), 'company_id' => $companyId, 'law_case_id' => $caseId,
                 'actor_user_id' => $actorId, 'event_type' => $eventType, 'title' => $title,
-                'reason' => $result['status'] === 'error' ? (string) ($result['message'] ?? 'Falha externa.') : null,
+                'reason' => $result['message'] ?? null,
                 'before_state' => $before ? json_encode($before, JSON_INVALID_UTF8_SUBSTITUTE) : null,
                 'after_state' => json_encode($after, JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}',
                 'created_at' => $checkedAt,

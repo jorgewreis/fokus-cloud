@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 class LawDatajudClient
@@ -18,17 +19,21 @@ class LawDatajudClient
     {
         $apiKey = trim((string) config('services.datajud.api_key'));
         if ($apiKey === '') {
-            return ['status' => 'error', 'message' => 'A consulta ao Datajud ainda não está configurada.'];
+            return $this->failure('not_configured', 'A consulta ao Datajud ainda não está configurada neste ambiente. Solicite à administração do sistema a configuração da chave pública do CNJ.');
         }
 
         $digits = preg_replace('/\D+/', '', $caseNumber) ?: '';
+        if (strlen($digits) !== 20) {
+            return $this->failure('invalid_number', 'Confira o número CNJ: a consulta exige os 20 dígitos do processo.');
+        }
         $alias = $this->aliasFor($digits);
         if ($alias === null) {
-            return ['status' => 'error', 'message' => 'O tribunal deste número ainda não possui rota Datajud configurada.'];
+            return $this->failure('unsupported_tribunal', 'O tribunal identificado neste número CNJ ainda não possui consulta configurada. Confira o número ou preencha os dados manualmente.');
         }
 
         try {
-            $response = Http::connectTimeout(3)->timeout(8)->acceptJson()->withHeaders([
+            $response = Http::connectTimeout(max(2, min(15, (int) config('services.datajud.connect_timeout', 10))))
+                ->timeout(max(5, min(60, (int) config('services.datajud.timeout', 30))))->acceptJson()->withHeaders([
                 'Authorization' => 'APIKey '.$apiKey,
                 'Content-Type' => 'application/json',
             ])->post(rtrim((string) config('services.datajud.base_url'), '/').'/'.$alias.'/_search', [
@@ -38,15 +43,33 @@ class LawDatajudClient
                     'orgaoJulgador.codigo', 'orgaoJulgador.nome', 'tribunal', 'situacaoProcessual.codigo',
                     'situacaoProcessual.nome', 'situacao.codigo', 'situacao.nome', 'situacaoAtual',
                 ],
-                'query' => ['term' => ['numeroProcesso' => $digits]],
+                'query' => ['bool' => [
+                    'should' => [['match' => ['numeroProcesso' => $digits]], ['term' => ['numeroProcesso' => $digits]]],
+                    'minimum_should_match' => 1,
+                ]],
             ]);
 
             if (! $response->successful()) {
-                return ['status' => 'error', 'message' => 'O Datajud não respondeu à consulta.'];
+                return match (true) {
+                    in_array($response->status(), [401, 403], true) => $this->failure('authentication_failed', 'O CNJ recusou a chave de acesso ao Datajud. A administração do sistema precisa conferir ou atualizar a chave pública.'),
+                    $response->status() === 429 => $this->failure('rate_limited', 'O Datajud atingiu o limite de consultas neste momento. Aguarde alguns minutos e tente novamente.'),
+                    in_array($response->status(), [408, 504], true) => $this->failure('timeout', 'O Datajud demorou mais que o limite da consulta. Tente novamente em alguns instantes.'),
+                    $response->serverError() => $this->failure('service_unavailable', 'O serviço do Datajud apresentou uma falha temporária. Tente novamente mais tarde.'),
+                    $response->status() === 404 => $this->failure('endpoint_not_found', 'O endereço de consulta deste tribunal não foi encontrado no Datajud. A administração do sistema precisa conferir a integração.'),
+                    default => $this->failure('request_rejected', 'O Datajud não aceitou a consulta (HTTP '.$response->status().'). Solicite à administração do sistema a conferência da integração.'),
+                };
             }
 
-            $source = data_get($response->json(), 'hits.hits.0._source');
-            if (! is_array($source)) return ['status' => 'not_found', 'metadata' => []];
+            $payload = $response->json();
+            $hits = data_get($payload, 'hits.hits');
+            if (! is_array($payload) || ! is_array($hits)) {
+                return $this->failure('invalid_response', 'O Datajud retornou uma resposta que não pôde ser interpretada. Tente novamente; se a falha continuar, informe a administração do sistema.');
+            }
+            if ($hits === []) return ['status' => 'not_found', 'code' => 'not_found', 'metadata' => [], 'message' => 'Nenhum registro público foi encontrado para este número no Datajud. Confira o número CNJ. O processo pode ainda não estar disponível na base ou ter acesso limitado; a ausência de resultado não confirma sigilo.'];
+            $source = data_get($hits, '0._source');
+            if (! is_array($source) || (isset($source['numeroProcesso']) && preg_replace('/\D+/', '', (string) $source['numeroProcesso']) !== $digits)) {
+                return $this->failure('invalid_response', 'O Datajud retornou dados incompatíveis com o processo consultado. Nenhum metadado desta resposta foi aplicado. Solicite à administração do sistema a conferência da integração.');
+            }
 
             $class = data_get($source, 'classe');
             $court = data_get($source, 'orgaoJulgador');
@@ -69,10 +92,29 @@ class LawDatajudClient
                 'official_status_text' => is_array($status) ? trim((string) ($status['nome'] ?? '')) : (is_string($status) ? trim($status) : null),
             ], static fn ($value): bool => $value !== null && $value !== '');
 
-            return ['status' => $metadata ? 'synced' : 'not_found', 'metadata' => $metadata];
-        } catch (\Throwable) {
-            return ['status' => 'error', 'message' => 'Não foi possível consultar o Datajud agora.'];
+            return [
+                'status' => $metadata ? 'synced' : 'not_found', 'code' => $metadata ? 'synced' : 'no_metadata', 'metadata' => $metadata,
+                'message' => $metadata
+                    ? 'Consulta concluída. Os metadados disponíveis foram recebidos; preenchimentos manuais divergentes foram preservados para sua revisão. Campos não fornecidos pelo CNJ podem continuar sem informação.'
+                    : 'O Datajud encontrou o processo, mas não forneceu os metadados utilizados nesta etapa. Você pode preencher os campos ausentes manualmente.',
+            ];
+        } catch (ConnectionException $exception) {
+            // Inspect only to classify transport errors; never expose URLs, headers or exception text.
+            $timedOut = preg_match('/cURL error 28|timed?\s*out|timeout/i', $exception->getMessage()) === 1;
+            $tlsFailed = preg_match('/cURL error (35|51|58|60|77|83)\b/i', $exception->getMessage()) === 1;
+            if ($tlsFailed) return $this->failure('secure_connection_failed', 'O servidor não conseguiu validar a conexão segura com o Datajud. A administração do sistema precisa conferir os certificados e a configuração de conexão.');
+            return $timedOut
+                ? $this->failure('timeout', 'A conexão com o Datajud excedeu o tempo de espera. Tente novamente em alguns instantes.')
+                : $this->failure('connection_failed', 'Não foi possível estabelecer uma conexão segura com o Datajud. Tente novamente; se a falha continuar, a administração do sistema deve conferir a conexão do servidor.');
+        } catch (\Throwable $exception) {
+            \Illuminate\Support\Facades\Log::error('Falha interna na consulta Datajud.', ['exception_class' => $exception::class]);
+            return $this->failure('internal_error', 'O sistema encontrou uma falha ao preparar ou interpretar a consulta ao Datajud. Informe a administração do sistema.');
         }
+    }
+
+    private function failure(string $code, string $message): array
+    {
+        return ['status' => 'error', 'code' => $code, 'message' => $message];
     }
 
     private function aliasFor(string $digits): ?string

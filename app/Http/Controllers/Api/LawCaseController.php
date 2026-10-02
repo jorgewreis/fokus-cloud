@@ -145,7 +145,7 @@ class LawCaseController extends Controller
 
         $case = DB::table('law_cases')->where('company_id', $companyId)->where('id', $id)->first();
         $sync = $cases->syncDatajud($case, $userId, $datajud, 'datajud_initial_sync');
-        return response()->json(['case' => $cases->caseArray($this->findCase($request, $id, $cases)), 'datajud' => ['status' => $sync['status']]], 201);
+        return response()->json(['case' => $cases->caseArray($this->findCase($request, $id, $cases)), 'datajud' => array_intersect_key($sync, array_flip(['status', 'code', 'message']))], 201);
     }
 
     public function show(Request $request, string $case, LawCaseManagementService $cases)
@@ -181,8 +181,14 @@ class LawCaseController extends Controller
                 'actor_name' => $row->actor_name,
             ])->values();
 
+        $latestDatajud = DB::table('law_case_events')->where('company_id', $companyId)->where('law_case_id', $case)
+            ->whereIn('event_type', ['datajud_initial_sync', 'datajud_manual_sync', 'datajud_monthly_sync', 'datajud_sync'])
+            ->orderByDesc('created_at')->orderByDesc('id')->first(['reason', 'after_state']);
+        $latestDatajudState = json_decode((string) ($latestDatajud->after_state ?? ''), true) ?: [];
+
         return response()->json([
             'case' => $cases->caseArray($current), 'contacts' => $contacts, 'relations' => $relations->concat($reverse)->values(),
+            'datajud' => ['status' => (string) $current->datajud_sync_status, 'code' => $latestDatajudState['datajud_result_code'] ?? null, 'message' => $latestDatajud->reason ?? null],
             'tags' => $tags, 'events' => $events,
             'history_page' => max(1, $request->integer('history_page', 1)),
             'history_total' => DB::table('law_case_events')->where('company_id', $companyId)->where('law_case_id', $case)->count(),
@@ -323,7 +329,7 @@ class LawCaseController extends Controller
     {
         $current = $this->findCase($request, $case, $cases, true);
         $result = $cases->syncDatajud($current, (string) $request->user()->id, $datajud, 'datajud_manual_sync');
-        return response()->json(['case' => $cases->caseArray($this->findCase($request, $case, $cases)), 'datajud' => ['status' => $result['status']]]);
+        return response()->json(['case' => $cases->caseArray($this->findCase($request, $case, $cases)), 'datajud' => array_intersect_key($result, array_flip(['status', 'code', 'message']))]);
     }
 
     public function resolveConflict(Request $request, string $case, string $conflict, LawCaseManagementService $cases, AuditRecorder $audit)

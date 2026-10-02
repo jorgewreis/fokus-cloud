@@ -180,6 +180,16 @@ jobs:
         run: |
           ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; cd '$DEPLOY_PATH'; php artisan migrate --force --no-interaction"
 
+      - name: Configure public Datajud access on server
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DATAJUD_API_KEY: ${{ secrets.DATAJUD_API_KEY }}
+        run: |
+          printf '%s' "$DATAJUD_API_KEY" | ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; cd '$DEPLOY_PATH'; php deploy/configure-datajud.php"
+
       - name: Optimize Laravel on server
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -188,6 +198,15 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; cd '$DEPLOY_PATH'; php artisan optimize"
+
+      - name: Check Datajud configuration and public endpoint
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; cd '$DEPLOY_PATH'; php artisan law:datajud-status; php artisan law:datajud-status --probe || printf '%s\n' '::warning::O Datajud não confirmou resposta externa; consulte o diagnóstico acima.'"
 
       - name: Ensure Laravel scheduler is active
         env:
