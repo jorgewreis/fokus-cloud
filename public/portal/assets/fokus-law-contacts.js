@@ -309,9 +309,10 @@
     const nameRow = $('div', 'law-contact-name-fields'); nameRow.append(nameField, acronymField);
     const natureField = field('Tipo de contato *', nature);
     const recordKindField = field('Cadastro', recordKind);
-    const hierarchyParent = setWidth(select([['', `Selecione ${contextData.organization_label.toLocaleLowerCase('pt-BR')} ou unidade superior`], ...(window.lawContactHierarchyOptions || []).filter((item) => item.id !== contact?.id).map((item) => [item.id, `${item.display_name}${item.record_kind === 'unit' ? ` · ${contextData.unit_label}` : ''}`])], contact?.parent_contact_id || ''), 800);
+    const parentPlaceholder = contextData.context_code === 'escritorio' ? 'Selecione o escritório ou a filial' : 'Selecione o órgão ou a unidade';
+    const hierarchyParent = setWidth(select([['', parentPlaceholder], ...(window.lawContactHierarchyOptions || []).filter((item) => item.id !== contact?.id).map((item) => [item.id, `${item.display_name}${item.record_kind === 'unit' ? ` · ${contextData.unit_label}` : ''}`])], contact?.parent_contact_id || ''), 800);
     hierarchyParent.name = 'parent_contact_id';
-    const parentField = field('Registro superior', hierarchyParent);
+    const parentField = field('Vinculado a', hierarchyParent);
     const preserveHiddenParent = Boolean(contact?.parent_contact_id && !contact?.parent);
     if (preserveHiddenParent) parentField.hidden = true;
     if (isUnitRecord) basic.content.append(recordKindField, parentField, nameRow);
