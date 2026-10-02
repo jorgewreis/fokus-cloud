@@ -55,7 +55,16 @@
       item.append(control); list.append(item);
     };
     addPage('‹', current - 1, 'Página anterior', current <= 1);
-    addPage(String(current), current, `Página ${current} de ${last}`, false, true);
+    const pages = last <= 7
+      ? Array.from({ length: last }, (_, index) => index + 1)
+      : [...new Set([1, current - 1, current, current + 1, last])].filter((page) => page >= 1 && page <= last).sort((a, b) => a - b);
+    pages.forEach((page, index) => {
+      if (index > 0 && page - pages[index - 1] > 1) {
+        const gap = $('li', 'fs-page-item'); gap.setAttribute('aria-hidden', 'true');
+        gap.append($('span', 'fs-page-link', '…')); list.append(gap);
+      }
+      addPage(String(page), page, `Página ${page} de ${last}`, false, page === current);
+    });
     addPage('›', current + 1, 'Próxima página', current >= last);
     nav.append(list); container.replaceChildren(summary, nav);
   }
