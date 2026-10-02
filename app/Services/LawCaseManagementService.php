@@ -59,6 +59,7 @@ class LawCaseManagementService
 
             foreach (($result['metadata'] ?? []) as $field => $value) {
                 if (! isset($mapping[$field])) continue;
+                $previousOfficial = $official[$field] ?? null;
                 $official[$field] = $value;
                 if (array_key_exists($field, $manual)) {
                     if ($manual[$field] === $value) {
@@ -68,6 +69,10 @@ class LawCaseManagementService
                         $after[$field] = $value;
                         DB::table('law_cases')->where('id', $caseId)->update([$mapping[$field] => $this->encodeField($value)]);
                     } else {
+                        if ($previousOfficial !== $value) {
+                            $before['datajud_'.$field] = $previousOfficial;
+                            $after['datajud_'.$field] = $value;
+                        }
                         $this->upsertConflict($companyId, $caseId, $field, $manual[$field], $value);
                     }
                     continue;
@@ -172,8 +177,11 @@ class LawCaseManagementService
 
     private function upsertConflict(string $companyId, string $caseId, string $field, mixed $manualValue, mixed $officialValue): void
     {
-        $decision = DB::table('law_case_metadata_conflicts')->where('company_id', $companyId)->where('law_case_id', $caseId)->where('field', $field)->whereNotNull('resolved_at')->orderByDesc('resolved_at')->first();
-        if ($decision && $decision->resolution === 'manual' && json_decode((string) $decision->official_value, true) === $officialValue && json_decode((string) $decision->manual_value, true) === $manualValue) return;
+        $decision = DB::table('law_case_metadata_conflicts')->where('company_id', $companyId)->where('law_case_id', $caseId)->where('field', $field)->whereNotNull('resolved_at')->whereIn('resolution', ['manual', 'official'])->orderByDesc('resolved_at')->orderByDesc('id')->first();
+        if ($decision && $decision->resolution === 'manual' && json_decode((string) $decision->official_value, true) === $officialValue && json_decode((string) $decision->manual_value, true) === $manualValue) {
+            DB::table('law_case_metadata_conflicts')->where('company_id', $companyId)->where('law_case_id', $caseId)->where('field', $field)->whereNull('resolved_at')->update(['resolution' => 'superseded', 'resolved_at' => now(), 'updated_at' => now()]);
+            return;
+        }
         $existing = DB::table('law_case_metadata_conflicts')->where('company_id', $companyId)->where('law_case_id', $caseId)
             ->where('field', $field)->whereNull('resolved_at')->orderByDesc('created_at')->first();
         $values = [
