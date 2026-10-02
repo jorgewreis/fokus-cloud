@@ -103,6 +103,7 @@ class LawCaseManagementService
                 'not_found' => 'Datajud não encontrou dados públicos para o processo',
                 default => 'Consulta ao Datajud não concluída',
             };
+            $before['datajud_sync_status'] = $current->datajud_sync_status;
             $after['datajud_sync_status'] = $result['status'];
             DB::table('law_case_events')->insert([
                 'id' => PrefixedUlid::make('LCE'), 'company_id' => $companyId, 'law_case_id' => $caseId,
