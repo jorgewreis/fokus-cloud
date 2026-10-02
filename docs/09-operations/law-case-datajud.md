@@ -7,8 +7,10 @@ pelo CNJ. Não registre seu conteúdo em código ou logs. `DATAJUD_API_BASE_URL`
 por padrão `https://api-publica.datajud.cnj.jus.br`. Reconstrua o cache de
 configuração após alterar variáveis de um ambiente que utilize esse cache.
 
-O cliente permite até 10 segundos para conexão e 30 segundos para consulta,
-como a integração de referência do ios1vcrime. Os limites são ajustáveis por
+O cliente permite até 10 segundos para conexão e 50 segundos para consulta.
+Uma busca de controle respondeu HTTP 200 em aproximadamente 28 segundos na
+investigação de 02/10/2026, deixando pouca margem no limite anterior de 30
+segundos. Os limites são ajustáveis por
 `DATAJUD_CONNECT_TIMEOUT` (2 a 15 segundos) e `DATAJUD_TIMEOUT` (5 a 60 segundos).
 A ausência de
 configuração não impede cadastro e preenchimento manual. A rotina automática
@@ -29,14 +31,16 @@ pacote confiável de certificados e reinicie o processo PHP que atende a
 aplicação. Não desabilite a validação HTTPS para contornar esse problema.
 
 O comando `php artisan law:datajud-status` confere a presença da chave sem
-exibi-la. Com `--probe`, faz uma consulta vazia (`match_none`, `size: 0`) ao
-endpoint TJBA para conferir autenticação e resposta, sem números ou dados de
-processos reais. O deploy registra esse diagnóstico; uma falha externa gera
+exibi-la. Com `--probe`, busca um número fictício inválido de 20 zeros
+(`match`, `size: 0`) no endpoint TJBA para conferir autenticação e resposta,
+sem números ou dados de processos reais. O diagnóstico segue o mesmo prazo
+da consulta do módulo. O deploy registra esse diagnóstico; uma falha externa gera
 aviso e não impede a publicação das demais correções.
 
 ## Consulta e mensagens
 
-A consulta combina `match` e `term` pelo número CNJ completo. O tribunal é
+A consulta usa `match` pelo número CNJ completo, sem duplicar a condição de
+busca em um `bool.should`. O tribunal é
 determinado pelo próprio número; não há tentativa em outro tribunal. Uma
 resposta que informe um número diferente é rejeitada. São solicitados somente
 os metadados desta etapa, sem movimentações.
@@ -45,6 +49,22 @@ As respostas de cadastro e consulta manual incluem `datajud.status`,
 `datajud.code` e `datajud.message`. O detalhe recupera o resultado da última
 consulta diretamente do histórico autorizado, independentemente da página de
 histórico exibida. Nenhuma migration adicional é necessária.
+
+Respostas HTTP 200 com `timed_out: true` ou fragmentos da busca em falha
+(`_shards.failed > 0`) são tratadas como consultas incompletas. Não confirmam
+ausência do processo nem sobrescrevem os metadados existentes. HTTP 429 com
+`circuit_breaking_exception` ou `es_rejected_execution_exception` indica
+sobrecarga do Datajud, exibida separadamente do limite de consultas. Quando
+o CNJ fornece `Retry-After`, a mensagem informa o prazo de espera indicado.
+
+O workflow manual `Diagnose Datajud access` compara o transporte do Laravel
+com uma requisição cURL no formato da referência ios1vcrime. Registra somente
+tempos de conexão, status, cabeçalhos de diagnóstico e tipos de erro, sem
+chaves, respostas brutas ou dados processuais. Verifica também a concordância
+da chave em cache com o `.env` do servidor. O parâmetro opcional `case_number`
+permite consultar um processo público expressamente autorizado pelo usuário
+com o próprio cliente do módulo e exibir seus metadados desta etapa; não altera
+o cadastro ou o histórico. Não use o parâmetro para processos sensíveis.
 
 A interface informa separadamente ausência de configuração, chave recusada
 (401/403), limite de consultas (429), tempo excedido, falha de conexão, falha

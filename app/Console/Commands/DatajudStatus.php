@@ -23,16 +23,16 @@ class DatajudStatus extends Command
 
         try {
             $response = Http::connectTimeout(max(2, min(15, (int) config('services.datajud.connect_timeout', 10))))
-                ->timeout(max(5, min(60, (int) config('services.datajud.timeout', 30))))
+                ->timeout(max(5, min(60, (int) config('services.datajud.timeout', 50))))
                 ->acceptJson()->withHeaders(['Authorization' => 'APIKey '.$key])
                 ->post(rtrim((string) config('services.datajud.base_url'), '/').'/api_publica_tjba/_search', [
-                    'size' => 0, 'query' => ['match_none' => (object) []],
+                    'size' => 0, 'query' => ['match' => ['numeroProcesso' => '00000000000000000000']],
                 ]);
-            if (! $response->successful() || ! is_array(data_get($response->json(), 'hits.hits'))) {
+            if (! $response->successful() || ! is_array(data_get($response->json(), 'hits.hits')) || data_get($response->json(), 'timed_out') === true || (int) data_get($response->json(), '_shards.failed', 0) > 0) {
                 $this->error('Endpoint TJBA não confirmou acesso válido (HTTP '.$response->status().').');
                 return self::FAILURE;
             }
-            $this->info('Endpoint TJBA respondeu HTTP '.$response->status().'. Autenticação aceita; nenhum processo real foi consultado.');
+            $this->info('Endpoint TJBA respondeu HTTP '.$response->status().'. Autenticação e busca pelo número aceitas; foi utilizado somente um número fictício inválido, sem dados de processos reais.');
             return self::SUCCESS;
         } catch (ConnectionException $exception) {
             preg_match('/cURL error (\d+)\b/', $exception->getMessage(), $match);

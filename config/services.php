@@ -43,7 +43,7 @@ return [
     'datajud' => [
         'api_key' => env('DATAJUD_API_KEY'),
         'base_url' => env('DATAJUD_API_BASE_URL', 'https://api-publica.datajud.cnj.jus.br'),
-        'timeout' => (int) env('DATAJUD_TIMEOUT', 30),
+        'timeout' => (int) env('DATAJUD_TIMEOUT', 50),
         'connect_timeout' => (int) env('DATAJUD_CONNECT_TIMEOUT', 10),
     ],
 

@@ -14,21 +14,30 @@ if ($base !== 'https://api-publica.datajud.cnj.jus.br' || $key === '') {
     exit(1);
 }
 $environment = Dotenv\Dotenv::parse((string) file_get_contents(getcwd().'/.env'));
-echo json_encode(['configuration' => ['key_present' => true, 'cached_key_matches_env' => $key === trim((string) ($environment['DATAJUD_API_KEY'] ?? ''))]], JSON_UNESCAPED_UNICODE).PHP_EOL;
+echo json_encode(['configuration' => ['key_present' => true, 'cached_key_matches_env' => $key === trim((string) ($environment['DATAJUD_API_KEY'] ?? '')), 'timeout_seconds' => config('services.datajud.timeout')]], JSON_UNESCAPED_UNICODE).PHP_EOL;
+$caseNumber = trim((string) getenv('DATAJUD_CASE_NUMBER'));
+if ($caseNumber !== '') {
+    if (! preg_match('/\A\d{20}\z/', $caseNumber)) exit(1);
+    $result = app(App\Services\LawDatajudClient::class)->lookup($caseNumber);
+    echo json_encode(['case_lookup' => $result, 'record_changes' => false], JSON_UNESCAPED_UNICODE).PHP_EOL;
+    exit(($result['status'] ?? '') === 'synced' ? 0 : 1);
+}
 $url = $base.'/api_publica_tjba/_search';
-$body = ['size' => 0, 'query' => ['match_none' => (object) []]];
+$body = ['size' => 0, 'query' => ['match' => ['numeroProcesso' => '00000000000000000000']]];
+$timeout = max(5, min(60, (int) config('services.datajud.timeout', 50)));
 $summarize = static function (string $label, int $status, string $raw, array $headers, array $metrics): void {
     $data = json_decode($raw, true);
     $error = is_array($data) ? ($data['error'] ?? []) : [];
     $errorType = is_array($error) ? ($error['type'] ?? ($error['root_cause'][0]['type'] ?? null)) : null;
     echo json_encode(['client' => $label, 'http' => $status, 'headers' => $headers, 'metrics' => $metrics,
         'json_keys' => is_array($data) ? array_keys($data) : [], 'error_type' => $errorType,
-        'valid_empty_search' => is_array($data['hits']['hits'] ?? null),
+        'valid_empty_search' => is_array($data['hits']['hits'] ?? null), 'source_timed_out' => $data['timed_out'] ?? null,
+        'failed_shards' => $data['_shards']['failed'] ?? null,
     ], JSON_UNESCAPED_UNICODE).PHP_EOL;
 };
 $metrics = [];
 try {
-    $response = Illuminate\Support\Facades\Http::connectTimeout(5)->timeout(15)->acceptJson()
+    $response = Illuminate\Support\Facades\Http::connectTimeout(5)->timeout($timeout)->acceptJson()
         ->withHeaders(['Authorization' => 'APIKey '.$key])->withOptions(['on_stats' => static function ($stats) use (&$metrics): void {
             $metrics = array_intersect_key($stats->getHandlerStats(), array_flip(['primary_ip', 'http_version', 'namelookup_time', 'connect_time', 'appconnect_time', 'starttransfer_time', 'total_time']));
         }])->post($url, $body);
@@ -44,7 +53,7 @@ $headers = [];
 $handle = curl_init($url);
 curl_setopt_array($handle, [CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true,
     CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: APIKey '.$key],
-    CURLOPT_POSTFIELDS => json_encode($body), CURLOPT_TIMEOUT => 15, CURLOPT_CONNECTTIMEOUT => 5,
+    CURLOPT_POSTFIELDS => json_encode($body), CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 5,
     CURLOPT_HEADERFUNCTION => static function ($ch, $line) use (&$headers): int {
         $parts = explode(':', $line, 2);
         if (count($parts) === 2 && in_array(strtolower(trim($parts[0])), ['retry-after', 'server', 'content-type'], true)) $headers[strtolower(trim($parts[0]))] = substr(trim($parts[1]), 0, 200);
