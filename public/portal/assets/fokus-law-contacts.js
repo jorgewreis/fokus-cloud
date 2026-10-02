@@ -307,7 +307,7 @@
     const legalName = input(contact?.legal_name || '', 'Razão social (opcional)', 180); legalName.name = 'legal_name';
     const nameField = field('Nome *', name); const acronymField = field('Sigla', acronym);
     const nameRow = $('div', 'law-contact-name-fields'); nameRow.append(nameField, acronymField);
-    const natureField = field('Tipo de contato *', nature);
+    const natureField = field('Natureza do contato *', nature);
     const recordKindField = field('Cadastro', recordKind);
     const parentPlaceholder = contextData.context_code === 'escritorio' ? 'Selecione o escritório ou a filial' : 'Selecione o órgão ou a unidade';
     const hierarchyParent = setWidth(select([['', parentPlaceholder], ...(window.lawContactHierarchyOptions || []).filter((item) => item.id !== contact?.id).map((item) => [item.id, `${item.display_name}${item.record_kind === 'unit' ? ` · ${contextData.unit_label}` : ''}`])], contact?.parent_contact_id || ''), 800);
