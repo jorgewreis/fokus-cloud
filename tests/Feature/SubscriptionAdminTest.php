@@ -387,6 +387,7 @@ class SubscriptionAdminTest extends TestCase
     {
         $admin = $this->platformAdmin();
         $fixture = $this->freeChangeFixture($admin);
+        DB::table('vouchers')->where('code', 'ACTIVEFREE')->update(['discount_type' => 'fixed', 'discount_value' => 1, 'status' => 'suspensa']);
         $data = ['action' => 'upgrade', 'reason' => 'Incluir módulos.', 'items' => [['module_code' => 'processos-advocacia'], ['module_code' => 'contatos-advocacia']], 'billing_cycle' => 'monthly', 'expected_version' => 1];
         $this->actingAs($admin, 'platform')->postJson('/api/backoffice/subscriptions/'.$fixture['subscription_id'].'/quote', $data)
             ->assertOk()->assertJsonPath('free_benefit', true)->assertJsonPath('charge_now', 0)->assertJsonPath('requires_new_voucher', false);

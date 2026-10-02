@@ -102,6 +102,8 @@ pendente; somente a confirmação do novo pagamento ativa o acesso pago.
 Uma ampliação elegível preserva o benefício `trial_free` vigente até o vencimento
 original. Ela não cria cobrança, não consome outro resgate e não reinicia o prazo.
 O preço-base da nova composição fica registrado separadamente do valor gratuito.
+O tipo de benefício concedido permanece no snapshot; editar ou suspender o cadastro
+do voucher não transforma em paga uma gratuidade já concedida e ainda vigente.
 
 A elegibilidade considera produto, plano e a regra de módulos do voucher. O contrato
 existente considera elegível a composição que contém pelo menos um módulo da lista

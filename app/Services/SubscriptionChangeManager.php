@@ -23,7 +23,7 @@ class SubscriptionChangeManager
             $action = (string) $data['action'];
             if (in_array($action, ['reativacao', 'upgrade', 'downgrade'], true) && $subscription->status === 'suspensa' && ! $subscription->provider_subscription_id) {
                 abort_if(DB::table('voucher_redemptions as redemption')->join('vouchers as voucher', 'voucher.id', '=', 'redemption.voucher_id')
-                    ->where('redemption.subscription_id', $subscriptionId)->where('voucher.discount_type', 'trial_free')
+                    ->where('redemption.subscription_id', $subscriptionId)->where(fn ($query) => \App\Services\VoucherManager::freeBenefit($query))
                     ->where('redemption.benefit_ends_at', '<=', now())->exists() && $subscription->current_period_ends_at && now()->gte($subscription->current_period_ends_at), 422, 'O benefício gratuito terminou. Inicie uma nova contratação paga.');
             }
             if (! in_array($action, ['upgrade', 'downgrade', 'cancelamento_imediato'], true)) {
@@ -231,7 +231,7 @@ class SubscriptionChangeManager
     {
         $codes = array_column(array_column($target['items'], 'conditions'), 'catalog_module_code');
         $redemption = DB::table('voucher_redemptions as redemption')->join('vouchers as voucher', 'voucher.id', '=', 'redemption.voucher_id')
-            ->where('redemption.subscription_id', $subscription->id)->where('voucher.discount_type', 'trial_free')
+            ->where('redemption.subscription_id', $subscription->id)->where(fn ($query) => \App\Services\VoucherManager::freeBenefit($query))
             ->orderByDesc('redemption.created_at')->orderByDesc('redemption.id')
             ->select('redemption.*', 'voucher.product_id as eligible_product_id', 'voucher.plan_id as eligible_plan_id', 'voucher.module_codes as eligible_module_codes', 'voucher.code')->first();
         if ($redemption && (! $redemption->benefit_ends_at || now()->gte($redemption->benefit_ends_at) || ($redemption->benefit_starts_at && now()->lt($redemption->benefit_starts_at)))) $redemption = null;

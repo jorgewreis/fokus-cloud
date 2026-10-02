@@ -97,7 +97,7 @@ class PendingSubscriptionVoucher
     {
         $ids = DB::table('voucher_redemptions as redemption')->join('vouchers as voucher', 'voucher.id', '=', 'redemption.voucher_id')
             ->join('subscriptions as subscription', 'subscription.id', '=', 'redemption.subscription_id')
-            ->where('voucher.discount_type', 'trial_free')->where('subscription.status', 'ativa')
+            ->where(fn ($query) => \App\Services\VoucherManager::freeBenefit($query))->where('subscription.status', 'ativa')
             ->whereNull('subscription.provider_subscription_id')->where('redemption.benefit_ends_at', '<=', now())
             ->where('subscription.current_period_ends_at', '<=', now())->distinct()
             ->pluck('subscription.id');

@@ -86,7 +86,7 @@ class BillingWebhookProcessor
             && DB::table('voucher_redemption_reservations as reservation')
                 ->join('vouchers as voucher', 'voucher.id', '=', 'reservation.voucher_id')
                 ->where('reservation.subscription_id', $subscription->id)->where('reservation.status', 'pending')
-                ->where('voucher.discount_type', 'trial_free')->exists()) {
+                ->where(fn ($query) => \App\Services\VoucherManager::freeBenefit($query, 'reservation'))->exists()) {
             return;
         }
         DB::table('subscriptions')->where('id', $subscription->id)->update([

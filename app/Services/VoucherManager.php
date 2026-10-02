@@ -10,6 +10,16 @@ class VoucherManager
 {
     public const RESERVATION_MINUTES = 30;
 
+    /** The granted benefit survives edits to the voucher's commercial record. */
+    public static function freeBenefit(\Illuminate\Database\Query\Builder $query, string $alias = 'redemption'): \Illuminate\Database\Query\Builder
+    {
+        return $query->where(function ($benefit) use ($alias): void {
+            $benefit->where($alias.'.snapshot->discount_type', 'trial_free')->orWhere(function ($legacy) use ($alias): void {
+                $legacy->whereNull($alias.'.snapshot->discount_type')->where('voucher.discount_type', 'trial_free');
+            });
+        });
+    }
+
     public function expireReservations(): int
     {
         return DB::table('voucher_redemption_reservations')

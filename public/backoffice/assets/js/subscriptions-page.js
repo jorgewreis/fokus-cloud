@@ -861,7 +861,7 @@ export function mount(root, context = {}) {
     $("#subscription-free-voucher-form").addEventListener("submit", onFreeVoucherSubmit, { signal: listeners.signal });
     createTrigger.addEventListener("fs:hidden", () => $("#subscription-create-open").focus(), { signal: listeners.signal });
     form.addEventListener("submit", onActionSubmit, { signal: listeners.signal });
-    form.addEventListener("input", invalidatePreview, { signal: listeners.signal });
+    form.addEventListener("input", (event) => { if (event.target.id !== "subscription-module-filter") invalidatePreview(); }, { signal: listeners.signal });
     $("#subscription-module-filter").addEventListener("input", filterChangeModules, { signal: listeners.signal });
     $("#subscription-module-options").addEventListener("change", () => {
         filterChangeModules();

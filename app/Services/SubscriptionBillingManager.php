@@ -70,7 +70,7 @@ class SubscriptionBillingManager
             $subscription = DB::table('subscriptions')->where('id', $payment->subscription_id)->lockForUpdate()->first();
             if (empty($payment->subscription_change_id) && $subscription && ! $subscription->provider_subscription_id && DB::table('voucher_redemptions as redemption')
                 ->join('vouchers as voucher', 'voucher.id', '=', 'redemption.voucher_id')
-                ->where('redemption.subscription_id', $subscription->id)->where('voucher.discount_type', 'trial_free')
+                ->where('redemption.subscription_id', $subscription->id)->where(fn ($query) => \App\Services\VoucherManager::freeBenefit($query))
                 ->exists()) {
                 return $subscription;
             }

@@ -386,8 +386,9 @@ class SubscriptionController extends Controller
     private function isExpiredFreeTrial(object $subscription): bool
     {
         return $subscription->status === 'suspensa' && ! $subscription->provider_subscription_id
+            && $subscription->current_period_ends_at && now()->gte($subscription->current_period_ends_at)
             && DB::table('voucher_redemptions as redemption')->join('vouchers as voucher', 'voucher.id', '=', 'redemption.voucher_id')
-                ->where('redemption.subscription_id', $subscription->id)->where('voucher.discount_type', 'trial_free')
+                ->where('redemption.subscription_id', $subscription->id)->where(fn ($query) => \App\Services\VoucherManager::freeBenefit($query))
                 ->where('redemption.benefit_ends_at', '<=', now())->exists();
     }
 

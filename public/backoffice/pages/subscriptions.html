@@ -159,7 +159,7 @@
             <form class="fs-form fs-card fs-card-panel" id="subscription-change-form" novalidate hidden>
                 <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-change-title">Gerenciar assinatura</h3><p class="fs-card-subtitle">Escolha uma ação e confira o efeito antes de confirmar. O motivo ficará no histórico.</p></div></div>
                 <div class="fs-card-body fs-u-d-flex fs-u-flex-column fs-u-gap-2">
-                    <label class="fs-form-label fs-u-d-flex fs-u-flex-column fs-u-gap-1" for="subscription-action">
+                    <label class="fs-form-label fs-u-d-flex fs-u-flex-column fs-u-gap-1 fs-u-w-100" for="subscription-action">
                         <span>Ação</span>
                         <select class="fs-form-select fs-u-w-100" id="subscription-action" name="action" required>
                             <option value="">Selecione uma ação</option>
@@ -172,7 +172,7 @@
                             <option value="cancelar_alteracao" id="subscription-cancel-change-option">Cancelar alteração pendente</option><option value="override" id="subscription-override-option">Ajustar valor manualmente</option>
                         </select>
                     </label>
-                    <label class="fs-form-label fs-u-d-flex fs-u-flex-column fs-u-gap-1" for="subscription-reason">
+                    <label class="fs-form-label fs-u-d-flex fs-u-flex-column fs-u-gap-1 fs-u-w-100" for="subscription-reason">
                         <span>Motivo</span>
                         <textarea class="fs-form-control fs-u-w-100" id="subscription-reason" name="reason" rows="3" maxlength="1000" required></textarea>
                     </label>
@@ -183,9 +183,9 @@
                     <fieldset id="subscription-module-fields" class="fs-form-fieldset fs-u-d-flex fs-u-flex-column fs-u-gap-2" hidden>
                         <legend class="fs-u-fs-sm">Módulos da nova composição</legend>
                         <p class="fs-u-fs-sm fs-u-color-secondary">Somente os módulos selecionados entram na alteração. Publicar um módulo não muda as assinaturas existentes.</p>
-                        <label class="fs-form-label fs-u-d-flex fs-u-flex-column fs-u-gap-1" for="subscription-module-filter"><span>Buscar módulo</span><input class="fs-form-control fs-u-w-100" id="subscription-module-filter" type="search" placeholder="Digite o nome do módulo" /></label><p class="fs-u-fs-sm fs-u-color-secondary" id="subscription-module-count" role="status"></p>
+                        <label class="fs-form-label fs-u-d-flex fs-u-flex-column fs-u-gap-1 fs-u-w-100" for="subscription-module-filter"><span>Buscar módulo</span><input class="fs-form-control fs-u-w-100" id="subscription-module-filter" type="search" placeholder="Digite o nome do módulo" /></label><p class="fs-u-fs-sm fs-u-color-secondary" id="subscription-module-count" role="status"></p>
                         <div id="subscription-module-options" class="fs-u-d-flex fs-u-flex-column fs-u-gap-2"></div>
-                        <label class="fs-form-label fs-u-d-flex fs-u-flex-column fs-u-gap-1" for="subscription-change-voucher"><span>Novo voucher (opcional)</span><input class="fs-form-control fs-u-w-100" id="subscription-change-voucher" name="voucher_code" maxlength="64" autocomplete="off" /><small>Deixe em branco para manter a gratuidade vigente, se a nova composição for elegível. O prazo original será preservado.</small></label>
+                        <label class="fs-form-label fs-u-d-flex fs-u-flex-column fs-u-gap-1 fs-u-w-100" for="subscription-change-voucher"><span>Novo voucher (opcional)</span><input class="fs-form-control fs-u-w-100" id="subscription-change-voucher" name="voucher_code" maxlength="64" autocomplete="off" /><small>Deixe em branco para manter a gratuidade vigente, se a nova composição for elegível. O prazo original será preservado.</small></label>
                     </fieldset>
                     <p id="subscription-action-help" class="fs-u-fs-sm fs-u-color-secondary" role="status"></p>
                     <div id="subscription-change-preview" class="fs-alert fs-alert-info" role="status" hidden></div>
