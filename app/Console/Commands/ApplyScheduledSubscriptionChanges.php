@@ -19,6 +19,15 @@ class ApplyScheduledSubscriptionChanges extends Command
         $applied = 0;
         foreach ($scheduled as $change) {
             $subscription = DB::table('subscriptions')->where('id', $change->subscription_id)->first();
+            if ($change->type === 'cancelamento' && $subscription?->provider_subscription_id) {
+                try {
+                    $mercadoPago->updatePreapproval((string) $subscription->provider_subscription_id, ['status' => 'cancelled'], 'scheduled-cancel-'.$change->id);
+                } catch (\Throwable $exception) {
+                    report($exception);
+                    $this->error('Não foi possível interromper a cobrança da assinatura '.$change->subscription_id.'. Nova tentativa no próximo ciclo.');
+                    continue;
+                }
+            }
             if ($change->type === 'downgrade' && $subscription?->provider_subscription_id) {
                 $target = json_decode((string) $change->after_snapshot, true) ?: [];
                 try {

@@ -24,7 +24,7 @@ class LawShellController extends Controller
         $subscriptions = DB::table('subscriptions as subscription')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->where('subscription.company_id', $companyId)
-            ->where('subscription.status', 'ativa')
+            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
             ->whereIn('product.code', ['law', 'fokus-law'])
             ->orderByDesc('subscription.created_at')
             ->get([
@@ -47,6 +47,7 @@ class LawShellController extends Controller
             $subscriptionIds = $subscriptions->pluck('id')->all();
             $modules = DB::table('subscription_items as item')
                 ->join('modules as module', 'module.id', '=', 'item.module_id')
+                ->whereNull('item.deleted_at')
                 ->whereIn('item.subscription_id', $subscriptionIds)
                 ->where('module.status', 'ativo')
                 ->where('module.publication_state', 'publicado')
@@ -75,7 +76,7 @@ class LawShellController extends Controller
 
         $lawNames = DB::table('subscriptions as subscription')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
-            ->where('subscription.status', 'ativa')
+            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
             ->whereIn('product.code', ['law', 'fokus-law'])
             ->whereNotNull('subscription.public_name')
             ->where('subscription.public_name', '!=', '')

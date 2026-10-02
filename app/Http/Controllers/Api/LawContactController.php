@@ -95,8 +95,8 @@ class LawContactController extends Controller
         $contextCode = $saved->context_code ?? null;
         if (! isset(self::CONTACT_CONTEXTS[$contextCode])) {
             $moduleContext = DB::table('subscription_items as item')->join('subscriptions as subscription', 'subscription.id', '=', 'item.subscription_id')
-                ->join('modules as module', 'module.id', '=', 'item.module_id')->join('products as product', 'product.id', '=', 'subscription.product_id')
-                ->where('subscription.company_id', $companyId)->where('subscription.status', 'ativa')->whereIn('product.code', ['law', 'fokus-law'])
+                ->join('modules as module', 'module.id', '=', 'item.module_id')->join('products as product', 'product.id', '=', 'subscription.product_id')->whereNull('item.deleted_at')
+                ->where('subscription.company_id', $companyId)->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))->whereIn('product.code', ['law', 'fokus-law'])
                 ->where(function ($query): void { $query->where('module.module_code', 'contatos')->orWhere('module.code', 'contatos'); })
                 ->orderByDesc('subscription.created_at')->value('module.context_code');
             $contextCode = match ($moduleContext) {
@@ -1118,8 +1118,8 @@ class LawContactController extends Controller
     private function eligibleCompanies(string $sourceCompanyId): array
     {
         return DB::table('companies as company')->join('subscriptions as subscription', 'subscription.company_id', '=', 'company.id')
-            ->join('subscription_items as item', 'item.subscription_id', '=', 'subscription.id')->join('modules as module', 'module.id', '=', 'item.module_id')->join('products as product', 'product.id', '=', 'subscription.product_id')
-            ->where('company.id', '!=', $sourceCompanyId)->where('company.status', 'ativa')->whereNull('company.deleted_at')->where('subscription.status', 'ativa')->whereIn('product.code', ['law', 'fokus-law'])->whereNull('item.deleted_at')
+            ->join('subscription_items as item', 'item.subscription_id', '=', 'subscription.id')->join('modules as module', 'module.id', '=', 'item.module_id')->join('products as product', 'product.id', '=', 'subscription.product_id')->whereNull('item.deleted_at')
+            ->where('company.id', '!=', $sourceCompanyId)->where('company.status', 'ativa')->whereNull('company.deleted_at')->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))->whereIn('product.code', ['law', 'fokus-law'])->whereNull('item.deleted_at')
             ->where('module.status', 'ativo')->where('module.publication_state', 'publicado')->where(fn ($q) => $q->where('module.module_code', 'contatos')->orWhere('module.code', 'contatos'))
             ->select('company.id', DB::raw('COALESCE(company.display_name, company.legal_name) as name'))->distinct()->orderBy('name')->get()->map(fn ($company) => ['id' => (string) $company->id, 'name' => (string) $company->name])->all();
     }
@@ -1187,8 +1187,8 @@ class LawContactController extends Controller
 
     private function moduleEnabled(string $companyId): bool
     {
-        return DB::table('subscriptions as subscription')->join('subscription_items as item', 'item.subscription_id', '=', 'subscription.id')->join('modules as module', 'module.id', '=', 'item.module_id')->join('products as product', 'product.id', '=', 'subscription.product_id')
-            ->where('subscription.company_id', $companyId)->where('subscription.status', 'ativa')->whereIn('product.code', ['law', 'fokus-law'])->whereNull('item.deleted_at')->where('module.status', 'ativo')->where('module.publication_state', 'publicado')
+        return DB::table('subscriptions as subscription')->join('subscription_items as item', 'item.subscription_id', '=', 'subscription.id')->join('modules as module', 'module.id', '=', 'item.module_id')->join('products as product', 'product.id', '=', 'subscription.product_id')->whereNull('item.deleted_at')
+            ->where('subscription.company_id', $companyId)->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))->whereIn('product.code', ['law', 'fokus-law'])->whereNull('item.deleted_at')->where('module.status', 'ativo')->where('module.publication_state', 'publicado')
             ->where(fn ($q) => $q->where('module.module_code', 'contatos')->orWhere('module.code', 'contatos'))->exists();
     }
 

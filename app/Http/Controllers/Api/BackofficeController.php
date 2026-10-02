@@ -1221,13 +1221,56 @@ class BackofficeController extends Controller
         return $data;
     }
 
+    public function quoteSubscriptionChange(Request $request, string $subscription, SubscriptionChangeManager $changes)
+    {
+        $data = $request->validate([
+            'target_plan_id' => ['nullable', 'string', 'size:30'],
+            'items' => ['required_without:target_plan_id', 'array', 'min:1', 'max:30'],
+            'items.*.module_code' => ['required', 'string', 'max:64'],
+            'items.*.quantity' => ['nullable', 'integer', 'min:1', 'max:1000'],
+            'items.*.personalizations' => ['nullable', 'array'],
+            'items.*.personalizations.*.type_code' => ['required', 'string', 'max:64'],
+            'items.*.personalizations.*.tier_value' => ['required', 'integer', 'min:1'],
+            'billing_cycle' => ['required', Rule::in(['monthly', 'annual'])],
+            'voucher_code' => ['nullable', 'string', 'max:64'],
+            'expected_version' => ['required', 'integer', 'min:1'],
+        ], ['items.required_without' => 'Selecione ao menos um módulo ou escolha um plano.', 'items.min' => 'Selecione ao menos um módulo.', 'billing_cycle.required' => 'Escolha a forma de cobrança.', 'expected_version.required' => 'Reabra os detalhes da assinatura antes de continuar.']);
+        $current = DB::table('subscriptions')->where('id', $subscription)->first();
+        abort_unless($current, 404, 'Assinatura não encontrada.');
+        abort_if((int) $data['expected_version'] !== (int) $current->version, 409, 'A assinatura mudou. Reabra os detalhes antes de continuar.');
+        return response()->json($changes->quoteCustomerChange($subscription, $data));
+    }
+
+    public function cancelSubscriptionChange(Request $request, string $subscription, SubscriptionChangeManager $changes, PlatformAudit $audit)
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'max:1000'], 'expected_version' => ['required', 'integer', 'min:1']]);
+        return DB::transaction(function () use ($request, $subscription, $changes, $audit, $data) {
+            $current = DB::table('subscriptions')->where('id', $subscription)->lockForUpdate()->first();
+            abort_unless($current, 404, 'Assinatura não encontrada.');
+            abort_if((int) $current->version !== (int) $data['expected_version'], 409, 'A assinatura mudou. Reabra os detalhes.');
+            $result = $changes->cancelPending($subscription, $request->user()->id, $data['reason']);
+            abort_unless($result['count'], 422, 'Não há alteração pendente para cancelar.');
+            $audit->record($request->user()->id, 'backoffice.subscription_change_cancelled', 'subscription', $subscription, $current->company_id,
+                $data['reason'], before: $result['before'], after: $result['after'], request: $request);
+            return response()->json(['message' => 'Alteração pendente cancelada. A composição contratada foi mantida.']);
+        });
+    }
+
     public function changeSubscription(Request $request, string $subscription, PlatformAudit $audit, SubscriptionChangeManager $changes)
     {
         $data = $request->validate([
             'action' => ['required', Rule::in(['suspensao', 'reativacao', 'cancelamento', 'cancelamento_imediato', 'upgrade', 'downgrade', 'override'])],
             'reason' => ['required', 'string', 'max:1000'],
-            'target_plan_id' => ['required_if:action,upgrade,downgrade', 'nullable', 'string', 'size:30'],
+            'target_plan_id' => ['nullable', 'string', 'size:30'],
+            'items' => ['nullable', 'array', 'min:1', 'max:30'],
+            'items.*.module_code' => ['required_with:items', 'string', 'max:64'],
+            'items.*.quantity' => ['nullable', 'integer', 'min:1', 'max:1000'],
+            'items.*.personalizations' => ['nullable', 'array'],
+            'items.*.personalizations.*.type_code' => ['required', 'string', 'max:64'],
+            'items.*.personalizations.*.tier_value' => ['required', 'integer', 'min:0'],
+            'expected_version' => ['nullable', 'integer', 'min:1'],
             'billing_cycle' => ['nullable', Rule::in(['monthly', 'annual'])],
+            'voucher_code' => ['nullable', 'string', 'max:64'],
             'override' => ['required_if:action,override', 'nullable', 'array'],
             'override.monthly_amount' => ['nullable', 'numeric', 'min:0'],
             'override.billing_cycle' => ['nullable', Rule::in(['monthly', 'annual'])],
@@ -1239,10 +1282,13 @@ class BackofficeController extends Controller
             'override.items.*.quantity' => ['required_with:override.items', 'integer', 'min:1', 'max:1000'],
             'override.items.*.unit_price' => ['required_with:override.items', 'numeric', 'min:0'],
             'override.items.*.conditions' => ['nullable', 'array'],
-        ]);
+        ], ['reason.required' => 'Informe o motivo da alteração.', 'action.required' => 'Escolha a ação que deseja realizar.', 'items.min' => 'Selecione ao menos um módulo.', 'override.required_if' => 'Informe o valor e a forma de cobrança do ajuste manual.']);
         $current = DB::table('subscriptions')->where('id', $subscription)->first();
         abort_unless($current, 404, 'Assinatura não encontrada.');
         $result = $changes->change($subscription, $data, $request->user());
+        $payerEmail = DB::table('company_memberships as membership')->join('roles as role', 'role.id', '=', 'membership.role_id')->join('users as user', 'user.id', '=', 'membership.user_id')
+            ->where('membership.company_id', $current->company_id)->where('membership.status', 'ativo')->whereNull('membership.deleted_at')->where('role.code', 'admin')->value('user.email');
+        $result = app(\App\Services\SubscriptionBillingManager::class)->checkoutChange($subscription, $result, (string) ($payerEmail ?? $request->user()->email), '/backoffice/assinaturas', $request->user()->id);
         $audit->record(
             $request->user()->id,
             'backoffice.subscription_'.$data['action'],
@@ -1261,7 +1307,8 @@ class BackofficeController extends Controller
             'status' => $result['status'],
             'effective_at' => $result['effective_at'],
             'proration_amount' => $result['proration_amount'],
-            'message' => 'Alteração comercial registrada.',
+            'checkout_url' => $result['checkout_url'],
+            'message' => $result['status'] === 'aplicada' ? 'Alteração aplicada à assinatura.' : ($result['status'] === 'agendada' ? 'Alteração agendada para o fim da vigência atual.' : 'Ampliação registrada. Os novos módulos serão liberados após a confirmação do pagamento.'),
         ]);
     }
 
@@ -1477,6 +1524,7 @@ class BackofficeController extends Controller
             'id' => $payment->id,
             'provider' => $payment->provider,
             'provider_payment_id' => $payment->provider_payment_id,
+            'checkout_url' => $payment->provider_checkout_url ?? null,
             'status' => $payment->status,
             'amount' => (float) $payment->amount,
             'currency' => $payment->currency,

@@ -58,6 +58,7 @@ createServer(async (request, response) => {
     ], meta: { total: 2, current_page: Number(url.searchParams.get('page') || 1), per_page: 15, last_page: 1 } });
     if (url.pathname === '/api/backoffice/directory/users/empresa/USR_VISUAL') return json(response, { id: 'USR_VISUAL', name: 'Ana Empresa', email: 'ana@example.test', type: 'empresa', status: 'ativa', cpf: '12345678901', memberships: [{ company_id: 'CMP_VISUAL', company_name: 'Empresa de Demonstração', role: 'admin', status: 'ativo', subscriptions: [{ product_name: 'Fokus Law', plan_name: 'Essencial', status: 'ativa', billing_cycle: 'monthly' }] }] });
     if (url.pathname === '/api/backoffice/directory/users/plataforma/PAD_VISUAL') return json(response, { id: 'PAD_VISUAL', name: 'Administração Fokus', email: 'admin@fokuscloud.test', type: 'plataforma', role: 'superadministrador', status: 'ativo' });
+    if (url.pathname === '/api/catalog/law') return json(response, { modules: modules.map((module) => ({ ...module, monthly_amount: module.monthly_price, available_standalone: true })), plans: plans.map((plan) => ({ ...plan, module_codes: ['processos'] })) });
     if (url.pathname === '/api/backoffice/catalog/products') return json(response, { products });
     if (url.pathname === '/api/backoffice/catalog') return json(response, { products: [{ ...products[0], publication_pending: false, published_catalog_version: 3, modules, plans }], publications: [{ id: 'PUB_VISUAL_03', product_id: 'PRD_LAW', product_name: 'Fokus Law', version: 3, reason: 'Atualização comercial homologada.', published_at: '2026-09-23T14:30:00.000Z', published_by: 'Administração Fokus' }], options: { segments: { law: [{ code: 'advocacia', label: 'Advocacia' }] }, module_codes: [{ code: 'processos', label: 'Processos' }], personalization_types: [{ code: 'usuarios', label: 'Usuários' }] } });
     if (url.pathname === '/api/backoffice/subscriptions' && request.method === 'GET') {
@@ -81,7 +82,7 @@ createServer(async (request, response) => {
             plan_id: 'PLN_1',
             plan_code: 'law-advocacia',
             commercial_snapshot: { plan_id: 'PLN_1', plan_name: subscription.plan_name, billing_cycle: subscription.billing_cycle, monthly_amount: subscription.monthly_amount, amount: subscription.amount, status: subscription.status },
-            items: [{ id: 'ITM_VISUAL', name: 'Gestão de processos', quantity: 2, unit_price: 29.9, conditions: { plan_code: 'law-advocacia', usage_limit: 10 } }],
+            items: [{ id: 'ITM_VISUAL', module_id: 'MOD_1', name: 'Gestão de processos', quantity: 2, unit_price: 29.9, conditions: { plan_code: 'law-advocacia', usage_limit: 10 } }],
             payments: [{ id: 'PAG_VISUAL', provider: 'mercado_pago', status: 'aprovado', amount: subscription.amount, currency: 'BRL', paid_at: '2026-09-02T13:15:00.000Z', billing_period_starts_at: '2026-09-01T00:00:00.000Z', billing_period_ends_at: '2026-10-01T00:00:00.000Z', created_at: '2026-09-01T12:00:00.000Z' }],
             history: subscriptionChanges.filter((change) => change.subscription_id === id),
         });

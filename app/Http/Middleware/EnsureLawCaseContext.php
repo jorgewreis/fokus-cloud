@@ -16,7 +16,8 @@ class EnsureLawCaseContext
         abort_unless(DB::table('companies')->where('id', $companyId)->where('status', 'ativa')->whereNull('deleted_at')->exists(), 403, 'A empresa não está ativa.');
         $enabled = DB::table('subscription_items as item')->join('subscriptions as subscription', 'subscription.id', '=', 'item.subscription_id')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')->join('modules as module', 'module.id', '=', 'item.module_id')
-            ->where('subscription.company_id', $companyId)->where('subscription.status', 'ativa')->whereIn('product.code', ['law', 'fokus-law'])
+            ->whereNull('item.deleted_at')
+            ->where('subscription.company_id', $companyId)->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))->whereIn('product.code', ['law', 'fokus-law'])
             ->where('module.status', 'ativo')->where('module.publication_state', 'publicado')->where('module.module_code', 'processos')
             ->whereIn('module.context_code', ['judiciario', 'vara_criminal'])->exists();
         abort_unless($enabled, 403, 'Esta etapa de Processos está disponível para o contexto Judiciário Criminal contratado.');

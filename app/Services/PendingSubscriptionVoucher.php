@@ -99,6 +99,7 @@ class PendingSubscriptionVoucher
             ->join('subscriptions as subscription', 'subscription.id', '=', 'redemption.subscription_id')
             ->where('voucher.discount_type', 'trial_free')->where('subscription.status', 'ativa')
             ->whereNull('subscription.provider_subscription_id')->where('redemption.benefit_ends_at', '<=', now())
+            ->where('subscription.current_period_ends_at', '<=', now())->distinct()
             ->pluck('subscription.id');
         $suspended = 0;
         foreach ($ids as $id) {

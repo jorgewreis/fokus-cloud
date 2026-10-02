@@ -396,7 +396,7 @@ test('Assinaturas filtra por empresa, produto e status e consulta detalhes em dr
         await expect(page.locator('#subscription-detail-payments')).toContainText('Pago');
         await expect(page.locator('#subscription-detail-items')).toContainText('Gestão de processos');
         await expect(page.locator('#subscription-detail-history')).toContainText('Atualização do contrato');
-        await expect(page.locator('#subscription-detail-history')).toContainText('Consultar snapshots comerciais');
+        await expect(page.locator('#subscription-detail-history')).toContainText('Comparar condições da assinatura');
         await expect(page.locator('#subscription-override-option')).toBeHidden();
         await expect(page).toHaveScreenshot(`subscriptions-drawer-${name}.png`, { fullPage: true, animations: 'disabled', maxDiffPixelRatio: 0.08 });
 
@@ -591,7 +591,7 @@ test('encerramento imediato de assinatura exige confirmação e atualiza detalhe
     await page.getByRole('button', { name: /Ver detalhes da assinatura/ }).first().click();
     await page.locator('#subscription-action').selectOption('cancelamento_imediato');
     await page.getByLabel('Motivo').fill('Encerramento solicitado pela empresa.');
-    await page.getByRole('button', { name: 'Registrar ação' }).click();
+    await page.getByRole('button', { name: 'Revisar alteração' }).click();
     await expect(page.locator('#subscription-confirm-dialog')).toBeVisible();
     expect(patchCount).toBe(0);
 
@@ -609,7 +609,9 @@ test('ações de mudança mostram os campos próprios e respeitam permissão de 
     await expect(page.locator('#subscription-drawer')).toBeVisible();
     await page.locator('#subscription-action').selectOption('upgrade');
     await expect(page.locator('#subscription-target-fields')).toBeVisible();
-    await expect(page.locator('#subscription-target-plan')).toHaveAttribute('required', '');
+    await expect(page.locator('#subscription-target-plan')).not.toHaveAttribute('required', '');
+    await expect(page.locator('#subscription-module-fields')).toBeVisible();
+    await expect(page.locator('#subscription-change-voucher')).toBeVisible();
     await page.locator('#subscription-action').selectOption('downgrade');
     await expect(page.locator('#subscription-target-fields')).toBeVisible();
     await page.locator('#subscription-action').selectOption('suspensao');

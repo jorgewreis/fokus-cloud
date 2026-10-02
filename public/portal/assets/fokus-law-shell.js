@@ -1260,9 +1260,13 @@
         personalizationBox.append(field);
       });
       card.append(personalizationBox); moduleGrid.append(card); moduleControls.set(module.code, checkbox);
-      checkbox.addEventListener('change', () => { card.dataset.selected = checkbox.checked ? 'true' : 'false'; selectionState.textContent = checkbox.checked ? 'Selecionado' : 'Disponível'; planSelect.value = ''; });
+      checkbox.addEventListener('change', () => { card.dataset.selected = checkbox.checked ? 'true' : 'false'; selectionState.textContent = checkbox.checked ? 'Selecionado' : 'Disponível'; const plan = availablePlans.find((item) => item.id === planSelect.value); if (plan?.module_codes?.some((code) => !moduleControls.get(code)?.checked)) planSelect.value = ''; });
     });
     form.append(moduleGrid);
+    const voucherField = lawSubscriptionField('Novo voucher (opcional)');
+    const voucherInput = element('input', 'fs-form-control'); voucherInput.maxLength = 64; voucherInput.autocomplete = 'off';
+    voucherField.append(voucherInput, element('small', '', 'Deixe em branco para manter a gratuidade vigente, se a nova composição for elegível. O prazo original será preservado.'));
+    form.append(voucherField);
     planSelect.addEventListener('change', () => { const plan = availablePlans.find((item) => item.id === planSelect.value); if (!plan) return; moduleControls.forEach((checkbox, code) => { checkbox.checked = Boolean(plan.module_codes?.includes(code)); const card = checkbox.closest('.law-subscription-module-card'); card.dataset.selected = checkbox.checked ? 'true' : 'false'; card.querySelector('.law-subscription-module-state').textContent = checkbox.checked ? 'Selecionado' : 'Disponível'; }); });
 
     const actions = element('div', 'law-subscription-actions');
@@ -1271,22 +1275,30 @@
     const quote = element('div', 'law-subscription-quote'); actions.append(quoteButton, quote, applyButton); form.append(actions);
     const feedback = element('p', 'law-subscription-feedback'); feedback.setAttribute('role', 'status'); form.append(feedback);
     let payload;
+    let quoteRevision = 0;
+    form.addEventListener('input', () => { quoteRevision++; payload = null; applyButton.hidden = true; quote.replaceChildren(); });
+    form.addEventListener('change', () => { quoteRevision++; payload = null; applyButton.hidden = true; quote.replaceChildren(); });
     form.addEventListener('submit', async (event) => {
       event.preventDefault(); quoteButton.disabled = true; applyButton.hidden = true; feedback.textContent = '';
       const items = [];
       moduleControls.forEach((checkbox, code) => { if (checkbox.checked) { const card = checkbox.closest('.law-subscription-module-card'); items.push({ module_code: code, quantity: 1, personalizations: [...card.querySelectorAll('[data-type-code]')].map((input) => ({ type_code: input.dataset.typeCode, tier_value: Number(input.value) })) }); } });
-      payload = { billing_cycle: cycleSelect.value, version: current.version, reason: 'Alteração solicitada pelo administrador na página Assinatura.', items };
+      const revision = quoteRevision;
+      payload = { voucher_code: voucherInput.value.trim() || null, billing_cycle: cycleSelect.value, version: current.version, reason: 'Alteração solicitada pelo administrador na página Assinatura.', items };
       if (planSelect.value) payload.target_plan_id = planSelect.value;
       try {
         const result = await FokusApi.request('/law/subscription/quote', { method: 'POST', body: payload });
+        if (revision !== quoteRevision) return;
         quote.replaceChildren(element('strong', '', `${result.action === 'upgrade' ? 'Aumento' : 'Redução'} para ${formatLawMoney(result.target.amount)} por ${cycleSelect.value === 'annual' ? 'ano' : 'mês'}.`));
         quote.append(element('span', '', result.action === 'upgrade' ? `Cobrança proporcional agora: ${formatLawMoney(result.charge_now)}.` : `Vigência em ${formatLawDate(result.effective_at)}.`));
+        if (result.voucher_message) quote.append(element('p', '', `${result.voucher_message}${result.target.free_benefit_ends_at ? ` Válido até ${formatLawDate(result.target.free_benefit_ends_at)}.` : ''}`));
+        if (result.requires_new_voucher) { payload = null; feedback.dataset.state = 'error'; feedback.textContent = 'Informe um novo voucher elegível e recalcule a alteração.'; return; }
+        applyButton.textContent = result.free_benefit ? 'Confirmar alteração gratuita' : 'Confirmar alteração';
         if (pendingChange) applyButton.textContent = 'Atualizar alteração pendente';
         applyButton.hidden = false; applyButton.focus();
       } catch (error) { feedback.dataset.state = 'error'; feedback.textContent = error.message || 'Não foi possível calcular a alteração.'; }
       finally { quoteButton.disabled = false; }
     });
-    applyButton.addEventListener('click', async () => { applyButton.disabled = true; try { const result = await FokusApi.request('/law/subscription/change', { method: pendingChange ? 'PATCH' : 'POST', body: payload }); if (result.checkout_url) window.location.assign(result.checkout_url); else window.location.reload(); } catch (error) { feedback.dataset.state = 'error'; feedback.textContent = error.message || 'Não foi possível solicitar a alteração.'; applyButton.disabled = false; } });
+    applyButton.addEventListener('click', async () => { if (!payload) return; applyButton.disabled = true; try { const result = await FokusApi.request('/law/subscription/change', { method: pendingChange ? 'PATCH' : 'POST', body: payload }); if (result.checkout_url) window.location.assign(result.checkout_url); else window.location.reload(); } catch (error) { feedback.dataset.state = 'error'; feedback.textContent = error.message || 'Não foi possível solicitar a alteração.'; applyButton.disabled = false; } });
     contentRegion.append(form);
 
     if (pendingChange) {

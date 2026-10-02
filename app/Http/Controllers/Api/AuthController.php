@@ -48,7 +48,7 @@ class AuthController extends Controller
             ->join('roles as role', 'role.id', '=', 'membership.role_id')
             ->join('subscriptions as subscription', 'subscription.company_id', '=', 'company.id')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
-            ->leftJoin('subscription_items as item', 'item.subscription_id', '=', 'subscription.id')
+            ->leftJoin('subscription_items as item', fn ($join) => $join->on('item.subscription_id', '=', 'subscription.id')->whereNull('item.deleted_at'))
             ->leftJoin('modules as module', 'module.id', '=', 'item.module_id')
             ->leftJoin('module_segments as module_segment', 'module_segment.module_id', '=', 'module.id')
             ->where('membership.user_id', $user->id)
@@ -56,7 +56,7 @@ class AuthController extends Controller
             ->whereNull('membership.deleted_at')
             ->where('company.status', 'ativa')
             ->whereNull('company.deleted_at')
-            ->where('subscription.status', 'ativa')
+            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
             ->whereIn('product.code', ['law', 'fokus-law'])
             ->select('company.id as company_id', 'company.legal_name as company_name', 'subscription.public_name as subscription_public_name', 'product.name as product_name', 'role.code as profile_code', 'role.name as profile_name', 'module_segment.segment_code')
             ->orderBy('company.legal_name')
@@ -252,7 +252,7 @@ class AuthController extends Controller
         $hasLawSubscription = DB::table('subscriptions as subscription')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->where('subscription.company_id', $data['company_id'])
-            ->where('subscription.status', 'ativa')
+            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
             ->whereIn('product.code', ['law', 'fokus-law'])
             ->exists();
 
@@ -756,7 +756,7 @@ class AuthController extends Controller
     private function companiesFor(User $user): array
     {
         $lawNames = DB::table('subscriptions as subscription')->join('products as product', 'product.id', '=', 'subscription.product_id')
-            ->where('subscription.status', 'ativa')->whereIn('product.code', ['law', 'fokus-law'])
+            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))->whereIn('product.code', ['law', 'fokus-law'])
             ->whereNotNull('subscription.public_name')->where('subscription.public_name', '!=', '')
             ->groupBy('subscription.company_id')->select('subscription.company_id', DB::raw('MIN(subscription.public_name) as public_name'));
 
@@ -773,7 +773,7 @@ class AuthController extends Controller
         $subscription = DB::table('subscriptions as subscription')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->where('subscription.company_id', $companyId)
-            ->where('subscription.status', 'ativa')
+            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
             ->whereIn('product.code', ['law', 'fokus-law'])
             ->orderByDesc('subscription.created_at')
             ->first(['subscription.commercial_snapshot', 'subscription.product_id']);
@@ -840,7 +840,7 @@ class AuthController extends Controller
         $subscription = $companyId ? DB::table('subscriptions as subscription')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->where('subscription.company_id', $companyId)
-            ->where('subscription.status', 'ativa')
+            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
             ->orderByDesc('subscription.created_at')
             ->select('subscription.id as subscription_id', 'subscription.product_id', 'product.name as product_name', 'product.code as product_code')
             ->first() : null;

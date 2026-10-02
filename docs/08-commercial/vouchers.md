@@ -95,3 +95,35 @@ suspende a assinatura quando o benefício termina. Reativação, upgrade e
 downgrade não substituem uma contratação paga. Um novo checkout para o mesmo
 produto encerra a assinatura gratuita suspensa ao criar a nova assinatura
 pendente; somente a confirmação do novo pagamento ativa o acesso pago.
+
+
+## Voucher durante ampliação de assinatura
+
+Uma ampliação elegível preserva o benefício `trial_free` vigente até o vencimento
+original. Ela não cria cobrança, não consome outro resgate e não reinicia o prazo.
+O preço-base da nova composição fica registrado separadamente do valor gratuito.
+
+A elegibilidade considera produto, plano e a regra de módulos do voucher. O contrato
+existente considera elegível a composição que contém pelo menos um módulo da lista
+permitida, quando essa lista é informada. Os novos resgates guardam essas restrições
+em `snapshot.eligibility`; para resgates anteriores, sem esse campo, a verificação
+usa as restrições atuais do cadastro do voucher. Limites de resgate não são
+reaplicados à manutenção de um benefício já concedido.
+
+Se a nova composição não for elegível, a confirmação é bloqueada e pede um novo
+voucher gratuito elegível. Portal e backoffice oferecem esse campo na revisão.
+O novo código passa por validade, produto, plano, módulos e limites de uso; seu
+prazo começa na confirmação. Benefícios substituídos não provocam suspensão antes
+do vencimento do benefício atual e não voltam a valer após o término do substituto.
+
+Em assinaturas pagas, vouchers de percentual, valor fixo ou crédito são aplicados
+somente à diferença proporcional da ampliação, conforme informado na revisão;
+eles não alteram o preço recorrente. O voucher é reservado por 30 minutos e
+confirmado com a aplicação da alteração. Se a reserva expirar antes da confirmação
+do pagamento, a composição não é aplicada e o pagamento identificado é devolvido.
+O cliente pode refazer a solicitação com um código elegível.
+
+Aplicar um novo `trial_free` a uma ampliação de assinatura paga interrompe a
+recorrência existente antes de liberar o benefício. Sem recorrência ativa, uma
+assinatura não pode passar a um valor pago por uma alteração de composição: precisa
+de um voucher gratuito elegível ou de uma nova contratação paga.

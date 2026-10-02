@@ -27,7 +27,8 @@ class SyncLawCaseDatajud extends Command
                     ->join('subscriptions as subscription', 'subscription.id', '=', 'item.subscription_id')
                     ->join('products as product', 'product.id', '=', 'subscription.product_id')
                     ->join('modules as module', 'module.id', '=', 'item.module_id')
-                    ->whereColumn('subscription.company_id', 'law_cases.company_id')->where('subscription.status', 'ativa')
+            ->whereNull('item.deleted_at')
+                    ->whereColumn('subscription.company_id', 'law_cases.company_id')->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
                     ->whereIn('product.code', ['law', 'fokus-law'])->where('module.status', 'ativo')->where('module.publication_state', 'publicado')
                     ->whereIn('module.context_code', ['judiciario', 'vara_criminal'])
                     ->whereRaw("COALESCE(module.module_code, module.code) = ?", ['processos']);

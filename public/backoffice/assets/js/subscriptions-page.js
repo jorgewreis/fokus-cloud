@@ -27,9 +27,9 @@ const ACTION_LABELS = {
     reativacao: "Reativação",
     cancelamento: "Cancelamento agendado",
     cancelamento_imediato: "Encerramento imediato",
-    upgrade: "Upgrade",
-    downgrade: "Downgrade",
-    override: "Override comercial",
+    upgrade: "Ampliação de plano ou módulos",
+    downgrade: "Redução de plano ou módulos",
+    override: "Ajuste manual de valor",
 };
 
 const STATUS_TONES = {
@@ -187,6 +187,7 @@ export function mount(root, context = {}) {
         productId: new URLSearchParams(location.search).get("product_id") || "",
         current: null,
         plans: [],
+        changeCatalog: null,
         products: [],
         listController: null,
         detailController: null,
@@ -480,12 +481,19 @@ export function mount(root, context = {}) {
             ["Período da cobrança", `${formatDate(payment.billing_period_starts_at)} a ${formatDate(payment.billing_period_ends_at)}`],
         ])}</dl></div></article>`).join("") : '<p class="fs-u-fs-sm fs-u-color-secondary">Nenhum pagamento vinculado à assinatura.</p>';
 
+        $("#subscription-detail-payments").querySelectorAll("article").forEach((card, index) => {
+            const payment = payments[index];
+            const url = payment?.checkout_url;
+            if (payment?.status !== "aguardando_pagamento" || !url) return;
+            try { if (!["https:", "http:"].includes(new URL(url).protocol)) return; } catch { return; }
+            const link = document.createElement("a"); link.className = "fs-btn fs-btn-outline-primary"; link.href = url; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = "Abrir link de pagamento"; card.querySelector(".fs-card-body").append(link);
+        });
         const history = subscription.history || [];
         $("#subscription-detail-history").innerHTML = history.length ? history.map((change) => `<article class="fs-card"><div class="fs-card-header fs-u-d-flex fs-u-flex-wrap fs-u-justify-content-between fs-u-align-items-center fs-u-gap-2"><div><h4 class="fs-card-title">${escapeHtml(ACTION_LABELS[change.type] || String(change.type || "Alteração").replaceAll("_", " "))}</h4><p class="fs-card-subtitle">${escapeHtml(formatDate(change.created_at, true))}</p></div>${badge(change.status)}</div><div class="fs-card-body fs-u-d-flex fs-u-flex-column fs-u-gap-2"><dl class="fs-detail-list">${detailList([
             ["Motivo", change.reason || "Sem motivo registrado"],
             ["Vigência da alteração", formatDate(change.effective_at, true)],
             ["Cobrança proporcional", money(change.proration_amount)],
-        ])}</dl><details><summary>Consultar snapshots comerciais</summary><div class="fs-u-d-flex fs-u-flex-column fs-u-gap-2 fs-u-mt-2">${snapshotCard("Antes da alteração", change.before_snapshot)}${snapshotCard("Depois da alteração", change.after_snapshot)}</div></details></div></article>`).join("") : '<p class="fs-u-fs-sm fs-u-color-secondary">Nenhuma alteração comercial registrada.</p>';
+        ])}</dl><details><summary>Comparar condições da assinatura</summary><div class="fs-u-d-flex fs-u-flex-column fs-u-gap-2 fs-u-mt-2">${snapshotCard("Antes da alteração", change.before_snapshot)}${snapshotCard("Depois da alteração", change.after_snapshot)}</div></details></div></article>`).join("") : '<p class="fs-u-fs-sm fs-u-color-secondary">Nenhuma alteração comercial registrada.</p>';
 
         $("#subscription-detail-sections").hidden = false;
         form.hidden = false;
@@ -494,6 +502,26 @@ export function mount(root, context = {}) {
         $("#subscription-detail-error").hidden = true;
         $("#subscription-drawer-content").setAttribute("aria-busy", "false");
         form.reset();
+        $("#subscription-cycle").value = subscription.billing_cycle || "monthly";
+        $("#subscription-override-cycle").value = subscription.billing_cycle || "monthly";
+        $("#subscription-override-amount").value = subscription.monthly_amount ?? "";
+        state.pendingAction = null;
+        const pending = (subscription.history || []).some((change) => ["agendada", "aguardando_pagamento"].includes(change.status));
+        const allowed = {
+            suspensao: ["ativa", "inadimplente"].includes(subscription.status) && !pending,
+            reativacao: subscription.status === "suspensa" && !pending,
+            cancelamento: ["ativa", "inadimplente", "suspensa"].includes(subscription.status) && !pending,
+            cancelamento_imediato: !["encerrada", "cancelada"].includes(subscription.status),
+            upgrade: subscription.status === "ativa" && !pending,
+            downgrade: subscription.status === "ativa" && !pending,
+            cancelar_alteracao: pending,
+            override: canOverride && !pending && !["encerrada", "cancelada"].includes(subscription.status),
+        };
+        [...$("#subscription-action").options].forEach((option) => { if (option.value) option.disabled = !allowed[option.value]; });
+        $("#subscription-module-fields").hidden = true;
+        $("#subscription-change-preview").hidden = true;
+        $("#subscription-action-help").textContent = "";
+        $("#subscription-action-submit").textContent = "Revisar alteração";
         $("#subscription-target-fields").hidden = true;
         $("#subscription-override-fields").hidden = true;
         $("#subscription-target-plan").required = false;
@@ -512,7 +540,15 @@ export function mount(root, context = {}) {
         try {
             const subscription = await api.request(`/backoffice/subscriptions/${encodeURIComponent(subscriptionId)}`, { signal: scope.signal });
             if (scope.signal.aborted) return false;
+            const product = state.products.find((item) => item.id === subscription.product_id);
+            state.changeCatalog = null;
+            if (product) {
+                try { state.changeCatalog = await api.request(`/catalog/${encodeURIComponent(product.code)}`, { signal: scope.signal }); }
+                catch (error) { if (error.name === 'AbortError') return false; }
+            }
+            if (scope.signal.aborted) return false;
             renderDetails(subscription);
+            renderChangeModules();
             return true;
         } catch (error) {
             if (error.name !== "AbortError") {
@@ -535,6 +571,55 @@ export function mount(root, context = {}) {
         trigger?.focus();
     };
 
+    const renderChangeModules = (selectedPlan = false) => {
+        const host = $("#subscription-module-options");
+        const modules = state.changeCatalog?.modules || [];
+        const plans = state.changeCatalog?.plans || [];
+        const planSelect = $("#subscription-target-plan");
+        const previous = planSelect.value;
+        const oldSelections = new Set([...host.querySelectorAll('[data-subscription-module]:checked')].map((el) => el.value));
+        planSelect.innerHTML = '<option value="">Composição personalizada</option>' + plans.map((plan) => `<option value="${escapeHtml(plan.id)}">${escapeHtml(plan.name)}</option>`).join('');
+        planSelect.value = selectedPlan ? previous : (plans.find((p) => p.code === state.current?.commercial_snapshot?.plan_code)?.id || '');
+        const required = new Set(selectedPlan ? (plans.find((p) => p.id === planSelect.value)?.module_codes || []) : []);
+        host.replaceChildren();
+        modules.forEach((module) => {
+            const contracted = (state.current?.items || []).some((item) => item.module_id === module.id || item.conditions?.catalog_module_code === module.code);
+            const checked = selectedPlan ? required.has(module.code) || oldSelections.has(module.code) : contracted;
+            const label = document.createElement('label'); label.className = 'fs-check';
+            const input = document.createElement('input'); input.type = 'checkbox'; input.className = 'fs-check-input'; input.value = module.code; input.dataset.subscriptionModule = ''; input.dataset.moduleId = module.id; input.checked = checked; input.disabled = required.has(module.code);
+            const caption = document.createElement('span'); caption.className = 'fs-check-label'; caption.textContent = `${module.name} · ${money(module.monthly_amount)}/mês${contracted ? ' · Contratado' : ' · Disponível'}${required.has(module.code) ? ' · Incluído no plano' : ''}`;
+            label.append(input, caption);
+            const row = document.createElement('div'); row.className = 'fs-u-d-flex fs-u-flex-column fs-u-gap-1'; row.dataset.subscriptionModuleRow = module.code;
+            row.append(label);
+            const currentItem = (state.current?.items || []).find((item) => item.module_id === module.id);
+            const settings = document.createElement('div'); settings.className = 'fs-u-d-flex fs-u-flex-column fs-u-gap-1'; settings.hidden = !checked;
+            (module.personalizations || []).filter((personalization) => personalization.active).forEach((personalization) => {
+                const tiers = (personalization.tiers || []).filter((tier) => tier.active);
+                if (!tiers.length) return;
+                const field = document.createElement('label'); field.className = 'fs-form-label fs-u-d-flex fs-u-flex-column fs-u-gap-1';
+                const title = document.createElement('span'); title.textContent = personalization.name || personalization.type_label || personalization.type_code;
+                const select = document.createElement('select'); select.className = 'fs-form-select fs-u-w-100'; select.dataset.modulePersonalization = module.code; select.dataset.typeCode = personalization.type_code;
+                if (!personalization.required) select.append(new Option('Sem capacidade adicional', ''));
+                tiers.forEach((tier) => select.append(new Option(`${Number(tier.value).toLocaleString('pt-BR')} · ${money(tier.additional_monthly_amount)}/mês`, tier.value)));
+                const selected = currentItem?.conditions?.personalizations?.find((item) => item.type_code === personalization.type_code);
+                if (selected) select.value = String(selected.value);
+                field.append(title, select); settings.append(field);
+            });
+            input.addEventListener('change', () => { settings.hidden = !input.checked; });
+            row.append(settings); host.append(row);
+        });
+        filterChangeModules();
+        if (!modules.length) host.textContent = 'O catálogo publicado não está disponível. Recarregue antes de alterar módulos.';
+    };
+
+    const filterChangeModules = () => {
+        const host = $("#subscription-module-options");
+        const search = $("#subscription-module-filter").value.trim().toLocaleLowerCase('pt-BR');
+        host.querySelectorAll('[data-subscription-module-row]').forEach((row) => { row.hidden = Boolean(search) && !row.textContent.toLocaleLowerCase('pt-BR').includes(search); });
+        const count = host.querySelectorAll('[data-subscription-module]:checked').length;
+        $("#subscription-module-count").textContent = `${count} módulo${count === 1 ? '' : 's'} selecionado${count === 1 ? '' : 's'} para a nova composição.`;
+    };
+
     const updateActionFields = () => {
         const action = $("#subscription-action").value;
         const targetFields = $("#subscription-target-fields");
@@ -542,17 +627,24 @@ export function mount(root, context = {}) {
         const usesTarget = ["upgrade", "downgrade"].includes(action);
         targetFields.hidden = !usesTarget;
         overrideFields.hidden = action !== "override" || !canOverride;
-        $("#subscription-target-plan").required = usesTarget;
+        $("#subscription-target-plan").required = false;
+        $("#subscription-module-fields").hidden = !usesTarget;
         $("#subscription-cycle").required = usesTarget;
         $("#subscription-override-amount").required = action === "override" && canOverride;
     };
 
     const actionBody = (data) => {
         const action = data.get("action");
-        const body = { action, reason: String(data.get("reason") || "").trim() };
+        const body = { action, reason: String(data.get("reason") || "").trim(), expected_version: state.current.version };
         if (["upgrade", "downgrade"].includes(action)) {
             body.target_plan_id = data.get("target_plan_id");
             body.billing_cycle = data.get("billing_cycle");
+            body.voucher_code = String(data.get("voucher_code") || "").trim() || null;
+            body.expected_version = state.current.version;
+            body.items = [...$("#subscription-module-options").querySelectorAll('[data-subscription-module]:checked')].map((checkbox) => {
+                const item = (state.current.items || []).find((entry) => entry.module_id === checkbox.dataset.moduleId);
+                return { module_code: checkbox.value, quantity: Number(item?.quantity) || 1, personalizations: [...$("#subscription-module-options").querySelectorAll('[data-module-personalization]')].filter((select) => select.dataset.modulePersonalization === checkbox.value && select.value !== '').map((select) => ({ type_code: select.dataset.typeCode, tier_value: Number(select.value) })) };
+            });
         }
         if (action === "override") {
             body.override = {
@@ -572,14 +664,19 @@ export function mount(root, context = {}) {
         $("#subscription-form-error").hidden = true;
         try {
             const subscriptionId = state.current.id;
-            const response = await api.request(`/backoffice/subscriptions/${encodeURIComponent(subscriptionId)}`, {
-                method: "PATCH",
+            const cancelling = state.pendingAction.action === "cancelar_alteracao";
+            const response = await api.request(`/backoffice/subscriptions/${encodeURIComponent(subscriptionId)}${cancelling ? "/change" : ""}`, {
+                method: cancelling ? "DELETE" : "PATCH",
                 body: state.pendingAction,
                 signal: pageAbort.signal,
             });
             state.pendingAction = null;
             confirmModal?.hide?.();
-            setMessage(response?.message || "Ação comercial registrada.", "success");
+            setMessage(response?.message || "Alteração registrada.", "success");
+            if (response?.checkout_url) {
+                const message = $("#subscription-message");
+                if (message) { const link = document.createElement("a"); link.href = response.checkout_url; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = " Abrir link de pagamento"; message.append(link); }
+            }
             await Promise.all([loadDetails(subscriptionId), loadList()]);
         } catch (error) {
             if (error.name !== "AbortError") {
@@ -660,27 +757,58 @@ export function mount(root, context = {}) {
         loadList();
     };
 
-    const onActionChange = () => updateActionFields();
-    const onActionSubmit = (event) => {
+    const invalidatePreview = () => {
+        state.pendingAction = null;
+        $("#subscription-change-preview").hidden = true;
+        $("#subscription-action-submit").textContent = "Revisar alteração";
+    };
+    const onActionChange = () => {
+        updateActionFields();
+        invalidatePreview();
+        const descriptions = {
+            suspensao: "Suspende o acesso agora e pausa as cobranças recorrentes, quando houver.",
+            reativacao: "Restaura o acesso e retoma a cobrança recorrente. Um benefício gratuito vencido não será renovado.",
+            cancelamento: `Mantém o acesso até ${formatDate(state.current?.current_period_ends_at)}. Ao fim da vigência, encerra a assinatura e a cobrança recorrente.`,
+            cancelamento_imediato: "Encerra o acesso e a cobrança recorrente agora. Esta ação não realiza reembolso automático dos períodos já pagos.",
+            upgrade: "Selecione a nova composição e revise os valores. A gratuidade elegível mantém o vencimento original; uma ampliação paga depende da confirmação do pagamento.",
+            downgrade: `A redução será aplicada ao fim da vigência atual, em ${formatDate(state.current?.current_period_ends_at)}. Não há cobrança proporcional agora.`,
+            cancelar_alteracao: "Cancela a solicitação ainda pendente. Se o cancelamento da assinatura estava agendado, restaura a situação anterior.",
+            override: "Ajusta diretamente o valor contratado e a cobrança recorrente. Disponível somente para perfis autorizados.",
+        };
+        $("#subscription-action-help").textContent = descriptions[$("#subscription-action").value] || "";
+    };
+    const onActionSubmit = async (event) => {
         event.preventDefault();
         if (!state.current || state.saving) return;
         updateActionFields();
-        if (window.FokusForm && !window.FokusForm.validate(form)) return;
         if (!form.reportValidity()) return;
-        const data = new FormData(form);
-        const action = String(data.get("action") || "");
-        if (action === "override" && !canOverride) {
-            $("#subscription-form-error").textContent = "Seu perfil não pode executar override comercial.";
-            $("#subscription-form-error").hidden = false;
-            return;
-        }
-        state.pendingAction = actionBody(data);
-        if (action === "cancelamento_imediato") {
-            $("#subscription-confirm-reason").textContent = `Motivo informado: ${state.pendingAction.reason}`;
-            confirmModal?.show?.();
-            return;
-        }
-        executeAction();
+        const body = actionBody(new FormData(form));
+        if (state.pendingAction && JSON.stringify(state.pendingAction) === JSON.stringify(body)) { executeAction(); return; }
+        const submit = $("#subscription-action-submit");
+        const preview = $("#subscription-change-preview");
+        submit.disabled = true;
+        state.saving = true;
+        $("#subscription-form-error").hidden = true;
+        try {
+            if (["upgrade", "downgrade"].includes(body.action)) {
+                const quote = await api.request(`/backoffice/subscriptions/${encodeURIComponent(state.current.id)}/quote`, { method: "POST", body, signal: pageAbort.signal });
+                if (quote.requires_new_voucher) throw new Error(quote.voucher_message);
+                if (quote.action !== body.action) throw new Error(`Esta composição corresponde a ${quote.action === "upgrade" ? "uma ampliação" : "uma redução"}. Selecione a ação correspondente.`);
+                preview.replaceChildren(document.createTextNode(`Novo valor: ${money(quote.target.amount)} por ${body.billing_cycle === "annual" ? "ano" : "mês"}. Cobrança agora: ${money(quote.charge_now)}. Vigência: ${formatDate(quote.effective_at)}.`));
+                if (quote.voucher_message) { const note = document.createElement("p"); note.textContent = `${quote.voucher_message}${quote.target.free_benefit_ends_at ? ` Válido até ${formatDate(quote.target.free_benefit_ends_at)}.` : ""}`; preview.append(note); }
+            } else {
+                preview.textContent = `${$("#subscription-action-help").textContent} Motivo: ${body.reason}`;
+            }
+            state.pendingAction = body;
+            preview.hidden = false;
+            submit.textContent = "Confirmar alteração";
+            if (body.action === "cancelamento_imediato") {
+                $("#subscription-confirm-reason").textContent = `Motivo informado: ${body.reason}`;
+                confirmModal?.show?.();
+            } else submit.focus();
+        } catch (error) {
+            if (error.name !== "AbortError") { $("#subscription-form-error").textContent = error.message || "Não foi possível revisar a alteração."; $("#subscription-form-error").hidden = false; }
+        } finally { state.saving = false; submit.disabled = false; }
     };
 
     const onConfirm = () => executeAction();
@@ -688,6 +816,11 @@ export function mount(root, context = {}) {
     const onDrawerHidden = () => restoreFocus();
     const onReset = () => {
         queueMicrotask(() => {
+            invalidatePreview();
+            $("#subscription-action-help").textContent = "";
+            $("#subscription-module-fields").hidden = true;
+            $("#subscription-cycle").value = state.current?.billing_cycle || "monthly";
+            renderChangeModules();
             $("#subscription-target-fields").hidden = true;
             $("#subscription-override-fields").hidden = true;
             $("#subscription-target-plan").required = false;
@@ -728,8 +861,17 @@ export function mount(root, context = {}) {
     $("#subscription-free-voucher-form").addEventListener("submit", onFreeVoucherSubmit, { signal: listeners.signal });
     createTrigger.addEventListener("fs:hidden", () => $("#subscription-create-open").focus(), { signal: listeners.signal });
     form.addEventListener("submit", onActionSubmit, { signal: listeners.signal });
+    form.addEventListener("input", invalidatePreview, { signal: listeners.signal });
+    $("#subscription-module-filter").addEventListener("input", filterChangeModules, { signal: listeners.signal });
+    $("#subscription-module-options").addEventListener("change", () => {
+        filterChangeModules();
+        const selected = new Set([...$("#subscription-module-options").querySelectorAll('[data-subscription-module]:checked')].map((input) => input.value));
+        const plan = state.changeCatalog?.plans?.find((entry) => entry.id === $("#subscription-target-plan").value);
+        if (plan?.module_codes?.some((code) => !selected.has(code))) $("#subscription-target-plan").value = "";
+    }, { signal: listeners.signal });
     list.addEventListener("click", onListClick, { signal: listeners.signal });
     pagination.addEventListener("click", onPageClick, { signal: listeners.signal });
+    $("#subscription-target-plan").addEventListener("change", () => { renderChangeModules(true); invalidatePreview(); }, { signal: listeners.signal });
     $("#subscription-action").addEventListener("change", onActionChange, { signal: listeners.signal });
     form.addEventListener("reset", onReset, { signal: listeners.signal });
     $("#subscription-confirm-submit").addEventListener("click", onConfirm, { signal: listeners.signal });

@@ -166,7 +166,9 @@ class SubscriptionAdminTest extends TestCase
     public function test_admin_can_pause_reactivate_and_schedule_cancellation_with_audit(): void
     {
         $admin = $this->platformAdmin();
-        $fixture = $this->subscriptionFixture();
+        $fixture = $this->subscriptionFixture(['provider_subscription_id' => 'pre-managed']);
+        config(['services.mercado_pago.access_token' => 'test-token']);
+        Http::fake(['https://api.mercadopago.com/preapproval/pre-managed' => Http::response(['status' => 'authorized'], 200)]);
 
         $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/subscriptions/'.$fixture['subscription_id'], [
             'action' => 'suspensao',
@@ -183,16 +185,20 @@ class SubscriptionAdminTest extends TestCase
         $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/subscriptions/'.$fixture['subscription_id'], [
             'action' => 'cancelamento',
             'reason' => 'Encerramento solicitado pelo cliente.',
-        ])->assertOk()->assertJsonPath('status', 'aplicada');
+        ])->assertOk()->assertJsonPath('status', 'agendada');
         $this->assertDatabaseHas('subscriptions', ['id' => $fixture['subscription_id'], 'status' => 'cancelamento_agendado']);
         $this->assertDatabaseCount('subscription_changes', 3);
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.subscription_cancelamento']);
+        Http::assertSent(fn ($request) => $request->method() === 'PUT' && $request['status'] === 'paused');
+        Http::assertSent(fn ($request) => $request->method() === 'PUT' && $request['status'] === 'authorized');
     }
 
     public function test_upgrade_uses_published_plan_and_waits_for_payment(): void
     {
         $admin = $this->platformAdmin();
-        $fixture = $this->subscriptionFixture();
+        $fixture = $this->subscriptionFixture(['provider_subscription_id' => 'pre-change']);
+        config(['services.mercado_pago.access_token' => 'test-token']);
+        Http::fake(['https://api.mercadopago.com/*' => Http::response(['id' => 'pref-upgrade', 'init_point' => 'https://mercadopago.test/upgrade', 'status' => 'authorized'], 200)]);
         $targetPlanId = DB::table('plans')->where('code', 'law-cartorio-criminal')->value('id');
 
         $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/subscriptions/'.$fixture['subscription_id'], [
@@ -322,7 +328,11 @@ class SubscriptionAdminTest extends TestCase
     public function test_downgrade_is_scheduled_and_command_applies_it_at_period_end(): void
     {
         $admin = $this->platformAdmin();
-        $fixture = $this->subscriptionFixture(['period_ends_at' => now()->subMinute()]);
+        $fixture = $this->subscriptionFixture(['period_ends_at' => now()->subMinute(), 'provider_subscription_id' => 'pre-change']);
+        config(['services.mercado_pago.access_token' => 'test-token']);
+        Http::fake(['https://api.mercadopago.com/*' => Http::response(['id' => 'pref-upgrade', 'init_point' => 'https://mercadopago.test/upgrade', 'status' => 'authorized'], 200)]);
+        $original = json_decode(DB::table('subscriptions')->where('id', $fixture['subscription_id'])->value('commercial_snapshot'), true);
+        DB::table('subscriptions')->where('id', $fixture['subscription_id'])->update(['commercial_snapshot' => json_encode([...$original, 'amount' => 500, 'monthly_amount' => 500])]);
         $targetPlanId = DB::table('plans')->where('code', 'law-cartorio-criminal')->value('id');
 
         $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/subscriptions/'.$fixture['subscription_id'], [
@@ -371,6 +381,85 @@ class SubscriptionAdminTest extends TestCase
             ->assertJsonPath('recent_activity.0.description', 'Assinatura: Advocacia · Empresa Alpha · Nome público alterado de “sem nome público” para “Empresa Alpha”.');
         $this->actingAs($superadmin, 'platform')->patchJson($url, ['public_name' => null])->assertOk()->assertJsonPath('public_name', null);
         $this->actingAs($superadmin, 'platform')->patchJson($url, ['public_name' => str_repeat('x', 121)])->assertUnprocessable();
+    }
+
+    public function test_free_upgrade_preserves_expiry_without_new_payment_or_redemption(): void
+    {
+        $admin = $this->platformAdmin();
+        $fixture = $this->freeChangeFixture($admin);
+        $data = ['action' => 'upgrade', 'reason' => 'Incluir módulos.', 'items' => [['module_code' => 'processos-advocacia'], ['module_code' => 'contatos-advocacia']], 'billing_cycle' => 'monthly', 'expected_version' => 1];
+        $this->actingAs($admin, 'platform')->postJson('/api/backoffice/subscriptions/'.$fixture['subscription_id'].'/quote', $data)
+            ->assertOk()->assertJsonPath('free_benefit', true)->assertJsonPath('charge_now', 0)->assertJsonPath('requires_new_voucher', false);
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/subscriptions/'.$fixture['subscription_id'], $data)->assertOk()->assertJsonPath('status', 'aplicada');
+        $this->assertDatabaseHas('subscriptions', ['id' => $fixture['subscription_id'], 'status' => 'ativa', 'current_period_ends_at' => $fixture['expiry']]);
+        $this->assertSame(2, DB::table('subscription_items')->where('subscription_id', $fixture['subscription_id'])->whereNull('deleted_at')->count());
+        $this->assertDatabaseCount('voucher_redemptions', 1);
+        $this->assertDatabaseCount('payments', 1);
+        Http::assertNothingSent();
+    }
+
+    public function test_portal_free_upgrade_uses_the_same_rules_without_gateway_charge(): void
+    {
+        $admin = $this->platformAdmin();
+        $fixture = $this->freeChangeFixture($admin);
+        $user = User::find($fixture['user_id']);
+        $payload = ['billing_cycle' => 'monthly', 'version' => 1, 'items' => [['module_code' => 'processos-advocacia'], ['module_code' => 'contatos-advocacia']]];
+        $this->actingAs($user)->withSession(['active_company_id' => $fixture['company_id']])->postJson('/api/law/subscription/quote', $payload)
+            ->assertOk()->assertJsonPath('free_benefit', true)->assertJsonPath('charge_now', 0);
+        $this->postJson('/api/law/subscription/change', $payload)->assertCreated()->assertJsonPath('status', 'aplicada')->assertJsonPath('checkout_url', null);
+        $this->assertDatabaseHas('subscriptions', ['id' => $fixture['subscription_id'], 'current_period_ends_at' => $fixture['expiry']]);
+        $this->assertDatabaseCount('payments', 1);
+        Http::assertNothingSent();
+    }
+
+    public function test_free_upgrade_requires_eligible_replacement_voucher_and_old_expiry_does_not_suspend_it(): void
+    {
+        $admin = $this->platformAdmin();
+        $fixture = $this->freeChangeFixture($admin, true);
+        $data = ['action' => 'upgrade', 'reason' => 'Nova composição elegível.', 'items' => [['module_code' => 'processos-advocacia'], ['module_code' => 'contatos-advocacia']], 'billing_cycle' => 'monthly', 'expected_version' => 1];
+        $url = '/api/backoffice/subscriptions/'.$fixture['subscription_id'];
+        $this->actingAs($admin, 'platform')->postJson($url.'/quote', $data)->assertOk()->assertJsonPath('requires_new_voucher', true);
+        $this->actingAs($admin, 'platform')->patchJson($url, $data)->assertUnprocessable();
+        DB::table('vouchers')->insert(['id' => PrefixedUlid::make('VCH'), 'code' => 'NEWFREE', 'name' => 'Novo benefício', 'discount_type' => 'trial_free', 'discount_value' => 100,
+            'created_by_platform_admin_id' => $admin->id, 'product_id' => $fixture['product_id'], 'benefit_duration' => 'm1', 'redemption_limit_per_company' => 1, 'status' => 'ativa', 'created_at' => now(), 'updated_at' => now()]);
+        $this->actingAs($admin, 'platform')->patchJson($url, [...$data, 'voucher_code' => 'NEWFREE'])->assertOk()->assertJsonPath('status', 'aplicada');
+        $this->assertDatabaseCount('voucher_redemptions', 2);
+        $this->assertDatabaseCount('payments', 1);
+        $this->travel(8)->days();
+        $this->assertSame(0, app(\App\Services\PendingSubscriptionVoucher::class)->suspendExpired());
+        $this->assertDatabaseHas('subscriptions', ['id' => $fixture['subscription_id'], 'status' => 'ativa']);
+        Http::assertNothingSent();
+    }
+
+    public function test_backoffice_can_cancel_pending_cancellation_and_restore_contract(): void
+    {
+        $admin = $this->platformAdmin();
+        $fixture = $this->subscriptionFixture();
+        $url = '/api/backoffice/subscriptions/'.$fixture['subscription_id'];
+        $this->actingAs($admin, 'platform')->patchJson($url, ['action' => 'cancelamento', 'reason' => 'Encerrar ao final.'])->assertOk()->assertJsonPath('status', 'agendada');
+        $this->actingAs($admin, 'platform')->deleteJson($url.'/change', ['reason' => 'Cliente decidiu continuar.', 'expected_version' => 2])->assertOk();
+        $this->assertDatabaseHas('subscriptions', ['id' => $fixture['subscription_id'], 'status' => 'ativa', 'cancel_at' => null]);
+        $this->assertDatabaseHas('subscription_changes', ['subscription_id' => $fixture['subscription_id'], 'status' => 'cancelada']);
+    }
+
+    private function freeChangeFixture(PlatformAdmin $admin, bool $restricted = false): array
+    {
+        Http::fake();
+        $fixture = $this->subscriptionFixture();
+        $subscription = DB::table('subscriptions')->where('id', $fixture['subscription_id'])->first();
+        $snapshot = json_decode($subscription->commercial_snapshot, true);
+        $expiry = now()->addDays(7)->toDateTimeString();
+        $voucherId = PrefixedUlid::make('VCH');
+        DB::table('vouchers')->insert(['id' => $voucherId, 'code' => 'ACTIVEFREE', 'name' => 'Gratuidade vigente', 'discount_type' => 'trial_free', 'discount_value' => 100,
+            'product_id' => $subscription->product_id, 'plan_id' => $restricted ? $snapshot['plan_id'] : null, 'benefit_duration' => 'd7',
+            'redemption_limit_per_company' => 1, 'status' => 'ativa', 'created_by_platform_admin_id' => $admin->id, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('voucher_redemptions')->insert(['id' => PrefixedUlid::make('VRD'), 'voucher_id' => $voucherId, 'company_id' => $fixture['company_id'], 'subscription_id' => $fixture['subscription_id'],
+            'discount_amount' => 64.70, 'benefit_starts_at' => now(), 'benefit_ends_at' => $expiry, 'snapshot' => json_encode(['discount_type' => 'trial_free']), 'created_at' => now()]);
+        DB::table('subscriptions')->where('id', $fixture['subscription_id'])->update(['current_period_ends_at' => $expiry, 'commercial_snapshot' => json_encode([
+            ...$snapshot, 'plan_id' => null, 'plan_code' => null, 'plan_name' => 'Personalizada', 'base_amount' => 34.9, 'base_monthly_amount' => 34.9,
+            'amount' => 0, 'monthly_amount' => 0, 'current_period_ends_at' => $expiry,
+        ])]);
+        return [...$fixture, 'expiry' => $expiry, 'product_id' => $subscription->product_id];
     }
 
     private function platformAdmin(string $role = 'superadministrador'): PlatformAdmin

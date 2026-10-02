@@ -102,7 +102,7 @@
                 <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-create-offer-title">Oferta publicada</h3><p class="fs-card-subtitle">O valor final é calculado pelo servidor.</p></div></div>
                 <div class="fs-card-body fs-u-mx-2 fs-u-mt-2 fs-u-mb-3 fs-u-d-flex fs-u-flex-column fs-u-gap-2">
                     <label class="fs-form-label fs-u-mt-3" for="subscription-create-product"><span class="fs-u-ml-2">Produto</span><select class="fs-form-select fs-width-500" id="subscription-create-product" name="product_code" required><option value="">Selecione um produto</option></select></label>
-                    <label class="fs-form-label fs-u-mt-3" for="subscription-create-plan"><span class="fs-u-ml-2">Plano publicado</span><select class="fs-form-select fs-width-500" id="subscription-create-plan" name="plan_code" required><option value="">Selecione um plano</option></select></label>
+                    <label class="fs-form-label fs-u-mt-3" for="subscription-create-plan"><span class="fs-u-ml-2">Plano publicado</span><select class="fs-form-select fs-width-500" id="subscription-create-plan" name="plan_code" required><option value="">Composição personalizada</option></select></label>
                     <label class="fs-form-label fs-u-mt-3" for="subscription-create-cycle"><span class="fs-u-ml-2">Ciclo</span><select class="fs-form-select fs-width-300" id="subscription-create-cycle" name="cycle" required><option value="monthly">Mensal</option><option value="annual">Anual</option></select></label>
                     <div class="fs-alert fs-alert-info" id="subscription-create-catalog-notice" role="status" hidden></div>
                     <p class="fs-u-fs-sm fs-u-color-secondary" id="subscription-create-amount">Selecione um plano para consultar o valor publicado. O servidor confirma o preço no checkout.</p>
@@ -157,32 +157,41 @@
             </form>
 
             <form class="fs-form fs-card fs-card-panel" id="subscription-change-form" novalidate hidden>
-                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-change-title">Registrar ação comercial</h3><p class="fs-card-subtitle">As alterações exigem motivo e são registradas no histórico.</p></div></div>
+                <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="subscription-change-title">Gerenciar assinatura</h3><p class="fs-card-subtitle">Escolha uma ação e confira o efeito antes de confirmar. O motivo ficará no histórico.</p></div></div>
                 <div class="fs-card-body fs-u-d-flex fs-u-flex-column fs-u-gap-2">
-                    <label class="fs-form-label" for="subscription-action">
+                    <label class="fs-form-label fs-u-d-flex fs-u-flex-column fs-u-gap-1" for="subscription-action">
                         <span>Ação</span>
-                        <select class="fs-form-select" id="subscription-action" name="action" required>
+                        <select class="fs-form-select fs-u-w-100" id="subscription-action" name="action" required>
                             <option value="">Selecione uma ação</option>
                             <option value="suspensao">Suspender</option>
                             <option value="reativacao">Reativar</option>
                             <option value="cancelamento">Agendar cancelamento</option>
                             <option value="cancelamento_imediato">Encerrar assinatura imediatamente</option>
-                            <option value="upgrade">Solicitar upgrade</option>
-                            <option value="downgrade">Agendar downgrade</option>
-                            <option value="override" id="subscription-override-option">Override comercial</option>
+                            <option value="upgrade">Ampliar plano ou incluir módulos</option>
+                            <option value="downgrade">Reduzir plano ou remover módulos</option>
+                            <option value="cancelar_alteracao" id="subscription-cancel-change-option">Cancelar alteração pendente</option><option value="override" id="subscription-override-option">Ajustar valor manualmente</option>
                         </select>
                     </label>
-                    <label class="fs-form-label" for="subscription-reason">
+                    <label class="fs-form-label fs-u-d-flex fs-u-flex-column fs-u-gap-1" for="subscription-reason">
                         <span>Motivo</span>
-                        <textarea class="fs-form-control" id="subscription-reason" name="reason" rows="3" maxlength="1000" required></textarea>
+                        <textarea class="fs-form-control fs-u-w-100" id="subscription-reason" name="reason" rows="3" maxlength="1000" required></textarea>
                     </label>
                     <div class="fs-form-row" id="subscription-target-fields" hidden>
-                        <label class="fs-form-col fs-col-8 fs-form-label" for="subscription-target-plan"><span>Plano de destino</span><select class="fs-form-select" id="subscription-target-plan" name="target_plan_id"><option value="">Selecione um plano</option></select></label>
+                        <label class="fs-form-col fs-col-8 fs-form-label" for="subscription-target-plan"><span>Plano da nova composição</span><select class="fs-form-select" id="subscription-target-plan" name="target_plan_id"><option value="">Composição personalizada</option></select></label>
                         <label class="fs-form-col fs-col-4 fs-form-label" for="subscription-cycle"><span>Ciclo</span><select class="fs-form-select" id="subscription-cycle" name="billing_cycle"><option value="monthly">Mensal</option><option value="annual">Anual</option></select></label>
                     </div>
+                    <fieldset id="subscription-module-fields" class="fs-form-fieldset fs-u-d-flex fs-u-flex-column fs-u-gap-2" hidden>
+                        <legend class="fs-u-fs-sm">Módulos da nova composição</legend>
+                        <p class="fs-u-fs-sm fs-u-color-secondary">Somente os módulos selecionados entram na alteração. Publicar um módulo não muda as assinaturas existentes.</p>
+                        <label class="fs-form-label fs-u-d-flex fs-u-flex-column fs-u-gap-1" for="subscription-module-filter"><span>Buscar módulo</span><input class="fs-form-control fs-u-w-100" id="subscription-module-filter" type="search" placeholder="Digite o nome do módulo" /></label><p class="fs-u-fs-sm fs-u-color-secondary" id="subscription-module-count" role="status"></p>
+                        <div id="subscription-module-options" class="fs-u-d-flex fs-u-flex-column fs-u-gap-2"></div>
+                        <label class="fs-form-label fs-u-d-flex fs-u-flex-column fs-u-gap-1" for="subscription-change-voucher"><span>Novo voucher (opcional)</span><input class="fs-form-control fs-u-w-100" id="subscription-change-voucher" name="voucher_code" maxlength="64" autocomplete="off" /><small>Deixe em branco para manter a gratuidade vigente, se a nova composição for elegível. O prazo original será preservado.</small></label>
+                    </fieldset>
+                    <p id="subscription-action-help" class="fs-u-fs-sm fs-u-color-secondary" role="status"></p>
+                    <div id="subscription-change-preview" class="fs-alert fs-alert-info" role="status" hidden></div>
                     <div class="fs-form-row" id="subscription-override-fields" hidden>
                         <label class="fs-form-col fs-col-6 fs-form-label" for="subscription-override-amount"><span>Valor mensal</span><input class="fs-form-control" id="subscription-override-amount" name="override_monthly_amount" type="number" min="0" step="0.01" inputmode="decimal" /></label>
-                        <label class="fs-form-col fs-col-6 fs-form-label" for="subscription-override-cycle"><span>Ciclo do override</span><select class="fs-form-select" id="subscription-override-cycle" name="override_billing_cycle"><option value="monthly">Mensal</option><option value="annual">Anual</option></select></label>
+                        <label class="fs-form-col fs-col-6 fs-form-label" for="subscription-override-cycle"><span>Forma de cobrança</span><select class="fs-form-select" id="subscription-override-cycle" name="override_billing_cycle"><option value="monthly">Mensal</option><option value="annual">Anual</option></select></label>
                     </div>
                     <div class="fs-alert fs-alert-danger" id="subscription-form-error" role="alert" hidden></div>
                 </div>
@@ -190,7 +199,7 @@
         </div>
         <div class="fs-offcanvas-footer" id="subscription-action-footer" hidden>
             <button class="fs-btn fs-btn-outline-secondary" id="subscription-action-reset" type="reset" form="subscription-change-form">Limpar ação</button>
-            <button class="fs-btn fs-btn-primary" id="subscription-action-submit" type="submit" form="subscription-change-form">Registrar ação</button>
+            <button class="fs-btn fs-btn-primary" id="subscription-action-submit" type="submit" form="subscription-change-form">Revisar alteração</button>
         </div>
         <button id="subscription-confirm-trigger" type="button" data-fs="modal" data-fs-target="#subscription-confirm-dialog" aria-label="Confirmar encerramento" hidden></button>
         <div class="fs-modal fs-confirmation-dialog" id="subscription-confirm-dialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="subscription-confirm-title" aria-describedby="subscription-confirm-description">

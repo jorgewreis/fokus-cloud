@@ -140,3 +140,46 @@ continua sendo atualizada separadamente pelas mudanças operacionais do contrato
   `preapproval` do Mercado Pago é criado.
 - A confirmação depende de webhook assinado e idempotente ou conciliação
   posterior com o Mercado Pago.
+
+
+## Alterações de assinaturas existentes
+
+Publicar um módulo ou alterar a composição de um plano não inclui funcionalidades
+nas assinaturas existentes. O acesso usa os itens efetivamente contratados e
+ignora itens removidos (`deleted_at`). A nova composição depende de uma alteração
+explícita pelo administrador da empresa ou por um perfil autorizado no backoffice.
+
+O backoffice permite ampliar ou reduzir a composição escolhendo um plano publicado,
+seus módulos adicionais e capacidades, ou uma composição personalizada. Apenas o
+catálogo publicado pode ser contratado. Módulos do plano escolhido são obrigatórios;
+dependências, incompatibilidades, preços e faixas são conferidos pelo servidor.
+Selecionar um plano não dispensa selecionar corretamente os itens da composição.
+
+Antes da confirmação, o painel apresenta o valor da nova composição, a cobrança
+proporcional, a data de aplicação e a situação do voucher. Alterar campos invalida
+a revisão anterior. Motivo e revisão do contrato protegem a atualização e compõem
+a auditoria. O portal usa as mesmas regras comerciais.
+
+| Ação no backoffice | Efeito |
+| --- | --- |
+| Ampliar plano ou incluir módulos | Aplicação imediata se houver gratuidade elegível. Quando há diferença a pagar, gera link de pagamento e libera a nova composição após confirmação. |
+| Reduzir plano ou remover módulos | Aplicação ao final da vigência, sem cobrança proporcional imediata. |
+| Suspender | Interrompe o acesso e pausa a recorrência existente. |
+| Reativar | Restaura o acesso e retoma a recorrência existente. Não renova voucher vencido. |
+| Agendar cancelamento | Mantém acesso até `cancel_at`; o agendador encerra a assinatura e cancela a recorrência nessa data. |
+| Encerrar assinatura imediatamente | Encerra acesso e recorrência; cancela solicitações pendentes. Não estorna automaticamente os períodos já pagos. |
+| Cancelar alteração pendente | Cancela a solicitação, pagamentos locais pendentes e a reserva de voucher vinculada. Se era cancelamento agendado, restaura a situação anterior. |
+| Ajustar valor manualmente | Exige `platform.commercial.override`; atualiza o preço e a recorrência existente. Durante gratuidade válida, mantém zero a pagar e atualiza apenas o preço-base. |
+
+Assinaturas encerradas não recebem essas alterações. A interface apresenta ações
+compatíveis com a situação atual. Quando há solicitação pendente, ela deve ser
+cancelada antes de iniciar outra ação, salvo encerramento imediato.
+
+`POST /api/backoffice/subscriptions/{subscription}/quote` calcula sem alterar o
+contrato. `DELETE /api/backoffice/subscriptions/{subscription}/change` cancela a
+solicitação pendente. Ambos exigem `platform.subscriptions.manage`, assim como
+`PATCH /api/backoffice/subscriptions/{subscription}`. As ações preservam o histórico.
+
+`SubscriptionAccess` centraliza o acesso de assinaturas ativas e de cancelamentos
+agendados ainda vigentes; é compartilhado por autenticação, permissões, contexto e
+sincronização de Processos para evitar regras divergentes entre esses consumidores.

@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 class SubscriptionChangeManager
 {
-    public function __construct(private readonly CatalogManager $catalog)
+    public function __construct(private readonly CatalogManager $catalog, private readonly VoucherManager $vouchers)
     {
     }
 
@@ -24,7 +24,11 @@ class SubscriptionChangeManager
             if (in_array($action, ['reativacao', 'upgrade', 'downgrade'], true) && $subscription->status === 'suspensa' && ! $subscription->provider_subscription_id) {
                 abort_if(DB::table('voucher_redemptions as redemption')->join('vouchers as voucher', 'voucher.id', '=', 'redemption.voucher_id')
                     ->where('redemption.subscription_id', $subscriptionId)->where('voucher.discount_type', 'trial_free')
-                    ->where('redemption.benefit_ends_at', '<=', now())->exists(), 422, 'O benefício gratuito terminou. Inicie uma nova contratação paga.');
+                    ->where('redemption.benefit_ends_at', '<=', now())->exists() && $subscription->current_period_ends_at && now()->gte($subscription->current_period_ends_at), 422, 'O benefício gratuito terminou. Inicie uma nova contratação paga.');
+            }
+            if (! in_array($action, ['upgrade', 'downgrade', 'cancelamento_imediato'], true)) {
+                abort_if(DB::table('subscription_changes')->where('subscription_id', $subscriptionId)->whereIn('status', ['agendada', 'aguardando_pagamento'])->exists(),
+                    409, 'Existe uma alteração pendente. Cancele-a antes de executar outra ação.');
             }
             $after = $before;
             $status = 'aplicada';
@@ -49,6 +53,8 @@ class SubscriptionChangeManager
                     $after['status'] = 'encerrada';
                     $after['cancel_at'] = $effectiveAt->toISOString();
                 } else {
+                    abort_unless(in_array($subscription->status, ['ativa', 'inadimplente', 'suspensa'], true), 422, 'Esta assinatura não pode receber um novo cancelamento agendado.');
+                    $status = 'agendada';
                     $effectiveAt = $subscription->current_period_ends_at ? Carbon::parse($subscription->current_period_ends_at) : now();
                     $updates['status'] = 'cancelamento_agendado';
                     $updates['cancel_at'] = $effectiveAt;
@@ -58,18 +64,37 @@ class SubscriptionChangeManager
             } elseif (in_array($action, ['upgrade', 'downgrade'], true)) {
                 abort_if(DB::table('subscription_changes')->where('subscription_id', $subscriptionId)->whereIn('status', ['agendada', 'aguardando_pagamento'])->exists(), 409,
                     'Já existe uma alteração pendente para esta assinatura. Edite ou cancele-a antes de criar outra.');
-                $target = $this->targetPlanSnapshot($subscription, $data);
-                $after = [...$before, ...$target['snapshot']];
+                abort_unless($subscription->status === 'ativa', 422, 'A assinatura precisa estar ativa para alterar planos ou módulos.');
+                $quote = $this->quoteCustomerChange($subscriptionId, $data);
+                abort_unless($action === $quote['action'], 422, 'Esta composição corresponde a '.($quote['action'] === 'upgrade' ? 'uma ampliação' : 'uma redução').'. Confira o resumo da alteração.');
+                abort_if($quote['requires_new_voucher'], 422, $quote['voucher_message']);
+                abort_if(! $quote['free_benefit'] && ! $subscription->provider_subscription_id,
+                    422, 'Esta assinatura não tem uma cobrança recorrente ativa. Use um voucher gratuito elegível ou inicie uma nova contratação paga.');
+                $after = [...$before, ...$quote['target']];
                 $status = $action === 'upgrade' ? 'aguardando_pagamento' : 'agendada';
-                $effectiveAt = $action === 'upgrade'
-                    ? now()
-                    : ($subscription->current_period_ends_at ? Carbon::parse($subscription->current_period_ends_at) : now());
-                $prorationAmount = $action === 'upgrade'
-                    ? $this->proration($before, $target['snapshot'], $effectiveAt)
-                    : 0;
+                $effectiveAt = Carbon::parse($quote['effective_at']);
+                $prorationAmount = $quote['charge_now'];
+                if (! empty($data['voucher_code'])) {
+                    abort_unless($action === 'upgrade', 422, 'Aplique o novo voucher em uma ampliação imediata da assinatura.');
+                    $voucher = $this->vouchers->findEligible($data['voucher_code'], $subscription->product_id, $subscription->company_id,
+                        array_column(array_column($after['items'], 'conditions'), 'catalog_module_code'), $after['plan_code'] ?? null);
+                    $reservation = $this->vouchers->reserve($voucher, $subscription->company_id, 'change-'.PrefixedUlid::make('SCH'), [
+                        'code' => $voucher->code, 'name' => $voucher->name, 'discount_type' => $voucher->discount_type,
+                        'discount_value' => (float) $voucher->discount_value, 'benefit_duration' => $voucher->benefit_duration,
+                        'discount_amount' => $quote['voucher_discount'], 'subscription_id' => $subscriptionId,
+                        'product_id' => $subscription->product_id, 'plan_code' => $after['plan_code'] ?? null,
+                        'module_codes' => array_column(array_column($after['items'], 'conditions'), 'catalog_module_code'),
+                        'application' => $quote['free_benefit'] ? 'subscription_free' : 'upgrade_charge',
+                    ], $admin->id, actorType: DB::table('platform_admins')->where('id', $admin->id)->exists() ? 'admin' : 'customer');
+                    $this->vouchers->attachSubscription($reservation->id, $subscriptionId);
+                    $after['upgrade_voucher_reservation_id'] = $reservation->id;
+                }
             } elseif ($action === 'override') {
                 abort_unless($admin->hasPermission('platform.commercial.override'), 403, 'Somente o superadministrador pode executar override comercial.');
                 $after = $this->overrideSnapshot($before, $data['override'] ?? []);
+                $benefit = $this->changeVoucher($subscription, $after, []);
+                abort_if($benefit['blocked'], 422, $benefit['message']);
+                if ($benefit['free']) $after = [...$after, ...$benefit['snapshot']];
                 if (array_key_exists('items', $data['override'] ?? [])) {
                     $this->replaceItems($subscription, $after['items'], $admin->id);
                 }
@@ -85,6 +110,17 @@ class SubscriptionChangeManager
                 abort(422, 'Ação de assinatura inválida.');
             }
 
+            if ($subscription->provider_subscription_id && in_array($action, ['suspensao', 'reativacao', 'cancelamento_imediato', 'override'], true)) {
+                $gatewayData = match ($action) {
+                    'suspensao' => ['status' => 'paused'], 'reativacao' => ['status' => 'authorized'],
+                    'cancelamento_imediato' => ['status' => 'cancelled'],
+                    default => ['auto_recurring' => ['frequency' => $after['billing_cycle'] === 'annual' ? 12 : 1,
+                        'frequency_type' => 'months', 'transaction_amount' => (float) $after['amount'], 'currency_id' => 'BRL']],
+                };
+                app(MercadoPagoClient::class)->updatePreapproval((string) $subscription->provider_subscription_id, $gatewayData, 'action-'.$subscriptionId.'-'.$subscription->version.'-'.$action);
+                $updates['provider_status'] = $gatewayData['status'] ?? $subscription->provider_status;
+            }
+            if ($action === 'cancelamento_imediato') $this->cancelPending($subscriptionId, $admin->id, (string) $data['reason']);
             if (in_array($action, ['suspensao', 'reativacao', 'cancelamento', 'cancelamento_imediato', 'override'], true)) {
                 $after['status'] = $updates['status'] ?? $subscription->status;
                 $updates['commercial_snapshot'] = json_encode($after);
@@ -111,6 +147,12 @@ class SubscriptionChangeManager
                 'updated_at' => now(),
             ]);
 
+            if ($action === 'upgrade' && ! empty($after['free_benefit'])) {
+                $applied = $this->applyApprovedChange($changeId, $isPlatformAdmin ? $admin->id : null);
+                $after = $applied['after'];
+                $status = 'aplicada';
+            }
+
             return [
                 'id' => $changeId,
                 'status' => $status,
@@ -119,6 +161,34 @@ class SubscriptionChangeManager
                 'before' => $before,
                 'after' => $after,
             ];
+        });
+    }
+
+    public function cancelPending(string $subscriptionId, ?string $actorId = null, string $reason = 'Cancelamento da alteração pendente.'): array
+    {
+        return DB::transaction(function () use ($subscriptionId, $actorId, $reason): array {
+            $subscription = DB::table('subscriptions')->where('id', $subscriptionId)->lockForUpdate()->first();
+            abort_unless($subscription, 404, 'Assinatura não encontrada.');
+            $pending = DB::table('subscription_changes')->where('subscription_id', $subscriptionId)->whereIn('status', ['agendada', 'aguardando_pagamento'])->lockForUpdate()->get();
+            $before = $this->snapshot($subscription);
+            $isPlatformActor = $actorId && DB::table('platform_admins')->where('id', $actorId)->exists();
+            foreach ($pending as $change) {
+                $after = json_decode((string) $change->after_snapshot, true) ?: [];
+                if (! empty($after['upgrade_voucher_reservation_id'])) $this->vouchers->release($after['upgrade_voucher_reservation_id'], actorId: $actorId, actorType: $isPlatformActor ? 'admin' : ($actorId ? 'customer' : 'system'));
+                DB::table('subscription_changes')->where('id', $change->id)->update(['status' => 'cancelada', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
+                DB::table('payments')->where('subscription_change_id', $change->id)->where('status', 'aguardando_pagamento')->update(['status' => 'cancelado', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
+            }
+            if ($subscription->status === 'cancelamento_agendado') {
+                $original = $pending->firstWhere('type', 'cancelamento');
+                $prior = $original ? (json_decode((string) $original->before_snapshot, true) ?: []) : [];
+                $restored = in_array($prior['status'] ?? '', ['ativa', 'suspensa', 'inadimplente'], true) ? $prior['status'] : 'ativa';
+                DB::table('subscriptions')->where('id', $subscriptionId)->update(['status' => $restored, 'cancel_at' => null,
+                    'commercial_snapshot' => json_encode([...$before, 'status' => $restored, 'cancel_at' => null]), 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
+            }
+            $after = $this->snapshot(DB::table('subscriptions')->where('id', $subscriptionId)->first());
+            app(AuditRecorder::class)->company($subscription->company_id, $isPlatformActor ? null : $actorId, 'subscription', $subscriptionId, 'update', $before, $after, reason: $reason,
+                actorType: $isPlatformActor ? 'admin' : ($actorId ? 'customer' : 'system'));
+            return ['before' => $before, 'after' => $after, 'count' => $pending->count()];
         });
     }
 
@@ -131,21 +201,77 @@ class SubscriptionChangeManager
 
         $before = $this->snapshot($subscription);
         $target = $this->targetPlanSnapshot($subscription, $data)['snapshot'];
-        $isIncrease = (float) ($target['amount'] ?? 0) > (float) ($before['amount'] ?? 0)
-            || ((float) ($target['amount'] ?? 0) === (float) ($before['amount'] ?? 0) && (float) ($target['monthly_amount'] ?? 0) > (float) ($before['monthly_amount'] ?? 0));
+        $currentBase = (float) ($before['base_amount'] ?? $before['amount'] ?? 0);
+        $currentMonthlyBase = (float) ($before['base_monthly_amount'] ?? $before['monthly_amount'] ?? 0);
+        $added = array_diff(array_column($target['items'], 'module_id'), array_column($before['items'] ?? [], 'module_id'));
+        $isIncrease = (float) $target['amount'] > $currentBase
+            || ($added !== [] && (float) $target['amount'] === $currentBase)
+            || ((float) $target['amount'] === $currentBase && (float) $target['monthly_amount'] > $currentMonthlyBase);
         $action = $isIncrease ? 'upgrade' : 'downgrade';
-        $effectiveAt = $action === 'upgrade'
-            ? now()
-            : ($subscription->current_period_ends_at ? Carbon::parse($subscription->current_period_ends_at) : now());
-
+        $effectiveAt = $action === 'upgrade' ? now() : ($subscription->current_period_ends_at ? Carbon::parse($subscription->current_period_ends_at) : now());
+        $benefit = $this->changeVoucher($subscription, $target, $data);
+        if (! $benefit['free'] && ! $benefit['blocked'] && ! $subscription->provider_subscription_id) {
+            $benefit['blocked'] = true;
+            $benefit['message'] = 'A assinatura não tem cobrança recorrente ativa. Informe um voucher gratuito elegível ou inicie uma nova contratação paga.';
+        }
+        $target = [...$target, ...$benefit['snapshot']];
+        $charge = $action === 'upgrade' ? $this->proration([...$before, 'monthly_amount' => $currentMonthlyBase], $target, $effectiveAt) : 0;
+        if ($benefit['free']) $charge = 0;
+        $discount = $benefit['voucher'] && ! $benefit['free'] ? $this->vouchers->discount($benefit['voucher'], $charge) : ($benefit['free'] ? (float) $target['base_amount'] : 0);
         return [
-            'action' => $action,
-            'current' => $before,
-            'target' => $target,
-            'effective_at' => $effectiveAt,
-            'charge_now' => $action === 'upgrade' ? $this->proration($before, $target, $effectiveAt) : 0,
+            'action' => $action, 'current' => $before, 'target' => $target, 'effective_at' => $effectiveAt,
+            'charge_now' => round(max(0, $charge - ($benefit['free'] ? 0 : $discount)), 2),
+            'free_benefit' => $benefit['free'], 'requires_new_voucher' => $benefit['blocked'],
+            'voucher_message' => $benefit['message'], 'voucher_discount' => $discount,
             'version' => (int) $subscription->version,
         ];
+    }
+
+    private function changeVoucher(object $subscription, array $target, array $data): array
+    {
+        $codes = array_column(array_column($target['items'], 'conditions'), 'catalog_module_code');
+        $redemption = DB::table('voucher_redemptions as redemption')->join('vouchers as voucher', 'voucher.id', '=', 'redemption.voucher_id')
+            ->where('redemption.subscription_id', $subscription->id)->where('voucher.discount_type', 'trial_free')
+            ->orderByDesc('redemption.created_at')->orderByDesc('redemption.id')
+            ->select('redemption.*', 'voucher.product_id as eligible_product_id', 'voucher.plan_id as eligible_plan_id', 'voucher.module_codes as eligible_module_codes', 'voucher.code')->first();
+        if ($redemption && (! $redemption->benefit_ends_at || now()->gte($redemption->benefit_ends_at) || ($redemption->benefit_starts_at && now()->lt($redemption->benefit_starts_at)))) $redemption = null;
+        $voucher = ! empty($data['voucher_code']) ? $this->vouchers->findEligible($data['voucher_code'], $subscription->product_id, $subscription->company_id, $codes, $target['plan_code'] ?? null) : null;
+        $free = $voucher ? $voucher->discount_type === 'trial_free' : (bool) $redemption;
+        $blocked = false;
+        $message = null;
+        $start = $redemption?->benefit_starts_at;
+        $end = $redemption?->benefit_ends_at;
+        if ($voucher && $free) {
+            abort_unless($voucher->benefit_duration, 422, 'O voucher gratuito precisa ter uma duração definida.');
+            $start = now()->toDateTimeString();
+            $end = match ($voucher->benefit_duration) {
+                'd7' => now()->addDays(7), 'm1' => now()->addMonth(), 'm3' => now()->addMonths(3),
+                'm6' => now()->addMonths(6), 'a1' => now()->addYear(), default => null,
+            };
+            abort_unless($end, 422, 'Duração do voucher gratuito inválida.');
+            $end = $end->toDateTimeString();
+            $message = 'Novo voucher gratuito: o prazo começa na confirmação desta alteração.';
+        } elseif ($redemption && ! $voucher) {
+            $saved = json_decode((string) $redemption->snapshot, true) ?: [];
+            $scope = $saved['eligibility'] ?? ['product_id' => $redemption->eligible_product_id, 'plan_id' => $redemption->eligible_plan_id, 'module_codes' => json_decode((string) ($redemption->eligible_module_codes ?? ''), true) ?: []];
+            $blocked = (! empty($scope['product_id']) && $scope['product_id'] !== $subscription->product_id)
+                || (! empty($scope['plan_id']) && $scope['plan_id'] !== ($target['plan_id'] ?? null))
+                || (! empty($scope['module_codes']) && ! array_intersect($scope['module_codes'], $codes));
+            $message = $blocked ? 'O voucher atual não permite esta composição. Informe outro voucher gratuito elegível para continuar sem cobrança.' : 'Gratuidade mantida até o vencimento original. O upgrade não renova o prazo.';
+        } elseif ($voucher) {
+            $message = 'O desconto do novo voucher será aplicado somente à cobrança proporcional desta alteração. Conclua o pagamento em até 30 minutos.';
+        }
+        $snapshot = ['free_benefit' => $free && ! $blocked, 'upgrade_voucher_reservation_id' => null];
+        if ($free && ! $blocked) {
+            $snapshot = [...$snapshot, 'base_amount' => (float) $target['amount'], 'base_monthly_amount' => (float) $target['monthly_amount'],
+                'discount_amount' => (float) $target['amount'], 'amount' => 0.0, 'monthly_amount' => 0.0,
+                'current_period_starts_at' => $start, 'current_period_ends_at' => $end,
+                'free_benefit_ends_at' => $end, 'free_voucher_code' => $voucher?->code ?? $redemption?->code];
+        } else {
+            $snapshot = [...$snapshot, 'base_amount' => (float) $target['amount'], 'base_monthly_amount' => (float) $target['monthly_amount'],
+                'discount_amount' => 0.0, 'free_benefit_ends_at' => null, 'free_voucher_code' => null];
+        }
+        return ['snapshot' => $snapshot, 'free' => $free && ! $blocked, 'blocked' => $blocked, 'message' => $message, 'voucher' => $voucher];
     }
 
     public function applyApprovedChange(string $changeId, ?string $adminId = null): array
@@ -161,12 +287,30 @@ class SubscriptionChangeManager
             $before = $this->snapshot($subscription);
             $items = $after['items'] ?? [];
 
+            if (! empty($after['free_benefit']) && $subscription->provider_subscription_id) {
+                app(MercadoPagoClient::class)->updatePreapproval((string) $subscription->provider_subscription_id, ['status' => 'cancelled'], 'free-change-'.$changeId);
+            }
+            if (! empty($after['upgrade_voucher_reservation_id'])) {
+                $this->vouchers->confirmForSubscription($subscription->id, $adminId, $adminId ? 'admin' : 'system', 'http', reservationId: $after['upgrade_voucher_reservation_id']);
+                $reservation = DB::table('voucher_redemption_reservations')->where('id', $after['upgrade_voucher_reservation_id'])->first();
+                abort_unless($reservation && $reservation->status === 'confirmed', 422, 'A reserva do voucher expirou. Refaça a alteração.');
+                if (! empty($after['free_benefit'])) {
+                    $redemption = DB::table('voucher_redemptions')->where('subscription_id', $subscription->id)->where('voucher_id', $reservation->voucher_id)->orderByDesc('created_at')->orderByDesc('id')->first();
+                    $after['current_period_starts_at'] = $redemption->benefit_starts_at;
+                    $after['current_period_ends_at'] = $redemption->benefit_ends_at;
+                    $after['free_benefit_ends_at'] = $redemption->benefit_ends_at;
+                }
+            }
             $this->replaceItems($subscription, $items, $adminId);
 
             $after['status'] = 'ativa';
             DB::table('subscriptions')->where('id', $subscription->id)->update([
                 'status' => 'ativa',
                 'billing_cycle' => $after['billing_cycle'] ?? $subscription->billing_cycle,
+                'provider_subscription_id' => ! empty($after['free_benefit']) ? null : $subscription->provider_subscription_id,
+                'provider_status' => ! empty($after['free_benefit']) ? 'cancelled' : $subscription->provider_status,
+                'current_period_starts_at' => ! empty($after['current_period_starts_at']) ? Carbon::parse($after['current_period_starts_at'])->toDateTimeString() : $subscription->current_period_starts_at,
+                'current_period_ends_at' => ! empty($after['current_period_ends_at']) ? Carbon::parse($after['current_period_ends_at'])->toDateTimeString() : $subscription->current_period_ends_at,
                 'commercial_snapshot' => json_encode($after),
                 'updated_at' => now(),
                 'version' => DB::raw('version + 1'),
@@ -204,11 +348,12 @@ class SubscriptionChangeManager
             if ($change->type !== 'cancelamento') {
                 $this->replaceItems($subscription, $after['items'] ?? [], $adminId);
             }
-            $after['status'] = $change->type === 'cancelamento' ? 'encerrada' : 'ativa';
+            $after['status'] = $change->type === 'cancelamento' ? 'encerrada' : (! empty($after['free_benefit']) && ! empty($after['free_benefit_ends_at']) && now()->gte($after['free_benefit_ends_at']) ? 'suspensa' : 'ativa');
 
             DB::table('subscriptions')->where('id', $subscription->id)->update([
                 'status' => $after['status'],
                 'open_company_product' => $after['status'] === 'encerrada' ? null : $subscription->open_company_product,
+                'provider_status' => $after['status'] === 'encerrada' && $subscription->provider_subscription_id ? 'cancelled' : $subscription->provider_status,
                 'billing_cycle' => $after['billing_cycle'] ?? $subscription->billing_cycle,
                 'commercial_snapshot' => json_encode($after),
                 'cancel_at' => $after['status'] === 'encerrada' ? null : ($subscription->cancel_at ?? null),

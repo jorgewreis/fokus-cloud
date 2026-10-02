@@ -7,6 +7,58 @@ use Illuminate\Support\Facades\DB;
 
 class SubscriptionBillingManager
 {
+    public function checkoutChange(string $subscriptionId, array $result, string $payerEmail, string $returnPath, ?string $adminId = null): array
+    {
+        if ($result['status'] !== 'aguardando_pagamento') return [...$result, 'checkout_url' => null];
+        $subscription = DB::table('subscriptions')->where('id', $subscriptionId)->first();
+        $client = app(MercadoPagoClient::class);
+        $paymentId = null;
+        try {
+            if ((float) $result['proration_amount'] > 0) {
+                $paymentId = PrefixedUlid::make('PAG');
+                DB::table('payments')->insert([
+                    'id' => $paymentId, 'company_id' => $subscription->company_id, 'subscription_id' => $subscriptionId,
+                    'subscription_change_id' => $result['id'], 'provider' => 'mercado_pago', 'status' => 'aguardando_pagamento',
+                    'amount' => $result['proration_amount'], 'currency' => 'BRL', 'created_at' => now(), 'updated_at' => now(),
+                ]);
+                $returnUrl = rtrim(config('app.url'), '/').$returnPath;
+                $preference = $client->createPreference([
+                    'external_reference' => $paymentId,
+                    'items' => [['id' => $result['id'], 'title' => 'Ampliação da assinatura — diferença proporcional',
+                        'quantity' => 1, 'currency_id' => 'BRL', 'unit_price' => (float) $result['proration_amount']]],
+                    'payer' => ['email' => $client->payerEmail($payerEmail)],
+                    'notification_url' => rtrim(config('app.url'), '/').'/api/webhooks/mercado-pago',
+                    'back_urls' => ['success' => $returnUrl.'?checkout=success', 'pending' => $returnUrl.'?checkout=pending', 'failure' => $returnUrl.'?checkout=failure'],
+                    'auto_return' => 'approved',
+                ], $paymentId);
+                $url = $preference['init_point'] ?? $preference['sandbox_init_point'] ?? null;
+                abort_unless(is_string($url) && $url !== '' && ! empty($preference['id']), 502, 'Não foi possível obter o link de pagamento.');
+                DB::table('payments')->where('id', $paymentId)->update(['provider_preference_id' => $preference['id'],
+                    'provider_checkout_url' => $url, 'provider_payload_sanitized' => json_encode($client->sanitizePayload($preference)), 'updated_at' => now()]);
+                return [...$result, 'checkout_url' => $url];
+            }
+            if ($subscription->provider_subscription_id) {
+                $target = $result['after'];
+                $client->updatePreapproval((string) $subscription->provider_subscription_id, ['auto_recurring' => [
+                    'frequency' => ($target['billing_cycle'] ?? $subscription->billing_cycle) === 'annual' ? 12 : 1,
+                    'frequency_type' => 'months', 'transaction_amount' => (float) $target['amount'], 'currency_id' => 'BRL',
+                ]], 'law-change-'.$result['id']);
+            }
+            $applied = app(SubscriptionChangeManager::class)->applyApprovedChange($result['id'], $adminId);
+            return [...$result, 'status' => 'aplicada', 'after' => $applied['after'], 'checkout_url' => null];
+        } catch (\Throwable $exception) {
+            DB::table('subscription_changes')->where('id', $result['id'])->where('status', 'aguardando_pagamento')->update(['status' => 'falhou', 'updated_at' => now()]);
+            if ($paymentId) DB::table('payments')->where('id', $paymentId)->update(['status' => 'cancelado', 'updated_at' => now()]);
+            $this->releaseChangeVoucher($result['after'] ?? []);
+            throw $exception;
+        }
+    }
+
+    private function releaseChangeVoucher(array $snapshot): void
+    {
+        if (! empty($snapshot['upgrade_voucher_reservation_id'])) app(VoucherManager::class)->release($snapshot['upgrade_voucher_reservation_id']);
+    }
+
     public function applyPayment(string $paymentId, array $remote, string $status, ?string $correlationId = null): ?object
     {
         return DB::transaction(function () use ($paymentId, $remote, $status, $correlationId): ?object {
@@ -60,6 +112,17 @@ class SubscriptionBillingManager
                 if ($change && $change->status === 'aguardando_pagamento') {
                     if ($status === 'aprovado') {
                         $after = json_decode((string) $change->after_snapshot, true) ?: [];
+                        if (! empty($after['upgrade_voucher_reservation_id'])) {
+                            $reservation = DB::table('voucher_redemption_reservations')->where('id', $after['upgrade_voucher_reservation_id'])->lockForUpdate()->first();
+                            if (! $reservation || $reservation->status !== 'pending' || now()->gt($reservation->expires_at)) {
+                                abort_unless(! empty($remote['id']), 422, 'Pagamento sem identificação para devolver a cobrança de voucher expirado.');
+                                app(MercadoPagoClient::class)->createRefund((string) $remote['id'], null, 'expired-voucher-change-'.$change->id);
+                                DB::table('payments')->where('id', $payment->id)->update(['status' => 'estornado', 'updated_at' => $now]);
+                                DB::table('subscription_changes')->where('id', $change->id)->update(['status' => 'falhou', 'updated_at' => $now]);
+                                $this->releaseChangeVoucher($after);
+                                return $subscription;
+                            }
+                        }
                         if ($subscription?->provider_subscription_id) {
                             $cycle = $after['billing_cycle'] ?? $subscription->billing_cycle ?? 'monthly';
                             app(MercadoPagoClient::class)->updatePreapproval((string) $subscription->provider_subscription_id, [
@@ -73,6 +136,7 @@ class SubscriptionBillingManager
                         }
                         app(SubscriptionChangeManager::class)->applyApprovedChange($change->id);
                     } elseif (in_array($status, ['recusado', 'cancelado', 'estornado'], true)) {
+                        $this->releaseChangeVoucher(json_decode((string) $change->after_snapshot, true) ?: []);
                         DB::table('subscription_changes')->where('id', $change->id)->update(['status' => 'falhou', 'updated_at' => $now, 'version' => DB::raw('version + 1')]);
                     }
                 }

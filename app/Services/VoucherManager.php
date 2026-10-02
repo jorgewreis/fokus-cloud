@@ -83,7 +83,7 @@ class VoucherManager
                 'company_id' => $companyId,
                 'request_key' => Str::limit($requestKey, 128, ''),
                 'status' => 'pending',
-                'snapshot' => json_encode($snapshot),
+                'snapshot' => json_encode([...$snapshot, 'eligibility' => ['product_id' => $lockedVoucher->product_id, 'plan_id' => $lockedVoucher->plan_id, 'module_codes' => json_decode((string) ($lockedVoucher->module_codes ?? ''), true) ?: []]]),
                 'reserved_at' => now(),
                 'expires_at' => now()->addMinutes(self::RESERVATION_MINUTES),
                 'created_at' => now(),
@@ -129,10 +129,10 @@ class VoucherManager
             ['status' => 'pending'], $after, reason: 'Reserva de voucher liberada após falha ou cancelamento.', request: $request, actorType: $actorType, channel: $channel);
     }
 
-    public function confirmForSubscription(string $subscriptionId, ?string $actorId = null, string $actorType = 'gateway', string $channel = 'webhook', ?string $correlationId = null, ?Request $request = null): void
+    public function confirmForSubscription(string $subscriptionId, ?string $actorId = null, string $actorType = 'gateway', string $channel = 'webhook', ?string $correlationId = null, ?Request $request = null, ?string $reservationId = null): void
     {
-        DB::transaction(function () use ($subscriptionId, $actorId, $actorType, $channel, $correlationId, $request): void {
-            $reservation = DB::table('voucher_redemption_reservations')->where('subscription_id', $subscriptionId)->where('status', 'pending')->lockForUpdate()->first();
+        DB::transaction(function () use ($subscriptionId, $actorId, $actorType, $channel, $correlationId, $request, $reservationId): void {
+            $reservation = DB::table('voucher_redemption_reservations')->where('subscription_id', $subscriptionId)->where('status', 'pending')->when($reservationId, fn ($query) => $query->where('id', $reservationId))->lockForUpdate()->first();
             if (! $reservation || ($reservation->expires_at && now()->gt($reservation->expires_at))) {
                 if ($reservation) {
                     DB::table('voucher_redemption_reservations')->where('id', $reservation->id)->update(['status' => 'expired', 'released_at' => now(), 'updated_at' => now()]);

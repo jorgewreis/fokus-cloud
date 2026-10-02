@@ -62,6 +62,20 @@ class LawPermissionsTest extends TestCase
         ]);
     }
 
+    public function test_scheduled_cancellation_preserves_access_until_its_effective_date(): void
+    {
+        DB::table('subscriptions')->where('company_id', $this->companyId)->update(['status' => 'cancelamento_agendado', 'cancel_at' => now()->addDay()]);
+        $this->actingAs($this->admin)->withSession(['active_company_id' => $this->companyId])->getJson('/api/law/contacts')->assertOk();
+        $this->travel(2)->days();
+        $this->getJson('/api/law/contacts')->assertForbidden();
+    }
+
+    public function test_removed_modules_no_longer_grant_permissions(): void
+    {
+        DB::table('subscription_items')->where('company_id', $this->companyId)->update(['deleted_at' => now()]);
+        $this->actingAs($this->admin)->withSession(['active_company_id' => $this->companyId])->getJson('/api/law/contacts')->assertForbidden();
+    }
+
     public function test_permissions_are_enforced_on_direct_api_calls_and_scoped_to_the_active_unit(): void
     {
         $viewer = $this->user('Visualizador', '52998224725', 'viewer@example.test');

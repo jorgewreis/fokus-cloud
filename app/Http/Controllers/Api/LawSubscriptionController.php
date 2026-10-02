@@ -149,67 +149,15 @@ class LawSubscriptionController extends Controller
         abort_if($pending, 409, 'Já existe uma alteração pendente. Edite ou cancele-a antes de criar outra.');
 
         $quote = $changes->quoteCustomerChange($subscription->id, $data);
-        abort_if($quote['action'] === 'upgrade' && $quote['charge_now'] <= 0 && ! $subscription->provider_subscription_id,
+        abort_if($quote['action'] === 'upgrade' && $quote['charge_now'] <= 0 && ! $quote['free_benefit'] && ! $subscription->provider_subscription_id,
             422, 'Não foi possível confirmar a forma de cobrança desta assinatura. Atualize o pagamento atual antes de solicitar o upgrade.');
         $result = $changes->change($subscription->id, [
             'action' => $quote['action'], 'target_plan_id' => $data['target_plan_id'] ?? null,
             'items' => $data['items'] ?? null, 'billing_cycle' => $data['billing_cycle'] ?? null,
-            'expected_version' => $data['version'] ?? null,
+            'expected_version' => $data['version'] ?? null, 'voucher_code' => $data['voucher_code'] ?? null,
             'reason' => $data['reason'] ?? 'Alteração solicitada pelo administrador da empresa.',
         ], $request->user());
-        $checkoutUrl = null;
-        if ($result['status'] === 'aguardando_pagamento' && $result['proration_amount'] > 0) {
-            $paymentId = PrefixedUlid::make('PAG');
-            DB::table('payments')->insert([
-                'id' => $paymentId, 'company_id' => $subscription->company_id, 'subscription_id' => $subscription->id,
-                'subscription_change_id' => $result['id'], 'provider' => 'mercado_pago', 'status' => 'aguardando_pagamento',
-                'amount' => $result['proration_amount'], 'currency' => 'BRL', 'created_at' => now(), 'updated_at' => now(),
-            ]);
-            try {
-                $preference = $mercadoPago->createPreference([
-                    'external_reference' => $paymentId,
-                    'items' => [[
-                        'id' => $result['id'], 'title' => 'Diferença proporcional da assinatura Fokus Law',
-                        'quantity' => 1, 'currency_id' => 'BRL', 'unit_price' => (float) $result['proration_amount'],
-                    ]],
-                    'payer' => ['email' => $mercadoPago->payerEmail((string) $request->user()->email)],
-                    'notification_url' => rtrim(config('app.url'), '/').'/api/webhooks/mercado-pago',
-                    'back_urls' => [
-                        'success' => rtrim(config('app.url'), '/').'/portal/fokus-law/assinatura?checkout=success',
-                        'pending' => rtrim(config('app.url'), '/').'/portal/fokus-law/assinatura?checkout=pending',
-                        'failure' => rtrim(config('app.url'), '/').'/portal/fokus-law/assinatura?checkout=failure',
-                    ],
-                    'auto_return' => 'approved',
-                ], $paymentId);
-                $checkoutUrl = $preference['init_point'] ?? $preference['sandbox_init_point'] ?? null;
-                $preferenceId = (string) ($preference['id'] ?? '');
-                abort_unless(is_string($checkoutUrl) && $checkoutUrl !== '' && $preferenceId !== '', 502, 'O Mercado Pago não retornou os dados do checkout.');
-                DB::table('payments')->where('id', $paymentId)->update([
-                    'provider_preference_id' => $preferenceId,
-                    'provider_checkout_url' => $checkoutUrl,
-                    'provider_payload_sanitized' => json_encode($mercadoPago->sanitizePayload(['id' => $preference['id'] ?? null, 'init_point' => $checkoutUrl])),
-                    'updated_at' => now(),
-                ]);
-            } catch (\Throwable $exception) {
-                DB::table('subscription_changes')->where('id', $result['id'])->update(['status' => 'falhou', 'updated_at' => now()]);
-                DB::table('payments')->where('id', $paymentId)->update(['status' => 'cancelado', 'updated_at' => now()]);
-                throw $exception;
-            }
-        } elseif ($result['status'] === 'aguardando_pagamento') {
-            if ($subscription->provider_subscription_id) {
-                $target = $result['after'];
-                $cycle = $target['billing_cycle'] ?? $subscription->billing_cycle ?? 'monthly';
-                $mercadoPago->updatePreapproval((string) $subscription->provider_subscription_id, [
-                    'auto_recurring' => [
-                        'frequency' => $cycle === 'annual' ? 12 : 1,
-                        'frequency_type' => 'months',
-                        'transaction_amount' => (float) ($target['amount'] ?? 0),
-                        'currency_id' => 'BRL',
-                    ],
-                ], 'law-change-'.$result['id']);
-            }
-            $changes->applyApprovedChange($result['id']);
-        }
+        $result = app(\App\Services\SubscriptionBillingManager::class)->checkoutChange($subscription->id, $result, (string) $request->user()->email, '/portal/fokus-law/assinatura');
         app(\App\Services\AuditRecorder::class)->company(
             $subscription->company_id, $request->user()->id, 'subscription', $subscription->id, 'update',
             $result['before'], $result['after'], reason: $data['reason'] ?? 'Alteração comercial solicitada pelo administrador.', request: $request, actorType: 'customer',
@@ -218,8 +166,8 @@ class LawSubscriptionController extends Controller
         return response()->json([
             'id' => $result['id'], 'status' => $result['status'], 'action' => $quote['action'],
             'effective_at' => $result['effective_at'], 'charge_now' => $result['proration_amount'],
-            'checkout_url' => $checkoutUrl,
-            'message' => $result['status'] === 'agendada' ? 'Redução agendada para o fim do período pago.' : 'Upgrade aguardando confirmação da cobrança.',
+            'checkout_url' => $result['checkout_url'],
+            'message' => $result['status'] === 'aplicada' ? 'Alteração aplicada à assinatura.' : ($result['status'] === 'agendada' ? 'Redução agendada para o fim da vigência atual.' : 'Ampliação aguardando confirmação do pagamento.'),
         ], 201);
     }
 
@@ -230,10 +178,10 @@ class LawSubscriptionController extends Controller
         $subscription = $this->currentSubscription($request);
         $pending = DB::table('subscription_changes')->where('subscription_id', $subscription->id)->whereIn('status', ['agendada', 'aguardando_pagamento'])->latest('created_at')->first();
         abort_unless($pending, 404, 'Não há alteração pendente para editar.');
-        DB::transaction(function () use ($pending): void {
-            DB::table('subscription_changes')->where('id', $pending->id)->whereIn('status', ['agendada', 'aguardando_pagamento'])->update(['status' => 'cancelada', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
-            DB::table('payments')->where('subscription_change_id', $pending->id)->where('status', 'aguardando_pagamento')->update(['status' => 'cancelado', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
-        });
+        $quote = $changes->quoteCustomerChange($subscription->id, $data);
+        abort_if($quote['requires_new_voucher'], 422, $quote['voucher_message']);
+        abort_if(isset($data['version']) && (int) $data['version'] !== (int) $subscription->version, 409, 'A assinatura mudou. Atualize antes de continuar.');
+        $changes->cancelPending($subscription->id, $request->user()->id);
         return $this->change($request, $changes, $mercadoPago);
     }
 
@@ -243,10 +191,7 @@ class LawSubscriptionController extends Controller
         $subscription = $this->currentSubscription($request);
         $pending = DB::table('subscription_changes')->where('subscription_id', $subscription->id)->whereIn('status', ['agendada', 'aguardando_pagamento'])->latest('created_at')->first();
         abort_unless($pending, 404, 'Não há alteração pendente para cancelar.');
-        DB::transaction(function () use ($pending): void {
-            DB::table('subscription_changes')->where('id', $pending->id)->whereIn('status', ['agendada', 'aguardando_pagamento'])->update(['status' => 'cancelada', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
-            DB::table('payments')->where('subscription_change_id', $pending->id)->where('status', 'aguardando_pagamento')->update(['status' => 'cancelado', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
-        });
+        app(SubscriptionChangeManager::class)->cancelPending($subscription->id, $request->user()->id);
         return response()->json(['message' => 'Alteração pendente cancelada.']);
     }
 
@@ -263,6 +208,7 @@ class LawSubscriptionController extends Controller
             'billing_cycle' => ['required', Rule::in(['monthly', 'annual'])],
             'version' => ['nullable', 'integer', 'min:1'],
             'reason' => ['nullable', 'string', 'max:1000'],
+            'voucher_code' => ['nullable', 'string', 'max:64'],
         ]);
     }
 
