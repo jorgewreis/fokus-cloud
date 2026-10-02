@@ -89,6 +89,8 @@
 .law-nav-heading-icon { width: 18px; height: 18px; flex: 0 0 18px; object-fit: contain; filter: brightness(0) invert(1); }
 .law-page-navigation { min-height: 0; flex: 1; overflow: auto; }
 .law-page-navigation ul { margin: 0; padding: 0; list-style: none; }
+.law-page-navigation #page-items { display: grid; align-content: start; gap: 8px; }
+.law-page-navigation #page-items > ul { display: grid; gap: 8px; }
 .law-nav-item { display: flex; min-height: 40px; align-items: center; gap: 10px; padding: 8px 9px; border: 0; border-radius: 7px; background: transparent; color: #eee6f0; cursor: pointer; text-align: left; text-decoration: none; }
 .law-nav-item:hover, .law-nav-item:focus-visible { outline: none; background: rgba(255,255,255,.09); }
 .law-nav-item[aria-current="page"] { background: var(--law-shell-raised); color: #fff; font-weight: 600; }

@@ -275,7 +275,7 @@
         if (summary.recent?.length) summary.recent.slice(0, 5).forEach((item) => {
           const link = button('', 'law-contact-recent-item', (event) => openDetails(root, item.id, false, refresh, event.currentTarget));
           const detail = $('span', 'law-contact-recent-meta');
-          const activityLabels = { created: 'Cadastrado', viewed: 'Consultado', search_opened: 'Aberto pela busca' };
+          const activityLabels = { created: 'Cadastrado', viewed: 'Consultado', search_opened: 'Consultado' };
           const timestamp = item.at ? new Date(item.at) : null;
           const time = $('time', '', timestamp && !Number.isNaN(timestamp.valueOf()) ? timestamp.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Agora');
           if (timestamp && !Number.isNaN(timestamp.valueOf())) time.dateTime = timestamp.toISOString();
