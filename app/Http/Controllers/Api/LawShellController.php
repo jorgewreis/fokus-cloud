@@ -143,6 +143,7 @@ class LawShellController extends Controller
                 'role' => (string) $membership->role,
             ],
             'active_company_id' => $companyId,
+            'active_membership_id' => (string) $membership->id,
             'companies' => $companies->values()->all(),
             'units' => $units->map(fn (object $unit): array => ['id' => (string) $unit->id, 'name' => (string) $unit->name, 'status' => 'ativo'])->values()->all(),
             'active_unit_id' => $activeUnit ? (string) $activeUnit->id : null,

@@ -21,7 +21,7 @@ Este documento complementa:
 - Servidores visualizam mais itens acionaveis.
 - Visualizador nao possui rotina operacional propria documentada na v1.
 - Backoffice presta suporte orientativo sem acessar dados juridicos.
-- Erros Datajud nao geram alerta operacional nem interface visivel ao usuario.
+- No módulo Processos do Judiciário Criminal, falhas do Datajud aparecem no próprio processo e em seu histórico; não geram notificações nem fila de revisão. Consulte [Operação do Datajud](law-case-datajud.md).
 - Alertas devem chamar atencao apenas para condicoes que exigem acao real.
 
 ## Tela inicial

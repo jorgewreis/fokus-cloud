@@ -1,119 +1,123 @@
-# Gestao de processos do Fokus Law
+# Gestão de Processos — Judiciário Criminal
 
-## Objetivo
+## Objetivo e contexto
 
-Gestao de Processos e o nome comercial do modulo central do Fokus Law. No menu
-interno do sistema, o modulo deve aparecer como `Processos`.
+O módulo técnico `processos`, apresentado como **Processos** no Fokus Law,
+organiza o acompanhamento interno do Cartório Criminal. O cadastro separa dados
+oficiais de decisões de trabalho, para identificar processos, atribuir
+responsabilidade, priorizar providências e preservar um histórico auditável.
 
-O modulo organiza os processos da unidade juridica e serve como eixo para
-contatos, partes, tarefas, expedicoes, prazos, sigilo, historico e indicadores.
+Esta etapa atende ao contexto contratado `vara_criminal`. Advocacia e os demais
+contextos continuam sujeitos a definição própria. A página reutiliza o shell do
+Fokus Law e componentes Fokus Styles 2.7.0: cards, tabela, campos, botões e
+diálogos. A composição de formulários e diálogos está em `law-record-ui.js`, para
+uso por outras páginas do portal. O dashboard amplia a composição compartilhada
+de largura dos cards no CSS do shell; as cores, a tipografia e os componentes
+existentes são reutilizados, sem alteração do pacote Fokus Styles.
 
-## Escopo da v1
+## Cadastro e consulta oficial
 
-Faz parte do escopo:
+O cadastro exige CNJ completo válido e unidade ativa da empresa. Autuação e
+distribuição são datas opcionais. O número é único na empresa, inclusive entre
+arquivados. O processo nasce Ativo, com prioridade Normal, sigilo Público
+interno e sem responsável obrigatório. Cartas recebidas usam a classe processual.
 
-- numero do processo, preferencialmente CNJ quando houver;
-- classe processual;
-- assuntos, artigos ou capitulacoes;
-- prioridades operacionais;
-- niveis de sigilo;
-- dados de autuacao e distribuicao;
-- situacao processual oficial;
-- situacao operacional interna;
-- integracao com Datajud;
-- contatos com papel processual;
-- tags informativas;
-- linha do tempo do processo;
-- vinculos com tarefas, expedicoes, prazos e pendencias.
+O Datajud é consultado após salvar, mensalmente e por ação manual. São
+solicitados apenas classe, assuntos, órgão julgador e situação oficial, quando
+disponível. Não são importadas movimentações e a situação oficial não é
+inferida delas. A ausência de retorno ou falha externa não desfaz o cadastro.
 
-Cartas recebidas continuam sendo tratadas como classe processual dentro de
-Processos, nao como expedicao.
+Campos oficiais retornados não admitem edição direta. Campos ausentes ficam
+disponíveis para preenchimento manual. Se um valor oficial posterior divergir
+de um preenchimento manual, este é preservado e o editor autorizado escolhe
+qual valor manter. Os dois valores, a decisão e o autor são registrados.
+Manter o preenchimento não reabre a divergência na próxima consulta idêntica;
+um valor oficial novo pode gerar nova divergência.
 
-## Dados oficiais e dados internos
+O detalhe informa a data da última tentativa. Falhas aparecem no próprio
+processo, sem fila de revisão ou notificações. A rotina diária consulta registros
+não arquivados cuja última tentativa tem pelo menos um mês, respeitando assinatura
+ativa e contexto contratado. Arquivados conservam a consulta manual.
+Consulte [Operação do Datajud](../09-operations/law-case-datajud.md).
 
-O modulo deve separar dados oficiais de dados operacionais internos.
+## Organização interna
 
-| Tipo de dado | Exemplos | Regra |
-| --- | --- | --- |
-| Oficial/Datajud | classe, assunto, orgao julgador, movimentacoes publicas, situacao oficial | Pode ser sincronizado. |
-| Operacional interno | responsavel, prioridade, tags, observacoes, status de trabalho | Nao deve ser sobrescrito pelo Datajud. |
-| Sensivel | sigilo, contatos/partes, observacoes restritas, dados protegidos | Deve respeitar permissao e mascaramento. |
-| Relacional | contatos, partes, tarefas, expedicoes, prazos e pendencias | Deve permanecer vinculado ao processo. |
+Os estados iniciais são Ativo, Pendente, Suspenso, Concluído e Arquivado.
+Chefias e administradores podem criar complementos na unidade e desativar
+opções não essenciais. Ativo e Arquivado são preservados porque sustentam
+cadastro, reabertura e arquivamento. Desativar não apaga registros anteriores.
 
-## Status oficial e status operacional
+O responsável principal é opcional. As prioridades são Normal, Alta e Urgente.
+Etiquetas são configuradas por unidade. Datajud não modifica estado operacional,
+responsável, prioridade, etiquetas ou sigilo.
 
-O status oficial representa a situacao externa sincronizada ou informada a
-partir de fonte oficial.
+## Sigilo e acesso entre unidades
 
-O status operacional representa a leitura interna da unidade, como:
+**Público interno** permite consulta a partir de todas as unidades da mesma
+empresa, por pessoas com acesso ao módulo. Edição depende da permissão da ação,
+sem exigir vínculo com a unidade proprietária. Essa é uma exceção explícita à
+regra geral de isolamento operacional por unidade.
 
-- ativo;
-- pendente de providencia;
-- aguardando expedicao;
-- aguardando retorno;
-- suspenso internamente;
-- concluido internamente;
-- arquivado internamente;
-- cancelado.
+**Restrito** exige autorização nominal por processo, além do acesso ao módulo e
+da permissão da ação, inclusive para administradores consultarem seu conteúdo.
+Administrador da empresa, administrador da unidade proprietária ou chefia dessa
+unidade concede e revoga autorizações. A restrição vale também entre unidades.
+Pessoas sem autorização não veem o registro, seus totais ou seus vínculos.
 
-O Datajud nunca deve controlar automaticamente o status operacional.
+A mudança de sigilo é reservada à administração/chefia da unidade proprietária.
+Ao tornar um processo restrito, o autor recebe uma autorização nominal
+registrada para poder concluir a gestão dos demais acessos. Administradores
+podem gerir autorizações por identificador do processo sem obter acesso
+automático ao conteúdo.
 
-## Tags informativas
+Configurações de estados, etiquetas e complementos de papéis continuam
+restritas à chefia ou administração da unidade proprietária.
 
-Tags informativas sao marcadores configuraveis para facilitar triagem,
-filtros, filas e indicadores.
+## Contatos e relações
 
-Exemplos:
+Contatos reutilizáveis recebem papéis padronizados: parte autora, parte ré,
+vítima, investigado, acusado, advogado, defensor público, promotor de Justiça,
+testemunha, perito, autoridade policial, órgão julgador e outro. A unidade pode
+cadastrar complementos. O mesmo contato pode ter vários papéis ou participar
+de vários processos. Os vínculos não copiam documentos ou dados pessoais.
 
-- reu preso;
-- urgente para pauta;
-- aguardando Ministerio Publico;
-- mutirao;
-- processo monitorado;
-- carta recebida;
-- prioridade de gabinete.
+São selecionados contatos ativos da mesma empresa, compartilhados internamente
+ou locais da unidade do processo. Processos existentes podem ser relacionados
+por dependência ou apensamento. Os vínculos são informativos: não propagam
+estado, sigilo ou autorização. Cada registro relacionado passa por sua própria
+verificação de acesso.
 
-Tags nao substituem prioridade, sigilo, classe processual nem status.
+## Listagem, arquivamento e histórico
 
-## Niveis de sigilo
+O dashboard reutiliza cores, formato, tipografia e componentes do card de
+Contatos. O card de Processos informa total acessível não arquivado, distribuição
+por classe em barras e os cinco cadastros mais recentes. Classes além das três
+principais são agrupadas em Outras classes. Todas as métricas e os atalhos
+respeitam autorização nominal e isolamento entre empresas.
 
-O modulo deve prever niveis de sigilo, em vez de depender apenas de marcador
-binario.
+A busca usa CNJ completo ou parcial. A lista mostra número, classe, unidade,
+situação oficial, estado operacional e sigilo, ordenando pela data de cadastro
+mais recente. Há paginação e resumo por classe dos registros acessíveis da
+consulta. Arquivados entram quando solicitado em **Incluir arquivados**.
 
-Niveis iniciais:
+Arquivar e reabrir são ações próprias, com justificativa obrigatória e controle
+de versão. A reabertura retorna ao estado Ativo e preserva o motivo anterior
+no histórico. Editar o estado não permite contornar essas ações.
 
-- `public_internal`: publico para usuarios autorizados da unidade;
-- `unit_restricted`: restrito a perfis operacionais da unidade;
-- `case_confidential`: sigiloso com autorizacao especifica por processo;
-- `enhanced_confidential`: sigilo reforcado quando a regra da unidade exigir.
+O histórico registra autor, data, antes/depois, vínculos, autorizações,
+arquivamentos, reaberturas, divergências e consultas oficiais, inclusive falhas.
+É paginado e não depende da retenção da auditoria geral. Não há exclusão de
+processo nesta etapa.
 
-Processos em nivel sigiloso devem restringir contatos vinculados, partes,
-tarefas, expedicoes, prazos, buscas, indicadores e exportacoes.
+## Fora desta etapa
 
-## Linha do tempo
+Não há tarefas, expedições, prazos, pendências, documentos, movimentações
+oficiais, observações livres, artigos/capitulações, receitas operacionais,
+importação/exportação, notificações por e-mail, PJe ou e-SAJ. Referências gerais
+a essas capacidades descrevem evolução futura, não esta entrega.
 
-A linha do tempo do processo deve consolidar:
+## Referências
 
-- movimentacoes oficiais sincronizadas;
-- tarefas criadas, concluidas ou canceladas;
-- expedicoes geradas, enviadas, retornadas ou encerradas;
-- prazos e pendencias;
-- alteracoes de contatos e papeis processuais;
-- mudancas de prioridade, tag ou sigilo;
-- eventos de auditoria relevantes.
-
-## Relacao com receitas operacionais
-
-Processos podem sugerir tarefas ou expedicoes com base em classe, assunto, tag,
-prioridade ou situacao operacional. Essas sugestoes nao devem executar acao
-automaticamente sem receita operacional habilitada e regra aprovada.
-
-## Criterios de aceite
-
-- O nome comercial e Gestao de Processos.
-- O menu interno usa o rotulo Processos.
-- Dados oficiais e dados operacionais internos ficam separados.
-- Tags informativas nao substituem prioridade nem sigilo.
-- Niveis de sigilo substituem o uso de sigilo apenas binario no modelo alvo.
-- A linha do tempo consolida eventos oficiais, operacionais e relacionais.
-- Cartas recebidas permanecem como classe processual.
+- [Requisitos](../05-requirements/fokus-law-gestao-processual.md).
+- [Modelo de dados](../06-data/law-case-management-data-model.md).
+- [Segurança](../07-security/fokus-law-security-and-permissions.md).

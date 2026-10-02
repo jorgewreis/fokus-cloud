@@ -40,6 +40,11 @@ return [
         'measurement_id' => env('FOKUS_GA4_MEASUREMENT_ID'),
     ],
 
+    'datajud' => [
+        'api_key' => env('DATAJUD_API_KEY'),
+        'base_url' => env('DATAJUD_API_BASE_URL', 'https://api-publica.datajud.cnj.jus.br'),
+    ],
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],

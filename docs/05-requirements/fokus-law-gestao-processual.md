@@ -1,64 +1,50 @@
-# Requisitos da gestao de processos
+# Requisitos de Processos — Judiciário Criminal
 
-## Objetivo
+## Escopo autorizado
 
-Definir requisitos do modulo `processos`, cujo nome comercial deve ser Gestao
-Processual e cujo rotulo no menu interno deve ser Processos.
+Primeira implementação para o Cartório Criminal, contexto contratado
+`vara_criminal`. Este contrato prevalece sobre previsões gerais de evolução.
 
-## Requisitos funcionais
-
-| Codigo | Requisito | Criterio de aceite |
+| Código | Funcionalidade | Regra e critério de aceite |
 | --- | --- | --- |
-| RF-GPR-001 | O sistema deve cadastrar processos como entidade central da unidade. | Um processo e criado com numero, classe, unidade, situacao, dados de autuacao e distribuicao. |
-| RF-GPR-002 | O sistema deve registrar assuntos, artigos ou capitulacoes. | O processo permite filtrar e consultar por assunto juridico e base legal informada. |
-| RF-GPR-003 | O sistema deve separar situacao oficial de status operacional interno. | Alteracao Datajud nao sobrescreve status operacional da unidade. |
-| RF-GPR-004 | O sistema deve permitir prioridades operacionais. | Prioridade aparece em listas, filtros, tarefas e indicadores sem se confundir com sigilo. |
-| RF-GPR-005 | O sistema deve permitir tags informativas configuraveis. | Tags podem ser aplicadas e filtradas sem substituir classe, prioridade, sigilo ou status. |
-| RF-GPR-006 | O sistema deve controlar niveis de sigilo. | Processo pode ter nivel publico interno, restrito a unidade, sigiloso por autorizacao ou sigilo reforcado. |
-| RF-GPR-007 | O sistema deve integrar dados processuais basicos com Datajud. | Metadados oficiais sao sincronizados sem sobrescrever dados operacionais internos. |
-| RF-GPR-008 | O sistema deve vincular contatos como partes processuais ou outros papeis. | O mesmo contato pode ser usado em mais de um processo da unidade com papel proprio por processo. |
-| RF-GPR-009 | O sistema deve exibir linha do tempo do processo. | A linha do tempo consolida movimentacoes, tarefas, expedicoes, prazos, contatos, partes e auditoria relevante. |
-| RF-GPR-010 | O sistema deve permitir sugestoes por receitas operacionais. | Classe, assunto, tag ou status podem sugerir tarefas/expedicoes sem execucao automatica indevida. |
-| RF-GPR-011 | O sistema deve tratar cartas recebidas como classe processual. | Carta recebida aparece em Processos e nao cria expedicao propria. |
+| RF-GPR-001 | Cadastrar | Exigir CNJ válido e unidade ativa; datas opcionais; impedir repetição na empresa, inclusive arquivados. |
+| RF-GPR-002 | Consultar Datajud | Consulta inicial, mensal e manual; somente metadados básicos; data da última tentativa. |
+| RF-GPR-003 | Tratar falhas | Preservar cadastro; liberar campos ausentes para preenchimento manual. |
+| RF-GPR-004 | Resolver divergências | Preservar valor manual; mostrar ambos; editor autorizado escolhe e decisão é registrada. |
+| RF-GPR-005 | Separar estados | Datajud não modifica estado operacional, responsável, prioridade, etiquetas ou sigilo. |
+| RF-GPR-006 | Configurar estados | Ativo, Pendente, Suspenso, Concluído e Arquivado; complementos locais; configuração por chefia/administrador. |
+| RF-GPR-007 | Atribuir | Responsável principal opcional entre vínculos ativos da empresa; permitir remover atribuição. |
+| RF-GPR-008 | Priorizar | Normal, Alta e Urgente; inicialmente Normal. |
+| RF-GPR-009 | Controlar sigilo | Público interno ou Restrito; restrito exige autorização nominal inclusive entre unidades. |
+| RF-GPR-010 | Administrar acesso | Administrador/chefia da unidade proprietária ou administrador da empresa concede/revoga; registrar eventos. |
+| RF-GPR-011 | Compartilhar internamente | Público interno visível em toda a empresa; edição depende de permissão; empresas diferentes isoladas. |
+| RF-GPR-012 | Etiquetar | Etiquetas da unidade; vincular/desvincular sem modificar outras propriedades. |
+| RF-GPR-013 | Relacionar | Dependência/apensamento entre registros acessíveis da mesma empresa; sem propagação. |
+| RF-GPR-014 | Vincular contatos | Reutilizar contatos ativos compatíveis com a unidade; papéis padronizados e complementos locais. |
+| RF-GPR-015 | Buscar | Somente CNJ, completo ou parcial; seis campos principais; mais recentes primeiro; paginação. |
+| RF-GPR-016 | Resumir | Totais por classe da consulta; excluir registros sem autorização. |
+| RF-GPR-017 | Arquivar/reabrir | Justificativa e versão atual obrigatórias; reabrir em Ativo; preservar histórico. |
+| RF-GPR-018 | Auditar | Autor, data, antes/depois e motivos exigidos; metadados oficiais na linha do tempo; histórico paginado. |
+| RF-GPR-019 | Cartas recebidas | Classe processual, sem fluxo separado. |
 
-## Regras de negocio
+## Permissões e concorrência
 
-- `processos` e o codigo tecnico do modulo.
-- Gestao de Processos e o nome comercial.
-- Processos e o rotulo do menu interno.
-- Dados oficiais sincronizados ficam separados dos dados operacionais internos.
-- Datajud prevalece apenas em metadados oficiais sincronizaveis.
-- Dados internos como responsavel, prioridade, tags, observacoes e status
-  operacional nao podem ser sobrescritos por integracao externa.
-- Tags sao informativas e nao substituem sigilo, prioridade, classe ou status.
-- Niveis de sigilo devem ser avaliados antes de exibir contatos vinculados,
-  partes, tarefas, expedicoes, prazos, indicadores e exportacoes.
-- Partes processuais sao papeis contextuais de contatos e nao um cadastro
-  isolado no modelo alvo.
-- Receitas operacionais podem sugerir proximas acoes, mas execucoes dependem de
-  regra habilitada e usuario autorizado.
+As ações usam `law.cases.view`, `create`, `update`, `archive`, `reopen`,
+`access.manage` e `configure`. Perfis padrão recebem leitura. Operador, chefia
+e administrador da unidade recebem ações operacionais; Somente leitura não
+recebe edição. Chefia e administrador recebem configuração e gestão de acesso.
+Perfis personalizados seguem a configuração vigente.
 
-## Interfaces minimas
+A unidade ativa determina a permissão operacional geral. Processos públicos de
+outra unidade não exigem vínculo com sua unidade proprietária. Configuração e
+concessão de acesso exigem autoridade na unidade proprietária. Sigilo é
+verificado no backend em cada leitura e mutação.
 
-- lista de processos;
-- detalhe do processo;
-- cadastro e edicao de processo;
-- contatos e partes do processo;
-- tags e prioridades;
-- controle de sigilo;
-- linha do tempo;
-- aba ou secao de tarefas;
-- aba ou secao de expedicoes;
-- aba ou secao de prazos e pendencias;
-- resumo de sincronizacao Datajud.
+Edição, arquivamento, reabertura e decisão de divergência exigem versão atual.
+Uma consulta oficial incrementa a versão. Alterações e respectivos eventos são
+transacionais. Remover vínculos não apaga o histórico.
 
-## Criterios de aceite
+## Fora desta etapa
 
-- Gestao de Processos aparece como nome comercial e Processos como rotulo interno.
-- Processo possui classe, assuntos/artigos, prioridade, sigilo, autuacao e
-  distribuicao.
-- Status oficial e status operacional sao independentes.
-- Tags filtram e classificam sem substituir regras estruturais.
-- Linha do tempo exibe eventos relevantes sem vazar dados sigilosos.
-- Datajud nao sobrescreve dados internos.
-- Cartas recebidas permanecem no fluxo de processos.
+Tarefas, expedições, prazos, pendências, documentos, movimentações oficiais,
+importação/exportação, notificações por e-mail, PJe e e-SAJ.

@@ -12,6 +12,7 @@ class LawAuthorizationService
     private const MODULE_PERMISSION_RESOURCES = [
         'process' => 'processos',
         'processes' => 'processos',
+        'cases' => 'processos',
         'contacts' => 'contatos',
         'expeditions' => 'expedicoes',
         'filings' => 'expedicoes',
@@ -151,6 +152,9 @@ class LawAuthorizationService
         $permissionIds = DB::table('customer_permissions')->where('product_code', 'law')->pluck('id', 'code')->all();
         $roleIds = [];
         foreach (self::DEFAULT_ROLES as $code => [$name, $permissionList]) {
+            $permissionList .= ',law.cases.view';
+            if ($code !== 'viewer') $permissionList .= ',law.cases.create,law.cases.update,law.cases.archive,law.cases.reopen';
+            if (in_array($code, ['unit_admin', 'chief_clerk'], true)) $permissionList .= ',law.cases.access.manage,law.cases.configure';
             $existing = DB::table('law_access_roles')->where('company_id', $companyId)->where('law_unit_id', $unitId)->where('code', $code)->first();
             $id = $existing?->id ?: PrefixedUlid::make('LAR');
             if (! $existing) {

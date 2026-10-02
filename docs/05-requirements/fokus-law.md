@@ -1,5 +1,14 @@
 # Requisitos do Fokus Law
 
+## Escopo atual de Processos
+
+Para a primeira entrega do Judiciário Criminal, prevalecem os
+[requisitos específicos de Processos](fokus-law-gestao-processual.md): cadastro
+mínimo CNJ/unidade, Datajud mensal somente para metadados, dois níveis de sigilo
+e visibilidade dos públicos internos entre unidades da empresa. Tarefas,
+expedições, prazos, documentos, movimentações e exportações são evoluções
+futuras deste módulo, mesmo quando previstas neste documento geral.
+
 ## Identificacao
 
 - Produto: Fokus Law.

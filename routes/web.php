@@ -93,6 +93,7 @@ $serveFokusLawShell = function (string $page = 'overview', bool $redirectProfile
     return response()->view('portal.fokus-law', ['initialPage' => $page]);
 };
 Route::get('/portal/fokus-law', fn () => $serveFokusLawShell());
+Route::get('/portal/fokus-law/processos', fn () => $serveFokusLawShell('processes'));
 Route::get('/portal/fokus-law/empresa', fn () => $serveFokusLawShell('company', false, true));
 Route::get('/portal/fokus-law/assinatura', fn () => $serveFokusLawShell('subscription', false, true));
 Route::get('/portal/fokus-law/perfil', fn () => $serveFokusLawShell('profile'));

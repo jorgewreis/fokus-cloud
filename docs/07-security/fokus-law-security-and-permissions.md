@@ -16,6 +16,29 @@ Este documento complementa:
 
 ## Principios
 
+### Exceção implementada: Processos do Judiciário Criminal
+
+O escopo desta etapa está definido nos [requisitos de Processos](../05-requirements/fokus-law-gestao-processual.md).
+Processos `public_internal` são visíveis em todas as unidades da empresa, por
+usuários autorizados ao módulo; a edição depende da permissão da ação avaliada
+na unidade ativa. Não é exigido vínculo com a unidade proprietária do processo
+público. Empresas diferentes permanecem isoladas.
+
+Processos `restricted` exigem autorização nominal por processo, inclusive
+para administradores consultarem conteúdo. Sem autorização, não aparecem em
+buscas, listas, totais por classe, relações ou histórico. Não são exibidos itens
+mascarados que revelem sua existência. Configuração e concessão/revogação de
+acesso são exclusivas da administração ou chefia da unidade proprietária, ou
+do administrador da empresa. A administração pode gerir autorizações por
+identificador sem obter acesso automático ao conteúdo restrito.
+
+Ao mudar um processo para restrito, seu autor recebe autorização nominal
+registrada. Vínculos de dependência/apensamento não propagam acesso ou sigilo.
+Não há exportações, entidades filhas, movimentações oficiais ou notificações
+nesta etapa. As previsões gerais abaixo sobre quatro níveis, mascaramento,
+herança e exportações são futuras para Processos e não descrevem o contrato
+implementado, que possui somente Público interno e Restrito.
+
 - Nenhum dado do Fokus Law pode ser carregado sem empresa ativa.
 - Nenhum recurso Law pode ser acessado sem assinatura valida do produto.
 - Nenhuma funcionalidade pode ser usada sem modulo contratado.

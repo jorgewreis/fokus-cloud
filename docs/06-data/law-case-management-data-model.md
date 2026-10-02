@@ -1,87 +1,79 @@
-# Modelo de dados da gestao de processos Law
+# Modelo de dados de Processos — Judiciário Criminal
 
-## Objetivo
+## Escopo
 
-Definir o modelo conceitual alvo da Gestao de Processos no Fokus Law.
+Implementado pela migration `2026_10_02_000100_create_law_case_management.php`.
+Processos pertencem à empresa e à unidade proprietária. Empresas permanecem
+isoladas. Público interno admite leitura entre unidades; Restrito exige
+autorização nominal. Chaves compostas preservam empresa e, quando necessário,
+unidade nas relações.
 
-Contatos, partes processuais e demais envolvidos reutilizaveis estao detalhados
-em [Modelo de dados da gestao de contatos Law](law-contacts-data-model.md).
+## Tabelas e contratos
 
-Este documento complementa o [Modelo de dados do Fokus Law](fokus-law-data-model.md).
+| Tabela | Identidade e conteúdo |
+| --- | --- |
+| `law_cases` | `LCS`; empresa/unidade, CNJ, metadados, estado, prioridade, sigilo, responsável, datas, arquivamento, versão e autores. |
+| `law_case_status_options` | `LSO`; código, rótulo, ordem e ativo por unidade; Ativo/Arquivado preservados. |
+| `law_case_tags` | `LTG`; nome único na unidade, ativo e autor. |
+| `law_case_tag_assignments` | Chave empresa/processo/etiqueta; mesma unidade; autor e data. |
+| `law_case_role_options` | `LRO`; papéis padronizados e complementos, código e rótulo por unidade. |
+| `law_case_contacts` | `LCV`; contato da mesma empresa, papel e rótulo histórico; único contato/papel no processo. |
+| `law_case_relations` | `LCR`; origem, destino, dependência/apensamento, autor; sem propagação. |
+| `law_confidential_case_accesses` | `LCA`; processo/vínculo nominal, concedente e revogação; único por vínculo/processo. |
+| `law_case_metadata_conflicts` | `LCF`; campo, valor manual/oficial, resolução, autor e datas. |
+| `law_case_events` | `LCE`; eventos persistentes, autor opcional, motivo, antes/depois JSON e data. |
 
-## Principios
+## Cadastro e valores iniciais
 
-- Processos sao a entidade central do Fokus Law.
-- Dados oficiais e dados internos devem permanecer separados.
-- Datajud atualiza apenas metadados oficiais sincronizaveis.
-- Tags informativas nao substituem classe, prioridade, sigilo ou status.
-- Sigilo deve ser representado por nivel no modelo alvo.
-- Cartas recebidas permanecem como classe processual.
+Somente `case_number` (CNJ normalizado, 20 dígitos) e `law_unit_id` são exigidos
+no formulário. CNJ é único por empresa, inclusive arquivados. Classe, códigos,
+assuntos, órgão, situação oficial, autuação e distribuição são opcionais.
 
-## Extensoes de `law_cases`
+Estado inicial `active`; opções `pending`, `suspended`, `completed` e
+`archived`. Prioridade `normal`, `high` ou `urgent`. Sigilo
+`public_internal` ou `restricted`. Responsável opcional por
+`responsible_membership_id`, necessariamente da mesma empresa.
 
-Campos alvo:
+`archive_reason`, `archived_at` e `archived_by` registram arquivamento.
+Reabertura exige motivo, limpa a condição de arquivado e retorna a Ativo,
+preservando eventos anteriores. `version` controla concorrência.
 
-- `case_number`;
-- `case_class`;
-- `subjects`;
-- `legal_basis`;
-- `filing_date`;
-- `distribution_date`;
-- `distribution_data`;
-- `official_status_code`;
-- `official_status_text`;
-- `operational_status`;
-- `operational_priority`;
-- `confidentiality_level`;
-- `internal_tags`;
-- `responsible_membership_id`;
-- `relevant_dates`;
-- `notes`.
+## Dados oficiais e divergências
 
-## Niveis de sigilo
+`datajud_metadata` conserva últimos valores oficiais conhecidos.
+`manual_metadata` conserva preenchimentos manuais preservados. Metadados
+ausentes não apagam valores anteriores. São aceitos classe/código, assuntos
+(lista code/name), órgão/código e situação/código, quando presentes.
+Nenhuma movimentação ou resposta integral é persistida.
 
-Valores iniciais de `confidentiality_level`:
+`datajud_sync_status` é `pending`, `synced`, `not_found` ou `error`.
+`last_datajud_checked_at` marca a última tentativa e controla vencimento mensal;
+`last_datajud_synced_at` marca último retorno com metadados.
 
-- `public_internal`;
-- `unit_restricted`;
-- `case_confidential`;
-- `enhanced_confidential`.
+Divergência aberta é atualizada quando o campo recebe valor oficial novo.
+Resoluções são `manual`, `official` ou `converged` quando fontes concordam.
+Decisão manual sobre o mesmo valor oficial não se repete a cada consulta.
 
-Quando o nivel exigir autorizacao explicita, o acesso deve ser registrado em
-`law_confidential_case_accesses`.
+## Relações, acesso e histórico
 
-## Tags processuais
+Contatos ativos são compartilhados na empresa ou locais da unidade do processo.
+Os vínculos não copiam dados pessoais. Papéis e etiquetas desativados não são
+apagados; referências e rótulos históricos permanecem. Opções iniciais são
+provisionadas também para unidades novas ao consultar referências do módulo.
 
-Tags podem ser armazenadas como estrutura propria ou como JSON no modelo inicial,
-desde que permitam:
+Relações são apresentadas nos dois processos somente quando ambos forem
+acessíveis. Cada registro conserva estado, sigilo e autorizações próprios.
 
-- codigo estavel;
-- nome exibido;
-- cor ou categoria opcional;
-- escopo por empresa ou unidade;
-- status ativo/inativo.
+A autorização nominal pode ser revogada e reativada. Ela habilita acesso ao
+registro; permissões gerais determinam ações disponíveis. Administrador pode
+gerir autorizações sem acesso automático ao conteúdo restrito.
 
-## Linha do tempo
+Eventos não dependem da retenção da auditoria geral da plataforma. A leitura
+do histórico é paginada e usa o mesmo controle de sigilo do detalhe.
+Tentativas de consulta oficial incrementam a versão e produzem eventos.
 
-A linha do tempo pode ser materializada futuramente ou composta por consulta nos
-registros relacionados:
+## Limites
 
-- movimentacoes oficiais sincronizadas;
-- tarefas;
-- expedicoes;
-- prazos e pendencias;
-- contatos e partes;
-- auditoria operacional relevante.
-
-## Criterios de aceite
-
-- O modelo de processos diferencia status oficial e operacional.
-- `confidentiality_level` e o campo alvo para sigilo.
-- `law_case_contacts` deve ser usado no modelo alvo para vincular partes,
-  advogados, orgaos de origem e demais contatos ao processo.
-- `is_confidential` pode existir apenas como compatibilidade derivada quando
-  necessario.
-- Tags permanecem informativas.
-- Datajud nao sobrescreve campos operacionais.
-- Cartas recebidas usam `case_class`.
+Não há observações, capitulações, tarefas, expedições, prazos, pendências,
+documentos, movimentações, importação ou exportação neste esquema. Previsões
+gerais desses campos descrevem evolução futura.

@@ -161,6 +161,15 @@ escopo.
 
 Representa processos do Fokus Law.
 
+**Contrato implementado — Judiciário Criminal:** somente CNJ válido e unidade
+são obrigatórios no cadastro; classe é opcional até consulta/preenchimento.
+Estados iniciais: `active`, `pending`, `suspended`, `completed`, `archived`, com
+complementos locais. Sigilo: `public_internal` ou `restricted`; público interno
+é visível entre unidades da empresa, restrito exige autorização nominal.
+Datajud consulta mensalmente metadados básicos, sem movimentações. O esquema
+efetivo está no documento específico abaixo. Campos e integrações adicionais
+da tabela conceitual a seguir são previsões futuras, não desta entrega.
+
 O detalhamento do modelo alvo da Gestao de Processos esta em [Modelo de dados da gestao de processos Law](law-case-management-data-model.md).
 
 | Campo | Tipo | Obrigatorio | Regra |

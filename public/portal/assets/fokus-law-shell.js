@@ -101,6 +101,7 @@
   function visibleModules() {
     return (context.modules || []).filter((module) => {
       const family = String(module.family || module.module_code || module.code || '').toLowerCase();
+      if (family.startsWith('processos')) return canLawPermission('law.cases.view');
       return !family.startsWith('contatos') || canLawPermission('law.contacts.view');
     });
   }
@@ -207,6 +208,8 @@
       appendNavButton(pageItems, 'Cadastro e consulta', 'contactsCreate', contactsView === 'module', () => { contactsView = 'module'; renderNavigation(); });
       if (canLawPermission('law.contacts.share.manage')) appendNavLink(pageItems, 'Compartilhamentos', '/portal/fokus-law/contatos/compartilhamentos', 'contactsShare', contactsView === 'contacts-sharing');
       if (canLawPermission('law.contacts.view')) appendNavLink(pageItems, 'Revisão e qualidade', '/portal/fokus-law/contatos/revisao-e-qualidade', 'contactsQuality', contactsView === 'contacts-quality');
+    } else if (String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('processos')) {
+      appendNavButton(pageItems, 'Cadastro e consulta', 'processes', true, () => renderContent('module'));
     } else {
       appendNavButton(pageItems, `Visão geral de ${descriptor.label}`, descriptor.icon, true, () => renderContent('module'), true);
       pageItems.append(element('p', 'law-nav-description', 'As páginas funcionais deste módulo serão adicionadas aqui.'));
@@ -293,6 +296,49 @@
         body.append(distribution, recentSection);
       }).catch(() => { if (card.isConnected) body.replaceChildren(element('p', 'law-dashboard-widget-error', 'Não foi possível carregar este resumo agora.')); });
     }
+    const processesModule = visibleModules().find((module) => String(module.code || '').includes('processos-vara-criminal'));
+    if (processesModule && canLawPermission('law.cases.view')) renderProcessDashboardWidget(grid, processesModule);
+  }
+
+  function renderProcessDashboardWidget(grid, module) {
+    const card = element('article', 'fs-card law-dashboard-module-widget law-dashboard-module-wide');
+    const header = element('header', 'law-dashboard-widget-header');
+    const identity = element('div', 'law-dashboard-widget-identity');
+    const mark = element('span', 'law-dashboard-widget-mark'); mark.append(icon('processes'));
+    const title = element('div'); title.append(element('span', 'law-dashboard-widget-kicker', 'GESTÃO PROCESSUAL'), element('h3', '', 'Gestão de Processos'));
+    identity.append(mark, title);
+    const open = element('button', 'law-dashboard-widget-open', 'Abrir módulo'); open.type = 'button'; open.append(element('span', '', '↗'));
+    open.addEventListener('click', () => { activeGroup = `module:${module.id}`; contactsView = 'module'; renderNavigation(); closeMobileNav(); contentRegion.focus({ preventScroll: true }); });
+    header.append(identity, open);
+    const body = element('div', 'law-dashboard-widget-body'); body.append(element('p', 'law-contact-loading', 'Carregando seus indicadores…'));
+    card.append(header, body); grid.append(card);
+    FokusApi.request('/law/cases/dashboard').then(({ summary }) => {
+      if (!card.isConnected) return;
+      const total = Number(summary.cases_total || 0); const distribution = element('div', 'law-dashboard-contact-distribution');
+      const ring = element('div', 'law-dashboard-contact-ring'); ring.style.setProperty('--contact-pf-share', '100%'); ring.dataset.empty = String(total === 0);
+      ring.setAttribute('role', 'img'); ring.setAttribute('aria-label', `${total} processos acessíveis não arquivados`);
+      const center = element('span', 'law-dashboard-ring-center'); center.append(element('strong', '', total.toLocaleString('pt-BR')), element('small', '', 'processos')); ring.append(center);
+      const breakdown = element('div', 'law-dashboard-contact-breakdown');
+      const classes = (summary.by_class || []).slice(0, 3);
+      const others = (summary.by_class || []).slice(3).reduce((sum, item) => sum + Number(item.total), 0);
+      if (others) classes.push({ label: 'Outras classes', total: others });
+      classes.forEach((item, index) => {
+        const row = element('div', `law-dashboard-breakdown-row law-dashboard-breakdown-${index % 2 ? 'pj' : 'pf'}`);
+        const head = element('div', 'law-dashboard-breakdown-head'); head.append(element('span', 'law-dashboard-breakdown-label', item.label), element('strong', '', Number(item.total).toLocaleString('pt-BR')));
+        const track = element('span', 'law-dashboard-breakdown-track'); const fill = element('span', 'law-dashboard-breakdown-fill'); fill.style.width = `${Math.min(100, Number(item.total) / Math.max(1, total) * 100)}%`; track.append(fill);
+        row.append(head, track); breakdown.append(row);
+      });
+      if (!classes.length) breakdown.append(element('span', 'law-dashboard-recent-empty', 'Cadastre o primeiro processo para acompanhar a distribuição por classe.'));
+      distribution.append(ring, breakdown);
+      const recent = element('div', 'law-dashboard-widget-recent'); recent.append(element('span', 'law-dashboard-widget-kicker', 'CADASTRADOS RECENTEMENTE'));
+      const links = element('div', 'law-dashboard-recent-list');
+      (summary.recent || []).forEach((item) => {
+        const link = element('button', 'law-dashboard-recent-link', item.case_number_formatted); link.type = 'button';
+        link.addEventListener('click', () => { activeGroup = `module:${module.id}`; contactsView = 'module'; renderRail(); renderNavigation(); window.FokusLawProcesses?.openCase(contentRegion, context, item.id); closeMobileNav(); }); links.append(link);
+      });
+      if (!(summary.recent || []).length) links.append(element('span', 'law-dashboard-recent-empty', 'Seus processos cadastrados aparecerão aqui.'));
+      recent.append(links); body.replaceChildren(distribution, recent);
+    }).catch(() => { if (card.isConnected) body.replaceChildren(element('p', 'law-dashboard-widget-error', 'Não foi possível carregar este resumo agora.')); });
   }
 
   function renderSettings() {
@@ -1035,6 +1081,14 @@
   }
 
   function renderModulePlaceholder(module) {
+    if (String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('processos')) {
+      if (!String(module.code || '').includes('vara-criminal')) {
+        contentRegion.append(element('h2', '', 'Processos'), element('p', 'fs-alert fs-alert-info', 'A etapa funcional atual atende ao Judiciário Criminal. As funcionalidades deste contexto serão definidas separadamente.'));
+        return;
+      }
+      window.FokusLawProcesses?.render(contentRegion, context);
+      return;
+    }
     if (String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos')) {
       if (contactsView === 'contacts-sharing') window.FokusLawContacts?.renderSharingPage(contentRegion, context);
       else if (contactsView === 'contacts-quality') window.FokusLawContacts?.renderQualityPage(contentRegion, context);
@@ -1576,13 +1630,17 @@
     renderCompanyOptions();
     renderUnitOptions();
     const remember = localStorage.getItem(preferenceKey(context.user.id, 'remember-group')) === 'true';
-    if (!['profile', 'company', 'subscription', 'users', 'transfer', 'contacts-sharing', 'contacts-quality'].includes(initialPage) && remember) {
+    if (!['profile', 'company', 'subscription', 'users', 'transfer', 'contacts-sharing', 'contacts-quality', 'processes'].includes(initialPage) && remember) {
       const lastGroup = localStorage.getItem(preferenceKey(context.user.id, 'last-group'));
       if ((lastGroup === 'settings' && context.permissions.manage_settings) || visibleModules().some((item) => `module:${item.id}` === lastGroup)) activeGroup = lastGroup;
     }
     if (['contacts-sharing', 'contacts-quality'].includes(initialPage)) {
       const contactsModule = visibleModules().find((item) => String(item.family || item.module_code || item.code || '').toLowerCase().startsWith('contatos'));
       if (contactsModule) activeGroup = `module:${contactsModule.id}`;
+    }
+    if (initialPage === 'processes') {
+      const processesModule = visibleModules().find((item) => String(item.family || item.module_code || item.code || '').toLowerCase().startsWith('processos'));
+      if (processesModule) activeGroup = `module:${processesModule.id}`;
     }
     if (localStorage.getItem(preferenceKey(context.user.id, 'reduced-motion')) === 'true') document.documentElement.classList.add('law-pref-reduced-motion');
     renderRail();
