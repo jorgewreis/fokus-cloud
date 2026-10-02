@@ -199,12 +199,13 @@ class LawPermissionsTest extends TestCase
     {
         $manager = $this->user('Gestor legado', '52998224725', 'legacy-manager@example.test');
         $membershipId = $this->membership($manager, 'gestor');
+        $permissionCount = DB::table('customer_permissions')->count();
         $migration = require database_path('migrations/2026_09_28_000100_create_customer_law_permissions.php');
 
         $migration->up();
         $migration->up();
 
-        $this->assertDatabaseCount('customer_permissions', 26);
+        $this->assertDatabaseCount('customer_permissions', $permissionCount);
         $this->assertDatabaseHas('customer_permissions', ['code' => 'law.contacts.sensitive.view']);
         $this->assertDatabaseHas('customer_permissions', ['code' => 'law.contacts.merge']);
         $this->assertDatabaseHas('customer_permissions', ['code' => 'law.contacts.shared.view']);
