@@ -29,7 +29,7 @@
   const input = (value = '', placeholder = '', maxLength = 255) => { const control = $('input', 'fs-form-control'); control.value = value || ''; control.placeholder = placeholder; control.maxLength = maxLength; return control; };
   const button = (text, cls = 'fs-btn fs-btn-secondary', fn) => { const control = $('button', cls, text); control.type = 'button'; if (fn) control.addEventListener('click', (event) => fn(event)); return control; };
   const CONTACT_PAGE_SIZE = 15;
-  const renderPagination = (...args) => window.FokusLawRecordUI.renderPagination(...args);
+  const renderPagination = (container, pagination, onPage, label = 'contatos') => window.FokusLawRecordUI.renderPagination(container, pagination, onPage, label);
   const iconButton = (label, icon, fn) => { const control = button('', 'fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action', fn); control.setAttribute('aria-label', label); control.title = label; const image = $('img'); image.src = `${CONTACT_ICONS}${icon}`; image.alt = ''; control.append(image); return control; };
   const section = (title) => {
     const box = $('section', 'fs-card fs-card-sm law-record-form-section');
