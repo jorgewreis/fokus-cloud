@@ -296,7 +296,7 @@
         body.append(distribution, recentSection);
       }).catch(() => { if (card.isConnected) body.replaceChildren(element('p', 'law-dashboard-widget-error', 'Não foi possível carregar este resumo agora.')); });
     }
-    const processesModule = visibleModules().find((module) => String(module.code || '').includes('processos-vara-criminal'));
+    const processesModule = visibleModules().find((module) => module.family === 'processos' && (['judiciario', 'vara_criminal'].includes(module.context_code) || String(module.code || '').includes('vara-criminal')));
     if (processesModule && canLawPermission('law.cases.view')) renderProcessDashboardWidget(grid, processesModule);
   }
 
@@ -1082,7 +1082,7 @@
 
   function renderModulePlaceholder(module) {
     if (String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('processos')) {
-      if (!String(module.code || '').includes('vara-criminal')) {
+      if (!['judiciario', 'vara_criminal'].includes(module.context_code) && !String(module.code || '').includes('vara-criminal')) {
         contentRegion.append(element('h2', '', 'Processos'), element('p', 'fs-alert fs-alert-info', 'A etapa funcional atual atende ao Judiciário Criminal. As funcionalidades deste contexto serão definidas separadamente.'));
         return;
       }

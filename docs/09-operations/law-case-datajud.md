@@ -17,7 +17,7 @@ registram a falha na linha do tempo do processo.
 O scheduler executa `law:sync-case-datajud` diariamente às 03:15, no fuso da
 aplicação. Consulta processos não arquivados cuja última tentativa tem pelo
 menos um mês, com assinatura ativa e módulo de Processos publicado no contexto
-`vara_criminal`. O limite é de 500 consultas por execução, ajustável por
+`judiciario` (compatível com o código legado `vara_criminal`). O limite é de 500 consultas por execução, ajustável por
 `--limit` até 5.000. Excedentes continuam vencidos para as próximas execuções.
 
 A rotina agendada usa `withoutOverlapping`. Falhas externas contam como

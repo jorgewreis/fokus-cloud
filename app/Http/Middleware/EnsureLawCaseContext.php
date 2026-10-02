@@ -18,7 +18,7 @@ class EnsureLawCaseContext
             ->join('products as product', 'product.id', '=', 'subscription.product_id')->join('modules as module', 'module.id', '=', 'item.module_id')
             ->where('subscription.company_id', $companyId)->where('subscription.status', 'ativa')->whereIn('product.code', ['law', 'fokus-law'])
             ->where('module.status', 'ativo')->where('module.publication_state', 'publicado')->where('module.module_code', 'processos')
-            ->where('module.context_code', 'vara_criminal')->exists();
+            ->whereIn('module.context_code', ['judiciario', 'vara_criminal'])->exists();
         abort_unless($enabled, 403, 'Esta etapa de Processos está disponível para o contexto Judiciário Criminal contratado.');
         return $next($request);
     }

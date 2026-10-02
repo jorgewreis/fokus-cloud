@@ -52,7 +52,7 @@ class LawShellController extends Controller
                 ->where('module.publication_state', 'publicado')
                 ->orderBy('module.display_order')
                 ->orderBy('module.name')
-                ->get(['module.id', 'module.code', 'module.module_code', 'module.name', 'module.display_order'])
+                ->get(['module.id', 'module.code', 'module.module_code', 'module.name', 'module.context_code', 'module.display_order'])
                 ->unique(fn (object $module): string => (string) $module->module_code)
                 ->values();
         }
@@ -173,6 +173,7 @@ class LawShellController extends Controller
                 'id' => (string) $module->id,
                 'code' => (string) $module->code,
                 'family' => (string) ($module->module_code ?: $module->code),
+                'context_code' => (string) $module->context_code,
                 'name' => (string) $module->name,
             ])->all(),
         ]);

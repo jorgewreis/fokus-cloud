@@ -29,7 +29,7 @@ class SyncLawCaseDatajud extends Command
                     ->join('modules as module', 'module.id', '=', 'item.module_id')
                     ->whereColumn('subscription.company_id', 'law_cases.company_id')->where('subscription.status', 'ativa')
                     ->whereIn('product.code', ['law', 'fokus-law'])->where('module.status', 'ativo')->where('module.publication_state', 'publicado')
-                    ->where('module.context_code', 'vara_criminal')
+                    ->whereIn('module.context_code', ['judiciario', 'vara_criminal'])
                     ->whereRaw("COALESCE(module.module_code, module.code) = ?", ['processos']);
             })
             ->orderBy('last_datajud_checked_at')->orderBy('id')->limit(max(1, min(5000, (int) $this->option('limit'))));

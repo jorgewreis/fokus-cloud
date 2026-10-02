@@ -7,7 +7,7 @@ organiza o acompanhamento interno do Cartório Criminal. O cadastro separa dados
 oficiais de decisões de trabalho, para identificar processos, atribuir
 responsabilidade, priorizar providências e preservar um histórico auditável.
 
-Esta etapa atende ao contexto contratado `vara_criminal`. Advocacia e os demais
+Esta etapa atende ao contexto contratado `judiciario` (compatível com o código legado `vara_criminal`). Advocacia e os demais
 contextos continuam sujeitos a definição própria. A página reutiliza o shell do
 Fokus Law e componentes Fokus Styles 2.7.0: cards, tabela, campos, botões e
 diálogos. A composição de formulários e diálogos está em `law-record-ui.js`, para

@@ -3,7 +3,7 @@
 ## Escopo autorizado
 
 Primeira implementação para o Cartório Criminal, contexto contratado
-`vara_criminal`. Este contrato prevalece sobre previsões gerais de evolução.
+`judiciario` (compatível com o código legado `vara_criminal`). Este contrato prevalece sobre previsões gerais de evolução.
 
 | Código | Funcionalidade | Regra e critério de aceite |
 | --- | --- | --- |
