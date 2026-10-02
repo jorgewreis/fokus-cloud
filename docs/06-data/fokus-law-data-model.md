@@ -28,7 +28,7 @@ Este documento complementa:
   deve usar `Contatos`.
 - Contatos substituem o cadastro restrito de partes no modelo alvo.
 - Partes processuais, advogados, instituicoes, orgaos e destinatarios sao
-  papeis ou classificacoes contextuais de contatos.
+  papeis de contatos.
 - Cartas recebidas sao classe de processo, nao expediente separado.
 - Dados oficiais e operacionais do processo devem ser separados.
 - Tags informativas nao substituem classe, prioridade, sigilo ou status.
@@ -718,8 +718,7 @@ criacao/alteracao e versionamento quando houver edicao concorrente.
 - Processos sao entidade central e pertencem a empresa e unidade juridica.
 - Gestao de Processos separa dados oficiais e operacionais.
 - Gestao de Contatos substitui o cadastro restrito de partes no modelo alvo.
-- Partes, advogados, instituicoes, orgaos e destinatarios sao papeis ou
-  classificacoes de contatos.
+- Partes, advogados, instituicoes, orgaos e destinatarios sao papeis de contatos.
 - Tags processuais sao informativas.
 - Sigilo usa `confidentiality_level` no modelo alvo.
 - Cartas recebidas nao possuem tabela propria de expediente.

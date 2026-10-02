@@ -7,7 +7,7 @@ por compatibilidade, mas novos registros usam `NULL`: setores internos
 autorizados veem a base da empresa. `record_kind` diferencia contato e unidade;
 `legal_nature` diferencia PF e PJ e é nulo para unidade. `parent_contact_id`
 forma uma hierarquia na mesma empresa, com um pai por filho e vários filhos por
-pai. Contexto, classificações e tags ficam em estruturas separadas.
+pai. Contexto e tags ficam em estruturas separadas.
 
 ```mermaid
 erDiagram
@@ -16,7 +16,6 @@ erDiagram
     law_contacts ||--o{ law_contact_addresses : has
     law_contacts ||--o{ law_contact_channels : has
     law_contacts ||--o{ law_contact_documents : identifies
-    law_contacts ||--o{ law_contact_classifications : classified
     law_contacts ||--o{ law_contact_tag_assignments : tagged
     law_contact_tags ||--o{ law_contact_tag_assignments : reused
     law_contacts ||--o{ law_contact_activity : accessed
@@ -72,34 +71,12 @@ existente é promovido a um registro `law_contacts` do tipo `unit`; o campo
 `migrated_contact_id` aponta para esse registro e mantém a correspondência com a
 linha histórica. Novos registros hierárquicos não são gravados como departamento.
 
-### Classificação e tags
+### Tags
 
-- `law_contact_classifications` associa o código opcional de categoria ao
-  contato e marca a seleção principal (`is_primary`). A interface grava no
-  máximo uma categoria; valores múltiplos legados permanecem preservados até a
-  próxima edição. `requires_review` sinaliza códigos legados sem correspondência
-  no catálogo atual. A PK impede repetição.
 - `law_contact_tags` contém nome e nome normalizado únicos por empresa.
-- `law_contact_tag_assignments` associa até seis tags a cada contato sem
-  duplicar associações.
+- `law_contact_tag_assignments` associa até seis tags a cada contato sem duplicar associações.
 
-Vocabulário de classificações: `lawyer`, `law_firm`, `private_company`,
-`financial_institution`, `educational_institution`,
-`civil_society_organization`, `professional_entity`, `notary_office`,
-`health_institution`, `religious_organization`, `union`, `association`,
-`cooperative`, `condominium`, `utility_provider`, `public_body`, `police`,
-`prosecutor_office`, `public_defender`, `other_organization`, `expert`,
-`witness`, `representative`, `party`, `public_servant`, `authority`,
-`service_user`, `interested_party`, `supplier`, `service_provider`,
-`collaborator`, `law_correspondent`, `magistrate`, `justice_officer`,
-`prosecutor` e `other`. `client` e `court_unit` são valores legados preservados
-e marcados para revisão. `public_body` identifica somente órgão público;
-empresas, bancos, escolas e outras organizações recebem sua categoria própria.
-Unidade judiciária é tipo institucional, com dados e código CNJ próprios.
-
-Categoria descreve o cadastro e não é obrigatória. Papéis de atuação e de
-vínculo são mantidos separadamente na relação PF–organização e não produzem
-registros transacionais ou financeiros.
+Papéis de vínculo são mantidos na relação PF–organização. Unidade judiciária é um tipo institucional, com dados e código CNJ próprios.
 
 ### `law_contact_company_settings`
 
@@ -136,7 +113,7 @@ Consumo = registros sem exclusão lógica/mesclagem, incluindo unidades. A
 exclusão lógica reduz o consumo. A contagem é feita no servidor
 durante a transação de criação/edição e validada contra o snapshot comercial da
 assinatura. Índices mantêm busca por empresa/natureza/status, escopo de canais,
-documento fingerprint, tags normalizadas, classificações e atividade recente.
+documento fingerprint, tags normalizadas e atividade recente.
 
 ## Segurança e integridade
 
@@ -146,7 +123,7 @@ documento fingerprint, tags normalizadas, classificações e atividade recente.
 - Dados sensíveis são omitidos ou mascarados sem `law.contacts.sensitive.view`;
   alterações comuns preservam os valores sensíveis não exibidos.
 - Mesclagem transfere registros filhos dentro de transação, combina
-  classificações/tags sem duplicatas, registra motivo e marca origem como
+  tags sem duplicatas, registra motivo e marca origem como
   mesclada.
 - Todas as ações administrativas e alterações relevantes geram auditoria.
 
@@ -155,8 +132,7 @@ documento fingerprint, tags normalizadas, classificações e atividade recente.
 A migração `2026_10_01_000100_add_context_and_hierarchy_to_law_contacts.php`
 promove departamentos existentes a unidades independentes e preserva as linhas
 legadas com `migrated_contact_id`. Os canais acompanham a unidade promovida.
-Também cria configuração contextual por empresa, marcadores de classificação
-principal e avisos para códigos legados sem correspondência. Na reversão,
+Também cria configuração contextual por empresa. Na reversão,
 unidades existentes são mantidas como organizações PJ para não apagar dados
 criados após a migração.
 

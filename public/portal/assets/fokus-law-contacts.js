@@ -29,10 +29,9 @@
   const input = (value = '', placeholder = '', maxLength = 255) => { const control = $('input', 'fs-form-control'); control.value = value || ''; control.placeholder = placeholder; control.maxLength = maxLength; return control; };
   const button = (text, cls = 'fs-btn fs-btn-secondary', fn) => { const control = $('button', cls, text); control.type = 'button'; if (fn) control.addEventListener('click', (event) => fn(event)); return control; };
   const iconButton = (label, icon, fn) => { const control = button('', 'fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action', fn); control.setAttribute('aria-label', label); control.title = label; const image = $('img'); image.src = `${CONTACT_ICONS}${icon}`; image.alt = ''; control.append(image); return control; };
-  const section = (title, copy = '') => {
+  const section = (title) => {
     const box = $('section', 'fs-card fs-card-sm law-contacts-form-section');
-    const header = $('div', 'fs-card-header'); header.append($('h3', 'fs-card-title', title));
-    if (copy) header.append($('p', 'fs-card-subtitle law-contact-help', copy));
+    const header = $('div', 'fs-card-header fs-u-p-3'); header.append($('h3', 'fs-card-title', title));
     const body = $('div', 'fs-card-body'); box.append(header, body); box.content = body; return box;
   };
   let modalSequence = 0;
@@ -130,10 +129,8 @@
     root.append(overview);
     const metrics = $('section', 'law-contact-metrics'); metrics.setAttribute('aria-live', 'polite'); metrics.append($('p', 'law-contact-loading', 'Carregando contatos…')); root.append(metrics);
     const recentCard = $('section', 'law-contact-recent-card fs-card');
-    const recentHeader = $('div', 'fs-card-header law-contact-recent-header');
-    const recentTitle = $('div'); recentTitle.append($('span', 'law-contact-section-kicker', 'SEU FLUXO'), $('h3', 'fs-card-title', 'Acessados recentemente'));
-    recentHeader.append(recentTitle);
-    recentHeader.append($('span', 'law-contact-recent-caption', 'Até cinco contatos consultados por você'));
+    const recentHeader = $('div', 'fs-card-header fs-u-p-3 law-contact-recent-header');
+    recentHeader.append($('h3', 'fs-card-title', 'Acessados recentemente'));
     const recentBody = $('div', 'fs-card-body law-contact-recent');
     recentCard.append(recentHeader, recentBody); root.append(recentCard);
 
@@ -313,7 +310,7 @@
     if (isUnitRecord) basic.content.append(recordKindField, parentField, nameRow);
     else basic.content.append(natureField, parentField, nameRow);
     const legalNameField = field('Razão social ou complemento do nome', legalName); basic.content.append(legalNameField);
-    const professionSection = section('Profissão / vínculo', 'Selecione uma opção cadastrada ou inclua uma nova especificação.');
+    const professionSection = section('Profissão / vínculo');
     const professionRows = $('div', 'law-contact-profession-list');
     (contact?.professions || []).forEach((value) => professionRows.append(professionChip(value)));
     const professionSelect = select([['', 'Selecione uma profissão'], ...(window.lawContactProfessions || []).map((value) => [value, value])]);
@@ -325,7 +322,7 @@
     const addProfession = (value) => { const clean = value.trim(); if (clean && ![...professionRows.querySelectorAll('[data-profession]')].some((item) => item.dataset.profession.toLocaleLowerCase() === clean.toLocaleLowerCase())) professionRows.append(professionChip(clean)); professionSelect.value = ''; professionNew.value = ''; };
     professionSelect.addEventListener('change', () => { if (professionSelect.value) addProfession(professionSelect.value); });
     professionSection.content.append(professionRows, field('Profissões cadastradas', professionSelect), field('Nova profissão / especificação', professionNew), professionSuggestions, button('Adicionar profissão', 'fs-btn fs-btn-secondary', () => addProfession(professionNew.value)));
-    const institutionalSection = section('Dados institucionais', 'Complementos para órgãos públicos e unidades judiciárias.');
+    const institutionalSection = section('Dados institucionais');
     const institutionalData = Array.isArray(contact?.institutional_data) ? contact.institutional_data : (contact?.institutional_data ? [contact.institutional_data] : []);
     const courtData = institutionalData.find((item) => item.type === 'court_unit') || {};
     const publicData = institutionalData.find((item) => item.type === 'public_body') || {};
@@ -349,7 +346,7 @@
     institutionalSection.content.append(field('Código CNJ da unidade judiciária', cnj), field('Competências (separadas por vírgula)', competencies), competencyList, field('Esfera administrativa', sphere), field('Identificador oficial', officialCode), field('Sistema emissor', issuingSystem));
     const updateInstitutional = () => { institutionalSection.hidden = recordKind.value === 'unit' ? false : nature.value !== 'pj'; cnj.parentElement.hidden = !courtType.checked; competencies.parentElement.hidden = !courtType.checked; sphere.parentElement.hidden = !publicType.checked; officialCode.parentElement.hidden = !publicType.checked; issuingSystem.parentElement.hidden = !publicType.checked; updateInstitutionalPrimary(); };
     courtType.addEventListener('change', updateInstitutional); publicType.addEventListener('change', updateInstitutional); updateInstitutional();
-    const relationshipSection = section('Vínculos empresariais', 'Associe este contato a empresas já cadastradas.');
+    const relationshipSection = section('Vínculos empresariais');
     const linkedContactIds = new Set((contact?.linked_contacts || []).map((item) => item.id));
     const linkMetadata = new Map((contact?.linked_contacts || []).map((item) => [item.id, { roles: item.roles || [], designations: item.designations || [] }]));
     const relationshipPicker = setWidth(select([['', 'Selecione para vincular']]), 900);
@@ -412,13 +409,12 @@
     let documentRows;
     let documentSection;
     if (window.lawContactsCanSensitive) {
-      const documentHighlight = contextData.context_code === 'escritorio' ? 'Na Advocacia, OAB recebe destaque para pessoas; o CPF segue disponível.' : 'Nos setores públicos, Matrícula e Cadastro recebem destaque; os demais documentos seguem disponíveis.';
-      documentSection = section('Documentos', `Até 4 documentos. ${documentHighlight} CPF ou CNPJ são validados quando informados; inscrição estadual exige UF.`);
+      documentSection = section('Documentos');
       documentRows = $('div', 'law-contact-repeat-list');
       (contact?.documents || []).filter((doc) => DOCUMENT_TYPES_BY_NATURE[nature.value].includes(doc.type)).forEach((doc) => documentRows.append(documentRow(doc, nature.value)));
       documentSection.content.append(documentRows, button('Adicionar documento', 'fs-btn fs-btn-secondary', () => { if (documentRows.children.length < 4) documentRows.append(documentRow({}, nature.value)); }));
     }
-    const channelSection = section('Telefones e e-mails', 'Até quatro telefones e dois e-mails. Marque canais pessoais como sensíveis; o acesso continua restrito por permissão.');
+    const channelSection = section('Telefones e e-mails');
     const channelRows = $('div', 'law-contact-repeat-list'); (contact?.channels || []).filter((item) => window.lawContactsCanSensitive || !item.personal).forEach((item) => channelRows.append(channelRow(item)));
     enforceSinglePrimary(channelRows, (row) => row.querySelector('[data-channel-type]').value === 'email' ? 'email' : 'phone', true);
     channelSection.content.append(channelRows, button('Adicionar telefone ou e-mail', 'fs-btn fs-btn-secondary', () => {
@@ -427,7 +423,7 @@
       const group = row.querySelector('[data-channel-type]').value === 'email' ? 'email' : 'phone';
       if (![...channelRows.children].some((other) => other !== row && (other.querySelector('[data-channel-type]').value === 'email' ? 'email' : 'phone') === group && other.querySelector('[data-primary]').value === '1')) row.querySelector('[data-primary]').value = '1';
     }));
-    const addressSection = section('Endereços', 'Até 2 endereços completos.');
+    const addressSection = section('Endereços');
     const addressRows = $('div', 'law-contact-repeat-list'); (contact?.addresses || []).forEach((item) => addressRows.append(addressRow(item)));
     enforceSinglePrimary(addressRows, () => 'address', true);
     addressSection.content.append(addressRows, button('Adicionar endereço', 'fs-btn fs-btn-secondary', () => {
@@ -436,9 +432,9 @@
       if (![...addressRows.children].some((other) => other !== row && other.querySelector('[data-primary]').value === '1')) row.querySelector('[data-primary]').value = '1';
     }));
     const tagField = input((contact?.tags || []).join(', '), 'Ex.: testemunha, urgente, comarca', 400); tagField.name = 'tags';
-    const tags = section('Tags', 'Separe por vírgula; até 6 por contato. As tags são reutilizadas pela empresa.'); tags.content.append(field('Tags', tagField));
+    const tags = section('Tags'); tags.content.append(field('Tags', tagField));
     const notes = document.createElement('textarea'); notes.className = 'fs-form-control'; notes.maxLength = 4000; notes.value = contact?.notes || ''; notes.name = 'notes';
-    const notesSection = section('Notas privadas', 'Visíveis somente a perfis com acesso a dados sensíveis.'); notesSection.content.append(field('Notas', notes));
+    const notesSection = section('Notas privadas'); notesSection.content.append(field('Notas', notes));
     const message = $('p', 'law-contact-feedback'); message.setAttribute('role', 'status');
     if (contact) {
       const excludedWrap = $('label', 'law-contact-check'); const excluded = $('input'); excluded.type = 'checkbox'; excluded.checked = Boolean(contact.sharing_excluded); excluded.name = 'sharing_excluded'; excludedWrap.append(excluded, $('span', '', 'Excluir dos compartilhamentos configurados')); basic.content.append(excludedWrap);
@@ -476,7 +472,6 @@
       const candidates = relationshipOptions.filter((item) => item.id !== contact?.id && item.legal_nature !== nature.value);
       relationshipPicker.replaceChildren(new Option('Selecione para vincular', ''), ...candidates.map((item) => new Option(`${item.display_name}${item.acronym ? ` (${item.acronym})` : ''}`, item.id)));
       relationshipSection.querySelector('.fs-card-title').textContent = nature.value === 'pj' ? 'Vínculos institucionais' : 'Vínculos empresariais';
-      relationshipSection.querySelector('.fs-card-subtitle').textContent = nature.value === 'pj' ? 'Estatísticas quantitativas dos vínculos, sem exibir nomes pessoais.' : 'Associe este contato a empresas já cadastradas.';
       relationshipPickerField.hidden = nature.value === 'pj'; relationshipChips.hidden = nature.value === 'pj'; relationshipStats.hidden = nature.value !== 'pj';
       relationshipSection.hidden = nature.value === 'pj' ? false : candidates.length === 0;
     };
@@ -881,7 +876,7 @@
       let rules = { legal_natures: ['pj'], profession_names: [], shared_fields: ['professional_channels'] };
 
       const formCard = $('section', 'fs-card law-contact-sharing-form-card');
-      const formHeader = $('div', 'fs-card-header');
+      const formHeader = $('div', 'fs-card-header fs-u-p-3');
       const formTitle = $('h3', 'fs-card-title', 'Criar política de compartilhamento');
       formHeader.append(formTitle);
       const form = $('form', 'law-contact-sharing-form');
@@ -974,9 +969,8 @@
 
       const statistics = result.statistics || {};
       const sharingDashboard = $('section', 'fs-card law-contact-sharing-dashboard');
-      const dashboardHeader = $('div', 'fs-card-header law-contact-sharing-dashboard-header');
-      dashboardHeader.append($('div', '', ''), $('p', 'fs-card-subtitle', 'Indicadores calculados somente para acordos recíprocos ativos.'));
-      dashboardHeader.firstElementChild.append($('span', 'law-contact-section-kicker', 'PANORAMA DOS ACORDOS'), $('h3', 'fs-card-title', 'O que sua rede compartilha'));
+      const dashboardHeader = $('div', 'fs-card-header fs-u-p-3 law-contact-sharing-dashboard-header');
+      dashboardHeader.append($('h3', 'fs-card-title', 'O que sua rede compartilha'));
       const metricGrid = $('div', 'law-contact-sharing-metrics');
       [
         ['Acordos ativos', statistics.active_agreements, 'Com confirmação dos dois lados', 'active'],
@@ -1013,7 +1007,7 @@
       sharingDashboard.append(dashboardHeader, metricGrid, chart); root.append(sharingDashboard);
 
       const tableCard = $('section', 'fs-card law-contact-sharing-table-card');
-      const tableHeader = $('div', 'fs-card-header'); tableHeader.append($('h3', 'fs-card-title', 'Políticas da empresa'), $('p', 'fs-card-subtitle', 'Acordos ativos e pendentes de confirmação recíproca.'));
+      const tableHeader = $('div', 'fs-card-header fs-u-p-3'); tableHeader.append($('h3', 'fs-card-title', 'Políticas da empresa'));
       const tableWrap = $('div', 'fs-table-responsive'); const table = $('table', 'fs-table law-contact-sharing-table'); const head = $('thead'); const headRow = $('tr');
       ['Empresa', 'Sua política', 'Acordo', 'Regras e dados por direção', 'Ações'].forEach((label) => headRow.append($('th', '', label))); head.append(headRow); table.append(head);
       const body = $('tbody');
@@ -1078,7 +1072,7 @@
       const labels = { without_phone: 'Sem telefone', lawyer_without_oab: 'Advogado sem número de OAB', police_without_company: 'Policial sem empresa vinculada' };
       const summary = result.summary || {};
       const sectionNode = $('section', 'law-contact-quality fs-card');
-      const header = $('div', 'fs-card-header'); header.append($('h3', 'fs-card-title', 'Pontos de atenção'), $('p', 'fs-card-subtitle law-contact-help', 'Os alertas aparecem somente quando há cadastros que precisam de complementação.'));
+      const header = $('div', 'fs-card-header fs-u-p-3'); header.append($('h3', 'fs-card-title', 'Pontos de atenção'));
       const grid = $('div', 'fs-card-body law-contact-quality-grid');
       Object.entries(labels).filter(([type]) => Number(summary[type] || 0) > 0).forEach(([type, label]) => {
         const card = $('article', 'law-contact-quality-metric'); card.append($('span', 'law-contact-quality-label', label), $('strong', '', Number(summary[type]).toLocaleString('pt-BR')), $('small', '', 'cadastros para revisar')); grid.append(card);
@@ -1088,7 +1082,7 @@
       }
       sectionNode.append(header, grid);
       const tableCard = $('section', 'law-contact-quality-table-card fs-card');
-      const tableHeader = $('div', 'fs-card-header'); tableHeader.append($('h3', 'fs-card-title', 'Cadastros para complementar'), $('p', 'fs-card-subtitle law-contact-help', `${Number(result.pagination?.total || 0).toLocaleString('pt-BR')} contatos com pelo menos uma informação prioritária pendente.`));
+      const tableHeader = $('div', 'fs-card-header fs-u-p-3'); tableHeader.append($('h3', 'fs-card-title', 'Cadastros para complementar'));
       const wrap = $('div', 'law-contact-quality-table-wrap'); const table = $('table', 'law-contact-quality-table');
       const thead = $('thead'); const headerRow = $('tr'); ['Contato', 'Tipo de cadastro', 'Informação a revisar', ''].forEach((text) => headerRow.append($('th', '', text))); thead.append(headerRow);
       const tbody = $('tbody'); const paging = $('div', 'law-contact-quality-paging');

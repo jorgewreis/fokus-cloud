@@ -137,7 +137,7 @@ nao criam planos ou modulos comerciais permanentes.
 - `processos`, `contatos`, `expedicoes`, `tarefas` e `audiencias` sao os unicos modulos tecnicos comerciais do Law;
 - `processos` deve ser comercializado como Gestao de Processos e exibido internamente como Processos;
 - `contatos` deve ser comercializado como Gestao de Contatos e exibido internamente como Contatos;
-- partes processuais, advogados, instituicoes, orgaos e destinatarios devem ser papeis ou classificacoes de contatos, nao modulos tecnicos separados;
+- partes processuais, advogados, instituicoes, orgaos e destinatarios devem ser papeis de contatos, nao modulos tecnicos separados;
 - `expedicoes` deve permitir varias instancias por unidade e setor, com tipos, numeracao e controles independentes;
 - oficios, mandados, cartas precatorias, cartas rogatorias, cartas de ordem, editais, guias de execucao e atos ordinatorios devem ser tipos do modulo `expedicoes`;
 - cartas expedidas nao devem possuir numeracao propria interna na v1 cartoraria, salvo evolucao futura por tipo;

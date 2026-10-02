@@ -36,10 +36,7 @@ Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
   outro) com períodos próprios. Cargo, posto, graduação ou função tem histórico
   independente, aceita várias designações simultâneas e vocabulário livre com
   sugestões reutilizáveis pela empresa (por exemplo, DPC, IPC, CB/PM e TEN/PM).
-- Classificação principal sugerida pelo contexto e classificações secundárias;
-  classificação e tipo institucional principal são editáveis. Identificadores
-  institucionais, inclusive CNJ, são opcionais e a ausência gera aviso não
-  bloqueante. OAB continua no documento existente.
+- Tipo institucional e identificadores opcionais, inclusive CNJ; a ausência gera aviso não bloqueante. OAB continua no documento existente.
 - Sugestões de possíveis duplicidades no cadastro e análise paginada sob demanda
   na visão geral. A interface explica o tipo de correspondência sem exibir o
   valor coincidente, não bloqueia gravação e não mescla automaticamente.
@@ -60,7 +57,7 @@ Ele só fica disponível para empresas cuja assinatura ativa inclua o componente
 | --- | --- |
 | Visão geral | Totais de pessoas, organizações e unidades; até cinco contatos recentes; pendências de qualidade e análise de duplicidades sob demanda. |
 | Contatos | Busca, filtros, resultados, paginação, situação, origem compartilhada e ações permitidas. |
-| Criar/editar | Formulário guiado por pessoa, organização ou unidade; contexto; classificações; profissões; vínculos e designações; dados institucionais; canais; endereços; hierarquia; tags e campos sensíveis autorizados. |
+| Criar/editar | Formulário guiado por pessoa, organização ou unidade; contexto; profissões; vínculos e designações; dados institucionais; canais; endereços; hierarquia; tags e campos sensíveis autorizados. |
 | Detalhes | Identificação contextual, profissões, vínculos, hierarquia, tags, canais, endereços, documentos e dados institucionais conforme a natureza e as permissões. |
 | Mesclagem | Escolha do cadastro preservado, confirmação do motivo, transferência de relações e auditoria. |
 | Compartilhamento | Configuração bilateral por empresa, natureza, profissão de PF e campos expostos; adesão e revogação auditadas. |
@@ -82,6 +79,8 @@ grade da listagem, grupos repetíveis de endereço/canal/documento
 e suas linhas aninhadas. Eles não recriam botões, campos, overlay, backdrop,
 foco ou comportamento de modal do Fokus Styles.
 
+Os cabeçalhos dos cards exibem somente o título e usam `fs-u-p-3`.
+
 ## Tipo de contato, profissões e nomes
 
 O contexto ativo define termos, rótulos e sugestões, sem alterar os dados
@@ -92,23 +91,7 @@ distinto de PF e PJ, com nome, canais e endereço próprios. Organizações e
 unidades formam árvores com um pai imediato por registro filho e vários filhos
 por pai, limitadas à empresa proprietária.
 
-A categoria é opcional e usa uma única seleção para descrever o cadastro.
-Ela não define papéis de vínculo. Papéis como cliente, servidor, colaborador e
-usuário do serviço pertencem ao vínculo entre pessoa e organização e servem
-somente ao cadastro.
-
-Para Pessoa jurídica, a categoria principal descreve a organização cadastrada:
-empresa privada, instituição financeira, instituição de ensino, organização da
-sociedade civil, entidade de classe, cartório extrajudicial, órgão público,
-polícia, Ministério Público, Defensoria Pública, escritório de advocacia ou
-outra organização. Órgão público é uma dessas opções; não representa empresas,
-bancos, escolas ou as demais pessoas jurídicas. Unidade judiciária não é
-categoria: é um tipo dos dados institucionais e pode receber código CNJ.
-
-PF/PJ define a natureza cadastral. Pessoa física pode receber categorias como
-parte, testemunha, perito, representante, autoridade, servidor público,
-fornecedor, prestador de serviço ou colaborador, além das sugestões próprias do
-contexto. Pessoa física pode acumular profissões e
+PF/PJ define a natureza cadastral. Pessoa física pode acumular profissões e
 vínculos profissionais selecionados do catálogo da empresa ou das sugestões do
 contexto. Pessoa jurídica tem campo opcional de sigla e não apresenta
 profissão/vínculo. Seus documentos incluem CNPJ e inscrição estadual com UF.
@@ -161,7 +144,7 @@ normalizados e verificados dentro da empresa. Ao detectar duplicidade, a API
 retorna conflito para que a pessoa usuária consulte o cadastro existente; a
 mesclagem é uma ação separada, exige permissão, natureza igual, motivo e
 auditoria. O cadastro de destino é mantido e os vínculos e dados filhos são
-transferidos sem duplicar classificações ou tags já existentes.
+transferidos sem duplicar tags já existentes.
 
 ## Tags e capacidade
 
@@ -216,7 +199,6 @@ empresa, que também pode delegá-la a um perfil personalizado.
   prévia e preserva registros e vínculos.
 - Pessoas, organizações e unidades têm formulários adequados; unidades aceitam
   um pai da mesma empresa e a hierarquia suporta vários filhos e níveis.
-- Categorias de referência permanecem distintas dos papéis dos vínculos.
 - PJ pode informar sigla e consultar vínculos recíprocos com várias PFs; PF pode
   consultar vínculos com várias PJs.
 - CEP completo aciona a integração ViaCEP; endereço segue preenchível quando a

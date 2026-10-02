@@ -55,9 +55,6 @@ Este arquivo deve descrever tabelas, colunas, tipos, obrigatoriedade e significa
 | law_contact_documents | document_number_encrypted | text | Sim | Documento cifrado; valor aberto não é guardado. |
 | law_contact_documents | document_fingerprint | string | Nao | HMAC para comparação de CPF/CNPJ e detecção de duplicidade. |
 | law_contact_departments | migrated_contact_id | ULID/null | Sim | Registro `unit` que recebeu o departamento legado; nulo para linhas ainda não promovidas. |
-| law_contact_classifications | classification_code | string | Sim | Classificação de referência acumulável e filtrável. |
-| law_contact_classifications | is_primary | boolean | Sim | Marca a classificação principal; demais classificações são secundárias. |
-| law_contact_classifications | requires_review | boolean | Sim | Sinaliza classificação legada sem correspondência no vocabulário atual; o valor original é preservado. |
 | law_contact_institutional_data | is_primary | boolean | Sim | Marca o tipo institucional principal; identificadores seguem opcionais. |
 | law_contact_company_settings | context_code | string | Não | Contexto único da base de Contatos da empresa: `escritorio`, `orgao_publico` ou `judiciario`. |
 | law_contact_company_settings | segment_code | string | Não | Segmento associado ao contexto ativo da empresa. |
