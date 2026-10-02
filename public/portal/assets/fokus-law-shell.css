@@ -888,7 +888,7 @@
 .law-contact-quality-paging { display: flex; align-items: center; justify-content: flex-end; gap: 9px; padding-top: 12px; color: #766b7c; font-size: 11px; }
 .law-contact-quality-table-card > .law-contact-quality-paging { min-height: 54px; margin-top: 0; padding: 10px 14px; border-top: 1px solid #e9e4ec; border-radius: 0 0 12px 12px; background: #faf9fb; }
 .law-contact-recent-card { min-width: 0; margin: 0 0 15px; overflow: hidden; border: 1px solid #e9e3ee; border-radius: 12px; background: #fff; box-shadow: 0 5px 14px rgba(35,20,45,.035); }
-.law-contact-recent-header { display: flex; min-height: 53px; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 16px !important; border-bottom: 1px solid #eee9f2; background: linear-gradient(90deg, #faf8fc, #fff); }
+.law-contact-recent-header { display: flex; min-height: 53px; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #eee9f2; background: linear-gradient(90deg, #faf8fc, #fff); }
 .law-contact-recent-header .fs-card-title { margin: 2px 0 0; color: #34243d; font-size: 12px; font-weight: 650; }
 .law-contact-section-kicker { color: #9274ae; font-size: 8px; }
 .law-contact-recent-caption { color: #8a808f; font-size: 9px; }
@@ -948,7 +948,7 @@
   .law-contact-metric-card { min-height: 96px; }
   .law-contact-metric-card > .fs-card-body { padding: 11px 10px 11px 13px !important; }
   .law-contact-metric-body strong { font-size: 21px; }
-  .law-contact-recent-header { align-items: flex-start; flex-direction: column; gap: 4px; padding: 9px 12px !important; }
+  .law-contact-recent-header { align-items: flex-start; flex-direction: column; gap: 4px; }
   .law-contact-recent-card > .fs-card-body { padding: 9px !important; }
   .law-contact-recent { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .law-contact-recent-item { padding: 7px; }
