@@ -204,7 +204,7 @@
     headingIcon = descriptor.icon;
     const isContactsModule = String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos');
     if (isContactsModule) {
-      appendNavButton(pageItems, 'Cadastro e consulta', 'contactsCreate', contactsView === 'module', () => { contactsView = 'module'; renderContent('module'); });
+      appendNavButton(pageItems, 'Cadastro e consulta', 'contactsCreate', contactsView === 'module', () => { contactsView = 'module'; renderNavigation(); });
       if (canLawPermission('law.contacts.share.manage')) appendNavLink(pageItems, 'Compartilhamentos', '/portal/fokus-law/contatos/compartilhamentos', 'contactsShare', contactsView === 'contacts-sharing');
       if (canLawPermission('law.contacts.view')) appendNavLink(pageItems, 'Revisão e qualidade', '/portal/fokus-law/contatos/revisao-e-qualidade', 'contactsQuality', contactsView === 'contacts-quality');
     } else {
