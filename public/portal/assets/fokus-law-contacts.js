@@ -304,7 +304,7 @@
     const acronym = input(contact?.acronym || '', 'Ex.: TJBA', 32); acronym.name = 'acronym';
     const particles = new Set(['da','das','de','do','dos','e']);
     name.addEventListener('blur', () => { name.value = name.value.trim().toLocaleLowerCase('pt-BR').replace(/(^|[\s-])([^\s-]+)/gu, (part) => { const word = part.trimStart(); const prefix = part.slice(0, part.length - word.length); return prefix + (particles.has(word) ? word : word.charAt(0).toLocaleUpperCase('pt-BR') + word.slice(1)); }); });
-    const legalName = input(contact?.legal_name || '', 'Razão social (opcional)', 180); legalName.name = 'legal_name';
+    const legalName = input(contact?.legal_name || '', 'Informe a razão social ou um complemento do nome', 180); legalName.name = 'legal_name';
     const nameField = field('Nome *', name); const acronymField = field('Sigla', acronym);
     const nameRow = $('div', 'law-contact-name-fields'); nameRow.append(nameField, acronymField);
     const natureField = field('Natureza do contato *', nature);
@@ -317,7 +317,7 @@
     if (preserveHiddenParent) parentField.hidden = true;
     if (isUnitRecord) basic.content.append(recordKindField, parentField, nameRow);
     else basic.content.append(natureField, parentField, nameRow);
-    const legalNameField = field('Razão social / nome complementar', legalName); basic.content.append(legalNameField);
+    const legalNameField = field('Razão social ou complemento do nome', legalName); basic.content.append(legalNameField);
     const catalog = window.lawContactClassificationCatalog || {};
     const classificationSection = section('Categoria', 'Opcional. Selecione a categoria que melhor descreve este cadastro.');
     const primaryClassification = setWidth(select([['', 'Sem categoria']], contact?.primary_classification || ''), 800);
