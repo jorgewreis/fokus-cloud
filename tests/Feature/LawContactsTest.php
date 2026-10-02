@@ -83,7 +83,8 @@ class LawContactsTest extends TestCase
             ->postJson('/api/law/contacts', [
                 'legal_nature' => 'pj', 'display_name' => 'SECRETARIA DE JUSTIÇA', 'legal_name' => 'SECRETARIA DE JUSTIÇA DO ESTADO',
                 'classifications' => ['public_body'], 'tags' => [' Setor público ', 'SETOR   PÚBLICO'],
-            ])->assertCreated()->assertJsonPath('contact.display_name', 'Secretaria de Justiça')->json('contact');
+            ])->assertCreated()->assertJsonPath('contact.display_name', 'Secretaria de Justiça')->assertJsonMissingPath('contact.classifications')->json('contact');
+        $this->assertDatabaseMissing('law_contact_classifications', ['company_id' => $this->companyId, 'law_contact_id' => $organization['id']]);
         $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
             'record_kind' => 'unit', 'display_name' => 'Contabilidade', 'parent_contact_id' => $organization['id'],
             'channels' => [['type' => 'email', 'value' => 'contabilidade@example.test', 'label' => 'Recepção']],
