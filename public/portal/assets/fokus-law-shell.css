@@ -404,7 +404,7 @@
 .law-contact-action-list .fs-table-action:hover, .law-contact-action-list .fs-table-action:focus-visible { border: 1px solid #e5dcef; background: #f7f3fa; }
 .law-contact-action-list .fs-table-action img { width: 20px; height: 20px; }
 .law-contact-empty { padding: 30px !important; color: var(--law-shell-muted) !important; text-align: center; }
-.law-contact-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin: 12px 0; color: var(--law-shell-muted); font-size: 12px; }
+.law-contact-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; color: var(--law-shell-muted); font-size: 12px; }
 .law-contact-feedback[data-state="error"] { color: #a11b1b; }
 .law-contact-modal-content { width: min(900px, calc(100vw - 28px)); max-width: 900px; }
 .law-contact-editor { display: grid; gap: 12px; }
@@ -885,8 +885,9 @@
 .law-contact-relationship-acronym { color: var(--law-shell-muted); font-size: 11px; font-weight: 500; }
 .law-contact-chip-remove { flex: 0 0 auto; white-space: nowrap; }
 .law-contact-duplicate-pair span { color: #766b7c; font-size: 11px; }
-.law-contact-quality-paging { display: flex; align-items: center; justify-content: flex-end; gap: 9px; padding-top: 12px; color: #766b7c; font-size: 11px; }
-.law-contact-quality-table-card > .law-contact-quality-paging { min-height: 54px; margin-top: 0; padding: 10px 14px; border-top: 1px solid #e9e4ec; border-radius: 0 0 12px 12px; background: #faf9fb; }
+.law-contact-quality-paging { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; color: var(--law-shell-muted); font-size: 12px; }
+.law-contact-quality-table-card > .law-contact-quality-paging,
+.law-contact-sharing-table-card > .law-contact-quality-paging { min-height: 54px; margin-top: 0; padding: 10px 14px; border-top: 1px solid #e9e4ec; border-radius: 0 0 12px 12px; background: #faf9fb; }
 .law-contact-recent-card { min-width: 0; margin: 0 0 15px; overflow: hidden; border: 1px solid #e9e3ee; border-radius: 12px; background: #fff; box-shadow: 0 5px 14px rgba(35,20,45,.035); }
 .law-contact-recent-header { display: flex; min-height: 53px; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #eee9f2; background: linear-gradient(90deg, #faf8fc, #fff); }
 .law-contact-recent-header .fs-card-title { margin: 2px 0 0; color: #34243d; font-size: 12px; font-weight: 650; }

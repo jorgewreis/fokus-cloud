@@ -159,7 +159,7 @@ class LawContactController extends Controller
             }
         }
         $page = max(1, (int) $request->query('page', 1));
-        $perPage = min(100, max(10, (int) $request->query('per_page', 25)));
+        $perPage = min(15, max(1, (int) $request->query('per_page', 15)));
         $total = count($contacts);
         $contacts = array_slice($contacts, ($page - 1) * $perPage, $perPage);
 
@@ -235,7 +235,7 @@ class LawContactController extends Controller
             $reason = $similarity >= 86 ? 'Nome semelhante e '.$pair['reason'] : $pair['reason'];
             $pairs[] = ['contact' => ['id' => $a->id, 'display_name' => $a->display_name], 'candidate' => ['id' => $b->id, 'display_name' => $b->display_name], 'reason' => $reason];
         }
-        $page = max(1, (int) $request->query('page', 1)); $perPage = min(50, max(10, (int) $request->query('per_page', 25)));
+        $page = max(1, (int) $request->query('page', 1)); $perPage = min(15, max(1, (int) $request->query('per_page', 15)));
         return response()->json(['pairs' => array_slice($pairs, ($page - 1) * $perPage, $perPage), 'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => count($pairs)]]);
     }
 
@@ -265,7 +265,7 @@ class LawContactController extends Controller
                 });
             }
             $sorted = $items->sortBy(fn ($item) => mb_strtolower($item['display_name']))->values();
-            $page = max(1, (int) $request->query('page', 1)); $perPage = min(50, max(10, (int) $request->query('per_page', 25)));
+            $page = max(1, (int) $request->query('page', 1)); $perPage = min(15, max(1, (int) $request->query('per_page', 15)));
             return response()->json(['summary' => $counts, 'contacts' => $sorted->slice(($page - 1) * $perPage, $perPage)->values(), 'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $sorted->count()]]);
         }
         abort_unless(in_array($type, ['without_phone', 'without_email', 'institutional_incomplete'], true), 422, 'Tipo de revisão inválido.');
@@ -274,7 +274,7 @@ class LawContactController extends Controller
             $types = $type === 'without_email' ? ['email'] : ['phone', 'mobile', 'whatsapp'];
             $query->whereNotExists(fn ($sub) => $sub->from('law_contact_channels')->whereColumn('law_contact_channels.law_contact_id', 'contact.id')->where('law_contact_channels.company_id', $companyId)->whereIn('channel_type', $types));
         } else $query->whereIn('contact.id', $this->institutionalIncompleteQuery($companyId, $this->contactContext($companyId)['context_code'])->select('contact.id'));
-        $total = (clone $query)->count(); $page = max(1, (int) $request->query('page', 1)); $perPage = min(50, max(10, (int) $request->query('per_page', 25)));
+        $total = (clone $query)->count(); $page = max(1, (int) $request->query('page', 1)); $perPage = min(15, max(1, (int) $request->query('per_page', 15)));
         $contacts = $query->orderBy('contact.display_name')->offset(($page - 1) * $perPage)->limit($perPage)->get(['contact.id', 'contact.display_name', 'contact.legal_nature']);
         return response()->json(['contacts' => $contacts, 'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total]]);
     }
