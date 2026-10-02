@@ -445,7 +445,6 @@
 .law-contact-check-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
 .law-contact-check { display: flex; min-width: 0; align-items: flex-start; gap: 8px; color: var(--law-shell-ink); font-size: 12px; font-weight: 500; }
 .law-contact-check input { flex: 0 0 auto; margin-top: 2px; accent-color: var(--law-shell-purple); }
-.law-contact-classification-options { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-top: 12px; }
 .law-contact-context-preview { margin: 12px 0 0; }
 .law-contact-context-preview p { margin: 6px 0 0; }
 .law-contact-repeat-list { display: grid; gap: 10px; margin: 11px 0; }
