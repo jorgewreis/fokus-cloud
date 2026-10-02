@@ -124,12 +124,15 @@ const publicationVersionEntries = (versions = {}) => [
         : "Não registradas"],
 ];
 
+const personalizationSelections = (value) => Array.isArray(value) ? value : (value && typeof value === "object"
+    ? Object.entries(value).map(([type_code, selection]) => ({ type_code, ...(selection && typeof selection === "object" ? selection : { value: selection }) })) : []);
+
 const itemConditions = (conditions = {}) => Object.entries(conditions)
     .filter(([key, value]) => value !== null && value !== "" && !["module_code", "selection_mode", "context_code", "collaboration_code", "collaboration"].includes(key))
     .filter(([key, value]) => !(key === "variant_code" && value === "colaboracao"))
     .map(([key, value]) => {
         if (key === "personalizations") {
-            const entries = Array.isArray(value) ? value : (value && typeof value === "object" ? Object.entries(value).map(([type_code, selection]) => ({ type_code, ...(selection && typeof selection === "object" ? selection : { value: selection }) })) : []);
+            const entries = personalizationSelections(value);
             const formatted = entries.map((selection) => {
                 if (!selection || typeof selection !== "object") return String(selection ?? "");
                 const type = selection.type_label || selection.type_code || selection.name || "Personalização";
@@ -601,8 +604,8 @@ export function mount(root, context = {}) {
                 const select = document.createElement('select'); select.className = 'fs-form-select fs-u-w-100'; select.dataset.modulePersonalization = module.code; select.dataset.typeCode = personalization.type_code;
                 if (!personalization.required) select.append(new Option('Sem capacidade adicional', ''));
                 tiers.forEach((tier) => select.append(new Option(`${Number(tier.value).toLocaleString('pt-BR')} · ${money(tier.additional_monthly_amount)}/mês`, tier.value)));
-                const selected = currentItem?.conditions?.personalizations?.find((item) => item.type_code === personalization.type_code);
-                if (selected) select.value = String(selected.value);
+                const selected = personalizationSelections(currentItem?.conditions?.personalizations).find((item) => item.type_code === personalization.type_code);
+                if (selected) select.value = String(selected.value ?? selected.tier_value ?? selected.tier?.value);
                 field.append(title, select); settings.append(field);
             });
             input.addEventListener('change', () => { settings.hidden = !input.checked; });

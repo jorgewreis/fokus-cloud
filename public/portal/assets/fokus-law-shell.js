@@ -1233,11 +1233,11 @@
       if (capabilities.length) { const list = element('ul', 'law-subscription-features'); capabilities.forEach((feature) => list.append(element('li', '', feature.name))); card.append(list); }
       const personalizationBox = element('div', 'law-subscription-personalizations');
       (module.personalizations || []).filter((p) => p.active).forEach((p) => {
-        const selected = currentItems.get(module.code)?.conditions?.personalizations?.find((entry) => entry.type_code === p.type_code);
+        const selected = lawSubscriptionPersonalizations(currentItems.get(module.code)?.conditions?.personalizations).find((entry) => entry.type_code === p.type_code);
         const field = lawSubscriptionField(p.name || p.type_label || p.label || p.type_code);
         const select = element('select', 'fs-form-control'); select.dataset.typeCode = p.type_code;
         (p.tiers || []).filter((tier) => tier.active).forEach((tier) => select.append(new Option(`${Number(tier.value).toLocaleString('pt-BR')} · ${formatLawMoney(tier.additional_monthly_amount)}/mês`, tier.value)));
-        if (selected?.value) select.value = String(selected.value);
+        if (selected) select.value = String(selected.value ?? selected.tier_value ?? selected.tier?.value);
         if (!select.options.length) return;
         field.append(select);
         if (p.type_code === 'contatos_cadastrados' && currentItems.has(module.code) && data.usage?.contatos_cadastrados?.available) {
@@ -1319,6 +1319,7 @@
     contentRegion.append(history);
   }
 
+  function lawSubscriptionPersonalizations(value) { return Array.isArray(value) ? value : value && typeof value === 'object' ? Object.entries(value).map(([type_code, choice]) => ({ type_code, ...(choice && typeof choice === 'object' ? choice : { value: choice }) })) : []; }
   function lawSubscriptionField(text) { const field = element('label', 'law-subscription-field'); field.append(element('span', '', text)); return field; }
   function lawVoucherLabel(voucher) {
     const value = Number(voucher.discount_value || 0);
