@@ -16,6 +16,7 @@ unidade nas relações.
 | `law_case_status_options` | `LSO`; código, rótulo, ordem e ativo por unidade; Ativo/Arquivado preservados. |
 | `law_case_tags` | `LTG`; nome único na unidade, ativo e autor. |
 | `law_case_tag_assignments` | Chave empresa/processo/etiqueta; mesma unidade; autor e data. |
+| `law_case_procedural_priorities` | Fundamentos legais cumulativos por empresa/processo, com código estável, autor e data; distintos de prioridade operacional. |
 | `law_case_role_options` | `LRO`; papéis padronizados e complementos, código e rótulo por unidade. |
 | `law_case_contacts` | `LCV`; contato da mesma empresa, papel e rótulo histórico; único contato/papel no processo. |
 | `law_case_relations` | `LCR`; origem, destino, dependência/apensamento, autor; sem propagação. |
@@ -32,7 +33,9 @@ O formulário aceita os 13 dígitos iniciais do CNJ e completa os sete finais
 com os valores da unidade selecionada; também aceita os 20 dígitos completos.
 Nos dois casos valida o CNJ completo. O número é único por empresa, inclusive
 arquivados. Classe, códigos, assuntos, órgão, situação oficial, autuação e
-distribuição são opcionais.
+distribuição são opcionais. A prioridade operacional (`normal`, `high` ou
+`urgent`) não se confunde com os fundamentos cumulativos de prioridade legal,
+registrados em `law_case_procedural_priorities`.
 
 Estado inicial `active`; opções `pending`, `suspended`, `completed` e
 `archived`. Prioridade `normal`, `high` ou `urgent`. Sigilo `public`,

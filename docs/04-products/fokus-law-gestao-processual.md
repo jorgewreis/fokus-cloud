@@ -87,9 +87,14 @@ Chefias e administradores podem criar complementos na unidade e desativar
 opções não essenciais. Ativo e Arquivado são preservados porque sustentam
 cadastro, reabertura e arquivamento. Desativar não apaga registros anteriores.
 
-O responsável principal é opcional. As prioridades são Normal, Alta e Urgente.
-Etiquetas são configuradas por unidade. Datajud não modifica estado operacional,
-responsável, prioridade, etiquetas ou sigilo.
+O responsável principal é opcional. A prioridade operacional é Normal, Alta ou
+Urgente e indica a urgência interna de trabalho. Ela permanece separada dos
+fundamentos de prioridade legal de tramitação, que podem ser cumulativos:
+Criança ou adolescente, Pessoa idosa (60 anos ou mais), Pessoa idosa (mais de
+80 anos), Réu preso, Violência doméstica e Pessoa com deficiência. Cada
+fundamento pode ser removido sem alterar os demais. Etiquetas são configuradas
+por unidade. Datajud não modifica estado operacional, responsável, prioridade,
+etiquetas ou sigilo.
 
 ## Sigilo e acesso entre unidades
 

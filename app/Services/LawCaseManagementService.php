@@ -160,6 +160,7 @@ class LawCaseManagementService
             'operational_status' => (string) $case->operational_status,
             'operational_status_label' => DB::table('law_case_status_options')->where('company_id', $case->company_id)->where('law_unit_id', $case->law_unit_id)->where('code', $case->operational_status)->value('label') ?? $case->operational_status,
             'operational_priority' => (string) $case->operational_priority,
+            'procedural_priorities' => DB::table('law_case_procedural_priorities')->where('company_id', $case->company_id)->where('law_case_id', $case->id)->orderBy('code')->pluck('code')->all(),
             'confidentiality_level' => (string) $case->confidentiality_level,
             'responsible_membership_id' => $case->responsible_membership_id,
             'responsible_name' => $case->responsible_name ?? null,

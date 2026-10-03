@@ -395,6 +395,8 @@
 .law-record-filters { display: grid; grid-template-columns: minmax(190px, 1.6fr) repeat(4, minmax(125px, 1fr)); align-items: end; gap: 11px; margin: 16px 0; padding: 16px; border: 1px solid var(--law-shell-line); border-radius: 12px; background: #fff; }
 .law-record-field { display: grid; min-width: 0; gap: 6px; color: var(--law-shell-ink); font-size: 12px; font-weight: 600; }
 .law-record-field > span { line-height: 1.35; }
+.law-record-priority-option { display: flex; align-items: center; gap: 9px; min-height: 34px; color: var(--law-shell-ink); font-size: 13px; font-weight: 500; }
+.law-record-editor .law-record-priority-checkbox { width: 18px; height: 18px; flex: 0 0 auto; margin: 0; accent-color: var(--law-shell-purple); }
 .law-record-table-wrap { width: 100%; border: 1px solid var(--law-shell-line); border-radius: 12px; background: #fff; }
 .law-record-table { min-width: 660px; text-align: left; }
 .law-record-table tbody tr { height: 56px; }

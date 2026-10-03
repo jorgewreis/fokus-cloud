@@ -177,6 +177,14 @@
       add(operational, 'Responsável principal', 'responsible_membership_id', select([['', 'Sem responsável'], ...local.members.map((v) => [v.id, v.name])], c.responsible_membership_id));
       if (detailData.can_manage_access) add(operational, 'Sigilo', 'confidentiality_level', select(local.confidentiality_levels.map((v) => [v.code, v.label]), c.confidentiality_level), 'Público: pessoas da empresa com acesso ao módulo. Sigiloso: a empresa vê tudo. Secreto: somente usuários nominados e autorizados neste processo.');
       const metadata = section('Dados processuais', 'CNJ');
+      const legal = section('Prioridade processual', 'PRIO', 'Fundamentos legais de tramitação prioritária; podem ser cumulativos.');
+      const legalPriorities = $('fieldset', 'fs-stack fs-stack-gap-2'); legalPriorities.append($('legend', 'fs-form-label', 'Fundamentos legais'));
+      (local.procedural_priorities || []).forEach((item) => {
+        const checkbox = input('', 'checkbox'); checkbox.className = 'law-record-priority-checkbox'; checkbox.value = item.code; checkbox.checked = (c.procedural_priorities || []).includes(item.code);
+        const option = $('label', 'law-record-priority-option'); option.append(checkbox, $('span', '', item.label)); legalPriorities.append(option);
+      });
+      controls.procedural_priorities = legalPriorities;
+      legal.body.append(legalPriorities, $('p', 'law-record-help', 'Selecione todos os fundamentos aplicáveis. Desmarque um fundamento para removê-lo.'));
       const classIsOfficial = (c.official_fields || []).includes('case_class'); const subjectsAreOfficial = (c.official_fields || []).includes('subjects');
       const editor = metadataEditor(local, { code: c.case_class_code, name: c.case_class }, c.subjects || []);
       if (!classIsOfficial) {
@@ -195,12 +203,13 @@
       add(metadata, 'Data de autuação', 'filing_date', input(c.filing_date, 'date'));
       add(metadata, 'Data de distribuição', 'distribution_date', input(c.distribution_date, 'date'));
       metadata.body.append($('p', 'fs-u-color-secondary', 'Os campos retornados pelo Datajud ficam disponíveis para consulta. Campos ausentes podem ser preenchidos manualmente.'));
-      const error = message(); form.append(operational, metadata, error); modal.body.append(form);
+      const error = message(); form.append(operational, legal, metadata, error); modal.body.append(form);
       const save = button('Salvar alterações', null, true); save.type = 'submit'; save.setAttribute('form', form.id); modal.footer.append(button('Cancelar', () => modal.close()), save);
       bindForm(form, save, error, async () => {
         const data = { version: c.version }; Object.entries(controls).forEach(([name, control]) => {
           if (name.startsWith('_') || control.disabled) return;
           if (name === 'subjects') data[name] = controls._metadataEditor.values().subjects;
+          else if (name === 'procedural_priorities') data[name] = [...control.querySelectorAll('input:checked')].map((checkbox) => checkbox.value);
           else if (name === 'case_class_code') {
             const klass = controls._metadataEditor.values().klass; data.case_class_code = klass?.code || null; data.case_class = klass?.name || null;
           }
@@ -246,7 +255,7 @@
         const feedback = $('p', `fs-alert ${['pending', 'not_found'].includes(c.datajud_sync_status) ? 'fs-alert-info' : c.datajud_sync_status === 'synced' ? 'fs-alert-success' : 'fs-alert-warning'}`, `${(c.datajud_sync_status === 'pending' ? fallbackMessage : result.datajud?.message) || fallbackMessage}${c.datajud_sync_status === 'error' ? ' O cadastro e os dados já registrados foram preservados.' : ''}`);
         feedback.setAttribute('role', 'status'); feedback.setAttribute('aria-live', 'polite'); main.body.append(feedback);
         const source = $('a', 'fs-u-fs-sm', 'Metadados oficiais: CNJ · DataJud'); source.href = 'https://datajud-wiki.cnj.jus.br/api-publica/'; source.target = '_blank'; source.rel = 'noopener noreferrer'; main.body.append(source); body.append(main);
-        const operational = section('Organização interna', 'ORG', 'Acompanhamento do trabalho da unidade'); operational.body.append(keyValues([['Unidade', c.unit_name], ['Estado operacional', c.operational_status_label], ['Prioridade', text(c.operational_priority)], ['Responsável principal', local.members.find((item) => item.id === c.responsible_membership_id)?.name || 'Sem responsável'], ['Sigilo', text(c.confidentiality_level)]]));
+        const operational = section('Organização interna', 'ORG', 'Acompanhamento do trabalho da unidade'); operational.body.append(keyValues([['Unidade', c.unit_name], ['Estado operacional', c.operational_status_label], ['Prioridade operacional', text(c.operational_priority)], ['Prioridades processuais', (c.procedural_priorities || []).map((code) => local.procedural_priorities?.find((item) => item.code === code)?.label || code).join('; ') || 'Nenhuma'], ['Responsável principal', local.members.find((item) => item.id === c.responsible_membership_id)?.name || 'Sem responsável'], ['Sigilo', text(c.confidentiality_level)]]));
         if (c.operational_status === 'archived') operational.body.append(keyValues([['Justificativa do arquivamento', c.archive_reason]])); operational.body.append($('p', 'law-record-detail-empty', 'A situação oficial do Datajud e o estado operacional são independentes.')); body.append(operational);
         if (c.metadata_conflicts?.length) {
           const conflicts = section('Divergências com o Datajud'); conflicts.body.append($('p', '', 'O preenchimento manual foi preservado. Escolha o valor que deve permanecer em cada campo.'));

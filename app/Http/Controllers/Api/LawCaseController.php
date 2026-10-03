@@ -20,6 +20,15 @@ use Illuminate\Support\Str;
 class LawCaseController extends Controller
 {
     private const PRIORITIES = ['normal', 'high', 'urgent'];
+    private const PROCEDURAL_PRIORITIES = ['child_adolescent', 'elderly', 'elderly_80', 'defendant_detained', 'domestic_violence', 'disability'];
+    private const PROCEDURAL_PRIORITY_LABELS = [
+        'child_adolescent' => 'Criança ou adolescente',
+        'elderly' => 'Pessoa idosa (60 anos ou mais)',
+        'elderly_80' => 'Pessoa idosa (mais de 80 anos)',
+        'defendant_detained' => 'Réu preso',
+        'domestic_violence' => 'Violência doméstica',
+        'disability' => 'Pessoa com deficiência',
+    ];
     private const CONFIDENTIALITY = ['public', 'confidential', 'secret'];
     private const RELATION_TYPES = ['dependent', 'apenso'];
 
@@ -114,6 +123,7 @@ class LawCaseController extends Controller
                 ->where('users.status', 'ativa')->orderBy('users.name')->get(['membership.id', 'users.name']),
             'contacts' => $contacts->orderBy('display_name')->limit(60)->get(['id', 'display_name', 'contact_type']),
             'priorities' => self::PRIORITIES,
+            'procedural_priorities' => collect(self::PROCEDURAL_PRIORITY_LABELS)->map(fn (string $label, string $code): array => ['code' => $code, 'label' => $label])->values(),
             'confidentiality_levels' => [['code' => 'public', 'label' => 'Público'], ['code' => 'confidential', 'label' => 'Sigiloso'], ['code' => 'secret', 'label' => 'Secreto']],
         ]);
     }
@@ -252,6 +262,8 @@ class LawCaseController extends Controller
             'filing_date' => ['sometimes', 'nullable', 'date'], 'distribution_date' => ['sometimes', 'nullable', 'date'],
             'operational_status' => ['sometimes', 'required', Rule::exists('law_case_status_options', 'code')->where('company_id', $current->company_id)->where('law_unit_id', $current->law_unit_id)],
             'operational_priority' => ['sometimes', 'required', Rule::in(self::PRIORITIES)],
+            'procedural_priorities' => ['sometimes', 'array', 'max:6'],
+            'procedural_priorities.*' => ['string', 'distinct', Rule::in(self::PROCEDURAL_PRIORITIES)],
             'confidentiality_level' => ['sometimes', 'required', Rule::in(self::CONFIDENTIALITY)],
             'responsible_membership_id' => ['sometimes', 'nullable', 'string', 'max:30'],
         ]);
@@ -284,8 +296,13 @@ class LawCaseController extends Controller
         if (array_key_exists('subjects', $data)) {
             $data['subjects'] = collect($data['subjects'] ?? [])->map(fn (array $subject) => $this->resolveMetadataOption((string) $current->company_id, 'subject', $subject['code'], $subject['name'] ?? null, (string) $request->user()->id))->filter()->values()->all();
         }
+        if (array_key_exists('procedural_priorities', $data)) {
+            $data['procedural_priorities'] = array_values(array_unique($data['procedural_priorities']));
+            sort($data['procedural_priorities']);
+        }
 
         $columns = $data;
+        unset($columns['procedural_priorities']);
         if (array_key_exists('subjects', $data)) $columns['subjects'] = json_encode(array_column($data['subjects'], 'code'), JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]';
         $manual = json_decode((string) ($current->manual_metadata ?? ''), true) ?: [];
         foreach ($metadataFields as $field) {
@@ -314,17 +331,29 @@ class LawCaseController extends Controller
         $before = [];
         $after = [];
         foreach ($fieldsForHistory as $field => $value) {
-            $old = $field === 'subjects' ? $cases->caseArray($current)['subjects'] : ($current->{$field} ?? null);
+            $old = in_array($field, ['subjects', 'procedural_priorities'], true) ? $cases->caseArray($current)[$field] : ($current->{$field} ?? null);
             if ($old !== $value) { $before[$field] = $old; $after[$field] = $value; }
         }
         if (! $after) return response()->json(['case' => $cases->caseArray($current)]);
 
-        DB::transaction(function () use ($current, $columns, $before, $after, $request, $audit): void {
+        DB::transaction(function () use ($current, $columns, $before, $after, $data, $request, $audit): void {
             $columns['updated_by'] = $request->user()->id;
             $columns['version'] = DB::raw('version + 1');
             $columns['updated_at'] = now();
             $changed = DB::table('law_cases')->where('company_id', $current->company_id)->where('id', $current->id)->where('version', $current->version)->update($columns);
             abort_if($changed !== 1, 409, 'O processo foi alterado por outra pessoa. Atualize a página antes de salvar.');
+            if (array_key_exists('procedural_priorities', $data)) {
+                $selected = array_values(array_unique($data['procedural_priorities']));
+                $existing = DB::table('law_case_procedural_priorities')->where('company_id', $current->company_id)->where('law_case_id', $current->id)->get(['id', 'code']);
+                $existingCodes = $existing->pluck('code')->all();
+                DB::table('law_case_procedural_priorities')->where('company_id', $current->company_id)->where('law_case_id', $current->id)->whereNotIn('code', $selected ?: [''])->delete();
+                foreach (array_diff($selected, $existingCodes) as $code) {
+                    DB::table('law_case_procedural_priorities')->insert([
+                        'id' => PrefixedUlid::make('LPP'), 'company_id' => $current->company_id, 'law_case_id' => $current->id,
+                        'code' => $code, 'created_by' => $request->user()->id, 'created_at' => now(),
+                    ]);
+                }
+            }
             if (($after['confidentiality_level'] ?? null) === 'secret') {
                 DB::table('law_confidential_case_accesses')->updateOrInsert([
                     'company_id' => $current->company_id, 'law_case_id' => $current->id,
