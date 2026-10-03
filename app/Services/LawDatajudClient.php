@@ -72,7 +72,7 @@ class LawDatajudClient
             if (! is_array($payload) || ! is_array($hits)) {
                 return $this->failure('invalid_response', 'O Datajud retornou uma resposta que não pôde ser interpretada. Tente novamente; se a falha continuar, informe a administração do sistema.');
             }
-            if ($hits === []) return ['status' => 'not_found', 'code' => 'not_found', 'metadata' => [], 'message' => 'Nenhum registro público foi encontrado para este número no Datajud. Confira o número CNJ. O processo pode ainda não estar disponível na base ou ter acesso limitado; a ausência de resultado não confirma sigilo.'];
+            if ($hits === []) return ['status' => 'not_found', 'code' => 'not_found', 'metadata' => [], 'message' => 'A consulta foi concluída, mas o Datajud não disponibilizou dados públicos para este processo. Os campos podem ser preenchidos manualmente.'];
             $source = data_get($hits, '0._source');
             if (! is_array($source) || (isset($source['numeroProcesso']) && preg_replace('/\D+/', '', (string) $source['numeroProcesso']) !== $digits)) {
                 return $this->failure('invalid_response', 'O Datajud retornou dados incompatíveis com o processo consultado. Nenhum metadado desta resposta foi aplicado. Solicite à administração do sistema a conferência da integração.');

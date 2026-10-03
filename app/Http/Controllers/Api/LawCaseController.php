@@ -41,15 +41,20 @@ class LawCaseController extends Controller
         if ($digits !== '') $query->where('law_cases.case_number', 'like', '%'.$digits.'%');
 
         $summaryQuery = clone $query;
-        $classLabel = "COALESCE((SELECT cnj_option.name FROM law_cnj_metadata_options cnj_option WHERE cnj_option.type = 'class' AND cnj_option.code = law_cases.case_class_code AND cnj_option.is_active = 1 LIMIT 1), (SELECT class_option.name FROM law_case_metadata_options class_option WHERE class_option.company_id = law_cases.company_id AND class_option.type = 'class' AND class_option.code = law_cases.case_class_code LIMIT 1), law_cases.case_class, 'Não informada')";
-        $summary = $summaryQuery->selectRaw($classLabel." as label, COUNT(*) as total")
-            ->groupByRaw($classLabel)->orderBy('label')->get()
-            ->map(fn (object $row): array => ['label' => (string) $row->label, 'total' => (int) $row->total])->values();
+        $classRows = $summaryQuery->selectRaw('law_cases.case_class_code, law_cases.case_class, COUNT(*) as total')
+            ->groupBy('law_cases.case_class_code', 'law_cases.case_class')->get();
+        $classNames = $this->classNames($companyId, $classRows->pluck('case_class_code')->filter()->unique()->all());
+        $summary = $classRows->groupBy(function (object $row) use ($classNames): string {
+            $code = (string) ($row->case_class_code ?? '');
+            return $classNames[$code] ?? ($row->case_class ?: 'Não informada');
+        })->map(fn ($rows, string $label): array => ['label' => $label, 'total' => (int) $rows->sum('total')])
+            ->sortBy('label')->values();
 
         $page = max(1, (int) $request->query('page', 1));
         $counts = (clone $query)->selectRaw("COUNT(DISTINCT law_cases.law_unit_id) as units, SUM(CASE WHEN law_cases.confidentiality_level = 'secret' THEN 1 ELSE 0 END) as secret")->first();
-        $recent = (clone $query)->selectRaw('law_cases.id, law_cases.case_number, '.$classLabel.' as case_class, law_cases.created_at')->orderByDesc('law_cases.created_at')->orderByDesc('law_cases.id')->limit(5)->get()
-            ->map(fn ($row) => ['id' => $row->id, 'case_number_formatted' => $cases->formatCaseNumber($row->case_number), 'case_class' => $row->case_class, 'created_at' => $row->created_at]);
+        $recentRows = (clone $query)->select('law_cases.id', 'law_cases.case_number', 'law_cases.case_class_code', 'law_cases.case_class', 'law_cases.created_at')->orderByDesc('law_cases.created_at')->orderByDesc('law_cases.id')->limit(5)->get();
+        $recentNames = $this->classNames($companyId, $recentRows->pluck('case_class_code')->filter()->unique()->all());
+        $recent = $recentRows->map(fn ($row) => ['id' => $row->id, 'case_number_formatted' => $cases->formatCaseNumber($row->case_number), 'case_class' => $recentNames[(string) ($row->case_class_code ?? '')] ?? ($row->case_class ?: 'Não informada'), 'created_at' => $row->created_at]);
         $perPage = min(50, max(1, (int) $request->query('per_page', 20)));
         $paginator = $query->select('law_cases.*', 'unit.name as unit_name', 'responsible_user.name as responsible_name')
             ->orderByDesc('law_cases.created_at')->orderByDesc('law_cases.id')
@@ -62,6 +67,15 @@ class LawCaseController extends Controller
             'summary' => ['units' => (int) ($counts->units ?? 0), 'secret' => (int) ($counts->secret ?? 0), 'recent' => $recent],
             'include_archived' => $request->boolean('include_archived'),
         ]);
+    }
+
+    /** Resolve display labels without correlated subqueries in aggregate SQL. */
+    private function classNames(string $companyId, array $codes): array
+    {
+        if ($codes === []) return [];
+        $global = DB::table('law_cnj_metadata_options')->where('type', 'class')->where('is_active', true)->whereIn('code', $codes)->pluck('name', 'code');
+        $local = DB::table('law_case_metadata_options')->where('company_id', $companyId)->where('type', 'class')->whereIn('code', $codes)->pluck('name', 'code');
+        return $global->union($local)->all();
     }
 
     public function references(Request $request, LawCaseManagementService $cases)
@@ -105,9 +119,14 @@ class LawCaseController extends Controller
     {
         $query = $this->visibleQuery($request, DB::table('law_cases'))->where('law_cases.company_id', $request->attributes->get('active_company_id'))
             ->where('law_cases.operational_status', '!=', 'archived');
-        $classLabel = "COALESCE((SELECT cnj_option.name FROM law_cnj_metadata_options cnj_option WHERE cnj_option.type = 'class' AND cnj_option.code = law_cases.case_class_code AND cnj_option.is_active = 1 LIMIT 1), (SELECT class_option.name FROM law_case_metadata_options class_option WHERE class_option.company_id = law_cases.company_id AND class_option.type = 'class' AND class_option.code = law_cases.case_class_code LIMIT 1), law_cases.case_class, 'Não informada')";
-        $classes = (clone $query)->selectRaw($classLabel." as label, COUNT(*) as total")
-            ->groupByRaw($classLabel)->orderByDesc('total')->orderBy('label')->get()->map(fn ($row) => ['label' => $row->label, 'total' => (int) $row->total]);
+        $classRows = (clone $query)->selectRaw('law_cases.case_class_code, law_cases.case_class, COUNT(*) as total')
+            ->groupBy('law_cases.case_class_code', 'law_cases.case_class')->get();
+        $classNames = $this->classNames((string) $request->attributes->get('active_company_id'), $classRows->pluck('case_class_code')->filter()->unique()->all());
+        $classes = $classRows->groupBy(function (object $row) use ($classNames): string {
+            $code = (string) ($row->case_class_code ?? '');
+            return $classNames[$code] ?? ($row->case_class ?: 'Não informada');
+        })->map(fn ($rows, string $label): array => ['label' => $label, 'total' => (int) $rows->sum('total')])
+            ->sort(fn (array $a, array $b): int => ($b['total'] <=> $a['total']) ?: strcmp($a['label'], $b['label']))->values();
         $recent = (clone $query)->orderByDesc('created_at')->orderByDesc('id')->limit(5)->get(['id', 'case_number'])
             ->map(fn ($row) => ['id' => $row->id, 'case_number_formatted' => $cases->formatCaseNumber($row->case_number)]);
         return response()->json(['summary' => ['cases_total' => $classes->sum('total'), 'by_class' => $classes->values(), 'recent' => $recent]]);
