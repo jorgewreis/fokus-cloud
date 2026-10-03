@@ -7,7 +7,7 @@ Primeira implementação para o Cartório Criminal, contexto contratado
 
 | Código | Funcionalidade | Regra e critério de aceite |
 | --- | --- | --- |
-| RF-GPR-001 | Cadastrar | Exigir CNJ válido e unidade ativa; datas opcionais; impedir repetição na empresa, inclusive arquivados. |
+| RF-GPR-001 | Cadastrar | Aceitar CNJ completo ou os 13 primeiros dígitos, completar estes com padrão editável por unidade e validar o número completo; exigir unidade ativa; datas opcionais; impedir repetição na empresa, inclusive arquivados. |
 | RF-GPR-002 | Consultar Datajud | Consulta inicial, mensal e manual; somente metadados básicos; data da última tentativa. |
 | RF-GPR-003 | Tratar falhas | Preservar cadastro; liberar campos ausentes para preenchimento manual. |
 | RF-GPR-004 | Resolver divergências | Preservar valor manual; mostrar ambos; editor autorizado escolhe e decisão é registrada. |
@@ -15,9 +15,9 @@ Primeira implementação para o Cartório Criminal, contexto contratado
 | RF-GPR-006 | Configurar estados | Ativo, Pendente, Suspenso, Concluído e Arquivado; complementos locais; configuração por chefia/administrador. |
 | RF-GPR-007 | Atribuir | Responsável principal opcional entre vínculos ativos da empresa; permitir remover atribuição. |
 | RF-GPR-008 | Priorizar | Normal, Alta e Urgente; inicialmente Normal. |
-| RF-GPR-009 | Controlar sigilo | Público interno ou Restrito; restrito exige autorização nominal inclusive entre unidades. |
+| RF-GPR-009 | Controlar sigilo | Público: usuários da empresa com acesso ao módulo; Sigiloso: a empresa vê todos os dados e a audiência vinculada não admite acesso externo; Secreto: exige autorização nominal por processo, inclusive entre unidades. |
 | RF-GPR-010 | Administrar acesso | Administrador/chefia da unidade proprietária ou administrador da empresa concede/revoga; registrar eventos. |
-| RF-GPR-011 | Compartilhar internamente | Público interno visível em toda a empresa; edição depende de permissão; empresas diferentes isoladas. |
+| RF-GPR-011 | Compartilhar internamente | Público visível em toda a empresa; audiência pública pode liberar acompanhamento externo individual; empresas diferentes não consultam dados do processo. |
 | RF-GPR-012 | Etiquetar | Etiquetas da unidade; vincular/desvincular sem modificar outras propriedades. |
 | RF-GPR-013 | Relacionar | Dependência/apensamento entre registros acessíveis da mesma empresa; sem propagação. |
 | RF-GPR-014 | Vincular contatos | Reutilizar contatos ativos compatíveis com a unidade; papéis padronizados e complementos locais. |
@@ -26,6 +26,7 @@ Primeira implementação para o Cartório Criminal, contexto contratado
 | RF-GPR-017 | Arquivar/reabrir | Justificativa e versão atual obrigatórias; reabrir em Ativo; preservar histórico. |
 | RF-GPR-018 | Auditar | Autor, data, antes/depois e motivos exigidos; metadados oficiais na linha do tempo; histórico paginado. |
 | RF-GPR-019 | Cartas recebidas | Classe processual, sem fluxo separado. |
+| RF-GPR-020 | Classes e assuntos | Selecionar referências por código e nome; permitir inclusão manual de código e nome; reutilizar o nome existente para códigos conhecidos sem alterá-lo; permitir uma classe e vários assuntos por processo. |
 
 ## Permissões e concorrência
 

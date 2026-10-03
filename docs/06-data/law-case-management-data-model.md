@@ -2,9 +2,9 @@
 
 ## Escopo
 
-Implementado pela migration `2026_10_02_000100_create_law_case_management.php`.
-Processos pertencem à empresa e à unidade proprietária. Empresas permanecem
-isoladas. Público interno admite leitura entre unidades; Restrito exige
+Implementado pelas migrations de Processos. Processos pertencem à empresa e à
+unidade proprietária. Empresas permanecem isoladas. Público e Sigiloso admitem
+leitura por usuários autorizados da empresa entre unidades; Secreto exige
 autorização nominal. Chaves compostas preservam empresa e, quando necessário,
 unidade nas relações.
 
@@ -22,16 +22,22 @@ unidade nas relações.
 | `law_confidential_case_accesses` | `LCA`; processo/vínculo nominal, concedente e revogação; único por vínculo/processo. |
 | `law_case_metadata_conflicts` | `LCF`; campo, valor manual/oficial, resolução, autor e datas. |
 | `law_case_events` | `LCE`; eventos persistentes, autor opcional, motivo, antes/depois JSON e data. |
+| `law_case_cnj_defaults` | Padrão CNJ editável por unidade: segmento, tribunal e unidade de origem. |
+| `law_cnj_metadata_options` | Catálogo global compartilhado de classes e assuntos CNJ, único por tipo e código; origem SGT ou Datajud. |
+| `law_case_metadata_options` | Complementos de classes e assuntos não encontrados na base global CNJ, únicos por empresa, tipo e código. |
 
 ## Cadastro e valores iniciais
 
-Somente `case_number` (CNJ normalizado, 20 dígitos) e `law_unit_id` são exigidos
-no formulário. CNJ é único por empresa, inclusive arquivados. Classe, códigos,
-assuntos, órgão, situação oficial, autuação e distribuição são opcionais.
+O formulário aceita os 13 dígitos iniciais do CNJ e completa os sete finais
+com os valores da unidade selecionada; também aceita os 20 dígitos completos.
+Nos dois casos valida o CNJ completo. O número é único por empresa, inclusive
+arquivados. Classe, códigos, assuntos, órgão, situação oficial, autuação e
+distribuição são opcionais.
 
 Estado inicial `active`; opções `pending`, `suspended`, `completed` e
-`archived`. Prioridade `normal`, `high` ou `urgent`. Sigilo
-`public_internal` ou `restricted`. Responsável opcional por
+`archived`. Prioridade `normal`, `high` ou `urgent`. Sigilo `public`,
+`confidential` ou `secret`. Audiências sigilosas e secretas não aceitam acesso
+externo de acompanhamento. Responsável opcional por
 `responsible_membership_id`, necessariamente da mesma empresa.
 
 `archive_reason`, `archived_at` e `archived_by` registram arquivamento.
@@ -65,8 +71,8 @@ Relações são apresentadas nos dois processos somente quando ambos forem
 acessíveis. Cada registro conserva estado, sigilo e autorizações próprios.
 
 A autorização nominal pode ser revogada e reativada. Ela habilita acesso ao
-registro; permissões gerais determinam ações disponíveis. Administrador pode
-gerir autorizações sem acesso automático ao conteúdo restrito.
+registro Secreto; permissões gerais determinam ações disponíveis. Administrador
+pode gerir autorizações sem acesso automático ao conteúdo Secreto.
 
 Eventos não dependem da retenção da auditoria geral da plataforma. A leitura
 do histórico é paginada e usa o mesmo controle de sigilo do detalhe.

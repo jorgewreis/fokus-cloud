@@ -71,6 +71,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/options/statuses', [LawCaseController::class, 'createStatusOption']);
             Route::post('/options/tags', [LawCaseController::class, 'createTag']);
             Route::post('/options/roles', [LawCaseController::class, 'createRoleOption']);
+            Route::put('/settings/cnj-defaults', [LawCaseController::class, 'updateCnjDefaults']);
             Route::delete('/options/{type}/{option}', [LawCaseController::class, 'deactivateOption']);
             Route::get('/{case}', [LawCaseController::class, 'show']);
             Route::patch('/{case}', [LawCaseController::class, 'update'])->middleware('law.permission:law.cases.update');

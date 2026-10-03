@@ -3,7 +3,7 @@
   const ICONS = {
     overview: 'Layout-Dashboard--Streamline-Ultimate.png',
     settings: 'Cog--Streamline-Ultimate.png',
-    processes: 'Folder-File--Streamline-Ultimate.png',
+    processes: 'Zip-File--Streamline-Ultimate-Regular.svg',
     contacts: 'Customer-Relationship-Management-List-Document-Share--Streamline-Ultimate.png',
     filings: 'Common-File-Quill--Streamline-Ultimate.png',
     hearings: 'Alarm-Bell--Streamline-Ultimate-Regular.png',

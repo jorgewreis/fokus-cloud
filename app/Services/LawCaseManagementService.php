@@ -59,15 +59,21 @@ class LawCaseManagementService
 
             foreach (($result['metadata'] ?? []) as $field => $value) {
                 if (! isset($mapping[$field])) continue;
+                if ($field === 'case_class' && ! empty($result['metadata']['case_class_code']) && is_string($value) && $value !== '') {
+                    $this->rememberMetadataOption('class', (string) $result['metadata']['case_class_code'], $value);
+                }
+                if ($field === 'subjects' && is_array($value)) {
+                    foreach ($value as $subject) if (is_array($subject) && ! empty($subject['code']) && ! empty($subject['name'])) $this->rememberMetadataOption('subject', (string) $subject['code'], (string) $subject['name']);
+                }
                 $previousOfficial = $official[$field] ?? null;
                 $official[$field] = $value;
                 if (array_key_exists($field, $manual)) {
-                    if ($manual[$field] === $value) {
+                    if ($this->metadataEquals($field, $manual[$field], $value)) {
                         unset($manual[$field]);
                         DB::table('law_case_metadata_conflicts')->where('company_id', $companyId)->where('law_case_id', $caseId)->where('field', $field)->whereNull('resolved_at')->update(['resolution' => 'converged', 'resolved_at' => now(), 'updated_at' => now()]);
                         $before[$field] = $this->decodeField($current->{$mapping[$field]}, $field);
                         $after[$field] = $value;
-                        DB::table('law_cases')->where('id', $caseId)->update([$mapping[$field] => $this->encodeField($value)]);
+                        DB::table('law_cases')->where('id', $caseId)->update([$mapping[$field] => $this->encodeStorageField($field, $value)]);
                     } else {
                         if ($previousOfficial !== $value) {
                             $before['datajud_'.$field] = $previousOfficial;
@@ -79,10 +85,11 @@ class LawCaseManagementService
                 }
 
                 $old = $this->decodeField($current->{$mapping[$field]}, $field);
-                if ($old !== $value) {
+                if (! $this->metadataEquals($field, $old, $value)) {
                     $before[$field] = $old;
                     $after[$field] = $value;
-                    DB::table('law_cases')->where('id', $caseId)->update([$mapping[$field] => $this->encodeField($value)]);
+                    if ($field === 'case_class' && ! empty($result['metadata']['case_class_code'])) continue;
+                    DB::table('law_cases')->where('id', $caseId)->update([$mapping[$field] => $this->encodeStorageField($field, $value)]);
                 }
             }
 
@@ -122,12 +129,16 @@ class LawCaseManagementService
     public function caseArray(object $case): array
     {
         $manual = json_decode((string) ($case->manual_metadata ?? ''), true) ?: [];
+        $classCode = (string) ($manual['case_class_code'] ?? $case->case_class_code ?? '');
+        $className = $classCode !== ''
+            ? (DB::table('law_cnj_metadata_options')->where('type', 'class')->where('code', $classCode)->where('is_active', true)->value('name') ?? DB::table('law_case_metadata_options')->where('company_id', $case->company_id)->where('type', 'class')->where('code', $classCode)->value('name') ?? $case->case_class)
+            : $case->case_class;
         $conflicts = DB::table('law_case_metadata_conflicts')
             ->where('company_id', $case->company_id)->where('law_case_id', $case->id)->whereNull('resolved_at')
             ->orderBy('created_at')->get(['id', 'field', 'manual_value', 'official_value'])
             ->map(fn (object $row): array => [
                 'id' => (string) $row->id, 'field' => (string) $row->field,
-                'manual_value' => json_decode((string) $row->manual_value, true),
+                'manual_value' => $row->field === 'subjects' ? $this->presentSubjects(json_decode((string) $row->manual_value, true) ?: [], (string) $case->company_id) : json_decode((string) $row->manual_value, true),
                 'official_value' => json_decode((string) $row->official_value, true),
             ])->values()->all();
 
@@ -137,9 +148,9 @@ class LawCaseManagementService
             'unit_name' => (string) ($case->unit_name ?? ''),
             'case_number' => (string) $case->case_number,
             'case_number_formatted' => $this->formatCaseNumber((string) $case->case_number),
-            'case_class' => $case->case_class,
-            'case_class_code' => $case->case_class_code,
-            'subjects' => json_decode((string) ($case->subjects ?? ''), true) ?: [],
+            'case_class' => $className,
+            'case_class_code' => $classCode !== '' ? $classCode : $case->case_class_code,
+            'subjects' => $this->presentSubjects(json_decode((string) ($case->subjects ?? ''), true) ?: [], (string) $case->company_id),
             'court_name' => $case->court_name,
             'court_code' => $case->court_code,
             'official_status_code' => $case->official_status_code,
@@ -203,8 +214,46 @@ class LawCaseManagementService
         return $field === 'subjects' ? (json_decode((string) ($value ?? ''), true) ?: []) : $value;
     }
 
+    private function encodeStorageField(string $field, mixed $value): mixed
+    {
+        if ($field === 'subjects' && is_array($value)) $value = array_values(array_map(fn ($subject) => is_array($subject) && ! empty($subject['code']) ? (string) $subject['code'] : $subject, $value));
+        return $this->encodeField($value);
+    }
+
+    private function metadataEquals(string $field, mixed $left, mixed $right): bool
+    {
+        if ($field !== 'subjects' || ! is_array($left) || ! is_array($right)) return $left === $right;
+        $codes = fn (array $items): array => array_values(array_unique(array_map(fn ($item) => is_array($item) ? (string) ($item['code'] ?? '') : (string) $item, $items)));
+        return $codes($left) === $codes($right);
+    }
+
+    private function presentSubjects(array $subjects, string $companyId): array
+    {
+        if ($subjects === []) return [];
+        if (count(array_filter($subjects, 'is_string')) !== count($subjects)) {
+            $codes = array_map(fn ($subject) => is_array($subject) ? null : (string) $subject, $subjects);
+            $options = DB::table('law_case_metadata_options')->where('company_id', $companyId)->where('type', 'subject')->whereIn('code', array_filter($codes))->get(['code', 'name'])->keyBy('code');
+            $globalOptions = DB::table('law_cnj_metadata_options')->where('type', 'subject')->where('is_active', true)->whereIn('code', array_filter($codes))->get(['code', 'name'])->keyBy('code');
+            foreach ($globalOptions as $code => $option) $options[$code] = $option;
+            return array_values(array_map(fn ($subject) => is_array($subject) ? $subject : ['code' => (string) $subject, 'name' => (string) ($options[(string) $subject]->name ?? $subject)], $subjects));
+        }
+        $codes = array_map('strval', $subjects);
+        $options = DB::table('law_case_metadata_options')->where('company_id', $companyId)->where('type', 'subject')->whereIn('code', $codes)->get(['code', 'name'])->keyBy('code');
+        $globalOptions = DB::table('law_cnj_metadata_options')->where('type', 'subject')->where('is_active', true)->whereIn('code', $codes)->get(['code', 'name'])->keyBy('code');
+        foreach ($globalOptions as $code => $option) $options[$code] = $option;
+        return array_values(array_map(fn (string $code) => ['code' => $code, 'name' => (string) ($options[$code]->name ?? $code)], $codes));
+    }
+
     private function encodeField(mixed $value): mixed
     {
         return is_array($value) ? (json_encode($value, JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]') : $value;
+    }
+
+    private function rememberMetadataOption(string $type, string $code, string $name): void
+    {
+        DB::table('law_cnj_metadata_options')->insertOrIgnore([
+            'id' => PrefixedUlid::make('LCN'), 'type' => $type, 'code' => $code, 'name' => $name,
+            'source' => 'datajud', 'is_active' => true, 'source_updated_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
     }
 }

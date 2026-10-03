@@ -43,7 +43,7 @@ Este arquivo deve descrever tabelas, colunas, tipos, obrigatoriedade e significa
 | law_cases | filing_date | date | Nao | Data de autuacao. |
 | law_cases | distribution_date | date | Nao | Data de distribuicao. |
 | law_cases | operational_priority | string | Nao | Prioridade operacional interna, sem substituir sigilo. |
-| law_cases | confidentiality_level | enum | Sim | Nivel de sigilo: `public_internal`, `unit_restricted`, `case_confidential` ou `enhanced_confidential`. |
+| law_cases | confidentiality_level | string | Sim | Nivel de sigilo: `public`, `confidential` ou `secret`. |
 | law_cases | internal_tags | json | Nao | Tags informativas configuraveis da unidade. |
 | law_contacts | legal_nature | enum/null | Sim | Natureza PF/PJ; nula em unidade independente. |
 | law_contacts | record_kind | string | Sim | `contact` para PF/PJ ou `unit` para unidade independente. |

@@ -164,8 +164,10 @@ Representa processos do Fokus Law.
 **Contrato implementado — Judiciário Criminal:** somente CNJ válido e unidade
 são obrigatórios no cadastro; classe é opcional até consulta/preenchimento.
 Estados iniciais: `active`, `pending`, `suspended`, `completed`, `archived`, com
-complementos locais. Sigilo: `public_internal` ou `restricted`; público interno
-é visível entre unidades da empresa, restrito exige autorização nominal.
+complementos locais. Sigilo: `public`, `confidential` ou `secret`; Público e
+Sigiloso são visíveis entre unidades da empresa, enquanto Secreto exige
+autorização nominal. Audiências vinculadas a processos não públicos não aceitam
+acompanhamento externo.
 Datajud consulta mensalmente metadados básicos, sem movimentações. O esquema
 efetivo está no documento específico abaixo. Campos e integrações adicionais
 da tabela conceitual a seguir são previsões futuras, não desta entrega.
@@ -188,7 +190,7 @@ O detalhamento do modelo alvo da Gestao de Processos esta em [Modelo de dados da
 | `official_status_code` | varchar | Nao | Codigo/situacao externa sincronizada. |
 | `official_status_text` | varchar | Nao | Texto de situacao externa sincronizada. |
 | `operational_priority` | varchar | Nao | Prioridade operacional. |
-| `confidentiality_level` | enum | Sim | `public_internal`, `unit_restricted`, `case_confidential`, `enhanced_confidential`. |
+| `confidentiality_level` | enum | Sim | `public`, `confidential`, `secret`. |
 | `internal_tags` | json | Nao | Tags informativas da unidade. |
 | `responsible_membership_id` | char(30) | Nao | Responsavel operacional. |
 | `relevant_dates` | json | Nao | Datas operacionais relevantes. |
@@ -644,7 +646,7 @@ CREATE TABLE law_cases (
   official_status_code VARCHAR(80) NULL,
   official_status_text VARCHAR(255) NULL,
   operational_priority VARCHAR(80) NULL,
-  confidentiality_level ENUM('public_internal', 'unit_restricted', 'case_confidential', 'enhanced_confidential') NOT NULL DEFAULT 'public_internal',
+  confidentiality_level ENUM('public', 'confidential', 'secret') NOT NULL DEFAULT 'public',
   internal_tags JSON NULL,
   responsible_membership_id CHAR(30) CHARACTER SET ascii COLLATE ascii_bin NULL,
   relevant_dates JSON NULL,

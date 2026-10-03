@@ -17,6 +17,7 @@ class LawHearingController extends Controller
     {
         $companyId = $request->attributes->get('active_company_id');
         $query = DB::table('law_hearings')->where('company_id', $companyId)->orderBy('scheduled_at');
+        $this->applyCaseVisibility($query, $request);
         $unitId = $this->activeUnitId($request);
         if ($unitId) $query->where('law_unit_id', $unitId);
         elseif ($this->hasActiveUnits($companyId)) $query->whereRaw('1 = 0');
@@ -43,6 +44,14 @@ class LawHearingController extends Controller
             $data['law_unit_id'] = $unitId;
         } elseif (! empty($data['law_unit_id'])) {
             abort_unless(DB::table('law_units')->where('id', $data['law_unit_id'])->where('company_id', $companyId)->where('status', 'ativo')->exists(), 422, 'O setor selecionado não pertence à empresa ativa.');
+        }
+        if (! empty($data['law_case_id'])) {
+            $case = DB::table('law_cases')->where('company_id', $companyId)->where('id', $data['law_case_id'])->first(['id', 'confidentiality_level']);
+            abort_unless($case, 404, 'Processo não encontrado nesta empresa.');
+            if ($case->confidentiality_level === 'secret') {
+                $membershipId = (string) ($request->attributes->get('active_membership')?->id ?? '');
+                abort_unless(DB::table('law_confidential_case_accesses')->where('company_id', $companyId)->where('law_case_id', $case->id)->where('company_membership_id', $membershipId)->whereNull('revoked_at')->exists(), 404, 'Processo não encontrado nesta empresa.');
+            }
         }
         $id = PrefixedUlid::make('LHE'); $userId = $request->user()->id;
         DB::transaction(function () use ($data, $id, $companyId, $userId): void {
@@ -86,6 +95,7 @@ class LawHearingController extends Controller
     {
         $current = $this->hearing($request, $hearing);
         abort_unless($current->external_tracking_enabled, 422, 'O acompanhamento externo não está habilitado.');
+        $this->assertPublicExternalAccess($current);
         $data = $request->validate(['law_contact_id' => ['nullable', 'string', 'max:30'], 'expires_at' => ['required', 'date', 'after:now']]);
         $plain = Str::random(64);
         DB::table('law_hearing_external_accesses')->insert([...$data, 'id' => PrefixedUlid::make('LHA'), 'company_id' => $current->company_id, 'law_hearing_id' => $current->id, 'token_hash' => hash('sha256', $plain), 'created_at' => now(), 'updated_at' => now()]);
@@ -103,20 +113,45 @@ class LawHearingController extends Controller
     {
         $access = DB::table('law_hearing_external_accesses')->where('token_hash', hash('sha256', $token))->whereNull('revoked_at')->where('expires_at', '>', now())->first();
         abort_unless($access, 404, 'Acesso externo inválido ou expirado.');
-        DB::table('law_hearing_external_accesses')->where('id', $access->id)->increment('access_count');
-        $hearing = DB::table('law_hearings')->where('id', $access->law_hearing_id)->where('company_id', $access->company_id)->first(['id', 'title', 'hearing_type', 'scheduled_at', 'ended_at', 'modality', 'location', 'room', 'status']);
+        $hearing = DB::table('law_hearings')->where('id', $access->law_hearing_id)->where('company_id', $access->company_id)->first();
         abort_unless($hearing, 404, 'Audiência não encontrada.');
-        return response()->json(['hearing' => $hearing, 'expires_at' => $access->expires_at]);
+        $this->assertPublicExternalAccess($hearing);
+        DB::table('law_hearing_external_accesses')->where('id', $access->id)->increment('access_count');
+        return response()->json(['hearing' => (object) array_intersect_key((array) $hearing, array_flip(['id', 'title', 'hearing_type', 'scheduled_at', 'ended_at', 'modality', 'location', 'room', 'status'])), 'expires_at' => $access->expires_at]);
     }
 
     private function hearing(Request $request, string $id): object
     {
         $query = DB::table('law_hearings')->where('id', $id)->where('company_id', $request->attributes->get('active_company_id'));
+        $this->applyCaseVisibility($query, $request);
         if ($unitId = $this->activeUnitId($request)) $query->where('law_unit_id', $unitId);
         elseif ($this->hasActiveUnits((string) $request->attributes->get('active_company_id'))) $query->whereRaw('1 = 0');
         $hearing = $query->first();
         abort_unless($hearing, 404, 'Audiência não encontrada.');
         return $hearing;
+    }
+
+    private function applyCaseVisibility($query, Request $request): void
+    {
+        $membershipId = (string) ($request->attributes->get('active_membership')?->id ?? '');
+        $query->where(function ($visible) use ($membershipId): void {
+            $visible->whereNotExists(function ($secretCase): void {
+                $secretCase->selectRaw('1')->from('law_cases as secret_case')
+                    ->whereColumn('secret_case.company_id', 'law_hearings.company_id')
+                    ->whereColumn('secret_case.id', 'law_hearings.law_case_id')
+                    ->where('secret_case.confidentiality_level', 'secret');
+            })->orWhereExists(function ($authorizedCase) use ($membershipId): void {
+                $authorizedCase->selectRaw('1')->from('law_cases as secret_case')
+                    ->join('law_confidential_case_accesses as case_access', function ($join): void {
+                        $join->on('case_access.company_id', '=', 'secret_case.company_id')
+                            ->on('case_access.law_case_id', '=', 'secret_case.id');
+                    })
+                    ->whereColumn('secret_case.company_id', 'law_hearings.company_id')
+                    ->whereColumn('secret_case.id', 'law_hearings.law_case_id')
+                    ->where('secret_case.confidentiality_level', 'secret')
+                    ->where('case_access.company_membership_id', $membershipId)->whereNull('case_access.revoked_at');
+            });
+        });
     }
 
     private function activeUnitId(Request $request): ?string
@@ -135,5 +170,14 @@ class LawHearingController extends Controller
     private function hasActiveUnits(string $companyId): bool
     {
         return DB::table('law_units')->where('company_id', $companyId)->where('status', 'ativo')->exists();
+    }
+
+    private function assertPublicExternalAccess(object $hearing): void
+    {
+        abort_unless((bool) $hearing->external_tracking_enabled, 404, 'Acompanhamento externo não disponível.');
+        abort_unless(! (bool) $hearing->is_confidential, 404, 'Audiência não disponível para acompanhamento externo.');
+        if (! $hearing->law_case_id) return;
+        $confidentiality = DB::table('law_cases')->where('company_id', $hearing->company_id)->where('id', $hearing->law_case_id)->value('confidentiality_level');
+        abort_unless($confidentiality === 'public', 404, 'Audiência não disponível para acompanhamento externo.');
     }
 }

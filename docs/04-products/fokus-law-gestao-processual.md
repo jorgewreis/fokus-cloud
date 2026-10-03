@@ -26,9 +26,9 @@ os mesmos renderizadores em `law-record-ui.js`, consumidos pelos dois módulos.
 O gráfico de Processos representa as classes judiciais; quando há mais de quatro
 classes, as menores são agrupadas em Outras classes somente na visualização.
 Os quatro indicadores mostram processos da consulta, classes, unidades e
-processos restritos aos quais o usuário tem acesso. Todos são calculados sobre
+processos secretos aos quais o usuário tem acesso. Todos são calculados sobre
 a mesma consulta autorizada da lista, incluindo a pesquisa e a opção de
-arquivados. O resumo nunca contabiliza processos restritos sem autorização.
+arquivados. O resumo nunca contabiliza processos secretos sem autorização.
 
 A ficha mantém dados processuais e organização interna em cards separados,
 com cabeçalho de identificação, vínculos e histórico. Formulários reutilizam
@@ -39,10 +39,24 @@ judiciário criminal; não incluem movimentações, tarefas ou prazos.
 
 ## Cadastro e consulta oficial
 
-O cadastro exige CNJ completo válido e unidade ativa da empresa. Autuação e
-distribuição são datas opcionais. O número é único na empresa, inclusive entre
-arquivados. O processo nasce Ativo, com prioridade Normal, sigilo Público
-interno e sem responsável obrigatório. Cartas recebidas usam a classe processual.
+O cadastro aceita CNJ completo ou os 13 primeiros dígitos. Cada unidade pode
+configurar o segmento, o tribunal e a unidade de origem usados para completar
+os números parciais; esses valores são sugestões editáveis e não bloqueiam a
+informação dos componentes próprios de cada processo. O CNJ é validado pelo
+dígito verificador antes de salvar. Autuação e distribuição são datas opcionais.
+O número é único na empresa, inclusive entre arquivados. O processo nasce Ativo,
+com prioridade Normal, sigilo Público e sem responsável obrigatório.
+Cartas recebidas usam a classe processual.
+
+Classes e assuntos oficiais do CNJ ficam em catálogo global compartilhado entre
+empresas. A carga inicial vem dos dados ativos do SGT; consultas Datajud podem
+acrescentar códigos ausentes ao mesmo catálogo. Códigos que não constam da base
+CNJ ficam em complemento privado da empresa. Os seletores exibem
+`código - nome`; no processo são guardados um código de classe e uma lista de
+códigos de assunto, com os nomes resolvidos pelo catálogo. A opção Outra classe
+ou Outro assunto permite informar código e nome. Se o código já estiver em
+qualquer catálogo aplicável, o nome existente é usado sem alterá-lo; somente
+códigos novos são cadastrados.
 
 O cadastro confirma o salvamento sem aguardar o Datajud. A consulta inicial é
 enfileirada na mesma transação e executada em segundo plano; o detalhe informa
@@ -78,22 +92,25 @@ responsável, prioridade, etiquetas ou sigilo.
 
 ## Sigilo e acesso entre unidades
 
-**Público interno** permite consulta a partir de todas as unidades da mesma
-empresa, por pessoas com acesso ao módulo. Edição depende da permissão da ação,
-sem exigir vínculo com a unidade proprietária. Essa é uma exceção explícita à
-regra geral de isolamento operacional por unidade.
+**Público** permite que usuários da empresa com acesso ao módulo consultem
+processos de todas as suas unidades. Advogados e estudantes podem acompanhar
+uma audiência pública pelo acesso externo individual que Audiências oferece.
+Edição continua sujeita à permissão da ação. Empresas diferentes permanecem
+isoladas.
 
-**Restrito** exige autorização nominal por processo, além do acesso ao módulo e
+**Sigiloso** permite a todos os usuários autorizados da empresa ver todos os
+dados do processo. A audiência vinculada não admite acesso externo.
+
+**Secreto** exige autorização nominal por processo, além do acesso ao módulo e
 da permissão da ação, inclusive para administradores consultarem seu conteúdo.
 Administrador da empresa, administrador da unidade proprietária ou chefia dessa
-unidade concede e revoga autorizações. A restrição vale também entre unidades.
-Pessoas sem autorização não veem o registro, seus totais ou seus vínculos.
+unidade concede e revoga autorizações. Pessoas sem autorização não veem o
+registro, seus totais, relações ou histórico. Ao tornar um processo secreto, o
+autor recebe uma autorização nominal. Administradores podem gerir autorizações
+por identificador sem obter acesso automático ao conteúdo.
 
 A mudança de sigilo é reservada à administração/chefia da unidade proprietária.
-Ao tornar um processo restrito, o autor recebe uma autorização nominal
-registrada para poder concluir a gestão dos demais acessos. Administradores
-podem gerir autorizações por identificador do processo sem obter acesso
-automático ao conteúdo.
+Audiências sigilosas ou secretas não podem emitir nem usar acesso externo.
 
 Configurações de estados, etiquetas e complementos de papéis continuam
 restritas à chefia ou administração da unidade proprietária.
