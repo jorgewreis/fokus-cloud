@@ -79,7 +79,7 @@
       const subjectChoices = [...(local.subjects || [])];
       const subjectsSelect = select(subjectChoices.map((item) => [item.code, `${item.code} - ${item.name}`])); subjectsSelect.multiple = true; subjectsSelect.size = Math.min(6, Math.max(3, subjectChoices.length));
       const knownCodes = new Set((local.subjects || []).map((item) => item.code));
-      [...subjectsSelect.options].forEach((option) => { if (initialSubjects.some((item) => item.code === option.value)) option.selected = true; });
+      [...subjectsSelect.options].forEach((option) => { option.selected = initialSubjects.some((item) => item.code === option.value); });
       const customHost = $('div', 'fs-stack fs-stack-gap-2');
       const addCustom = (value = null) => {
         const row = $('div', 'fs-u-d-flex fs-u-flex-wrap fs-u-gap-2'); const code = input(value?.code || '', 'text', 32); code.placeholder = 'Código do assunto'; const name = input(value?.name || '', 'text', 180); name.placeholder = 'Nome do assunto';
@@ -152,16 +152,14 @@
       const number = input('', 'text', 25); number.required = true; number.placeholder = '0000000-00.0000.0.00.0000'; number.inputMode = 'numeric';
       const unit = select(refs.units.map((item) => [item.id, item.name]), context.active_unit_id); unit.required = true;
       const filing = input('', 'date'); const distribution = input('', 'date');
-      const modal = dialog('Cadastrar processo', event?.currentTarget); const form = $('form', 'law-record-editor'); const error = message(); const main = section('Dados principais', 'CNJ', 'Cadastro do processo judicial'); const meta = section('Classe e assuntos');
-      const editor = metadataEditor(refs); const classBox = field('Classe processual', editor.classSelect, 'case_class_code', 'Selecione uma classe cadastrada ou escolha Outra classe para informar código e nome.');
-      main.body.append(classBox, editor.classOther, field('Número CNJ', number, 'case_number', 'Informe o número completo ou os 13 primeiros dígitos para completar com o padrão da unidade.'), field('Unidade', unit, 'law_unit_id'), field('Data de autuação (opcional)', filing, 'filing_date'), field('Data de distribuição (opcional)', distribution, 'distribution_date'));
+      const modal = dialog('Cadastrar processo', event?.currentTarget); const form = $('form', 'law-record-editor'); const error = message(); const main = section('Dados principais', 'CNJ', 'Cadastro do processo judicial');
+      main.body.append(field('Número CNJ', number, 'case_number', 'Informe o número completo ou os 13 primeiros dígitos para completar com o padrão da unidade.'), field('Unidade', unit, 'law_unit_id'), field('Data de autuação (opcional)', filing, 'filing_date'), field('Data de distribuição (opcional)', distribution, 'distribution_date'));
       const applyDefaults = (local) => { const d = local.cnj_defaults; if (number.value.replace(/\D/g, '').length === 13 && d) { const raw = number.value.replace(/\D/g, ''); number.value = cnj(raw + d.segment + d.court + d.origin); } };
       number.addEventListener('blur', () => applyDefaults(refs));
       unit.addEventListener('change', action(async () => { refs = await references(unit.value); applyDefaults(refs); }));
-      meta.body.append(field('Assuntos cadastrados', editor.subjectsSelect, 'subjects', 'Use Ctrl ou Command para selecionar mais de um assunto.'), button('Adicionar outro assunto', () => editor.addCustom()), editor.customHost);
-      form.append(main, meta, error); form.id = `law-case-form-${Date.now()}`; const save = button('Cadastrar processo', null, true); save.type = 'submit'; save.setAttribute('form', form.id); modal.body.append(form); modal.footer.append(button('Cancelar', () => modal.close()), save);
+      form.append(main, error); form.id = `law-case-form-${Date.now()}`; const save = button('Cadastrar processo', null, true); save.type = 'submit'; save.setAttribute('form', form.id); modal.body.append(form); modal.footer.append(button('Cancelar', () => modal.close()), save);
       bindForm(form, save, error, async () => {
-        const values = editor.values(); const result = await request('', { method: 'POST', body: { case_number: number.value, law_unit_id: unit.value, case_class_code: values.klass?.code || null, case_class: values.klass?.name || null, subjects: values.subjects, filing_date: filing.value || null, distribution_date: distribution.value || null } });
+        const result = await request('', { method: 'POST', body: { case_number: number.value, law_unit_id: unit.value, filing_date: filing.value || null, distribution_date: distribution.value || null } });
         modal.close();
         await detail(result.case.id);
       });
