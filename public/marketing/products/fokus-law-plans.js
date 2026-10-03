@@ -3,12 +3,39 @@
   if (!offersNode) return;
   const $ = (selector) => document.querySelector(selector);
   const money = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
-  const state = { catalog: null, cycle: 'monthly', plan: '', selected: new Set(), quoteTimer: 0, quote: null };
+  const state = { catalog: null, cycle: 'monthly', plan: '', selected: new Set(), quoteTimer: 0, quote: null, selectionMessage: '' };
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
   const annualFromMonthly = (monthly) => Math.round(Number(monthly) * 1000) / 100;
   const moduleByCode = (code) => state.catalog?.modules?.find((module) => module.code === code);
   const currentPlan = () => state.catalog?.plans?.find((plan) => plan.code === state.plan);
   const planCodes = () => currentPlan()?.module_codes || [];
+  const relatedCodes = (module, relation) => (module?.[relation] || []).map((item) => item.code);
+  const dependencyClosure = (codes) => {
+    const result = new Set();
+    const visit = (code) => {
+      if (result.has(code)) return;
+      result.add(code);
+      relatedCodes(moduleByCode(code), 'dependencies').forEach(visit);
+    };
+    codes.forEach(visit);
+    return result;
+  };
+  const incompatibilityBetween = (firstCode, secondCode) => {
+    const first = moduleByCode(firstCode);
+    const second = moduleByCode(secondCode);
+    return relatedCodes(first, 'incompatibilities').includes(secondCode)
+      || relatedCodes(second, 'incompatibilities').includes(firstCode);
+  };
+  const conflictIn = (codes) => {
+    const list = [...codes];
+    for (let index = 0; index < list.length; index += 1) {
+      for (let other = index + 1; other < list.length; other += 1) {
+        if (incompatibilityBetween(list[index], list[other])) return [list[index], list[other]];
+      }
+    }
+    return null;
+  };
+  const expandedSelection = (extraCode = null) => dependencyClosure([...planCodes(), ...state.selected, ...(extraCode ? [extraCode] : [])]);
   const segmentNames = { advocacia: 'Advocacia', setor_publico: 'Setor público' };
 
   const renderOffers = () => {
@@ -25,17 +52,57 @@
     planSelect.innerHTML = '<option value="">Assinatura Personalizada · escolha os módulos</option>' + plans.map((plan) => `<option value="${esc(plan.code)}">${esc(plan.name)}</option>`).join('');
     planSelect.value = state.plan;
     const required = new Set(planCodes());
-    const avail = (state.catalog.modules || []).filter((module) => !state.plan || required.has(module.code) || module.available_standalone);
+    const selected = expandedSelection();
+    const autoSelected = new Set([...selected].filter((code) => !required.has(code) && !state.selected.has(code)));
+    const avail = (state.catalog.modules || []).filter((module) => !state.plan || required.has(module.code) || module.available_standalone || selected.has(module.code));
     $('#lp-modules').innerHTML = avail.length ? avail.map((module) => {
       const isRequired = required.has(module.code);
-      const checked = isRequired || state.selected.has(module.code);
-      return `<label class="lp-module-choice"><input type="checkbox" value="${esc(module.code)}" ${checked ? 'checked' : ''} ${isRequired ? 'checked disabled' : ''}><span><strong>${esc(module.name)}${isRequired ? ' · incluído' : ''}</strong><small>${esc(module.description || '')}${!isRequired ? `${module.description ? ' · ' : ''}${money(module.monthly_amount)}/mês por módulo` : ''}</small></span></label>`;
+      const isAutoSelected = autoSelected.has(module.code);
+      const checked = selected.has(module.code);
+      const conflictingCode = !checked ? [...selected].find((code) => incompatibilityBetween(module.code, code)) : null;
+      const candidate = !checked ? dependencyClosure([...selected, module.code]) : selected;
+      const internalConflict = !checked && !conflictingCode ? conflictIn(candidate) : null;
+      const missingDependency = !checked && !conflictingCode && !internalConflict
+        ? [...candidate].find((code) => !moduleByCode(code)) : null;
+      const blockedBy = conflictingCode ? moduleByCode(conflictingCode) : null;
+      const impossibleConflict = internalConflict ? moduleByCode(internalConflict.find((code) => code !== module.code)) : null;
+      const blockedReason = blockedBy ? `Incompatível com ${blockedBy.name}`
+        : impossibleConflict ? `A dependência conflita com ${impossibleConflict.name}`
+          : missingDependency ? 'Uma dependência não está disponível no catálogo' : '';
+      const locked = isRequired || isAutoSelected || Boolean(blockedReason);
+      const note = isRequired ? 'Incluído no plano'
+        : isAutoSelected ? 'Selecionado automaticamente como dependência necessária'
+          : blockedReason;
+      return `<label class="lp-module-choice${locked && blockedReason ? ' is-unavailable' : ''}"><input type="checkbox" value="${esc(module.code)}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''}><span><strong>${esc(module.name)}${isRequired ? ' · incluído' : isAutoSelected ? ' · dependência necessária' : ''}</strong><small>${esc(module.description || '')}${!isRequired ? `${module.description ? ' · ' : ''}${money(module.monthly_amount)}/mês por módulo` : ''}${note ? ` · ${esc(note)}` : ''}</small></span></label>`;
     }).join('') : '<p class="lp-standalone-unavailable">Este plano não possui módulos adicionais liberados para contratação.</p>';
-    $('#lp-modules').querySelectorAll('input[type=checkbox]:not(:disabled)').forEach((input) => input.addEventListener('change', () => { input.checked ? state.selected.add(input.value) : state.selected.delete(input.value); refreshCapacities(); quote(); }));
+    const feedback = document.createElement('p');
+    feedback.className = 'lp-selection-feedback';
+    feedback.setAttribute('role', 'status');
+    feedback.setAttribute('aria-live', 'polite');
+    feedback.textContent = state.selectionMessage;
+    $('#lp-modules').append(feedback);
+    $('#lp-modules').querySelectorAll('input[type=checkbox]:not(:disabled)').forEach((input) => input.addEventListener('change', () => {
+      state.selectionMessage = '';
+      if (input.checked) {
+        const next = dependencyClosure([...planCodes(), ...state.selected, input.value]);
+        const conflict = conflictIn(next);
+        const missing = [...next].find((code) => !moduleByCode(code));
+        if (conflict || missing) {
+          input.checked = false;
+          const pair = conflict?.map(moduleByCode).filter(Boolean).map((module) => module.name);
+          state.selectionMessage = conflict
+            ? `Não foi possível selecionar: ${pair.join(' é incompatível com ')}.`
+            : 'Não foi possível selecionar: uma dependência não está disponível no catálogo.';
+        } else state.selected.add(input.value);
+      } else state.selected.delete(input.value);
+      renderBuilder();
+      refreshCapacities();
+      quote();
+    }));
     refreshCapacities();
   };
 
-  const selectedCodes = () => [...new Set([...planCodes(), ...state.selected])];
+  const selectedCodes = () => [...expandedSelection()];
   const refreshCapacities = () => {
     const node = $('#lp-capacities');
     const modules = selectedCodes().map(moduleByCode).filter(Boolean);
@@ -94,7 +161,7 @@
     if (planButton) { state.plan = planButton.dataset.choosePlan; state.selected.clear(); renderBuilder(); $('#composicao').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' }); quote(); }
     if (customButton) { state.plan = ''; state.selected.clear(); renderBuilder(); $('#composicao').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' }); }
   });
-  $('#lp-plan').addEventListener('change', () => { state.plan = $('#lp-plan').value; state.selected.clear(); renderBuilder(); quote(); });
+  $('#lp-plan').addEventListener('change', () => { state.plan = $('#lp-plan').value; state.selected.clear(); state.selectionMessage = ''; renderBuilder(); quote(); });
   document.querySelectorAll('[data-cycle]').forEach((button) => button.addEventListener('click', () => { state.cycle = button.dataset.cycle; document.querySelectorAll('[data-cycle]').forEach((item) => item.setAttribute('aria-pressed', String(item === button))); renderOffers(); quote(); }));
   $('#lp-buy').href = '/contratar/fokus-law';
   $('#lp-buy').addEventListener('click', (event) => { if (!state.quote) { event.preventDefault(); return; } });
