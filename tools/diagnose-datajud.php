@@ -18,7 +18,19 @@ echo json_encode(['configuration' => ['key_present' => true, 'cached_key_matches
 $caseNumber = trim((string) getenv('DATAJUD_CASE_NUMBER'));
 if ($caseNumber !== '') {
     if (! preg_match('/\A\d{20}\z/', $caseNumber)) exit(1);
+    Illuminate\Support\Facades\Http::record();
     $result = app(App\Services\LawDatajudClient::class)->lookup($caseNumber);
+    foreach (Illuminate\Support\Facades\Http::recorded() as $pair) {
+        $response = $pair[1];
+        if (! $response) continue;
+        $payload = $response->json();
+        $hits = data_get($payload, 'hits.hits', []);
+        echo json_encode(['response_summary' => ['http' => $response->status(), 'timed_out' => data_get($payload, 'timed_out'),
+            'failed_shards' => data_get($payload, '_shards.failed'), 'returned_hits' => is_array($hits) ? count($hits) : null,
+            'failure_types' => array_values(array_unique(array_filter(array_map(static fn ($failure) => data_get($failure, 'reason.type'), data_get($payload, '_shards.failures', []))))),
+            'retry_after' => $response->header('Retry-After'),
+        ]], JSON_UNESCAPED_UNICODE).PHP_EOL;
+    }
     echo json_encode(['case_lookup' => $result, 'record_changes' => false], JSON_UNESCAPED_UNICODE).PHP_EOL;
     exit(($result['status'] ?? '') === 'synced' ? 0 : 1);
 }
