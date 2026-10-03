@@ -21,6 +21,7 @@ class SyncLawCaseDatajud extends Command
             return self::SUCCESS;
         }
         $query = DB::table('law_cases')->where('operational_status', '!=', 'archived')
+            ->where('datajud_sync_status', '!=', 'pending')
             ->where(fn ($q) => $q->whereNull('last_datajud_checked_at')->orWhere('last_datajud_checked_at', '<=', now()->subMonthNoOverflow()))
             ->whereExists(function ($q): void {
                 $q->selectRaw('1')->from('subscription_items as item')

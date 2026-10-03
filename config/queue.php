@@ -31,6 +31,16 @@ return [
 
     'connections' => [
 
+        // Use the application database so enqueueing and case creation commit together.
+        'law-datajud' => [
+            'driver' => 'database',
+            'connection' => null,
+            'table' => 'jobs',
+            'queue' => 'law-datajud',
+            'retry_after' => 120,
+            'after_commit' => false,
+        ],
+
         'sync' => [
             'driver' => 'sync',
         ],

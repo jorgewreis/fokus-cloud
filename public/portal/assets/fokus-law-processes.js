@@ -3,7 +3,7 @@
   const labels = { normal: 'Normal', high: 'Alta', urgent: 'Urgente', public_internal: 'Público interno', restricted: 'Restrito', active: 'Ativo', pending: 'Pendente', suspended: 'Suspenso', completed: 'Concluído', archived: 'Arquivado', dependent: 'Dependência', apenso: 'Apensamento', case_class: 'Classe', case_class_code: 'Código da classe', subjects: 'Assuntos', court_name: 'Órgão julgador', court_code: 'Código do órgão', official_status_text: 'Situação oficial', official_status_code: 'Código da situação', operational_status: 'Estado operacional', operational_priority: 'Prioridade', confidentiality_level: 'Sigilo', responsible_membership_id: 'Responsável', filing_date: 'Autuação', distribution_date: 'Distribuição', datajud_sync_status: 'Consulta Datajud', company_membership_id: 'Usuário autorizado', contact_name: 'Contato', role: 'Papel', tag: 'Etiqueta', choice: 'Decisão', value: 'Valor', field: 'Campo', manual: 'Manter preenchimento', official: 'Adotar dado oficial' };
   Object.assign(labels, { error: 'Falha na consulta', synced: 'Dados atualizados', not_found: 'Dados não encontrados', law_unit_id: 'Unidade', contact_id: 'Contato', related_case_id: 'Processo relacionado', source_case_id: 'Processo de origem', contact_search: 'Pesquisa de contato', datajud_case_class: 'Classe oficial (Datajud)', datajud_subjects: 'Assuntos oficiais (Datajud)', datajud_court_name: 'Órgão julgador oficial (Datajud)', datajud_official_status_text: 'Situação oficial (Datajud)' });
   const text = (value) => value === null || value === undefined || value === '' || (Array.isArray(value) && !value.length) ? 'Não informado' : Array.isArray(value) ? value.map((item) => item.name ? `${item.name}${item.code ? ` (${item.code})` : ''}` : String(item)).join('; ') : labels[value] || String(value);
-  Object.assign(labels, { datajud_result_code: 'Resultado da consulta', not_configured: 'Consulta não configurada', invalid_number: 'Número CNJ incompleto', unsupported_tribunal: 'Tribunal sem consulta configurada', authentication_failed: 'Chave recusada pelo CNJ', rate_limited: 'Consultas limitadas pelo Datajud', service_busy: 'Datajud sobrecarregado', source_timeout: 'Busca não concluída pelo Datajud', partial_response: 'Resposta incompleta do Datajud', timeout: 'Tempo de espera excedido', service_unavailable: 'Falha temporária do Datajud', endpoint_not_found: 'Endereço de consulta não encontrado', request_rejected: 'Consulta recusada pelo Datajud', invalid_response: 'Resposta incompatível', connection_failed: 'Falha de conexão', secure_connection_failed: 'Falha na conexão segura', internal_error: 'Falha interna na consulta', no_metadata: 'Processo encontrado sem metadados disponíveis' });
+  Object.assign(labels, { datajud_result_code: 'Resultado da consulta', initial_sync_failed: 'Consulta automática não concluída', queued: 'Consulta agendada', not_configured: 'Consulta não configurada', invalid_number: 'Número CNJ incompleto', unsupported_tribunal: 'Tribunal sem consulta configurada', authentication_failed: 'Chave recusada pelo CNJ', rate_limited: 'Consultas limitadas pelo Datajud', service_busy: 'Datajud sobrecarregado', source_timeout: 'Busca não concluída pelo Datajud', partial_response: 'Resposta incompleta do Datajud', timeout: 'Tempo de espera excedido', service_unavailable: 'Falha temporária do Datajud', endpoint_not_found: 'Endereço de consulta não encontrado', request_rejected: 'Consulta recusada pelo Datajud', invalid_response: 'Resposta incompatível', connection_failed: 'Falha de conexão', secure_connection_failed: 'Falha na conexão segura', internal_error: 'Falha interna na consulta', no_metadata: 'Processo encontrado sem metadados disponíveis' });
   const date = (value) => value ? new Date(String(value).replace(' ', 'T')).toLocaleString('pt-BR') : 'Ainda não consultado';
   const cnj = (v) => String(v).replace(/^(\d{7})(\d{2})(\d{4})(\d)(\d{2})(\d{4})$/, '$1-$2.$3.$4.$5.$6');
   const request = (path = '', options) => window.FokusApi.request(`/law/cases${path}`, options);
@@ -12,12 +12,34 @@
   async function render(root, context, initialCaseId = null) {
     document.title = 'Processos | Fokus Law';
     const session = ++generation;
-    const { node: $, button, input, select, field, detailSection: section, message, dialog, bindForm, compositionChart, metricCards } = UI();
+    const { node: $, button, input, select, field, detailSection: section, message, dialog: openDialog, bindForm, compositionChart, metricCards } = UI();
+    const dialogs = new Set();
+    const dialog = (...args) => { const modal = openDialog(...args); dialogs.add(modal.element); return modal; };
     const can = (code) => context.company?.role === 'admin' || (context.law_permissions || []).includes(`law.cases.${code}`);
     const active = () => generation === session && root.isConnected && body.isConnected;
     let refs; let q = ''; let includeArchived = false; let page = 1;
     let currentId = null; let detailData; let viewToken = 0;
     const apiPath = (id) => `/${encodeURIComponent(id)}`;
+    let refreshTimer;
+    function watchDatajud(id, token, historyPage) {
+      clearTimeout(refreshTimer);
+      const valid = () => active() && currentId === id && viewToken === token;
+      const poll = async () => {
+        if (!valid()) return;
+        for (const element of dialogs) if (!element.isConnected) dialogs.delete(element);
+        if (dialogs.size) { refreshTimer = setTimeout(poll, 5000); return; }
+        try {
+          const result = await request(`${apiPath(id)}?history_page=${historyPage}`);
+          if (!valid()) return;
+          if (result.case.datajud_sync_status !== 'pending') {
+            for (const element of dialogs) if (!element.isConnected) dialogs.delete(element);
+            if (!dialogs.size) { await detail(id, historyPage); return; }
+          }
+        } catch (_) { /* Keep the saved record visible while the connection recovers. */ }
+        if (valid()) refreshTimer = setTimeout(poll, 5000);
+      };
+      refreshTimer = setTimeout(poll, 5000);
+    }
     const notice = message();
     const heading = $('header', 'law-page-heading law-record-page-heading'); heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE PROCESSOS'), $('h2', '', 'Processos'), $('p', 'law-page-lede', 'Judiciário criminal · Consulte os processos da empresa e organize o trabalho de cada unidade.'));
     const headingActions = $('div', 'law-record-heading-actions'); heading.append(headingActions);
@@ -49,6 +71,7 @@
       bindForm(form, submit, error, async () => { await send(); modal.close(); }); return modal;
     }
     async function list() {
+      clearTimeout(refreshTimer);
       const token = ++viewToken;
       currentId = null; notice.hidden = true; body.setAttribute('aria-busy', 'true');
       try {
@@ -142,6 +165,7 @@
       });
     }
     async function detail(id, historyPage = 1) {
+      clearTimeout(refreshTimer);
       const token = ++viewToken;
       const changedRecord = currentId !== id;
       body.setAttribute('aria-busy', 'true');
@@ -150,12 +174,15 @@
         if (!active() || token !== viewToken) return;
         detailData = result; refs = local; currentId = id; body.replaceChildren(); body.className = 'law-record-detail-body'; headingActions.replaceChildren(); const c = result.case;
         const actions = toolbar(); actions.append(button('Voltar à lista', action(list)));
-        if (can('update')) { actions.append(button('Editar processo', action(edit), true), button('Consultar Datajud', action(async (event) => {
+        if (can('update')) { const consult = button('Consultar Datajud', action(async (event) => {
           const control = event?.currentTarget;
           if (control) { control.textContent = 'Consultando Datajud…'; control.setAttribute('aria-busy', 'true'); }
           try { await request(`${apiPath(id)}/datajud`, { method: 'POST' }); await detail(id); }
           finally { if (control?.isConnected) { control.textContent = 'Consultar Datajud'; control.removeAttribute('aria-busy'); } }
-        }))); }
+        }));
+          if (c.datajud_sync_status === 'pending') { consult.disabled = true; consult.textContent = 'Consulta automática pendente'; }
+          actions.append(button('Editar processo', action(edit), true), consult);
+        }
         const archiveAction = c.operational_status === 'archived' ? 'reopen' : 'archive';
         if (can(archiveAction)) actions.append(button(archiveAction === 'archive' ? 'Arquivar' : 'Reabrir', action((event) => {
           const reason = $('textarea', 'fs-form-control'); reason.required = true; reason.minLength = 3; reason.maxLength = 2000;
@@ -170,8 +197,8 @@
         const main = section('Dados processuais', 'CNJ', 'Classe, assuntos e informações oficiais');
         main.body.append(keyValues([['Classe judicial', text(c.case_class)], ['Órgão julgador', text(c.court_name)], ['Assuntos', text(c.subjects)], ['Situação oficial', text(c.official_status_text)], ['Autuação', c.filing_date ? new Date(`${c.filing_date}T12:00:00`).toLocaleDateString('pt-BR') : 'Não informada'], ['Distribuição', c.distribution_date ? new Date(`${c.distribution_date}T12:00:00`).toLocaleDateString('pt-BR') : 'Não informada'], ['Última consulta ao Datajud', date(c.last_datajud_checked_at)]]));
         main.body.append(keyValues([['Resultado da consulta', c.datajud_sync_status === 'pending' ? 'Aguardando consulta' : text(result.datajud?.code || c.datajud_sync_status)], ['Última atualização bem-sucedida', c.last_datajud_synced_at ? date(c.last_datajud_synced_at) : 'Ainda não houve atualização pelo Datajud']]));
-        const fallbackMessage = c.datajud_sync_status === 'pending' ? 'Este processo ainda não foi consultado no Datajud.' : c.datajud_sync_status === 'not_found' ? 'O Datajud não retornou os metadados públicos deste processo. Confira o número CNJ ou preencha os campos ausentes manualmente.' : c.datajud_sync_status === 'synced' ? 'A última consulta ao Datajud foi concluída. Os campos não fornecidos pelo CNJ podem ser preenchidos manualmente.' : 'A última consulta ao Datajud falhou. Consulte o histórico para conferir o motivo ou tente novamente.';
-        const feedback = $('p', `fs-alert ${c.datajud_sync_status === 'synced' ? 'fs-alert-success' : 'fs-alert-warning'}`, `${result.datajud?.message || fallbackMessage}${c.datajud_sync_status === 'error' ? ' O cadastro e os dados já registrados foram preservados.' : ''}`);
+        const fallbackMessage = c.datajud_sync_status === 'pending' ? 'Processo cadastrado. A consulta ao Datajud será feita em segundo plano e pode levar alguns minutos. Você pode continuar trabalhando; os dados aparecerão aqui automaticamente.' : c.datajud_sync_status === 'not_found' ? 'O Datajud não retornou os metadados públicos deste processo. Confira o número CNJ ou preencha os campos ausentes manualmente.' : c.datajud_sync_status === 'synced' ? 'A última consulta ao Datajud foi concluída. Os campos não fornecidos pelo CNJ podem ser preenchidos manualmente.' : 'A última consulta ao Datajud falhou. Consulte o histórico para conferir o motivo ou tente novamente.';
+        const feedback = $('p', `fs-alert ${c.datajud_sync_status === 'pending' ? 'fs-alert-info' : c.datajud_sync_status === 'synced' ? 'fs-alert-success' : 'fs-alert-warning'}`, `${(c.datajud_sync_status === 'pending' ? fallbackMessage : result.datajud?.message) || fallbackMessage}${c.datajud_sync_status === 'error' ? ' O cadastro e os dados já registrados foram preservados.' : ''}`);
         feedback.setAttribute('role', 'status'); feedback.setAttribute('aria-live', 'polite'); main.body.append(feedback);
         const source = $('a', 'fs-u-fs-sm', 'Metadados oficiais: CNJ · DataJud'); source.href = 'https://datajud-wiki.cnj.jus.br/api-publica/'; source.target = '_blank'; source.rel = 'noopener noreferrer'; main.body.append(source); body.append(main);
         const operational = section('Organização interna', 'ORG', 'Acompanhamento do trabalho da unidade'); operational.body.append(keyValues([['Unidade', c.unit_name], ['Estado operacional', c.operational_status_label], ['Prioridade', text(c.operational_priority)], ['Responsável principal', local.members.find((item) => item.id === c.responsible_membership_id)?.name || 'Sem responsável'], ['Sigilo', text(c.confidentiality_level)]]));
@@ -204,6 +231,7 @@
         if (!result.events.length) history.body.append($('p', 'law-record-detail-empty', 'As alterações e atualizações deste processo aparecerão aqui.'));
         paginate(history.body, result.history_total, 50, result.history_page, (value) => detail(id, value), 'eventos'); body.append(history);
         if (changedRecord) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); heading.scrollIntoView({ block: 'start' }); }
+        if (c.datajud_sync_status === 'pending') watchDatajud(id, token, historyPage);
       } catch (error) { report(error); } finally { body.removeAttribute('aria-busy'); }
     }
     function linkedSection(title, items, remove, add) {

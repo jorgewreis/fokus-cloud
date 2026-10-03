@@ -44,7 +44,10 @@ distribuição são datas opcionais. O número é único na empresa, inclusive e
 arquivados. O processo nasce Ativo, com prioridade Normal, sigilo Público
 interno e sem responsável obrigatório. Cartas recebidas usam a classe processual.
 
-O Datajud é consultado após salvar, mensalmente e por ação manual. São
+O cadastro confirma o salvamento sem aguardar o Datajud. A consulta inicial é
+enfileirada na mesma transação e executada em segundo plano; o detalhe informa
+a espera e atualiza o resultado automaticamente, respeitando formulários abertos.
+Também há consulta mensal e por ação manual. São
 solicitados apenas classe, assuntos, órgão julgador e situação oficial, quando
 disponível. Não são importadas movimentações e a situação oficial não é
 inferida delas. A ausência de retorno ou falha externa não desfaz o cadastro.

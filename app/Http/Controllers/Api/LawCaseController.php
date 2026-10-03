@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SyncLawCaseDatajud;
 use App\Services\AuditRecorder;
 use App\Services\LawAuthorizationService;
 use App\Services\LawCaseManagementService;
@@ -103,7 +104,7 @@ class LawCaseController extends Controller
         return response()->json(['summary' => ['cases_total' => $classes->sum('total'), 'by_class' => $classes->values(), 'recent' => $recent]]);
     }
 
-    public function store(Request $request, LawCaseManagementService $cases, LawDatajudClient $datajud)
+    public function store(Request $request, LawCaseManagementService $cases)
     {
         $data = $request->validate([
             'case_number' => ['required', 'string', 'max:30'],
@@ -135,6 +136,8 @@ class LawCaseController extends Controller
                     'after_state' => json_encode(['law_unit_id' => $unit->id, 'operational_status' => 'active'], JSON_INVALID_UTF8_SUBSTITUTE),
                     'created_at' => $now,
                 ]);
+                SyncLawCaseDatajud::dispatch($companyId, $id, $userId)
+                    ->onConnection('law-datajud')->onQueue('law-datajud')->beforeCommit();
             });
         } catch (QueryException $exception) {
             if ((string) $exception->getCode() === '23000') {
@@ -143,9 +146,10 @@ class LawCaseController extends Controller
             throw $exception;
         }
 
-        $case = DB::table('law_cases')->where('company_id', $companyId)->where('id', $id)->first();
-        $sync = $cases->syncDatajud($case, $userId, $datajud, 'datajud_initial_sync');
-        return response()->json(['case' => $cases->caseArray($this->findCase($request, $id, $cases)), 'datajud' => array_intersect_key($sync, array_flip(['status', 'code', 'message']))], 201);
+        return response()->json([
+            'case' => $cases->caseArray($this->findCase($request, $id, $cases)),
+            'datajud' => ['status' => 'pending', 'code' => 'queued', 'message' => 'Processo cadastrado. A consulta ao Datajud será feita em segundo plano.'],
+        ], 201);
     }
 
     public function show(Request $request, string $case, LawCaseManagementService $cases)

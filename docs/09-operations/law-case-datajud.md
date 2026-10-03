@@ -81,8 +81,30 @@ preenchimentos manuais continuam sujeitas à decisão do usuário.
 
 ## Atualização mensal
 
+### Consulta inicial em segundo plano
+
+O cadastro grava o processo, seu histórico e o trabalho na tabela `jobs` na
+mesma transação. Retorna HTTP 201 com `datajud.status: pending` e código
+`queued`, sem aguardar a API externa. A conexão `law-datajud` utiliza o banco
+da aplicação mesmo quando a fila padrão usa outro driver. Não há migration nova.
+
+O scheduler inicia a cada minuto um worker exclusivo desta fila, em segundo
+plano, com proteção contra sobreposição. Cada consulta tem uma tentativa,
+timeout de 70 segundos e reserva de 120 segundos. Falhas são registradas no
+processo e permitem nova consulta manual, preservando o cadastro. O detalhe
+acompanha o resultado a cada cinco segundos, pausando enquanto houver um
+diálogo aberto. A consulta manual permanece disponível após a tentativa inicial.
+
+Em desenvolvimento, mantenha `php artisan schedule:work` em execução ou rode
+`php artisan queue:work law-datajud --queue=law-datajud --timeout=70 --tries=1`.
+Em produção, a instalação do cron do scheduler faz parte do deploy. Para
+conferir o agendamento, use `php artisan schedule:list`; trabalhos aguardando
+execução ficam na fila `law-datajud` da tabela `jobs`.
+
+### Rotina mensal
+
 O scheduler executa `law:sync-case-datajud` diariamente às 03:15, no fuso da
-aplicação. Consulta processos não arquivados cuja última tentativa tem pelo
+aplicação. Consulta processos não arquivados, sem consulta inicial pendente, cuja última tentativa tem pelo
 menos um mês, com assinatura ativa e módulo de Processos publicado no contexto
 `judiciario` (compatível com o código legado `vara_criminal`). O limite é de 500 consultas por execução, ajustável por
 `--limit` até 5.000. Excedentes continuam vencidos para as próximas execuções.
