@@ -1189,7 +1189,7 @@
     form.append(element('h3', '', 'Planos, módulos e capacidades'));
     form.append(element('p', 'law-page-lede', 'Escolha o plano, o ciclo de cobrança e a capacidade dos módulos disponíveis para sua empresa.'));
     const controls = element('div', 'law-subscription-controls');
-    const planWrap = lawSubscriptionField('Plano publicado');
+    const planWrap = lawSubscriptionField('Plano publicado (opcional)');
     const planSelect = element('select', 'fs-form-control'); planSelect.name = 'target_plan_id'; planSelect.append(new Option('Composição personalizada', ''));
     availablePlans.forEach((plan) => planSelect.append(new Option(`${plan.name} · ${formatLawMoney(plan.monthly_amount)}/mês`, plan.id)));
     planSelect.value = availablePlans.find((plan) => plan.code === current.plan_code)?.id || '';

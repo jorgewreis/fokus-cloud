@@ -511,7 +511,6 @@ class CatalogManager
 
         $current = DB::table($table)->where('id', $id)->first();
         abort_unless($current, 404, 'Item de catálogo não encontrado.');
-
         $status = $table === 'plans'
             ? 'inativo'
             : ($state === 'arquivado' ? 'arquivado' : 'inativo');
@@ -601,14 +600,16 @@ class CatalogManager
         };
         $current = DB::table($table)->where('id', $id)->first();
         abort_unless($current, 404, 'Item de catálogo não encontrado.');
+        if ($type === 'plan') abort_unless($current->publication_state === 'arquivado', 422, 'Arquive o plano antes de excluí-lo.');
 
         $dependencies = $type === 'module'
             ? $this->moduleDeletionDependencies($id)
             : $this->planDeletionDependencies($id, $current->code);
-        abort_if($dependencies !== [], 422, 'Não é possível excluir este item porque existem vínculos: '.implode(', ', $dependencies).'. Arquive-o para preservar o histórico.');
+        abort_if($dependencies !== [], 422, 'Não é possível excluir este item porque existem vínculos: '.implode(', ', $dependencies).'.');
 
-        DB::transaction(function () use ($table, $id): void {
+        DB::transaction(function () use ($table, $id, $current): void {
             DB::table($table)->where('id', $id)->delete();
+            if ($table === 'plans') DB::table('products')->where('id', $current->product_id)->update(['publication_pending' => true, 'updated_at' => now()]);
         });
 
         return (array) $current;
@@ -662,7 +663,8 @@ class CatalogManager
         if (DB::table('vouchers')->where('plan_id', $planId)->exists()) $dependencies[] = 'vouchers';
         if (DB::table('voucher_redemptions')->where('snapshot', 'like', '%'.$planId.'%')->orWhere('snapshot', 'like', '%'.$planCode.'%')->exists()) $dependencies[] = 'resgates de voucher';
         if (DB::table('subscription_items')->where('conditions_snapshot', 'like', '%'.$planCode.'%')->exists()) $dependencies[] = 'itens de assinatura';
-        if ($this->catalogSnapshotsContain($planId) || $this->catalogSnapshotsContain($planCode)) $dependencies[] = 'publicações do catálogo';
+        // Catalog publications are immutable snapshots; they remain readable
+        // after removing the live plan row and do not require it to exist.
 
         return $dependencies;
     }

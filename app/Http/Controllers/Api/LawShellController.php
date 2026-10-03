@@ -111,9 +111,11 @@ class LawShellController extends Controller
             'setor_publico' => 'Setor Público',
             default => 'Jurídico',
         };
-        $subscriptionLabel = $planName === ''
+        $subscriptionLabel = $planName === 'Assinatura Personalizada'
+            ? $planName
+            : ($planName === ''
             ? $segmentLabel
-            : (str_contains(mb_strtolower($planName), mb_strtolower($segmentLabel)) ? $planName : $segmentLabel.' - '.$planName);
+            : (str_contains(mb_strtolower($planName), mb_strtolower($segmentLabel)) ? $planName : $segmentLabel.' - '.$planName));
 
         $supportMode = null;
         $supportId = $request->session()->get('support_session_id');

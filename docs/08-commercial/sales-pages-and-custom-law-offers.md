@@ -28,8 +28,9 @@ publicada.
 - Plano: preço-base publicado + preço integral dos módulos extras disponíveis
   para contratação avulsa + diferenças entre a faixa escolhida e a faixa-base
   incluída no plano.
-- Módulos avulsos: soma dos módulos publicados que permitem contratação
-  independente e suas personalizações selecionadas.
+- Assinatura Personalizada: sem plano-base, soma o preço integral de cada módulo
+  publicado selecionado e as personalizações escolhidas. Dependências e
+  incompatibilidades continuam valendo; não há desconto de composição de plano.
 - Um módulo incluído no plano não recebe cobrança adicional como módulo extra.
 - A cobrança anual corresponde a dez mensalidades segundo a regra central de
   billing.

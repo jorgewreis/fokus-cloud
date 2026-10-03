@@ -114,7 +114,7 @@
   <script src="/portal/assets/fokus-law-contacts.js?v=20261002-record-compositions-v1" defer></script>
   <script src="/portal/assets/law-record-ui.js?v=20261002-record-compositions-v1" defer></script>
   <script src="/portal/assets/fokus-law-processes.js?v=20261003-procedural-priorities-v1" defer></script>
-  <script src="/portal/assets/fokus-law-shell.js?v=20261003-process-icon-v1" defer></script>
+  <script src="/portal/assets/fokus-law-shell.js?v=20261003-custom-subscription-v1" defer></script>
   <script src="/assets/js/portal-profile.js?v=20260925-profile-v4" defer></script>
 </body>
 </html>

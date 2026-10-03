@@ -47,12 +47,12 @@ export async function mount(root, context = {}) {
     const planActions = (plan) => {
         const canPublish = context.permissions?.has("platform.catalog.publish") || window.__backofficePermissions?.has("platform.catalog.publish");
         const items = [action("view", plan, "Ver detalhes do plano")];
-        if (["pausado", "inativo"].includes(plan.status)) items.push(action("edit", plan, "Editar plano"));
+        if (["pausado", "inativo"].includes(plan.status) && plan.publication_state !== "arquivado") items.push(action("edit", plan, "Editar plano"));
         if (!canPublish) return items.join("");
-        if (plan.status === "ativo" && plan.publication_state === "publicado") items.push(action("pause", plan, "Pausar plano"));
+        if (plan.publication_state === "arquivado") items.push(action("delete", plan, "Excluir plano", true));
+        else if (plan.status === "ativo" && plan.publication_state === "publicado") items.push(action("pause", plan, "Pausar plano"));
         else if (plan.status === "ativo") items.push(action("pause", plan, "Pausar plano para editar"), action("publish", plan, "Publicar plano"));
         else if (["inativo", "pausado"].includes(plan.status)) items.push(action("activate", plan, "Ativar plano"), action("archive", plan, "Arquivar plano"));
-        else if (plan.status === "arquivado") items.push(action("delete", plan, "Excluir plano", true));
         return items.join("");
     };
     const renderPagination = (totalPages) => { $("#plan-pagination").innerHTML = `<ul class="fs-pagination fs-pagination-compact"><li class="fs-page-item"><button class="fs-page-link" type="button" data-plan-page="${state.page - 1}" aria-label="Página anterior" ${state.page === 1 ? "disabled" : ""}>‹</button></li><li class="fs-page-item is-active" aria-current="page"><button class="fs-page-link" type="button" data-plan-page="${state.page}" aria-label="Página ${state.page}" aria-current="page">${state.page}</button></li><li class="fs-page-item"><button class="fs-page-link" type="button" data-plan-page="${state.page + 1}" aria-label="Próxima página" ${state.page === totalPages ? "disabled" : ""}>›</button></li></ul>`; };

@@ -429,6 +429,8 @@ class SubscriptionChangeManager
             $snapshot['plan_id'] = $plan->id;
             $snapshot['plan_code'] = $plan->code;
             $snapshot['plan_name'] = $plan->name;
+        } elseif (empty($snapshot['plan_name'])) {
+            $snapshot['plan_name'] = 'Assinatura Personalizada';
         }
 
         return $snapshot;
@@ -476,7 +478,7 @@ class SubscriptionChangeManager
         abort_if(in_array('', $moduleCodes, true) || count($moduleCodes) !== count(array_unique($moduleCodes)), 422, 'Cada módulo pode ser selecionado somente uma vez.');
         foreach ($moduleCodes as $code) {
             abort_unless($publishedModules->has($code), 422, 'Há um módulo indisponível no catálogo publicado.');
-            if (! $plan || ! in_array($code, $publishedPlan['module_codes'] ?? [], true)) abort_unless((bool) ($publishedModules->get($code)['available_standalone'] ?? false), 422, 'Um dos módulos selecionados só pode ser contratado por meio de um plano publicado.');
+            if ($plan && ! in_array($code, $publishedPlan['module_codes'] ?? [], true)) abort_unless((bool) ($publishedModules->get($code)['available_standalone'] ?? false), 422, 'Um dos módulos selecionados só pode ser contratado como adicional de um plano publicado.');
         }
         $moduleCatalog = $publishedModules;
         foreach ($requestedItems as $requested) {
@@ -548,7 +550,7 @@ class SubscriptionChangeManager
             'snapshot' => [
                 'plan_id' => $plan->id ?? null,
                 'plan_code' => $plan->code ?? null,
-                'plan_name' => $plan->name ?? 'Personalizada',
+                'plan_name' => $plan->name ?? 'Assinatura Personalizada',
                 'publication_versions' => [
                     'product_catalog_version' => (int) ($publishedCatalog['published_version'] ?? 0),
                     'plan_version' => isset($publishedPlan['published_version']) ? (int) $publishedPlan['published_version'] : null,

@@ -13,26 +13,24 @@
 
   const renderOffers = () => {
     const plans = state.catalog?.plans || [];
-    const standalones = (state.catalog?.modules || []).filter((module) => module.available_standalone && module.module_code === 'contatos');
-    $('#lp-offers-heading').textContent = standalones.length ? 'Escolha um plano ou comece por Contatos.' : 'Escolha um plano para sua operação.';
+    $('#lp-offers-heading').textContent = 'Escolha um plano ou monte uma assinatura personalizada por módulos.';
     const cards = plans.map((plan) => `<article class="lp-offer"><p class="law-eyebrow law-eyebrow-purple">${esc(segmentNames[plan.segment] || plan.segment || 'Fokus Law')}</p><h3>${esc(plan.name)}</h3><p>${esc(plan.description || 'Composição de módulos para sua operação.')}</p><strong>${money(state.cycle === 'annual' ? plan.annual_amount : plan.monthly_amount)} <small>/ ${state.cycle === 'annual' ? 'ano' : 'mês'}</small></strong><button type="button" data-choose-plan="${esc(plan.code)}">Configurar plano</button></article>`);
-    standalones.forEach((module) => cards.push(`<article class="lp-offer lp-standalone"><p class="law-eyebrow law-eyebrow-sage">GESTÃO DE CONTATOS AVULSA</p><h3>${esc(segmentNames[module.segments?.[0]] || module.segments?.[0] || 'Fokus Law')}</h3><p>${esc(module.name)}. Organize pessoas e organizações e personalize a capacidade.</p><strong>${money(Number(module.monthly_amount || 0) * (state.cycle === 'annual' ? 10 : 1))} <small>/ ${state.cycle === 'annual' ? 'ano' : 'mês'}</small></strong><button type="button" data-choose-standalone="${esc(module.code)}">Configurar Contatos</button></article>`));
+    cards.unshift('<article class="lp-offer lp-standalone"><p class="law-eyebrow law-eyebrow-sage">SEM PLANO-BASE</p><h3>Assinatura Personalizada</h3><p>Escolha somente os módulos de que sua operação precisa. Cada módulo é cobrado pelo preço integral publicado.</p><button type="button" data-choose-custom>Escolher módulos</button></article>');
     offersNode.innerHTML = cards.length ? cards.join('') : '<p class="lp-state">Não há planos ou módulos avulsos disponíveis no catálogo publicado.</p>';
   };
 
   const renderBuilder = () => {
     const planSelect = $('#lp-plan');
     const plans = state.catalog.plans || [];
-    const hasStandaloneContacts = (state.catalog.modules || []).some((module) => module.module_code === 'contatos' && module.available_standalone);
-    planSelect.innerHTML = `<option value="">${hasStandaloneContacts ? 'Somente módulos avulsos' : 'Selecione um plano-base'}</option>` + plans.map((plan) => `<option value="${esc(plan.code)}">${esc(plan.name)}</option>`).join('');
+    planSelect.innerHTML = '<option value="">Assinatura Personalizada · escolha os módulos</option>' + plans.map((plan) => `<option value="${esc(plan.code)}">${esc(plan.name)}</option>`).join('');
     planSelect.value = state.plan;
     const required = new Set(planCodes());
-    const avail = (state.catalog.modules || []).filter((module) => required.has(module.code) || (module.available_standalone && (state.plan || module.module_code === 'contatos')));
+    const avail = (state.catalog.modules || []).filter((module) => !state.plan || required.has(module.code) || module.available_standalone);
     $('#lp-modules').innerHTML = avail.length ? avail.map((module) => {
       const isRequired = required.has(module.code);
       const checked = isRequired || state.selected.has(module.code);
-      return `<label class="lp-module-choice"><input type="checkbox" value="${esc(module.code)}" ${checked ? 'checked' : ''} ${isRequired ? 'disabled' : ''}><span><strong>${esc(module.name)}${isRequired ? ' · incluído' : ''}</strong><small>${esc(module.description || `A partir de ${money(module.monthly_amount)}/mês`)}</small></span></label>`;
-    }).join('') : '<p class="lp-standalone-unavailable">A publicação atual não libera módulos para contratação avulsa. Os módulos de Contatos aparecem nos planos acima; a opção independente ficará disponível quando for habilitada e publicada no catálogo.</p>';
+      return `<label class="lp-module-choice"><input type="checkbox" value="${esc(module.code)}" ${checked ? 'checked' : ''} ${isRequired ? 'checked disabled' : ''}><span><strong>${esc(module.name)}${isRequired ? ' · incluído' : ''}</strong><small>${esc(module.description || '')}${!isRequired ? `${module.description ? ' · ' : ''}${money(module.monthly_amount)}/mês por módulo` : ''}</small></span></label>`;
+    }).join('') : '<p class="lp-standalone-unavailable">Este plano não possui módulos adicionais liberados para contratação.</p>';
     $('#lp-modules').querySelectorAll('input[type=checkbox]:not(:disabled)').forEach((input) => input.addEventListener('change', () => { input.checked ? state.selected.add(input.value) : state.selected.delete(input.value); refreshCapacities(); quote(); }));
     refreshCapacities();
   };
@@ -58,7 +56,7 @@
       const title = $('#lp-summary-title');
       const status = $('#lp-summary-status');
       const buy = $('#lp-buy');
-      if (!codes.length) { title.textContent = 'Selecione um plano ou módulo'; $('#lp-total').textContent = '—'; buy.setAttribute('aria-disabled', 'true'); state.quote = null; return; }
+      if (!codes.length) { title.textContent = 'Assinatura Personalizada'; $('#lp-total').textContent = '—'; buy.setAttribute('aria-disabled', 'true'); state.quote = null; return; }
       const overLimit = [...document.querySelectorAll('.lp-personalization select')].find((select) => select.value === 'over_limit');
       if (overLimit) {
         const module = moduleByCode(overLimit.dataset.module);
@@ -74,7 +72,7 @@
         title.textContent = 'Capacidade acima das faixas publicadas'; $('#lp-total').textContent = 'Sob consulta'; $('#lp-summary-items').textContent = 'A maior faixa publicada não atende ao limite desejado.'; status.textContent = 'Envie o pedido de proposta para a equipe comercial.'; buy.setAttribute('aria-disabled', 'true'); state.quote = null; return;
       }
       proposal.hidden = true;
-      title.textContent = currentPlan()?.name || 'Somente módulos avulsos';
+      title.textContent = currentPlan()?.name || 'Assinatura Personalizada';
       status.textContent = 'Atualizando cotação pelo servidor…'; buy.setAttribute('aria-disabled', 'true');
       const items = codes.map((code) => ({ module_code: code, quantity: 1, personalizations: [...document.querySelectorAll(`[data-module="${CSS.escape(code)}"]`)].filter((select) => select.value).map((select) => ({ type_code: select.dataset.type, tier_value: Number(select.value) })) }));
       try {
@@ -82,7 +80,7 @@
         state.quote = result;
         $('#lp-total').textContent = money(result.amount);
         $('#lp-cycle-label').textContent = state.cycle === 'annual' ? 'Total anual' : 'Total mensal';
-        $('#lp-summary-items').innerHTML = `<p>Plano-base: ${money(result.breakdown.plan_base)}</p><p>Módulos adicionais: ${money(result.breakdown.extra_modules)}</p><p>Ajuste de capacidade: ${money(result.breakdown.capacity_adjustments)}</p>`;
+        $('#lp-summary-items').innerHTML = `<p>${state.plan ? 'Plano-base' : 'Plano-base (sem plano)'}: ${money(result.breakdown.plan_base)}</p><p>${state.plan ? 'Módulos extras' : 'Módulos selecionados pelo preço integral'}: ${money(result.breakdown.extra_modules)}</p><p>Ajuste de capacidade: ${money(result.breakdown.capacity_adjustments)}</p>`;
         status.textContent = `Cotação baseada na versão ${result.publication_versions.product_catalog_release_version || result.publication_versions.product_catalog_version} do catálogo.`;
         buy.setAttribute('aria-disabled', 'false');
         localStorage.setItem('fokus-law-offer-v1', JSON.stringify({ selection_mode: state.plan ? 'plan' : 'modules', plan_code: state.plan || null, cycle: state.cycle, items, quote_version: result.publication_versions.product_catalog_release_version || result.publication_versions.product_catalog_version }));
@@ -92,9 +90,9 @@
 
   offersNode.addEventListener('click', (event) => {
     const planButton = event.target.closest('[data-choose-plan]');
-    const soloButton = event.target.closest('[data-choose-standalone]');
+    const customButton = event.target.closest('[data-choose-custom]');
     if (planButton) { state.plan = planButton.dataset.choosePlan; state.selected.clear(); renderBuilder(); $('#composicao').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' }); quote(); }
-    if (soloButton) { state.plan = ''; state.selected = new Set([soloButton.dataset.chooseStandalone]); renderBuilder(); $('#composicao').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' }); quote(); }
+    if (customButton) { state.plan = ''; state.selected.clear(); renderBuilder(); $('#composicao').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' }); }
   });
   $('#lp-plan').addEventListener('change', () => { state.plan = $('#lp-plan').value; state.selected.clear(); renderBuilder(); quote(); });
   document.querySelectorAll('[data-cycle]').forEach((button) => button.addEventListener('click', () => { state.cycle = button.dataset.cycle; document.querySelectorAll('[data-cycle]').forEach((item) => item.setAttribute('aria-pressed', String(item === button))); renderOffers(); quote(); }));

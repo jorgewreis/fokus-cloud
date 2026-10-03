@@ -338,6 +338,7 @@ class SubscriptionController extends Controller
             $commercialSnapshot['base_amount'] = $quoted['base_amount'];
             $commercialSnapshot['discount_amount'] = $quoted['discount_amount'];
             $commercialSnapshot['price_breakdown'] = $quoted['breakdown'];
+            if (empty($commercialSnapshot['plan_code'])) $commercialSnapshot['plan_name'] = 'Assinatura Personalizada';
             DB::table('subscriptions')->where('id', $subscriptionId)->update([
                 'commercial_snapshot' => json_encode([
                     ...$commercialSnapshot,
@@ -586,8 +587,6 @@ class SubscriptionController extends Controller
             abort_unless($publishedModules->has($code), 422, 'Módulo inválido para este produto.');
             if ($publishedPlan && ! in_array($code, $publishedPlan['module_codes'] ?? [], true)) {
                 abort_unless((bool) ($publishedModules[$code]['available_standalone'] ?? false), 422, 'Este módulo não está disponível como adicional independente.');
-            } elseif (! $publishedPlan) {
-                abort_unless((bool) ($publishedModules[$code]['available_standalone'] ?? false), 422, 'Este módulo não está disponível como contratação independente.');
             }
         }
         foreach ($data['items'] as $requested) {
