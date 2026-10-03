@@ -332,11 +332,20 @@
         const local = await references(unit.value); if (!modal.element.isConnected) return; host.replaceChildren();
         if (!local.can_configure) { host.append($('p', 'fs-alert fs-alert-warning', 'Você não pode configurar esta unidade.')); return; }
         const cnjBox = section('Padrão do número CNJ', 'CNJ');
-        const segment = input(local.cnj_defaults?.segment || '', 'text', 1); segment.inputMode = 'numeric'; segment.placeholder = '8'; segment.required = true;
-        const court = input(local.cnj_defaults?.court || '', 'text', 2); court.inputMode = 'numeric'; court.placeholder = '05'; court.required = true;
-        const origin = input(local.cnj_defaults?.origin || '', 'text', 4); origin.inputMode = 'numeric'; origin.placeholder = '0103'; origin.required = true;
+        const segment = select([['', 'Selecione o segmento'], ...(local.cnj_segments || []).map((item) => [item.code, `${item.code} - ${item.name}`])], local.cnj_defaults?.segment || ''); segment.required = true;
+        const court = select([['', 'Selecione o tribunal']]); court.required = true;
+        const updateCourts = (preferred = '') => {
+          const options = (local.cnj_courts || []).filter((item) => item.segment === segment.value);
+          court.replaceChildren(new Option('Selecione o tribunal', '', false, preferred === ''));
+          options.forEach((item) => court.add(new Option(`${item.code} - ${item.name}`, item.code, false, item.code === preferred)));
+          if (preferred && !options.some((item) => item.code === preferred)) court.value = '';
+        };
+        updateCourts(local.cnj_defaults?.court || '');
+        segment.addEventListener('change', () => updateCourts());
+        const origin = input(local.cnj_defaults?.origin || '', 'text', 4); origin.inputMode = 'numeric'; origin.placeholder = '0103'; origin.required = true; origin.pattern = '\\d{4}';
+        origin.addEventListener('input', () => { origin.value = origin.value.replace(/\D/g, '').slice(0, 4); });
         const cnjForm = $('form', 'fs-stack fs-stack-gap-2'); const cnjError = message(); const cnjSave = button('Salvar padrão CNJ', null, true); cnjSave.type = 'submit';
-        cnjForm.append(field('Segmento (1 dígito)', segment), field('Tribunal (2 dígitos)', court), field('Unidade de origem (4 dígitos)', origin), cnjError, cnjSave);
+        cnjForm.append(field('Segmento', segment), field('Tribunal', court), field('Comarca/unidade de origem (4 dígitos)', origin, 'origin', 'Informe exatamente os quatro dígitos definidos para a comarca ou unidade de origem.'), cnjError, cnjSave);
         bindForm(cnjForm, cnjSave, cnjError, async () => { await request('/settings/cnj-defaults', { method: 'PUT', body: { law_unit_id: unit.value, segment: segment.value, court: court.value, origin: origin.value } }); await draw(); });
         cnjBox.body.append(cnjForm); host.append(cnjBox);
         for (const [type, title, values, property] of [['statuses', 'Estados operacionais', local.statuses, 'label'], ['tags', 'Etiquetas', local.tags, 'name'], ['roles', 'Complementos de papéis processuais', local.roles, 'label']]) {

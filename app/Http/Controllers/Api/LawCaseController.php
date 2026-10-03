@@ -7,6 +7,7 @@ use App\Jobs\SyncLawCaseDatajud;
 use App\Services\AuditRecorder;
 use App\Services\LawAuthorizationService;
 use App\Services\LawCaseManagementService;
+use App\Services\LawCnjNumbering;
 use App\Services\LawDatajudClient;
 use App\Services\PrefixedUlid;
 use Illuminate\Database\QueryException;
@@ -104,6 +105,8 @@ class LawCaseController extends Controller
             'tags' => DB::table('law_case_tags')->where('company_id', $companyId)->where('law_unit_id', $unit->id)->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'roles' => DB::table('law_case_role_options')->where('company_id', $companyId)->where('law_unit_id', $unit->id)->where('is_active', true)->orderBy('is_system', 'desc')->orderBy('label')->get(['id', 'code', 'label', 'is_system']),
             'cnj_defaults' => DB::table('law_case_cnj_defaults')->where('company_id', $companyId)->where('law_unit_id', $unit->id)->first(['segment', 'court', 'origin']),
+            'cnj_segments' => LawCnjNumbering::segments(),
+            'cnj_courts' => LawCnjNumbering::courts(),
             'classes' => $catalogOptions('class'),
             'subjects' => $catalogOptions('subject')->sortBy('name')->values(),
             'members' => DB::table('company_memberships as membership')->join('users', 'users.id', '=', 'membership.user_id')
@@ -653,6 +656,9 @@ class LawCaseController extends Controller
             'court' => ['required', 'regex:/^\d{2}$/'],
             'origin' => ['required', 'regex:/^\d{4}$/'],
         ]);
+        if (! LawCnjNumbering::isValidCourt($data['segment'], $data['court'])) {
+            throw ValidationException::withMessages(['court' => 'Selecione um tribunal válido para o segmento escolhido.']);
+        }
         $companyId = (string) $request->attributes->get('active_company_id');
         $unit = DB::table('law_units')->where('company_id', $companyId)->where('id', $data['law_unit_id'])->where('status', 'ativo')->first();
         abort_unless($unit, 404, 'Unidade não encontrada.');

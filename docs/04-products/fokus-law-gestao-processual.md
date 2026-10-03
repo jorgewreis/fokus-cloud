@@ -40,10 +40,11 @@ judiciário criminal; não incluem movimentações, tarefas ou prazos.
 ## Cadastro e consulta oficial
 
 O cadastro aceita CNJ completo ou os 13 primeiros dígitos. Cada unidade pode
-configurar o segmento, o tribunal e a unidade de origem usados para completar
-os números parciais; esses valores são sugestões editáveis e não bloqueiam a
-informação dos componentes próprios de cada processo. O CNJ é validado pelo
-dígito verificador antes de salvar. Autuação e distribuição são datas opcionais.
+configurar segmento e tribunal em listas com os códigos e nomes da Resolução
+CNJ nº 65/2008, e informar a comarca/unidade de origem em quatro dígitos. Esses
+valores são sugestões editáveis e não bloqueiam a informação dos componentes
+próprios de cada processo. O CNJ é validado pelo dígito verificador antes de
+salvar. Autuação e distribuição são datas opcionais.
 O número é único na empresa, inclusive entre arquivados. O processo nasce Ativo,
 com prioridade Normal, sigilo Público e sem responsável obrigatório.
 Cartas recebidas usam a classe processual.
