@@ -88,12 +88,14 @@ GET /api/catalog/{product}
 ```
 
 Para a simulação pública do Fokus Law, `POST /api/catalog/fokus-law/quote` recebe
-somente códigos publicados, ciclo, plano opcional e faixas publicadas. Retorna
+códigos publicados, ciclo, plano opcional, modo (`plan`, `modules` ou `custom`)
+e faixas publicadas. `custom` permite montar uma assinatura sem plano-base com
+quaisquer módulos publicados e compatíveis do Fokus Law; `modules` mantém a
+regra de módulos avulsos habilitados para outros fluxos. Retorna
 valores mensal/anual, detalhamento de plano-base, módulos extras e ajustes de
 capacidade, além da versão do catálogo. O endpoint não cria dados financeiros
 nem aceita preço enviado pelo navegador. O checkout autenticado recalcula a
-mesma composição e rejeita módulos avulsos não publicados para contratação
-independente.
+mesma composição.
 
 Contrato `0.1.0`, em forma resumida:
 

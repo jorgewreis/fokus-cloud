@@ -672,7 +672,7 @@ class AuthController extends Controller
             'privacy_version' => ['required', 'string', 'max:64'],
             'return_to' => ['nullable', Rule::in(['/contratar/fokus-law', '/portal/fokus-law/assinatura', '/assinaturas/fokus-law', '/assinaturas/fokus-lead'])],
             'offer_intent' => ['nullable', 'array'],
-            'offer_intent.selection_mode' => ['required_with:offer_intent', Rule::in(['modules', 'plan'])],
+            'offer_intent.selection_mode' => ['required_with:offer_intent', Rule::in(['custom', 'modules', 'plan'])],
             'offer_intent.plan_code' => ['nullable', 'string', 'max:64'],
             'offer_intent.cycle' => ['required_with:offer_intent', Rule::in(['monthly', 'annual'])],
             'offer_intent.items' => ['required_with:offer_intent', 'array', 'min:1', 'max:40'],

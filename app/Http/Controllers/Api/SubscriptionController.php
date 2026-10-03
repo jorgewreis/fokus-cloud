@@ -41,7 +41,7 @@ class SubscriptionController extends Controller
             'items.*.personalizations.*.type_code' => ['required', 'string', 'max:64'],
             'items.*.personalizations.*.tier_value' => ['required', 'integer', 'min:1'],
             'cycle' => ['required', Rule::in(['monthly', 'annual'])],
-            'selection_mode' => ['required', Rule::in(['modules', 'plan'])],
+            'selection_mode' => ['required', Rule::in(['custom', 'modules', 'plan'])],
             'plan_code' => ['nullable', 'required_if:selection_mode,plan', 'string', 'max:64'],
         ]);
         $product = DB::table('products')->where('code', $productCode)->where('active', true)->where('status', 'ativo')->first();
@@ -90,7 +90,7 @@ class SubscriptionController extends Controller
             'items.*.personalizations.*.type_code' => ['required', 'string', 'max:64'],
             'items.*.personalizations.*.tier_value' => ['required', 'integer', 'min:1'],
             'cycle' => ['required', Rule::in(['monthly', 'annual'])],
-            'selection_mode' => ['required', Rule::in(['modules', 'plan'])],
+            'selection_mode' => ['required', Rule::in(['custom', 'modules', 'plan'])],
             'plan_code' => ['nullable', 'string', 'max:64'],
             'voucher_code' => ['nullable', 'string', 'max:64'],
         ]);
@@ -569,6 +569,7 @@ class SubscriptionController extends Controller
 
     private function quote(object $product, array $data, CatalogManager $catalog, bool $allowPendingPublication = false): array
     {
+        abort_if(($data['selection_mode'] ?? null) === 'custom' && ! in_array($product->code, ['law', 'fokus-law'], true), 422, 'A assinatura personalizada está disponível somente para o Fokus Law.');
         $codes = array_column($data['items'], 'module_code');
         abort_if(count($codes) !== count(array_unique($codes)), 422, 'Um módulo só pode ser informado uma vez.');
         $publishedCatalog = $catalog->publicCatalog($product->code, $allowPendingPublication);
@@ -587,6 +588,8 @@ class SubscriptionController extends Controller
             abort_unless($publishedModules->has($code), 422, 'Módulo inválido para este produto.');
             if ($publishedPlan && ! in_array($code, $publishedPlan['module_codes'] ?? [], true)) {
                 abort_unless((bool) ($publishedModules[$code]['available_standalone'] ?? false), 422, 'Este módulo não está disponível como adicional independente.');
+            } elseif (! $publishedPlan && $data['selection_mode'] !== 'custom') {
+                abort_unless((bool) ($publishedModules[$code]['available_standalone'] ?? false), 422, 'Este módulo não está disponível como contratação independente.');
             }
         }
         foreach ($data['items'] as $requested) {

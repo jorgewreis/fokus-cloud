@@ -76,14 +76,14 @@
       status.textContent = 'Atualizando cotação pelo servidor…'; buy.setAttribute('aria-disabled', 'true');
       const items = codes.map((code) => ({ module_code: code, quantity: 1, personalizations: [...document.querySelectorAll(`[data-module="${CSS.escape(code)}"]`)].filter((select) => select.value).map((select) => ({ type_code: select.dataset.type, tier_value: Number(select.value) })) }));
       try {
-        const result = await window.FokusApi.request('/catalog/fokus-law/quote', { method: 'POST', body: { product_code: 'fokus-law', selection_mode: state.plan ? 'plan' : 'modules', ...(state.plan ? { plan_code: state.plan } : {}), cycle: state.cycle, items } });
+        const result = await window.FokusApi.request('/catalog/fokus-law/quote', { method: 'POST', body: { product_code: 'fokus-law', selection_mode: state.plan ? 'plan' : 'custom', ...(state.plan ? { plan_code: state.plan } : {}), cycle: state.cycle, items } });
         state.quote = result;
         $('#lp-total').textContent = money(result.amount);
         $('#lp-cycle-label').textContent = state.cycle === 'annual' ? 'Total anual' : 'Total mensal';
         $('#lp-summary-items').innerHTML = `<p>${state.plan ? 'Plano-base' : 'Plano-base (sem plano)'}: ${money(result.breakdown.plan_base)}</p><p>${state.plan ? 'Módulos extras' : 'Módulos selecionados pelo preço integral'}: ${money(result.breakdown.extra_modules)}</p><p>Ajuste de capacidade: ${money(result.breakdown.capacity_adjustments)}</p>`;
         status.textContent = `Cotação baseada na versão ${result.publication_versions.product_catalog_release_version || result.publication_versions.product_catalog_version} do catálogo.`;
         buy.setAttribute('aria-disabled', 'false');
-        localStorage.setItem('fokus-law-offer-v1', JSON.stringify({ selection_mode: state.plan ? 'plan' : 'modules', plan_code: state.plan || null, cycle: state.cycle, items, quote_version: result.publication_versions.product_catalog_release_version || result.publication_versions.product_catalog_version }));
+        localStorage.setItem('fokus-law-offer-v1', JSON.stringify({ selection_mode: state.plan ? 'plan' : 'custom', plan_code: state.plan || null, cycle: state.cycle, items, quote_version: result.publication_versions.product_catalog_release_version || result.publication_versions.product_catalog_version }));
       } catch (error) { state.quote = null; status.textContent = error.message || 'Não foi possível calcular esta composição.'; $('#lp-total').textContent = '—'; }
     }, 180);
   };
