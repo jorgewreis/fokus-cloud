@@ -62,9 +62,11 @@ códigos novos são cadastrados.
 O cadastro confirma o salvamento sem aguardar o Datajud. A consulta inicial é
 enfileirada na mesma transação e executada em segundo plano; o detalhe informa
 a espera e atualiza o resultado automaticamente, respeitando formulários abertos.
-Também há consulta mensal e por ação manual. São
-solicitados apenas classe, assuntos, órgão julgador e situação oficial, quando
-disponível. Não são importadas movimentações e a situação oficial não é
+Também há consulta mensal. A ação manual **Consultar Datajud** só aparece se a
+consulta automática não obtiver metadados oficiais; após obter dados, a ação é
+ocultada. A reconsulta manual é uma alternativa de contingência e não substitui
+a atualização mensal. São solicitados apenas classe, assuntos, órgão julgador e
+situação oficial, quando disponível. Não são importadas movimentações e a situação não é
 inferida delas. A ausência de retorno ou falha externa não desfaz o cadastro.
 
 Campos oficiais retornados não admitem edição direta. Campos ausentes ficam
@@ -77,7 +79,8 @@ um valor oficial novo pode gerar nova divergência.
 O detalhe informa a data da última tentativa. Falhas aparecem no próprio
 processo, sem fila de revisão ou notificações. A rotina diária consulta registros
 não arquivados cuja última tentativa tem pelo menos um mês, respeitando assinatura
-ativa e contexto contratado. Arquivados conservam a consulta manual.
+ativa e contexto contratado. Arquivados conservam a consulta manual de
+contingência quando a consulta automática não tiver obtido metadados oficiais.
 Consulte [Operação do Datajud](../09-operations/law-case-datajud.md).
 
 ## Organização interna

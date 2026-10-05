@@ -8,7 +8,7 @@ Primeira implementação para o Cartório Criminal, contexto contratado
 | Código | Funcionalidade | Regra e critério de aceite |
 | --- | --- | --- |
 | RF-GPR-001 | Cadastrar | Aceitar CNJ completo ou os 13 primeiros dígitos, completar estes com padrão editável por unidade e validar o número completo; exigir unidade ativa; datas opcionais; impedir repetição na empresa, inclusive arquivados. |
-| RF-GPR-002 | Consultar Datajud | Consulta inicial, mensal e manual; somente metadados básicos; data da última tentativa. |
+| RF-GPR-002 | Consultar Datajud | Consulta inicial e mensal automáticas; consulta manual de contingência somente quando a automática não obtiver metadados oficiais; somente metadados básicos; data da última tentativa. |
 | RF-GPR-003 | Tratar falhas | Preservar cadastro; liberar campos ausentes para preenchimento manual. |
 | RF-GPR-004 | Resolver divergências | Preservar valor manual; mostrar ambos; editor autorizado escolhe e decisão é registrada. |
 | RF-GPR-005 | Separar estados | Datajud não modifica estado operacional, responsável, prioridade, etiquetas ou sigilo. |

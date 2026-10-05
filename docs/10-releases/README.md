@@ -10,6 +10,8 @@ roteiro de homologacao, plano de testes, lacunas tecnicas e notas de release.
 | Versao | Entrega | Status |
 | --- | --- | --- |
 | [`0.0.1`](v0.1-admin-backoffice/release-notes.md) | Pacote documental rastreavel do Backoffice Admin | Concluida |
+| [`0.0.2`](v0.1-admin-backoffice/release-notes.md) | Seguranca interna do Backoffice Admin (Marco 2) | Concluida |
+| [`0.0.3`](v0.1-admin-backoffice/release-notes.md) | Catalogo administrativo e publicacao versionada (Marco 3) | Concluida |
 | [`0.1`](v0.1-admin-backoffice/README.md) | Backoffice Admin funcional em desenvolvimento/homologacao | Planejada |
 
 ## Regra de manutencao

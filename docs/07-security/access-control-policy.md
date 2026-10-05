@@ -34,11 +34,16 @@ Nenhum dado de empresa pode ser lido, alterado ou excluido sem validar usuario a
 | Ver assinatura ativa | Sim | Nao | Nao |
 | Gerenciar usuarios | Sim | Apenas na propria unidade | Nao |
 | Alterar perfil de usuario | Sim | Nao | Nao |
-| Suspender usuario | Sim, inclusive globalmente | Apenas na propria unidade | Nao |
-| Restaurar usuario | Sim, inclusive globalmente | Apenas na propria unidade | Nao |
+| Suspender usuario | Sim, apenas no vinculo com a empresa ativa | Apenas na propria unidade | Nao |
+| Restaurar usuario | Sim, apenas no vinculo com a empresa ativa | Apenas na propria unidade | Nao |
 | Transferir administracao | Sim | Nao | Nao |
 | Acessar backoffice interno | Nao | Nao | Nao |
 | Usar modulo do produto contratado | Conforme plano | Conforme plano | Conforme plano |
+
+A suspensao ou restauracao feita pela administracao da empresa altera somente o
+vinculo com a empresa ativa. Ela nao suspende nem restaura a conta global do
+usuario e nao altera vinculos com outras empresas. A conta global segue a
+[politica de seguranca da conta](account-security-policy.md).
 
 O catalogo atomico, os escopos, a ordem de avaliacao e os testes normativos
 estao definidos em [Modelo de permissoes e perfis](permission-model.md).

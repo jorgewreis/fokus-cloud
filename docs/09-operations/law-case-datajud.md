@@ -91,9 +91,11 @@ da aplicação mesmo quando a fila padrão usa outro driver. Não há migration 
 O scheduler inicia a cada minuto um worker exclusivo desta fila, em segundo
 plano, com proteção contra sobreposição. Cada consulta tem uma tentativa,
 timeout de 70 segundos e reserva de 120 segundos. Falhas são registradas no
-processo e permitem nova consulta manual, preservando o cadastro. O detalhe
+processo e permitem consulta manual de contingência, preservando o cadastro. A
+ação manual só fica disponível quando a consulta automática não obtém metadados
+oficiais; é ocultada depois de uma consulta automática bem-sucedida. O detalhe
 acompanha o resultado a cada cinco segundos, pausando enquanto houver um
-diálogo aberto. A consulta manual permanece disponível após a tentativa inicial.
+diálogo aberto.
 
 Em desenvolvimento, mantenha `php artisan schedule:work` em execução ou rode
 `php artisan queue:work law-datajud --queue=law-datajud --timeout=70 --tries=1`.
@@ -111,8 +113,9 @@ menos um mês, com assinatura ativa e módulo de Processos publicado no contexto
 
 A rotina agendada usa `withoutOverlapping`. Falhas externas contam como
 tentativa e são registradas no processo. Não há fila de revisão nem
-notificação. A ação manual permite nova consulta antes do vencimento mensal,
-inclusive para processos arquivados acessíveis.
+notificação. A ação manual permite nova consulta antes do vencimento mensal
+quando a consulta automática não tiver obtido metadados oficiais, inclusive
+para processos arquivados acessíveis.
 
 ## Limites da fonte
 

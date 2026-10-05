@@ -12,6 +12,7 @@ Esta pasta documenta seguranca, privacidade, protecao de dados, LGPD, ameacas e 
 - [Requisitos de seguranca](security-requirements.md)
 - [Privacidade e LGPD](privacy-and-lgpd.md)
 - [Modelo de ameacas](threat-model.md)
+- [Revisao de prontidao para producao - 2026-09-24](production-readiness-review-2026-09-24.md)
 
 ## Quando atualizar
 

@@ -228,14 +228,18 @@
         if (!active() || token !== viewToken) return;
         detailData = result; refs = local; currentId = id; body.replaceChildren(); body.className = 'law-record-detail-body'; headingActions.replaceChildren(); const c = result.case;
         const actions = toolbar(); actions.append(button('Voltar à lista', action(list)));
-        if (can('update')) { const consult = button('Consultar Datajud', action(async (event) => {
-          const control = event?.currentTarget;
-          if (control) { control.textContent = 'Consultando Datajud…'; control.setAttribute('aria-busy', 'true'); }
-          try { await request(`${apiPath(id)}/datajud`, { method: 'POST' }); await detail(id); }
-          finally { if (control?.isConnected) { control.textContent = 'Consultar Datajud'; control.removeAttribute('aria-busy'); } }
-        }));
-          if (c.datajud_sync_status === 'pending') { consult.disabled = true; consult.textContent = 'Consulta automática pendente'; }
-          actions.append(button('Editar processo', action(edit), true), consult);
+        if (can('update')) {
+          actions.append(button('Editar processo', action(edit), true));
+          if (!(c.official_fields || []).length) {
+            const consult = button('Consultar Datajud', action(async (event) => {
+              const control = event?.currentTarget;
+              if (control) { control.textContent = 'Consultando Datajud…'; control.setAttribute('aria-busy', 'true'); }
+              try { await request(`${apiPath(id)}/datajud`, { method: 'POST' }); await detail(id); }
+              finally { if (control?.isConnected) { control.textContent = 'Consultar Datajud'; control.removeAttribute('aria-busy'); } }
+            }));
+            if (c.datajud_sync_status === 'pending') { consult.disabled = true; consult.textContent = 'Consulta automática pendente'; }
+            actions.append(consult);
+          }
         }
         const archiveAction = c.operational_status === 'archived' ? 'reopen' : 'archive';
         if (can(archiveAction)) actions.append(button(archiveAction === 'archive' ? 'Arquivar' : 'Reabrir', action((event) => {

@@ -318,8 +318,11 @@ Toda exportacao deve gerar auditoria com:
 
 ## Datajud
 
-Consulta Datajud na v1 sera automatica, sem acao manual do usuario e sem area
-visivel de erro na interface operacional.
+Na v1, a consulta Datajud ocorre automaticamente no cadastro e nas movimentacoes
+e em rotina mensal. A acao **Consultar Datajud** so deve ser apresentada quando
+a consulta automatica nao tiver obtido metadados oficiais. Depois que a consulta
+automatica obtiver metadados, a acao manual nao e apresentada. A consulta manual
+de contingencia respeita a mesma autorizacao e o limite de chamadas da rota.
 
 A sincronizacao deve ocorrer quando o processo for criado ou movimentado. O job
 de sincronizacao deve respeitar:
@@ -341,7 +344,8 @@ o sistema deve:
 - registrar erro ou vazio de forma sanitizada;
 - nao alterar dados internos quando nao houver retorno confiavel;
 - nao criar bloqueio operacional;
-- nao criar acao adicional obrigatoria para o usuario.
+- apresentar a acao manual de consulta somente quando a consulta automatica nao
+  tiver obtido metadados oficiais; essa acao e opcional e nao bloqueia o trabalho.
 
 Detalhes de suporte orientativo e incidentes operacionais da unidade estao em
 [Operacao do Fokus Law](../09-operations/fokus-law-operations.md).
