@@ -15,6 +15,7 @@ Esta pasta documenta a arquitetura do Fokus Cloud, suas fronteiras, componentes,
 - [Governanca visual com Fokus Styles](fokus-styles-ui-governance.md)
 - [Inventario de CSS do Fokus Styles, Backoffice e Fokus Law](fokus-styles-css-inventory.md)
 - [Protocolo de auditoria página por componente do Fokus Styles](fokus-styles-component-audit.md)
+- [Matriz de componentes por página — Fokus Law](fokus-law-page-component-matrix.md)
 - [Padroes de interface do Backoffice](backoffice-ui-patterns.md)
 - [Iconografia do menu lateral do Backoffice](backoffice-sidebar-icons.md)
 
