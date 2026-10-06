@@ -42,6 +42,7 @@ Sobre essa base, produtos derivados podem evoluir por modulos independentes:
 - [Arquitetura do sistema](03-architecture/system-architecture.md)
 - [Governanca visual com Fokus Styles](03-architecture/fokus-styles-ui-governance.md)
 - [Inventario de CSS do Fokus Styles, Backoffice e Fokus Law](03-architecture/fokus-styles-css-inventory.md)
+- [Protocolo de auditoria página por componente do Fokus Styles](03-architecture/fokus-styles-component-audit.md)
 - [Fluxo de identidade e acesso](03-architecture/identity-and-access-flow.md)
 - [Catalogo de modulos](04-products/module-catalog.md)
 - [Requisitos do modulo identidade e acesso](05-requirements/identity-and-access.md)

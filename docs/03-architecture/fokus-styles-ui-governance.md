@@ -64,6 +64,11 @@ O [inventário de CSS do Fokus Styles, Backoffice e Fokus Law](fokus-styles-css-
 registra a propriedade das folhas ativas, composições do Cloud e estilos de
 domínio do Law. Consulte-o antes de migrar ou remover um seletor local.
 
+Auditorias página a página devem seguir o [protocolo de auditoria
+página × componente](fokus-styles-component-audit.md), que exige cobertura de
+todo o catálogo instalado e de cada consumidor, incluindo controles HTML
+nativos, estados e evidências renderizadas.
+
 ## Exemplos
 
 Correto:
