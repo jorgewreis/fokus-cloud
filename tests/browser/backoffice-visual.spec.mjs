@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
 
+const selectFokusOption = async (page, label, option) => {
+    await page.getByRole('button', { name: label, exact: true }).click();
+    await page.getByRole('option', { name: option, exact: true }).click();
+};
+
 const viewports = [
     ['desktop', { width: 1440, height: 900 }],
     ['notebook', { width: 1024, height: 768 }],
@@ -769,14 +774,14 @@ test('Superadministrador MFA pode iniciar acesso de suporte a perfil real', asyn
     await expect(page.locator('[data-law-login-form]')).toBeVisible();
     await expect(page.locator('[aria-labelledby="law-support-title"]')).toBeHidden();
     await page.locator('#law-email').fill('superadmin@example.test');
-    await expect(page.locator('#law-access-type')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Tipo de acesso', exact: true })).toBeVisible();
     await expect(page.locator('[aria-labelledby="law-support-title"]')).toBeHidden();
     expect(supportContextRequested).toBe(false);
-    await page.locator('#law-access-type').selectOption('support');
+    await selectFokusOption(page, 'Tipo de acesso', 'Acesso de suporte');
     await expect(page.locator('[aria-labelledby="law-support-title"]')).toBeVisible();
     expect(supportContextRequested).toBe(true);
-    await page.locator('#law-support-subscription').selectOption('SUB_TESTE_01');
-    await page.locator('#law-support-user').selectOption('MBS_TESTE_01');
+    await selectFokusOption(page, 'Assinatura', 'Empresa Teste — Essencial (Suspensa)');
+    await selectFokusOption(page, 'Usuário e perfil', 'Administrador — Pessoa Teste (pessoa@example.test)');
     await page.locator('#law-support-reason').fill('Investigar erro de permissões');
     await page.locator('#law-support-start').click();
     await expect(page).toHaveURL(/\/portal\/fokus-law$/);
@@ -787,8 +792,8 @@ test('Superadministrador pode escolher entrar pela própria assinatura Fokus Law
     await page.route('**/api/auth/law-context', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ user: { name: 'Superadmin Teste' }, systems: [{ value: 'CMP_SUPERADMIN', label: 'Empresa do Superadmin — Fokus Law · Advocacia', profiles: [{ value: 'admin', label: 'Administrador' }] }] }) }));
     await page.goto('/marketing/products/fokus-law.html');
     await page.locator('#law-email').fill('superadmin@example.test');
-    await expect(page.locator('#law-access-type')).toBeVisible();
-    await page.locator('#law-access-type').selectOption('subscription');
+    await expect(page.getByRole('button', { name: 'Tipo de acesso', exact: true })).toBeVisible();
+    await selectFokusOption(page, 'Tipo de acesso', 'Assinatura do Fokus Law');
     await expect(page.locator('#law-system')).toHaveValue('CMP_SUPERADMIN');
     await expect(page.locator('#law-password')).toBeEnabled();
     await expect(page.locator('[aria-labelledby="law-support-title"]')).toBeHidden();

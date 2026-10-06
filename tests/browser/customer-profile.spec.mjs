@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
+const selectFokusOption = async (page, label, option) => {
+    await page.getByRole('button', { name: label, exact: true }).click();
+    await page.getByRole('option', { name: option, exact: true }).click();
+};
+
 const shellView = await readFile(new URL('../../resources/views/portal/fokus-law.blade.php', import.meta.url), 'utf8');
 const profileView = await readFile(new URL('../../resources/views/portal/partials/fokus-law-profile.blade.php', import.meta.url), 'utf8');
 const renderedShell = shellView
@@ -168,9 +173,9 @@ test('gestão de usuários integrada ao shell funciona em desktop, tablet e celu
         await page.getByLabel('CPF').fill('11111111111');
         await page.getByLabel('E-mail').fill('nova@example.test');
         await page.getByRole('checkbox', { name: 'Setor Central' }).check();
-        await page.getByLabel('Perfil para Setor Central').selectOption(`${lawUnits[0].id}_OPERATOR`);
+        await selectFokusOption(page, 'Perfil para Setor Central', 'Operador');
         await page.getByRole('checkbox', { name: 'Setor Interior' }).check();
-        await page.getByLabel('Perfil para Setor Interior').selectOption(`${lawUnits[1].id}_OPERATOR`);
+        await selectFokusOption(page, 'Perfil para Setor Interior', 'Operador');
         await page.getByRole('button', { name: 'Enviar convite' }).click();
         await expect(page.locator('#content-region .law-users-feedback').first()).toContainText('CPF válido');
         expect(mutations.filter((item) => item.method === 'POST')).toHaveLength(0);
@@ -180,7 +185,7 @@ test('gestão de usuários integrada ao shell funciona em desktop, tablet e celu
         await expect(page.locator('#content-region .law-users-feedback').first()).toContainText('Convite enviado');
         expect(mutations.some((item) => item.method === 'POST' && item.body.cpf === '52998224725' && item.body.law_assignments.length === 2)).toBe(true);
 
-        await page.getByLabel('Perfil de Ana Operadora').selectOption(`${lawUnits[0].id}_CHIEF`);
+        await selectFokusOption(page, 'Perfil de Ana Operadora', 'Gestor da unidade');
         await page.getByRole('button', { name: 'Salvar perfil' }).click();
         await expect(page.locator('#content-region .law-users-feedback').first()).toContainText('Acesso atualizado');
         expect(mutations.some((item) => item.method === 'PUT' && item.body.law_access_role_id === `${lawUnits[0].id}_CHIEF` && item.body.version === 1)).toBe(true);
