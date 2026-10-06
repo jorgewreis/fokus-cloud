@@ -110,7 +110,7 @@
   <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script>
   <script src="/assets/js/api-client.js"></script>
   <script src="/assets/js/brazilian-documents.js?v=20260930-document-validation-v1"></script>
-  <script src="/portal/assets/fokus-law-select.js?v=20261006-select-contract-v1"></script>
+  <script src="/portal/assets/fokus-law-select.js?v=20261006-select-contract-v2"></script>
   <script src="/portal/assets/fokus-law-access.js?v=20261006-style-contract-v1" defer></script>
   <script src="/portal/assets/fokus-law-contacts.js?v=20261006-style-contract-v1" defer></script>
   <script src="/portal/assets/law-record-ui.js?v=20261006-style-contract-v1" defer></script>

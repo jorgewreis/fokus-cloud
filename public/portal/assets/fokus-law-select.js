@@ -4,6 +4,7 @@
   if (!Select) return;
 
   const labelsBySelect = new WeakMap();
+  const accessibilityBySelect = new WeakMap();
   const toggleIds = new WeakMap();
   const invalidListeners = new WeakSet();
   let sequence = 0;
@@ -41,6 +42,12 @@
     select.dataset.fs = 'select';
     const labels = labelsBySelect.get(select) || Array.from(select.labels || []);
     labelsBySelect.set(select, labels);
+    const accessibility = accessibilityBySelect.get(select) || {
+      ariaLabel: select.getAttribute('aria-label'),
+      labelledBy: select.getAttribute('aria-labelledby'),
+      describedBy: select.getAttribute('aria-describedby'),
+    };
+    accessibilityBySelect.set(select, accessibility);
     current?.dispose();
 
     const instance = new Select(select);
@@ -54,14 +61,14 @@
     });
 
     const labelText = labels.map((label) => label.textContent.trim()).filter(Boolean).join(' ');
-    const ariaLabel = select.getAttribute('aria-label');
-    const labelledBy = select.getAttribute('aria-labelledby');
-    if (ariaLabel) toggle.setAttribute('aria-label', ariaLabel);
-    else if (labelledBy) toggle.setAttribute('aria-labelledby', labelledBy);
+    if (accessibility.ariaLabel) toggle.setAttribute('aria-label', accessibility.ariaLabel);
+    else if (accessibility.labelledBy) toggle.setAttribute('aria-labelledby', accessibility.labelledBy);
     else if (labelText) toggle.setAttribute('aria-label', labelText.replace(/\s+/g, ' '));
     if (select.required) toggle.setAttribute('aria-required', 'true');
-    const describedBy = select.getAttribute('aria-describedby');
-    if (describedBy) toggle.setAttribute('aria-describedby', describedBy);
+    if (accessibility.describedBy) toggle.setAttribute('aria-describedby', accessibility.describedBy);
+    select.removeAttribute('aria-label');
+    select.removeAttribute('aria-labelledby');
+    select.removeAttribute('aria-describedby');
     toggle.disabled = select.disabled;
 
     copyThemeToMenu(select, instance.menuEl);
