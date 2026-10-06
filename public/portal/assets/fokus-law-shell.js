@@ -43,6 +43,7 @@
   const element = (tag, className, text) => {
     const node = document.createElement(tag);
     if (className) node.className = className;
+    if (tag === 'select') { node.classList.remove('fs-form-control'); node.classList.add('fs-form-select'); node.dataset.fs = 'select'; }
     if (text !== undefined) node.textContent = text;
     return node;
   };
@@ -819,7 +820,7 @@
         : field === 'status' ? companyStatus(profile.company.status) : profile.company[field];
         const display = element('dd', '', value || 'Não informado');
         if (!value) display.classList.add('is-empty');
-        if (field === 'status') { display.classList.add('law-company-status'); display.dataset.state = profile.company.status || 'unknown'; }
+        if (field === 'status') { display.classList.add('fs-badge', 'law-company-status'); display.dataset.state = profile.company.status || 'unknown'; }
         row.append(display);
         details.append(row);
       });
@@ -955,21 +956,28 @@
       const row = element('div', 'law-preference-row');
       const text = element('div');
       const inputId = `pref-${key}`;
-      const labelElement = element('label');
-      labelElement.htmlFor = inputId;
+      const labelElement = element('div');
       labelElement.append(element('strong', '', label));
       labelElement.append(element('br'));
-      labelElement.append(element('small', '', description));
+      const descriptionElement = element('small', '', description);
+      descriptionElement.id = `${inputId}-description`;
+      labelElement.append(descriptionElement);
       text.append(labelElement);
-      const input = document.createElement('input');
+      const input = element('input', 'fs-check-input');
       input.id = inputId;
       input.type = 'checkbox';
+      input.setAttribute('aria-describedby', descriptionElement.id);
       input.checked = localStorage.getItem(preferenceKey(context.user.id, key)) === 'true';
       input.addEventListener('change', () => {
         localStorage.setItem(preferenceKey(context.user.id, key), String(input.checked));
         if (key === 'reduced-motion') document.documentElement.classList.toggle('law-pref-reduced-motion', input.checked);
       });
-      row.append(text, input);
+      const control = element('div', 'fs-check law-preference-control');
+      const visualLabel = element('label', 'fs-check-label');
+      visualLabel.htmlFor = inputId;
+      visualLabel.setAttribute('aria-label', label);
+      control.append(input, visualLabel);
+      row.append(text, control);
       card.append(row);
     });
     contentRegion.append(card);
@@ -1190,12 +1198,12 @@
     form.append(element('p', 'law-page-lede', 'Escolha o plano, o ciclo de cobrança e a capacidade dos módulos disponíveis para sua empresa.'));
     const controls = element('div', 'law-subscription-controls');
     const planWrap = lawSubscriptionField('Plano publicado (opcional)');
-    const planSelect = element('select', 'fs-form-control'); planSelect.name = 'target_plan_id'; planSelect.append(new Option('Composição personalizada', ''));
+    const planSelect = element('select', 'fs-form-select'); planSelect.name = 'target_plan_id'; planSelect.append(new Option('Composição personalizada', ''));
     availablePlans.forEach((plan) => planSelect.append(new Option(`${plan.name} · ${formatLawMoney(plan.monthly_amount)}/mês`, plan.id)));
     planSelect.value = availablePlans.find((plan) => plan.code === current.plan_code)?.id || '';
     planWrap.append(planSelect); controls.append(planWrap);
     const cycleWrap = lawSubscriptionField('Forma de cobrança');
-    const cycleSelect = element('select', 'fs-form-control'); cycleSelect.append(new Option('Mensal', 'monthly'), new Option('Anual', 'annual')); cycleSelect.value = current.billing_cycle || 'monthly'; cycleWrap.append(cycleSelect); controls.append(cycleWrap);
+    const cycleSelect = element('select', 'fs-form-select'); cycleSelect.append(new Option('Mensal', 'monthly'), new Option('Anual', 'annual')); cycleSelect.value = current.billing_cycle || 'monthly'; cycleWrap.append(cycleSelect); controls.append(cycleWrap);
     form.append(controls);
 
     const scope = activeContexts.has('judiciario') ? 'Judiciário' : activeContexts.has('orgao_publico') ? 'Órgão público' : activeSegment === 'advocacia' ? 'Advocacia' : activeSegment === 'setor_publico' ? 'Setor público' : 'Sua empresa';
@@ -1221,7 +1229,7 @@
       (module.personalizations || []).filter((p) => p.active).forEach((p) => {
         const selected = lawSubscriptionPersonalizations(currentItems.get(module.code)?.conditions?.personalizations).find((entry) => entry.type_code === p.type_code);
         const field = lawSubscriptionField(p.name || p.type_label || p.label || p.type_code);
-        const select = element('select', 'fs-form-control'); select.dataset.typeCode = p.type_code;
+        const select = element('select', 'fs-form-select'); select.dataset.typeCode = p.type_code;
         (p.tiers || []).filter((tier) => tier.active).forEach((tier) => select.append(new Option(`${Number(tier.value).toLocaleString('pt-BR')} · ${formatLawMoney(tier.additional_monthly_amount)}/mês`, tier.value)));
         if (selected) select.value = String(selected.value ?? selected.tier_value ?? selected.tier?.value);
         if (!select.options.length) return;

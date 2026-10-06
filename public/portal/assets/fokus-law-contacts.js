@@ -25,7 +25,7 @@
   };
   const field = (labelText, control) => { const label = $('label', 'law-record-field'); label.append($('span', '', labelText), control); return label; };
   const setWidth = (control, width) => { control.classList.add(`fs-width-${width}`); return control; };
-  const select = (items, value = '') => { const control = $('select', 'fs-form-control'); items.forEach(([v, label]) => { const option = new Option(label, v); option.selected = v === value; control.append(option); }); return control; };
+  const select = (items, value = '') => { const control = $('select', 'fs-form-select'); control.dataset.fs = 'select'; items.forEach(([v, label]) => { const option = new Option(label, v); option.selected = v === value; control.append(option); }); return control; };
   const input = (value = '', placeholder = '', maxLength = 255) => { const control = $('input', 'fs-form-control'); control.value = value || ''; control.placeholder = placeholder; control.maxLength = maxLength; return control; };
   const button = (text, cls = 'fs-btn fs-btn-secondary', fn) => { const control = $('button', cls, text); control.type = 'button'; if (fn) control.addEventListener('click', (event) => fn(event)); return control; };
   const CONTACT_PAGE_SIZE = 15;
@@ -243,7 +243,7 @@
         datalist.replaceChildren(...(result.tags || []).map((name) => { const option = $('option'); option.value = name; return option; }));
         tbody.replaceChildren();
         if (!currentItems.length) {
-          const tr = $('tr'); const td = $('td', 'law-record-empty', 'Nenhum contato encontrado com estes filtros.'); td.colSpan = 5; tr.append(td); tbody.append(tr);
+          const tr = $('tr'); const td = $('td', 'fs-table-empty law-record-empty', 'Nenhum contato encontrado com estes filtros.'); td.colSpan = 5; tr.append(td); tbody.append(tr);
         } else currentItems.forEach((contact) => {
           const tr = $('tr');
           const titleCell = $('td'); const open = button(contact.display_name, 'law-record-name', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget));
@@ -748,7 +748,7 @@
           const activeRoles = (linked.roles || []).filter((item) => item.current).map((item) => `${roleLabels[item.code] || item.code}${item.code === 'other' && item.detail ? `: ${item.detail}` : ''}`);
           const activeDesignations = (linked.designations || []).filter((item) => item.current).map((item) => item.name);
           const metadataTags = $('div', 'law-record-detail-linked-tags');
-          [...activeRoles, ...activeDesignations].forEach((value) => metadataTags.append($('span', 'law-record-detail-linked-tag', value)));
+          [...activeRoles, ...activeDesignations].forEach((value) => metadataTags.append($('span', 'fs-badge law-record-detail-linked-tag', value)));
           if (metadataTags.children.length) row.append(metadataTags);
           items.append(row);
       });
@@ -1044,7 +1044,7 @@
           }));
           actionsCell.append(actionList); row.append(actionsCell); body.append(row);
         });
-        if (!body.children.length) { const row = $('tr'); const cell = $('td', 'law-record-empty', 'Ainda não há políticas ativas ou pendentes.'); cell.colSpan = 5; row.append(cell); body.append(row); }
+        if (!body.children.length) { const row = $('tr'); const cell = $('td', 'fs-table-empty law-record-empty', 'Ainda não há políticas ativas ou pendentes.'); cell.colSpan = 5; row.append(cell); body.append(row); }
         renderPagination(paging, { page, per_page: CONTACT_PAGE_SIZE, total: sharingRows.length }, drawSharingPage, 'políticas');
       };
       table.append(body); tableWrap.append(table); tableCard.append(tableHeader, tableWrap, paging); root.append(tableCard); drawSharingPage();
@@ -1100,7 +1100,7 @@
             finally { trigger.disabled = false; }
           })); row.append(action); tbody.append(row);
         });
-        if (!tbody.children.length) { const row = $('tr'); const cell = $('td', 'law-record-empty', 'Não há cadastros pendentes.'); cell.colSpan = 4; row.append(cell); tbody.append(row); }
+        if (!tbody.children.length) { const row = $('tr'); const cell = $('td', 'fs-table-empty law-record-empty', 'Não há cadastros pendentes.'); cell.colSpan = 4; row.append(cell); tbody.append(row); }
         renderPagination(paging, pageResult.pagination || {}, async (page) => drawTable(await window.FokusApi.request(`/law/contacts/quality/review?type=action_required&page=${page}&per_page=${CONTACT_PAGE_SIZE}`)), 'cadastros');
       };
       table.append(thead, tbody); wrap.append(table); tableCard.append(tableHeader, wrap, paging);

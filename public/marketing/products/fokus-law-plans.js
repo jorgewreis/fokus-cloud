@@ -41,8 +41,8 @@
   const renderOffers = () => {
     const plans = state.catalog?.plans || [];
     $('#lp-offers-heading').textContent = 'Escolha um plano ou monte uma assinatura personalizada por módulos.';
-    const cards = plans.map((plan) => `<article class="lp-offer"><p class="law-eyebrow law-eyebrow-purple">${esc(segmentNames[plan.segment] || plan.segment || 'Fokus Law')}</p><h3>${esc(plan.name)}</h3><p>${esc(plan.description || 'Composição de módulos para sua operação.')}</p><strong>${money(state.cycle === 'annual' ? plan.annual_amount : plan.monthly_amount)} <small>/ ${state.cycle === 'annual' ? 'ano' : 'mês'}</small></strong><button type="button" data-choose-plan="${esc(plan.code)}">Configurar plano</button></article>`);
-    cards.unshift('<article class="lp-offer lp-standalone"><p class="law-eyebrow law-eyebrow-sage">SEM PLANO-BASE</p><h3>Assinatura Personalizada</h3><p>Escolha somente os módulos de que sua operação precisa. Cada módulo é cobrado pelo preço integral publicado.</p><button type="button" data-choose-custom>Escolher módulos</button></article>');
+    const cards = plans.map((plan) => `<article class="lp-offer"><p class="law-eyebrow law-eyebrow-purple">${esc(segmentNames[plan.segment] || plan.segment || 'Fokus Law')}</p><h3>${esc(plan.name)}</h3><p>${esc(plan.description || 'Composição de módulos para sua operação.')}</p><strong>${money(state.cycle === 'annual' ? plan.annual_amount : plan.monthly_amount)} <small>/ ${state.cycle === 'annual' ? 'ano' : 'mês'}</small></strong><button class="fs-btn fs-btn-primary law-submit" type="button" data-choose-plan="${esc(plan.code)}">Configurar plano</button></article>`);
+    cards.unshift('<article class="lp-offer lp-standalone"><p class="law-eyebrow law-eyebrow-sage">SEM PLANO-BASE</p><h3>Assinatura Personalizada</h3><p>Escolha somente os módulos de que sua operação precisa. Cada módulo é cobrado pelo preço integral publicado.</p><button class="fs-btn fs-btn-primary law-submit" type="button" data-choose-custom>Escolher módulos</button></article>');
     offersNode.innerHTML = cards.length ? cards.join('') : '<p class="lp-state">Não há planos ou módulos avulsos disponíveis no catálogo publicado.</p>';
   };
 
@@ -73,7 +73,7 @@
       const note = isRequired ? 'Incluído no plano'
         : isAutoSelected ? 'Selecionado automaticamente como dependência necessária'
           : blockedReason;
-      return `<label class="lp-module-choice${locked && blockedReason ? ' is-unavailable' : ''}"><input type="checkbox" value="${esc(module.code)}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''}><span><strong>${esc(module.name)}${isRequired ? ' · incluído' : isAutoSelected ? ' · dependência necessária' : ''}</strong><small>${esc(module.description || '')}${!isRequired ? `${module.description ? ' · ' : ''}${money(module.monthly_amount)}/mês por módulo` : ''}${note ? ` · ${esc(note)}` : ''}</small></span></label>`;
+      return `<label class="lp-module-choice fs-check${locked && blockedReason ? ' is-unavailable' : ''}"><input class="fs-check-input" type="checkbox" value="${esc(module.code)}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''}><span class="fs-check-label"><strong>${esc(module.name)}${isRequired ? ' · incluído' : isAutoSelected ? ' · dependência necessária' : ''}</strong><small>${esc(module.description || '')}${!isRequired ? `${module.description ? ' · ' : ''}${money(module.monthly_amount)}/mês por módulo` : ''}${note ? ` · ${esc(note)}` : ''}</small></span></label>`;
     }).join('') : '<p class="lp-standalone-unavailable">Este plano não possui módulos adicionais liberados para contratação.</p>';
     const feedback = document.createElement('p');
     feedback.className = 'lp-selection-feedback';
@@ -111,7 +111,7 @@
       const planDefault = currentPlan()?.personalization_defaults?.find((item) => item.personalization_id === personalization.id);
       const baseTier = planDefault ? tiers.find((tier) => tier.id === planDefault.tier_id) : (personalization.required ? tiers[0] : null);
       const type = personalization.type_code;
-      return `<div class="lp-personalization"><label>${esc(module.name)} · ${esc(personalization.name || personalization.type_label || type)}<select data-module="${esc(module.code)}" data-type="${esc(type)}" data-max-tier="${Number(tiers.at(-1)?.value || 0)}">${!personalization.required && !baseTier ? '<option value="">Sem limite adicional</option>' : ''}${tiers.map((tier) => `<option value="${Number(tier.value)}" ${(baseTier?.id === tier.id) ? 'selected' : ''}>${Number(tier.value).toLocaleString('pt-BR')} · ${money(tier.additional_monthly_amount)}/mês</option>`).join('')}<option value="over_limit">Acima de ${Number(tiers.at(-1)?.value || 0).toLocaleString('pt-BR')} · solicitar proposta</option></select></label></div>`;
+      return `<div class="lp-personalization"><label>${esc(module.name)} · ${esc(personalization.name || personalization.type_label || type)}<select class="fs-form-select" data-fs="select" data-module="${esc(module.code)}" data-type="${esc(type)}" data-max-tier="${Number(tiers.at(-1)?.value || 0)}">${!personalization.required && !baseTier ? '<option value="">Sem limite adicional</option>' : ''}${tiers.map((tier) => `<option value="${Number(tier.value)}" ${(baseTier?.id === tier.id) ? 'selected' : ''}>${Number(tier.value).toLocaleString('pt-BR')} · ${money(tier.additional_monthly_amount)}/mês</option>`).join('')}<option value="over_limit">Acima de ${Number(tiers.at(-1)?.value || 0).toLocaleString('pt-BR')} · solicitar proposta</option></select></label></div>`;
     })).join('');
     node.querySelectorAll('select').forEach((select) => select.addEventListener('change', quote));
   };

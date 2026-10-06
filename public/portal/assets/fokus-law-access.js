@@ -2,6 +2,7 @@
   const node = (tag, className = '', text = '') => {
     const item = document.createElement(tag);
     if (className) item.className = className;
+    if (tag === 'select') { item.classList.add('fs-form-select'); item.dataset.fs = 'select'; }
     if (text) item.textContent = text;
     return item;
   };

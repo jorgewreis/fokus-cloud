@@ -7,8 +7,8 @@
   <meta name="theme-color" content="#1b1028" />
   <title>Fokus Law | Fokus Cloud</title>
   <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20260923-support-mode-v1" />
-  <link rel="stylesheet" href="/marketing/products/fokus-law.css?v=20260924-law-access-choice-v1" />
-  <link rel="stylesheet" href="/portal/assets/fokus-law-shell.css?v=20261006-fs-component-contract-v1" />
+  <link rel="stylesheet" href="/marketing/products/fokus-law.css?v=20261006-style-contract-v1" />
+  <link rel="stylesheet" href="/portal/assets/fokus-law-shell.css?v=20261006-style-contract-v1" />
 </head>
 <body class="fokus-law-shell-page">
   <a class="law-shell-skip" href="#law-workspace">Pular para o conteúdo principal</a>
@@ -45,7 +45,7 @@
           </div>
           <div class="law-unit-context" id="unit-context" hidden>
             <label class="law-context-caption" for="law-unit-select">SETOR</label>
-            <select class="law-unit-select" id="law-unit-select" aria-label="Setor ativo"></select>
+            <select class="law-unit-select fs-form-select" data-fs="select" data-fs-select-theme="dark" id="law-unit-select" aria-label="Setor ativo"></select>
           </div>
         </header>
 
@@ -58,7 +58,7 @@
         </nav>
 
         <footer class="law-user-footer">
-          <div class="law-user-avatar" id="user-avatar" aria-hidden="true">—</div>
+          <div class="law-user-avatar fs-avatar fs-avatar-sm" id="user-avatar" aria-hidden="true">—</div>
           <div class="law-user-meta"><strong id="user-name">—</strong><span id="user-email">—</span></div>
           <a class="law-profile-link" href="/portal/fokus-law/perfil" aria-label="Meu perfil" title="Meu perfil">
             <img src="/backoffice/assets/icons/Settings-User--Streamline-Ultimate.png" alt="" />
@@ -110,11 +110,12 @@
   <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script>
   <script src="/assets/js/api-client.js"></script>
   <script src="/assets/js/brazilian-documents.js?v=20260930-document-validation-v1"></script>
-  <script src="/portal/assets/fokus-law-access.js?v=20260930-document-validation-v1" defer></script>
-  <script src="/portal/assets/fokus-law-contacts.js?v=20261002-record-compositions-v1" defer></script>
-  <script src="/portal/assets/law-record-ui.js?v=20261002-record-compositions-v1" defer></script>
-  <script src="/portal/assets/fokus-law-processes.js?v=20261005-datajud-fallback-v1" defer></script>
-  <script src="/portal/assets/fokus-law-shell.js?v=20261003-custom-subscription-v1" defer></script>
+  <script src="/portal/assets/fokus-law-select.js?v=20261006-select-contract-v1"></script>
+  <script src="/portal/assets/fokus-law-access.js?v=20261006-style-contract-v1" defer></script>
+  <script src="/portal/assets/fokus-law-contacts.js?v=20261006-style-contract-v1" defer></script>
+  <script src="/portal/assets/law-record-ui.js?v=20261006-style-contract-v1" defer></script>
+  <script src="/portal/assets/fokus-law-processes.js?v=20261006-style-contract-v1" defer></script>
+  <script src="/portal/assets/fokus-law-shell.js?v=20261006-style-contract-v1" defer></script>
   <script src="/assets/js/portal-profile.js?v=20260925-profile-v4" defer></script>
 </body>
 </html>

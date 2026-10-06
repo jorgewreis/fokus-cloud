@@ -3,6 +3,7 @@
   let sequence = 0;
   const node = (tag, cls = '', text = '') => {
     const el = document.createElement(tag); el.className = cls;
+    if (tag === 'select') { el.classList.add('fs-form-select'); el.dataset.fs = 'select'; }
     if (text !== '') el.textContent = text; return el;
   };
   const button = (text, action, primary = false) => {
