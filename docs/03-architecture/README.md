@@ -13,6 +13,7 @@ Esta pasta documenta a arquitetura do Fokus Cloud, suas fronteiras, componentes,
 - [Design system de formularios](form-design-system.md)
 - [Consulta de enderecos ViaCEP no Fokus Law](fokus-law-viacep-address-lookup.md)
 - [Governanca visual com Fokus Styles](fokus-styles-ui-governance.md)
+- [Inventario de CSS do Fokus Styles, Backoffice e Fokus Law](fokus-styles-css-inventory.md)
 - [Padroes de interface do Backoffice](backoffice-ui-patterns.md)
 - [Iconografia do menu lateral do Backoffice](backoffice-sidebar-icons.md)
 

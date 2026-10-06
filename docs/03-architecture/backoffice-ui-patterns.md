@@ -7,6 +7,9 @@ dados, permissões e regras de negócio.
 As regras gerais de decisão, fronteira entre repositórios e validação estão em
 [Governança visual com Fokus Styles](fokus-styles-ui-governance.md). Os prompts
 reutilizáveis ficam em [`docs/prompts`](../prompts/).
+O [inventário de CSS](fokus-styles-css-inventory.md) identifica as folhas
+ativas do shell, composições compartilhadas e arquivos legados sem carregamento
+confirmado.
 
 ## Regra de composição
 

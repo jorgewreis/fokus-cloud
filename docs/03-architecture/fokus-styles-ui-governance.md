@@ -60,6 +60,10 @@ Os prompts reutilizáveis correspondentes estão em [`docs/prompts`](../prompts/
 o prompt-base, o de componente específico, o de elemento composto, os dois
 fluxos de página e o prompt de perguntas.
 
+O [inventário de CSS do Fokus Styles, Backoffice e Fokus Law](fokus-styles-css-inventory.md)
+registra a propriedade das folhas ativas, composições do Cloud e estilos de
+domínio do Law. Consulte-o antes de migrar ou remover um seletor local.
+
 ## Exemplos
 
 Correto:

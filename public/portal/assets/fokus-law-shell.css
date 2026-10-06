@@ -35,8 +35,11 @@
 }
 
 .fokus-law-shell-page :is(button, input, select, textarea) { font-family: var(--law-body, "Google Sans", sans-serif); }
-.fokus-law-shell-page .fs-btn-primary { border-color: var(--law-shell-panel); background: var(--law-shell-panel); color: #fff; }
-.fokus-law-shell-page .fs-btn-primary:is(:hover, :focus-visible) { border-color: var(--law-shell-purple); background: var(--law-shell-purple); color: #fff; }
+.fokus-law-shell-page .fs-btn-primary {
+  --fs-btn-color: #fff;
+  --fs-btn-bg: var(--law-shell-panel);
+  --fs-btn-border-color: var(--law-shell-panel);
+}
 .fokus-law-shell-page :is(button, input, select, textarea):focus-visible { outline-color: var(--law-shell-purple); }
 [hidden] { display: none !important; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
@@ -340,7 +343,6 @@
 .law-subscription-field { display: grid; gap: 7px; min-width: 0; }
 .law-subscription-field > span { color: #554a5c; font-size: 12px; font-weight: 600; }
 .law-subscription-field .fs-form-control { width: 100%; min-height: 42px; border-color: #dcd4e3; border-radius: 7px; background-color: #fff; color: var(--law-shell-ink); }
-.law-subscription-field .fs-form-control:focus { border-color: var(--law-shell-purple); box-shadow: 0 0 0 3px rgba(115,82,165,.12); }
 .law-subscription-scope { margin: 0 0 14px; color: var(--law-shell-panel); font-size: 13px; font-weight: 700; }
 .law-subscription-module-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 16px; }
 .law-subscription-module-card { min-width: 0; padding: 21px; border: 1px solid #e7e0eb; border-radius: 13px; background: linear-gradient(165deg, #fff, #fdfbfe); transition: border-color .2s, box-shadow .2s, transform .2s; }
