@@ -58,22 +58,54 @@ MODO DE AUDITORIA E PLANEJAMENTO
 1. Inspecione estado do repositório, documentação, implementação, consumidores,
    contratos e dependências relevantes antes de concluir. Preserve todo
    trabalho local; nunca reverta alterações alheias.
-2. Separe fatos confirmados por inspeção, divergências observadas,
+2. Sempre localize, leia e use a matriz página × componente vigente antes da
+   auditoria. Para Fokus Law, a referência obrigatória neste workspace é
+   `docs/03-architecture/fokus-law-page-component-matrix.md`. Confira se ela
+   corresponde ao escopo e às rotas atuais; não descarte páginas, estados,
+   controles ou achados já registrados. Se estiver ausente ou desatualizada,
+   complete primeiro o inventário e identifique claramente lacunas e mudanças
+   de escopo. Para outros produtos, procure a matriz equivalente e não trate a
+   matriz Law como cobertura de Lead ou Backoffice.
+3. Compare sistematicamente cada célula da matriz com a versão instalada do
+   Fokus Styles, markup/DOM, estilos e consumidores atuais, além da renderização
+   autenticada quando disponível. Audite todos os componentes efetivamente
+   usados por página, inclusive `label`, tipos de `input`, `select`, `textarea`,
+   `button`, links, tabelas, grupos de opções, nomes acessíveis, drawers,
+   dialogs, modals e estados. Atualize a matriz para refletir evidências e
+   divergências confirmadas, cobertura não verificável e correções aprovadas;
+   nunca registre como alinhado o que não foi verificado.
+4. Separe fatos confirmados por inspeção, divergências observadas,
    recomendações, pendências e bloqueios. Não declare equivalência visual com
    base apenas em nomes de classes ou markup.
-3. Produza uma matriz página × componente: uso observado, contrato oficial,
+5. Mantenha a matriz página × componente com: uso observado, contrato oficial,
    classe/variante/token efetivos, consumidores, estados verificados e resultado
    (`alinhado`, `divergente`, `não usado` ou `não verificável`). Liste também
    qualquer componente local que substitua ou sobreponha um contrato `fs-*`.
    Complete todas as páginas do escopo antes de resumir; se o trabalho precisar
    ser dividido, delimite as páginas de cada parte e consolide sem duplicar nem
    omitir consumidores.
-4. Classifique cada proposta como reutilização, composição compartilhada,
+6. Classifique cada proposta como reutilização, composição compartilhada,
    mudança no Fokus Styles ou complemento exclusivo local. Aponte repositório,
    consumidores, impactos e riscos relevantes.
-5. Apresente plano e critérios de aceite antes de alterar interfaces. Não
-   execute a implementação enquanto ela não estiver solicitada ou autorizada.
-6. Se fatos puderem ser confirmados no código ou na documentação, investigue em
+7. Ao concluir a auditoria, apresente todas as correções recomendadas em um
+   único lote revisável, agrupado por produto/página e prioridade. Para cada
+   item, informe divergência e evidência, correção proposta, arquivos ou
+   repositório afetados, impacto/risco e critério de aceite. Inclua uma seção
+   explícita de itens fora do lote e pendências não verificáveis.
+8. Antes de alterar qualquer interface, peça uma única confirmação para o lote
+   consolidado. Permita que o usuário aprove o lote inteiro ou indique itens
+   específicos para aprovar, rejeitar ou adiar. Não peça confirmações item a
+   item e não comece alterações dependentes enquanto essa confirmação estiver
+   pendente. Uma solicitação genérica para executar o agente autoriza a
+   auditoria, não substitui a confirmação do lote de correções. Se o usuário já
+   aprovar explicitamente o lote identificado, não pergunte de novo.
+9. Depois da confirmação, implemente todas as correções aprovadas dentro do
+   escopo confirmado, atualize as células correspondentes da matriz e valide os
+   critérios de aceite. Correções rejeitadas ou adiadas permanecem registradas
+   como pendentes, sem serem aplicadas. Se surgir uma alteração material fora
+   do lote aprovado, pause somente essa alteração, descreva o novo item e peça
+   autorização complementar agrupada quando houver novos itens.
+10. Se fatos puderem ser confirmados no código ou na documentação, investigue em
    vez de perguntar. Para uma decisão material ainda sem resposta, siga
    `docs/prompts/perguntas-fokus-styles.txt`: faça somente uma pergunta por
    vez, com exatamente cinco alternativas mutuamente compreensíveis, marque
