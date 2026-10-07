@@ -158,7 +158,7 @@ html[data-theme="light"] .styles-theme-toggle-icon-cloud { display: block; }
     .layout-lab-main { padding: 16px; }
     .layout-lab-header { display: grid; gap: 14px; }
     .layout-lab-header h3 { font-size: 24px; }
-    .layout-lab-header button, .layout-lab-panel-heading button { width: 100%; }
+    .layout-lab-header button, .layout-lab-panel-heading button { width: auto; max-width: 100%; justify-self: start; }
     .layout-lab-metrics { grid-template-columns: 1fr; gap: 8px; margin: 18px 0 14px; }
     .layout-lab-metrics article, .layout-lab-panel { padding: 14px; }
     .layout-lab-content, .layout-lab-content[data-mode="flex"] { grid-template-columns: 1fr; flex-direction: column; gap: 10px; }

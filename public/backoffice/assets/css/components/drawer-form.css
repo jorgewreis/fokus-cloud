@@ -41,7 +41,7 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: ca
 .fs-confirmation-dialog .fs-modal-footer .fs-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 120px; min-height: 38px; padding: 0 16px; }
 .fs-confirmation-dialog .fs-modal-footer .fs-btn-outline-primary { color: var(--fs-alert-primary-text) !important; border: var(--fs-border-width, 1px) solid var(--fs-color-primary) !important; background: transparent !important; }
 .fs-confirmation-dialog .fs-modal-footer .fs-btn-danger { color: var(--fs-color-on-danger) !important; border: var(--fs-border-width, 1px) solid var(--fs-color-danger) !important; background: var(--fs-color-danger) !important; }
-@media (max-width: 520px) { .fs-confirmation-dialog .fs-modal-footer { flex-direction: column-reverse; } .fs-confirmation-dialog .fs-modal-footer .fs-btn { width: 100%; min-width: 0; } }
+@media (max-width: 520px) { .fs-confirmation-dialog .fs-modal-footer { align-items: flex-start; flex-direction: column-reverse; } .fs-confirmation-dialog .fs-modal-footer .fs-btn { width: auto; max-width: 100%; min-width: 0; } }
 .backoffice-records-page .fs-card-body dl { display: flex; flex-direction: column; gap: 10px; margin: 0; }
 .backoffice-records-page .fs-card-body dl > div { display: flex; flex-direction: column; gap: 2px; }
 @media (max-width: 680px) { .backoffice-records-page { padding-bottom: 36px; } }
@@ -236,7 +236,7 @@ body > .backoffice-records-drawer.fs-offcanvas-end { width: 480px; max-width: ca
     .create-drawer .painel-form .fs-width-400,
     .create-drawer .painel-form .fs-width-600,
     .create-drawer .painel-form .drawer-actions .fs-width-300,
-    .create-drawer .painel-form .drawer-actions .fs-width-400 { width: 100% !important; }
+    .create-drawer .painel-form .drawer-actions .fs-width-400 { width: auto !important; max-width: 100% !important; }
     .create-drawer .painel-form .drawer-actions { flex-wrap: wrap; }
 }
 

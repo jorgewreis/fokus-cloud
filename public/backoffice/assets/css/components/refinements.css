@@ -16,7 +16,7 @@
 /* BUTTONS */
 .submit.fs-btn-sm { min-height: 30px; padding-inline: 12px; font-size: 11px; }
 .submit.fs-btn-lg { min-height: 44px; padding-inline: 20px; font-size: 14px; }
-.button-block { width: 100%; }
+.button-block { display: inline-flex; width: auto; max-width: 100%; }
 .button-warning { background: var(--color-yellow-500); color: var(--color-yellow-950); }
 .button-link { min-height: auto; padding: 0; border: 0; background: transparent; color: var(--role-color-600); text-decoration: none; }
 .icon-button.is-active, .icon-button[aria-pressed="true"] { border-color: var(--role-color-300); background: var(--role-color-050); color: var(--role-color-700); }
@@ -189,7 +189,8 @@ html[data-theme="dark"] .fs-modal { background: rgb(0 0 0 / .68); }
 @media (max-width: 640px) {
     .fs-btn-lg, .submit.fs-btn-lg { min-height: 44px; }
     .filter-bar { align-items: stretch; }
-    .filter-bar .form-field, .filter-bar .fs-btn { width: 100%; flex-basis: 100%; }
+    .filter-bar .form-field { width: 100%; flex-basis: 100%; }
+    .filter-bar .fs-btn { width: auto; max-width: 100%; flex-basis: auto; align-self: flex-start; }
     .modal-body-scroll { max-height: calc(100vh - 180px); }
     .data-table.is-responsive { min-width: 0; }
     .data-table.is-responsive thead { display: none; }

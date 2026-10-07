@@ -197,8 +197,9 @@
 }
 
 .btn-block {
-    display: flex;
-    width: 100%;
+    display: inline-flex;
+    width: auto;
+    max-width: 100%;
 }
 
 .btn-icon {

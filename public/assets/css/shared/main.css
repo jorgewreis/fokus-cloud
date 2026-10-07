@@ -3,4 +3,4 @@
  * `npm run styles:sync` before dev/build. Page-specific CSS belongs in
  * `public/assets/css/modules/<module>` and must be linked after this file.
  */
-@import url("./fokus.css?v=20260917-page-header-v13");
+@import url("./fokus.css?v=20261007-compact-buttons-v1");

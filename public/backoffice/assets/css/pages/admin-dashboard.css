@@ -322,8 +322,9 @@ html[data-role="admin"] .sidebar-institutional img {
 }
 .admin-final-dashboard .admin-user-menu a,
 .admin-final-dashboard .admin-user-menu button {
-    display: block;
-    width: 100%;
+    display: inline-flex;
+    width: auto;
+    max-width: 100%;
     padding: 9px 10px;
     border: 0 !important;
     border-radius: 5px;
@@ -1110,7 +1111,9 @@ html[data-role="admin"] .fs-sidebar .bottom {
     padding: 0 15px;
 }
 html[data-role="admin"] .fs-sidebar .bottom .sidebar-button {
-    width: 100%;
+    width: auto;
+    max-width: 100%;
+    align-self: flex-start;
     margin: 0;
     padding: 5px 15px;
     gap: 16px;
@@ -1461,7 +1464,8 @@ html[data-role="admin"] .fs-sidebar > .sidebar-nav::-webkit-scrollbar-thumb {
    sublink buttons only. */
 html[data-role="admin"] .fs-sidebar .sidebar-subnav-button {
     box-sizing: border-box;
-    width: 100% !important;
+    width: auto !important;
+    max-width: 100% !important;
     height: 30px !important;
     min-height: 30px !important;
     margin: 0 !important;

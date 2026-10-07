@@ -34,6 +34,49 @@ const directionalIconPolicy = `
     content: none !important;
 }
 `;
+const compactButtonPolicy = `
+
+/* Action buttons stay content-sized across desktop and compact layouts. */
+button:not(.fs-form-select):not(.fs-btn-icon):not(.fs-btn-close):not(.fs-table-action),
+.fs-btn:not(.fs-btn-icon):not(.fs-btn-close):not(.fs-table-action),
+.btn:not(.btn-icon),
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+    box-sizing: border-box;
+    width: fit-content;
+    inline-size: fit-content;
+    max-width: 100%;
+    flex: 0 1 auto;
+    align-self: flex-start;
+    justify-self: start;
+}
+
+.btn-block,
+.button-block,
+.fs-menu-list button,
+button.fs-dropdown-item,
+.fs-accordion-button,
+button.fs-list-group-item,
+.fs-button-group-vertical > .fs-btn,
+.fs-btn-group-responsive > .fs-btn,
+.fs-page-layout > .fs-btn,
+.layout-lab-header button,
+.layout-lab-panel-heading button,
+.form-actions .btn,
+.modal-footer .btn,
+.backoffice-records-page .fs-filter-form > .fs-btn,
+.backoffice-records-drawer .fs-offcanvas-footer > .fs-btn {
+    box-sizing: border-box;
+    display: inline-flex;
+    width: auto;
+    inline-size: auto;
+    max-width: 100%;
+    flex: 0 1 auto;
+    align-self: flex-start;
+    justify-self: start;
+}
+`;
 const immutableBackofficeContract = `
 
 /* Immutable Backoffice record-page contract. Page CSS may compose this API,
@@ -210,8 +253,9 @@ html[data-role="admin"] .fs-alert[hidden] {
     .backoffice-records-page > .fs-page-layout { padding-inline: 0; }
     .backoffice-records-page > section.fs-card-panel { width: 100%; }
     .backoffice-records-page .fs-filter-form .fs-form-label,
-    .backoffice-records-page .fs-filter-form > .fs-btn { flex-basis: 100%; }
-    .backoffice-records-drawer .fs-offcanvas-footer > .fs-btn { flex: 1 1 100%; }
+    .backoffice-records-page .fs-filter-form > .fs-btn { width: auto; max-width: 100%; flex-basis: auto; align-self: flex-start; }
+    .backoffice-records-drawer .fs-offcanvas-footer { align-items: flex-start; }
+    .backoffice-records-drawer .fs-offcanvas-footer > .fs-btn { width: auto; max-width: 100%; flex: 0 1 auto; }
 }
 `;
 const sharedPageHeaderPolicy = `
@@ -652,10 +696,10 @@ body { font-family: "Google Sans", sans-serif; }
 }
 @media (max-width: 680px) {
     .fs-page-layout { flex-direction: column; align-items: flex-start; }
-    .fs-page-layout > .fs-btn { width: 100%; justify-content: center; }
+    .fs-page-layout > .fs-btn { width: auto; max-width: 100%; justify-content: center; align-self: flex-start; }
     .fs-filter-form { padding: 16px; }
     .fs-card-panel > .fs-card-footer { align-items: flex-start; padding: 14px 16px; }
 }
 `;
-await writeFile(target, `${sanitizedCss}${linkPolicy}${directionalIconPolicy}${sharedPageHeaderPolicy}${immutableBackofficeContract}`, 'utf8');
+await writeFile(target, `${sanitizedCss}${linkPolicy}${directionalIconPolicy}${sharedPageHeaderPolicy}${compactButtonPolicy}${immutableBackofficeContract}`, 'utf8');
 console.log(`Synced fokus-styles to ${target}`);

@@ -201,12 +201,8 @@
 @media (max-width: 48rem) {
     .form-actions,
     .form-actions-between {
-        align-items: stretch;
+        align-items: flex-start;
         flex-direction: column;
-    }
-
-    .form-actions .btn {
-        width: 100%;
     }
 
     .form-horizontal .form-field { display: flex; align-items: stretch; }
