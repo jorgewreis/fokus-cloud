@@ -30,6 +30,17 @@
     if (!(select instanceof HTMLSelectElement) || !select.isConnected) return null;
 
     const current = Select.getInstance(select);
+    // Fokus Styles portals the custom menu to document.body. Modal's outside-click
+    // handler then sees every option click as a backdrop click and closes the dialog.
+    // Keep native selects in dialogs; fs-form-select still supplies the official styling.
+    if (select.closest('.fs-modal')) {
+      current?.dispose();
+      select.classList.add('fs-form-select');
+      select.removeAttribute('data-fs');
+      select.classList.remove('law-native-multiselect');
+      return null;
+    }
+
     if (select.multiple || select.size > 1) {
       current?.dispose();
       select.removeAttribute('data-fs');
