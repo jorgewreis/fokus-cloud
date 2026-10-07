@@ -60,7 +60,17 @@ class FormDesignSystemTest extends TestCase
         $this->assertStringContainsString('data-sidebar-item="companies"', $panel);
         $this->assertStringContainsString('data-platform-access-card', $home);
         $this->assertStringContainsString('platform-access.js?v=20260914-platform-access1', $home);
-        $this->assertStringContainsString('20260916-fokus-styles-auth-shell', $activate);
+        foreach ([
+            '/backoffice/assets/css/main.css',
+            '/assets/css/shared/fokus.css',
+            '/backoffice/assets/css/components/form-admin.css',
+        ] as $stylesheet) {
+            $this->assertMatchesRegularExpression(
+                sprintf('/href="%s\?v=20\d{6}-[a-z0-9-]+"/', preg_quote($stylesheet, '/')),
+                $activate,
+                $stylesheet . ' must have a versioned cache-buster'
+            );
+        }
 
         $this->assertStringContainsString('MutationObserver', $script);
         $this->assertStringContainsString('markRequiredFields', $script);
