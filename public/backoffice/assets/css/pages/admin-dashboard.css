@@ -549,7 +549,7 @@ html[data-role="admin"] .fs-sidebar .sidebar-group-chevron {
     width: 10px !important;
     height: 10px !important;
     flex: 0 0 10px !important;
-    margin: 0 0 0 auto !important;
+    margin: 0 0 0 8px !important;
     filter: none !important;
     opacity: .75 !important;
 }
