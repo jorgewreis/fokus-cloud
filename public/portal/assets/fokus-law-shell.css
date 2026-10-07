@@ -405,7 +405,7 @@
 .law-contact-card { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border: 1px solid var(--fs-color-border, #e5dfeb); border-radius: 9px; background: #fff; }
 .law-contact-card > div { display: grid; gap: 4px; }.law-contact-card span { color: var(--law-shell-muted); font-size: 12px; }
 .law-dashboard-contacts { min-width: 0; margin-top: 16px; }
-.law-record-heading-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 16px; }
+.law-record-heading-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 20px; }
 .law-contact-quality-heading .law-record-heading-actions { margin-bottom: 14px; }
 .law-record-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 15px 0; }
 .law-record-metric-card, .law-record-recent-card { min-width: 0; margin: 0; }
