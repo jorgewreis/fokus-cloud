@@ -879,8 +879,8 @@
 .law-record-chart-pj .law-record-chart-dot { background: #73c6b3; }
 .law-record-chart-dept .law-record-chart-dot { background: #f0bd72; }
 .law-record-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 11px; margin: 0 0 14px; }
-.law-record-metric-card { position: relative; min-width: 0; min-height: 104px; overflow: hidden; margin: 0; padding: 0; border: 1px solid #ebe7ef; border-radius: 12px; background: #fff; box-shadow: 0 5px 14px rgba(35,20,45,.035); }
-.law-record-metric-card::before { position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--metric-accent, #9270bc); content: ""; }
+.law-record-metric-card { position: relative; min-width: 0; min-height: 104px; overflow: hidden; margin: 0; padding: 0; border: 1px solid #ebe7ef; border-radius: 6px 12px 12px 6px; background: #fff; box-shadow: 0 5px 14px rgba(35,20,45,.035); }
+.law-record-metric-card::before { position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--metric-accent, #9270bc); content: ""; }
 .law-record-metric-violet { --metric-accent: #9270bc; --metric-wash: #f8f4fb; }
 .law-record-metric-blue { --metric-accent: #638fc5; --metric-wash: #f3f7fc; }
 .law-record-metric-teal { --metric-accent: #4e9e92; --metric-wash: #f1f8f7; }
