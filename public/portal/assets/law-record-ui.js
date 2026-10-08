@@ -7,7 +7,7 @@
     if (text !== '') el.textContent = text; return el;
   };
   const button = (text, action, primary = false) => {
-    const el = node('button', `fs-btn fs-btn-${primary ? 'primary' : 'secondary'}`, text); el.type = 'button';
+    const el = node('button', `fs-btn ${primary ? 'fs-btn-primary' : 'fs-btn-outline-primary'}`, text); el.type = 'button';
     if (action) el.addEventListener('click', action); return el;
   };
   const input = (value = '', type = 'text', max = 180) => {

@@ -25,7 +25,7 @@
                 <label class="fs-form-label" for="billing-payments-status"><span>Status</span><select class="fs-form-select fs-width-500" id="billing-payments-status" name="status"><option value="">Todos os status</option><option value="aguardando_pagamento">Aguardando pagamento</option><option value="aprovado">Aprovado</option><option value="recusado">Recusado</option><option value="cancelado">Cancelado</option><option value="estornado">Estornado</option><option value="em_disputa">Em disputa</option></select></label>
                 <label class="fs-form-label" for="billing-payments-from"><span>Registrado desde</span><input class="fs-form-control fs-width-400" id="billing-payments-from" name="date_from" type="date" /></label>
                 <label class="fs-form-label" for="billing-payments-to"><span>Registrado até</span><input class="fs-form-control fs-width-400" id="billing-payments-to" name="date_to" type="date" /></label>
-                <button class="fs-btn fs-btn-outline-secondary fs-width-300 fs-form-action" type="submit">Filtrar</button>
+                <button class="fs-btn fs-btn-outline-primary fs-width-300 fs-form-action" type="submit">Filtrar</button>
             </form>
         </section>
         <section class="fs-card fs-card-panel" aria-labelledby="billing-payments-title">
@@ -47,7 +47,7 @@
                 <label class="fs-form-label" for="billing-reconciliation-impact"><span>Impacto</span><select class="fs-form-select fs-width-400" id="billing-reconciliation-impact" name="impact"><option value="">Todos os impactos</option><option value="alto">Alto</option><option value="medio">Médio</option><option value="baixo">Baixo</option></select></label>
                 <label class="fs-form-label" for="billing-reconciliation-from"><span>Aberta desde</span><input class="fs-form-control fs-width-400" id="billing-reconciliation-from" name="date_from" type="date" /></label>
                 <label class="fs-form-label" for="billing-reconciliation-to"><span>Aberta até</span><input class="fs-form-control fs-width-400" id="billing-reconciliation-to" name="date_to" type="date" /></label>
-                <button class="fs-btn fs-btn-outline-secondary fs-width-300 fs-form-action" type="submit">Filtrar</button>
+                <button class="fs-btn fs-btn-outline-primary fs-width-300 fs-form-action" type="submit">Filtrar</button>
             </form>
         </section>
         <section class="fs-card fs-card-panel" aria-labelledby="billing-reconciliation-title">
@@ -68,7 +68,7 @@
                 <label class="fs-form-label" for="billing-refunds-status"><span>Status</span><select class="fs-form-select fs-width-500" id="billing-refunds-status" name="status"><option value="">Todos os status</option><option value="solicitado">Solicitado</option><option value="aprovado">Aprovado</option><option value="executado">Executado</option><option value="recusado">Recusado</option></select></label>
                 <label class="fs-form-label" for="billing-refunds-from"><span>Solicitado desde</span><input class="fs-form-control fs-width-400" id="billing-refunds-from" name="date_from" type="date" /></label>
                 <label class="fs-form-label" for="billing-refunds-to"><span>Solicitado até</span><input class="fs-form-control fs-width-400" id="billing-refunds-to" name="date_to" type="date" /></label>
-                <button class="fs-btn fs-btn-outline-secondary fs-width-300 fs-form-action" type="submit">Filtrar</button>
+                <button class="fs-btn fs-btn-outline-primary fs-width-300 fs-form-action" type="submit">Filtrar</button>
             </form>
         </section>
         <section class="fs-card fs-card-panel" aria-labelledby="billing-refunds-title">
@@ -88,5 +88,5 @@
     </aside>
 
     <button id="billing-action-trigger" type="button" data-fs="modal" data-fs-target="#billing-action-modal" aria-label="Confirmar ação financeira" hidden></button>
-    <div class="fs-modal" id="billing-action-modal" aria-hidden="true"><div class="fs-modal-dialog fs-modal-sm"><div class="fs-modal-content"><form id="billing-action-form"><div class="fs-modal-header"><h2 class="fs-modal-title" id="billing-action-title">Confirmar ação</h2><button class="fs-btn-close" type="button" data-fs-dismiss="modal" aria-label="Fechar"></button></div><div class="fs-modal-body"><p id="billing-action-description"></p><label class="fs-form-label" for="billing-action-reason"><span>Motivo</span><textarea class="fs-form-control" id="billing-action-reason" name="reason" maxlength="1000" required></textarea></label><div class="fs-alert fs-alert-danger" id="billing-action-error" role="alert" hidden></div></div><div class="fs-modal-footer"><button class="fs-btn fs-btn-outline-secondary" type="button" data-fs-dismiss="modal">Voltar</button><button class="fs-btn fs-btn-primary" id="billing-action-submit" type="submit">Confirmar</button></div></form></div></div></div>
+    <div class="fs-modal" id="billing-action-modal" aria-hidden="true"><div class="fs-modal-dialog fs-modal-sm"><div class="fs-modal-content"><form id="billing-action-form"><div class="fs-modal-header"><h2 class="fs-modal-title" id="billing-action-title">Confirmar ação</h2><button class="fs-btn-close" type="button" data-fs-dismiss="modal" aria-label="Fechar"></button></div><div class="fs-modal-body"><p id="billing-action-description"></p><label class="fs-form-label" for="billing-action-reason"><span>Motivo</span><textarea class="fs-form-control" id="billing-action-reason" name="reason" maxlength="1000" required></textarea></label><div class="fs-alert fs-alert-danger" id="billing-action-error" role="alert" hidden></div></div><div class="fs-modal-footer"><button class="fs-btn fs-btn-outline-primary" type="button" data-fs-dismiss="modal">Voltar</button><button class="fs-btn fs-btn-primary" id="billing-action-submit" type="submit">Confirmar</button></div></form></div></div></div>
 </main>

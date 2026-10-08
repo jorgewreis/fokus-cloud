@@ -200,7 +200,7 @@ export function mount(root, context = {}) {
         const actions = [];
         if (["aberta", "em_revisao"].includes(item.status)) actions.push(`<button class="fs-btn fs-btn-outline-primary" type="button" data-billing-action="reconciliation:revisar:${escapeHtml(item.id)}">Marcar em revisão</button>`);
         if (canManageReconciliation && ["aberta", "em_revisao"].includes(item.status)) {
-            actions.push(`<button class="fs-btn fs-btn-outline-secondary" type="button" data-billing-action="reconciliation:descartar:${escapeHtml(item.id)}">Descartar</button>`);
+            actions.push(`<button class="fs-btn fs-btn-outline-primary" type="button" data-billing-action="reconciliation:descartar:${escapeHtml(item.id)}">Descartar</button>`);
             actions.push(`<button class="fs-btn fs-btn-primary" type="button" data-billing-action="reconciliation:corrigir:${escapeHtml(item.id)}">Corrigir com status do Mercado Pago</button>`);
         }
         return `${card("Divergência", pairs)}${actions.length ? card("Ações", `<div class="fs-u-d-flex fs-u-flex-wrap fs-u-gap-2">${actions.join("")}</div>`) : ""}`;

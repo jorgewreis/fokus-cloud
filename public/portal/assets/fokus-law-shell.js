@@ -589,7 +589,7 @@
     modalError.setAttribute('role', 'alert');
     modalBody.append(modalError);
     const modalFooter = element('div', 'fs-modal-footer');
-    const modalCancel = element('button', 'fs-btn fs-btn-outline-secondary', 'Cancelar');
+    const modalCancel = element('button', 'fs-btn fs-btn-outline-primary', 'Cancelar');
     modalCancel.type = 'button';
     modalCancel.setAttribute('data-fs-dismiss', 'modal');
     const modalConfirm = element('button', 'fs-btn fs-btn-danger', 'Remover acesso');
@@ -635,7 +635,7 @@
           if (user.role !== 'admin') {
             const actions = element('div', 'law-users-row-actions');
             [['gestor', 'Gestor'], ['usuario', 'Usuário']].forEach(([role, label]) => {
-              const button = element('button', role === user.role ? 'fs-btn fs-btn-outline-primary' : 'fs-btn fs-btn-outline-secondary', role === user.role ? `${label} · atual` : `Definir perfil: ${label}`);
+              const button = element('button', 'fs-btn fs-btn-outline-primary', role === user.role ? `${label} · atual` : `Definir perfil: ${label}`);
               button.type = 'button';
               button.disabled = role === user.role || user.status === 'removido';
               button.addEventListener('click', () => updateUser(user, { role }));
@@ -649,7 +649,7 @@
               });
               actions.append(restore);
             } else if (user.status !== 'suspenso') {
-              const suspend = element('button', 'fs-btn fs-btn-outline-secondary', 'Suspender acesso');
+              const suspend = element('button', 'fs-btn fs-btn-outline-primary', 'Suspender acesso');
               suspend.type = 'button';
               suspend.addEventListener('click', () => updateUser(user, { status: 'suspenso' }));
               actions.append(suspend);

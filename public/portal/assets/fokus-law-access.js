@@ -107,7 +107,7 @@
       const selected = new Set(role?.permissions || []);
       catalog.filter((permission) => permission.granted_to_actor).forEach((permission) => { const label = node('label'); const input = node('input'); input.type = 'checkbox'; input.value = permission.code; input.checked = selected.has(permission.code); label.append(input, node('span', '', permission.description)); fieldset.append(label); });
       form.append(fieldset); const error = node('p', 'law-users-feedback'); error.setAttribute('role', 'alert'); form.append(error);
-      const save = node('button', 'fs-btn fs-btn-primary', 'Salvar perfil'); save.type = 'submit'; const cancel = node('button', 'fs-btn fs-btn-outline-secondary', 'Cancelar'); cancel.type = 'button'; cancel.addEventListener('click', () => form.remove()); form.append(save, cancel); region.append(form); name.focus();
+      const save = node('button', 'fs-btn fs-btn-primary', 'Salvar perfil'); save.type = 'submit'; const cancel = node('button', 'fs-btn fs-btn-outline-primary', 'Cancelar'); cancel.type = 'button'; cancel.addEventListener('click', () => form.remove()); form.append(save, cancel); region.append(form); name.focus();
       form.addEventListener('submit', async (event) => {
         event.preventDefault(); if (!form.reportValidity()) return;
         const permission_codes = [...fieldset.querySelectorAll('input:checked')].map((input) => input.value);
@@ -151,7 +151,7 @@
             assignable.forEach((role) => select.append(new Option(visibleRoleName(role, context), role.id, false, role.id === law.role_id)));
             const save = node('button', 'fs-btn fs-btn-outline-primary', 'Salvar perfil'); save.type = 'button'; save.disabled = !select.value || select.value === law.role_id;
             select.addEventListener('change', () => { save.disabled = select.value === law.role_id; }); save.addEventListener('click', () => updateAccess(user, law, { law_access_role_id: select.value }, save)); actions.append(select, save);
-            const state = node('button', 'fs-btn fs-btn-outline-secondary', law.status === 'removido' ? 'Restaurar acesso' : law.status === 'suspenso' ? 'Reativar acesso' : 'Suspender acesso'); state.type = 'button';
+            const state = node('button', 'fs-btn fs-btn-outline-primary', law.status === 'removido' ? 'Restaurar acesso' : law.status === 'suspenso' ? 'Reativar acesso' : 'Suspender acesso'); state.type = 'button';
             state.addEventListener('click', async () => {
               if (law.status === 'removido') { state.disabled = true; try { await request(`/portal/users/${encodeURIComponent(user.id)}/law-access/restore`, { method: 'POST', body: { law_unit_id: unitId, version: law.version } }); await render(context, region, 'Acesso restaurado.'); } catch (error) { feedback.dataset.state = 'error'; feedback.textContent = error.message; state.disabled = false; } }
               else updateAccess(user, law, { status: law.status === 'suspenso' ? 'ativo' : 'suspenso' }, state);
