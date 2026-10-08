@@ -55,3 +55,15 @@
 .law-hero-offer-action p{margin:0;color:#655c68;font-size:.68rem;line-height:1.35}
 @media(max-width:640px){.law-hero-offer-card{grid-template-columns:1fr;gap:.8rem;padding:1rem 1.05rem 1.1rem}.law-hero-offer-copy h2{font-size:2rem}.law-hero-offer-action{grid-column:1;grid-row:auto;gap:.5rem}.law-hero-offer-button{width:auto;max-width:100%;align-self:flex-start}}
 .law-module-status-warning{color:var(--fs-color-warning)}
+
+/* Module availability details and implementation progress */
+.law-module-card p+p{margin-top:10px}
+.law-module-card p.law-module-detail{font-size:.7rem;opacity:.7}
+.law-module-progress{width:100%;margin-top:12px}
+.law-module-progress-heading{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.4rem;color:rgba(255,255,255,.7);font-size:.7rem}
+.law-module-progress-heading strong{color:#fff;font-variant-numeric:tabular-nums}
+.law-module-progress progress{display:block;width:100%;height:8px;appearance:none;border:0;border-radius:999px;background:rgba(255,255,255,.16)}
+.law-module-progress progress::-webkit-progress-bar{border-radius:999px;background:rgba(255,255,255,.16)}
+.law-module-progress progress::-webkit-progress-value{border-radius:999px;background:var(--law-sage-light)}
+.law-module-progress progress::-moz-progress-bar{border-radius:999px;background:var(--law-sage-light)}
+.law-module-progress-warning progress::-webkit-progress-value,.law-module-progress-warning progress::-moz-progress-bar{background:var(--fs-color-warning)}
