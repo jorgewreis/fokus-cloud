@@ -12,6 +12,7 @@
   const copyThemeToMenu = (select, menu) => {
     const darkMenu = select.dataset.fsSelectTheme === 'dark';
     menu.classList.toggle('law-select-menu-dark', darkMenu);
+    menu.classList.toggle('law-select-menu-full-width-options', Boolean(select.closest('.law-process-settings-grid')));
     if (darkMenu) return;
     const computed = getComputedStyle(select);
     [
