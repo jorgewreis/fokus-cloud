@@ -340,12 +340,14 @@
     async function configure() {
       if (!refs?.units?.length) { body.append($('p', 'fs-alert fs-alert-info', 'Selecione uma unidade ativa no menu para consultar as configurações disponíveis.')); return; }
       const unit = select(refs.units.map((v) => [v.id, v.name]), refs.selected_unit_id);
-      const unitField = field('Unidade', unit); const host = $('div', 'fs-stack fs-stack-gap-3');
-      body.append(unitField, host);
+      const unitField = field('Unidade', unit); unitField.classList.add('law-process-settings-unit-field');
+      const unitBox = section('Unidade ativa', 'UND'); unitBox.classList.add('law-process-settings-unit'); unitBox.body.classList.add('law-process-settings-unit-body'); unitBox.body.append(unitField);
+      const host = $('div', 'law-process-settings-grid');
+      body.append(unitBox, host);
       async function draw() {
         const local = await references(unit.value); refs = local; host.replaceChildren();
         if (!local.can_configure) { host.append($('p', 'fs-alert fs-alert-warning', 'Você não pode configurar esta unidade.')); return; }
-        const cnjBox = section('Padrão do número CNJ', 'CNJ');
+        const cnjBox = section('Padrão do número CNJ', 'CNJ'); cnjBox.classList.add('law-process-settings-cnj'); cnjBox.body.classList.add('law-process-settings-cnj-body');
         const segment = select([['', 'Selecione o segmento'], ...(local.cnj_segments || []).map((item) => [item.code, `${item.code} - ${item.name}`])], local.cnj_defaults?.segment || ''); segment.required = true;
         const court = select([['', 'Selecione o tribunal']]); court.required = true;
         const updateCourts = (preferred = '') => {
@@ -358,18 +360,20 @@
         segment.addEventListener('change', () => updateCourts());
         const origin = input(local.cnj_defaults?.origin || '', 'text', 4); origin.inputMode = 'numeric'; origin.placeholder = '0103'; origin.required = true; origin.pattern = '\\d{4}';
         origin.addEventListener('input', () => { origin.value = origin.value.replace(/\D/g, '').slice(0, 4); });
-        const cnjForm = $('form', 'fs-stack fs-stack-gap-2'); const cnjError = message(); const cnjSave = button('Salvar padrão CNJ', null, true); cnjSave.type = 'submit';
+        const cnjForm = $('form', 'law-process-settings-cnj-form'); const cnjError = message(); const cnjSave = button('Salvar padrão CNJ', null, true); cnjSave.type = 'submit';
         cnjForm.append(field('Segmento', segment), field('Tribunal', court), field('Comarca/unidade de origem (4 dígitos)', origin, 'origin', 'Informe exatamente os quatro dígitos definidos para a comarca ou unidade de origem.'), cnjError, cnjSave);
         bindForm(cnjForm, cnjSave, cnjError, async () => { await request('/settings/cnj-defaults', { method: 'PUT', body: { law_unit_id: unit.value, segment: segment.value, court: court.value, origin: origin.value } }); await draw(); });
         cnjBox.body.append(cnjForm); host.append(cnjBox);
         for (const [type, title, values, property] of [['statuses', 'Estados operacionais', local.statuses, 'label'], ['tags', 'Etiquetas', local.tags, 'name'], ['roles', 'Complementos de papéis processuais', local.roles, 'label']]) {
-          const box = section(title);
+          const box = section(title); box.classList.add('law-process-settings-options', `law-process-settings-${type}`); box.body.classList.add('law-process-settings-options-body');
+          const list = $('div', 'law-process-settings-list');
           values.forEach((item) => {
-            const row = toolbar(); row.append($('span', '', item[property]));
-            if (!['active', 'archived'].includes(item.code)) row.append(button('Desativar', action(async () => { await request(`/options/${type}/${item.id}`, { method: 'DELETE' }); await draw(); })));
-            box.body.append(row);
+            const row = toolbar(); row.classList.add('law-process-settings-option'); row.append($('span', 'law-process-settings-option-name', item[property]));
+            if (!['active', 'archived'].includes(item.code)) { const remove = button('Desativar', action(async () => { await request(`/options/${type}/${item.id}`, { method: 'DELETE' }); await draw(); })); remove.classList.add('law-process-settings-option-remove'); row.append(remove); }
+            list.append(row);
           });
-          const form = $('form', 'fs-stack fs-stack-gap-2'); const name = input('', 'text', type === 'tags' ? 64 : 80); name.required = true; const error = message(); const save = button('Adicionar', null, true); save.type = 'submit'; form.append(field(type === 'tags' ? 'Nome da etiqueta' : 'Nome da opção', name, property), error, save); box.body.append(form);
+          box.body.append(list);
+          const form = $('form', 'law-process-settings-add-form'); const name = input('', 'text', type === 'tags' ? 64 : 80); name.required = true; name.placeholder = type === 'tags' ? 'Ex.: Prioridade' : 'Digite um nome'; const error = message(); const save = button('Adicionar', null, true); save.type = 'submit'; form.append(field(type === 'tags' ? 'Nome da etiqueta' : 'Nome da opção', name, property), error, save); box.body.append(form);
           bindForm(form, save, error, async () => { await request(`/options/${type}`, { method: 'POST', body: { law_unit_id: unit.value, [property]: name.value.trim() } }); await draw(); }); host.append(box);
         }
       }
