@@ -113,12 +113,19 @@ class LawCaseController extends Controller
         $paginator = $query->select('law_cases.*', 'unit.name as unit_name', 'responsible_user.name as responsible_name')
             ->orderByDesc('law_cases.created_at')->orderByDesc('law_cases.id')
             ->paginate($perPage, ['*'], 'page', $page);
+        $confidentialityAlertCount = (clone $query)->whereNotIn('law_cases.confidentiality_level', ['confidential', 'secret'])
+            ->whereExists(function ($priorities): void {
+                $priorities->selectRaw('1')->from('law_case_procedural_priorities as priority')
+                    ->whereColumn('priority.company_id', 'law_cases.company_id')->whereColumn('priority.law_case_id', 'law_cases.id')
+                    ->whereIn('priority.code', ['child_adolescent', 'domestic_violence']);
+            })->distinct()->count('law_cases.id');
 
         return response()->json([
             'cases' => $paginator->getCollection()->map(fn (object $row): array => $cases->caseArray($row))->values(),
             'pagination' => ['page' => $paginator->currentPage(), 'per_page' => $paginator->perPage(), 'total' => $paginator->total()],
             'summary_by_class' => $summary,
             'summary' => ['units' => (int) ($counts->units ?? 0), 'secret' => (int) ($counts->secret ?? 0), 'recent' => $recent],
+            'confidentiality_alert_count' => $confidentialityAlertCount,
             'include_archived' => $request->boolean('include_archived'),
         ]);
     }
@@ -255,6 +262,13 @@ class LawCaseController extends Controller
             $join->on('contact.id', '=', 'link.law_contact_id')->on('contact.company_id', '=', 'link.company_id');
         })->where('link.company_id', $companyId)->where('link.law_case_id', $case)->orderBy('contact.display_name')
             ->get(['link.id', 'link.case_role', 'link.case_role_label', 'contact.id as contact_id', 'contact.display_name']);
+        $contactCompanies = DB::table('law_contact_company_links as company_link')->join('law_contacts as linked_company', function ($join): void {
+            $join->on('linked_company.company_id', '=', 'company_link.company_id')->on('linked_company.id', '=', 'company_link.company_contact_id');
+        })->where('company_link.company_id', $companyId)->whereIn('company_link.person_contact_id', $contacts->pluck('contact_id'))
+            ->where('linked_company.status', 'ativo')->whereNull('linked_company.deleted_at')->whereNull('linked_company.merged_into_id')
+            ->orderBy('linked_company.display_name')->get(['company_link.person_contact_id', 'linked_company.display_name'])
+            ->groupBy('person_contact_id')->map(fn ($items) => $items->pluck('display_name')->unique()->implode(', '));
+        $contacts = $contacts->map(fn (object $contact): array => [...(array) $contact, 'company_name' => $contactCompanies->get($contact->contact_id)]);
 
         $relations = DB::table('law_case_relations as relation')->join('law_cases as other', function ($join): void {
             $join->on('other.company_id', '=', 'relation.company_id')->on('other.id', '=', 'relation.related_law_case_id');
