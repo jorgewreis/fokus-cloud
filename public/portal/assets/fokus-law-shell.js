@@ -1460,11 +1460,14 @@
     const search = document.querySelector('#global-search');
     const searchState = document.querySelector('#search-state');
     const contactsModule = visibleModules().find((module) => String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos'));
+    const processesModule = visibleModules().find((module) => String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('processos'));
     const canSearchContacts = Boolean(contactsModule && canLawPermission('law.contacts.view'));
+    const canSearchProcesses = Boolean(processesModule && canLawPermission('law.cases.view'));
+    const canSearch = canSearchContacts || canSearchProcesses;
     let searchTimer;
     let searchRequest = 0;
-    search.disabled = !canSearchContacts;
-    search.placeholder = canSearchContacts ? 'Pesquisar contatos' : 'Busca de contatos indisponível';
+    search.disabled = !canSearch;
+    search.placeholder = canSearch ? 'Pesquisar processos, partes e contatos' : 'Busca indisponível';
     search.setAttribute('role', 'combobox');
     search.setAttribute('aria-autocomplete', 'list');
 
@@ -1480,41 +1483,48 @@
       searchState.hidden = false;
       search.setAttribute('aria-expanded', 'true');
     };
-    const showSearchResults = (contacts) => {
+    const showSearchResults = (cases, contacts) => {
       searchState.replaceChildren();
-      if (!contacts.length) {
-        showSearchMessage('Nenhum contato encontrado.');
+      if (!cases.length && !contacts.length) {
+        showSearchMessage('Nenhum processo, parte ou contato encontrado.');
         return;
       }
-
-      const heading = element('p', 'law-search-results-heading', 'CONTATOS');
-      searchState.append(heading);
-      contacts.forEach((contact, index) => {
+      const addResults = (headingText, items, type) => {
+        if (!items.length) return;
+        searchState.append(element('p', 'law-search-results-heading', headingText));
+        items.forEach((item, index) => {
         const result = element('button', 'law-search-result');
         result.type = 'button';
         result.setAttribute('role', 'option');
         result.setAttribute('aria-selected', 'false');
-        result.dataset.contactSearchResult = String(index);
-        const name = element('strong', '', contact.display_name || 'Contato sem nome');
-        const professions = (contact.professions || []).slice(0, 2).join(', ');
-        const detail = [contact.legal_nature === 'pj' ? 'Pessoa jurídica' : 'Pessoa física', professions, contact.status === 'inativo' ? 'Inativo' : 'Ativo']
-          .filter(Boolean).join(' · ');
+        result.dataset.searchResult = String(index);
+        result.dataset.searchType = type;
+        const name = element('strong', '', type === 'case' ? item.case_number : (item.display_name || 'Contato sem nome'));
+        const detail = type === 'case'
+          ? [item.parties?.join(', '), item.case_class, item.unit_name].filter(Boolean).join(' · ')
+          : [item.legal_nature === 'pj' ? 'Pessoa jurídica' : 'Pessoa física', (item.professions || []).slice(0, 2).join(', '), item.status === 'inativo' ? 'Inativo' : 'Ativo'].filter(Boolean).join(' · ');
         result.append(name, element('span', '', detail));
         result.addEventListener('click', async () => {
           hideSearchState();
-          activeGroup = `module:${contactsModule.id}`;
-          renderNavigation();
           closeMobileNav();
           contentRegion.focus({ preventScroll: true });
           try {
-            await window.FokusLawContacts?.openSearchedContact(contentRegion, contact.id, Boolean(contact.is_shared), search);
+            if (type === 'case') {
+              activeGroup = `module:${processesModule.id}`;
+              renderNavigation();
+              await window.FokusLawProcesses?.openCase(contentRegion, context, item.id);
+            } else {
+              activeGroup = `module:${contactsModule.id}`;
+              renderNavigation();
+              await window.FokusLawContacts?.openSearchedContact(contentRegion, item.id, Boolean(item.is_shared), search);
+            }
           } catch (error) {
             showSearchMessage(error.message || 'Não foi possível abrir este contato.', 'error');
             search.focus();
           }
         });
         result.addEventListener('keydown', (event) => {
-          const options = [...searchState.querySelectorAll('[data-contact-search-result]')];
+          const options = [...searchState.querySelectorAll('[data-search-result]')];
           const currentIndex = options.indexOf(result);
           if (event.key === 'ArrowDown') { event.preventDefault(); options[(currentIndex + 1) % options.length]?.focus(); }
           if (event.key === 'ArrowUp') { event.preventDefault(); if (currentIndex === 0) search.focus(); else options[currentIndex - 1]?.focus(); }
@@ -1522,48 +1532,54 @@
         });
         searchState.append(result);
       });
+      };
+      addResults('PROCESSOS', cases, 'case');
+      addResults('CONTATOS', contacts, 'contact');
       searchState.hidden = false;
       search.setAttribute('aria-expanded', 'true');
     };
 
     search.addEventListener('focus', () => {
-      if (!canSearchContacts) return;
+      if (!canSearch) return;
       if (search.value.trim().length >= 2) {
         search.dispatchEvent(new Event('input'));
         return;
       }
-      showSearchMessage('Digite ao menos 2 caracteres para buscar nos contatos.');
+      showSearchMessage('Digite ao menos 2 caracteres para buscar processos, partes ou contatos.');
     });
     search.addEventListener('input', () => {
       window.clearTimeout(searchTimer);
       const query = search.value.trim();
-      if (!canSearchContacts) return;
+      if (!canSearch) return;
       if (query.length < 2) {
         searchRequest += 1;
-        showSearchMessage('Digite ao menos 2 caracteres para buscar nos contatos.');
+        showSearchMessage('Digite ao menos 2 caracteres para buscar processos, partes ou contatos.');
         return;
       }
-      showSearchMessage('Buscando contatos…');
+      showSearchMessage('Buscando processos, partes e contatos…');
       const requestId = ++searchRequest;
       searchTimer = window.setTimeout(async () => {
-        const params = new URLSearchParams({ q: query, page: '1', per_page: '10' });
         try {
-          const result = await FokusApi.request(`/law/contacts?${params.toString()}`);
+          const params = new URLSearchParams({ q: query, page: '1', per_page: '10' });
+          const [caseResult, contactResult] = await Promise.all([
+            canSearchProcesses ? FokusApi.request(`/law/cases/search?q=${encodeURIComponent(query)}`) : Promise.resolve({ cases: [] }),
+            canSearchContacts ? FokusApi.request(`/law/contacts?${params.toString()}`) : Promise.resolve({ contacts: [] }),
+          ]);
           if (requestId !== searchRequest || search.value.trim() !== query) return;
-          showSearchResults(result.contacts || []);
+          showSearchResults(caseResult.cases || [], contactResult.contacts || []);
         } catch (error) {
           if (requestId !== searchRequest) return;
-          showSearchMessage(error.message || 'Não foi possível pesquisar contatos.', 'error');
+          showSearchMessage(error.message || 'Não foi possível realizar a busca.', 'error');
         }
       }, 220);
     });
     search.addEventListener('keydown', (event) => {
       if (event.key === 'ArrowDown') {
-        const firstResult = searchState.querySelector('[data-contact-search-result]');
+        const firstResult = searchState.querySelector('[data-search-result]');
         if (firstResult && !searchState.hidden) { event.preventDefault(); firstResult.focus(); }
       }
       if (event.key === 'Enter' && !searchState.hidden) {
-        const firstResult = searchState.querySelector('[data-contact-search-result]');
+        const firstResult = searchState.querySelector('[data-search-result]');
         if (firstResult) { event.preventDefault(); firstResult.click(); }
       }
       if (event.key === 'Escape') hideSearchState();

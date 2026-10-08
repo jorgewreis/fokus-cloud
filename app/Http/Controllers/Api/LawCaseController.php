@@ -32,6 +32,50 @@ class LawCaseController extends Controller
     private const CONFIDENTIALITY = ['public', 'confidential', 'secret'];
     private const RELATION_TYPES = ['dependent', 'apenso'];
 
+    public function search(Request $request, LawCaseManagementService $cases)
+    {
+        $data = $request->validate(['q' => ['required', 'string', 'min:2', 'max:100']]);
+        $companyId = (string) $request->attributes->get('active_company_id');
+        $term = trim($data['q']);
+        $digits = preg_replace('/\D+/', '', $term) ?: '';
+        $rows = $this->visibleQuery($request, DB::table('law_cases'))
+            ->leftJoin('law_units as unit', fn ($join) => $join->on('unit.id', '=', 'law_cases.law_unit_id')->on('unit.company_id', '=', 'law_cases.company_id'))
+            ->where('law_cases.company_id', $companyId)
+            ->where('law_cases.operational_status', '!=', 'archived')
+            ->where(function ($query) use ($term, $digits): void {
+                if ($digits !== '') $query->where('law_cases.case_number', 'like', '%'.$digits.'%');
+                $query->orWhereExists(function ($party) use ($term): void {
+                    $party->selectRaw('1')->from('law_case_contacts as link')
+                        ->join('law_contacts as contact', function ($join): void {
+                            $join->on('contact.id', '=', 'link.law_contact_id')->on('contact.company_id', '=', 'link.company_id');
+                        })
+                        ->whereColumn('link.law_case_id', 'law_cases.id')
+                        ->whereColumn('link.company_id', 'law_cases.company_id')
+                        ->whereNull('contact.deleted_at')->whereNull('contact.merged_into_id')
+                        ->where('contact.display_name', 'like', '%'.$term.'%');
+                });
+            })
+            ->select('law_cases.id', 'law_cases.case_number', 'law_cases.case_class', 'law_cases.case_class_code', 'unit.name as unit_name')
+            ->orderByDesc('law_cases.created_at')->orderByDesc('law_cases.id')->limit(10)->get();
+
+        $partyNames = DB::table('law_case_contacts as link')
+            ->join('law_contacts as contact', function ($join): void {
+                $join->on('contact.id', '=', 'link.law_contact_id')->on('contact.company_id', '=', 'link.company_id');
+            })
+            ->where('link.company_id', $companyId)->whereIn('link.law_case_id', $rows->pluck('id'))
+            ->whereNull('contact.deleted_at')->whereNull('contact.merged_into_id')
+            ->orderBy('contact.display_name')->get(['link.law_case_id', 'contact.display_name'])
+            ->groupBy('law_case_id')->map(fn ($parties) => $parties->pluck('display_name')->unique()->take(3)->values());
+
+        return response()->json(['cases' => $rows->map(fn ($row): array => [
+            'id' => $row->id,
+            'case_number' => $cases->formatCaseNumber($row->case_number),
+            'case_class' => $row->case_class ?: 'Classe não informada',
+            'unit_name' => $row->unit_name,
+            'parties' => $partyNames->get($row->id, collect())->all(),
+        ])->values()]);
+    }
+
     public function index(Request $request, LawCaseManagementService $cases)
     {
         $companyId = (string) $request->attributes->get('active_company_id');

@@ -63,6 +63,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware(EnsureCompanyContext::class)->group(function () {
         Route::get('/law/shell-context', [LawShellController::class, 'context']);
         Route::prefix('law/cases')->middleware([App\Http\Middleware\EnsureLawCaseContext::class, 'law.permission:law.cases.view', App\Http\Middleware\LawCaseTransaction::class])->group(function () {
+            Route::get('/search', [LawCaseController::class, 'search']);
             Route::get('/', [LawCaseController::class, 'index']);
             Route::get('/references', [LawCaseController::class, 'references']);
             Route::get('/dashboard', [LawCaseController::class, 'dashboard']);

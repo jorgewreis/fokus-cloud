@@ -8,7 +8,7 @@
   <title>Fokus Law | Fokus Cloud</title>
   <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20261007-compact-buttons-v1" />
   <link rel="stylesheet" href="/marketing/products/fokus-law.css?v=20261007-compact-buttons-v1" />
-  <link rel="stylesheet" href="/portal/assets/fokus-law-shell.css?v=20261008-process-settings-pages-v1" />
+  <link rel="stylesheet" href="/portal/assets/fokus-law-shell.css?v=20261008-global-case-search-v1" />
 </head>
 <body class="fokus-law-shell-page">
   <a class="law-shell-skip" href="#law-workspace">Pular para o conteúdo principal</a>
@@ -79,9 +79,9 @@
         <div class="law-search-wrap">
           <img src="/backoffice/assets/icons/Search-Bar--Streamline-Ultimate.png" alt="" />
           <label class="visually-hidden" for="global-search">Pesquisar no Fokus Law</label>
-          <input class="fs-form-control" id="global-search" type="search" placeholder="Pesquisar contatos" autocomplete="off" aria-controls="search-state" aria-expanded="false" />
+          <input class="fs-form-control" id="global-search" type="search" placeholder="Pesquisar processos, partes e contatos" autocomplete="off" aria-controls="search-state" aria-expanded="false" />
           <kbd aria-hidden="true">Ctrl K</kbd>
-          <div class="law-search-state" id="search-state" role="region" aria-label="Resultados da busca de contatos" aria-live="polite" hidden></div>
+          <div class="law-search-state" id="search-state" role="region" aria-label="Resultados da busca" aria-live="polite" hidden></div>
         </div>
         <div class="law-toolbar-actions">
           <div class="law-popover-anchor">
@@ -115,7 +115,7 @@
   <script src="/portal/assets/fokus-law-contacts.js?v=20261006-style-contract-v1" defer></script>
   <script src="/portal/assets/law-record-ui.js?v=20261006-style-contract-v1" defer></script>
   <script src="/portal/assets/fokus-law-processes.js?v=20261008-process-settings-pages-v1" defer></script>
-  <script src="/portal/assets/fokus-law-shell.js?v=20261008-process-settings-pages-v1" defer></script>
+  <script src="/portal/assets/fokus-law-shell.js?v=20261008-global-case-search-v1" defer></script>
   <script src="/assets/js/portal-profile.js?v=20260925-profile-v4" defer></script>
 </body>
 </html>
