@@ -27,7 +27,7 @@
   const setWidth = (control, width) => { control.classList.add(`fs-width-${width}`); return control; };
   const select = (items, value = '') => { const control = $('select', 'fs-form-select'); control.dataset.fs = 'select'; items.forEach(([v, label]) => { const option = new Option(label, v); option.selected = v === value; control.append(option); }); return control; };
   const input = (value = '', placeholder = '', maxLength = 255) => { const control = $('input', 'fs-form-control'); control.value = value || ''; control.placeholder = placeholder; control.maxLength = maxLength; return control; };
-  const button = (text, cls = 'fs-btn fs-btn-secondary', fn) => { const control = $('button', cls, text); control.type = 'button'; if (fn) control.addEventListener('click', (event) => fn(event)); return control; };
+  const button = (text, cls = 'fs-btn fs-btn-outline-primary', fn) => { const control = $('button', cls, text); control.type = 'button'; if (fn) control.addEventListener('click', (event) => fn(event)); return control; };
   const CONTACT_PAGE_SIZE = 15;
   const renderPagination = (container, pagination, onPage, label = 'contatos') => window.FokusLawRecordUI.renderPagination(container, pagination, onPage, label);
   const iconButton = (label, icon, fn) => { const control = button('', 'fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action', fn); control.setAttribute('aria-label', label); control.title = label; const image = $('img'); image.src = `${CONTACT_ICONS}${icon}`; image.alt = ''; control.append(image); return control; };
@@ -67,7 +67,7 @@
       const modal = createModal(root, title, 'fs-modal-sm', opener);
       let accepted = false;
       modal.body.append($('p', '', description));
-      const cancel = button('Cancelar', 'fs-btn fs-btn-secondary', () => modal.close());
+      const cancel = button('Cancelar', 'fs-btn fs-btn-outline-primary', () => modal.close());
       const confirm = button(actionLabel, 'fs-btn fs-btn-danger', () => { accepted = true; modal.close(); });
       modal.footer.append(cancel, confirm);
       modal.onHidden(() => resolve(accepted));
@@ -90,7 +90,7 @@
       };
       choice.addEventListener('change', renderPreview); renderPreview();
       modal.body.append(field('Segmento e contexto', choice), preview, message);
-      modal.footer.append(button('Cancelar', 'fs-btn fs-btn-secondary', () => modal.close()));
+      modal.footer.append(button('Cancelar', 'fs-btn fs-btn-outline-primary', () => modal.close()));
       const save = button('Aplicar contexto', 'fs-btn fs-btn-primary', async () => {
         save.disabled = true;
         try { await window.FokusApi.request('/law/contacts/context', { method: 'PUT', body: { context_code: choice.value } }); modal.close(); await onSaved?.(); }
@@ -121,7 +121,7 @@
     const headingActions = $('div', 'law-record-heading-actions');
     if (can('law.contacts.create')) {
       headingActions.append(button('Novo contato', 'fs-btn fs-btn-primary', (event) => openEditor(root, null, refresh, event.currentTarget, relationshipOptions, designationOptions, competencyOptions)));
-      headingActions.append(button('Cadastrar unidade', 'fs-btn fs-btn-secondary', (event) => openEditor(root, null, refresh, event.currentTarget, relationshipOptions, designationOptions, competencyOptions, 'unit')));
+      headingActions.append(button('Cadastrar unidade', 'fs-btn fs-btn-outline-primary', (event) => openEditor(root, null, refresh, event.currentTarget, relationshipOptions, designationOptions, competencyOptions, 'unit')));
     }
     heading.append(headingActions);
     root.append(heading);
@@ -314,7 +314,7 @@
     professionNew.setAttribute('list', professionSuggestions.id);
     const addProfession = (value) => { const clean = value.trim(); if (clean && ![...professionRows.querySelectorAll('[data-profession]')].some((item) => item.dataset.profession.toLocaleLowerCase() === clean.toLocaleLowerCase())) professionRows.append(professionChip(clean)); professionSelect.value = ''; professionNew.value = ''; };
     professionSelect.addEventListener('change', () => { if (professionSelect.value) addProfession(professionSelect.value); });
-    professionSection.content.append(professionRows, field('Profissões cadastradas', professionSelect), field('Nova profissão / especificação', professionNew), professionSuggestions, button('Adicionar profissão', 'fs-btn fs-btn-secondary', () => addProfession(professionNew.value)));
+    professionSection.content.append(professionRows, field('Profissões cadastradas', professionSelect), field('Nova profissão / especificação', professionNew), professionSuggestions, button('Adicionar profissão', 'fs-btn fs-btn-outline-primary', () => addProfession(professionNew.value)));
     const institutionalSection = section('Dados institucionais');
     const institutionalData = Array.isArray(contact?.institutional_data) ? contact.institutional_data : (contact?.institutional_data ? [contact.institutional_data] : []);
     const courtData = institutionalData.find((item) => item.type === 'court_unit') || {};
@@ -381,7 +381,7 @@
         const roleOptions = [['', 'Selecione um papel'], ...(roleSets[contextData.context_code] || roleSets.judiciario)];
         const addRoleRow = (role = {}) => { const entry = $('div', 'law-contact-relationship-entry law-contact-role-entry'); const selectRole = setWidth(select(roleOptions, role.code || ''), 400); const detail = setWidth(input(role.detail || '', 'Complemento para Outro', 160), 500); entry.append(field('Papel', selectRole), field('Complemento (Outro)', detail), button('Remover papel', 'fs-btn fs-btn-danger law-contact-chip-remove', () => entry.remove())); entry.getMetadata = () => ({ code: selectRole.value, detail: selectRole.value === 'other' ? detail.value.trim() || null : null }); roleRows.append(entry); };
         metadata.roles.forEach(addRoleRow);
-        const addRole = button('Adicionar papel', 'fs-btn fs-btn-secondary', () => addRoleRow());
+        const addRole = button('Adicionar papel', 'fs-btn fs-btn-outline-primary', () => addRoleRow());
         roleGroup.append(roleRows, addRole);
         const designationGroup = $('div', 'law-contact-relationship-group');
         designationGroup.append($('h4', 'law-contact-relationship-title', 'Designações'));
@@ -389,7 +389,7 @@
         const designationList = $('datalist'); designationList.id = `${form.id}-designations-${id}`; designationOptions.forEach((value) => { const option = $('option'); option.value = value; designationList.append(option); });
         const addDesignationRow = (designation = {}) => { const entry = $('div', 'law-contact-relationship-entry law-contact-designation-entry'); const title = setWidth(input(designation.name || '', 'Ex.: DPC, IPC, CB/PM, SD/PM, TEN/PM', 120), 500); title.setAttribute('list', designationList.id); entry.append(field('Cargo/posto/graduação/função', title), button('Remover designação', 'fs-btn fs-btn-danger law-contact-chip-remove', () => entry.remove())); entry.getMetadata = () => title.value.trim() ? { name: title.value.trim() } : null; designationRows.append(entry); };
         metadata.designations.forEach(addDesignationRow);
-        const addDesignation = button('Adicionar designação', 'fs-btn fs-btn-secondary', () => addDesignationRow());
+        const addDesignation = button('Adicionar designação', 'fs-btn fs-btn-outline-primary', () => addDesignationRow());
         designationGroup.append(designationRows, addDesignation);
         row.append(roleGroup, designationGroup, designationList);
         row.dataset.linkId = id;
@@ -405,12 +405,12 @@
       documentSection = section('Documentos');
       documentRows = $('div', 'law-contact-repeat-list');
       (contact?.documents || []).filter((doc) => DOCUMENT_TYPES_BY_NATURE[nature.value].includes(doc.type)).forEach((doc) => documentRows.append(documentRow(doc, nature.value)));
-      documentSection.content.append(documentRows, button('Adicionar documento', 'fs-btn fs-btn-secondary', () => { if (documentRows.children.length < 4) documentRows.append(documentRow({}, nature.value)); }));
+      documentSection.content.append(documentRows, button('Adicionar documento', 'fs-btn fs-btn-outline-primary', () => { if (documentRows.children.length < 4) documentRows.append(documentRow({}, nature.value)); }));
     }
     const channelSection = section('Telefones e e-mails');
     const channelRows = $('div', 'law-contact-repeat-list'); (contact?.channels || []).filter((item) => window.lawContactsCanSensitive || !item.personal).forEach((item) => channelRows.append(channelRow(item)));
     enforceSinglePrimary(channelRows, (row) => row.querySelector('[data-channel-type]').value === 'email' ? 'email' : 'phone', true);
-    channelSection.content.append(channelRows, button('Adicionar telefone ou e-mail', 'fs-btn fs-btn-secondary', () => {
+    channelSection.content.append(channelRows, button('Adicionar telefone ou e-mail', 'fs-btn fs-btn-outline-primary', () => {
       if (channelRows.children.length >= 6) return;
       const row = channelRow(); channelRows.append(row);
       const group = row.querySelector('[data-channel-type]').value === 'email' ? 'email' : 'phone';
@@ -419,7 +419,7 @@
     const addressSection = section('Endereços');
     const addressRows = $('div', 'law-contact-repeat-list'); (contact?.addresses || []).forEach((item) => addressRows.append(addressRow(item)));
     enforceSinglePrimary(addressRows, () => 'address', true);
-    addressSection.content.append(addressRows, button('Adicionar endereço', 'fs-btn fs-btn-secondary', () => {
+    addressSection.content.append(addressRows, button('Adicionar endereço', 'fs-btn fs-btn-outline-primary', () => {
       if (addressRows.children.length >= 2) return;
       const row = addressRow(); addressRows.append(row);
       if (![...addressRows.children].some((other) => other !== row && other.querySelector('[data-primary]').value === '1')) row.querySelector('[data-primary]').value = '1';
@@ -432,7 +432,7 @@
     if (contact) {
       const excludedWrap = $('label', 'law-contact-check'); const excluded = $('input'); excluded.type = 'checkbox'; excluded.checked = Boolean(contact.sharing_excluded); excluded.name = 'sharing_excluded'; excludedWrap.append(excluded, $('span', '', 'Excluir dos compartilhamentos configurados')); basic.content.append(excludedWrap);
     }
-    const cancel = button('Cancelar', 'fs-btn fs-btn-secondary', () => modal.close());
+    const cancel = button('Cancelar', 'fs-btn fs-btn-outline-primary', () => modal.close());
     const save = $('button', 'fs-btn fs-btn-primary', contact ? 'Salvar alterações' : 'Cadastrar contato'); save.type = 'submit'; save.setAttribute('form', form.id);
     modal.footer.append(cancel, save);
     form.append(basic, professionSection, institutionalSection, relationshipSection);
@@ -628,7 +628,7 @@
     const name = input(department.name || '', 'Ex.: Contabilidade', 120); name.dataset.departmentName = '1'; name.required = true;
     const channels = $('div', 'law-contact-repeat-list');
     (department.channels || []).forEach((channel) => channels.append(departmentChannelRow(channel)));
-    const add = button('Adicionar telefone ou e-mail', 'fs-btn fs-btn-secondary', () => { if (channels.children.length < 6) channels.append(departmentChannelRow()); });
+    const add = button('Adicionar telefone ou e-mail', 'fs-btn fs-btn-outline-primary', () => { if (channels.children.length < 6) channels.append(departmentChannelRow()); });
     row.append(field('Nome do departamento *', name), channels, add, button('Remover departamento', 'fs-btn fs-btn-danger law-contact-remove', () => row.remove())); return row;
   }
 
@@ -842,7 +842,7 @@
     const form = $('form', 'law-record-editor'); form.id = `law-contact-form-${++modalSequence}`;
     const target = select(choices); target.required = true; const reason = document.createElement('textarea'); reason.className = 'fs-form-control'; reason.minLength = 5; reason.maxLength = 500; reason.required = true; reason.placeholder = 'Explique por que estes cadastros representam o mesmo contato.';
     const message = $('p', 'law-contact-feedback'); message.setAttribute('role', 'status');
-    modal.footer.append(button('Cancelar', 'fs-btn fs-btn-secondary', () => modal.close())); const submit = $('button', 'fs-btn fs-btn-primary', 'Mesclar cadastros'); submit.type = 'submit'; submit.setAttribute('form', form.id); modal.footer.append(submit);
+    modal.footer.append(button('Cancelar', 'fs-btn fs-btn-outline-primary', () => modal.close())); const submit = $('button', 'fs-btn fs-btn-primary', 'Mesclar cadastros'); submit.type = 'submit'; submit.setAttribute('form', form.id); modal.footer.append(submit);
     form.append(field('Contato que será mantido', target), field('Motivo da mesclagem', reason), message);
     form.addEventListener('submit', async (event) => { event.preventDefault(); submit.disabled = true; try { await window.FokusApi.request(`/law/contacts/${encodeURIComponent(contact.id)}/merge`, { method: 'POST', body: { target_contact_id: target.value, reason: reason.value.trim() } }); modal.close(); onChanged(); } catch (error) { message.dataset.state = 'error'; message.textContent = error.message || 'Não foi possível mesclar os contatos.'; } finally { submit.disabled = false; } });
     modal.body.append(form);
@@ -881,7 +881,7 @@
       const selectedWrap = $('div', 'law-contact-sharing-recipients');
       const ruleGroups = $('div', 'law-contact-sharing-rule-groups');
       const actions = $('div', 'law-contact-sharing-actions');
-      const cancelEdit = button('Cancelar edição', 'fs-btn fs-btn-secondary', () => renderSharingPage(root, context)); cancelEdit.hidden = true;
+      const cancelEdit = button('Cancelar edição', 'fs-btn fs-btn-outline-primary', () => renderSharingPage(root, context)); cancelEdit.hidden = true;
       const submit = $('button', 'fs-btn fs-btn-primary', 'Criar política para 0 empresas'); submit.type = 'submit';
       actions.append(cancelEdit, submit);
 
@@ -1058,7 +1058,7 @@
     heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Revisão e qualidade'), $('p', 'law-page-lede', 'Priorize os dados essenciais para localizar e relacionar seus contatos.'));
     if (context.company?.role === 'admin') {
       const actions = $('div', 'law-record-heading-actions');
-      actions.append(button('Contexto da base', 'fs-btn fs-btn-secondary', (event) => openContactContextSettings(root, event.currentTarget, () => renderQualityPage(root, context))));
+      actions.append(button('Contexto da base', 'fs-btn fs-btn-outline-primary', (event) => openContactContextSettings(root, event.currentTarget, () => renderQualityPage(root, context))));
       heading.append(actions);
     }
     root.append(heading);
@@ -1090,7 +1090,7 @@
         (pageResult.contacts || []).forEach((item) => {
           const row = $('tr'); row.append($('th', '', item.display_name), $('td', '', item.legal_nature === 'pj' ? 'Pessoa jurídica' : 'Pessoa física'));
           const issues = $('td', 'law-contact-quality-issues'); (item.issues || []).forEach((issue) => issues.append($('span', 'law-contact-quality-tag', labels[issue] || issue))); row.append(issues);
-          const action = $('td', 'law-contact-quality-action'); action.append(button(canEdit ? 'Completar cadastro' : 'Ver cadastro', 'fs-btn fs-btn-secondary', async (event) => {
+          const action = $('td', 'law-contact-quality-action'); action.append(button(canEdit ? 'Completar cadastro' : 'Ver cadastro', 'fs-btn fs-btn-outline-primary', async (event) => {
             if (!canEdit) { openDetails(root, item.id, false, () => renderQualityPage(root, context), event.currentTarget); return; }
             const trigger = event.currentTarget; trigger.disabled = true;
             try {
@@ -1111,11 +1111,11 @@
           const intro = $('p', 'law-record-help'); const rows = $('div'); const paging = $('div', 'law-contact-quality-paging'); modal.body.append(intro, rows, paging);
           const drawPage = (pageResult) => {
             intro.textContent = `${Number(pageResult.pagination?.total || 0).toLocaleString('pt-BR')} par(es) para revisão. Os valores coincidentes ficam ocultos; esta análise não altera cadastros.`;
-            rows.replaceChildren(); (pageResult.pairs || []).forEach((pair) => { const row = $('div', 'law-contact-duplicate-pair'); row.append($('strong', '', `${pair.contact.display_name} · ${pair.candidate.display_name}`), $('span', '', pair.reason), button('Revisar primeiro contato', 'fs-btn fs-btn-secondary', () => { modal.close(); openDetails(root, pair.contact.id, false, () => renderQualityPage(root, context)); })); rows.append(row); });
+            rows.replaceChildren(); (pageResult.pairs || []).forEach((pair) => { const row = $('div', 'law-contact-duplicate-pair'); row.append($('strong', '', `${pair.contact.display_name} · ${pair.candidate.display_name}`), $('span', '', pair.reason), button('Revisar primeiro contato', 'fs-btn fs-btn-outline-primary', () => { modal.close(); openDetails(root, pair.contact.id, false, () => renderQualityPage(root, context)); })); rows.append(row); });
             if (!pageResult.pairs?.length) rows.append($('p', '', 'Nenhum candidato encontrado.'));
             renderPagination(paging, pageResult.pagination || {}, async (page) => drawPage(await window.FokusApi.request(`/law/contacts/quality/duplicates?page=${page}&per_page=${CONTACT_PAGE_SIZE}`)), 'pares');
           };
-          drawPage(result); modal.footer.append(button('Fechar', 'fs-btn fs-btn-secondary', () => modal.close()));
+          drawPage(result); modal.footer.append(button('Fechar', 'fs-btn fs-btn-outline-primary', () => modal.close()));
         } catch (error) { window.alert(error.message || 'Não foi possível analisar duplicidades.'); }
         finally { trigger.disabled = false; trigger.textContent = 'Analisar possíveis duplicidades'; }
       });

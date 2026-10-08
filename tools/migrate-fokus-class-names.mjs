@@ -5,7 +5,7 @@ const root = join(process.cwd(), 'public');
 const extensions = new Set(['.html', '.js', '.css']);
 const explicit = new Map([
   ['btn', 'fs-btn'], ['btn-green', 'fs-btn-success'], ['btn-error', 'fs-btn-danger'],
-  ['btn-outline', 'fs-btn-outline-primary'], ['btn-outline-error', 'fs-btn-outline-danger'], ['btn-white', 'fs-btn-secondary'],
+  ['btn-outline', 'fs-btn-outline-primary'], ['btn-outline-error', 'fs-btn-outline-danger'], ['btn-white', 'fs-btn-outline-primary'],
   ['button', 'fs-btn'], ['button-success', 'fs-btn-success'], ['button-danger', 'fs-btn-danger'],
   ['button-outline', 'fs-btn-outline-primary'], ['form-control', 'fs-form-control'], ['form-input', 'fs-form-control'],
   ['form-select', 'fs-form-select'], ['form-textarea', 'fs-form-control'], ['form-label', 'fs-form-label'],

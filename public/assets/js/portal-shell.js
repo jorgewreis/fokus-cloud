@@ -21,7 +21,7 @@
     const inner = document.createElement('div'); inner.className = 'portal-content';
     const header = document.createElement('header'); header.className = 'portal-header';
     header.innerHTML = `<div><p class="portal-eyebrow">Portal do cliente</p><h1>${document.title.split('|')[0].trim()}</h1></div><p id="portal-user-name">Carregando conta...</p>`;
-    const supportNotice = document.createElement('section'); supportNotice.className = 'fs-alert fs-alert-warning'; supportNotice.hidden = true; supportNotice.setAttribute('role', 'status'); supportNotice.innerHTML = '<div><strong>Modo de suporte ativo</strong><p data-support-context></p><button type="button" class="fs-btn fs-btn-secondary" data-support-exit>Encerrar acesso de suporte</button></div>';
+    const supportNotice = document.createElement('section'); supportNotice.className = 'fs-alert fs-alert-warning'; supportNotice.hidden = true; supportNotice.setAttribute('role', 'status'); supportNotice.innerHTML = '<div><strong>Modo de suporte ativo</strong><p data-support-context></p><button type="button" class="fs-btn fs-btn-outline-primary" data-support-exit>Encerrar acesso de suporte</button></div>';
     inner.append(header, supportNotice, main); content.append(inner); shell.append(aside, content); document.body.append(shell);
     let supportModeActive = false;
     document.querySelector('#portal-logout').onclick = async () => {

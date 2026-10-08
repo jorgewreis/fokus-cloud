@@ -70,10 +70,10 @@
     <main class="law-main" id="law-workspace">
       <section class="law-support-notice" id="support-notice" role="status" hidden>
         <div><strong>Modo de suporte ativo</strong><span id="support-context"></span></div>
-        <button class="fs-btn fs-btn-secondary" id="support-exit" type="button">Encerrar acesso de suporte</button>
+        <button class="fs-btn fs-btn-outline-primary" id="support-exit" type="button">Encerrar acesso de suporte</button>
       </section>
       <header class="law-topbar" aria-label="Barra de ferramentas">
-        <button class="law-mobile-menu fs-btn fs-btn-secondary fs-btn-icon" id="mobile-menu-button" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="law-sidebar">
+        <button class="law-mobile-menu fs-btn fs-btn-outline-primary fs-btn-icon" id="mobile-menu-button" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="law-sidebar">
           <span aria-hidden="true">☰</span>
         </button>
         <div class="law-search-wrap">
@@ -85,7 +85,7 @@
         </div>
         <div class="law-toolbar-actions">
           <div class="law-popover-anchor">
-            <button class="law-toolbar-button fs-btn fs-btn-secondary fs-btn-icon" id="notifications-button" type="button" aria-label="Notificações" aria-expanded="false" aria-controls="notifications-panel">
+            <button class="law-toolbar-button fs-btn fs-btn-outline-primary fs-btn-icon" id="notifications-button" type="button" aria-label="Notificações" aria-expanded="false" aria-controls="notifications-panel">
               <img src="/backoffice/assets/icons/Alarm-Bell--Streamline-Ultimate-Regular.png" alt="" />
             </button>
             <section class="law-popover law-notifications-panel" id="notifications-panel" aria-labelledby="notifications-title" hidden>
@@ -112,10 +112,10 @@
   <script src="/assets/js/brazilian-documents.js?v=20260930-document-validation-v1"></script>
   <script src="/portal/assets/fokus-law-select.js?v=20261008-select-options-full-width-v1"></script>
   <script src="/portal/assets/fokus-law-access.js?v=20261006-style-contract-v1" defer></script>
-  <script src="/portal/assets/fokus-law-contacts.js?v=20261006-style-contract-v1" defer></script>
+  <script src="/portal/assets/fokus-law-contacts.js?v=20261008-primary-outline-buttons-v1" defer></script>
   <script src="/portal/assets/law-record-ui.js?v=20261006-style-contract-v1" defer></script>
   <script src="/portal/assets/fokus-law-processes.js?v=20261008-related-process-card-format-v1" defer></script>
-  <script src="/portal/assets/fokus-law-shell.js?v=20261008-global-case-search-v1" defer></script>
+  <script src="/portal/assets/fokus-law-shell.js?v=20261008-primary-outline-buttons-v1" defer></script>
   <script src="/assets/js/portal-profile.js?v=20260925-profile-v4" defer></script>
 </body>
 </html>

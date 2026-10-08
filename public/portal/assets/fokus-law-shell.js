@@ -635,7 +635,7 @@
           if (user.role !== 'admin') {
             const actions = element('div', 'law-users-row-actions');
             [['gestor', 'Gestor'], ['usuario', 'Usuário']].forEach(([role, label]) => {
-              const button = element('button', role === user.role ? 'fs-btn fs-btn-secondary' : 'fs-btn fs-btn-outline-secondary', role === user.role ? `${label} · atual` : `Definir perfil: ${label}`);
+              const button = element('button', role === user.role ? 'fs-btn fs-btn-outline-primary' : 'fs-btn fs-btn-outline-secondary', role === user.role ? `${label} · atual` : `Definir perfil: ${label}`);
               button.type = 'button';
               button.disabled = role === user.role || user.status === 'removido';
               button.addEventListener('click', () => updateUser(user, { role }));
@@ -1306,7 +1306,7 @@
         const checkout = (data.payments || []).find((payment) => payment.status === 'aguardando_pagamento' && payment.checkout_url)?.checkout_url;
         if (checkout) { const resume = element('a', 'fs-btn fs-btn-primary', 'Continuar pagamento'); resume.href = checkout; pending.append(resume); }
       }
-      const cancel = element('button', 'fs-btn fs-btn-secondary', 'Cancelar alteração'); cancel.type = 'button'; cancel.addEventListener('click', async () => { cancel.disabled = true; try { await FokusApi.request('/law/subscription/change', { method: 'DELETE' }); window.location.reload(); } catch (error) { feedback.dataset.state = 'error'; feedback.textContent = error.message; cancel.disabled = false; } }); pending.append(cancel);
+      const cancel = element('button', 'fs-btn fs-btn-outline-primary', 'Cancelar alteração'); cancel.type = 'button'; cancel.addEventListener('click', async () => { cancel.disabled = true; try { await FokusApi.request('/law/subscription/change', { method: 'DELETE' }); window.location.reload(); } catch (error) { feedback.dataset.state = 'error'; feedback.textContent = error.message; cancel.disabled = false; } }); pending.append(cancel);
       contentRegion.append(pending);
     }
     const history = element('section', 'law-subscription-history'); history.append(element('h3', '', 'Histórico e pagamentos'));
