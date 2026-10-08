@@ -337,7 +337,7 @@
         if (item.case_number || item.detail) {
           const content = $('div', 'law-record-linked-content');
           content.append($('span', 'law-record-linked-label', item.label));
-          const metadata = item.case_number ? `Classe processual: ${text(item.case_class)} · Situação oficial: ${text(item.official_status_text)}` : item.detail;
+          const metadata = item.case_number ? `${text(item.case_class)} - ${text(item.official_status_text)}` : item.detail;
           content.append($('span', 'law-record-linked-meta', metadata));
           row.append(content);
         } else row.append($('span', '', item.label));
@@ -363,7 +363,7 @@
     }
     function renderContacts(result, local) {
       const id = result.case.id;
-      linkedSection('Contatos e papéis processuais', result.contacts.map((item) => ({ ...item, label: item.display_name, detail: `Papel processual: ${text(item.case_role_label)}${item.company_name ? ` · Empresa vinculada: ${item.company_name}` : ''}` })), (item) => request(`${apiPath(id)}/contacts/${item.id}`, { method: 'DELETE' }), (event) => {
+      linkedSection('Contatos e papéis processuais', result.contacts.map((item) => ({ ...item, label: item.display_name, detail: `${text(item.case_role_label)}${item.company_name ? ` - ${item.company_name}` : ''}` })), (item) => request(`${apiPath(id)}/contacts/${item.id}`, { method: 'DELETE' }), (event) => {
         const search = input('', 'search', 100); const contact = select([['', 'Selecione um contato']]); contact.required = true;
         const role = select(local.roles.map((v) => [v.code, v.label])); role.required = true;
         let token = 0;

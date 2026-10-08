@@ -266,8 +266,8 @@ class LawCaseController extends Controller
             $join->on('linked_company.company_id', '=', 'company_link.company_id')->on('linked_company.id', '=', 'company_link.company_contact_id');
         })->where('company_link.company_id', $companyId)->whereIn('company_link.person_contact_id', $contacts->pluck('contact_id'))
             ->where('linked_company.status', 'ativo')->whereNull('linked_company.deleted_at')->whereNull('linked_company.merged_into_id')
-            ->orderBy('linked_company.display_name')->get(['company_link.person_contact_id', 'linked_company.display_name'])
-            ->groupBy('person_contact_id')->map(fn ($items) => $items->pluck('display_name')->unique()->implode(', '));
+            ->orderBy('linked_company.display_name')->get(['company_link.person_contact_id', 'linked_company.display_name', 'linked_company.acronym'])
+            ->groupBy('person_contact_id')->map(fn ($items) => $items->map(fn (object $company) => $company->acronym ?: $company->display_name)->unique()->implode(', '));
         $contacts = $contacts->map(fn (object $contact): array => [...(array) $contact, 'company_name' => $contactCompanies->get($contact->contact_id)]);
 
         $relations = DB::table('law_case_relations as relation')->join('law_cases as other', function ($join): void {

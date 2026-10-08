@@ -54,3 +54,4 @@
 .law-page .law-hero-offer-button:hover:not(:focus-visible){--fs-btn-bg:var(--law-purple);--fs-btn-border-color:var(--law-purple)}
 .law-hero-offer-action p{margin:0;color:#655c68;font-size:.68rem;line-height:1.35}
 @media(max-width:640px){.law-hero-offer-card{grid-template-columns:1fr;gap:.8rem;padding:1rem 1.05rem 1.1rem}.law-hero-offer-copy h2{font-size:2rem}.law-hero-offer-action{grid-column:1;grid-row:auto;gap:.5rem}.law-hero-offer-button{width:auto;max-width:100%;align-self:flex-start}}
+.law-module-status-warning{color:var(--fs-color-warning)}
