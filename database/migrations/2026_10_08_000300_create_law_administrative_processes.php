@@ -84,6 +84,7 @@ return new class extends Migration
             $table->char('updated_by', 30)->charset('ascii')->collation('ascii_bin');
             $table->timestamps();
             $table->unique(['company_id', 'number'], 'law_admin_process_number_uq');
+            $table->unique(['company_id', 'id'], 'law_admin_process_company_id_uq');
             $table->unique(['company_id', 'law_unit_id', 'id'], 'law_admin_process_unit_id_uq');
             $table->foreign('company_id')->references('id')->on('companies')->cascadeOnDelete();
             $table->foreign(['company_id', 'law_unit_id'])->references(['company_id', 'id'])->on('law_units')->restrictOnDelete();
