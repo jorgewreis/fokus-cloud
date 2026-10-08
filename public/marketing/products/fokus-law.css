@@ -67,3 +67,5 @@
 .law-module-progress progress::-webkit-progress-value{border-radius:999px;background:var(--law-sage-light)}
 .law-module-progress progress::-moz-progress-bar{border-radius:999px;background:var(--law-sage-light)}
 .law-module-progress-warning progress::-webkit-progress-value,.law-module-progress-warning progress::-moz-progress-bar{background:var(--fs-color-warning)}
+
+.law-module-status-planned{color:var(--fs-color-primary)}
