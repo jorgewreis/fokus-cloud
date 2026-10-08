@@ -49,9 +49,80 @@
 
 .lead-page .lead-login {
     width: 100%;
-    max-width: 400px;
+    max-width: 430px;
     justify-self: end;
-    padding: 1.35rem;
+    padding: 2rem;
+    border: 1px solid rgba(255, 255, 255, .42);
+    box-shadow: 0 25px 70px rgba(4, 18, 31, .35);
+}
+
+.lead-page .lead-login-heading h2 {
+    margin: 0 0 .55rem;
+    font-size: 2.7rem;
+    line-height: .94;
+}
+
+.lead-page .lead-login-heading p {
+    margin: 0 0 1.55rem;
+}
+
+.lead-page .lead-login form {
+    gap: .5rem;
+}
+
+.lead-page .lead-login label {
+    font-size: .73rem;
+}
+
+.lead-page .lead-login input.fs-form-control,
+.lead-page .lead-login .fs-form-select {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: .65rem .72rem;
+    border: 1px solid rgba(16, 42, 67, .2);
+    border-radius: 0;
+    background: rgba(255, 255, 255, .65);
+    color: var(--lead-ink);
+    font: 400 .86rem var(--lead-body);
+}
+
+.lead-page .lead-field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .7rem;
+    margin-bottom: .45rem;
+}
+
+.lead-page .lead-field-grid > div {
+    display: grid;
+    min-width: 0;
+    gap: .5rem;
+}
+
+.lead-page .lead-submit {
+    justify-self: start;
+    width: auto;
+    max-width: 100%;
+    --fs-btn-color: #fff;
+    --fs-btn-bg: var(--lead-navy);
+    --fs-btn-border-color: var(--lead-navy);
+    --fs-btn-hover-bg: #174463;
+    --fs-btn-active-bg: var(--lead-navy-deep);
+    margin-top: .7rem;
+    min-height: 2.75rem;
+    padding: .82rem 1rem;
+    border-radius: 0;
+    font: 600 .86rem var(--lead-body);
+    text-align: left;
+    justify-content: flex-start;
+}
+
+.lead-page .lead-login-status {
+    min-height: 2.1em;
+    margin: .4rem 0 0;
+    color: #71818e;
+    font-size: .72rem;
 }
 
 @media (max-width: 900px) {
@@ -62,5 +133,15 @@
 
     .lead-page .lead-login {
         justify-self: start;
+    }
+}
+
+@media (max-width: 640px) {
+    .lead-page .lead-login {
+        padding: 1.35rem;
+    }
+
+    .lead-page .lead-field-grid {
+        grid-template-columns: 1fr;
     }
 }
