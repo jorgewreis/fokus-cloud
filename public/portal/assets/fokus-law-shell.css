@@ -970,7 +970,7 @@
 .law-process-settings-add-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; align-self: end; gap: 8px 10px; padding-top: 12px; border-top: 1px solid #eee9f2; }
 .law-process-settings-add-form > .law-record-field { min-width: 0; }
 .law-process-settings-add-form > .fs-alert { grid-column: 1 / -1; margin: 0; }
-.law-process-settings-add-form > .fs-btn { width: auto; min-height: 38px; white-space: nowrap; }
+.law-process-settings-add-form > .fs-btn { width: auto; min-height: 38px; align-self: end !important; white-space: nowrap; }
 @media (prefers-reduced-motion: no-preference) {
   .law-dashboard-module-widget, .law-record-metric-card, .law-record-recent-item { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
   .law-dashboard-module-widget:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(27,16,40,.11); }
