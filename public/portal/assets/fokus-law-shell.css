@@ -150,7 +150,7 @@
 .law-exit-button:hover:not(:focus-visible) { --fs-btn-color: var(--law-shell-panel); --fs-btn-bg: #f5f0f8; --fs-btn-border-color: var(--law-shell-purple); }
 .law-select-menu-dark .fs-dropdown-item { color: var(--law-shell-ivory); }
 .law-select-menu-dark .fs-dropdown-item:hover, .law-select-menu-dark .fs-dropdown-item:focus-visible { background: rgba(255,255,255,.12); }
-.fokus-law-shell-page .fs-dropdown-menu.law-select-menu-full-width-options > .fs-dropdown-item { box-sizing: border-box; display: flex; width: 100%; max-width: none; }
+.fs-dropdown-menu.law-select-menu-full-width-options > .fs-dropdown-item { box-sizing: border-box; display: flex !important; inline-size: 100% !important; width: 100% !important; max-inline-size: none; max-width: none; }
 .law-native-multiselect { box-sizing: border-box; width: 100%; min-width: 0; min-height: 6rem; padding: 6px 8px; border: 1px solid var(--fs-control-border-color); border-radius: var(--fs-control-radius); background: var(--fs-control-bg); color: var(--fs-color-text); font: inherit; }
 .law-native-multiselect:focus-visible { outline: var(--fs-focus-width) solid var(--fs-focus-color); outline-offset: var(--fs-focus-offset); box-shadow: 0 0 0 var(--fs-focus-ring-size) var(--fs-focus-ring-color); }
 .law-popover-anchor { position: relative; }

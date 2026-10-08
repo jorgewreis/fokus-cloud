@@ -12,7 +12,9 @@
   const copyThemeToMenu = (select, menu) => {
     const darkMenu = select.dataset.fsSelectTheme === 'dark';
     menu.classList.toggle('law-select-menu-dark', darkMenu);
-    menu.classList.toggle('law-select-menu-full-width-options', Boolean(select.closest('.law-process-settings-grid')));
+    // Fokus Styles portals the menu to document.body, so this modifier and its
+    // styles must apply to every Law select rather than depend on the form tree.
+    menu.classList.add('law-select-menu-full-width-options');
     if (darkMenu) return;
     const computed = getComputedStyle(select);
     [
