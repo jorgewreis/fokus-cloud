@@ -530,6 +530,9 @@
 .law-record-detail-chip-group { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 5px; }
 .law-record-detail-chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .law-record-detail-chip { padding: 3px 7px; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; background: rgba(255,255,255,.1); color: #fff; font-size: 10px; overflow-wrap: anywhere; }
+.law-process-status-badge[data-tone="success"] { border-color: transparent; background-color: var(--fs-color-success); color: var(--fs-alert-info-text); }
+.law-process-status-badge[data-tone="danger"] { border-color: transparent; background-color: var(--fs-color-danger); color: var(--fs-alert-info-text); }
+.law-process-status-badge[data-tone="warning"] { border-color: transparent; background-color: var(--fs-color-warning); color: var(--fs-alert-info-text); }
 .law-record-detail-chip-tags .law-record-detail-chip { border-color: rgba(249, 213, 139, .32); background: rgba(183, 132, 38, .18); }
 .law-record-detail-card { min-width: 0; margin: 0; overflow: hidden; border: 1px solid #e6dfeb; border-radius: 12px; background: #fff; box-shadow: 0 4px 14px rgba(40, 20, 59, .035); }
 .law-record-detail-institution { grid-column: 1 / -1; }
