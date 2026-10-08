@@ -513,7 +513,7 @@
 }
 .law-record-detail-summary { position: relative; display: grid; grid-column: 1 / -1; grid-template-columns: 58px minmax(0, 1fr); align-items: center; gap: 14px; min-width: 0; overflow: hidden; padding: 18px; border: 1px solid #3d2852; border-radius: 14px; background: radial-gradient(ellipse at 92% 12%, rgba(164, 122, 207, .32), transparent 38%), linear-gradient(125deg, #28143b, #44265e 72%, #563875); color: #fff; box-shadow: 0 12px 28px rgba(48, 26, 68, .15); }
 .law-record-detail-summary::after { position: absolute; right: -24px; bottom: -74px; width: 188px; height: 188px; border: 1px solid rgba(255,255,255,.12); border-radius: 50%; content: ""; box-shadow: 0 0 0 22px rgba(255,255,255,.035), 0 0 0 45px rgba(255,255,255,.025); pointer-events: none; }
-.law-record-detail-avatar { display: grid; width: 58px; height: 58px; place-items: center; border: 1px solid rgba(255,255,255,.34); border-radius: 18px; background: rgba(255,255,255,.14); color: #fff; font-size: 20px; font-weight: 750; letter-spacing: .02em; }
+.law-record-detail-avatar { display: grid; width: 58px; height: 58px; place-items: center; border: 0; border-radius: 8px; background: rgba(255, 255, 255, .05); color: #fff; font-size: 20px; font-weight: 750; letter-spacing: .02em; }
 .law-record-detail-avatar img { width: 28px; height: 28px; object-fit: contain; filter: brightness(0) invert(1); }
 .law-record-detail-summary-copy { position: relative; z-index: 1; min-width: 0; padding-right: 28px; }
 .law-record-detail-eyebrow { display: block; margin-bottom: 5px; padding-right: 112px; color: #d5c1e8; font-size: 10px; font-weight: 750; letter-spacing: .13em; }
@@ -660,7 +660,7 @@
   .law-contact-sharing-actions .fs-btn { width: auto; max-width: 100%; }
   .law-record-detail-body { grid-template-columns: minmax(0, 1fr); }
   .law-record-detail-summary { grid-template-columns: 46px minmax(0, 1fr); gap: 11px; padding: 14px; }
-  .law-record-detail-avatar { width: 46px; height: 46px; border-radius: 14px; font-size: 17px; }
+  .law-record-detail-avatar { width: 46px; height: 46px; border-radius: 8px; font-size: 17px; }
   .law-record-detail-name { font-size: 17px; }
   .law-record-detail-summary-badges { top: 12px; right: 12px; grid-column: auto; }
   .law-record-detail-eyebrow { padding-right: 92px; }
@@ -823,7 +823,7 @@
 .law-dashboard-widget-header { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 16px; border-bottom: 1px solid rgba(255,255,255,.1); background: linear-gradient(110deg, #2a173a, #473057); color: #fff; }
 .law-dashboard-widget-identity { display: flex; min-width: 0; align-items: center; gap: 11px; }
 .law-dashboard-widget-identity > div { min-width: 0; }
-.law-dashboard-widget-mark { display: grid; width: 35px; height: 35px; flex: 0 0 35px; place-items: center; border: 1px solid rgba(255,255,255,.15); border-radius: 11px; background: rgba(255,255,255,.11); }
+.law-dashboard-widget-mark { display: grid; width: 35px; height: 35px; flex: 0 0 35px; place-items: center; border: 1px solid rgba(255,255,255,.15); border-radius: 6px; background: rgba(255,255,255,.11); }
 .law-dashboard-widget-mark img { width: 18px; height: 18px; object-fit: contain; filter: brightness(0) invert(1); }
 .law-dashboard-widget-header .law-dashboard-widget-kicker { margin-bottom: 3px; color: #d7c7e5; }
 .law-dashboard-widget-header h3 { overflow: hidden; margin: 0; color: #fff; font-size: 14px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
