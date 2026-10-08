@@ -29,6 +29,9 @@ class LawCaseManagementService
             ]);
         }
         foreach (self::ROLE_OPTIONS as $code => $label) {
+            DB::table('law_case_role_options')->where('company_id', $companyId)->where('law_unit_id', $unitId)
+                ->where('code', '<>', $code)->where('label', $label)->where('is_system', false)->where('is_active', true)
+                ->update(['is_active' => false, 'updated_at' => now()]);
             DB::table('law_case_role_options')->insertOrIgnore([
                 'id' => PrefixedUlid::make('LRO'), 'company_id' => $companyId, 'law_unit_id' => $unitId,
                 'code' => $code, 'label' => $label, 'is_active' => true, 'is_system' => true,
