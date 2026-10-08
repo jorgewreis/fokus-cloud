@@ -230,7 +230,7 @@
         metrics.append(...window.FokusLawRecordUI.metricCards(metricSpecs));
         recentBody.replaceChildren();
         if (summary.recent?.length) summary.recent.slice(0, 5).forEach((item) => {
-          const link = button('', 'law-record-recent-item', (event) => openDetails(root, item.id, false, refresh, event.currentTarget));
+          const link = button('', 'law-record-recent-item', (event) => openDetails(root, item.id, false, refresh, event.currentTarget, can('law.contacts.update'), { relationshipOptions, designationOptions, competencyOptions }));
           const detail = $('span', 'law-record-recent-meta');
           const activityLabels = { created: 'Cadastrado', viewed: 'Consultado', search_opened: 'Consultado' };
           const timestamp = item.at ? new Date(item.at) : null;
@@ -246,14 +246,14 @@
           const tr = $('tr'); const td = $('td', 'fs-table-empty law-record-empty', 'Nenhum contato encontrado com estes filtros.'); td.colSpan = 5; tr.append(td); tbody.append(tr);
         } else currentItems.forEach((contact) => {
           const tr = $('tr');
-          const titleCell = $('td'); const open = button(contact.display_name, 'law-record-name', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget));
+          const titleCell = $('td'); const open = button(contact.display_name, 'law-record-name', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget, can('law.contacts.update'), { relationshipOptions, designationOptions, competencyOptions }));
           titleCell.append(open); if (contact.is_shared) titleCell.append($('span', 'law-contact-shared-badge', `Compartilhado por ${contact.source_company_name || 'outra empresa'}`));
           tr.append(titleCell, $('td', '', contact.record_kind === 'unit' ? (currentContext?.unit_label || 'Unidade') : contact.legal_nature === 'pj' ? 'Pessoa jurídica' : 'Pessoa física'));
           tr.append($('td', '', contact.legal_nature === 'pj' || contact.record_kind === 'unit' ? '—' : ((contact.professions || []).join(', ') || '—')));
           tr.append($('td', '', (contact.tags || []).join(', ') || '—'));
           const actions = $('td', 'law-record-actions');
           const actionList = $('div', 'law-record-action-list');
-          actionList.append(iconButton('Ver detalhes', 'Folder-File--Streamline-Ultimate.png', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget)));
+          actionList.append(iconButton('Ver detalhes', 'Folder-File--Streamline-Ultimate.png', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget, can('law.contacts.update'), { relationshipOptions, designationOptions, competencyOptions })));
           if (!contact.is_shared && can('law.contacts.update')) actionList.append(iconButton('Editar contato', 'Common-File-Edit--Streamline-Ultimate.png', (event) => openEditor(root, contact, refresh, event.currentTarget, relationshipOptions, designationOptions, competencyOptions)));
           if (!contact.is_shared && can('law.contacts.delete')) actionList.append(iconButton('Excluir contato', 'Common-File-Remove--Streamline-Ultimate.png', async (event) => {
             if (!await confirmAction(root, 'Excluir contato', 'O cadastro será removido da base ativa e deixará de consumir capacidade. A trilha de auditoria será preservada.', 'Excluir contato', event.currentTarget)) return;
@@ -640,7 +640,7 @@
     row.append(field('Tipo', type), field('Contato', value), field('Rótulo', label), button('Remover', 'fs-btn fs-btn-danger law-contact-remove', () => row.remove())); return row;
   }
 
-  async function openDetails(root, id, isShared, onChanged, opener = null) {
+  async function openDetails(root, id, isShared, onChanged, opener = null, canEdit = false, editorOptions = {}) {
     const result = await window.FokusApi.request(`/law/contacts/${encodeURIComponent(id)}${isShared ? '' : '?from_search=1'}`);
     const contact = result.contact;
     const modal = createModal(root, 'Ficha do contato', 'fs-modal-xl', opener);
@@ -829,6 +829,13 @@
     }
     if (contact.is_shared) body.append($('aside', 'law-contact-share-notice', 'As alterações só podem ser feitas pela empresa responsável pelo cadastro.'));
     modal.body.append(body);
+    if (!isShared && canEdit && !contact.is_shared) {
+      const edit = button('Editar contato', 'fs-btn fs-btn-primary', () => {
+        modal.close();
+        openEditor(root, contact, onChanged, edit, editorOptions.relationshipOptions || [], editorOptions.designationOptions || [], editorOptions.competencyOptions || []);
+      });
+      modal.footer.append(edit);
+    }
     if (!isShared && window.lawContactsCanMerge && contact.has_possible_duplicates) {
       const merge = button('Mesclar com outro contato', 'fs-btn fs-btn-outline-primary', () => openMerge(modal, root, contact, onChanged)); modal.footer.append(merge);
     }
