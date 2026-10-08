@@ -370,7 +370,7 @@
           values.forEach((item) => {
             const row = toolbar(); row.classList.add('law-process-settings-option'); row.append($('span', 'law-process-settings-option-name', item[property]));
             if (!['active', 'archived'].includes(item.code)) {
-              const remove = button('', 'fs-btn fs-btn-icon fs-btn-icon-plain law-process-settings-option-remove', action(async () => { await request(`/options/${type}/${item.id}`, { method: 'DELETE' }); await draw(); }));
+              const remove = button('', action(async () => { await request(`/options/${type}/${item.id}`, { method: 'DELETE' }); await draw(); })); remove.className = 'fs-btn fs-btn-icon fs-btn-icon-plain law-process-settings-option-remove';
               remove.setAttribute('aria-label', `Desativar ${item[property]}`); remove.title = 'Desativar';
               const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); icon.setAttribute('viewBox', '0 0 24 24'); icon.setAttribute('aria-hidden', 'true'); icon.setAttribute('focusable', 'false');
               const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle'); circle.setAttribute('cx', '12'); circle.setAttribute('cy', '12'); circle.setAttribute('r', '10'); circle.setAttribute('fill', '#f6a0aa'); circle.setAttribute('stroke', '#eb7583'); circle.setAttribute('stroke-width', '1.5');
