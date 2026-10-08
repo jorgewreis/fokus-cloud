@@ -36,12 +36,13 @@
     return null;
   };
   const expandedSelection = (extraCode = null) => dependencyClosure([...planCodes(), ...state.selected, ...(extraCode ? [extraCode] : [])]);
-  const segmentNames = { advocacia: 'Advocacia', setor_publico: 'Setor público' };
+  const segmentNames = { advocacia: 'ADVOCACIA', setor_publico: 'SETOR PÚBLICO' };
+  const segmentClass = (segment) => segment === 'advocacia' ? 'advocacia' : segment === 'setor_publico' ? 'setor-publico' : 'default';
 
   const renderOffers = () => {
     const plans = state.catalog?.plans || [];
     $('#lp-offers-heading').textContent = 'Escolha um plano ou monte uma assinatura personalizada por módulos.';
-    const cards = plans.map((plan) => `<article class="lp-offer"><p class="law-eyebrow law-eyebrow-purple">${esc(segmentNames[plan.segment] || plan.segment || 'Fokus Law')}</p><h3>${esc(plan.name)}</h3><p>${esc(plan.description || 'Composição de módulos para sua operação.')}</p><strong>${money(state.cycle === 'annual' ? plan.annual_amount : plan.monthly_amount)} <small>/ ${state.cycle === 'annual' ? 'ano' : 'mês'}</small></strong><button class="fs-btn fs-btn-primary law-submit" type="button" data-choose-plan="${esc(plan.code)}">Configurar plano</button></article>`);
+    const cards = plans.map((plan) => `<article class="lp-offer"><p class="lp-segment-tag lp-segment-tag--${segmentClass(plan.segment)}">${esc(segmentNames[plan.segment] || plan.segment || 'FOKUS LAW')}</p><h3>${esc(plan.name)}</h3><p>${esc(plan.description || 'Composição de módulos para sua operação.')}</p><strong>${money(state.cycle === 'annual' ? plan.annual_amount : plan.monthly_amount)} <small>/ ${state.cycle === 'annual' ? 'ano' : 'mês'}</small></strong><button class="fs-btn fs-btn-primary law-submit" type="button" data-choose-plan="${esc(plan.code)}">Configurar plano</button></article>`);
     cards.unshift('<article class="lp-offer lp-standalone"><p class="law-eyebrow law-eyebrow-sage">SEM PLANO-BASE</p><h3>Assinatura Personalizada</h3><p>Escolha somente os módulos de que sua operação precisa. Cada módulo é cobrado pelo preço integral publicado.</p><button class="fs-btn fs-btn-primary law-submit" type="button" data-choose-custom>Escolher módulos</button></article>');
     offersNode.innerHTML = cards.length ? cards.join('') : '<p class="lp-state">Não há planos ou módulos avulsos disponíveis no catálogo publicado.</p>';
   };
