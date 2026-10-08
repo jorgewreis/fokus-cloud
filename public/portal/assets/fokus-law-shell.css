@@ -506,6 +506,9 @@
 .law-record-facts dt { margin-bottom: 4px; color: var(--law-shell-muted); font-size: 10px; font-weight: 600; }
 .law-record-facts dd { margin: 0; color: var(--law-shell-ink); font-size: 12px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
 .law-record-linked-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 10px; border: 1px solid var(--law-shell-line); border-radius: 9px; font-size: 12px; }
+.law-record-linked-content { display: grid; flex: 1 1 220px; min-width: 0; gap: 4px; }
+.law-record-linked-label { color: var(--law-shell-ink); }
+.law-record-linked-meta { color: var(--law-shell-muted); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
 .law-record-history-entry { display: grid; gap: 8px; padding: 0 0 18px 14px; border-left: 2px solid var(--law-shell-lilac); }
 .law-record-history-entry h4 { margin: 0; color: var(--law-shell-ink); font: inherit; font-size: 12px; font-weight: 650; }
 .law-record-filters-search { grid-template-columns: minmax(0, 1fr) auto auto; }

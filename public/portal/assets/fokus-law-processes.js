@@ -315,7 +315,13 @@
       const box = section(title, 'VÍN');
       if (!items.length) box.body.append($('p', 'law-record-detail-empty', 'Nenhum vínculo registrado.'));
       items.forEach((item) => {
-        const row = $('div', 'law-record-linked-row'); row.append($('span', '', item.label));
+        const row = $('div', 'law-record-linked-row');
+        if (item.case_number) {
+          const content = $('div', 'law-record-linked-content');
+          content.append($('span', 'law-record-linked-label', item.label));
+          content.append($('span', 'law-record-linked-meta', `Classe processual: ${text(item.case_class)} · Situação oficial: ${text(item.official_status_text)}`));
+          row.append(content);
+        } else row.append($('span', '', item.label));
         if (can('update')) {
           const removeButton = button('', action(async () => { await remove(item); await detail(currentId); }));
           removeButton.className = 'fs-btn fs-btn-icon fs-btn-icon-plain law-process-settings-option-remove';

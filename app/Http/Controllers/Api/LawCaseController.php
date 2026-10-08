@@ -260,12 +260,34 @@ class LawCaseController extends Controller
             $join->on('other.company_id', '=', 'relation.company_id')->on('other.id', '=', 'relation.related_law_case_id');
         })->where('relation.company_id', $companyId)->where('relation.law_case_id', $case)
             ->where(fn ($query) => $this->visibleOther($request, $query))
-            ->orderBy('other.case_number')->get(['relation.id', 'relation.relation_type', 'other.id as related_case_id', 'other.case_number']);
+            ->orderBy('other.case_number')->get(['relation.id', 'relation.relation_type', 'other.id as related_case_id', 'other.case_number', 'other.case_class', 'other.case_class_code', 'other.manual_metadata', 'other.official_status_text']);
         $reverse = DB::table('law_case_relations as relation')->join('law_cases as other', function ($join): void {
             $join->on('other.company_id', '=', 'relation.company_id')->on('other.id', '=', 'relation.law_case_id');
         })->where('relation.company_id', $companyId)->where('relation.related_law_case_id', $case)
             ->where(fn ($query) => $this->visibleOther($request, $query))
-            ->orderBy('other.case_number')->get(['relation.id', 'relation.relation_type', 'other.id as related_case_id', 'other.case_number']);
+            ->orderBy('other.case_number')->get(['relation.id', 'relation.relation_type', 'other.id as related_case_id', 'other.case_number', 'other.case_class', 'other.case_class_code', 'other.manual_metadata', 'other.official_status_text']);
+
+        $relations = $relations->concat($reverse)->values();
+        $relatedClassCodes = $relations->map(function (object $relation): string {
+            $manual = json_decode((string) ($relation->manual_metadata ?? ''), true) ?: [];
+            return trim((string) ($manual['case_class_code'] ?? $relation->case_class_code ?? ''));
+        })->filter()->unique()->values();
+        $cnjClassNames = $relatedClassCodes->isEmpty() ? collect() : DB::table('law_cnj_metadata_options')
+            ->where('type', 'class')->where('is_active', true)->whereIn('code', $relatedClassCodes)->pluck('name', 'code');
+        $companyClassNames = $relatedClassCodes->isEmpty() ? collect() : DB::table('law_case_metadata_options')
+            ->where('company_id', $companyId)->where('type', 'class')->whereIn('code', $relatedClassCodes)->pluck('name', 'code');
+        $relations = $relations->map(function (object $relation) use ($cnjClassNames, $companyClassNames): array {
+            $manual = json_decode((string) ($relation->manual_metadata ?? ''), true) ?: [];
+            $classCode = trim((string) ($manual['case_class_code'] ?? $relation->case_class_code ?? ''));
+            return [
+                'id' => (string) $relation->id,
+                'relation_type' => (string) $relation->relation_type,
+                'related_case_id' => (string) $relation->related_case_id,
+                'case_number' => (string) $relation->case_number,
+                'case_class' => ($classCode !== '' ? ($cnjClassNames[$classCode] ?? $companyClassNames[$classCode] ?? null) : null) ?: ($relation->case_class ?: null),
+                'official_status_text' => $relation->official_status_text,
+            ];
+        });
 
         $tags = DB::table('law_case_tag_assignments as assignment')->join('law_case_tags as tag', function ($join): void {
             $join->on('tag.company_id', '=', 'assignment.company_id')->on('tag.law_unit_id', '=', 'assignment.law_unit_id')->on('tag.id', '=', 'assignment.law_case_tag_id');
@@ -286,7 +308,7 @@ class LawCaseController extends Controller
         $latestDatajudState = json_decode((string) ($latestDatajud->after_state ?? ''), true) ?: [];
 
         return response()->json([
-            'case' => $cases->caseArray($current), 'contacts' => $contacts, 'relations' => $relations->concat($reverse)->values(),
+            'case' => $cases->caseArray($current), 'contacts' => $contacts, 'relations' => $relations,
             'datajud' => ['status' => (string) $current->datajud_sync_status, 'code' => $latestDatajudState['datajud_result_code'] ?? null, 'message' => $latestDatajud->reason ?? null],
             'tags' => $tags, 'events' => $events,
             'history_page' => max(1, $request->integer('history_page', 1)),
