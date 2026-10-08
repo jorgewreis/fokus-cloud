@@ -121,8 +121,10 @@ para processos arquivados acessíveis.
 
 O Datajud pode não retornar processos ou campos. São solicitados somente
 metadados permitidos; não há movimentações nem persistência da resposta
-integral. A situação oficial não é inferida de movimentos e admite
-preenchimento manual quando não fornecida. O detalhe exibe atribuição
+integral. Um processo novo começa com a situação oficial provisória “Em andamento”
+enquanto a consulta estiver pendente; quando o Datajud retornar uma situação,
+ela substitui o valor provisório. A situação não é inferida de movimentos e
+admite preenchimento manual quando não fornecida. O detalhe exibe atribuição
 CNJ/DataJud e data da última consulta.
 
 ## Referências oficiais

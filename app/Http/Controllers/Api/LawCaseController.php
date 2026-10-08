@@ -217,6 +217,7 @@ class LawCaseController extends Controller
                 DB::table('law_cases')->insert([
                     'id' => $id, 'company_id' => $companyId, 'law_unit_id' => $unit->id, 'case_number' => $caseNumber,
                     'case_class' => null, 'case_class_code' => $class['code'] ?? null,
+                    'official_status_text' => 'Em andamento',
                     'subjects' => json_encode($subjectCodes, JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]',
                     'datajud_metadata' => '{}', 'manual_metadata' => json_encode(array_filter(['case_class_code' => $class['code'] ?? null, 'subjects' => $subjectCodes], fn ($v) => $v !== null && $v !== []), JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}', 'datajud_sync_status' => 'pending',
                     'filing_date' => $data['filing_date'] ?? null, 'distribution_date' => $data['distribution_date'] ?? null,
@@ -226,7 +227,7 @@ class LawCaseController extends Controller
                 DB::table('law_case_events')->insert([
                     'id' => PrefixedUlid::make('LCE'), 'company_id' => $companyId, 'law_case_id' => $id,
                     'actor_user_id' => $userId, 'event_type' => 'created', 'title' => 'Processo cadastrado',
-                    'after_state' => json_encode(['law_unit_id' => $unit->id, 'operational_status' => 'active'], JSON_INVALID_UTF8_SUBSTITUTE),
+                    'after_state' => json_encode(['law_unit_id' => $unit->id, 'operational_status' => 'active', 'official_status_text' => 'Em andamento'], JSON_INVALID_UTF8_SUBSTITUTE),
                     'created_at' => $now,
                 ]);
                 SyncLawCaseDatajud::dispatch($companyId, $id, $userId)
@@ -302,7 +303,8 @@ class LawCaseController extends Controller
             'case_class_code' => ['sometimes', 'nullable', 'string', 'max:32'],
             'subjects' => ['sometimes', 'array', 'max:30'], 'subjects.*.code' => ['nullable', 'string', 'max:32'], 'subjects.*.name' => ['required_with:subjects', 'string', 'max:180'],
             'court_name' => ['sometimes', 'nullable', 'string', 'max:180'], 'court_code' => ['sometimes', 'nullable', 'string', 'max:32'],
-            'official_status_code' => ['sometimes', 'nullable', 'string', 'max:48'], 'official_status_text' => ['sometimes', 'nullable', 'string', 'max:180'],
+            'official_status_code' => ['sometimes', 'nullable', 'string', 'max:48'],
+            'official_status_text' => ['sometimes', 'nullable', Rule::in(['Em andamento', 'Suspenso', 'Arquivado', 'Em grau de recurso'])],
             'filing_date' => ['sometimes', 'nullable', 'date'], 'distribution_date' => ['sometimes', 'nullable', 'date'],
             'operational_status' => ['sometimes', 'required', Rule::exists('law_case_status_options', 'code')->where('company_id', $current->company_id)->where('law_unit_id', $current->law_unit_id)],
             'operational_priority' => ['sometimes', 'required', Rule::in(self::PRIORITIES)],

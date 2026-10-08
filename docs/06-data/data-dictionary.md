@@ -38,6 +38,7 @@ Este arquivo deve descrever tabelas, colunas, tipos, obrigatoriedade e significa
 | law_unit_memberships | version | integer | Sim | Versão para concorrência otimista de atribuições de acesso. |
 | law_cases | operational_status | enum | Sim | Estado operacional interno do processo: `active`, `pending`, `suspended`, `archived` ou `cancelled`. |
 | law_cases | official_status_code | string | Nao | Codigo/situacao oficial sincronizada de fonte externa, sem controlar o status interno. |
+| law_cases | official_status_text | string | Nao | Situacao oficial; inicia provisoriamente como `Em andamento` enquanto a consulta Datajud está pendente. |
 | law_cases | subjects | json | Nao | Assuntos processuais sincronizados ou informados. |
 | law_cases | legal_basis | json | Nao | Artigos, capitulacoes ou base legal informada. |
 | law_cases | filing_date | date | Nao | Data de autuacao. |

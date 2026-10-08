@@ -12,11 +12,11 @@ class LawCaseManagementService
     ];
 
     private const ROLE_OPTIONS = [
-        'parte_autora' => 'Parte autora', 'parte_re' => 'Parte ré', 'vitima' => 'Vítima',
-        'investigado' => 'Investigado', 'acusado' => 'Acusado', 'advogado' => 'Advogado',
-        'defensor_publico' => 'Defensor público', 'promotor' => 'Promotor de Justiça',
-        'testemunha' => 'Testemunha', 'perito' => 'Perito', 'autoridade_policial' => 'Autoridade policial',
-        'orgao_julgador' => 'Órgão julgador', 'outro' => 'Outro',
+        'advogado' => 'Advogado', 'autoridade_policial' => 'Autoridade policial',
+        'defensor_publico' => 'Defensor público', 'outro' => 'Outro',
+        'parte_autora' => 'Parte autora', 'parte_re' => 'Parte ré',
+        'promotor' => 'Promotor de Justiça', 'vitima' => 'Vítima',
+        'testemunha_defesa' => 'Testemunha da Defesa', 'testemunha_denuncia' => 'Testemunha da Denúncia',
     ];
 
     public function ensureUnitOptions(string $companyId, string $unitId, ?string $actorId = null): void

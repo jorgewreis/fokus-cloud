@@ -126,11 +126,11 @@ restritas à chefia ou administração da unidade proprietária.
 
 ## Contatos e relações
 
-Contatos reutilizáveis recebem papéis padronizados: parte autora, parte ré,
-vítima, investigado, acusado, advogado, defensor público, promotor de Justiça,
-testemunha, perito, autoridade policial, órgão julgador e outro. A unidade pode
-cadastrar complementos. O mesmo contato pode ter vários papéis ou participar
-de vários processos. Os vínculos não copiam documentos ou dados pessoais.
+Contatos reutilizáveis recebem estes papéis padrão: advogado, autoridade
+policial, defensor público, outro, parte autora, parte ré, promotor de Justiça,
+vítima, testemunha da Defesa e testemunha da Denúncia. A unidade pode cadastrar
+complementos próprios. O mesmo contato pode ter vários papéis ou participar de
+vários processos. Os vínculos não copiam documentos ou dados pessoais.
 
 São selecionados contatos ativos da mesma empresa, compartilhados internamente
 ou locais da unidade do processo. Processos existentes podem ser relacionados

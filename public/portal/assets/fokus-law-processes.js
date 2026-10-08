@@ -197,7 +197,13 @@
       } else metadata.body.append(keyValues([['Assuntos', text(c.subjects)]]));
       controls._metadataEditor = editor;
       for (const [name, label] of [['court_name', 'Órgão julgador'], ['official_status_text', 'Situação oficial']]) {
-        if (!(c.official_fields || []).includes(name)) add(metadata, label, name, input(c[name]));
+        if (!(c.official_fields || []).includes(name)) {
+          const statuses = ['Em andamento', 'Suspenso', 'Arquivado', 'Em grau de recurso'];
+          const currentStatus = statuses.includes(c.official_status_text) ? c.official_status_text : 'Em andamento';
+          add(metadata, label, name, name === 'official_status_text'
+            ? select(statuses.map((status) => [status, status]), currentStatus)
+            : input(c[name]));
+        }
         else metadata.body.append(keyValues([[label, text(c[name])]]));
       }
       add(metadata, 'Data de autuação', 'filing_date', input(c.filing_date, 'date'));

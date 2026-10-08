@@ -207,7 +207,9 @@ O detalhamento do modelo alvo da Gestao de Processos esta em [Modelo de dados da
 Regras:
 
 - `operational_status` e interno e nao deve ser controlado pelo Datajud.
-- Campos `official_*` representam situacao processual externa.
+- Campos `official_*` representam situacao processual externa. No cadastro, o
+  texto inicia provisoriamente como `Em andamento` enquanto a consulta ao Datajud está
+  pendente; uma situação retornada pelo Datajud substitui esse valor.
 - Campos oficiais e operacionais devem permanecer separados.
 - Tags nao substituem classe, prioridade, status ou sigilo.
 - Cartas recebidas devem usar `case_class`, nao tabela de expediente.
