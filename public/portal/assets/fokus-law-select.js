@@ -65,6 +65,7 @@
     current?.dispose();
 
     const instance = new Select(select);
+    if (select.closest('.lp-builder, .lp-proposal')) instance.wrapperEl.classList.add('fs-u-inline-size-100');
     const toggle = instance.toggleEl;
     const toggleId = toggleIds.get(select) || `law-select-control-${++sequence}`;
     toggleIds.set(select, toggleId);
