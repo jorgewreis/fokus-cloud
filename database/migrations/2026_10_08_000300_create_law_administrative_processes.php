@@ -2,19 +2,14 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        // MySQL DDL is not transactional; recover the first failed deploy which
-        // stopped while attaching the version table's foreign key.
-        if (Schema::hasTable('law_admin_process_type_versions') && ! Schema::hasTable('law_admin_processes')) {
-            Schema::dropIfExists('law_admin_process_type_versions');
-            Schema::dropIfExists('law_admin_process_types');
-        }
-        Schema::create('law_admin_process_types', function (Blueprint $table): void {
+        $this->createIfMissing('law_admin_process_types', function (Blueprint $table): void {
             $table->char('id', 30)->charset('ascii')->collation('ascii_bin')->primary();
             $table->char('company_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->string('name', 120);
@@ -28,7 +23,7 @@ return new class extends Migration
             $table->foreign('company_id', 'law_admin_pt_company_fk')->references('id')->on('companies')->cascadeOnDelete();
             $table->foreign('created_by', 'law_admin_pt_creator_fk')->references('id')->on('users')->restrictOnDelete();
         });
-        Schema::create('law_admin_process_type_versions', function (Blueprint $table): void {
+        $this->createIfMissing('law_admin_process_type_versions', function (Blueprint $table): void {
             $table->char('id', 30)->charset('ascii')->collation('ascii_bin')->primary();
             $table->char('company_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->char('process_type_id', 30)->charset('ascii')->collation('ascii_bin');
@@ -41,7 +36,7 @@ return new class extends Migration
             $table->foreign(['company_id', 'process_type_id'], 'law_admin_ptv_type_fk')->references(['company_id', 'id'])->on('law_admin_process_types')->cascadeOnDelete();
             $table->foreign('created_by', 'law_admin_ptv_creator_fk')->references('id')->on('users')->restrictOnDelete();
         });
-        Schema::create('law_admin_process_statuses', function (Blueprint $table): void {
+        $this->createIfMissing('law_admin_process_statuses', function (Blueprint $table): void {
             $table->char('id', 30)->charset('ascii')->collation('ascii_bin')->primary();
             $table->char('company_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->string('label', 80);
@@ -52,7 +47,7 @@ return new class extends Migration
             $table->unique(['company_id', 'label'], 'law_admin_status_label_uq');
             $table->foreign('company_id', 'law_admin_ps_company_fk')->references('id')->on('companies')->cascadeOnDelete();
         });
-        Schema::create('law_admin_process_roles', function (Blueprint $table): void {
+        $this->createIfMissing('law_admin_process_roles', function (Blueprint $table): void {
             $table->char('id', 30)->charset('ascii')->collation('ascii_bin')->primary();
             $table->char('company_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->string('label', 80);
@@ -61,7 +56,7 @@ return new class extends Migration
             $table->unique(['company_id', 'label'], 'law_admin_role_label_uq');
             $table->foreign('company_id', 'law_admin_pr_company_fk')->references('id')->on('companies')->cascadeOnDelete();
         });
-        Schema::create('law_admin_process_tags', function (Blueprint $table): void {
+        $this->createIfMissing('law_admin_process_tags', function (Blueprint $table): void {
             $table->char('id', 30)->charset('ascii')->collation('ascii_bin')->primary();
             $table->char('company_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->string('name', 64);
@@ -70,7 +65,7 @@ return new class extends Migration
             $table->unique(['company_id', 'name'], 'law_admin_tag_name_uq');
             $table->foreign('company_id', 'law_admin_ptags_company_fk')->references('id')->on('companies')->cascadeOnDelete();
         });
-        Schema::create('law_admin_processes', function (Blueprint $table): void {
+        $this->createIfMissing('law_admin_processes', function (Blueprint $table): void {
             $table->char('id', 30)->charset('ascii')->collation('ascii_bin')->primary();
             $table->char('company_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->char('law_unit_id', 30)->charset('ascii')->collation('ascii_bin');
@@ -95,14 +90,15 @@ return new class extends Migration
             $table->foreign('company_id', 'law_admin_p_company_fk')->references('id')->on('companies')->cascadeOnDelete();
             $table->foreign(['company_id', 'law_unit_id'], 'law_admin_p_unit_fk')->references(['company_id', 'id'])->on('law_units')->restrictOnDelete();
             $table->foreign(['company_id', 'process_type_id'], 'law_admin_p_type_fk')->references(['company_id', 'id'])->on('law_admin_process_types')->restrictOnDelete();
-            $table->foreign(['company_id', 'responsible_membership_id'], 'law_admin_p_owner_fk')->references(['company_id', 'id'])->on('company_memberships')->nullOnDelete();
+            $table->foreign(['company_id', 'responsible_membership_id'], 'law_admin_p_owner_fk')->references(['company_id', 'id'])->on('company_memberships')->restrictOnDelete();
             $table->foreign('created_by', 'law_admin_p_creator_fk')->references('id')->on('users')->restrictOnDelete();
             $table->foreign('updated_by', 'law_admin_p_updater_fk')->references('id')->on('users')->restrictOnDelete();
             $table->foreign('archived_by', 'law_admin_p_archiver_fk')->references('id')->on('users')->nullOnDelete();
             $table->index(['company_id', 'status', 'created_at'], 'law_admin_process_status_idx');
             $table->index(['company_id', 'law_unit_id', 'priority'], 'law_admin_process_unit_priority_idx');
         });
-        Schema::create('law_admin_process_events', function (Blueprint $table): void {
+        $this->ensureProcessForeignKeys();
+        $this->createIfMissing('law_admin_process_events', function (Blueprint $table): void {
             $table->char('id', 30)->charset('ascii')->collation('ascii_bin')->primary();
             $table->char('company_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->char('process_id', 30)->charset('ascii')->collation('ascii_bin');
@@ -115,7 +111,7 @@ return new class extends Migration
             $table->foreign(['company_id', 'process_id'], 'law_admin_pe_process_fk')->references(['company_id', 'id'])->on('law_admin_processes')->cascadeOnDelete();
             $table->foreign('actor_user_id', 'law_admin_pe_actor_fk')->references('id')->on('users')->nullOnDelete();
         });
-        Schema::create('law_admin_process_contacts', function (Blueprint $table): void {
+        $this->createIfMissing('law_admin_process_contacts', function (Blueprint $table): void {
             $table->char('id', 30)->charset('ascii')->collation('ascii_bin')->primary();
             $table->char('company_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->char('process_id', 30)->charset('ascii')->collation('ascii_bin');
@@ -126,13 +122,36 @@ return new class extends Migration
             $table->foreign(['company_id', 'process_id'], 'law_admin_pc_process_fk')->references(['company_id', 'id'])->on('law_admin_processes')->cascadeOnDelete();
             $table->foreign(['company_id', 'contact_id'], 'law_admin_pc_contact_fk')->references(['company_id', 'id'])->on('law_contacts')->cascadeOnDelete();
         });
-        Schema::create('law_admin_process_tag_assignments', function (Blueprint $table): void {
+        $this->createIfMissing('law_admin_process_tag_assignments', function (Blueprint $table): void {
             $table->char('process_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->char('tag_id', 30)->charset('ascii')->collation('ascii_bin');
             $table->primary(['process_id', 'tag_id']);
             $table->foreign('process_id', 'law_admin_pta_process_fk')->references('id')->on('law_admin_processes')->cascadeOnDelete();
             $table->foreign('tag_id', 'law_admin_pta_tag_fk')->references('id')->on('law_admin_process_tags')->cascadeOnDelete();
         });
+    }
+
+    private function createIfMissing(string $table, callable $definition): void
+    {
+        if (! Schema::hasTable($table)) Schema::create($table, $definition);
+    }
+
+    private function ensureProcessForeignKeys(): void
+    {
+        if (DB::connection()->getDriverName() !== 'mysql') return;
+        $constraints = [
+            'law_admin_p_company_fk' => fn (Blueprint $table) => $table->foreign('company_id', 'law_admin_p_company_fk')->references('id')->on('companies')->cascadeOnDelete(),
+            'law_admin_p_unit_fk' => fn (Blueprint $table) => $table->foreign(['company_id', 'law_unit_id'], 'law_admin_p_unit_fk')->references(['company_id', 'id'])->on('law_units')->restrictOnDelete(),
+            'law_admin_p_type_fk' => fn (Blueprint $table) => $table->foreign(['company_id', 'process_type_id'], 'law_admin_p_type_fk')->references(['company_id', 'id'])->on('law_admin_process_types')->restrictOnDelete(),
+            'law_admin_p_owner_fk' => fn (Blueprint $table) => $table->foreign(['company_id', 'responsible_membership_id'], 'law_admin_p_owner_fk')->references(['company_id', 'id'])->on('company_memberships')->restrictOnDelete(),
+            'law_admin_p_creator_fk' => fn (Blueprint $table) => $table->foreign('created_by', 'law_admin_p_creator_fk')->references('id')->on('users')->restrictOnDelete(),
+            'law_admin_p_updater_fk' => fn (Blueprint $table) => $table->foreign('updated_by', 'law_admin_p_updater_fk')->references('id')->on('users')->restrictOnDelete(),
+            'law_admin_p_archiver_fk' => fn (Blueprint $table) => $table->foreign('archived_by', 'law_admin_p_archiver_fk')->references('id')->on('users')->nullOnDelete(),
+        ];
+        foreach ($constraints as $name => $foreignKey) {
+            $exists = DB::table('information_schema.REFERENTIAL_CONSTRAINTS')->where('CONSTRAINT_SCHEMA', DB::connection()->getDatabaseName())->where('TABLE_NAME', 'law_admin_processes')->where('CONSTRAINT_NAME', $name)->exists();
+            if (! $exists) Schema::table('law_admin_processes', $foreignKey);
+        }
     }
 
     public function down(): void
