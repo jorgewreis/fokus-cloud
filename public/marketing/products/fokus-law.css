@@ -74,3 +74,6 @@
 .law-module-progress{--law-module-progress-color:var(--law-sage-light);margin-top:auto;padding-top:12px}
 .law-module-progress-warning{--law-module-progress-color:var(--fs-color-warning)}
 .law-module-progress progress::-webkit-progress-value,.law-module-progress progress::-moz-progress-bar{background:var(--law-module-progress-color)}
+
+.law-module-progress progress::-webkit-progress-value{background:var(--law-module-progress-color)}
+.law-module-progress progress::-moz-progress-bar{background:var(--law-module-progress-color)}
