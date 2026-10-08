@@ -333,6 +333,12 @@ class LawContactController extends Controller
         $data = $this->validated($request);
         $recordKind = $data['record_kind'] ?? 'contact';
         $nature = $recordKind === 'unit' ? null : ($data['legal_nature'] ?? null);
+        if ($recordKind === 'contact') {
+            $normalizedName = mb_strtolower(preg_replace('/\s+/u', ' ', trim($this->normalizeName($data['display_name']))), 'UTF-8');
+            $duplicateName = DB::table('law_contacts')->where('company_id', $companyId)->where('record_kind', 'contact')->whereNull('deleted_at')->whereNull('merged_into_id')
+                ->whereRaw('LOWER(display_name) = ?', [$normalizedName])->exists();
+            abort_if($duplicateName, 409, 'Já existe um contato ativo com este nome. Consulte o cadastro existente para evitar duplicidade.');
+        }
         abort_if($recordKind === 'contact' && ! in_array($nature, ['pf', 'pj'], true), 422, 'Selecione se o cadastro é Pessoa física ou Organização.');
         abort_if($recordKind === 'contact' && $nature === 'pf' && ! empty($data['parent_contact_id']), 422, 'Pessoas físicas não podem fazer parte da hierarquia institucional.');
         abort_if($recordKind === 'unit' && (empty($data['parent_contact_id']) || ! empty($data['linked_contact_ids']) || ! empty($data['linked_relationships']) || ! empty($data['documents']) || ! empty($data['professions']) || ! empty($data['departments'])), 422, 'Unidades precisam de uma organização ou unidade superior e não recebem documentos, profissões ou vínculos PF/PJ.');

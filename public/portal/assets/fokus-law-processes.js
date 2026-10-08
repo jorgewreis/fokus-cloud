@@ -305,7 +305,17 @@
     function linkedSection(title, items, remove, add) {
       const box = section(title, 'VÍN');
       if (!items.length) box.body.append($('p', 'law-record-detail-empty', 'Nenhum vínculo registrado.'));
-      items.forEach((item) => { const row = $('div', 'law-record-linked-row'); row.append($('span', '', item.label)); if (can('update')) row.append(button('Remover', action(async () => { await remove(item); await detail(currentId); }))); box.body.append(row); });
+      items.forEach((item) => {
+        const row = $('div', 'law-record-linked-row'); row.append($('span', '', item.label));
+        if (can('update')) {
+          const removeButton = button('', action(async () => { await remove(item); await detail(currentId); }));
+          removeButton.className = 'fs-btn fs-btn-icon fs-btn-icon-plain law-process-settings-option-remove';
+          removeButton.setAttribute('aria-label', `Remover ${item.label}`); removeButton.title = 'Remover';
+          const icon = $('img'); icon.src = '/portal/assets/icons/Subtract-Circle--Streamline-Ultimate.png'; icon.alt = ''; icon.setAttribute('aria-hidden', 'true');
+          removeButton.append(icon); row.append(removeButton);
+        }
+        box.body.append(row);
+      });
       if (can('update') && add) box.body.append(button('Adicionar', action(add))); body.append(box); return box;
     }
     function renderTags(result, local) {

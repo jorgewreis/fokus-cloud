@@ -204,6 +204,7 @@ class LawCaseController extends Controller
         abort_unless($unit, 422, 'Selecione uma unidade ativa da empresa.');
         $caseNumber = $this->normalizeCaseNumber($data['case_number'], $companyId, (string) $unit->id);
         $this->assertValidCnj($caseNumber);
+        abort_if(DB::table('law_cases')->where('company_id', $companyId)->where('case_number', $caseNumber)->exists(), 409, 'Já existe um processo com este número nesta empresa.');
         $class = $this->resolveMetadataOption($companyId, 'class', $data['case_class_code'] ?? null, $data['case_class'] ?? null, (string) $request->user()->id);
         $subjects = collect($data['subjects'] ?? [])->map(fn (array $subject) => $this->resolveMetadataOption($companyId, 'subject', $subject['code'], $subject['name'] ?? null, (string) $request->user()->id))->values()->all();
         $subjectCodes = array_column($subjects, 'code');
