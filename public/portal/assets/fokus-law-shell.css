@@ -956,6 +956,7 @@
 .law-process-settings-unit-field { width: min(100%, 560px); }
 .law-process-settings-unit-field select { width: 100%; }
 .law-process-settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 14px; }
+.law-process-settings-grid select, .law-process-settings-grid .fs-form-select, .law-process-settings-grid .fs-form-control { box-sizing: border-box; inline-size: 100%; min-inline-size: 0; }
 .law-process-settings-cnj, .law-process-settings-statuses { grid-column: 1 / -1; }
 .law-process-settings-cnj-body { display: block !important; padding: 16px !important; }
 .law-process-settings-cnj-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(180px, .7fr); align-items: start; gap: 12px; }
