@@ -107,6 +107,7 @@
     const can = (permission) => permissions.has(permission);
     window.lawContactsCanSensitive = can('law.contacts.sensitive.view');
     window.lawContactsCanMerge = can('law.contacts.merge');
+    window.lawContactsCanUpdate = can('law.contacts.update');
     let page = 1;
     let currentItems = [];
     let currentContext = null;
@@ -183,6 +184,7 @@
         relationshipOptions = result.relationship_options || [];
         designationOptions = result.designation_options || [];
         competencyOptions = result.competency_options || [];
+        window.lawContactEditorOptions = { relationshipOptions, designationOptions, competencyOptions };
         currentItems = result.contacts || [];
         metrics.replaceChildren();
         const summary = result.summary || {};
@@ -829,10 +831,18 @@
     }
     if (contact.is_shared) body.append($('aside', 'law-contact-share-notice', 'As alterações só podem ser feitas pela empresa responsável pelo cadastro.'));
     modal.body.append(body);
-    if (!isShared && canEdit && !contact.is_shared) {
-      const edit = button('Editar contato', 'fs-btn fs-btn-primary', () => {
+    if (!isShared && (canEdit || window.lawContactsCanUpdate) && !contact.is_shared) {
+      const edit = button('Editar contato', 'fs-btn fs-btn-primary', async () => {
         modal.close();
-        openEditor(root, contact, onChanged, edit, editorOptions.relationshipOptions || [], editorOptions.designationOptions || [], editorOptions.competencyOptions || []);
+        let options = editorOptions;
+        if (!options.relationshipOptions && !options.designationOptions && !options.competencyOptions) {
+          options = window.lawContactEditorOptions || {};
+          if (!options.relationshipOptions && !options.designationOptions && !options.competencyOptions) {
+            const list = await window.FokusApi.request('/law/contacts?status=ativo&per_page=100');
+            options = { relationshipOptions: list.relationship_options || [], designationOptions: list.designation_options || [], competencyOptions: list.competency_options || [] };
+          }
+        }
+        openEditor(root, contact, onChanged, edit, options.relationshipOptions || [], options.designationOptions || [], options.competencyOptions || []);
       });
       modal.footer.append(edit);
     }
@@ -1134,7 +1144,7 @@
     render,
     renderSharingPage,
     renderQualityPage,
-    openContact: (root, id, opener = null) => openDetails(root, id, false, () => {}, opener),
-    openSearchedContact: (root, id, isShared, opener = null) => openDetails(root, id, isShared, () => render(root, context), opener),
+    openContact: (root, id, opener = null, canEdit = window.lawContactsCanUpdate) => openDetails(root, id, false, () => {}, opener, canEdit),
+    openSearchedContact: (root, id, isShared, opener = null, canEdit = window.lawContactsCanUpdate) => openDetails(root, id, isShared, () => render(root, context), opener, canEdit),
   };
 })();

@@ -292,7 +292,7 @@
         const recent = element('div', 'law-dashboard-recent-list');
         (summary.recent || []).slice(0, 5).forEach((contact) => {
           const link = element('button', 'law-dashboard-recent-link', contact.display_name); link.type = 'button';
-          link.addEventListener('click', (event) => window.FokusLawContacts?.openContact(contentRegion, contact.id, event.currentTarget));
+          link.addEventListener('click', (event) => window.FokusLawContacts?.openContact(contentRegion, contact.id, event.currentTarget, canLawPermission('law.contacts.update')));
           recent.append(link);
         });
         if (!(summary.recent || []).length) recent.append(element('span', 'law-dashboard-recent-empty', 'Os contatos que você acessar aparecerão aqui.'));
@@ -1516,7 +1516,7 @@
             } else {
               activeGroup = `module:${contactsModule.id}`;
               renderNavigation();
-              await window.FokusLawContacts?.openSearchedContact(contentRegion, item.id, Boolean(item.is_shared), search);
+              await window.FokusLawContacts?.openSearchedContact(contentRegion, item.id, Boolean(item.is_shared), search, canLawPermission('law.contacts.update'));
             }
           } catch (error) {
             showSearchMessage(error.message || 'Não foi possível abrir este contato.', 'error');

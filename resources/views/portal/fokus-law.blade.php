@@ -112,10 +112,10 @@
   <script src="/assets/js/brazilian-documents.js?v=20260930-document-validation-v1"></script>
   <script src="/portal/assets/fokus-law-select.js?v=20261008-select-options-full-width-v1"></script>
   <script src="/portal/assets/fokus-law-access.js?v=20261008-primary-outline-buttons-v2" defer></script>
-  <script src="/portal/assets/fokus-law-contacts.js?v=20261008-contact-detail-edit-button-v1" defer></script>
+  <script src="/portal/assets/fokus-law-contacts.js?v=20261008-contact-detail-edit-permissions-v1" defer></script>
   <script src="/portal/assets/law-record-ui.js?v=20261008-primary-outline-buttons-v2" defer></script>
   <script src="/portal/assets/fokus-law-processes.js?v=20261008-related-process-card-format-v1" defer></script>
-  <script src="/portal/assets/fokus-law-shell.js?v=20261008-primary-outline-buttons-v2" defer></script>
+  <script src="/portal/assets/fokus-law-shell.js?v=20261008-contact-detail-edit-permissions-v1" defer></script>
   <script src="/assets/js/portal-profile.js?v=20260925-profile-v4" defer></script>
 </body>
 </html>
