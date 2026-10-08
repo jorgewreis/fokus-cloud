@@ -37,6 +37,7 @@
   let context = null;
   const initialPage = shell.dataset.initialPage || 'overview';
   let contactsView = ['contacts-sharing', 'contacts-quality'].includes(initialPage) ? initialPage : 'module';
+  let processesView = ['processes-settings', 'processes-access'].includes(initialPage) ? initialPage : 'module';
   let settingsView = ['company', 'subscription', 'users', 'transfer'].includes(initialPage) ? initialPage : 'settings';
   let activeGroup = ['company', 'subscription', 'users', 'transfer'].includes(initialPage) ? 'settings' : 'overview';
 
@@ -210,12 +211,14 @@
       if (canLawPermission('law.contacts.share.manage')) appendNavLink(pageItems, 'Compartilhamentos', '/portal/fokus-law/contatos/compartilhamentos', 'contactsShare', contactsView === 'contacts-sharing');
       if (canLawPermission('law.contacts.view')) appendNavLink(pageItems, 'Revisão e qualidade', '/portal/fokus-law/contatos/revisao-e-qualidade', 'contactsQuality', contactsView === 'contacts-quality');
     } else if (String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('processos')) {
-      appendNavButton(pageItems, 'Cadastro e consulta', 'processes', true, () => renderContent('module'));
+      appendNavLink(pageItems, 'Cadastro e consulta', '/portal/fokus-law/processos', 'processes', processesView === 'module');
+      if (canLawPermission('law.cases.configure')) appendNavLink(pageItems, 'Configurações da unidade', '/portal/fokus-law/processos/configuracoes', 'settings', processesView === 'processes-settings');
+      if (canLawPermission('law.cases.access.manage')) appendNavLink(pageItems, 'Autorizações', '/portal/fokus-law/processos/autorizacoes', 'users', processesView === 'processes-access');
     } else {
       appendNavButton(pageItems, `Visão geral de ${descriptor.label}`, descriptor.icon, true, () => renderContent('module'), true);
       pageItems.append(element('p', 'law-nav-description', 'As páginas funcionais deste módulo serão adicionadas aqui.'));
     }
-    renderContent(contactsView);
+    renderContent(isContactsModule ? contactsView : processesView);
     document.querySelector('#section-icon').src = ICON_ROOT + ICONS[headingIcon];
   }
 
@@ -1080,7 +1083,7 @@
         contentRegion.append(element('h2', '', 'Processos'), element('p', 'fs-alert fs-alert-info', 'A etapa funcional atual atende ao Judiciário Criminal. As funcionalidades deste contexto serão definidas separadamente.'));
         return;
       }
-      window.FokusLawProcesses?.render(contentRegion, context);
+      window.FokusLawProcesses?.render(contentRegion, context, null, processesView);
       return;
     }
     if (String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos')) {
@@ -1629,7 +1632,7 @@
 
   function setContext(value) {
     context = value;
-    if (!['profile', 'users', 'transfer'].includes(initialPage)) document.title = initialPage === 'company' ? 'Empresa | Fokus Law' : 'Fokus Law | Fokus Cloud';
+    if (!['profile', 'users', 'transfer'].includes(initialPage)) document.title = initialPage === 'company' ? 'Empresa | Fokus Law' : initialPage === 'processes-settings' ? 'Configurações de Processos | Fokus Law' : initialPage === 'processes-access' ? 'Autorizações de Processos | Fokus Law' : 'Fokus Law | Fokus Cloud';
     document.querySelector('#user-name').textContent = context.user.name;
     document.querySelector('#user-email').textContent = context.user.email;
     document.querySelector('#user-avatar').textContent = context.user.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
@@ -1637,7 +1640,7 @@
     renderCompanyOptions();
     renderUnitOptions();
     const remember = localStorage.getItem(preferenceKey(context.user.id, 'remember-group')) === 'true';
-    if (!['profile', 'company', 'subscription', 'users', 'transfer', 'contacts-sharing', 'contacts-quality', 'processes'].includes(initialPage) && remember) {
+    if (!['profile', 'company', 'subscription', 'users', 'transfer', 'contacts-sharing', 'contacts-quality', 'processes', 'processes-settings', 'processes-access'].includes(initialPage) && remember) {
       const lastGroup = localStorage.getItem(preferenceKey(context.user.id, 'last-group'));
       if ((lastGroup === 'settings' && context.permissions.manage_settings) || visibleModules().some((item) => `module:${item.id}` === lastGroup)) activeGroup = lastGroup;
     }
@@ -1645,7 +1648,7 @@
       const contactsModule = visibleModules().find((item) => String(item.family || item.module_code || item.code || '').toLowerCase().startsWith('contatos'));
       if (contactsModule) activeGroup = `module:${contactsModule.id}`;
     }
-    if (initialPage === 'processes') {
+    if (['processes', 'processes-settings', 'processes-access'].includes(initialPage)) {
       const processesModule = visibleModules().find((item) => String(item.family || item.module_code || item.code || '').toLowerCase().startsWith('processos'));
       if (processesModule) activeGroup = `module:${processesModule.id}`;
     }

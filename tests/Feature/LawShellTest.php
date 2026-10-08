@@ -229,6 +229,21 @@ class LawShellTest extends TestCase
         $this->get('/portal/perfil')->assertRedirect('/portal/fokus-law/perfil');
     }
 
+    public function test_process_settings_and_authorization_pages_open_inside_the_law_shell(): void
+    {
+        $session = ['active_company_id' => $this->companyId];
+
+        $this->actingAs($this->user)->withSession($session)
+            ->get('/portal/fokus-law/processos/configuracoes')
+            ->assertOk()->assertViewIs('portal.fokus-law')
+            ->assertSee('data-initial-page="processes-settings"', false);
+
+        $this->actingAs($this->user)->withSession($session)
+            ->get('/portal/fokus-law/processos/autorizacoes')
+            ->assertOk()->assertViewIs('portal.fokus-law')
+            ->assertSee('data-initial-page="processes-access"', false);
+    }
+
     public function test_shell_context_returns_empty_modules_without_active_law_entitlements(): void
     {
         $this->actingAs($this->user)->withSession(['active_company_id' => $this->companyId])

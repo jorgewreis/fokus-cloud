@@ -94,6 +94,8 @@ $serveFokusLawShell = function (string $page = 'overview', bool $redirectProfile
 };
 Route::get('/portal/fokus-law', fn () => $serveFokusLawShell());
 Route::get('/portal/fokus-law/processos', fn () => $serveFokusLawShell('processes'));
+Route::get('/portal/fokus-law/processos/configuracoes', fn () => $serveFokusLawShell('processes-settings'));
+Route::get('/portal/fokus-law/processos/autorizacoes', fn () => $serveFokusLawShell('processes-access'));
 Route::get('/portal/fokus-law/empresa', fn () => $serveFokusLawShell('company', false, true));
 Route::get('/portal/fokus-law/assinatura', fn () => $serveFokusLawShell('subscription', false, true));
 Route::get('/portal/fokus-law/perfil', fn () => $serveFokusLawShell('profile'));

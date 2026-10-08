@@ -8,8 +8,9 @@
   const request = (path = '', options) => window.FokusApi.request(`/law/cases${path}`, options);
   let generation = 0;
 
-  async function render(root, context, initialCaseId = null) {
-    document.title = 'Processos | Fokus Law';
+  async function render(root, context, initialCaseId = null, pageView = 'module') {
+    const pageTitles = { module: 'Processos', 'processes-settings': 'Configurações da unidade', 'processes-access': 'Autorizações' };
+    document.title = `${pageTitles[pageView] || pageTitles.module} | Fokus Law`;
     const session = ++generation;
     const { node: $, button, input, select, field, detailSection: section, message, dialog: openDialog, bindForm, compositionChart, metricCards } = UI();
     const dialogs = new Set();
@@ -40,8 +41,9 @@
       refreshTimer = setTimeout(poll, 5000);
     }
     const notice = message();
-    const heading = $('header', 'law-page-heading law-record-page-heading'); heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE PROCESSOS'), $('h2', '', 'Processos'), $('p', 'law-page-lede', 'Judiciário criminal · Consulte os processos da empresa e organize o trabalho de cada unidade.'));
-    const headingActions = $('div', 'law-record-heading-actions'); heading.append(headingActions);
+    const heading = $('header', 'law-page-heading law-record-page-heading'); heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE PROCESSOS'), $('h2', '', pageTitles[pageView] || pageTitles.module), $('p', 'law-page-lede', pageView === 'processes-settings' ? 'Gerencie os padrões e as opções processuais de cada unidade.' : pageView === 'processes-access' ? 'Gerencie quem pode consultar processos secretos nas unidades que você administra.' : 'Judiciário criminal · Consulte os processos da empresa e organize o trabalho de cada unidade.'));
+    const headingActions = $('div', 'law-record-heading-actions');
+    if (pageView === 'module') heading.append(headingActions);
     const body = $('div'); root.replaceChildren(heading, notice, body);
     const report = (error) => { if (active()) { notice.textContent = error.message || 'Não foi possível carregar os processos.'; notice.hidden = false; } };
     const action = (fn) => async (event) => {
@@ -107,8 +109,6 @@
         if (!active() || token !== viewToken) return;
         body.replaceChildren(); body.className = ''; headingActions.replaceChildren();
         if (can('create')) headingActions.append(button('Novo processo', action(create), true));
-        if (refs?.can_configure) headingActions.append(button('Configurações da unidade', action(configure)));
-        if (refs?.can_configure || context.company?.role === 'admin') headingActions.append(button('Gerenciar autorizações', action(manageAccess)));
         const total = Number(result.pagination.total); const classes = result.summary_by_class || []; const summary = result.summary || {};
         const overview = $('section', 'law-record-overview-banner fs-card'); overview.setAttribute('aria-label', 'Resumo dos processos acessíveis');
         const copy = $('div', 'law-record-overview-copy'); copy.append($('span', 'law-record-overview-kicker', 'PAINEL PROCESSUAL'), $('h3', '', 'Seus processos, em uma visão.'), $('p', '', 'Classes judiciais, organização interna e histórico dos processos em um só lugar.'));
@@ -337,12 +337,13 @@
         const member = select(available.map((v) => [v.id, v.name])); simpleForm('Conceder autorização nominal', [['Usuário da empresa', member, 'company_membership_id']], async () => { await request(`${apiPath(id)}/access`, { method: 'POST', body: { company_membership_id: member.value } }); await detail(id); }, 'Conceder acesso', event?.currentTarget);
       }))); body.append(box);
     }
-    async function configure(event) {
-      if (!refs?.can_configure) throw new Error('A configuração é exclusiva da chefia ou do administrador da unidade.');
-      const modal = dialog('Configurações de Processos', event?.currentTarget); const host = $('div', 'fs-stack fs-stack-gap-3'); modal.body.append(host);
-      const unit = select(refs.units.map((v) => [v.id, v.name]), refs.selected_unit_id); modal.body.prepend(field('Unidade', unit));
+    async function configure() {
+      if (!refs?.units?.length) { body.append($('p', 'fs-alert fs-alert-info', 'Selecione uma unidade ativa no menu para consultar as configurações disponíveis.')); return; }
+      const unit = select(refs.units.map((v) => [v.id, v.name]), refs.selected_unit_id);
+      const unitField = field('Unidade', unit); const host = $('div', 'fs-stack fs-stack-gap-3');
+      body.append(unitField, host);
       async function draw() {
-        const local = await references(unit.value); if (!modal.element.isConnected) return; host.replaceChildren();
+        const local = await references(unit.value); refs = local; host.replaceChildren();
         if (!local.can_configure) { host.append($('p', 'fs-alert fs-alert-warning', 'Você não pode configurar esta unidade.')); return; }
         const cnjBox = section('Padrão do número CNJ', 'CNJ');
         const segment = select([['', 'Selecione o segmento'], ...(local.cnj_segments || []).map((item) => [item.code, `${item.code} - ${item.name}`])], local.cnj_defaults?.segment || ''); segment.required = true;
@@ -372,34 +373,42 @@
           bindForm(form, save, error, async () => { await request(`/options/${type}`, { method: 'POST', body: { law_unit_id: unit.value, [property]: name.value.trim() } }); await draw(); }); host.append(box);
         }
       }
-      unit.addEventListener('change', action(draw)); modal.footer.append(button('Concluir', action(async () => { modal.close(); if (currentId) await detail(currentId); else { await getRefs(context.active_unit_id); await list(); } }))); await draw();
+      unit.addEventListener('change', action(draw)); await draw();
     }
-    function manageAccess(event) {
+    function manageAccess() {
       const number = input('', 'text', 25); number.required = true;
-      const modal = dialog('Gerenciar autorizações de processo secreto', event?.currentTarget);
       const lookup = $('form', 'fs-stack fs-stack-gap-3'); const lookupError = message(); const submit = button('Consultar autorizações', null, true); submit.type = 'submit';
-      lookup.append(field('Número CNJ', number, 'case_number', 'A gestão verifica sua autoridade na unidade proprietária e não abre o conteúdo do processo.'), lookupError, submit); modal.body.append(lookup);
-      bindForm(lookup, submit, lookupError, async () => {
+      const results = $('div', 'fs-stack fs-stack-gap-3');
+      lookup.append(field('Número CNJ', number, 'case_number', 'A gestão verifica sua autoridade na unidade proprietária e não abre o conteúdo do processo.'), lookupError, submit);
+      body.append(lookup, results);
+      async function loadAccess() {
         const found = await request(`/access-management?${new URLSearchParams({ case_number: number.value })}`);
         const local = await references(found.law_unit_id); const grants = await request(`${apiPath(found.case_id)}/access`);
-        if (!modal.element.isConnected) return;
-        modal.body.replaceChildren(); const error = message(); modal.body.append($('h3', '', `Autorizações · ${number.value}`), error);
-        const reload = async () => { modal.close(); await list(); };
+        if (!active()) return;
+        results.replaceChildren();
+        const box = section(`Autorizações · ${number.value}`, 'ACESSO', `Unidade: ${local.units.find((unit) => unit.id === found.law_unit_id)?.name || 'Unidade do processo'}`);
+        if (!grants.users.length) box.body.append($('p', 'fs-alert fs-alert-info', 'Nenhuma autorização nominal ativa para este processo.'));
         grants.users.forEach((user) => {
-          const row = toolbar(); row.append($('span', '', user.name), button('Revogar', async (e) => {
-            e.currentTarget.disabled = true; try { await request(`${apiPath(found.case_id)}/access/${user.id}`, { method: 'DELETE' }); await reload(); } catch (failure) { error.textContent = failure.message; error.hidden = false; e.currentTarget.disabled = false; }
-          })); modal.body.append(row);
+          const row = toolbar(); row.append($('span', '', user.name), button('Revogar', action(async () => { await request(`${apiPath(found.case_id)}/access/${user.id}`, { method: 'DELETE' }); await loadAccess(); })));
+          box.body.append(row);
         });
-        const members = local.members.filter((m) => !grants.users.some((g) => g.company_membership_id === m.id));
+        const members = local.members.filter((member) => !grants.users.some((granted) => granted.company_membership_id === member.id));
         if (members.length) {
-          const form = $('form', 'fs-stack fs-stack-gap-2'); const member = select(members.map((m) => [m.id, m.name])); const save = button('Conceder acesso', null, true); save.type = 'submit';
-          form.append(field('Usuário da empresa', member, 'company_membership_id'), save); modal.body.append(form);
-          bindForm(form, save, error, async () => { await request(`${apiPath(found.case_id)}/access`, { method: 'POST', body: { company_membership_id: member.value } }); await reload(); });
+          const form = $('form', 'fs-stack fs-stack-gap-2'); const member = select(members.map((item) => [item.id, item.name])); const error = message(); const save = button('Conceder acesso', null, true); save.type = 'submit';
+          form.append(field('Usuário da empresa', member, 'company_membership_id'), error, save); box.body.append(form);
+          bindForm(form, save, error, async () => { await request(`${apiPath(found.case_id)}/access`, { method: 'POST', body: { company_membership_id: member.value } }); await loadAccess(); });
         }
-        modal.footer.append(button('Fechar', () => modal.close()));
-      });
+        results.append(box);
+      }
+      bindForm(lookup, submit, lookupError, loadAccess);
     }
-    try { if (context.active_unit_id) await getRefs(context.active_unit_id); if (initialCaseId) await detail(initialCaseId); else await list(); } catch (error) { report(error); }
+    try {
+      if (context.active_unit_id) await getRefs(context.active_unit_id);
+      if (initialCaseId) await detail(initialCaseId);
+      else if (pageView === 'processes-settings') await configure();
+      else if (pageView === 'processes-access') manageAccess();
+      else await list();
+    } catch (error) { report(error); }
   }
   window.FokusLawProcesses = { render, openCase: (root, context, id) => render(root, context, id) };
 })();
