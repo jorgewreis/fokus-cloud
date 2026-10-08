@@ -885,7 +885,7 @@ test('controles compartilhados preservam a cascata do Fokus Styles', async ({ pa
     await expect(page.locator('#product-pagination .fs-page-item.is-active .fs-page-link')).toHaveCount(1);
 
     const beforeHover = await page.evaluate(() => {
-        const filter = document.querySelector('#product-filter-form .fs-btn-outline-secondary');
+        const filter = document.querySelector('#product-filter-form .fs-btn-outline-primary');
         const activePage = document.querySelector('#product-pagination .fs-page-item.is-active .fs-page-link');
         const input = document.querySelector('#product-search');
         const select = document.querySelector('#product-status-filter');
@@ -903,9 +903,9 @@ test('controles compartilhados preservam a cascata do Fokus Styles', async ({ pa
     expect(beforeHover.inputPadding).toBe('0px 12px');
     expect(beforeHover.selectPadding).toBe('0px 12px');
 
-    await page.locator('#product-filter-form .fs-btn-outline-secondary').hover();
+    await page.locator('#product-filter-form .fs-btn-outline-primary').hover();
     await page.waitForTimeout(200);
-    const hoverContract = await page.locator('#product-filter-form .fs-btn-outline-secondary').evaluate((button) => ({
+    const hoverContract = await page.locator('#product-filter-form .fs-btn-outline-primary').evaluate((button) => ({
         hovered: button.matches(':hover'),
         background: getComputedStyle(button).backgroundColor,
         color: getComputedStyle(button).color,
