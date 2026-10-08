@@ -62,6 +62,24 @@ Route::middleware('auth')->group(function () {
     Route::post('/auth/resend-verification', [AuthController::class, 'resendVerification'])->middleware('throttle:2,10,customer-resend-verification');
     Route::middleware(EnsureCompanyContext::class)->group(function () {
         Route::get('/law/shell-context', [LawShellController::class, 'context']);
+        Route::prefix('law/admin-cases')->middleware([App\Http\Middleware\EnsureLawAdministrativeProcessContext::class, 'law.permission:law.cases.view', App\Http\Middleware\LawCaseTransaction::class])->group(function () {
+            Route::get('/search', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'search']);
+            Route::get('/dashboard', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'dashboard']);
+            Route::get('/references', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'references']);
+            Route::get('/', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'index']);
+            Route::post('/', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'store']);
+            Route::post('/types', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'saveType']);
+            Route::post('/options/{kind}', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'addOption']);
+            Route::delete('/options/{kind}/{id}', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'deactivateOption']);
+            Route::get('/{case}', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'show']);
+            Route::patch('/{case}', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'update']);
+            Route::post('/{case}/archive', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'archive']);
+            Route::post('/{case}/reopen', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'reopen']);
+            Route::post('/{case}/contacts', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'addContact']);
+            Route::delete('/{case}/contacts/{link}', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'removeContact']);
+            Route::post('/{case}/tags', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'addTag']);
+            Route::delete('/{case}/tags/{tag}', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'removeTag']);
+        });
         Route::prefix('law/cases')->middleware([App\Http\Middleware\EnsureLawCaseContext::class, 'law.permission:law.cases.view', App\Http\Middleware\LawCaseTransaction::class])->group(function () {
             Route::get('/search', [LawCaseController::class, 'search']);
             Route::get('/', [LawCaseController::class, 'index']);

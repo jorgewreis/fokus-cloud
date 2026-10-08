@@ -212,8 +212,8 @@
       if (canLawPermission('law.contacts.view')) appendNavLink(pageItems, 'Revisão e qualidade', '/portal/fokus-law/contatos/revisao-e-qualidade', 'contactsQuality', contactsView === 'contacts-quality');
     } else if (String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('processos')) {
       appendNavLink(pageItems, 'Cadastro e consulta', '/portal/fokus-law/processos', 'processes', processesView === 'module');
-      if (canLawPermission('law.cases.configure')) appendNavLink(pageItems, 'Configurações da unidade', '/portal/fokus-law/processos/configuracoes', 'settings', processesView === 'processes-settings');
-      if (canLawPermission('law.cases.access.manage')) appendNavLink(pageItems, 'Autorizações', '/portal/fokus-law/processos/autorizacoes', 'users', processesView === 'processes-access');
+      if (canLawPermission('law.cases.configure')) appendNavLink(pageItems, module.context_code === 'orgao_publico' ? 'Configurações do órgão' : 'Configurações da unidade', '/portal/fokus-law/processos/configuracoes', 'settings', processesView === 'processes-settings');
+      if (module.context_code !== 'orgao_publico' && canLawPermission('law.cases.access.manage')) appendNavLink(pageItems, 'Autorizações', '/portal/fokus-law/processos/autorizacoes', 'users', processesView === 'processes-access');
     } else {
       appendNavButton(pageItems, `Visão geral de ${descriptor.label}`, descriptor.icon, true, () => renderContent('module'), true);
       pageItems.append(element('p', 'law-nav-description', 'As páginas funcionais deste módulo serão adicionadas aqui.'));
@@ -300,7 +300,7 @@
         body.append(distribution, recentSection);
       }).catch(() => { if (card.isConnected) body.replaceChildren(element('p', 'law-dashboard-widget-error', 'Não foi possível carregar este resumo agora.')); });
     }
-    const processesModule = visibleModules().find((module) => module.family === 'processos' && (['judiciario', 'vara_criminal'].includes(module.context_code) || String(module.code || '').includes('vara-criminal')));
+    const processesModule = visibleModules().find((module) => String(module.family || '').startsWith('processos'));
     if (processesModule && canLawPermission('law.cases.view')) renderProcessDashboardWidget(grid, processesModule);
   }
 
@@ -316,7 +316,7 @@
     header.append(identity, open);
     const body = element('div', 'law-dashboard-widget-body'); body.append(element('p', 'law-contact-loading', 'Carregando seus indicadores…'));
     card.append(header, body); grid.append(card);
-    FokusApi.request('/law/cases/dashboard').then(({ summary }) => {
+    FokusApi.request(module.context_code === 'orgao_publico' ? '/law/admin-cases/dashboard' : '/law/cases/dashboard').then(({ summary }) => {
       if (!card.isConnected) return;
       const total = Number(summary.cases_total || 0);
       const distribution = window.FokusLawRecordUI.compositionChart(summary.by_class || [], total, 'processos', true);
@@ -324,7 +324,7 @@
       const links = element('div', 'law-dashboard-recent-list');
       (summary.recent || []).forEach((item) => {
         const link = element('button', 'law-dashboard-recent-link', item.case_number_formatted); link.type = 'button';
-        link.addEventListener('click', () => { activeGroup = `module:${module.id}`; contactsView = 'module'; renderRail(); renderNavigation(); window.FokusLawProcesses?.openCase(contentRegion, context, item.id); closeMobileNav(); }); links.append(link);
+        link.addEventListener('click', () => { activeGroup = `module:${module.id}`; contactsView = 'module'; renderRail(); renderNavigation(); window.FokusLawProcesses?.openCase(contentRegion, context, item.id, module); closeMobileNav(); }); links.append(link);
       });
       if (!(summary.recent || []).length) links.append(element('span', 'law-dashboard-recent-empty', 'Seus processos cadastrados aparecerão aqui.'));
       recent.append(links); body.replaceChildren(distribution, recent);
@@ -1079,11 +1079,11 @@
 
   function renderModulePlaceholder(module) {
     if (String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('processos')) {
-      if (!['judiciario', 'vara_criminal'].includes(module.context_code) && !String(module.code || '').includes('vara-criminal')) {
-        contentRegion.append(element('h2', '', 'Processos'), element('p', 'fs-alert fs-alert-info', 'A etapa funcional atual atende ao Judiciário Criminal. As funcionalidades deste contexto serão definidas separadamente.'));
+      if (!['judiciario', 'vara_criminal', 'orgao_publico'].includes(module.context_code) && !String(module.code || '').includes('vara-criminal')) {
+        contentRegion.append(element('h2', '', 'Processos'), element('p', 'fs-alert fs-alert-info', 'Este contexto de Processos não está disponível para esta assinatura.'));
         return;
       }
-      window.FokusLawProcesses?.render(contentRegion, context, null, processesView);
+      window.FokusLawProcesses?.render(contentRegion, context, null, processesView, module);
       return;
     }
     if (String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos')) {
@@ -1512,7 +1512,7 @@
             if (type === 'case') {
               activeGroup = `module:${processesModule.id}`;
               renderNavigation();
-              await window.FokusLawProcesses?.openCase(contentRegion, context, item.id);
+              await window.FokusLawProcesses?.openCase(contentRegion, context, item.id, processesModule);
             } else {
               activeGroup = `module:${contactsModule.id}`;
               renderNavigation();
@@ -1562,7 +1562,7 @@
         try {
           const params = new URLSearchParams({ q: query, page: '1', per_page: '10' });
           const [caseResult, contactResult] = await Promise.all([
-            canSearchProcesses ? FokusApi.request(`/law/cases/search?q=${encodeURIComponent(query)}`) : Promise.resolve({ cases: [] }),
+            canSearchProcesses ? FokusApi.request(`${processesModule?.context_code === 'orgao_publico' ? '/law/admin-cases' : '/law/cases'}/search?q=${encodeURIComponent(query)}`) : Promise.resolve({ cases: [] }),
             canSearchContacts ? FokusApi.request(`/law/contacts?${params.toString()}`) : Promise.resolve({ contacts: [] }),
           ]);
           if (requestId !== searchRequest || search.value.trim() !== query) return;
