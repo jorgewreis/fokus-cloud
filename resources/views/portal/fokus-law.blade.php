@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1b1028" />
   <title>Fokus Law | Fokus Cloud</title>
-  <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=BAB781ACDB04" />
+  <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20261009-select-menu-options-v1" />
   <link rel="stylesheet" href="/marketing/products/fokus-law.css?v=20261008-primary-outline-buttons-v1" />
   <link rel="stylesheet" href="/portal/assets/fokus-law-shell.css?v=20261008-related-process-metadata-and-privacy-alert-v1" />
 </head>
