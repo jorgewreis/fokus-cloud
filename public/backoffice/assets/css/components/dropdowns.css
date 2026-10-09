@@ -1,5 +1,5 @@
 .fs-dropdown { position: relative; }
 .fs-dropdown-menu { position: absolute; right: 0; z-index: var(--z-dropdown); min-width: 180px; margin-top: var(--space-1); padding: var(--space-1); border: 1px solid var(--theme-border-alt); border-radius: var(--radius-md); background: var(--theme-surface); box-shadow: var(--shadow-md); }
 .fs-dropdown-menu[hidden] { display: none; }
-button.fs-dropdown-item { display: inline-flex; width: auto; max-width: 100%; padding: 8px 10px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--theme-text); text-align: left; cursor: pointer; }
+button.fs-dropdown-item { box-sizing: border-box; display: flex; width: 100%; inline-size: 100%; max-width: none; max-inline-size: none; padding: 8px 10px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--theme-text); text-align: left; cursor: pointer; }
 .fs-dropdown-item:hover, .fs-dropdown-item:focus-visible { background: var(--role-color-050); color: var(--role-color-700); }
