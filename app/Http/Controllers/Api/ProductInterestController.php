@@ -97,22 +97,6 @@ class ProductInterestController extends Controller
                 ->replyTo($interest->email, $interest->name)
         );
 
-        $adminRecipients = PlatformAdmin::query()
-            ->where('status', 'ativo')
-            ->whereNull('deactivated_at')
-            ->whereHas('role.permissions', fn ($query) => $query->where('code', 'platform.product_interests.manage'))
-            ->pluck('email')
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-
-        abort_if(empty($adminRecipients), 503, 'Seu interesse foi registrado, mas não foi possível encaminhá-lo à equipe neste momento.');
-
-        Mail::to($adminRecipients)
-            ->replyTo($interest->email, $interest->name)
-            ->send(new ProductInterestNotification($interest->fresh()));
-
         return response()->json([
             'message' => 'Interesse registrado com sucesso.',
             'interest_id' => $interest->id,
