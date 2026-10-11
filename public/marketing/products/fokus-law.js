@@ -285,7 +285,7 @@
       };
       try {
         await window.FokusApi.request('/product-interests', { method: 'POST', body: payload });
-        interestStatus.textContent = 'Recebemos suas informações. Elas foram registradas e enviadas à equipe Fokus Law, que analisará seu cenário e retornará por e-mail com uma sugestão de módulo.';
+        interestStatus.textContent = 'Recebemos suas informações. Elas foram registradas e encaminhadas à equipe Fokus Law.';
         interestForm.reset();
         renderModulePriorities();
       } catch (error) {
