@@ -77,3 +77,18 @@
 
 .law-module-progress progress::-webkit-progress-value{background:var(--law-module-progress-color)}
 .law-module-progress progress::-moz-progress-bar{background:var(--law-module-progress-color)}
+
+/* Gestão de Processos: contexto atual e escopos por segmento */
+.law-process-section{background:#f0eaf4}
+.law-process-intro{max-width:900px}
+.law-process-intro>p:last-child{color:#625668}
+.law-process-segment-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin-top:3rem;background:var(--law-line);border:1px solid var(--law-line)}
+.law-process-segment{padding:1.8rem;background:#fff;min-height:300px}
+.law-process-segment-current{background:#fffdf8;box-shadow:inset 0 4px 0 var(--law-purple)}
+.law-process-segment-status{margin:0 0 1rem;color:var(--law-purple);font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.law-process-segment h3{margin:0 0 .8rem;color:var(--law-plum);font-size:1.3rem}
+.law-process-segment>p:not(.law-process-segment-status){color:#665c68;font-size:.9rem}
+.law-process-segment ul{margin:1rem 0 0;padding-left:1.15rem;color:#554b5a;font-size:.84rem}
+.law-process-segment li+li{margin-top:.55rem}
+.law-process-scope-note{max-width:1000px;margin:1.4rem 0 0;color:#665c68;font-size:.8rem}
+@media(max-width:900px){.law-process-segment-grid{grid-template-columns:1fr}.law-process-segment{min-height:0}}
