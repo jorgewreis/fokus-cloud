@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\ProductInterestNotification;
+use App\Models\PlatformAdmin;
 use App\Models\ProductInterest;
 use App\Services\PrefixedUlid;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -76,6 +79,22 @@ class ProductInterestController extends Controller
             }
             return ProductInterest::create(['id' => PrefixedUlid::make('INT'), 'status' => 'novo', ...$attributes]);
         });
+
+        $adminRecipients = PlatformAdmin::query()
+            ->where('status', 'ativo')
+            ->whereNull('deactivated_at')
+            ->whereHas('role.permissions', fn ($query) => $query->where('code', 'platform.product_interests.manage'))
+            ->pluck('email')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        abort_if(empty($adminRecipients), 503, 'Seu interesse foi registrado, mas não foi possível encaminhá-lo à equipe neste momento.');
+
+        Mail::to($adminRecipients)
+            ->replyTo($interest->email, $interest->name)
+            ->send(new ProductInterestNotification($interest->fresh()));
 
         $adminRecipients = PlatformAdmin::query()
             ->where('status', 'ativo')
