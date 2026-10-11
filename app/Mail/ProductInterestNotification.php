@@ -1,13 +1,13 @@
 <?php
 
-namespace App\\Mail;
+namespace App\Mail;
 
-use App\\Models\\ProductInterest;
-use Illuminate\\Bus\\Queueable;
-use Illuminate\\Mail\\Mailable;
-use Illuminate\\Mail\\Mailables\\Content;
-use Illuminate\\Mail\\Mailables\\Envelope;
-use Illuminate\\Queue\\SerializesModels;
+use App\Models\ProductInterest;
+use Illuminate\Bus\Queueable;
+use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Queue\SerializesModels;
 
 final class ProductInterestNotification extends Mailable
 {
