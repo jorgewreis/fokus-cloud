@@ -264,6 +264,11 @@
         desiredModules ? 'Módulos que gostaria que existissem: ' + desiredModules : '',
         desiredFeatures ? 'Funcionalidades desejadas nesses módulos: ' + desiredFeatures : ''
       ].filter(Boolean).join('\n');
+      if (feedback.length > 4000) {
+        interestStatus.textContent = 'Reduza os detalhes por módulo para até 4.000 caracteres no total.';
+        interestButton.disabled = false;
+        return;
+      }
       const payload = {
         name: String(data.get('name') || '').trim(),
         email: String(data.get('email') || '').trim(),
@@ -280,11 +285,11 @@
       };
       try {
         await window.FokusApi.request('/product-interests', { method: 'POST', body: payload });
-        interestStatus.textContent = 'Recebemos suas informações. Nossa equipe analisará seu cenário e retornará por e-mail com uma sugestão de módulo que possa ajudar.';
+        interestStatus.textContent = 'Recebemos suas informações. Elas foram registradas e enviadas à equipe Fokus Law, que analisará seu cenário e retornará por e-mail com uma sugestão de módulo.';
         interestForm.reset();
         renderModulePriorities();
       } catch (error) {
-        interestStatus.textContent = error.message || 'Não foi possível enviar o formulário agora. Tente novamente em instantes.';
+        interestStatus.textContent = error.message || 'Não foi possível enviar e encaminhar suas informações agora. Tente novamente em instantes.';
       } finally {
         interestButton.disabled = false;
       }
