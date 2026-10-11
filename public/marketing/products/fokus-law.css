@@ -131,3 +131,13 @@
 .law-interest-honeypot{position:absolute!important;left:-10000px!important;width:1px!important;height:1px!important;opacity:0!important}
 @media(max-width:900px){.law-interest-section{grid-template-columns:1fr;gap:2rem}.law-interest-intro{max-width:700px}}
 @media(max-width:640px){.law-interest-fields,.law-interest-modules,.law-interest-location{grid-template-columns:1fr}.law-interest-form{padding:1rem}.law-interest-full,.law-interest-modules,.law-interest-location{grid-column:auto}}
+
+/* Melhorias do formulário de interesse: prioridades por módulo */
+.law-interest-help{grid-column:1/-1;margin:0;color:rgba(38,20,52,.72);font-size:.88rem;line-height:1.5}
+.law-interest-modules{grid-template-columns:repeat(2,minmax(0,1fr))}
+.law-interest-priorities{padding:1rem;border:1px solid rgba(38,20,52,.14);border-radius:.75rem;background:rgba(255,255,255,.62)}
+.law-interest-priorities h3{margin:0 0 .45rem;font-size:1.05rem}
+.law-interest-priority-fields{display:grid;gap:1rem;margin-top:1rem}
+.law-interest-priority-fields label{display:grid;gap:.45rem}
+.law-interest-modules .law-interest-help{font-weight:400}
+@media(max-width:640px){.law-interest-modules{grid-template-columns:1fr}}
