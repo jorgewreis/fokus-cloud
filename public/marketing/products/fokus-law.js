@@ -229,6 +229,52 @@
     }).catch(() => {}).finally(() => { supportAdminReady = true; });
   }
 
+  const interestForm = document.querySelector('[data-law-interest-form]');
+  if (interestForm && window.FokusApi) {
+    const interestStatus = interestForm.querySelector('[data-law-interest-status]');
+    const interestButton = interestForm.querySelector('button[type="submit"]');
+    interestForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!interestForm.reportValidity()) return;
+      const data = new FormData(interestForm);
+      const state = String(data.get('state') || '').trim().toUpperCase();
+      if (state && !/^[A-Z]{2}$/.test(state)) {
+        interestStatus.textContent = 'Informe a UF com duas letras, por exemplo BA.';
+        interestForm.elements.state.focus();
+        return;
+      }
+      interestStatus.textContent = 'Enviando seu interesse…';
+      interestButton.disabled = true;
+      const modules = data.getAll('modules');
+      const payload = {
+        name: String(data.get('name') || '').trim(),
+        email: String(data.get('email') || '').trim(),
+        products: ['law'],
+        profiles: [String(data.get('profile') || '')],
+        organization: String(data.get('organization') || '').trim() || undefined,
+        city: String(data.get('city') || '').trim() || undefined,
+        state: state || undefined,
+        team_size: String(data.get('team_size') || '') || undefined,
+        modules,
+        main_difficulties: String(data.get('main_difficulties') || '').trim(),
+        current_process: String(data.get('current_process') || '').trim() || undefined,
+        privacy_accepted: Boolean(data.get('privacy_accepted')),
+        privacy_version: '1.0',
+        source_url: location.href,
+        website: String(data.get('website') || '')
+      };
+      try {
+        await window.FokusApi.request('/product-interests', { method: 'POST', body: payload });
+        interestStatus.textContent = 'Interesse recebido. Nossa equipe comercial poderá retornar pelo e-mail informado.';
+        interestForm.reset();
+      } catch (error) {
+        interestStatus.textContent = error.message || 'Não foi possível enviar o formulário agora. Tente novamente em instantes.';
+      } finally {
+        interestButton.disabled = false;
+      }
+    });
+  }
+
   const livePlans = document.querySelector('[data-law-live-plans]'), grid = document.querySelector('[data-law-live-plan-grid]');
   if (livePlans && grid && window.FokusApi) window.FokusApi.request('/catalog/fokus-law').then((catalog) => { const plans = catalog.plans || []; if (!plans.length) return; grid.innerHTML = plans.map((plan) => `<article class="law-live-plan"><strong>${plan.name}</strong><span>A partir de R$ ${Number(plan.monthly_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / mês</span></article>`).join(''); livePlans.hidden = false; }).catch(() => {});
 })();
