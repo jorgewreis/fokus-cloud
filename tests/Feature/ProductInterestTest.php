@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Mail\ProductInterestNotification;
 use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
 use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class ProductInterestTest extends TestCase
