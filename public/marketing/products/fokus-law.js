@@ -233,31 +233,46 @@
   if (interestForm && window.FokusApi) {
     const interestStatus = interestForm.querySelector('[data-law-interest-status]');
     const interestButton = interestForm.querySelector('button[type="submit"]');
+    const modulesField = interestForm.querySelector('[data-module-priorities]');
+    const modulePriorityFields = interestForm.querySelector('[data-module-priority-fields]');
+    const moduleInputs = [...interestForm.querySelectorAll('input[name="interest_modules"]')];
+    const renderModulePriorities = () => {
+      const selected = moduleInputs.filter((input) => input.checked).map((input) => input.value);
+      modulesField.hidden = selected.length === 0;
+      modulePriorityFields.innerHTML = selected.map((module, index) => {
+        const id = 'law-interest-priority-' + index;
+        return '<label for="' + id + '">' + module + '<textarea class="fs-form-control" id="' + id + '" name="module_priority" rows="3" maxlength="500" placeholder="Quais funcionalidades desse módulo são mais importantes para você?"></textarea></label>';
+      }).join('');
+    };
+    moduleInputs.forEach((input) => input.addEventListener('change', renderModulePriorities));
     interestForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!interestForm.reportValidity()) return;
       const data = new FormData(interestForm);
-      const state = String(data.get('state') || '').trim().toUpperCase();
-      if (state && !/^[A-Z]{2}$/.test(state)) {
-        interestStatus.textContent = 'Informe a UF com duas letras, por exemplo BA.';
-        interestForm.elements.state.focus();
-        return;
-      }
-      interestStatus.textContent = 'Enviando seu interesse…';
+      interestStatus.textContent = 'Enviando suas informações…';
       interestButton.disabled = true;
-      const modules = data.getAll('modules');
+      const moduleInterests = data.getAll('interest_modules').map((value) => String(value));
+      const priorities = [...modulePriorityFields.querySelectorAll('textarea')].map((field, index) => {
+        const module = moduleInterests[index];
+        const detail = field.value.trim();
+        return detail ? module + ': ' + detail : '';
+      }).filter(Boolean);
+      const desiredModules = String(data.get('desired_modules') || '').trim();
+      const desiredFeatures = String(data.get('desired_features') || '').trim();
+      const feedback = [
+        priorities.length ? 'Funcionalidades prioritárias por módulo: ' + priorities.join(' | ') : '',
+        desiredModules ? 'Módulos que gostaria que existissem: ' + desiredModules : '',
+        desiredFeatures ? 'Funcionalidades desejadas nesses módulos: ' + desiredFeatures : ''
+      ].filter(Boolean).join('\n');
       const payload = {
         name: String(data.get('name') || '').trim(),
         email: String(data.get('email') || '').trim(),
         products: ['law'],
         profiles: [String(data.get('profile') || '')],
         organization: String(data.get('organization') || '').trim() || undefined,
-        city: String(data.get('city') || '').trim() || undefined,
-        state: state || undefined,
-        team_size: String(data.get('team_size') || '') || undefined,
-        modules,
+        modules: [...moduleInterests, ...(desiredModules ? ['Sugestão de módulo'] : [])],
         main_difficulties: String(data.get('main_difficulties') || '').trim(),
-        current_process: String(data.get('current_process') || '').trim() || undefined,
+        current_process: feedback || undefined,
         privacy_accepted: Boolean(data.get('privacy_accepted')),
         privacy_version: '1.0',
         source_url: location.href,
@@ -265,8 +280,9 @@
       };
       try {
         await window.FokusApi.request('/product-interests', { method: 'POST', body: payload });
-        interestStatus.textContent = 'Interesse recebido. Nossa equipe comercial poderá retornar pelo e-mail informado.';
+        interestStatus.textContent = 'Recebemos suas informações. Nossa equipe analisará seu cenário e retornará por e-mail com uma sugestão de módulo que possa ajudar.';
         interestForm.reset();
+        renderModulePriorities();
       } catch (error) {
         interestStatus.textContent = error.message || 'Não foi possível enviar o formulário agora. Tente novamente em instantes.';
       } finally {
