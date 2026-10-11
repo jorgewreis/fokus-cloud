@@ -92,3 +92,11 @@
 .law-process-segment li+li{margin-top:.55rem}
 .law-process-scope-note{max-width:1000px;margin:1.4rem 0 0;color:#665c68;font-size:.8rem}
 @media(max-width:900px){.law-process-segment-grid{grid-template-columns:1fr}.law-process-segment{min-height:0}}
+
+/* Contraste dos botões principais na página pública do Fokus Law */
+.law-page .law-hero-offer-card .law-hero-offer-button,
+.law-page .law-final-cta .law-cta-button{color:#fff}
+.law-page .law-hero-offer-card .law-hero-offer-button:hover,
+.law-page .law-hero-offer-card .law-hero-offer-button:focus-visible,
+.law-page .law-final-cta .law-cta-button:hover,
+.law-page .law-final-cta .law-cta-button:focus-visible{color:#fff}
