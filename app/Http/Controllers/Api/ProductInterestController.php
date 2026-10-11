@@ -92,9 +92,10 @@ class ProductInterestController extends Controller
 
         abort_if(empty($adminRecipients), 503, 'Seu interesse foi registrado, mas não foi possível encaminhá-lo à equipe neste momento.');
 
-        Mail::to($adminRecipients)
-            ->replyTo($interest->email, $interest->name)
-            ->send(new ProductInterestNotification($interest->fresh()));
+        Mail::to($adminRecipients)->send(
+            (new ProductInterestNotification($interest->fresh()))
+                ->replyTo($interest->email, $interest->name)
+        );
 
         $adminRecipients = PlatformAdmin::query()
             ->where('status', 'ativo')
