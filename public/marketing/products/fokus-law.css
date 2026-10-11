@@ -141,3 +141,7 @@
 .law-interest-priority-fields label{display:grid;gap:.45rem}
 .law-interest-modules .law-interest-help{font-weight:400}
 @media(max-width:640px){.law-interest-modules{grid-template-columns:1fr}}
+
+/* Consentimento: link da política em linha própria para leitura clara */
+.law-interest-consent .fs-check-label{display:grid;justify-items:start;gap:.3rem;min-width:0}
+.law-interest-consent .fs-check-label a{display:inline-block;width:max-content;max-width:100%;overflow-wrap:anywhere}
