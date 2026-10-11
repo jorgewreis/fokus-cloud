@@ -18,6 +18,16 @@ class ProductInterestTest extends TestCase
     {
         parent::setUp();
         $this->seed();
+        Mail::fake();
+        PlatformAdmin::create([
+            'id' => PrefixedUlid::make('PAD'),
+            'name' => 'Admin Comercial',
+            'email' => 'admin@example.test',
+            'password' => Hash::make('SenhaInterna!2026'),
+            'status' => 'ativo',
+            'platform_role_id' => PlatformRole::where('code', 'administrador_comercial')->value('id'),
+            'email_verified_at' => now(),
+        ]);
     }
 
     public function test_public_interest_is_created_and_same_email_is_updated(): void
@@ -33,6 +43,8 @@ class ProductInterestTest extends TestCase
         $this->assertDatabaseCount('product_interests', 1);
         $this->assertDatabaseHas('product_interests', ['email' => 'interest@example.test', 'name' => 'Nome atualizado']);
         $this->assertDatabaseHas('product_interests', ['email' => 'interest@example.test', 'desired_capacity' => 75000, 'catalog_max_capacity' => 50000, 'request_context' => 'law_over_limit']);
+        Mail::assertSent(ProductInterestNotification::class, 2);
+        Mail::assertSent(ProductInterestNotification::class, fn ($mail) => $mail->hasTo('admin@example.test') && $mail->hasReplyTo('interest@example.test'));
     }
 
     public function test_public_interest_requires_privacy_consent(): void
