@@ -100,3 +100,34 @@
 .law-page .law-hero-offer-card .law-hero-offer-button:focus-visible,
 .law-page .law-final-cta .law-cta-button:hover,
 .law-page .law-final-cta .law-cta-button:focus-visible{color:#fff}
+
+/* Formulário de interesse no Fokus Law */
+.law-interest-section{display:grid;grid-template-columns:minmax(250px,.8fr) minmax(0,1.2fr);gap:clamp(2rem,6vw,6rem);align-items:start;padding:clamp(3.5rem,7vw,7rem) clamp(1.25rem,8vw,9rem);background:var(--law-ivory);color:var(--law-plum)}
+.law-interest-intro{max-width:520px}
+.law-interest-section h2{font-family:var(--law-display);font-size:clamp(2.8rem,5vw,5rem);font-weight:400;line-height:.95;letter-spacing:.02em;text-transform:uppercase;margin:0 0 1.25rem}
+.law-interest-intro>p:not(.law-eyebrow){line-height:1.7;color:rgba(38,20,52,.78)}
+.law-interest-goals{display:grid;gap:.85rem;padding:0;margin:2rem 0 0;list-style:none}
+.law-interest-goals li{position:relative;padding-left:1.35rem;line-height:1.5}
+.law-interest-goals li:before{content:"";position:absolute;left:0;top:.55em;width:.5rem;height:.5rem;border-radius:50%;background:var(--law-sage)}
+.law-interest-form{padding:clamp(1.25rem,3vw,2.5rem);border:1px solid rgba(38,20,52,.14);border-radius:1.25rem;background:#fff;box-shadow:0 16px 45px rgba(38,20,52,.07)}
+.law-interest-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.15rem}
+.law-interest-form label{display:grid;gap:.45rem;font-size:.9rem;font-weight:600}
+.law-interest-form label span{font-size:.8em;font-weight:400;opacity:.7}
+.law-interest-form input.fs-form-control,.law-interest-form select.fs-form-select,.law-interest-form textarea.fs-form-control{width:100%;min-width:0}
+.law-interest-form textarea{resize:vertical}
+.law-interest-full{grid-column:1/-1}
+.law-interest-modules{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem 1rem;margin:0;padding:1rem;border:1px solid rgba(38,20,52,.14);border-radius:.75rem}
+.law-interest-modules legend{padding:0 .4rem;font-size:.9rem;font-weight:700}
+.law-interest-modules .fs-check,.law-interest-consent.fs-check{display:flex;align-items:flex-start;gap:.65rem;font-weight:400}
+.law-interest-modules .fs-check-input,.law-interest-consent .fs-check-input{flex:0 0 auto;margin-top:.2rem}
+.law-interest-modules .fs-check-label,.law-interest-consent .fs-check-label{line-height:1.5}
+.law-interest-location{grid-column:1/-1;display:grid;grid-template-columns:1.3fr .65fr 1fr;gap:1rem}
+.law-interest-consent.fs-check{display:flex;margin:1.4rem 0}
+.law-interest-consent a{color:var(--law-plum);text-decoration:underline;text-underline-offset:2px}
+.law-interest-submit{width:100%;color:#fff}
+.law-interest-submit:hover,.law-interest-submit:focus-visible{color:#fff}
+.law-interest-status{min-height:1.5em;margin:.9rem 0 0;font-weight:600}
+.law-interest-note{margin:.25rem 0 0;font-size:.82rem;opacity:.75}
+.law-interest-honeypot{position:absolute!important;left:-10000px!important;width:1px!important;height:1px!important;opacity:0!important}
+@media(max-width:900px){.law-interest-section{grid-template-columns:1fr;gap:2rem}.law-interest-intro{max-width:700px}}
+@media(max-width:640px){.law-interest-fields,.law-interest-modules,.law-interest-location{grid-template-columns:1fr}.law-interest-form{padding:1rem}.law-interest-full,.law-interest-modules,.law-interest-location{grid-column:auto}}
