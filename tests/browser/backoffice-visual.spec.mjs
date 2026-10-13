@@ -696,6 +696,44 @@ test('consulta de e-mail no acesso Fokus Law identifica nome e sistema ativo', a
     await expect(page.locator('#law-system option')).toHaveText('Empresa de Demonstração — Fokus Law · Advocacia');
     await expect(page.locator('[data-law-login-status]')).toContainText('Pessoa Teste');
     await expect(page.locator('#law-password')).toBeEnabled();
+    await expect(page.locator('#law-system-label')).toHaveText('Empresa vinculada');
+});
+
+test('acessos identificam vínculos de pessoa física com o rótulo do produto', async ({ page }) => {
+    await page.route('**/api/auth/law-context', (route) => route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ user: { name: 'Pessoa Teste' }, systems: [{ value: 'CMP_PF', label: 'Pessoa Teste — Fokus Law · Advocacia', document_type: 'cpf', profiles: [{ value: 'admin', label: 'Administrador' }] }] }),
+    }));
+    await page.goto('/marketing/products/fokus-law.html');
+    await page.locator('#law-email').fill('pessoa@example.test');
+    await expect(page.locator('#law-system-label')).toHaveText('Pessoa vinculada');
+    await expect(page.locator('#law-login-instructions')).toContainText('pessoa vinculada');
+
+    let leadDocumentType = 'cpf';
+    await page.route('**/api/auth/lead-context', (route) => route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ user: { name: 'Corretor Teste' }, systems: [{ value: 'CMP_CORRETOR', label: 'Corretor Teste — Fokus Lead', document_type: leadDocumentType, profiles: [{ value: 'corretor', label: 'Corretor' }] }] }),
+    }));
+    await page.goto('/marketing/products/fokus-lead.html');
+    await page.locator('#lead-email').fill('corretor@example.test');
+    await expect(page.locator('#lead-system-label')).toHaveText('Corretor vinculado');
+    await expect(page.locator('#lead-login-instructions')).toContainText('corretor vinculado');
+    await expect(page.locator('#lead-profile')).toBeHidden();
+    await expect(page.locator('#lead-password')).toBeEnabled();
+    await expect(page.locator('.lead-nav-cta')).toHaveCount(0);
+    await expect(page.locator('#lead-login-title')).toHaveCSS('font-size', '43.2px');
+    await expect.poll(() => page.locator('#lead-login-title').evaluate((element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        return range.getClientRects().length;
+    })).toBe(1);
+    leadDocumentType = 'cnpj';
+    await page.locator('#lead-email').fill('');
+    await page.locator('#lead-email').fill('imobiliaria@example.test');
+    await expect(page.locator('#lead-system-label')).toHaveText('Empresa vinculada');
+    await expect(page.locator('#lead-login-instructions')).toContainText('empresa vinculada');
 });
 
 test('consulta de e-mail mostra usuário existente sem assinatura ativa', async ({ page }) => {

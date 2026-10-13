@@ -93,6 +93,36 @@ $serveFokusLawShell = function (string $page = 'overview', bool $redirectProfile
     return response()->view('portal.fokus-law', ['initialPage' => $page]);
 };
 Route::get('/portal/fokus-law', fn () => $serveFokusLawShell());
+Route::get('/portal/fokus-lead', function () {
+    $user = Auth::guard('web')->user();
+    if (! $user || $user->status !== 'ativa') {
+        return redirect('/?acesso=cliente');
+    }
+    if (! $user->email_verified_at) {
+        return redirect('/verificar-email?return_to='.rawurlencode('/portal/fokus-lead'));
+    }
+
+    $companyId = request()->session()->get('active_company_id');
+    if (! $companyId) {
+        return redirect('/portal/empresas');
+    }
+
+    $membership = DB::table('company_memberships as membership')
+        ->join('companies as company', 'company.id', '=', 'membership.company_id')
+        ->where('membership.company_id', $companyId)->where('membership.user_id', $user->id)
+        ->where('membership.status', 'ativo')->whereNull('membership.deleted_at')
+        ->where('company.status', 'ativa')->whereNull('company.deleted_at')
+        ->select('company.legal_name as company_name')->first();
+    $hasLeadSubscription = DB::table('subscriptions as subscription')
+        ->join('products as product', 'product.id', '=', 'subscription.product_id')
+        ->where('subscription.company_id', $companyId)
+        ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
+        ->whereIn('product.code', ['lead', 'fokus-lead'])->exists();
+
+    abort_unless($membership && $hasLeadSubscription, 403, 'Esta conta não tem um vínculo ativo com o Fokus Lead.');
+
+    return response()->view('portal.fokus-lead', ['companyName' => $membership->company_name]);
+});
 Route::get('/portal/fokus-law/processos', fn () => $serveFokusLawShell('processes'));
 Route::get('/portal/fokus-law/processos/configuracoes', fn () => $serveFokusLawShell('processes-settings'));
 Route::get('/portal/fokus-law/processos/autorizacoes', fn () => $serveFokusLawShell('processes-access'));

@@ -113,10 +113,12 @@ class AuthenticationAndIsolationTest extends TestCase
             ->assertOk()
             ->assertJsonPath('user.name', 'Administrador Teste')
             ->assertJsonPath('systems.0.label', 'Empresa Teste Ltda — Fokus Law · Advocacia')
+            ->assertJsonPath('systems.0.document_type', 'cnpj')
             ->assertJsonPath('systems.0.profiles.0.value', 'admin');
         DB::table('subscriptions')->where('id', $subscriptionId)->update(['public_name' => 'Empresa Alpha']);
         $this->actingAs($user)->getJson('/api/auth/me')->assertOk()->assertJsonPath('companies.0.name', 'Empresa Alpha')->assertJsonPath('companies.0.legal_name', 'Empresa Teste Ltda');
-        $this->postJson('/api/auth/law-context', ['email' => 'ADMIN@EXAMPLE.TEST'])->assertOk()->assertJsonPath('systems.0.label', 'Empresa Alpha — Fokus Law · Advocacia');
+        DB::table('companies')->where('id', $companyId)->update(['document_type' => 'cpf', 'document_number' => '11144477735']);
+        $this->postJson('/api/auth/law-context', ['email' => 'ADMIN@EXAMPLE.TEST'])->assertOk()->assertJsonPath('systems.0.label', 'Empresa Alpha — Fokus Law · Advocacia')->assertJsonPath('systems.0.document_type', 'cpf');
         DB::table('users')->where('id', $user->id)->update(['email_verified_at' => null]);
         $this->postJson('/api/auth/law-context', ['email' => 'admin@example.test'])->assertOk()->assertJsonPath('user.name', 'Administrador Teste');
     }
@@ -126,6 +128,59 @@ class AuthenticationAndIsolationTest extends TestCase
         $this->postJson('/api/auth/law-context', ['email' => 'nao-existe@example.test'])
             ->assertNotFound()
             ->assertJsonPath('message', 'Usuário não encontrado.');
+    }
+
+    public function test_lead_context_returns_only_active_lead_company_and_profile_data(): void
+    {
+        $this->postJson('/api/auth/register-company', $this->registration())->assertCreated();
+        $user = User::where('email', 'admin@example.test')->firstOrFail();
+        $companyId = DB::table('companies')->value('id');
+        DB::table('users')->where('id', $user->id)->update(['status' => 'ativa', 'email_verified_at' => now()]);
+        DB::table('companies')->where('id', $companyId)->update(['status' => 'ativa']);
+        $product = DB::table('products')->where('code', 'lead')->firstOrFail();
+        DB::table('subscriptions')->insert([
+            'id' => PrefixedUlid::make('ASS'), 'company_id' => $companyId, 'product_id' => $product->id, 'status' => 'ativa',
+            'open_company_product' => $companyId.'-'.$product->id, 'version' => 1, 'billing_cycle' => 'monthly',
+            'current_period_starts_at' => now(), 'current_period_ends_at' => now()->addMonth(), 'provider_subscription_id' => 'lead-context-test',
+            'created_by' => $user->id, 'updated_by' => $user->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->postJson('/api/auth/lead-context', ['email' => 'ADMIN@EXAMPLE.TEST'])
+            ->assertOk()
+            ->assertJsonPath('user.name', 'Administrador Teste')
+            ->assertJsonPath('systems.0.document_type', 'cnpj')
+            ->assertJsonPath('systems.0.profiles.0.value', 'admin');
+
+        DB::table('companies')->where('id', $companyId)->update(['document_type' => 'cpf', 'document_number' => '11144477735']);
+        $this->postJson('/api/auth/lead-context', ['email' => 'ADMIN@EXAMPLE.TEST'])
+            ->assertOk()->assertJsonPath('systems.0.document_type', 'cpf');
+    }
+
+    public function test_lead_login_requires_a_lead_subscription_and_opens_the_protected_workspace(): void
+    {
+        $this->postJson('/api/auth/register-company', $this->registration())->assertCreated();
+        $user = User::where('email', 'admin@example.test')->firstOrFail();
+        $companyId = DB::table('companies')->value('id');
+        DB::table('users')->where('id', $user->id)->update(['status' => 'ativa', 'email_verified_at' => now()]);
+        DB::table('companies')->where('id', $companyId)->update(['status' => 'ativa']);
+        $product = DB::table('products')->where('code', 'lead')->firstOrFail();
+        DB::table('subscriptions')->insert([
+            'id' => PrefixedUlid::make('ASS'), 'company_id' => $companyId, 'product_id' => $product->id, 'status' => 'ativa',
+            'open_company_product' => $companyId.'-'.$product->id, 'version' => 1, 'billing_cycle' => 'monthly',
+            'current_period_starts_at' => now(), 'current_period_ends_at' => now()->addMonth(), 'provider_subscription_id' => 'lead-login-test',
+            'created_by' => $user->id, 'updated_by' => $user->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->postJson('/api/auth/lead-login', [
+            'email' => $user->email, 'password' => 'SenhaSegura!2026', 'company_id' => $companyId, 'profile' => 'admin',
+        ])->assertOk()->assertJsonPath('redirect_to', '/portal/fokus-lead');
+
+        $this->get('/portal/fokus-lead')->assertOk()->assertSee('Vínculo confirmado para Empresa Teste Ltda.')->assertSee('Os módulos do Fokus Lead ainda estão em desenvolvimento.');
+    }
+
+    public function test_lead_workspace_requires_authentication(): void
+    {
+        $this->get('/portal/fokus-lead')->assertRedirect('/?acesso=cliente');
     }
 
     public function test_law_context_reports_missing_subscription_for_an_existing_user(): void

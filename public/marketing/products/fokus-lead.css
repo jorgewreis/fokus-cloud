@@ -345,6 +345,16 @@
     color: #71818e;
     opacity: .76;
 }
+.lead-page .lead-login .lead-password-recovery {
+    display: block;
+    width: fit-content;
+    margin: .15rem 0 .35rem;
+    color: var(--lead-ink);
+    font-size: .78rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+.lead-page .lead-login .lead-password-recovery:hover { text-decoration: underline; }
 
 .lead-page .lead-section { padding: clamp(4.5rem, 8vw, 8rem) clamp(1.25rem, 7vw, 7.5rem); }
 .lead-page .lead-section h2,

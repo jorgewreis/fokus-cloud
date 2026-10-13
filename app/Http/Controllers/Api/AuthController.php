@@ -58,7 +58,7 @@ class AuthController extends Controller
             ->whereNull('company.deleted_at')
             ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
             ->whereIn('product.code', ['law', 'fokus-law'])
-            ->select('company.id as company_id', 'company.legal_name as company_name', 'subscription.public_name as subscription_public_name', 'product.name as product_name', 'role.code as profile_code', 'role.name as profile_name', 'module_segment.segment_code')
+            ->select('company.id as company_id', 'company.legal_name as company_name', 'company.document_type', 'subscription.public_name as subscription_public_name', 'product.name as product_name', 'role.code as profile_code', 'role.name as profile_name', 'module_segment.segment_code')
             ->orderBy('company.legal_name')
             ->get();
 
@@ -77,12 +77,58 @@ class AuthController extends Controller
             return [
                 'value' => (string) $rows->first()->company_id,
                 'label' => (($rows->first()->subscription_public_name ?: $rows->first()->company_name).' — '.$rows->first()->product_name.' · '.$segmentLabel),
+                'document_type' => (string) $rows->first()->document_type,
                 'profiles' => $rows->map(fn (object $row): array => [
                     'value' => (string) $row->profile_code,
                     'label' => (string) $row->profile_name,
                 ])->unique('value')->values()->all(),
             ];
         })->values()->all();
+
+        return response()->json(['user' => $userPayload, 'systems' => $systems]);
+    }
+
+    public function leadContext(Request $request)
+    {
+        $email = Str::lower(trim((string) $request->validate([
+            'email' => ['required', 'email:rfc', 'max:255'],
+        ])['email']));
+
+        $user = User::whereRaw('LOWER(email) = ?', [$email])->first();
+        abort_unless($user, 404, 'Usuário não encontrado.');
+        $userPayload = ['name' => $user->name, 'email' => $user->email];
+
+        if ($user->status !== 'ativa') {
+            return response()->json(['user' => $userPayload, 'systems' => [], 'message' => 'A conta deste usuário não está ativa.']);
+        }
+
+        $systems = DB::table('company_memberships as membership')
+            ->join('companies as company', 'company.id', '=', 'membership.company_id')
+            ->join('roles as role', 'role.id', '=', 'membership.role_id')
+            ->join('subscriptions as subscription', 'subscription.company_id', '=', 'company.id')
+            ->join('products as product', 'product.id', '=', 'subscription.product_id')
+            ->where('membership.user_id', $user->id)
+            ->where('membership.status', 'ativo')->whereNull('membership.deleted_at')
+            ->where('company.status', 'ativa')->whereNull('company.deleted_at')
+            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
+            ->whereIn('product.code', ['lead', 'fokus-lead'])
+            ->select('company.id as company_id', 'company.legal_name as company_name', 'company.document_type', 'subscription.public_name as subscription_public_name', 'product.name as product_name', 'role.code as profile_code', 'role.name as profile_name')
+            ->orderBy('company.legal_name')
+            ->get()
+            ->groupBy('company_id')
+            ->map(fn ($rows): array => [
+                'value' => (string) $rows->first()->company_id,
+                'label' => (($rows->first()->subscription_public_name ?: $rows->first()->company_name).' — '.$rows->first()->product_name),
+                'document_type' => (string) $rows->first()->document_type,
+                'profiles' => $rows->map(fn (object $row): array => [
+                    'value' => (string) $row->profile_code,
+                    'label' => (string) $row->profile_name,
+                ])->unique('value')->values()->all(),
+            ])->values()->all();
+
+        if (! $systems) {
+            return response()->json(['user' => $userPayload, 'systems' => [], 'message' => 'Não existe nenhuma assinatura ativa do Fokus Lead vinculada a este usuário.']);
+        }
 
         return response()->json(['user' => $userPayload, 'systems' => $systems]);
     }
@@ -270,6 +316,63 @@ class AuthController extends Controller
         $redirectTo = $user->email_verified_at
             ? '/portal/fokus-law'
             : '/verificar-email?return_to='.rawurlencode('/portal/fokus-law');
+
+        return response()->json([
+            'user' => $this->userPayload($user),
+            'active_company_id' => $data['company_id'],
+            'redirect_to' => $redirectTo,
+        ]);
+    }
+
+    public function leadLogin(Request $request)
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email:rfc', 'max:255'],
+            'password' => ['required', 'string'],
+            'company_id' => ['required', 'string', 'max:40'],
+            'profile' => ['required', 'string', 'max:80'],
+        ]);
+
+        $user = User::whereRaw('LOWER(email) = ?', [Str::lower(trim($data['email']))])->first();
+        if (! $user || $user->status !== 'ativa' || ($user->locked_until && $user->locked_until->isFuture()) || ! Hash::check($data['password'], $user->password)) {
+            if ($user) {
+                $this->recordFailedLogin($user);
+            }
+            $this->recordAccessEvent($user, $data['company_id'], 'customer.login_failed', 'failed');
+
+            return response()->json(['message' => 'E-mail ou senha inválidos.'], 422);
+        }
+
+        $membership = DB::table('company_memberships as membership')
+            ->join('companies as company', 'company.id', '=', 'membership.company_id')
+            ->join('roles as role', 'role.id', '=', 'membership.role_id')
+            ->where('membership.company_id', $data['company_id'])
+            ->where('membership.user_id', $user->id)
+            ->where('membership.status', 'ativo')->whereNull('membership.deleted_at')
+            ->where('company.status', 'ativa')->whereNull('company.deleted_at')
+            ->where('role.code', $data['profile'])
+            ->exists();
+        $hasLeadSubscription = DB::table('subscriptions as subscription')
+            ->join('products as product', 'product.id', '=', 'subscription.product_id')
+            ->where('subscription.company_id', $data['company_id'])
+            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
+            ->whereIn('product.code', ['lead', 'fokus-lead'])
+            ->exists();
+
+        if (! $membership || ! $hasLeadSubscription) {
+            return response()->json(['message' => 'O vínculo ou a assinatura do Fokus Lead selecionados não estão disponíveis para esta conta.'], 403);
+        }
+
+        $user->forceFill([
+            'failed_login_attempts' => 0,
+            'login_attempt_window_started_at' => null,
+            'locked_until' => null,
+        ])->save();
+        $this->authenticateIntoSession($request, $user, $data['company_id']);
+
+        $redirectTo = $user->email_verified_at
+            ? '/portal/fokus-lead'
+            : '/verificar-email?return_to='.rawurlencode('/portal/fokus-lead');
 
         return response()->json([
             'user' => $this->userPayload($user),

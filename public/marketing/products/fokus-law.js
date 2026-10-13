@@ -6,6 +6,8 @@
   if (form) {
     const email = form.elements.email;
     const system = form.elements.system;
+    const systemLabel = form.querySelector('#law-system-label');
+    const instructions = form.closest('.law-login-card').querySelector('#law-login-instructions');
     const profile = form.elements.profile;
     const password = form.elements.password;
     const submit = form.querySelector('button[type="submit"]');
@@ -24,6 +26,8 @@
     const reset = (message = 'A identificação começa ao informar seu e-mail.') => {
       systems = [];
       userName = '';
+      systemLabel.textContent = 'Empresa vinculada';
+      instructions.textContent = 'Informe seu e-mail para localizar a empresa vinculada, o sistema e o perfil disponíveis.';
       system.disabled = true;
       system.innerHTML = '<option value="">Aguardando identificação</option>';
       profile.disabled = true;
@@ -37,6 +41,11 @@
 
     const renderProfiles = () => {
       const selected = systems.find((item) => item.value === system.value);
+      const isPerson = selected?.document_type === 'cpf';
+      systemLabel.textContent = isPerson ? 'Pessoa vinculada' : 'Empresa vinculada';
+      instructions.textContent = isPerson
+        ? 'Informe seu e-mail para localizar a pessoa vinculada, o sistema e o perfil disponíveis.'
+        : 'Informe seu e-mail para localizar a empresa vinculada, o sistema e o perfil disponíveis.';
       const availableProfiles = selected?.profiles || [];
       profile.innerHTML = '<option value="">Escolha seu perfil</option>' + availableProfiles.map((item) => `<option value="${item.value}">${item.label}</option>`).join('');
       profileField.hidden = availableProfiles.length < 2;
