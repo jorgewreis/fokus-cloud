@@ -316,6 +316,33 @@
 }
 .lead-page .lead-login-status { color: #526a7d; line-height: 1.45; }
 
+/* Aproxima o acesso do Lead da hierarquia usada no Fokus Law. */
+.lead-page .lead-login {
+    background: rgba(245, 240, 231, .97);
+    border: 1px solid rgba(255, 255, 255, .42);
+    box-shadow: 0 25px 70px rgba(4, 18, 31, .38);
+}
+.lead-page .lead-login-heading h2 { letter-spacing: .03em; }
+.lead-page .lead-login-heading p { color: #5f6870; }
+.lead-page .lead-field-grid {
+    grid-template-columns: 1fr;
+    gap: .5rem;
+    margin: .1rem 0 .45rem;
+}
+.lead-page .lead-field-grid > div { gap: .5rem; }
+.lead-page .lead-login input.fs-form-control,
+.lead-page .lead-login .fs-form-select {
+    background: rgba(255, 255, 255, .68);
+    --fs-control-bg: rgba(255, 255, 255, .68);
+    --fs-control-border-color: rgba(16, 42, 67, .22);
+    --fs-control-radius: 0;
+}
+.lead-page .lead-login input:disabled,
+.lead-page .lead-login select:disabled {
+    color: #71818e;
+    opacity: .76;
+}
+
 .lead-page .lead-section { padding: clamp(4.5rem, 8vw, 8rem) clamp(1.25rem, 7vw, 7.5rem); }
 .lead-page .lead-section h2,
 .lead-page .lead-discovery h2 {
