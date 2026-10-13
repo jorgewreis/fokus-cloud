@@ -612,6 +612,7 @@
 }
 
 /* Composição do hero alinhada à página do Fokus Law. */
+.lead-page-shell { overflow-x: hidden; }
 .lead-page .lead-nav { padding: 1.7rem clamp(1.25rem, 5vw, 5rem); }
 .lead-page .lead-hero {
     height: 940px;
@@ -629,7 +630,7 @@
 .lead-page .lead-hero-copy { max-width: 630px; }
 .lead-page .lead-hero-offer-card { max-width: 710px; margin-top: 2.1rem; }
 .lead-page .lead-proof { max-width: 710px; margin-top: 4rem; }
-.lead-page .lead-login-heading h2 { font-size: 2.7rem; line-height: .94; }
+.lead-page .lead-login-heading h2 { font-size: 2.7rem; line-height: .94; letter-spacing: 0; white-space: nowrap; }
 .lead-page .lead-login-heading p { font-size: .86rem; }
 .lead-page .lead-field-grid { display: flex; flex-direction: column; }
 
@@ -651,4 +652,5 @@
     .lead-page .lead-hero { padding-inline: 1.1rem; }
     .lead-page .lead-hero h1 { font-size: clamp(3.35rem, 13vw, 4.6rem); }
     .lead-page .lead-proof { margin-top: 2.5rem; }
+    .lead-page .lead-login-heading h2 { font-size: 2.4rem; white-space: normal; }
 }

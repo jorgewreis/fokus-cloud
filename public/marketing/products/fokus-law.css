@@ -56,6 +56,8 @@
 @media(max-width:640px){.law-hero-offer-card{grid-template-columns:1fr;gap:.8rem;padding:1rem 1.05rem 1.1rem}.law-hero-offer-copy h2{font-size:2rem}.law-hero-offer-action{grid-column:1;grid-row:auto;gap:.5rem}.law-hero-offer-button{width:auto;max-width:100%;align-self:flex-start}}
 .law-module-status-warning{color:var(--fs-color-warning)}
 
+.law-page { overflow-x: hidden; }
+
 /* Module availability details and implementation progress */
 .law-module-card p+p{margin-top:10px}
 .law-module-card p.law-module-detail{font-size:.7rem;opacity:.7}
