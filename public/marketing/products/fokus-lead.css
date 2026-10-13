@@ -145,3 +145,113 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Formulário com hierarquia visual inspirada na proposta do Fokus Law, usando a paleta própria do Lead. */
+.lead-page .lead-interest {
+    background: var(--lead-navy-deep);
+    color: #fff;
+}
+.lead-page .lead-interest h2 { color: #fff; }
+.lead-page .lead-interest-copy { color: rgba(255, 255, 255, .72); }
+.lead-page .lead-interest-form { gap: 1rem; }
+.lead-page .lead-interest-form label,
+.lead-page .lead-interest-form legend { color: var(--lead-terracotta-light); }
+.lead-page .lead-interest-form input.fs-form-control,
+.lead-page .lead-interest-form textarea.fs-form-control {
+    box-sizing: border-box;
+    min-height: 2.8rem;
+    padding: .75rem .85rem;
+    border: 1px solid rgba(233, 162, 127, .35);
+    border-radius: 0;
+    background: rgba(255, 255, 255, .06);
+    color: #fff;
+    font: 400 .9rem var(--lead-body);
+}
+.lead-page .lead-interest-form textarea.fs-form-control { min-height: 7rem; }
+.lead-page .lead-interest-form input.fs-form-control::placeholder,
+.lead-page .lead-interest-form textarea.fs-form-control::placeholder { color: rgba(255, 255, 255, .48); }
+.lead-page .lead-interest-form input.fs-form-control:focus,
+.lead-page .lead-interest-form textarea.fs-form-control:focus { border-color: var(--lead-terracotta-light); }
+.lead-page .lead-interest-form .check-option:not(.lead-privacy-check) {
+    min-height: 2.7rem;
+    padding: .55rem .75rem;
+    border: 1px solid rgba(233, 162, 127, .3);
+    background: rgba(255, 255, 255, .04);
+    color: rgba(255, 255, 255, .86);
+}
+.lead-page .lead-interest-form .check-option:not(.lead-privacy-check):has(input:checked) {
+    border-color: var(--lead-terracotta-light);
+    background: rgba(201, 111, 74, .16);
+}
+.lead-page .lead-interest-form .check-option input { accent-color: var(--lead-terracotta); }
+.lead-page .lead-interest-form .lead-privacy-check {
+    align-items: flex-start;
+    padding: .2rem 0;
+    color: rgba(255, 255, 255, .78);
+    font-size: .78rem;
+    font-weight: 400;
+}
+.lead-page .lead-interest-form .lead-privacy-check .fs-check-label { color: inherit; }
+.lead-page .lead-interest-form .lead-interest-submit {
+    --fs-btn-color: #fff;
+    --fs-btn-bg: var(--lead-terracotta);
+    --fs-btn-border-color: var(--lead-terracotta);
+    --fs-btn-hover-bg: #b85e3b;
+    --fs-btn-active-bg: #a94f30;
+    justify-self: start;
+    width: auto;
+    max-width: 100%;
+    min-height: 2.8rem;
+    margin-top: .35rem;
+    padding: .8rem 1rem;
+    font: 700 .82rem var(--lead-body);
+}
+.lead-page .lead-form-feedback { color: rgba(255, 255, 255, .76); }
+
+/* Bloco de chamada do hero inspirado na hierarquia da home do Fokus Law. */
+.lead-hero-offer-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .75rem 1.5rem;
+    margin-top: 2rem;
+    padding: 1.1rem 1.25rem 1.2rem;
+    border-top: 4px solid var(--lead-terracotta);
+    background: var(--lead-cream);
+    color: var(--lead-ink);
+    box-shadow: 0 18px 42px rgba(4, 18, 31, .28);
+}
+.lead-hero-offer-kicker {
+    margin: 0 0 .25rem;
+    color: var(--lead-terracotta);
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .13em;
+}
+.lead-hero-offer-copy h2 {
+    margin: 0;
+    color: var(--lead-navy);
+    font: 400 clamp(1.9rem, 3vw, 2.45rem)/.95 var(--lead-display);
+    text-transform: uppercase;
+}
+.lead-hero-offer-action { display: flex; align-items: center; }
+.lead-page .lead-hero-offer-button {
+    --fs-btn-color: #fff;
+    --fs-btn-bg: var(--lead-navy);
+    --fs-btn-border-color: var(--lead-navy);
+    --fs-btn-hover-bg: var(--lead-blue);
+    --fs-btn-active-bg: var(--lead-navy-deep);
+    display: inline-flex;
+    min-height: 3.1rem;
+    align-items: center;
+    justify-content: center;
+    padding: .85rem 1.1rem;
+    font: 700 .9rem/1.2 var(--lead-body);
+    text-decoration: none;
+}
+@media (max-width: 640px) {
+    .lead-hero-offer-card { grid-template-columns: 1fr; gap: .8rem; padding: 1rem 1.05rem 1.1rem; }
+    .lead-hero-offer-copy h2 { font-size: 2rem; }
+    .lead-hero-offer-action { justify-content: flex-start; }
+    .lead-page .lead-hero-offer-button { width: auto; max-width: 100%; }
+}
