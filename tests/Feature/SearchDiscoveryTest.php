@@ -44,9 +44,12 @@ class SearchDiscoveryTest extends TestCase
         $this->assertStringContainsString('1. Identificação do fornecedor', $terms);
         $this->assertStringContainsString('Interesse em produtos em desenvolvimento', $privacy);
         $this->assertStringContainsString('Quais dados são solicitados?', $privacy);
+        $this->assertStringContainsString('legal-document-page', $terms);
+        $this->assertStringContainsString('legal-document-page', $privacy);
 
         $styles = file_get_contents(public_path('assets/css/modules/showcase/showcase.css'));
         $this->assertStringContainsString('.showcase-page.home-page > main >', $styles);
+        $this->assertStringContainsString('.showcase-page.legal-document-page .showcase-information p { color: #4f524e; }', $styles);
     }
 
     public function test_account_pages_are_excluded_without_blocking_public_content(): void
