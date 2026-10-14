@@ -35,5 +35,5 @@
       </section>
     </main>
   </div>
-  <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script><script src="/assets/js/api-client.js"></script><script src="/assets/js/portal-profile.js?v=20261002-law-profile-v1"></script><script src="/portal/assets/fokus-lead-shell.js?v=20261014-lead-shell-v2"></script>
+  <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script><script src="/assets/js/api-client.js"></script><script src="/assets/js/portal-profile.js?v=20261002-law-profile-v1"></script><script src="/portal/assets/fokus-lead-shell.js?v=20261014-lead-identity-v1"></script>
 </body></html>
