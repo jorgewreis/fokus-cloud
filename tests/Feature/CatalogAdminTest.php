@@ -150,7 +150,9 @@ class CatalogAdminTest extends TestCase
 
     public function test_public_lead_catalog_exposes_published_plans_and_modules_for_the_marketing_page(): void
     {
-        $catalog = $this->getJson('/api/catalog/lead')
+        DB::table('products')->where('code', 'lead')->update(['code' => 'fokus-lead']);
+
+        $catalog = $this->getJson('/api/catalog/fokus-lead')
             ->assertOk()
             ->assertJsonStructure(['product', 'modules', 'plans', 'published_version'])
             ->json();

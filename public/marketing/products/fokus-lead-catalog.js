@@ -11,7 +11,7 @@
     style: 'currency', currency: 'BRL',
   }).format(Number(value || 0));
 
-  window.FokusApi.request('/catalog/lead').then((catalog) => {
+  window.FokusApi.request('/catalog/fokus-lead').then((catalog) => {
     const modules = catalog.modules || [];
     const moduleNames = new Map(modules.map((module) => [module.code, module.name]));
     const plans = catalog.plans || [];
