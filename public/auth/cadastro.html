@@ -76,7 +76,8 @@
       const adminCpf = document.querySelector('#admin-cpf');
       const form = document.querySelector('#register-form');
       const feedback = document.querySelector('#feedback');
-      const returnTo = new URLSearchParams(location.search).get('return_to') === '/contratar/fokus-law' ? '/contratar/fokus-law' : undefined;
+      const requestedReturnTo = new URLSearchParams(location.search).get('return_to');
+      const returnTo = ['/contratar/fokus-law', '/assinaturas/fokus-lead'].includes(requestedReturnTo) ? requestedReturnTo : undefined;
 
       const documents = window.FokusDocuments;
       const companyMask = documents.bind(companyDocument, () => type.value);
@@ -133,7 +134,7 @@
         values.document_number = documents.normalize(companyDocument.value, type.value);
         values.cpf = documents.normalize(adminCpf.value, 'cpf');
         let offerIntent = null;
-        if (returnTo) { try { offerIntent = JSON.parse(localStorage.getItem('fokus-law-offer-v1') || 'null'); } catch {} }
+        if (returnTo) { try { offerIntent = JSON.parse(localStorage.getItem(returnTo === '/assinaturas/fokus-lead' ? 'fokus-lead-offer-v1' : 'fokus-law-offer-v1') || 'null'); } catch {} }
         try {
           await FokusApi.request('/auth/register-company', {
             method: 'POST',

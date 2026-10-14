@@ -177,6 +177,8 @@ Route::get('/produtos/fokus-law', fn () => response()->file(public_path('marketi
 Route::get('/produtos/fokus-law/planos', fn () => response()->file(public_path('marketing/products/fokus-law-planos.html')));
 Route::get('/contratar/fokus-law', fn () => response()->file(public_path('auth/contratar-fokus-law.html')));
 Route::get('/produtos/fokus-lead', fn () => response()->file(public_path('marketing/products/fokus-lead.html')));
+Route::get('/produtos/fokus-lead/planos', fn () => response()->file(public_path('marketing/products/fokus-lead-planos.html')));
+Route::get('/assinaturas/fokus-lead', fn () => response()->file(public_path('auth/assinar-fokus-lead.html')));
 Route::get('/privacidade', fn () => response()->file(public_path('marketing/privacy.html')));
 
 // Development-server fallback. Production NGINX redirects these physical legacy paths before serving static files.

@@ -25,6 +25,29 @@
     height: 940px;
     min-height: 940px;
 }
+
+/* Feature-led route into the commercial catalog. */
+.law-plan-spotlight{position:relative;isolation:isolate;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:2rem;min-height:300px;margin-top:3rem;padding:clamp(2rem,5vw,4.5rem);overflow:hidden;color:#fff!important;text-decoration:none;background:radial-gradient(ellipse at 82% 45%,rgba(165,139,200,.35),transparent 28%),linear-gradient(118deg,#1b1028 0%,#38204e 58%,#7352a5 100%);box-shadow:0 24px 60px rgba(43,23,61,.2);transition:transform .3s,box-shadow .3s}
+.law-plan-spotlight:before{content:"";position:absolute;z-index:-1;inset:14px;border:1px solid rgba(255,255,255,.18);pointer-events:none}
+.law-plan-spotlight:after{content:"";position:absolute;z-index:-1;width:460px;height:460px;right:2%;top:50%;border:1px solid rgba(181,207,185,.22);border-radius:50%;transform:translateY(-50%);box-shadow:0 0 0 34px rgba(181,207,185,.035),0 0 0 68px rgba(181,207,185,.025)}
+.law-plan-spotlight:hover{transform:translateY(-5px);box-shadow:0 32px 76px rgba(43,23,61,.28)}
+.law-plan-spotlight:focus-visible{outline:3px solid var(--law-sage-light);outline-offset:5px}
+.law-plan-spotlight-copy{position:relative;z-index:1;display:grid;gap:1rem;max-width:760px}
+.law-plan-spotlight-copy>span:first-child{color:var(--law-sage-light);font-size:.68rem;font-weight:700;letter-spacing:.18em}
+.law-plan-spotlight-copy>strong{max-width:700px;font:400 clamp(2.5rem,5.5vw,5rem)/.9 var(--law-display);letter-spacing:.02em;text-transform:uppercase}
+.law-plan-spotlight-copy>span:nth-of-type(2){max-width:590px;color:rgba(255,255,255,.76);font-size:1rem}
+.law-plan-spotlight-link{display:inline-flex;align-items:center;gap:.85rem;margin-top:.45rem;color:#fff;font-size:.82rem;font-weight:700;letter-spacing:.04em}
+.law-plan-spotlight-link b{display:grid;place-items:center;width:2.4rem;height:2.4rem;border:1px solid rgba(181,207,185,.7);border-radius:50%;color:var(--law-sage-light);font-size:1.15rem;transition:transform .25s,background .25s}
+.law-plan-spotlight:hover .law-plan-spotlight-link b{transform:translate(3px,-3px);background:rgba(181,207,185,.14)}
+.law-plan-spotlight-orbit{position:relative;z-index:1;width:clamp(170px,22vw,270px);aspect-ratio:1;display:grid;place-items:center}
+.law-plan-spotlight-orbit i{position:absolute;inset:0;border:1px solid rgba(181,207,185,.42);border-radius:50%}
+.law-plan-spotlight-orbit i:nth-child(2){inset:16%;border-style:dashed;animation:law-spotlight-spin 38s linear infinite}
+.law-plan-spotlight-orbit i:nth-child(3){inset:31%;border-color:rgba(165,139,200,.7);box-shadow:0 0 50px rgba(165,139,200,.22)}
+.law-plan-spotlight-orbit b{font:400 2.8rem var(--law-display);letter-spacing:.12em;color:#fff}
+.law-plan-spotlight-index{position:absolute;right:2rem;bottom:1.7rem;color:rgba(255,255,255,.55);font-size:.58rem;font-weight:700;letter-spacing:.16em}
+@keyframes law-spotlight-spin{to{transform:rotate(360deg)}}
+@media(max-width:700px){.law-plan-spotlight{grid-template-columns:1fr;min-height:0;padding:2rem 1.6rem 3.6rem}.law-plan-spotlight-orbit{position:absolute;right:-3rem;top:-2rem;width:170px;opacity:.35}.law-plan-spotlight-copy>strong{max-width:480px}.law-plan-spotlight-index{right:1.6rem;bottom:1.2rem}}
+@media(prefers-reduced-motion:reduce){.law-plan-spotlight,.law-plan-spotlight-link b,.law-plan-spotlight-orbit i{transition:none;animation:none}.law-plan-spotlight:hover{transform:none}}
 .law-page .law-hero.law-support-mode {
     height: auto;
     min-height: 940px;

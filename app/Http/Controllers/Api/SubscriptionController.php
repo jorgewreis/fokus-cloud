@@ -82,7 +82,7 @@ class SubscriptionController extends Controller
     {
         abort_unless($request->user()->email_verified_at, 403, 'Confirme o e-mail antes de assinar.');
         $data = $request->validate([
-            'product_code' => ['required', Rule::in(['law', 'fokus-law', 'lead'])],
+            'product_code' => ['required', Rule::in(['law', 'fokus-law', 'lead', 'fokus-lead'])],
             'items' => ['required', 'array', 'min:1'],
             'items.*.module_code' => ['required', 'string', 'max:64'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:1000'],
@@ -569,7 +569,7 @@ class SubscriptionController extends Controller
 
     private function quote(object $product, array $data, CatalogManager $catalog, bool $allowPendingPublication = false): array
     {
-        abort_if(($data['selection_mode'] ?? null) === 'custom' && ! in_array($product->code, ['law', 'fokus-law'], true), 422, 'A assinatura personalizada está disponível somente para o Fokus Law.');
+        abort_if(($data['selection_mode'] ?? null) === 'custom' && ! in_array($product->code, ['law', 'fokus-law', 'lead', 'fokus-lead'], true), 422, 'A assinatura personalizada não está disponível para este produto.');
         $codes = array_column($data['items'], 'module_code');
         abort_if(count($codes) !== count(array_unique($codes)), 422, 'Um módulo só pode ser informado uma vez.');
         $publishedCatalog = $catalog->publicCatalog($product->code, $allowPendingPublication);
@@ -588,7 +588,7 @@ class SubscriptionController extends Controller
             abort_unless($publishedModules->has($code), 422, 'Módulo inválido para este produto.');
             if ($publishedPlan && ! in_array($code, $publishedPlan['module_codes'] ?? [], true)) {
                 abort_unless((bool) ($publishedModules[$code]['available_standalone'] ?? false), 422, 'Este módulo não está disponível como adicional independente.');
-            } elseif (! $publishedPlan && $data['selection_mode'] !== 'custom') {
+            } elseif (! $publishedPlan && ($data['selection_mode'] !== 'custom' || in_array($product->code, ['lead', 'fokus-lead'], true))) {
                 abort_unless((bool) ($publishedModules[$code]['available_standalone'] ?? false), 422, 'Este módulo não está disponível como contratação independente.');
             }
         }

@@ -166,6 +166,14 @@ class CatalogAdminTest extends TestCase
         );
 
         $this->get('/produtos/fokus-lead')->assertOk();
+        $this->get('/produtos/fokus-lead/planos')->assertOk();
+        $this->get('/assinaturas/fokus-lead')->assertOk();
+
+        $plan = collect($catalog['plans'])->firstWhere('code', 'lead-one-essencial');
+        $this->postJson('/api/catalog/fokus-lead/quote', [
+            'product_code' => 'fokus-lead', 'selection_mode' => 'plan', 'plan_code' => $plan['code'],
+            'cycle' => 'annual', 'items' => collect($plan['module_codes'])->map(fn (string $code) => ['module_code' => $code, 'quantity' => 1])->all(),
+        ])->assertOk()->assertJsonPath('product_code', 'fokus-lead')->assertJsonPath('cycle', 'annual');
     }
 
     public function test_public_law_quote_refuses_missing_and_pending_catalogs(): void

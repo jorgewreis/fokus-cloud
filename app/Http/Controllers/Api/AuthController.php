@@ -522,7 +522,7 @@ class AuthController extends Controller
     public function resendVerification(Request $request)
     {
         $returnTo = $request->validate([
-            'return_to' => ['nullable', Rule::in(['/portal', '/portal/fokus-law', '/portal/fokus-law/assinatura', '/contratar/fokus-law'])],
+            'return_to' => ['nullable', Rule::in(['/portal', '/portal/fokus-law', '/portal/fokus-law/assinatura', '/contratar/fokus-law', '/assinaturas/fokus-lead'])],
         ])['return_to'] ?? '/portal';
         $this->sendToken($request->user(), 'email_verification', '/verificar-email', [
             'company_id' => $request->session()->get('active_company_id'),

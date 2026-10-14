@@ -125,6 +125,30 @@ class VoucherRedemptionTest extends TestCase
         $this->assertSame('law-advocacia', $snapshot['plan_code']);
     }
 
+    public function test_canonical_fokus_lead_plan_can_be_quoted_and_checked_out(): void
+    {
+        [$user, $companyId] = $this->customerContext();
+        DB::table('products')->where('code', 'lead')->update(['code' => 'fokus-lead']);
+        $catalog = $this->getJson('/api/catalog/fokus-lead')->assertOk()->json();
+        $plan = collect($catalog['plans'])->firstWhere('code', 'lead-one-essencial');
+        $payload = [
+            'product_code' => 'fokus-lead', 'selection_mode' => 'plan', 'plan_code' => $plan['code'], 'cycle' => 'monthly',
+            'items' => collect($plan['module_codes'])->map(fn (string $code) => ['module_code' => $code, 'quantity' => 1])->all(),
+        ];
+        $quote = $this->postJson('/api/catalog/fokus-lead/quote', $payload)->assertOk()->json();
+        Http::fake(['https://api.mercadopago.com/preapproval' => Http::response(['id' => 'lead-preapproval', 'init_point' => 'https://mercadopago.test/lead-checkout'], 201)]);
+
+        $result = $this->actingAs($user)->withSession(['active_company_id' => $companyId])
+            ->postJson('/api/subscriptions/checkout', $payload)->assertCreated();
+
+        $this->assertSame('https://mercadopago.test/lead-checkout', $result->json('checkout_url'));
+        $this->assertEquals($quote['amount'], (float) $result->json('amount'));
+        $this->assertDatabaseHas('subscriptions', [
+            'id' => $result->json('subscription_id'),
+            'product_id' => DB::table('products')->where('code', 'fokus-lead')->value('id'),
+        ]);
+    }
+
     public function test_failed_gateway_checkout_releases_the_voucher_reservation_without_persisting_commercial_data(): void
     {
         [$user, $companyId] = $this->customerContext();
