@@ -119,10 +119,20 @@
 }
 
 .lead-page .lead-login-status {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
     min-height: 2.1em;
     margin: .4rem 0 0;
-    color: #71818e;
+    padding: 5px 10px;
+    border: 1px solid #7352a5;
+    background-color: #ffffffbb;
+    color: #7352a5;
     font-size: .72rem;
+    line-height: 1.45;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 @media (max-width: 900px) {
@@ -314,7 +324,6 @@
     background: #fff;
     font: 400 .88rem var(--lead-body);
 }
-.lead-page .lead-login-status { color: #526a7d; line-height: 1.45; }
 
 /* Aproxima o acesso do Lead da hierarquia usada no Fokus Law. */
 .lead-page .lead-login {

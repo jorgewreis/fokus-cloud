@@ -55,7 +55,7 @@
       submit.disabled = availableProfiles.length === 0;
       if (availableProfiles.length === 1) {
         profile.value = availableProfiles[0].value;
-        status.textContent = `${userName ? `${userName} — ` : ''}Perfil confirmado. Digite sua senha.`;
+        status.textContent = 'Digite sua senha';
       } else {
         status.textContent = availableProfiles.length ? `${userName ? `${userName} — ` : ''}Sistema localizado. Escolha o perfil para liberar a senha.` : `${userName ? `${userName} — ` : ''}Nenhum perfil disponível para este sistema.`;
       }
@@ -152,7 +152,7 @@
     profile.addEventListener('change', () => {
       password.disabled = !profile.value;
       submit.disabled = !profile.value;
-      status.textContent = profile.value ? `${userName ? `${userName} — ` : ''}Perfil confirmado. Digite sua senha.` : 'Escolha seu perfil para continuar.';
+      status.textContent = profile.value ? 'Digite sua senha' : 'Escolha seu perfil para continuar.';
       if (!profile.value) password.value = '';
     });
     form.addEventListener('submit', async (event) => {
