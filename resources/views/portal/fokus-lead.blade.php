@@ -6,7 +6,7 @@
   <title>Fokus Lead | Fokus Cloud</title>
   <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20261009-select-menu-options-v1">
   <link rel="stylesheet" href="/marketing/products/fokus-lead-tokens.css?v=20261014-lead-tokens-v1">
-  <link rel="stylesheet" href="/portal/assets/fokus-lead-shell.css?v=20261014-lead-shell-v1">
+  <link rel="stylesheet" href="/portal/assets/fokus-lead-shell.css?v=20261014-lead-shell-v2">
 </head>
 <body class="lead-shell-page">
   <a class="lead-skip" href="#lead-workspace">Pular para o conteúdo principal</a>
@@ -37,5 +37,5 @@
       </section>
     </main>
   </div>
-  <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script><script src="/assets/js/api-client.js"></script><script src="/assets/js/portal-profile.js?v=20261002-law-profile-v1"></script><script src="/portal/assets/fokus-lead-shell.js?v=20261014-lead-shell-v1"></script>
+  <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script><script src="/assets/js/api-client.js"></script><script src="/assets/js/portal-profile.js?v=20261002-law-profile-v1"></script><script src="/portal/assets/fokus-lead-shell.js?v=20261014-lead-shell-v2"></script>
 </body></html>
