@@ -20,36 +20,36 @@
         <form id="register-form">
           <label class="form-field">
             <span class="fs-form-label">Tipo de documento</span>
-            <select class="field-size-md" name="document_type" id="document-type">
+            <select class="fs-form-select" name="document_type" id="document-type">
               <option value="cnpj">CNPJ</option>
               <option value="cpf">CPF</option>
             </select>
           </label>
           <label class="form-field">
             <span class="fs-form-label" id="company-document-label">CNPJ</span>
-            <input class="field-size-md" id="company-document" name="document_number" inputmode="text" maxlength="18" autocomplete="off" required aria-describedby="company-document-error" />
+            <input class="fs-form-control" id="company-document" name="document_number" inputmode="text" maxlength="18" autocomplete="off" required aria-describedby="company-document-error" />
             <span id="company-document-error" class="field-error" role="alert"></span>
           </label>
           <label class="form-field" id="company-name-label">
             <span class="fs-form-label" id="company-name-label-text">Razão social</span>
-            <input class="field-size-md" id="legal-name" name="legal_name" autocomplete="organization" required />
+            <input class="fs-form-control" id="legal-name" name="legal_name" autocomplete="organization" required />
           </label>
           <label class="form-field">
             <span class="fs-form-label">Nome completo do administrador</span>
-            <input class="field-size-md" id="admin-name" name="name" autocomplete="name" required />
+            <input class="fs-form-control" id="admin-name" name="name" autocomplete="name" required />
           </label>
           <label class="form-field">
             <span class="fs-form-label">CPF do administrador</span>
-            <input class="field-size-md" id="admin-cpf" name="cpf" inputmode="numeric" maxlength="14" autocomplete="off" required aria-describedby="admin-cpf-error" />
+            <input class="fs-form-control" id="admin-cpf" name="cpf" inputmode="numeric" maxlength="14" autocomplete="off" required aria-describedby="admin-cpf-error" />
             <span id="admin-cpf-error" class="field-error" role="alert"></span>
           </label>
           <label class="form-field">
             <span class="fs-form-label">E-mail profissional</span>
-            <input class="field-size-md" name="email" type="email" required />
+            <input class="fs-form-control" name="email" type="email" required />
           </label>
           <label class="form-field">
             <span class="fs-form-label">Senha</span>
-            <input class="field-size-md" name="password" type="password" minlength="12" required />
+            <input class="fs-form-control" name="password" type="password" minlength="12" required />
           </label>
           <label class="consent-field">
             <input type="checkbox" name="terms" required />
@@ -60,7 +60,7 @@
             <span>Li e aceito a Política de Privacidade.</span>
           </label>
         </form>
-        <div class="login-actions"><button class="law-submit" form="register-form" type="submit">Cadastre-se</button></div>
+        <div class="login-actions"><button class="fs-btn fs-btn-primary law-submit" form="register-form" type="submit">Cadastre-se</button></div>
         <p id="feedback" class="form-message" role="status"></p>
       </section>
     </main>
