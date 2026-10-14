@@ -688,13 +688,13 @@ test('Novo usuário permite convidar usuário externo vinculado a empresa Fokus 
     await expect(page.locator('#backoffice-toast-container .fs-toast-body')).toContainText('Convite enviado ao usuário externo.');
 });
 
-test('consulta de e-mail no acesso Fokus Law identifica nome e sistema ativo', async ({ page }) => {
+test('consulta de e-mail no acesso Fokus Law localiza sistema e solicita senha', async ({ page }) => {
     await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ message: 'Acesso interno não autenticado.' }) }));
     await page.goto('/marketing/products/fokus-law.html');
     await page.locator('#law-email').fill('pessoa@example.test');
     await expect(page.locator('#law-system')).toBeEnabled();
     await expect(page.locator('#law-system option')).toHaveText('Empresa de Demonstração — Fokus Law · Advocacia');
-    await expect(page.locator('[data-law-login-status]')).toHaveText('Digite sua senha');
+    await expect(page.locator('[data-law-login-status]')).toHaveText('Informe sua senha.');
     await expect(page.locator('[data-law-login-status]')).not.toContainText('Pessoa Teste');
     await expect(page.locator('#law-password')).toBeEnabled();
     await expect(page.locator('#law-system-label')).toHaveText('Empresa vinculada');
@@ -750,7 +750,8 @@ test('consulta de e-mail mostra usuário existente sem assinatura ativa', async 
     }));
     await page.goto('/marketing/products/fokus-law.html');
     await page.locator('#law-email').fill('pessoa@example.test');
-    await expect(page.locator('[data-law-login-status]')).toContainText('Pessoa Teste — Não existe nenhuma assinatura ativa do Fokus Law vinculada a este usuário.');
+    await expect(page.locator('[data-law-login-status]')).toHaveText('Nenhuma assinatura ativa encontrada.');
+    await expect(page.locator('[data-law-login-status]')).not.toContainText('Pessoa Teste');
     await expect(page.locator('#law-system')).toBeDisabled();
     await expect(page.locator('#law-password')).toBeDisabled();
 });
@@ -761,7 +762,7 @@ test('Fokus Law usa o mesmo toast do Backoffice para erro de consulta', async ({
     await page.locator('#law-email').fill('ausente@example.test');
     await expect(page.locator('#backoffice-toast-container .fs-backoffice-toast')).toBeVisible();
     await expect(page.locator('#backoffice-toast-container .fs-toast-title')).toHaveText('Erro');
-    await expect(page.locator('#backoffice-toast-container .fs-toast-body')).toHaveText('Usuário não encontrado.');
+    await expect(page.locator('#backoffice-toast-container .fs-toast-body')).toHaveText('E-mail não localizado.');
     await expect(page.locator('#backoffice-toast-container .fs-backoffice-toast')).toHaveScreenshot('fokus-law-login-error-toast.png', { animations: 'disabled', maxDiffPixelRatio: 0.02 });
     const lawToastStyles = await page.locator('#backoffice-toast-container .fs-backoffice-toast').evaluate((toast) => {
         const read = (element) => {

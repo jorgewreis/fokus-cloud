@@ -13,11 +13,9 @@
   const status = form.querySelector('[data-lead-login-status]');
   let lookupTimer;
   let systems = [];
-  let userName = '';
 
-  const reset = (message = 'A identificação começa ao informar seu e-mail.') => {
+  const reset = (message = 'Informe seu e-mail para consultar os acessos.') => {
     systems = [];
-    userName = '';
     systemLabel.textContent = 'Empresa vinculada';
     instructions.textContent = 'Informe seu e-mail para localizar a empresa vinculada e os acessos disponíveis.';
     system.replaceChildren(new Option('Aguardando identificação', ''));
@@ -48,19 +46,18 @@
     submit.disabled = availableProfiles.length === 0 || availableProfiles.length > 1;
     if (availableProfiles.length === 1) {
       profile.value = availableProfiles[0].value;
-      status.textContent = 'Digite sua senha';
+      status.textContent = 'Informe sua senha.';
     } else {
       status.textContent = availableProfiles.length
-        ? `${userName ? `${userName} — ` : ''}Vínculo localizado. Escolha o perfil para continuar.`
-        : `${userName ? `${userName} — ` : ''}Nenhum perfil disponível para este vínculo.`;
+        ? 'Selecione um perfil.'
+        : 'Nenhum perfil disponível.';
     }
   };
 
   const renderSystems = (payload) => {
     systems = payload.systems || [];
-    userName = payload.user?.name || '';
     if (!systems.length) {
-      reset(`${userName ? `${userName} — ` : ''}${payload.message || 'Não existe nenhuma assinatura ativa do Fokus Lead vinculada a este usuário.'}`);
+      reset('Nenhuma assinatura ativa encontrada.');
       return;
     }
     system.replaceChildren(new Option('Selecione o vínculo', ''));
@@ -70,7 +67,7 @@
       system.value = systems[0].value;
       renderProfiles();
     } else {
-      status.textContent = `${userName ? `${userName} — ` : ''}Selecione o vínculo para continuar.`;
+      status.textContent = 'Selecione um vínculo.';
     }
   };
 
@@ -79,7 +76,7 @@
     event.preventDefault();
     if (!form.reportValidity() || !system.value || !profile.value) return;
     submit.disabled = true;
-    status.textContent = 'Validando seu acesso ao Fokus Lead…';
+    status.textContent = 'Validando credenciais…';
     try {
       const result = await window.FokusApi.request('/auth/lead-login', {
         method: 'POST',
@@ -87,16 +84,16 @@
       });
       location.assign(result.redirect_to || '/portal/fokus-lead');
     } catch (error) {
-      status.textContent = error.message || 'Não foi possível entrar no Fokus Lead.';
+      status.textContent = 'Falha na autenticação.';
       submit.disabled = false;
     }
   });
   email.addEventListener('input', () => {
     clearTimeout(lookupTimer);
-    reset('Informe um e-mail válido para consultar seu cadastro.');
+    reset('E-mail inválido.');
     const value = email.value.trim();
     if (!value || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return;
-    status.textContent = 'Consultando os vínculos deste e-mail…';
+    status.textContent = 'Consultando vínculos…';
     lookupTimer = setTimeout(async () => {
       if (email.value.trim().toLowerCase() !== value.toLowerCase()) return;
       try {
@@ -104,7 +101,7 @@
         if (email.value.trim().toLowerCase() === value.toLowerCase()) renderSystems(payload);
       } catch (error) {
         if (email.value.trim().toLowerCase() !== value.toLowerCase()) return;
-        reset(error.status === 404 ? 'Usuário não encontrado.' : (error.message || 'Não foi possível consultar os vínculos deste e-mail.'));
+        reset(error.status === 404 ? 'E-mail não localizado.' : 'Falha ao consultar vínculos. Tente novamente.');
       }
     }, 420);
   });
@@ -113,7 +110,7 @@
   profile.addEventListener('change', () => {
     password.disabled = !profile.value;
     submit.disabled = !profile.value;
-    status.textContent = profile.value ? 'Digite sua senha' : 'Escolha seu perfil para continuar.';
+    status.textContent = profile.value ? 'Informe sua senha.' : 'Selecione um perfil.';
     if (!profile.value) password.value = '';
   });
 })();
