@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CompanyUserController;
 use App\Http\Controllers\Api\LawHearingController;
 use App\Http\Controllers\Api\LawCompanyProfileController;
 use App\Http\Controllers\Api\LawShellController;
+use App\Http\Controllers\Api\LeadShellController;
 use App\Http\Controllers\Api\LawUnitController;
 use App\Http\Controllers\Api\LawContactController;
 use App\Http\Controllers\Api\LawCaseController;
@@ -64,6 +65,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/auth/resend-verification', [AuthController::class, 'resendVerification'])->middleware('throttle:2,10,customer-resend-verification');
     Route::middleware(EnsureCompanyContext::class)->group(function () {
         Route::get('/law/shell-context', [LawShellController::class, 'context']);
+        Route::get('/lead/shell-context', [LeadShellController::class, 'context']);
         Route::prefix('law/admin-cases')->middleware([App\Http\Middleware\EnsureLawAdministrativeProcessContext::class, 'law.permission:law.cases.view', App\Http\Middleware\LawCaseTransaction::class])->group(function () {
             Route::get('/search', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'search']);
             Route::get('/dashboard', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'dashboard']);

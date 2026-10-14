@@ -175,7 +175,7 @@ class AuthenticationAndIsolationTest extends TestCase
             'email' => $user->email, 'password' => 'SenhaSegura!2026', 'company_id' => $companyId, 'profile' => 'admin',
         ])->assertOk()->assertJsonPath('redirect_to', '/portal/fokus-lead');
 
-        $this->get('/portal/fokus-lead')->assertOk()->assertSee('Vínculo confirmado para Empresa Teste Ltda.')->assertSee('Os módulos do Fokus Lead ainda estão em desenvolvimento.');
+        $this->get('/portal/fokus-lead')->assertOk()->assertViewIs('portal.fokus-lead')->assertSee('Bem-vindo ao Fokus Lead')->assertSee('data-initial-page="dashboard"', false);
     }
 
     public function test_lead_workspace_requires_authentication(): void

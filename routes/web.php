@@ -121,7 +121,22 @@ Route::get('/portal/fokus-lead', function () {
 
     abort_unless($membership && $hasLeadSubscription, 403, 'Esta conta não tem um vínculo ativo com o Fokus Lead.');
 
-    return response()->view('portal.fokus-lead', ['companyName' => $membership->company_name]);
+    return response()->view('portal.fokus-lead', ['initialPage' => 'dashboard']);
+});
+Route::get('/portal/fokus-lead/perfil', function () {
+    $user = Auth::guard('web')->user();
+    if (! $user || $user->status !== 'ativa') return redirect('/?acesso=cliente');
+    if (! $user->email_verified_at) return redirect('/verificar-email?return_to='.rawurlencode('/portal/fokus-lead/perfil'));
+    $companyId = request()->session()->get('active_company_id');
+    if (! $companyId) return redirect('/portal/empresas');
+    $hasMembership = DB::table('company_memberships as membership')->join('companies as company', 'company.id', '=', 'membership.company_id')
+        ->where('membership.company_id', $companyId)->where('membership.user_id', $user->id)->where('membership.status', 'ativo')->whereNull('membership.deleted_at')
+        ->where('company.status', 'ativa')->whereNull('company.deleted_at')->exists();
+    $hasLeadSubscription = DB::table('subscriptions as subscription')->join('products as product', 'product.id', '=', 'subscription.product_id')
+        ->where('subscription.company_id', $companyId)->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
+        ->whereIn('product.code', ['lead', 'fokus-lead'])->exists();
+    abort_unless($hasMembership && $hasLeadSubscription, 403, 'Esta conta não tem um vínculo ativo com o Fokus Lead.');
+    return response()->view('portal.fokus-lead', ['initialPage' => 'profile']);
 });
 Route::get('/portal/fokus-law/processos', fn () => $serveFokusLawShell('processes'));
 Route::get('/portal/fokus-law/processos/configuracoes', fn () => $serveFokusLawShell('processes-settings'));

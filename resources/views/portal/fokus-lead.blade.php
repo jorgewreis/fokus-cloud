@@ -1,47 +1,39 @@
 <!doctype html>
 <html lang="pt-BR" data-theme="light">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="robots" content="noindex,nofollow">
-    <title>Fokus Lead | Área de acesso</title>
-    <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20261009-select-menu-options-v1">
-    <style>
-        @font-face { font-family: 'Bebas Neue'; src: url('/assets/fonts/google/bebas-neue-original.woff2') format('woff2'); font-weight: 400; font-display: swap; }
-        :root { color-scheme: light; --lead-navy: #102a43; --lead-terracotta: #c96f4a; --lead-cream: #f5efe7; --lead-muted: #536879; }
-        * { box-sizing: border-box; }
-        body { min-height: 100vh; margin: 0; background: var(--lead-cream); color: var(--lead-navy); font: 400 16px/1.6 system-ui, sans-serif; }
-        .lead-access-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1.4rem clamp(1.25rem, 6vw, 5rem); background: var(--lead-navy); color: #fff; }
-        .lead-access-brand { color: #fff; font-size: .82rem; font-weight: 700; letter-spacing: .16em; text-decoration: none; }
-        .lead-access-brand span { color: #e9a27f; }
-        .lead-access-header a:last-child { color: #fff; font-size: .86rem; text-underline-offset: .2em; }
-        .lead-access-main { width: min(100% - 2.5rem, 920px); margin: clamp(3rem, 9vh, 6rem) auto; }
-        .lead-access-kicker { margin: 0 0 .65rem; color: var(--lead-terracotta); font-size: .72rem; font-weight: 700; letter-spacing: .18em; }
-        .lead-access-main h1, .lead-access-panel h2 { margin: 0; font-family: 'Bebas Neue', 'Arial Narrow', sans-serif; font-weight: 400; line-height: .95; text-transform: uppercase; }
-        .lead-access-main h1 { font-size: clamp(3.5rem, 8vw, 6rem); }
-        .lead-access-subtitle { max-width: 650px; margin: 1rem 0 2.5rem; color: var(--lead-muted); }
-        .lead-access-panel { padding: clamp(1.5rem, 4vw, 3rem); border-top: 4px solid var(--lead-terracotta); background: #fff; box-shadow: 0 18px 50px rgba(16, 42, 67, .1); }
-        .lead-access-panel h2 { max-width: 680px; font-size: clamp(2.2rem, 5vw, 3.4rem); }
-        .lead-access-panel p:last-of-type { max-width: 680px; color: var(--lead-muted); }
-        .lead-access-panel a { display: inline-flex; margin-top: .7rem; padding: .75rem 1rem; background: var(--lead-navy); color: #fff; text-decoration: none; }
-        @media (max-width: 520px) { .lead-access-header { align-items: flex-start; } .lead-access-header a:last-child { max-width: 8rem; text-align: right; } }
-    </style>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#071b2d">
+  <title>Fokus Lead | Fokus Cloud</title>
+  <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20261009-select-menu-options-v1">
+  <link rel="stylesheet" href="/marketing/products/fokus-lead-tokens.css?v=20261014-lead-tokens-v1">
+  <link rel="stylesheet" href="/portal/assets/fokus-lead-shell.css?v=20261014-lead-shell-v1">
 </head>
-<body>
-    <header class="lead-access-header">
-        <a class="lead-access-brand" href="/">FOKUS CLOUD <span>LEAD</span></a>
-        <a href="/portal">Voltar à visão geral</a>
-    </header>
-    <main class="lead-access-main">
-        <p class="lead-access-kicker">ÁREA DE ACESSO</p>
-        <h1>Fokus Lead</h1>
-        <p class="lead-access-subtitle">Vínculo confirmado para {{ $companyName }}.</p>
-        <section class="lead-access-panel" aria-labelledby="lead-access-title">
-            <p class="lead-access-kicker">ESPAÇO DE TRABALHO</p>
-            <h2 id="lead-access-title">Uma área para acompanhar a rotina comercial.</h2>
-            <p>Os módulos do Fokus Lead ainda estão em desenvolvimento. Esta área reunirá o acompanhamento de clientes, imóveis e oportunidades quando os recursos forem disponibilizados.</p>
-            <a href="/portal">Voltar à visão geral</a>
-        </section>
+<body class="lead-shell-page">
+  <a class="lead-skip" href="#lead-workspace">Pular para o conteúdo principal</a>
+  <div id="lead-loading" class="lead-loading" role="status" aria-live="polite">Carregando o Fokus Lead…</div>
+  <div class="lead-shell" id="lead-shell" data-initial-page="{{ $initialPage ?? 'dashboard' }}" hidden>
+    <div class="lead-scrim" id="lead-scrim" hidden></div>
+    <aside class="lead-sidebar" id="lead-sidebar" aria-label="Navegação do Fokus Lead">
+      <a class="lead-brand" href="/portal/fokus-lead" aria-label="Fokus Lead, dashboard"><span class="lead-brand-mark">F</span><span>FOKUS <b>LEAD</b></span></a>
+      <div class="lead-company-block"><span class="lead-caption">EMPRESA ATIVA</span><button id="lead-company-button" class="lead-company-button" type="button" aria-haspopup="listbox" aria-expanded="false"><span id="lead-company-name">—</span><span aria-hidden="true">⌄</span></button><div id="lead-company-options" class="lead-company-options" role="listbox" aria-label="Empresas com Fokus Lead" hidden></div><p id="lead-subscription" class="lead-subscription">Fokus Lead</p></div>
+      <nav class="lead-navigation" aria-label="Principal"><a id="lead-dashboard-link" href="/portal/fokus-lead" aria-current="page"><span aria-hidden="true">▦</span>Dashboard</a><a id="lead-profile-link" href="/portal/fokus-lead/perfil"><span aria-hidden="true">◎</span>Meu perfil</a></nav>
+      <div class="lead-module-space" aria-hidden="true"></div>
+      <footer class="lead-user"><span id="lead-avatar" class="lead-avatar" aria-hidden="true">—</span><span class="lead-user-data"><strong id="lead-user-name">—</strong><small id="lead-user-email">—</small></span><a href="/portal/fokus-lead/perfil" aria-label="Abrir meu perfil">⋯</a></footer>
+    </aside>
+    <main id="lead-workspace" class="lead-main">
+      <header class="lead-topbar"><button id="lead-menu-button" class="lead-menu-button" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="lead-sidebar">☰</button><div class="lead-topbar-context"><span>FOKUS LEAD</span><strong id="lead-top-company">—</strong></div><div class="lead-top-actions"><button id="lead-top-company-button" type="button" aria-haspopup="listbox" aria-expanded="false"><span id="lead-top-company-name">—</span><span aria-hidden="true">⌄</span></button><div id="lead-top-company-options" class="lead-company-options lead-top-options" role="listbox" aria-label="Empresas com Fokus Lead" hidden></div><a href="/portal/fokus-lead/perfil">Meu perfil</a><button id="lead-logout" type="button">Sair</button></div></header>
+      <section id="lead-dashboard" class="lead-content" hidden><p class="lead-eyebrow">ESPAÇO DE TRABALHO</p><h1>Bem-vindo ao Fokus Lead</h1><p class="lead-intro">A base da sua operação comercial está pronta para receber os módulos.</p><section class="lead-welcome-card" aria-labelledby="lead-welcome-heading"><span class="lead-card-index">LEAD / 01</span><h2 id="lead-welcome-heading">Olá, <span id="lead-welcome-user">—</span>.</h2><p>Este espaço está sendo preparado para sua equipe. Os módulos serão disponibilizados aqui quando estiverem prontos.</p><dl><div><dt>Empresa</dt><dd id="lead-dashboard-company">—</dd></div><div><dt>Assinatura</dt><dd id="lead-dashboard-subscription">—</dd></div><div><dt>Seu acesso</dt><dd id="lead-dashboard-role">—</dd></div></dl></section></section>
+      <section id="lead-profile" class="lead-content lead-profile-content" hidden>
+        <div class="lead-profile-page"><header class="lead-profile-heading"><p class="lead-eyebrow">CONTA E ACESSO</p><h1>Meu perfil</h1><p class="lead-intro">Revise seus dados pessoais e mantenha as credenciais atualizadas.</p></header>
+          <div id="profile-loading" class="lead-profile-loading" role="status" aria-live="polite">Carregando seus dados…</div><div id="profile-support-notice" class="lead-support-notice" role="status" hidden><strong>Acesso de suporte ativo</strong><span>O perfil está somente para leitura durante o acesso de suporte.</span></div>
+          <div id="profile-sections" class="lead-profile-sections" hidden>
+            <section class="lead-profile-card"><div class="lead-profile-card-heading"><div><p>INFORMAÇÕES DA CONTA</p><h2>Dados pessoais</h2></div><span>Titular</span></div><form id="personal-form" class="lead-profile-form" novalidate><label>Nome completo<input class="fs-form-control" id="profile-name" name="name" autocomplete="name" maxlength="255" required></label><label>Telefone <small>opcional</small><input class="fs-form-control" id="profile-phone" name="phone" type="tel" autocomplete="tel-national" inputmode="tel" maxlength="16" placeholder="(00) 00000-0000"></label><label>CPF<input class="fs-form-control" id="profile-cpf" readonly></label><div class="lead-form-footer"><p id="personal-status" role="status" aria-live="polite"></p><button class="fs-btn fs-btn-primary" type="submit">Salvar dados pessoais</button></div></form></section>
+            <section class="lead-profile-card"><div class="lead-profile-card-heading"><div><p>CONFIRMAÇÃO NECESSÁRIA</p><h2>E-mail</h2></div><span id="email-verified"></span></div><p class="lead-current-email">E-mail atual <strong id="current-email">—</strong></p><form id="email-form" class="lead-profile-form" novalidate><label>Novo endereço de e-mail<input class="fs-form-control" name="email" type="email" autocomplete="email" maxlength="255" required></label><label>Senha atual<input class="fs-form-control" name="current_password" type="password" autocomplete="current-password" required></label><div class="lead-form-footer"><p id="email-status" role="status" aria-live="polite"></p><button class="fs-btn fs-btn-primary" type="submit">Enviar confirmação</button></div></form><p class="lead-footnote">O endereço atual continua ativo até você confirmar o link enviado ao novo e-mail.</p></section>
+            <section class="lead-profile-card"><div class="lead-profile-card-heading"><div><p>PROTEÇÃO DO ACESSO</p><h2>Segurança</h2></div></div><form id="security-form" class="lead-profile-form" novalidate><label>Senha atual<input class="fs-form-control" name="current_password" type="password" autocomplete="current-password" required></label><label>Nova senha<input class="fs-form-control" name="password" type="password" autocomplete="new-password" minlength="12" required aria-describedby="password-help"></label><label>Confirme a nova senha<input class="fs-form-control" name="password_confirmation" type="password" autocomplete="new-password" minlength="12" required></label><small id="password-help">Use pelo menos 12 caracteres. Senhas comuns ou encontradas em vazamentos serão recusadas.</small><div class="lead-form-footer"><p id="security-status" role="status" aria-live="polite"></p><button class="fs-btn fs-btn-primary" type="submit">Alterar senha</button></div></form><p class="lead-footnote">A alteração encerra suas outras sessões e mantém este acesso ativo.</p></section>
+          </div>
+        </div>
+      </section>
     </main>
-</body>
-</html>
+  </div>
+  <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script><script src="/assets/js/api-client.js"></script><script src="/assets/js/portal-profile.js?v=20261002-law-profile-v1"></script><script src="/portal/assets/fokus-lead-shell.js?v=20261014-lead-shell-v1"></script>
+</body></html>
