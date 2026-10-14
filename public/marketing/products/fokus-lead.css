@@ -695,6 +695,9 @@
 .lead-page .lead-login-heading h2 { font-size: 2.7rem; line-height: .94; letter-spacing: 0; white-space: nowrap; }
 .lead-page .lead-login-heading p { font-size: .86rem; }
 .lead-page .lead-field-grid { display: flex; flex-direction: column; }
+.lead-page .lead-field-grid [hidden] { display: none !important; }
+.lead-page .lead-hero-offer-card { margin-top: 6rem; }
+.lead-page .lead-proof { margin-top: 2.4rem; }
 
 @media (max-width: 900px) {
     .lead-page .lead-hero {
@@ -707,6 +710,8 @@
     .lead-page .lead-hero-content,
     .lead-page .lead-hero-offer-card,
     .lead-page .lead-proof { max-width: 100%; }
+    .lead-page .lead-hero-offer-card { margin-top: 2.1rem; }
+    .lead-page .lead-proof { margin-top: 4rem; }
     .lead-page .lead-login { justify-self: start; }
 }
 
