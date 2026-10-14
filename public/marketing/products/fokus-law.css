@@ -33,7 +33,7 @@
 .law-plan-offers-intro{max-width:560px;margin:0;color:#645a67;font-size:.98rem;line-height:1.65}
 .law-live-plans{margin-top:2rem}
 .law-live-plans-label{margin:0 0 .8rem;color:#6e6371;font-size:.64rem;font-weight:700;letter-spacing:.16em}
-.law-live-plan-grid{display:grid;gap:.55rem}
+.law-live-plan-grid{display:grid;grid-template-columns:1fr;gap:.55rem}
 .law-live-plan{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:1rem;padding:.85rem 1rem;border-left:3px solid var(--law-sage);background:#f7f5f1;transition:background .2s,border-color .2s}
 .law-live-plan:hover{border-color:var(--law-purple);background:#f1edf5}
 .law-live-plan strong{min-width:0;color:var(--law-plum);font-size:.86rem}
