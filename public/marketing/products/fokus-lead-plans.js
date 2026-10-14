@@ -59,8 +59,8 @@
   };
   const renderOffers = () => {
     const plans = state.catalog.plans || [];
-    const cards = plans.map((plan) => `<article class="lead-price-card${plan.featured ? ' is-featured' : ''}"><p>${esc(plan.segment || 'FOKUS LEAD')}</p><h3>${esc(plan.name)}</h3><span>${esc(plan.description || 'Uma combinação de recursos para sua rotina imobiliária.')}</span><strong>${money(state.cycle === 'annual' ? plan.annual_amount : plan.monthly_amount)}<small> / ${state.cycle === 'annual' ? 'ano' : 'mês'}</small></strong><button type="button" data-plan="${esc(plan.code)}">Configurar este plano <b aria-hidden="true">↗</b></button></article>`);
-    cards.unshift('<article class="lead-price-card lead-custom-card"><p>FLEXIBILIDADE</p><h3>Personalizada</h3><span>Escolha módulos independentes, conforme a disponibilidade do catálogo.</span><strong>Você escolhe</strong><button type="button" data-custom>Montar composição <b aria-hidden="true">↗</b></button></article>');
+    const cards = plans.map((plan) => `<article class="lead-price-card${plan.featured ? ' is-featured' : ''}"><p>${esc(plan.segment || 'FOKUS LEAD')}</p><h3>${esc(plan.name)}</h3><span>${esc(plan.description || 'Uma combinação de recursos para sua rotina imobiliária.')}</span><strong>${money(state.cycle === 'annual' ? plan.annual_amount : plan.monthly_amount)}<small> / ${state.cycle === 'annual' ? 'ano' : 'mês'}</small></strong><button type="button" data-plan="${esc(plan.code)}">Configurar este plano</button></article>`);
+    cards.unshift('<article class="lead-price-card lead-custom-card"><p>FLEXIBILIDADE</p><h3>Personalizada</h3><span>Escolha módulos independentes, conforme a disponibilidade do catálogo.</span><strong>Você escolhe</strong><button type="button" data-custom>Montar composição</button></article>');
     offersNode.innerHTML = cards.join('');
   };
   offersNode.addEventListener('click', (event) => {
