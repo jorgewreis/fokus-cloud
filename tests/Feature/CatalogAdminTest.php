@@ -148,6 +148,24 @@ class CatalogAdminTest extends TestCase
         $this->assertGreaterThan(0, (float) $quote['amount']);
     }
 
+    public function test_public_lead_catalog_exposes_published_plans_and_modules_for_the_marketing_page(): void
+    {
+        $catalog = $this->getJson('/api/catalog/lead')
+            ->assertOk()
+            ->assertJsonStructure(['product', 'modules', 'plans', 'published_version'])
+            ->json();
+
+        $this->assertNotEmpty($catalog['modules']);
+        $this->assertNotEmpty($catalog['plans']);
+        $this->assertContains('lead-one-essencial', array_column($catalog['plans'], 'code'));
+        $this->assertSame(
+            ['pessoas', 'imoveis', 'notificacoes'],
+            collect($catalog['plans'])->firstWhere('code', 'lead-one-essencial')['module_codes'],
+        );
+
+        $this->get('/produtos/fokus-lead')->assertOk();
+    }
+
     public function test_public_law_quote_refuses_missing_and_pending_catalogs(): void
     {
         $payload = ['product_code' => 'law', 'selection_mode' => 'modules', 'cycle' => 'monthly', 'items' => [['module_code' => 'contatos-advocacia']]];

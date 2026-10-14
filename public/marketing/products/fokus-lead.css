@@ -156,6 +156,30 @@
     }
 }
 
+.lead-page .lead-catalog { background: #fff; }
+.lead-page .lead-catalog .lead-section-intro h2 { color: var(--lead-navy); }
+.lead-page .lead-catalog .lead-section-intro > p:last-child { color: #536a7b; }
+.lead-plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-top: 3rem; }
+.lead-plan-card { display: flex; flex-direction: column; padding: 1.5rem; border: 1px solid rgba(16,42,67,.16); border-top: 4px solid var(--lead-blue); background: var(--lead-cream); }
+.lead-plan-card.is-featured { border-top-color: var(--lead-terracotta); }
+.lead-plan-context { margin: 0; color: var(--lead-blue); font-size: .66rem; font-weight: 700; letter-spacing: .12em; }
+.lead-plan-card h3 { margin: 1rem 0 .5rem; color: var(--lead-navy); font: 400 2rem/.95 var(--lead-display); text-transform: uppercase; }
+.lead-plan-price { margin: .5rem 0 0; color: var(--lead-navy); font-size: 1.35rem; font-weight: 700; }
+.lead-plan-price span,.lead-plan-annual { color: #536a7b; font-size: .75rem; font-weight: 400; }
+.lead-plan-annual { margin: .2rem 0 1rem; }
+.lead-plan-card ul { display: grid; gap: .4rem; margin: 0 0 1.5rem; padding-left: 1.1rem; color: #40596d; font-size: .78rem; }
+.lead-module-catalog { margin-top: 4rem; }
+.lead-module-catalog h3 { color: var(--lead-navy); font: 400 2.4rem/.95 var(--lead-display); text-transform: uppercase; }
+.lead-module-catalog-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
+.lead-module-catalog-card { padding: 1.1rem; border-left: 3px solid var(--lead-terracotta); background: #f5f7f8; }
+.lead-module-catalog-card h4 { margin: 0; color: var(--lead-navy); font-size: .9rem; }
+.lead-module-catalog-card p { min-height: 2.8em; color: #536a7b; font-size: .74rem; line-height: 1.5; }
+.lead-module-catalog-card strong { color: var(--lead-blue); font-size: .8rem; }
+.lead-module-catalog-card strong span { color: #536a7b; font-size: .68rem; font-weight: 400; }
+.lead-catalog-state { grid-column: 1 / -1; color: #536a7b; }
+@media(max-width:900px) { .lead-plan-grid,.lead-module-catalog-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width:600px) { .lead-plan-grid,.lead-module-catalog-grid { grid-template-columns: 1fr; } }
+
 /* Formulário com hierarquia visual inspirada na proposta do Fokus Law, usando a paleta própria do Lead. */
 .lead-page .lead-interest {
     background: var(--lead-navy-deep);
