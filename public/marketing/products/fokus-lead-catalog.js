@@ -15,13 +15,10 @@
     const modules = catalog.modules || [];
     const plans = catalog.plans || [];
 
-    plansNode.innerHTML = plans.length ? plans.map((plan) => {
-      const segment = plan.segment === 'one' ? 'CORRETOR AUTÔNOMO' : plan.segment === 'team' ? 'EQUIPES E IMOBILIÁRIAS' : 'FOKUS LEAD';
-      return `<article class="lead-offer-row${plan.featured ? ' is-featured' : ''}">
-        <div><p>${escapeHtml(segment)}</p><h3>${escapeHtml(plan.name)}</h3></div>
+    plansNode.innerHTML = plans.length ? plans.map((plan) => `<article class="lead-offer-row${plan.featured ? ' is-featured' : ''}">
+        <h3>${escapeHtml(plan.name)}</h3>
         <span>${money(plan.monthly_amount)} <small>/ mês</small></span>
-      </article>`;
-    }).join('') : '<p class="lead-catalog-state">Não há planos publicados no catálogo.</p>';
+      </article>`).join('') : '<p class="lead-catalog-state">Não há planos publicados no catálogo.</p>';
 
     modulesNode.innerHTML = modules.length ? modules.map((module) => `<article class="lead-module-catalog-card">
       <h4>${escapeHtml(module.name)}</h4>

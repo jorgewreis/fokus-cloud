@@ -11,19 +11,24 @@
 .lead-page .lead-brand a,.lead-page .lead-brand a:hover,.lead-page .lead-brand a:focus-visible{text-decoration:none!important}
 
 /* Oferta em duas colunas com lista e banner na paleta Fokus Lead. */
-.lead-offer-showcase{display:grid;grid-template-columns:minmax(0,1.02fr) minmax(360px,.98fr);gap:clamp(2rem,5vw,5rem);align-items:stretch;margin:2rem 0 4rem}
+.lead-offer-showcase{display:grid;grid-template-columns:minmax(0,1.02fr) minmax(360px,.98fr);gap:clamp(2rem,5vw,5rem);align-items:stretch;margin:0 0 4rem}
 .lead-offer-list{align-self:center;min-width:0}
 .lead-offer-list .lead-section-intro{margin:0}
 .lead-offer-list .lead-section-intro h2{max-width:650px;margin:.6rem 0 1rem;font-size:clamp(2.8rem,5vw,5rem)}
 .lead-offer-list .lead-section-intro>p:last-child{max-width:560px;margin:0;color:#536a7b;font-size:.98rem;line-height:1.65}
-.lead-offer-rows{display:grid;grid-template-columns:minmax(0,1fr);gap:.65rem;margin-top:2rem}
-.lead-offer-row{display:grid;grid-template-columns:minmax(0,1fr) max-content;align-items:center;gap:1rem;min-width:0;padding:1rem 1.15rem;border:1px solid rgba(16,42,67,.1);border-left:3px solid var(--lead-blue);background:var(--lead-cream);box-shadow:0 8px 20px rgba(7,27,45,.045)}
+.lead-live-plans{margin-top:2rem}
+.lead-live-plans-label{margin:0 0 .8rem;color:#536a7b;font-size:.64rem;font-weight:700;letter-spacing:.16em}
+.lead-offer-rows{display:grid;grid-template-columns:minmax(0,1fr);gap:.65rem}
+.lead-offer-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:1rem;min-width:0;padding:.85rem 1rem;border:0;border-left:3px solid var(--lead-blue);background:#f7f5f1;transition:background .2s,border-color .2s}
+.lead-offer-row:hover{border-color:var(--lead-terracotta);background:#f2eee8}
 .lead-offer-row.is-featured{border-left-color:var(--lead-terracotta)}
 .lead-offer-row>div{min-width:0}
-.lead-offer-row p{margin:0 0 .25rem;color:var(--lead-blue);font-size:.58rem;font-weight:700;letter-spacing:.13em}
-.lead-offer-row h3{margin:0;color:var(--lead-navy);font-size:.9rem;font-weight:700;line-height:1.4;overflow-wrap:normal;word-break:normal}
-.lead-offer-row>span{color:var(--lead-navy);font-size:.79rem;font-weight:700;white-space:nowrap}
-.lead-offer-row>span small{color:#536a7b;font-size:.72rem;font-weight:400}
+.lead-offer-row p{display:none}
+.lead-offer-row h3{margin:0;color:var(--lead-navy);font-size:.86rem;font-weight:700;line-height:1.4;overflow-wrap:normal;word-break:normal}
+.lead-offer-row>span{margin:0;color:#536a7b;font-size:.76rem;font-weight:400;white-space:nowrap}
+.lead-offer-row>span small{color:#536a7b;font-size:inherit;font-weight:400}
+.lead-plan-catalog-text-link{display:inline-flex;margin-top:1rem;color:var(--lead-blue);font-size:.82rem;font-weight:700;text-decoration-thickness:1px;text-underline-offset:.22em}
+.lead-plan-catalog-text-link:focus-visible,.lead-catalog-banner a:focus-visible{outline:3px solid var(--lead-terracotta-light);outline-offset:4px}
 .lead-catalog-banner{position:relative;isolation:isolate;display:flex;min-height:430px;align-items:flex-end;overflow:hidden;padding:clamp(2rem,4vw,3.5rem);color:#fff;background:linear-gradient(126deg,#071b2d 0%,#102a43 48%,#2f638c 100%);box-shadow:0 26px 60px rgba(7,27,45,.2)}
 .lead-catalog-banner:before{position:absolute;z-index:-1;inset:0;background:linear-gradient(125deg,transparent 0 29%,rgba(233,162,127,.58) 29% 30%,transparent 30% 35%,rgba(233,162,127,.3) 35% 36%,transparent 36%),linear-gradient(145deg,transparent 0 44%,rgba(255,255,255,.08) 44% 74%,transparent 74%);content:""}
 .lead-catalog-banner:after{position:absolute;z-index:-1;top:-16%;right:-7%;width:70%;height:132%;border-left:1px solid rgba(255,255,255,.22);background:linear-gradient(135deg,rgba(47,99,140,.24),rgba(16,42,67,.1) 52%,rgba(7,27,45,.8));content:"";transform:skewX(-18deg)}
@@ -718,4 +723,25 @@
     .lead-page .lead-hero h1 { font-size: clamp(3.35rem, 13vw, 4.6rem); }
     .lead-page .lead-proof { margin-top: 2.5rem; }
     .lead-page .lead-login-heading h2 { font-size: 2.4rem; white-space: normal; }
+}
+
+/* Repete a moldura e as proporções do catálogo do Fokus Law. */
+.lead-page .lead-catalog { padding: clamp(4rem, 8vw, 8rem) clamp(1.25rem, 8vw, 9rem); }
+.lead-page .lead-catalog > .lead-content { width: 100%; max-width: none; margin: 0; }
+.lead-page .lead-catalog .lead-offer-showcase { grid-template-columns: minmax(0, 1.02fr) minmax(360px, .98fr); gap: clamp(2rem, 5vw, 5rem); }
+.lead-page .lead-catalog .lead-offer-list { align-self: center; }
+.lead-page .lead-catalog .lead-offer-list .lead-section-intro h2 { max-width: 650px; margin: .6rem 0 1rem; font-size: clamp(2.8rem, 5vw, 5rem); }
+.lead-page .lead-catalog .lead-offer-list .lead-section-intro > p:last-child { max-width: 560px; margin: 0; font-size: .98rem; line-height: 1.65; }
+.lead-page .lead-catalog .lead-catalog-banner { min-height: 430px; padding: clamp(2rem, 4vw, 3.5rem); }
+@media (max-width: 1100px) {
+    .lead-page .lead-catalog .lead-offer-showcase { grid-template-columns: 1fr; }
+    .lead-page .lead-catalog .lead-catalog-banner { min-height: 380px; }
+}
+@media (max-width: 640px) {
+    .lead-page .lead-catalog { padding: 4.1rem 1.2rem; }
+    .lead-page .lead-catalog .lead-offer-showcase { gap: 2.3rem; }
+    .lead-page .lead-catalog .lead-offer-list .lead-section-intro h2 { font-size: clamp(2.8rem, 12vw, 4.2rem); }
+    .lead-page .lead-catalog .lead-offer-row { grid-template-columns: 1fr; gap: .4rem; }
+    .lead-page .lead-catalog .lead-offer-row > span { white-space: normal; }
+    .lead-page .lead-catalog .lead-catalog-banner { min-height: 400px; padding: 1.6rem; }
 }
