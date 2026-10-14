@@ -51,6 +51,27 @@ class LeadShellTest extends TestCase
             ->assertJsonPath('subscription.label', 'Fokus Lead')->assertJsonCount(1, 'companies')->assertJsonPath('companies.0.id', $this->companyId);
     }
 
+    public function test_lead_shell_context_resolves_database_plan_and_contracted_published_modules(): void
+    {
+        $productId = DB::table('products')->where('code', 'lead')->value('id');
+        $plan = DB::table('plans')->where('product_id', $productId)->where('code', 'lead-one-essencial')->firstOrFail();
+        $module = DB::table('modules')->where('product_id', $productId)->where('code', 'pessoas')->firstOrFail();
+        DB::table('modules')->where('id', $module->id)->update(['status' => 'ativo', 'publication_state' => 'publicado']);
+        $subscription = DB::table('subscriptions')->where('company_id', $this->companyId)->firstOrFail();
+        DB::table('subscriptions')->where('id', $subscription->id)->update(['commercial_snapshot' => json_encode(['plan_code' => 'lead-one-essencial'])]);
+        DB::table('subscription_items')->insert([
+            'id' => PrefixedUlid::make('ITM'), 'company_id' => $this->companyId, 'subscription_id' => $subscription->id,
+            'module_id' => $module->id, 'name_snapshot' => $module->name, 'quantity' => 1, 'unit_price_snapshot' => $module->monthly_price,
+            'conditions_snapshot' => json_encode(['plan_code' => $plan->code]), 'created_by' => $this->user->id, 'updated_by' => $this->user->id,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->actingAs($this->user)->withSession(['active_company_id' => $this->companyId])->getJson('/api/lead/shell-context')
+            ->assertOk()->assertJsonPath('subscription.plan_name', 'Essencial')
+            ->assertJsonPath('subscription.label', 'Fokus Lead · Essencial')
+            ->assertJsonCount(1, 'modules')->assertJsonPath('modules.0.id', $module->id)->assertJsonPath('modules.0.name', $module->name);
+    }
+
     public function test_lead_shell_context_blocks_missing_company_context_and_unverified_user(): void
     {
         $this->getJson('/api/lead/shell-context')->assertUnauthorized();

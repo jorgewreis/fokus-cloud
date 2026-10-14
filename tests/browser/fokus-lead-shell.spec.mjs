@@ -9,6 +9,7 @@ const context = {
   company: { id: 'CMP_LEAD', name: 'Empresa Lead', legal_name: 'Empresa Lead Ltda.', role: 'admin' },
   active_company_id: 'CMP_LEAD', subscription: { label: 'Fokus Lead · Essencial', status: 'lead' },
   companies: [{ id: 'CMP_LEAD', name: 'Empresa Lead', role: 'admin' }, { id: 'CMP_SECOND', name: 'Outra Empresa', role: 'usuario' }],
+  modules: [{ id: 'MOD_PEOPLE', code: 'pessoas', family: 'pessoas', name: 'Pessoas' }],
 };
 
 async function installMocks(page) {
@@ -31,6 +32,13 @@ test('dashboard Lead usa contexto real sem indicadores simulados e troca empresa
     await expect(page.getByText(/clientes cadastrados|oportunidades abertas|atividades recentes/i)).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   }
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await expect(page.locator('#lead-dashboard-modules')).toBeVisible();
+  await expect(page.locator('#lead-module-navigation').getByRole('button', { name: 'Pessoas' })).toBeVisible();
+  await page.locator('#lead-module-navigation').getByRole('button', { name: 'Pessoas' }).click();
+  await expect(page.getByRole('heading', { name: 'Pessoas', exact: true })).toBeVisible();
+  await expect(page.locator('#lead-module-plan')).toHaveText('Fokus Lead · Essencial');
+  await page.locator('#lead-module-back').click();
   await page.locator('#lead-top-company-button').click();
   await expect(page.getByRole('option', { name: 'Outra Empresa' })).toBeVisible();
   await page.getByRole('option', { name: 'Outra Empresa' }).click();

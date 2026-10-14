@@ -2,6 +2,8 @@
   const shell = document.querySelector('#lead-shell');
   const loading = document.querySelector('#lead-loading');
   const page = shell.dataset.initialPage === 'profile' ? 'profile' : 'dashboard';
+  let currentPage = page;
+  let activeModule = null;
   const sidebar = document.querySelector('#lead-sidebar');
   const menuButton = document.querySelector('#lead-menu-button');
   const scrim = document.querySelector('#lead-scrim');
@@ -56,14 +58,57 @@
     document.querySelector('#lead-dashboard-company').textContent = company;
     document.querySelector('#lead-dashboard-subscription').textContent = value.subscription.label || 'Fokus Lead';
     document.querySelector('#lead-dashboard-role').textContent = value.company.role;
-    document.querySelector('#lead-dashboard').hidden = page !== 'dashboard';
-    document.querySelector('#lead-profile').hidden = page !== 'profile';
+    renderModules();
+    renderPage();
+    document.querySelector('#lead-module-back').addEventListener('click', () => { currentPage = 'dashboard'; activeModule = null; renderPage(); });
+    document.querySelector('#lead-dashboard-link').addEventListener('click', () => { currentPage = 'dashboard'; activeModule = null; renderModules(); renderPage(); });
+    document.querySelector('#lead-profile-link').addEventListener('click', (event) => {
+      if (currentPage !== 'profile') return;
+      event.preventDefault(); currentPage = 'profile'; activeModule = null; renderModules(); renderPage();
+    });
     document.querySelector('#lead-dashboard-link').removeAttribute('aria-current');
     document.querySelector('#lead-profile-link').removeAttribute('aria-current');
     document.querySelector(`#lead-${page}-link`).setAttribute('aria-current', 'page');
     document.title = page === 'profile' ? 'Meu perfil | Fokus Lead' : 'Fokus Lead | Fokus Cloud';
     renderCompanies();
     if (page === 'profile' && window.initializeLawProfile) window.initializeLawProfile();
+  }
+
+  function renderModules() {
+    const modules = context.modules || [];
+    const section = document.querySelector('#lead-modules-section');
+    const nav = document.querySelector('#lead-module-navigation');
+    const dashboardModules = document.querySelector('#lead-dashboard-modules');
+    const list = document.querySelector('#lead-module-list');
+    section.hidden = modules.length === 0;
+    dashboardModules.hidden = modules.length === 0;
+    nav.replaceChildren(); list.replaceChildren();
+    modules.forEach((module) => {
+      const makeButton = (className) => {
+        const button = document.createElement('button');
+        button.type = 'button'; button.className = className;
+        button.textContent = module.name;
+        if (activeModule?.id === module.id) button.setAttribute('aria-current', 'page');
+        button.addEventListener('click', () => { activeModule = module; currentPage = 'module'; renderModules(); renderPage(); closeMenu(); document.querySelector('#lead-workspace').focus({ preventScroll: true }); });
+        return button;
+      };
+      nav.append(makeButton('lead-module-link'));
+      list.append(makeButton('lead-module-card'));
+    });
+  }
+
+  function renderPage() {
+    document.querySelector('#lead-dashboard').hidden = currentPage !== 'dashboard';
+    document.querySelector('#lead-profile').hidden = currentPage !== 'profile';
+    document.querySelector('#lead-module-view').hidden = currentPage !== 'module';
+    document.querySelector('#lead-dashboard-link').removeAttribute('aria-current');
+    document.querySelector('#lead-profile-link').removeAttribute('aria-current');
+    if (currentPage === 'profile' || currentPage === 'dashboard') document.querySelector(`#lead-${currentPage}-link`).setAttribute('aria-current', 'page');
+    if (currentPage === 'module' && activeModule) {
+      document.querySelector('#lead-module-title').textContent = activeModule.name;
+      document.querySelector('#lead-module-plan').textContent = context.subscription.label || 'Fokus Lead';
+      document.title = `${activeModule.name} | Fokus Lead`;
+    } else document.title = currentPage === 'profile' ? 'Meu perfil | Fokus Lead' : 'Fokus Lead | Fokus Cloud';
   }
 
   switchButtons.forEach((button) => button.addEventListener('click', () => {
