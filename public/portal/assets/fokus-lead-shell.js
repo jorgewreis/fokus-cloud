@@ -7,9 +7,9 @@
   const sidebar = document.querySelector('#lead-sidebar');
   const menuButton = document.querySelector('#lead-menu-button');
   const scrim = document.querySelector('#lead-scrim');
-  const optionLists = [document.querySelector('#lead-company-options'), document.querySelector('#lead-top-company-options')];
-  const switchButtons = [document.querySelector('#lead-company-button'), document.querySelector('#lead-top-company-button')];
-  const initials = (name) => String(name || '').trim().split(/\s+/).slice(0, 2).map((part) => part[0] || '').join('').toUpperCase() || 'FL';
+  const optionLists = [document.querySelector('#lead-top-company-options')];
+  const switchButtons = [document.querySelector('#lead-top-company-button')];
+  const roleLabel = (role) => ({ admin: 'Administrador', gestor: 'Gestor', usuario: 'Usuário' })[role] || role || 'Não informado';
   let context;
 
   const closeMenu = (restore = false) => {
@@ -47,17 +47,14 @@
   function setContext(value) {
     context = value;
     const company = value.company.name || value.company.legal_name;
-    document.querySelector('#lead-company-name').textContent = company;
     document.querySelector('#lead-top-company-name').textContent = company;
-    document.querySelector('#lead-top-company').textContent = company;
-    document.querySelector('#lead-subscription').textContent = value.subscription.label || 'Fokus Lead';
+    document.querySelector('#lead-top-plan').textContent = value.subscription.plan_name || value.subscription.label?.replace(/^Fokus Lead\s*[·-]\s*/i, '') || 'Plano ativo';
     document.querySelector('#lead-user-name').textContent = value.user.name;
-    document.querySelector('#lead-user-email').textContent = value.user.email;
-    document.querySelector('#lead-avatar').textContent = initials(value.user.name);
+    document.querySelector('#lead-user-role').textContent = roleLabel(value.company.role);
     document.querySelector('#lead-welcome-user').textContent = value.user.name.split(/\s+/)[0];
     document.querySelector('#lead-dashboard-company').textContent = company;
     document.querySelector('#lead-dashboard-subscription').textContent = value.subscription.label || 'Fokus Lead';
-    document.querySelector('#lead-dashboard-role').textContent = value.company.role;
+    document.querySelector('#lead-dashboard-role').textContent = roleLabel(value.company.role);
     renderModules();
     renderPage();
     document.querySelector('#lead-module-back').addEventListener('click', () => { currentPage = 'dashboard'; activeModule = null; renderPage(); });
@@ -112,7 +109,7 @@
   }
 
   switchButtons.forEach((button) => button.addEventListener('click', () => {
-    const ownList = button.id === 'lead-top-company-button' ? optionLists[1] : optionLists[0];
+    const ownList = optionLists[0];
     const open = ownList.hidden;
     optionLists.forEach((list) => { list.hidden = true; });
     ownList.hidden = !open;

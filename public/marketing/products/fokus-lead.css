@@ -698,6 +698,11 @@
 .lead-page .lead-field-grid [hidden] { display: none !important; }
 .lead-page .lead-hero-offer-card { margin-top: 6rem; }
 .lead-page .lead-proof { margin-top: 2.4rem; }
+@media (min-width: 901px) {
+    .lead-page .lead-hero-offer-card,
+    .lead-page .lead-proof { position: relative; top: 3px; }
+    .lead-page .lead-login { transform: translateY(28px); }
+}
 
 @media (max-width: 900px) {
     .lead-page .lead-hero {
@@ -712,6 +717,9 @@
     .lead-page .lead-proof { max-width: 100%; }
     .lead-page .lead-hero-offer-card { margin-top: 2.1rem; }
     .lead-page .lead-proof { margin-top: 4rem; }
+    .lead-page .lead-hero-offer-card,
+    .lead-page .lead-proof { position: static; top: auto; }
+    .lead-page .lead-login { transform: none; }
     .lead-page .lead-login { justify-self: start; }
 }
 
