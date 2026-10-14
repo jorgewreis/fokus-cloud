@@ -13,17 +13,13 @@
 
   window.FokusApi.request('/catalog/fokus-lead').then((catalog) => {
     const modules = catalog.modules || [];
-    const moduleNames = new Map(modules.map((module) => [module.code, module.name]));
     const plans = catalog.plans || [];
 
     plansNode.innerHTML = plans.length ? plans.map((plan) => {
-      const included = (plan.module_codes || []).map((code) => moduleNames.get(code)).filter(Boolean);
-      return `<article class="lead-plan-card${plan.featured ? ' is-featured' : ''}">
-        <p class="lead-plan-context">${escapeHtml(plan.segment === 'one' ? 'CORRETOR AUTÔNOMO' : plan.segment === 'team' ? 'EQUIPES E IMOBILIÁRIAS' : 'FOKUS LEAD')}</p>
-        <h3>${escapeHtml(plan.name)}</h3>
-        <p class="lead-plan-price">${money(plan.monthly_amount)} <span>/ mês</span></p>
-        <p class="lead-plan-annual">${money(plan.annual_amount)} por ano</p>
-        <ul>${included.map((name) => `<li>${escapeHtml(name)}</li>`).join('')}</ul>
+      const segment = plan.segment === 'one' ? 'CORRETOR AUTÔNOMO' : plan.segment === 'team' ? 'EQUIPES E IMOBILIÁRIAS' : 'FOKUS LEAD';
+      return `<article class="lead-offer-row${plan.featured ? ' is-featured' : ''}">
+        <div><p>${escapeHtml(segment)}</p><h3>${escapeHtml(plan.name)}</h3></div>
+        <span>${money(plan.monthly_amount)} <small>/ mês</small></span>
       </article>`;
     }).join('') : '<p class="lead-catalog-state">Não há planos publicados no catálogo.</p>';
 
