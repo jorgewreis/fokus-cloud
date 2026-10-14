@@ -180,6 +180,7 @@ Route::get('/produtos/fokus-lead', fn () => response()->file(public_path('market
 Route::get('/produtos/fokus-lead/planos', fn () => response()->file(public_path('marketing/products/fokus-lead-planos.html')));
 Route::get('/assinaturas/fokus-lead', fn () => response()->file(public_path('auth/assinar-fokus-lead.html')));
 Route::get('/privacidade', fn () => response()->file(public_path('marketing/privacy.html')));
+Route::get('/termos-de-uso', fn () => response()->file(public_path('marketing/terms.html')));
 
 // Development-server fallback. Production NGINX redirects these physical legacy paths before serving static files.
 Route::permanentRedirect('/admin', '/acesso');

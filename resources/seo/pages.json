@@ -56,6 +56,14 @@
     "type": "WebPage"
   },
   {
+    "file": "marketing/terms.html",
+    "url": "https://www.fokuscloud.com.br/termos-de-uso",
+    "site": "Fokus Cloud",
+    "title": "Termos de Uso | Fokus Cloud",
+    "description": "Conheça as regras para criação e uso de contas, contratação e utilização dos produtos Fokus Cloud.",
+    "type": "WebPage"
+  },
+  {
     "file": "styles/index.html",
     "url": "https://styles.fokuscloud.com.br/",
     "site": "Fokus Styles",

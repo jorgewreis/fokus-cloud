@@ -7,7 +7,7 @@
     <title>Cadastre-se | Fokus Cloud</title>
     <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20261009-select-menu-options-v1" />
     <link rel="stylesheet" href="/marketing/products/fokus-law.css?v=20261008-primary-outline-buttons-v1" />
-    <link rel="stylesheet" href="/auth/checkout.css?v=20261014-shared-register-bg-v1" />
+    <link rel="stylesheet" href="/auth/checkout.css?v=20261014-shared-register-consent-links-v2" />
   </head>
   <body class="law-checkout-page shared-register-page">
     <main class="checkout-wrap">
@@ -51,14 +51,16 @@
             <span class="fs-form-label">Senha</span>
             <input class="fs-form-control" name="password" type="password" minlength="12" required />
           </label>
-          <label class="consent-field">
-            <input type="checkbox" name="terms" required />
-            <span>Li e aceito os Termos de Uso.</span>
-          </label>
-          <label class="consent-field">
-            <input type="checkbox" name="privacy" required />
-            <span>Li e aceito a Política de Privacidade.</span>
-          </label>
+          <div class="consent-field">
+            <input id="terms-consent" type="checkbox" name="terms" required />
+            <label for="terms-consent">Li e aceito os Termos de Uso.</label>
+            <a href="/termos-de-uso" target="_blank" rel="noopener">Ler documento</a>
+          </div>
+          <div class="consent-field">
+            <input id="privacy-consent" type="checkbox" name="privacy" required />
+            <label for="privacy-consent">Li e aceito a Política de Privacidade.</label>
+            <a href="/privacidade" target="_blank" rel="noopener">Ler documento</a>
+          </div>
         </form>
         <div class="login-actions"><button class="fs-btn fs-btn-primary law-submit" form="register-form" type="submit">Cadastre-se</button></div>
         <p id="feedback" class="form-message" role="status"></p>
