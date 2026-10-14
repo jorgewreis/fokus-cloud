@@ -2,3 +2,5 @@
 
 .lead-checkout-card #lead-checkout-title { font-size: 3rem; }
 .lead-checkout-card #lead-checkout-content h2 { font-size: 1.5rem; }
+
+.lead-checkout-card #lead-checkout-content .fs-form-control{background-color:#fff;color:var(--lead-navy);border:1px solid rgba(16,42,67,.24);color-scheme:light}.lead-checkout-card #lead-checkout-content .fs-form-control:focus-visible{outline:3px solid var(--lead-blue);outline-offset:2px}
