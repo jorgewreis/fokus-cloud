@@ -33,6 +33,22 @@ class SearchDiscoveryTest extends TestCase
             ->assertRedirect('https://styles.fokuscloud.com.br/sitemap.xml');
     }
 
+    public function test_terms_and_privacy_pages_expose_their_content(): void
+    {
+        $this->get('https://www.fokuscloud.com.br/termos-de-uso')->assertOk();
+        $this->get('https://www.fokuscloud.com.br/privacidade')->assertOk();
+
+        $terms = file_get_contents(public_path('marketing/terms.html'));
+        $privacy = file_get_contents(public_path('marketing/privacy.html'));
+        $this->assertStringContainsString('Regras para usar os serviços.', $terms);
+        $this->assertStringContainsString('1. Identificação do fornecedor', $terms);
+        $this->assertStringContainsString('Interesse em produtos em desenvolvimento', $privacy);
+        $this->assertStringContainsString('Quais dados são solicitados?', $privacy);
+
+        $styles = file_get_contents(public_path('assets/css/modules/showcase/showcase.css'));
+        $this->assertStringContainsString('.showcase-page.home-page > main >', $styles);
+    }
+
     public function test_account_pages_are_excluded_without_blocking_public_content(): void
     {
         $this->get('https://www.fokuscloud.com.br/portal/perfil')->assertRedirect('/?acesso=cliente');
