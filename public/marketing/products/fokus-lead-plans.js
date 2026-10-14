@@ -30,6 +30,7 @@
     const request = ++state.request;
     const codes = selectedCodes();
     const buy = $('#lead-checkout-link');
+    $('#lead-summary-title').textContent = currentPlan()?.name || 'Assinatura personalizada';
     if (!codes.length) { state.quote = null; $('#lead-total').textContent = '—'; buy.setAttribute('aria-disabled', 'true'); $('#lead-quote-status').textContent = 'Selecione pelo menos um módulo para consultar a cotação.'; return; }
     const items = selectionItems();
     $('#lead-quote-status').textContent = 'Atualizando a cotação pelo servidor…'; buy.setAttribute('aria-disabled', 'true');
