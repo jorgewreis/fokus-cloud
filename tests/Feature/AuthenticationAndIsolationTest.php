@@ -36,6 +36,28 @@ class AuthenticationAndIsolationTest extends TestCase
         $this->assertDatabaseCount('companies', 1);
         $this->assertDatabaseCount('users', 1);
         $this->assertDatabaseHas('company_memberships', ['status' => 'ativo']);
+        $this->assertDatabaseHas('legal_acceptances', ['document_type' => 'terms', 'document_version' => '2.0']);
+        $this->assertDatabaseHas('legal_acceptances', ['document_type' => 'privacy', 'document_version' => '2.0']);
+    }
+
+    public function test_registration_requires_explicit_legal_manifestations(): void
+    {
+        $payload = $this->registration();
+        unset($payload['terms'], $payload['privacy']);
+        $this->postJson('/api/auth/register-company', $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors(['terms', 'privacy']);
+        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('companies', 0);
+        $this->assertDatabaseCount('legal_acceptances', 0);
+    }
+
+    public function test_registration_rejects_outdated_legal_document_versions(): void
+    {
+        $this->postJson('/api/auth/register-company', $this->registration(['terms_version' => '1.0', 'privacy_version' => '1.0']))
+            ->assertUnprocessable()->assertJsonValidationErrors(['terms_version', 'privacy_version']);
+        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('companies', 0);
+        $this->assertDatabaseCount('legal_acceptances', 0);
     }
 
     public function test_law_offer_intent_is_preserved_in_email_verification_token(): void
@@ -232,7 +254,7 @@ class AuthenticationAndIsolationTest extends TestCase
         return array_merge([
             'document_type' => 'cnpj', 'document_number' => '11.222.333/0001-81', 'legal_name' => 'Empresa Teste Ltda',
             'name' => 'Administrador Teste', 'cpf' => '11144477735', 'email' => 'admin@example.test',
-            'password' => 'SenhaSegura!2026', 'terms_version' => '1.0', 'privacy_version' => '1.0',
+            'password' => 'SenhaSegura!2026', 'terms' => true, 'privacy' => true, 'terms_version' => '2.0', 'privacy_version' => '2.0',
         ], $overrides);
     }
 }

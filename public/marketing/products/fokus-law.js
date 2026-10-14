@@ -283,7 +283,7 @@
         main_difficulties: String(data.get('main_difficulties') || '').trim(),
         current_process: feedback || undefined,
         privacy_accepted: Boolean(data.get('privacy_accepted')),
-        privacy_version: '1.0',
+        privacy_version: '2.0',
         source_url: location.href,
         website: String(data.get('website') || '')
       };

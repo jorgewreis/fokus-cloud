@@ -7,6 +7,7 @@ use App\Mail\ProductInterestNotification;
 use App\Models\PlatformAdmin;
 use App\Models\ProductInterest;
 use App\Services\PrefixedUlid;
+use App\Support\LegalDocuments;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -15,7 +16,7 @@ use Illuminate\Validation\Rule;
 
 class ProductInterestController extends Controller
 {
-    public const PRIVACY_VERSION = '1.0';
+    public const PRIVACY_VERSION = LegalDocuments::PRIVACY_VERSION;
 
     public function store(Request $request)
     {

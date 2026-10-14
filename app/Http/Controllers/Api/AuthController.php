@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\PasswordSecurity;
 use App\Services\PrefixedUlid;
 use App\Support\BrazilianDocuments;
+use App\Support\LegalDocuments;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -771,8 +772,10 @@ class AuthController extends Controller
             'document_type' => ['required', Rule::in(['cpf', 'cnpj'])],
             'document_number' => ['required', 'string'],
             'legal_name' => ['required', 'string', 'max:255'],
-            'terms_version' => ['required', 'string', 'max:64'],
-            'privacy_version' => ['required', 'string', 'max:64'],
+            'terms' => ['accepted'],
+            'privacy' => ['accepted'],
+            'terms_version' => ['required', 'string', Rule::in([LegalDocuments::TERMS_VERSION])],
+            'privacy_version' => ['required', 'string', Rule::in([LegalDocuments::PRIVACY_VERSION])],
             'return_to' => ['nullable', Rule::in(['/contratar/fokus-law', '/portal/fokus-law/assinatura', '/assinaturas/fokus-law', '/assinaturas/fokus-lead'])],
             'offer_intent' => ['nullable', 'array'],
             'offer_intent.selection_mode' => ['required_with:offer_intent', Rule::in(['custom', 'modules', 'plan'])],
@@ -789,7 +792,10 @@ class AuthController extends Controller
         if ($newUser) {
             $rules += ['name' => ['required', 'string', 'max:255'], 'cpf' => ['required', 'string'], 'email' => ['required', 'email:rfc', 'max:255'], 'password' => ['required', 'string', 'min:12']];
         }
-        return $request->validate($rules);
+        return $request->validate($rules, [
+            'terms_version.in' => 'Atualize a página para ler e aceitar a versão atual dos Termos de Uso.',
+            'privacy_version.in' => 'Atualize a página para ler a versão atual da Política de Privacidade.',
+        ]);
     }
 
     private function validateDocuments(string $type, string $document, string $cpf): void

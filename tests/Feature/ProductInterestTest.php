@@ -38,7 +38,7 @@ class ProductInterestTest extends TestCase
             'name' => 'Pessoa Interessada', 'email' => 'interest@example.test', 'products' => ['law'],
             'profiles' => ['Advocacia'], 'main_difficulties' => 'Perco o acompanhamento das tarefas.',
             'modules' => ['contatos-advocacia'], 'desired_capacity' => 75000, 'catalog_max_capacity' => 50000,
-            'request_context' => 'law_over_limit', 'privacy_accepted' => true, 'privacy_version' => '1.0',
+            'request_context' => 'law_over_limit', 'privacy_accepted' => true, 'privacy_version' => '2.0',
         ];
         $this->postJson('/api/product-interests', $payload)->assertCreated();
         $this->postJson('/api/product-interests', [...$payload, 'products' => ['law', 'lead'], 'name' => 'Nome atualizado'])->assertCreated();
@@ -54,7 +54,7 @@ class ProductInterestTest extends TestCase
         $this->postJson('/api/product-interests', [
             'name' => 'Pessoa', 'email' => 'privacy@example.test', 'products' => ['lead'],
             'profiles' => ['Corretor autônomo'], 'main_difficulties' => 'Preciso organizar os leads.',
-            'privacy_version' => '1.0',
+            'privacy_version' => '2.0',
         ])->assertUnprocessable()->assertJsonValidationErrors('privacy_accepted');
     }
 
@@ -70,5 +70,16 @@ class ProductInterestTest extends TestCase
         $this->actingAs($admin, 'platform')->getJson('/api/backoffice/product-interests?product=lead')->assertOk()->assertJsonPath('data.0.email', 'lead-admin@example.test');
         $this->actingAs($admin, 'platform')->patchJson("/api/backoffice/product-interests/{$id}", ['status' => 'qualificado'])->assertOk();
         $this->assertDatabaseHas('product_interests', ['id' => $id, 'status' => 'qualificado']);
+    }
+
+    public function test_interest_rejects_a_stale_privacy_notice_without_persisting_data(): void
+    {
+        $this->postJson('/api/product-interests', [
+            'name' => 'Pessoa', 'email' => 'stale@example.test', 'products' => ['lead'],
+            'profiles' => ['Corretor autônomo'], 'main_difficulties' => 'Organização dos leads.',
+            'privacy_accepted' => true, 'privacy_version' => '1.0',
+        ])->assertUnprocessable();
+        $this->assertDatabaseCount('product_interests', 0);
+        Mail::assertNothingSent();
     }
 }

@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "published_on": "2026-10-14",
+  "documents": [
+    {
+      "type": "terms",
+      "file": "terms.html",
+      "sha256": "5b9cca9d9934f41cc5dd7ec56a9483ac8d549a4008b067648de75193a479eb2d"
+    },
+    {
+      "type": "privacy",
+      "file": "privacy.html",
+      "sha256": "ee859b3720654fa8953225d6d8a83596daef25e9e7ea888f4f2e527ed3a36c6c"
+    }
+  ]
+}

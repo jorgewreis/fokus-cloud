@@ -11,6 +11,7 @@ Esta pasta documenta seguranca, privacidade, protecao de dados, LGPD, ameacas e 
 - [Politica de seguranca da conta](account-security-policy.md)
 - [Requisitos de seguranca](security-requirements.md)
 - [Privacidade e LGPD](privacy-and-lgpd.md)
+- [Documentos legais públicos e revisão da versão 2.0](legal-documents.md)
 - [Modelo de ameacas](threat-model.md)
 - [Revisao de prontidao para producao - 2026-09-24](production-readiness-review-2026-09-24.md)
 

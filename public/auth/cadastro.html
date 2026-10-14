@@ -58,7 +58,7 @@
           </div>
           <div class="consent-field">
             <input id="privacy-consent" type="checkbox" name="privacy" required />
-            <label for="privacy-consent">Li e aceito a Política de Privacidade.</label>
+            <label for="privacy-consent">Li e estou ciente da Política de Privacidade.</label>
             <a href="/privacidade" target="_blank" rel="noopener">Ler documento</a>
           </div>
         </form>
@@ -140,7 +140,7 @@
         try {
           await FokusApi.request('/auth/register-company', {
             method: 'POST',
-            body: { ...values, ...(returnTo ? { return_to: returnTo, offer_intent: offerIntent } : {}), terms_version: '1.0', privacy_version: '1.0' },
+            body: { ...values, ...(returnTo ? { return_to: returnTo, offer_intent: offerIntent } : {}), terms_version: '2.0', privacy_version: '2.0' },
           });
           location.href = returnTo ? `/verificar-email?return_to=${encodeURIComponent(returnTo)}` : '/verificar-email';
         } catch (error) {
