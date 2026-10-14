@@ -694,7 +694,8 @@ test('consulta de e-mail no acesso Fokus Law identifica nome e sistema ativo', a
     await page.locator('#law-email').fill('pessoa@example.test');
     await expect(page.locator('#law-system')).toBeEnabled();
     await expect(page.locator('#law-system option')).toHaveText('Empresa de Demonstração — Fokus Law · Advocacia');
-    await expect(page.locator('[data-law-login-status]')).toContainText('Pessoa Teste');
+    await expect(page.locator('[data-law-login-status]')).toHaveText('Digite sua senha');
+    await expect(page.locator('[data-law-login-status]')).not.toContainText('Pessoa Teste');
     await expect(page.locator('#law-password')).toBeEnabled();
     await expect(page.locator('#law-system-label')).toHaveText('Empresa vinculada');
 });
