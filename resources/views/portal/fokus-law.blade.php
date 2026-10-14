@@ -8,7 +8,7 @@
   <title>Fokus Law | Fokus Cloud</title>
   <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20261009-select-menu-options-v1" />
   <link rel="stylesheet" href="/marketing/products/fokus-law.css?v=20261008-primary-outline-buttons-v1" />
-  <link rel="stylesheet" href="/portal/assets/fokus-law-shell.css?v=20261008-related-process-metadata-and-privacy-alert-v1" />
+  <link rel="stylesheet" href="/portal/assets/fokus-law-shell.css?v=20261014-square-rail-icons-v1" />
 </head>
 <body class="fokus-law-shell-page">
   <a class="law-shell-skip" href="#law-workspace">Pular para o conteúdo principal</a>
@@ -115,7 +115,7 @@
   <script src="/portal/assets/fokus-law-contacts.js?v=20261008-contact-detail-edit-permissions-v1" defer></script>
   <script src="/portal/assets/law-record-ui.js?v=20261008-primary-outline-buttons-v2" defer></script>
   <script src="/portal/assets/fokus-law-processes.js?v=20261008-admin-processes-v1" defer></script>
-  <script src="/portal/assets/fokus-law-shell.js?v=20261008-admin-process-context-v1" defer></script>
+  <script src="/portal/assets/fokus-law-shell.js?v=20261014-square-rail-icons-v1" defer></script>
   <script src="/assets/js/portal-profile.js?v=20260925-profile-v4" defer></script>
 </body>
 </html>

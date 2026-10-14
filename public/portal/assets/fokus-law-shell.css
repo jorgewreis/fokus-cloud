@@ -70,8 +70,8 @@
 .law-mark { display: grid; width: 40px; height: 40px; margin-bottom: 8px; place-items: center; border: 1px solid rgba(255,255,255,.15); border-radius: 12px; color: #fff; font-size: 22px; font-weight: 600; text-decoration: none; }
 .law-rail-items { display: flex; width: 100%; flex-direction: column; align-items: center; gap: 7px; }
 .law-rail-spacer { flex: 1; }
-.law-rail-button, .law-rail-link { position: relative; display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; border: 0; border-radius: 9px; background: transparent; color: #f5f0e7; cursor: pointer; text-decoration: none; }
-.law-rail-button img, .law-rail-link img { width: 20px; height: 20px; object-fit: contain; filter: brightness(0) invert(1); }
+.law-rail-button, .law-rail-link { position: relative; display: grid; box-sizing: border-box; width: 44px; min-width: 44px; max-width: 44px; height: 44px; min-height: 44px; flex: 0 0 44px; place-items: center; padding: 0; border: 0; border-radius: 9px; background: transparent; color: #f5f0e7; cursor: pointer; text-decoration: none; }
+.law-rail-button img, .law-rail-link img { display: block; width: 20px; min-width: 20px; height: 20px; min-height: 20px; flex: 0 0 20px; aspect-ratio: 1; object-fit: contain; filter: brightness(0) invert(1); }
 .law-rail-button:hover, .law-rail-link:hover { background: rgba(255,255,255,.1); }
 .law-rail-button:focus-visible, .law-rail-link:focus-visible { outline: 2px solid var(--law-shell-sage); outline-offset: 2px; }
 .law-rail-button[aria-current="page"] { background: var(--law-shell-purple); }

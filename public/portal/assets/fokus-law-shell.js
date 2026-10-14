@@ -73,7 +73,7 @@
   }
 
   function addRailButton(group, label, iconName) {
-    const button = element('button', 'law-rail-button');
+    const button = element('button', 'law-rail-button fs-btn-icon');
     button.type = 'button';
     button.dataset.group = group;
     button.setAttribute('aria-label', label);

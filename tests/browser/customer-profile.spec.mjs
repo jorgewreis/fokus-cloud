@@ -50,6 +50,23 @@ test('perfil do cliente adapta as três seções a desktop, tablet e celular', a
         await expect(page.locator('#law-sidebar')).toBeVisible();
         await expect(page.locator('.law-topbar')).toBeVisible();
         await expect(page.locator('.law-rail')).toBeVisible();
+        const railItemSizes = await page.locator('.law-rail-button, .law-rail-link').evaluateAll((items) => items.map((item) => {
+            const { width, height } = item.getBoundingClientRect();
+            return [width, height];
+        }));
+        expect(railItemSizes.length).toBeGreaterThan(0);
+        for (const [width, height] of railItemSizes) {
+            expect(width).toBe(44);
+            expect(height).toBe(44);
+        }
+        const railIconSizes = await page.locator('.law-rail-button img, .law-rail-link img').evaluateAll((icons) => icons.map((icon) => {
+            const { width, height } = icon.getBoundingClientRect();
+            return [width, height];
+        }));
+        for (const [width, height] of railIconSizes) {
+            expect(width).toBe(20);
+            expect(height).toBe(20);
+        }
         await expect(page.locator('#page-items a[aria-current="page"]')).toHaveAttribute('href', '/portal/fokus-law/perfil');
         expect(await page.locator('.law-shell').evaluate((element) => getComputedStyle(element).display)).toBe(viewport.width <= 720 ? 'block' : 'grid');
         expect(await page.locator('body').evaluate((element) => getComputedStyle(element).fontFamily)).toContain('Google Sans');
