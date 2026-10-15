@@ -1,0 +1,18 @@
+/* FORM CONTROL TOKENS */
+:root {
+    --control-height-xs: 1.75rem;
+    --control-height-sm: 2.125rem;
+    --control-height-md: 2.75rem;
+    --control-height-lg: 3.25rem;
+    --control-height-xl: 3.75rem;
+    --control-padding-x-xs: var(--space-2);
+    --control-padding-x-sm: var(--space-3);
+    --control-padding-x-md: var(--space-4);
+    --control-padding-x-lg: var(--space-4);
+    --control-padding-x-xl: var(--space-5);
+    --control-focus-ring: 0 0 0 0.2rem var(--color-primary-alpha-20);
+    --control-transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+    --control-disabled-opacity: 0.65;
+    --control-range-track-height: 0.5rem;
+    --control-range-thumb-size: 1.125rem;
+}

@@ -1,0 +1,259 @@
+/* PALETA PRIMITIVA */
+:root{
+
+    /* -- BLUE */
+    --color-blue-100: #cfe2ff;
+    --color-blue-200: #9ec5fe;
+    --color-blue-300: #6ea8fe;
+    --color-blue-400: #3d8bfd;
+    --color-blue-500: #0d6efd;
+    --color-blue-600: #2F638C;
+    --color-blue-700: #102A43;
+    --color-blue-800: #0b2741;
+    --color-blue-900: #071B2D;
+
+    /* -- INDIGO */
+    --color-indigo-100: #e0cffc;
+    --color-indigo-200: #c29ffa;
+    --color-indigo-300: #a370f7;
+    --color-indigo-400: #8540f5;
+    --color-indigo-500: #6610f2;
+    --color-indigo-600: #520dc2;
+    --color-indigo-700: #3d0a91;
+    --color-indigo-800: #290661;
+    --color-indigo-900: #140330;
+
+    /* -- PURPLE */
+    --color-purple-100: #e2d9f3;
+    --color-purple-200: #c5b3e6;
+    --color-purple-300: #a98eda;
+    --color-purple-400: #8c68cd;
+    --color-purple-500: #6f42c1;
+    --color-purple-600: #59359a;
+    --color-purple-700: #432874;
+    --color-purple-800: #2c1a4d;
+    --color-purple-900: #160d27;
+
+    /* -- PINK */
+    --color-pink-100: #f7d6e6;
+    --color-pink-200: #efadce;
+    --color-pink-300: #e685b5;
+    --color-pink-400: #de5c9d;
+    --color-pink-500: #d63384;
+    --color-pink-600: #ab296a;
+    --color-pink-700: #801f4f;
+    --color-pink-800: #561435;
+    --color-pink-900: #2b0a1a;
+
+    /* -- RED */
+    --color-red-100: #f8d7da;
+    --color-red-200: #f1aeb5;
+    --color-red-300: #ea868f;
+    --color-red-400: #e35d6a;
+    --color-red-500: #dc3545;
+    --color-red-600: #b02a37;
+    --color-red-700: #842029;
+    --color-red-800: #58151c;
+    --color-red-900: #2c0b0e;
+
+    /* -- ORANGE */
+    --color-orange-100: #F5EFE7;
+    --color-orange-200: #fecba1;
+    --color-orange-300: #E9A27F;
+    --color-orange-400: #fd9843;
+    --color-orange-500: #fd7e14;
+    --color-orange-600: #C96F4A;
+    --color-orange-700: #984c0c;
+    --color-orange-800: #653208;
+    --color-orange-900: #331904;
+
+    /* -- YELLOW */
+    --color-yellow-100: #fff3cd;
+    --color-yellow-200: #ffe69c;
+    --color-yellow-300: #ffda6a;
+    --color-yellow-400: #ffcd39;
+    --color-yellow-500: #ffc107;
+    --color-yellow-600: #cc9a06;
+    --color-yellow-700: #997404;
+    --color-yellow-800: #664d03;
+    --color-yellow-900: #332701;
+
+    /* -- GREEN */
+    --color-green-100: #d1e7dd;
+    --color-green-200: #a3cfbb;
+    --color-green-300: #75b798;
+    --color-green-400: #479f76;
+    --color-green-500: #198754;
+    --color-green-600: #146c43;
+    --color-green-700: #0f5132;
+    --color-green-800: #0a3622;
+    --color-green-900: #051b11;
+
+    /* -- TEAL */
+    --color-teal-100: #d2f4ea;
+    --color-teal-200: #a6e9d5;
+    --color-teal-300: #79dfc1;
+    --color-teal-400: #4dd4ac;
+    --color-teal-500: #20c997;
+    --color-teal-600: #1aa179;
+    --color-teal-700: #13795b;
+    --color-teal-800: #0d503c;
+    --color-teal-900: #06281e;
+
+    /* -- CYAN */
+    --color-cyan-100: #cff4fc;
+    --color-cyan-200: #9eeaf9;
+    --color-cyan-300: #6edff6;
+    --color-cyan-400: #3dd5f3;
+    --color-cyan-500: #0dcaf0;
+    --color-cyan-600: #0aa2c0;
+    --color-cyan-700: #087990;
+    --color-cyan-800: #055160;
+    --color-cyan-900: #032830;
+
+    /* -- GRAY */
+    --color-gray-100: #f4f5f7;
+    --color-gray-200: #e9ecef;
+    --color-gray-300: #dee2e6;
+    --color-gray-400: #ced4da;
+    --color-gray-500: #adb5bd;
+    --color-gray-600: #6c757d;
+    --color-gray-700: #495057;
+    --color-gray-800: #343a40;
+    --color-gray-900: #212529;
+
+    /* -- BLACK */
+    --color-black: #000000;
+
+    /* -- WHITE */
+    --color-white: #ffffff;
+}
+
+/* PALETA SEMÂNTICA */
+:root {
+    /* -- COR PRINCIPAL */
+    --color-primary: var(--color-blue-500);
+    --color-primary-hover: var(--color-blue-600);
+    --color-primary-active: var(--color-blue-700);
+    --color-primary-light: var(--color-blue-300);
+    --color-primary-contrast: var(--color-white);
+    --color-link: var(--color-blue-600);
+    --color-link-hover: var(--color-blue-700);
+    --color-focus: var(--color-blue-500);
+    --color-primary-surface: var(--color-blue-900);
+    --color-primary-surface-hover: var(--color-blue-800);
+
+    /* -- COR SECUNDÁRIA */
+    --color-secondary: var(--color-gray-500);
+    --color-secondary-hover: var(--color-gray-600);
+    --color-secondary-active: var(--color-gray-700);
+    --color-secondary-light: var(--color-gray-300);
+    --color-secondary-contrast: var(--color-white);
+
+    /* -- SUPERFÍCIES */
+    --color-bg: var(--color-white);
+    --color-surface: var(--color-gray-100);
+    --color-surface-hover: var(--color-gray-200);
+    --color-surface-card: var(--color-white);
+
+    /* -- TEXTO */
+    --color-text: var(--color-gray-900);
+    --color-text-muted: var(--color-gray-600);
+    --color-text-inverted: var(--color-white);
+    --color-text-placeholder: var(--color-gray-500);
+    --color-text-disabled: var(--color-gray-500);
+
+    /* -- BORDAS E DIVISORES */
+    --color-border: var(--color-gray-300);
+    --color-border-light: var(--color-gray-200);
+    --color-border-dark: var(--color-gray-500);
+    --color-border-focus: var(--color-blue-500);
+
+    /* -- FEEDBACK */
+    --color-success: var(--color-green-500);
+    --color-success-hover: var(--color-green-600);
+    --color-success-active: var(--color-green-700);
+    --color-success-bg: var(--color-green-100);
+    --color-success-text: var(--color-green-700);
+    --color-success-border: var(--color-green-500);
+    --color-error: var(--color-red-500);
+    --color-error-hover: var(--color-red-600);
+    --color-error-active: var(--color-red-700);
+    --color-error-bg: var(--color-red-100);
+    --color-error-text: var(--color-red-700);
+    --color-error-border: var(--color-red-500);
+    --color-warning: var(--color-yellow-500);
+    --color-warning-hover: var(--color-yellow-600);
+    --color-warning-active: var(--color-yellow-700);
+    --color-warning-bg: var(--color-yellow-100);
+    --color-warning-text: var(--color-yellow-700);
+    --color-warning-border: var(--color-yellow-500);
+    --color-info: var(--color-cyan-500);
+    --color-info-hover: var(--color-cyan-600);
+    --color-info-active: var(--color-cyan-700);
+    --color-info-bg: var(--color-cyan-100);
+    --color-info-text: var(--color-cyan-700);
+    --color-info-border: var(--color-cyan-500);
+}
+
+/* TRANSPARÊNCIAS E OVERLAYS */
+:root {
+    --color-overlay-10: rgba(0, 0, 0, 0.1);
+    --color-overlay-20: rgba(0, 0, 0, 0.2);
+    --color-overlay-30: rgba(0, 0, 0, 0.3);
+    --color-overlay-40: rgba(0, 0, 0, 0.4);
+    --color-overlay-50: rgba(0, 0, 0, 0.5);
+    --color-primary-alpha-10: rgba(13, 110, 253, 0.1);
+    --color-primary-alpha-20: rgba(13, 110, 253, 0.2);
+    --color-primary-alpha-30: rgba(13, 110, 253, 0.3);
+    --color-primary-alpha-40: rgba(13, 110, 253, 0.4);
+    --color-primary-alpha-50: rgba(13, 110, 253, 0.5);
+    --color-secondary-alpha-10: rgba(108, 117, 125, 0.1);
+    --color-secondary-alpha-20: rgba(108, 117, 125, 0.2);
+    --color-secondary-alpha-30: rgba(108, 117, 125, 0.3);
+    --color-secondary-alpha-40: rgba(108, 117, 125, 0.4);
+    --color-secondary-alpha-50: rgba(108, 117, 125, 0.5);
+    --color-success-alpha-10: rgba(40, 167, 69, 0.1);
+    --color-success-alpha-20: rgba(40, 167, 69, 0.2);
+    --color-success-alpha-30: rgba(40, 167, 69, 0.3);
+    --color-success-alpha-40: rgba(40, 167, 69, 0.4);
+    --color-success-alpha-50: rgba(40, 167, 69, 0.5);
+    --color-error-alpha-10: rgba(220, 53, 69, 0.1);
+    --color-error-alpha-20: rgba(220, 53, 69, 0.2);
+    --color-error-alpha-30: rgba(220, 53, 69, 0.3);
+    --color-error-alpha-40: rgba(220, 53, 69, 0.4);
+    --color-error-alpha-50: rgba(220, 53, 69, 0.5);
+    --color-warning-alpha-10: rgba(255, 193, 7, 0.1);
+    --color-warning-alpha-20: rgba(255, 193, 7, 0.2);
+    --color-warning-alpha-30: rgba(255, 193, 7, 0.3);
+    --color-warning-alpha-40: rgba(255, 193, 7, 0.4);
+    --color-warning-alpha-50: rgba(255, 193, 7, 0.5);
+    --color-info-alpha-10: rgba(13, 202, 240, 0.1);
+    --color-info-alpha-20: rgba(13, 202, 240, 0.2);
+    --color-info-alpha-30: rgba(13, 202, 240, 0.3);
+    --color-info-alpha-40: rgba(13, 202, 240, 0.4);
+    --color-info-alpha-50: rgba(13, 202, 240, 0.5);
+}
+
+.cloud-color{
+    color: var(--color-white);
+}
+
+.lead-color-1{
+    color: var(--color-blue-900);
+}
+.lead-color-2{
+    color: var(--color-blue-700);
+}
+.lead-color-3{
+    color: var(--color-blue-600);
+}
+.lead-color-4{
+    color: var(--color-orange-600);
+}
+.lead-color-5{
+    color: var(--color-orange-300);
+}
+.lead-color-6{
+    color: var(--color-orange-100);
+}

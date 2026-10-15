@@ -1,0 +1,47 @@
+/* BORDER-RADIUS TOKENS */
+:root {
+    --radius-unit: 0.125rem; /* 2px */
+}
+
+/* -- ESCALA NUMÉRICA */
+:root {
+    --radius-0: 0;
+    --radius-1: calc(var(--radius-unit) * 1); /* 2px */
+    --radius-2: calc(var(--radius-unit) * 2); /* 4px */
+    --radius-3: calc(var(--radius-unit) * 3); /* 6px */
+    --radius-4: calc(var(--radius-unit) * 4); /* 8px */
+    --radius-5: calc(var(--radius-unit) * 5); /* 10px */
+    --radius-6: calc(var(--radius-unit) * 6); /* 12px */
+}
+
+/* -- VALORES ESPECIAIS */
+:root {
+    --radius-none: var(--radius-0);
+    --radius-pill: 9999px;
+    --radius-circle: 50%;
+}
+
+/* -- RAIOS SEMÂNTICOS */
+:root {
+    /* -- COMPONENTES */
+    --radius-card: var(--radius-3);
+    --radius-button: var(--radius-2);
+    --radius-input: var(--radius-2);
+    --radius-badge: var(--radius-pill);
+    --radius-avatar: var(--radius-circle);
+    --radius-modal: var(--radius-4);
+    --radius-dropdown: var(--radius-2);
+    --radius-tooltip: var(--radius-2);
+    --radius-chip: var(--radius-pill);
+    --radius-tab: var(--radius-2);
+    --radius-toast: var(--radius-3);
+    --radius-popover: var(--radius-2);
+    --radius-input-group: var(--radius-2);
+
+    /* -- ELEMENTOS */
+    --radius-image: var(--radius-2);
+    --radius-panel: var(--radius-3);
+    --radius-section: var(--radius-4);
+    --radius-top: var(--radius-3) var(--radius-3) 0 0;
+    --radius-bottom: 0 0 var(--radius-3) var(--radius-3);
+}

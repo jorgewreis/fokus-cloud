@@ -1,0 +1,31 @@
+/* MOTION TOKENS */
+:root {
+    /* -- DURAÇÕES */
+    --duration-instant: 0ms;
+    --duration-fast: 120ms;
+    --duration-normal: 200ms;
+    --duration-slow: 320ms;
+    --duration-slower: 500ms;
+
+    /* -- CURVAS */
+    --ease-linear: linear;
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --ease-emphasized: cubic-bezier(0.2, 0, 0, 1.2);
+    --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+    --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+
+    /* -- TRANSIÇÕES SEMÂNTICAS */
+    --transition-color: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+    --transition-surface: background-color var(--duration-normal) var(--ease-standard), box-shadow var(--duration-normal) var(--ease-standard), transform var(--duration-normal) var(--ease-standard);
+    --transition-overlay: opacity var(--duration-normal) var(--ease-standard), visibility var(--duration-normal) var(--ease-standard);
+    --transition-transform: transform var(--duration-normal) var(--ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --transition-color: none;
+        --transition-surface: none;
+        --transition-overlay: none;
+        --transition-transform: none;
+    }
+}

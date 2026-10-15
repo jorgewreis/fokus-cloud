@@ -1,0 +1,34 @@
+/* Z-INDEX TOKENS */
+
+/* -- ESCALA PRIMITIVA */
+:root {
+    --z-0: 0;
+    --z-10: 10;
+    --z-20: 20;
+    --z-30: 30;
+    --z-40: 40;
+    --z-50: 50;
+    --z-60: 60;
+    --z-70: 70;
+    --z-80: 80;
+    --z-90: 90;
+    --z-max: 9999;
+}
+
+/* -- CAMADAS SEMÂNTICAS */
+:root {
+    --z-base: var(--z-0);
+    --z-content: var(--z-10);
+    --z-sticky: var(--z-20);
+    --z-dropdown: var(--z-30);
+    --z-popover: var(--z-40);
+    --z-overlay: var(--z-50);
+    --z-modal: var(--z-60);
+    --z-toast: var(--z-70);
+    --z-tooltip: var(--z-80);
+    --z-header: var(--z-20);
+    --z-sidebar: var(--z-20);
+    --z-drawer: var(--z-40);
+    --z-bottom-navigation: var(--z-30);
+    --z-modal-backdrop: var(--z-50);
+}
