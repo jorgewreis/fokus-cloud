@@ -1,7 +1,7 @@
 # Integração inicial do Laravel com o Fokus Lead
 
 Estado em 15/10/2026: código preparado no branch `feat/lead-postgresql-model`,
-sem publicação remota e sem ativação em produção. O projeto Supabase exclusivo
+publicado para revisão após autorização explícita do usuário, sem ativação em produção. O projeto Supabase exclusivo
 `yukmvgkojmpzmsynlyxn` já contém o modelo. Nenhuma credencial LOGIN da aplicação
 foi criada ou configurada por esta entrega.
 
@@ -80,7 +80,8 @@ em falha e projeção administrativa. O teste do leitor usa SQLite somente para
 validar seleção/serialização; não simula políticas RLS do PostgreSQL. A validação
 nativa das políticas já está documentada em `validation.md` e `validate-live.sql`.
 
-A ativação em produção e a publicação no repositório público estão pendentes.
+A publicação do branch no repositório público foi autorizada pelo usuário.
+A ativação em produção permanece pendente de revisão, credenciais e deploy.
 
 Resultado local: 23 testes PHP aprovados (119 asserções), build Vite aprovado,
 sintaxe JavaScript e contrato visual das
