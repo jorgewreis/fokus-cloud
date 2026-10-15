@@ -86,6 +86,37 @@ return [
             ]) : [],
         ],
 
+        // Conexões do produto: nunca herdam DB_URL/DB_HOST ou credenciais do core.
+        'lead' => [
+            'driver' => 'pgsql',
+            'host' => env('LEAD_DB_HOST'),
+            'port' => env('LEAD_DB_PORT', '5432'),
+            'database' => env('LEAD_DB_DATABASE', 'postgres'),
+            'username' => env('LEAD_DB_USERNAME'),
+            'password' => env('LEAD_DB_PASSWORD'),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'search_path' => 'pg_catalog',
+            'sslmode' => 'verify-full',
+            'sslrootcert' => env('LEAD_DB_SSLROOTCERT'),
+            'options' => [PDO::ATTR_TIMEOUT => 5],
+        ],
+
+        'lead_metrics' => [
+            'driver' => 'pgsql',
+            'host' => env('LEAD_METRICS_DB_HOST'),
+            'port' => env('LEAD_METRICS_DB_PORT', '5432'),
+            'database' => env('LEAD_METRICS_DB_DATABASE', 'postgres'),
+            'username' => env('LEAD_METRICS_DB_USERNAME'),
+            'password' => env('LEAD_METRICS_DB_PASSWORD'),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'search_path' => 'pg_catalog',
+            'sslmode' => 'verify-full',
+            'sslrootcert' => env('LEAD_DB_SSLROOTCERT'),
+            'options' => [PDO::ATTR_TIMEOUT => 5],
+        ],
+
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),
