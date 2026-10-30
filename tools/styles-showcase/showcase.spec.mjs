@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { readFileSync } from 'node:fs';
 const example = slug => readFileSync(new URL(`../../public/styles/examples/${slug}.html`, import.meta.url), 'utf8');
 for (const width of [1440, 1165, 768, 390]) {
@@ -53,4 +54,13 @@ test('exact source, keyboard, form validation and reset, search and no-results',
   await page.getByRole('searchbox').fill('zzzzz');
   await expect(page.locator('#empty')).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test('WCAG AA automated checks of homepage and complete examples', async ({ page }, info) => {
+  for (const path of ['/styles/index.html', '/styles/examples/projects.html', '/styles/examples/onboarding.html', '/styles/examples/records.html']) {
+    await page.goto(path);
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+    await info.attach(path.replaceAll('/', '_') + '-axe.json', { body: JSON.stringify(results, null, 2), contentType: 'application/json' });
+    expect(results.violations, path).toEqual([]);
+  }
 });
