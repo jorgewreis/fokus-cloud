@@ -1044,3 +1044,10 @@
   .law-contact-repeat-row.law-contact-channel-row { grid-template-columns: minmax(0, 1fr); }
   .law-contact-repeat-row.law-contact-channel-row > .law-record-field, .law-contact-repeat-row.law-contact-channel-row > .law-contact-channel-privacy, .law-contact-repeat-row.law-contact-channel-row > .law-contact-remove { grid-column: 1; grid-row: auto; }
 }
+
+
+/* Contact editor controls must shrink within mobile modal cards. */
+.law-record-editor .law-record-form-section > .fs-card-body { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.law-record-editor .law-record-field input,
+.law-record-editor .law-record-field select,
+.law-record-editor .law-record-field textarea { box-sizing: border-box; min-width: 0; max-width: 100%; }
