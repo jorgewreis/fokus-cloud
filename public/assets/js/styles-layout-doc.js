@@ -15,6 +15,32 @@
     });
   });
 
+  const componentsOutput = document.querySelector("[data-components-output]");
+  const componentsCode = document.querySelector("[data-components-code]");
+  if (componentsOutput && componentsCode) {
+    const states = {
+      success: ["Publicação concluída", "O conteúdo foi publicado com sucesso."],
+      warning: ["Revisão necessária", "Revise os campos antes de publicar."],
+      danger: ["Publicação não concluída", "Não foi possível publicar agora."],
+    };
+    const updateComponents = (state) => {
+      if (!states[state]) return;
+      componentsOutput.className = `fs-alert fs-alert-${state}`;
+      componentsOutput.querySelector(".fs-alert-heading").textContent = states[state][0];
+      componentsOutput.querySelector(".fs-alert-text").textContent = states[state][1];
+      const example = componentsOutput.cloneNode(true);
+      example.removeAttribute("data-components-output");
+      componentsCode.textContent = example.outerHTML;
+      document.querySelectorAll("[data-components-state]").forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.componentsState === state));
+      });
+    };
+    document.querySelectorAll("[data-components-state]").forEach((button) => {
+      button.addEventListener("click", () => updateComponents(button.dataset.componentsState));
+    });
+    updateComponents("success");
+  }
+
   const layoutLab = document.querySelector("[data-layout-lab]");
   if (layoutLab) {
     const stage = layoutLab.querySelector("[data-layout-stage]");
@@ -94,17 +120,19 @@
     };
     const updateFormsCode = () => {
       const emailState = email.classList.contains("is-invalid") ? ' aria-invalid="true"' : "";
-      const termsState = formsLab.querySelector("#lab-terms").checked ? " checked" : "";
+      const newsState = formsLab.querySelector("#lab-news").checked ? " checked" : "";
       formsCode.textContent = `<fieldset class="fs-form-fieldset">
     <legend>Seu espaço de trabalho</legend>
+    <label class="fs-form-label" for="example-email">Email</label>
     <div class="fs-input-group">
-        <span class="fs-input-group-text">@</span>
-        <input class="fs-form-control${emailState ? " is-invalid" : ""}" type="email"${emailState}>
-    </div>
-    <input class="fs-form-range" type="range" value="${range.value}">
+        <span class="fs-input-group-text" aria-hidden="true">@</span>
+        <input class="fs-form-control${emailState ? " is-invalid" : ""}" id="example-email" name="email" type="email" autocomplete="email" required${emailState}${emailState ? ' aria-describedby="example-email-error"' : ""}>
+    </div>${emailState ? '\n    <p class="fs-invalid-feedback" id="example-email-error">Informe um email válido.</p>' : ""}
+    <label class="fs-form-label" for="example-team-size">Tamanho da equipe</label>
+    <input class="fs-form-range" id="example-team-size" name="teamSize" type="range" min="1" max="50" value="${range.value}">
     <div class="fs-switch">
-        <input class="fs-switch-input" type="checkbox"${termsState}>
-        <label class="fs-switch-label">Receber novidades</label>
+        <input class="fs-switch-input" id="example-news" name="news" type="checkbox"${newsState}>
+        <label class="fs-switch-label" for="example-news">Receber novidades e conteúdos</label>
     </div>
 </fieldset>`;
     };

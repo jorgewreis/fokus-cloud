@@ -1,0 +1,204 @@
+
+/* Composition of these examples, not additional framework components. */
+:root  {
+   --fs-font-sans: system-ui,sans-serif;
+   --fs-color-primary:#66e3b4;
+   --fs-color-on-primary:#08291e;
+   --fs-color-action-primary:#66e3b4;
+   --fs-color-text:#e8efec;
+   --fs-color-text-primary:#e8efec;
+   --fs-color-muted:#a9bbb2;
+   --fs-color-text-muted:#a9bbb2;
+   --fs-color-surface:#111c18;
+   --fs-color-subtle:#17261f;
+   --fs-color-border:#33483e;
+   --fs-color-border-default:#33483e;
+   --fs-color-bg-subtle:#17261f;
+   --fs-color-bg-surface:#111c18;
+   --fs-focus-color:#66e3b4;
+   color-scheme:dark;
+
+}
+
+*  {
+   box-sizing:border-box
+}
+ body {
+  margin:0;
+  font:14px/1.55 var(--fs-font-sans);
+  background:#0b1410;
+  color:#e8efec
+}
+ a {
+  color:#8cebc5
+}
+ h1 {
+  font-size:24px;
+  line-height:1.2;
+  margin:0 0 8px
+}
+ h2 {
+  font-size:17px;
+  margin:0
+}
+ p {
+  margin:6px 0 16px;
+  color:#b5c6bd
+}
+ button,input,select {
+  font:inherit
+}
+ :focus-visible {
+  outline:3px solid #a2f4d2;
+  outline-offset:3px
+}
+ .demo-shell {
+  max-width:1000px;
+  margin:auto;
+  padding:24px
+}
+ .demo-top,.demo-heading,.demo-toolbar {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:16px;
+  flex-wrap:wrap
+}
+ .demo-top {
+  border-bottom:1px solid #33483e;
+  padding-bottom:14px;
+  margin-bottom:24px
+}
+.demo-top strong {
+  letter-spacing:.12em;
+  font-size:12px
+}
+.demo-kicker {
+  font-size:11px;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:#8cebc5
+}
+.demo-stats {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+  margin:20px 0
+}
+.demo-stat {
+  padding:16px;
+  border:1px solid #33483e;
+  border-radius:8px;
+  background:#111c18
+}
+.demo-stat strong {
+  display:block;
+  font-size:28px;
+  color:#eef9f3
+}
+.demo-stat span {
+  font-size:12px;
+  color:#b5c6bd
+}
+.demo-panel {
+  border:1px solid #33483e;
+  border-radius:10px;
+  padding:20px;
+  background:#111c18
+}
+.demo-scroll {
+  overflow-x:auto;
+  margin-top:16px
+}
+.fs-table {
+  min-width:420px
+}
+.fs-table th,.fs-table td {
+  padding:12px;
+  text-align:left
+}
+.demo-progress {
+  accent-color:#66e3b4;
+  width:100%;
+  height:8px
+}
+.demo-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:18px
+}
+.demo-field label {
+  display:block;
+  margin-bottom:6px
+}
+.demo-field input,.demo-field select {
+  width:100%;
+  min-height:44px
+}
+.demo-field {
+  margin-bottom:18px
+}
+.demo-check {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin:18px 0
+}
+.demo-status {
+  min-height:24px;
+  color:#8cebc5;
+  margin-top:14px
+}
+.demo-error {
+  color:#ffb8b8
+}
+.demo-caption {
+  font-size:11px;
+  margin:20px 0 0;
+  color:#a9bbb2
+}
+.demo-toolbar input {
+  max-width:320px;
+  width:100%
+}
+.fs-btn {
+  min-height:44px;
+  white-space:normal
+}
+.demo-selected {
+  border-left:3px solid #66e3b4;
+  padding-left:14px;
+  margin-top:20px
+}
+ [hidden] {
+  display:none!important
+}
+@media(max-width:480px) {
+  .demo-shell {
+  padding:16px
+}
+.demo-stats {
+  gap:7px
+}
+.demo-stat {
+  padding:10px
+}
+.demo-stat strong {
+  font-size:23px
+}
+.demo-grid {
+  grid-template-columns:1fr
+}
+.demo-panel {
+  padding:14px
+}
+
+}
+@media(prefers-reduced-motion:reduce) {
+  *,*::before,*::after {
+  animation:none!important;
+  transition:none!important;
+  scroll-behavior:auto!important
+}
+
+}
