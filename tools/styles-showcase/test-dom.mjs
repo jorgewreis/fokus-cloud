@@ -6,6 +6,9 @@ const { JSDOM } = await import(process.env.STYLES_JSDOM || 'jsdom');
 const root = fileURLToPath(new URL('../../public/', import.meta.url));
 const read = path => readFileSync(root + path, 'utf8');
 const home = read('styles/index.html');
+// The showcase uses clear labels, not decorative arrow glyphs.
+assert.doesNotMatch(home, /[↗→➜➔]/u, 'No decorative arrows in showcase markup');
+assert.doesNotMatch(read('assets/css/modules/styles-showcase.css'), /[↗→➜➔]/u, 'No CSS-generated decorative arrows');
 const stylesheet = read('styles/vendor/fokus-2.7.0.min.css');
 for (const slug of ['projects', 'onboarding', 'records']) {
   const html = read(`styles/examples/${slug}.html`);
