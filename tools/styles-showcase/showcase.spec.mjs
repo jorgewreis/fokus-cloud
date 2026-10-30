@@ -8,6 +8,10 @@ for (const width of [1440, 1165, 768, 390]) {
     await page.goto('/styles/index.html');
     await page.evaluate(() => document.fonts.ready);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.locator('body')).not.toContainText(/[↗→➜➔]/u);
+    expect(await page.locator('.showcase-strip span').evaluateAll(elements =>
+      elements.every(el => ['none', 'normal', '""'].includes(getComputedStyle(el, '::before').content))
+    )).toBe(true);
     expect(await page.locator('.showcase-wordmark').first().evaluate(el => getComputedStyle(el).fontFamily)).toContain('Bebas Neue');
     expect(await page.locator('body').evaluate(el => getComputedStyle(el).fontFamily)).toContain('Google Sans');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
