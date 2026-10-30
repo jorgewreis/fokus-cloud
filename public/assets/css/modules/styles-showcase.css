@@ -1,6 +1,7 @@
 /* Styles-only marketing composition. Framework components use pinned 2.7.0. */
 .styles-showcase {
   --showcase-bg:#090f0c;
+  --fs-control-transition:none;
   --showcase-surface:#121c17;
   --showcase-border:#2b3c32;
   --showcase-text:#eef5f0;
