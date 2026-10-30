@@ -163,3 +163,18 @@ similaridade de nome apenas reforça um candidato já corroborado. A resposta
 expõe motivo, nunca o valor coincidente. A análise é sob demanda e paginada;
 não bloqueia gravação nem mescla automaticamente. CPF/CNPJ permanece sujeito à
 validação rígida existente.
+
+
+## Complemento protegido do contato (2026-10-30)
+
+- `law_contacts.sensitive_details_encrypted`: JSON criptografado pelo `Crypt` da aplicação; não usar em pesquisa, exportação, logs ou compartilhamento entre empresas. A chave da aplicação deve permanecer no gerenciamento seguro de segredos, com backup e rotação controlada.
+- API `sensitive_details`: nascimento (`birth_date`, ISO, não futuro), filiação (`parentage`, até 4), contas (`bank_accounts`, até 5) e chaves Pix (`pix_keys`, até 10). Nascimento/filiação são exclusivos PF; unidades não recebem este bloco.
+- Somente usuários com permissão existente `law.contacts.sensitive.view` podem ler no detalhe ou editar o bloco, além da permissão normal de edição. Não é enviado em listagens nem contatos compartilhados, mesmo ao leitor com permissão sensível. Banco/Pix ficam mascarados inicialmente na interface de consulta; exibição explícita pelo usuário autorizado.
+- Omitir `sensitive_details` no PATCH preserva o conteúdo. Enviá-lo substitui o bloco; arrays vazios/data nula limpam os campos. Uma alteração PF→PJ com nascimento/filiação existentes é rejeitada: revisar e remover explicitamente antes de mudar a natureza. Mesclagem com bloco protegido preenchido é bloqueada para impedir perda silenciosa; a consolidação assistida fica pendente.
+- Documentos: até 20; PIS, PASEP, NIT, NIS, CadÚnico (código familiar), CNH e CIN são tipos distintos PF, criptografados como os documentos existentes. O código familiar do CadÚnico não é tratado como NIS. Não foi implementada consulta/certificação desses cadastros externos.
+- Canais: até 10 e-mails e 4 telefones (14 no total). Limites comerciais de quantidade de contatos da empresa permanecem inalterados.
+- Nenhuma senha Gov.br, senha bancária ou credencial foi adicionada; chaves inesperadas no bloco são rejeitadas. Relações com processos/audiências seguem no modelo já existente, sem cadastro duplicado.
+
+### Validação antes da liberação
+
+Executar `php artisan test --filter=LawContactsTest`, `node --check public/portal/assets/fokus-law-contacts.js` e `node tests/Frontend/law-contact-sensitive-details.cjs`. Homologar visualmente PF/PJ/unidade, usuário restrito e compartilhamento. Migração deve preceder o código em qualquer futura liberação; rollback da coluna remove os dados do bloco, portanto exige backup e decisão explícita. Este PR não executa migração nem deploy.
