@@ -209,7 +209,7 @@ a.fs-btn { color: var(--fs-btn-color); }
 
 /* Dashboard composition: these demo-* / desk-* rules are not framework APIs. */
 .desk-demo { background:#0a110e; font-size:12px; }
-.desk-layout { display:grid; grid-template-columns:140px minmax(0,1fr); min-height:100vh; max-width:1200px; margin:auto; }
+.desk-layout { display:grid; grid-template-columns:140px minmax(0,1fr); min-height:0; max-width:1200px; margin:auto; }
 .desk-sidebar { background:#0d1712; border-right:1px solid #263a2f; display:flex; flex-direction:column; padding:22px 12px 16px; gap:28px; }
 .desk-brand { display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; text-decoration:none; color:#f0f8f3; letter-spacing:-.04em; white-space:nowrap; }
 .desk-brand>span { display:grid; place-items:center; height:25px; width:25px; border-radius:7px; background:#5cec9a; color:#092319; font-size:21px; }
