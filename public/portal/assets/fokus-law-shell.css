@@ -1051,3 +1051,8 @@
 .law-record-editor .law-record-field input,
 .law-record-editor .law-record-field select,
 .law-record-editor .law-record-field textarea { box-sizing: border-box; min-width: 0; max-width: 100%; }
+@media (max-width: 600px) {
+  .law-record-editor .law-record-field,
+  .law-record-editor .law-record-name-fields { width: 100%; max-width: 100%; }
+  .law-record-editor .law-record-field [class*="fs-width-"] { width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+}
