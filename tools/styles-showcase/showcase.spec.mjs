@@ -62,5 +62,11 @@ test('WCAG AA automated checks of homepage and complete examples', async ({ page
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
     await info.attach(path.replaceAll('/', '_') + '-axe.json', { body: JSON.stringify(results, null, 2), contentType: 'application/json' });
     expect.soft(results.violations, path).toEqual([]);
+    if (path === '/styles/index.html') {
+      await page.getByRole('button', { name: 'Ativar tema claro' }).click();
+      const light = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+      await info.attach('homepage-light-axe.json', { body: JSON.stringify(light, null, 2), contentType: 'application/json' });
+      expect.soft(light.violations, 'homepage light').toEqual([]);
+    }
   }
 });

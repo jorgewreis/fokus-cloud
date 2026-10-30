@@ -1,5 +1,18 @@
 /* The fetched HTML is both the iframe source and the exact copied source. */
 (() => {
+  // The real hero preview follows its content height, including responsive wraps.
+  const hero = document.querySelector('.showcase-preview iframe');
+  let observer;
+  const sizeHero = () => {
+    const body = hero?.contentDocument?.body;
+    if (!body) return;
+    observer?.disconnect();
+    const resize = () => { hero.style.height = Math.ceil(body.getBoundingClientRect().height) + 2 + 'px'; };
+    resize();
+    if ('ResizeObserver' in window) { observer = new ResizeObserver(resize); observer.observe(body); }
+  };
+  hero?.addEventListener('load', sizeHero);
+  if (hero?.contentDocument?.readyState === 'complete') sizeHero();
   const panel = document.querySelector('#source-panel');
   if (!panel) return;
   const source = document.querySelector('#example-source');
