@@ -229,11 +229,6 @@
   font-size:12px;
   color:var(--showcase-muted)
 }
-.showcase-strip span::before {
-  content:'↗';
-  margin-right:12px;
-  color:var(--showcase-accent)
-}
 .showcase-section {
   padding-block:64px;
   border-bottom:1px solid var(--showcase-border);
