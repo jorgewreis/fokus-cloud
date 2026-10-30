@@ -206,3 +206,78 @@
 
 /* Link color must not override the framework button foreground. */
 a.fs-btn { color: var(--fs-btn-color); }
+
+/* Dashboard composition: these demo-* / desk-* rules are not framework APIs. */
+.desk-demo { background:#0a110e; font-size:12px; }
+.desk-layout { display:grid; grid-template-columns:140px minmax(0,1fr); min-height:100vh; max-width:1200px; margin:auto; }
+.desk-sidebar { background:#0d1712; border-right:1px solid #263a2f; display:flex; flex-direction:column; padding:22px 12px 16px; gap:28px; }
+.desk-brand { display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; text-decoration:none; color:#f0f8f3; letter-spacing:-.04em; white-space:nowrap; }
+.desk-brand>span { display:grid; place-items:center; height:25px; width:25px; border-radius:7px; background:#5cec9a; color:#092319; font-size:21px; }
+.desk-workspace { font-size:8px; letter-spacing:.12em; margin:0; color:#a7b9ae; }
+.desk-workspace strong { display:block; color:#e6f0ea; font-size:11px; font-weight:500; letter-spacing:0; margin-top:5px; }
+.desk-sidebar nav { display:grid; gap:5px; }
+.desk-sidebar nav a { color:#afc2b6; display:flex; align-items:center; gap:8px; padding:11px 8px; text-decoration:none; font-size:10px; border-radius:6px; }
+.desk-sidebar nav a[aria-current] { color:#85f4b4; background:#183326; }
+.desk-sidebar nav a:hover { background:#20392c; color:#fff; }
+.desk-sidebar nav a>span { font-size:14px; }
+.desk-sidebar nav small { margin-left:auto; color:#c4dacf; }
+.desk-sidebar-note { margin-top:auto; color:#bad0c1; font-size:9px; line-height:1.8; }
+.desk-sidebar-note small { color:#a3b8aa; padding-left:12px; }
+.desk-dot { display:inline-block; width:5px; height:5px; border-radius:50%; background:#5cec9a; margin-right:5px; }
+.desk-profile { border-top:1px solid #263a2f; padding-top:16px; display:flex; gap:8px; align-items:center; font-size:10px; }
+.desk-profile>span { background:#284233; width:27px; height:27px; display:grid; place-items:center; border-radius:50%; color:#bdf2d2; font-size:9px; }
+.desk-profile small { display:block; font-size:8px; color:#aec0b4; }
+.desk-main { min-width:0; padding:0 24px 20px; }
+.desk-topbar { min-height:55px; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid #26392e; color:#a7baae; font-size:9px; }
+.desk-topbar b { color:#dce9df; font-weight:400; margin-left:8px; }
+.desk-version { letter-spacing:.08em; color:#b6c8bb; font-size:8px; }
+.desk-welcome { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:24px 0 20px; }
+.desk-welcome h1 { font-size:26px; letter-spacing:-.04em; font-weight:600; }
+.desk-welcome p { font-size:10px; margin:6px 0 0; }
+.desk-welcome .demo-kicker { font-size:8px; margin:0 0 9px; color:#84efae; letter-spacing:.13em; }
+.desk-welcome .fs-btn { min-height:36px; padding:8px 12px; font-size:10px; white-space:nowrap; }
+.desk-stats { margin:0 0 16px; gap:10px; }
+.desk-stats .demo-stat { padding:14px; background:linear-gradient(140deg,#14251b,#101b15); border-color:#2b4434; border-radius:8px; }
+.desk-stats .demo-stat span { font-size:9px; }
+.desk-stats .demo-stat strong { font-size:29px; font-weight:600; margin:5px 0 0; letter-spacing:-.05em; }
+.desk-stats .demo-stat em { font-style:normal; font-size:18px; margin-left:2px; color:#b9d0c2; }
+.desk-stats .demo-stat small { color:#a8bdaf; font-size:8px; }
+.desk-chart-panel,.desk-projects { border:1px solid #2a4032; border-radius:9px; background:#101b15; padding:16px; margin-bottom:16px; }
+.desk-section-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.desk-section-head h2 { font-size:12px; font-weight:600; }
+.desk-section-head p { margin:4px 0 0; font-size:9px; }
+.desk-chart-key { font-size:8px; color:#bdd1c3; white-space:nowrap; }
+.desk-chart-key i { display:inline-block; background:#5cec9a; width:6px; height:6px; border-radius:50%; margin-right:4px; }
+.desk-chart { margin:14px 0 0; }
+.desk-chart svg { width:100%; height:auto; display:block; }
+.desk-chart figcaption { font-size:8px; color:#a8bdaf; margin-top:5px; }
+.desk-search { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 12px; margin-top:14px; align-items:center; }
+.desk-search label { grid-column:1/-1; font-size:9px; color:#c6d9cd; }
+.desk-search input { width:100%; min-width:0; min-height:34px; font-size:10px; background:#0b1510; border-color:#3a5142; color:#e8efec; }
+.desk-search input::placeholder { color:#a8bdaf; }
+.desk-search>span { font-size:9px; color:#adc4b5; }
+.desk-projects .demo-scroll { margin-top:10px; }
+.desk-projects .fs-table { min-width:360px; font-size:10px; }
+.desk-projects .fs-table th { font-size:8px; color:#b2c8b9; text-transform:uppercase; letter-spacing:.06em; font-weight:500; }
+.desk-projects .fs-table th,.desk-projects .fs-table td { padding:10px 6px; border-color:#293f31; }
+.desk-projects .fs-badge { font-size:8px; }
+.desk-project-mark { width:19px; height:19px; display:inline-grid; place-items:center; border-radius:5px; margin-right:7px; background:#254e36; color:#b0f4c7; font-size:8px; }
+.desk-project-mark-blue { background:#22374a; color:#b9d7f8; }
+.desk-project-mark-gold { background:#463d25; color:#f3dea6; }
+.desk-main>.demo-caption { font-size:8px; margin:0; color:#a8bdaf; }
+#project-empty { font-size:11px; margin-top:12px; }
+@media(max-width:550px) {
+ .desk-layout { grid-template-columns:minmax(0,1fr); }
+ .desk-sidebar { padding:12px 16px; gap:12px; border-right:0; border-bottom:1px solid #263a2f; }
+ .desk-sidebar nav { display:flex; gap:8px; flex-wrap:wrap; }
+ .desk-sidebar nav a { padding:9px 12px; }
+ .desk-workspace,.desk-sidebar-note,.desk-profile { display:none; }
+ .desk-main { padding:0 16px 16px; }
+ .desk-topbar { min-height:42px; }
+ .desk-welcome { margin-block:20px; }
+ .desk-welcome h1 { font-size:25px; }
+ .desk-stats { gap:7px; }
+ .desk-stats .demo-stat { padding:10px; }
+ .desk-stats .demo-stat strong { font-size:25px; }
+ .desk-chart-panel,.desk-projects { padding:12px; }
+}

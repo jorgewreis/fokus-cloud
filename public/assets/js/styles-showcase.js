@@ -1,5 +1,8 @@
 /* The fetched HTML is both the iframe source and the exact copied source. */
 (() => {
+  document.querySelectorAll('[data-component-demo]').forEach(button => button.addEventListener('click', () => {
+    document.querySelector('#component-feedback').textContent = button.textContent + ' acionado. Exemplo local.';
+  }));
   // The real hero preview follows its content height, including responsive wraps.
   const hero = document.querySelector('.showcase-preview iframe');
   let observer;

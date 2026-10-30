@@ -34,6 +34,10 @@ test('exact source, keyboard, form validation and reset, search and no-results',
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(() => { Object.defineProperty(navigator, 'clipboard', { value: { writeText: async value => { window.copied = value; } } }); });
   await page.goto('/styles/index.html');
+  await page.getByRole('button', { name: 'Botão primário', exact: true }).click();
+  await expect(page.locator('#component-feedback')).toContainText('acionado');
+  await page.getByRole('textbox', { name: 'E-mail', exact: true }).fill('teste@example.com');
+  await expect(page.locator('#component-email')).toHaveValue('teste@example.com');
   for (const slug of ['projects', 'onboarding', 'records']) {
     await page.locator(`[data-example="${slug}"]`).focus(); await page.keyboard.press('Enter');
     await expect(page.locator('#example-source')).toHaveText(example(slug));
