@@ -496,3 +496,6 @@
 }
 
 }
+
+/* Restore component foreground: the documentation link reset is unlayered. */
+.styles-showcase a.fs-btn { color: var(--fs-btn-color); }

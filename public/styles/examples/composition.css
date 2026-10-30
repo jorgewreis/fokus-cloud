@@ -5,6 +5,7 @@
    --fs-color-primary:#66e3b4;
    --fs-color-on-primary:#08291e;
    --fs-color-action-primary:#66e3b4;
+  --fs-alert-primary-text:#8cebc5;
    --fs-color-text:#e8efec;
    --fs-color-text-primary:#e8efec;
    --fs-color-muted:#a9bbb2;
@@ -202,3 +203,6 @@
 }
 
 }
+
+/* Link color must not override the framework button foreground. */
+a.fs-btn { color: var(--fs-btn-color); }
