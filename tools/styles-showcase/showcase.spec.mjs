@@ -19,7 +19,9 @@ for (const width of [1440, 1165, 768, 390]) {
     await page.screenshot({ path: info.outputPath(`showcase-B-${width}-dark.png`), fullPage: true });
     await page.getByRole('button', { name: 'Ativar tema claro' }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-    await page.screenshot({ path: info.outputPath(`showcase-B-${width}-light.png`), fullPage: true });
+    // Wait for nested-frame painting after the parent theme switch, not only DOM state.
+    await page.locator('.showcase-preview iframe').contentFrame().locator('body').evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await page.screenshot({ path: info.outputPath(`showcase-B-${width}-light.png`), fullPage: true, animations: 'disabled' });
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   });
