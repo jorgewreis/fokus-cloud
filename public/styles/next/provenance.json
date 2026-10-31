@@ -3,7 +3,7 @@
   "published": false,
   "source": {
     "baselineCommit": "218afe443936e31edd57fdca03b392ac23381d1d",
-    "digest": "7beaece9608795de76703e9609318ae6a3d572b8564b79e13b5371b791e0fdab",
+    "digest": "aba4d61e443c0b49af4729b09a642f341b10dad0ce6575f8e6083a156b6be330",
     "sassEvidenceCssSha256": "22f780be35e3ecfe3fcb02ab6e7537ca855bb7150f15c514f0f9eb1e7a7e1743",
     "files": [
       {
@@ -16,7 +16,7 @@
       },
       {
         "path": "docs/catalog/fixture-provenance.json",
-        "sha256": "ad072ba8935d3eed9172f67ec340958ae9d00b20a7af1f100c05328df9b27b7a"
+        "sha256": "f64757ee1a79b66886d6354bf9a1331e1c14fd5222e9558deae683fd4641a3a4"
       },
       {
         "path": "docs/catalog/fixtures/accordion/always-open.html",
@@ -236,7 +236,7 @@
       },
       {
         "path": "docs/catalog/fixtures/datatable/states.js",
-        "sha256": "5e4814b4331f9df3b4a9e3d4b1c4cb3cd9424ffb4da3146722f6d7748bad89fb"
+        "sha256": "d8a44f666599b5fa735396ba1cb2a542fd5280e04488a3819220ea3e66d00234"
       },
       {
         "path": "docs/catalog/fixtures/datatable/tokens.css",
@@ -264,7 +264,7 @@
       },
       {
         "path": "docs/catalog/fixtures/datepicker/basic.js",
-        "sha256": "4b218557bc7afcde648877851ab8c5397ecf506918458e904057e2098b1b1ce9"
+        "sha256": "dc84e3dcc2f809e5935ec96269029769dc64340525e6a0979498335dd2d3c4ea"
       },
       {
         "path": "docs/catalog/fixtures/datepicker/states.html",
@@ -392,7 +392,7 @@
       },
       {
         "path": "docs/catalog/fixtures/notification-center/basic.js",
-        "sha256": "acfcde9309d88dce188d89b8c23f6c6c42e5ca21eeed3b20f003a9c901037120"
+        "sha256": "1821f14b67a390d66979a525340d47a8a020488bdf9ac46f6ddb607066bf8a4d"
       },
       {
         "path": "docs/catalog/fixtures/offcanvas/basic.html",
@@ -468,7 +468,7 @@
       },
       {
         "path": "docs/catalog/fixtures/select/basic.js",
-        "sha256": "2776a767c3a4dd2ac73603be3bc568967690a4cb04144c5ac5fc4eced152ae83"
+        "sha256": "ab437b59b381b8bec422d59f2370c86256fddb5fcac00a99fb3e4ca6c6735719"
       },
       {
         "path": "docs/catalog/fixtures/select/states.html",
@@ -1679,7 +1679,7 @@
   "files": {
     "catalog.json": {
       "source": "docs/generated/next/catalog.json",
-      "sha256": "22f0c392ac9a06d77c1b74f463085989e622b3333d89991f810f77fa4be7e1f2"
+      "sha256": "a35aee5ae62eb612f69efdd9eab72d6839ca4deff9b7677d2805d093213e556c"
     },
     "fokus.css": {
       "source": "dist/css/fokus.css",
