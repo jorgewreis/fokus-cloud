@@ -21,7 +21,7 @@ function previewDocument(example) {
   const origin = location.origin;
   // Only reviewed example fixtures are executable. Historical snippets remain text.
   const js = (example.jsCode || '').replace(/import\s*\{([^}]+)\}\s*from\s*['"]fokus-styles\/js['"];?/g, 'const {$1} = FokusStyles;');
-  const csp = `default-src 'none'; script-src 'unsafe-inline' ${origin}; style-src 'unsafe-inline' ${origin}; img-src data: ${origin}; font-src ${origin}; connect-src 'none'; form-action 'none'; base-uri 'none'`;
+  const csp = `default-src 'none'; script-src 'unsafe-inline' ${origin}; style-src 'unsafe-inline' ${origin}; img-src data: blob: ${origin}; font-src ${origin}; connect-src 'none'; form-action 'none'; base-uri 'none'`;
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${escapeHtml(csp)}"><link rel="stylesheet" href="${origin}/styles/next/fokus.css"><style>body{padding:24px;margin:0} ${example.cssCode || ''} .fs-tooltip-arrow,.fs-popover-arrow,.fs-dropdown-rich-chevron,.fs-tree-toggle,.fs-datatable-sort-btn::after,.fs-accordion-button::after{display:none!important;content:none!important}</style></head><body>${example.htmlCode || ''}<script src="${origin}/styles/next/fokus.js"></script><script>${js.replace(/<\/script/gi, '<\\/script')}</script></body></html>`;
 }
 function showContract() {
@@ -41,7 +41,10 @@ function showContract() {
   for (const example of contract.examples || []) {
     element('h4', example.title, detail);
     if (example.coverage) element('p', Array.isArray(example.coverage) ? example.coverage.join(' · ') : String(example.coverage), detail);
-    for (const limitation of example.limitations || []) element('p', limitation, detail);
+    const exampleLimitations = element('ul', undefined, detail);
+    exampleLimitations.className = 'catalog-example-limitations';
+    for (const limitation of example.limitations || []) element('li', limitation, exampleLimitations);
+    if (contract.id === 'file-upload-advanced') element('p', 'Nesta integração, a prévia permite imagens blob: locais para miniaturas. O aviso de CSP acima é preservado da fonte; envio de arquivos e conexões de rede continuam bloqueados.', detail);
     const frame = element('iframe', undefined, detail); frame.title = `${contract.title}: ${example.title} · piloto isolado`; frame.setAttribute('sandbox', 'allow-scripts'); frame.referrerPolicy = 'no-referrer'; frame.srcdoc = previewDocument(example);
     const reset = element('button', 'Reiniciar exemplo', detail); reset.type = 'button'; reset.className = 'fs-btn'; reset.addEventListener('click', () => { frame.srcdoc = previewDocument(example); });
     codeBlock(detail, 'HTML original do exemplo', example.htmlCode || '');

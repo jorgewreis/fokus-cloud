@@ -33,7 +33,12 @@ try {
   await page.evaluate(hash => {location.hash=hash;}, hash);
   await page.waitForFunction(hash => document.querySelector('#catalog-list a[aria-current]')?.hash === hash, hash);
   assert.equal(await page.locator('#catalog-detail h2').count(),1);
-  for (const frame of await page.locator('#catalog-detail iframe').all()) assert.equal(await frame.getAttribute('sandbox'),'allow-scripts');
+  for (const frame of await page.locator('#catalog-detail iframe').all()) {
+   assert.equal(await frame.getAttribute('sandbox'),'allow-scripts');
+   const child = await (await frame.elementHandle()).contentFrame();
+   await child.waitForLoadState('load');
+   assert.equal(await child.evaluate(() => typeof FokusStyles),'object');
+  }
  }
  await page.evaluate(hash => {location.hash=hash;}, links[0]);
  await page.waitForFunction(hash => document.querySelector('#catalog-list a[aria-current]')?.hash === hash, links[0]);
@@ -46,6 +51,18 @@ try {
  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
  await mkdir(resolve(import.meta.dirname, 'test-results'),{recursive:true});
  await page.screenshot({path:process.env.STYLES_SCREENSHOT || resolve(import.meta.dirname, 'test-results/styles-next-mobile.png'),fullPage:true});
+ await page.goto(base + '/styles/next/#file-upload-advanced');
+ const upload = page.frameLocator('#catalog-detail iframe');
+ await upload.locator('input[type=file]').setInputFiles({name:'pixel.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=','base64')});
+ await upload.locator('.fs-file-upload-list img').waitFor();
+ const thumbnail = await upload.locator('.fs-file-upload-list img').elementHandle();
+ await thumbnail.waitForElementState('visible');
+ assert.ok(await thumbnail.evaluate(img=>img.src.startsWith('blob:')));
+ await page.waitForTimeout(100);
+ assert.ok(await thumbnail.evaluate(img=>img.complete && img.naturalWidth > 0));
+ await page.locator('#catalog-detail').getByRole('button',{name:'Reiniciar exemplo',exact:true}).click();
+ await upload.locator('input[type=file]').waitFor();
+ assert.equal(await upload.locator('input[type=file]').evaluate(input=>input.files.length),0);
  await page.goto(base + '/styles/next/#invalid'); assert.match(await page.locator('#catalog-detail').textContent(), /não encontrado/);
  await page.route('**/styles/next/catalog.json', route => route.fulfill({status:503,body:''}));
  await page.reload(); await page.locator('#catalog-retry').waitFor({state:'visible'});
