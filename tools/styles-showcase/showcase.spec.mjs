@@ -46,6 +46,13 @@ test('exact source, keyboard, form validation and reset, search and no-results',
     await page.getByRole('button', { name: 'Fechar código' }).click();
     await expect(page.locator(`[data-example="${slug}"]`)).toBeFocused();
   }
+  await page.goto('/styles/examples/projects.html');
+  await page.getByRole('searchbox', { name: 'Buscar projeto ou responsável' }).fill('Ana');
+  await expect(page.locator('#project-rows tr:visible')).toHaveCount(1);
+  await page.getByRole('searchbox').fill('zzzz');
+  await expect(page.locator('#project-empty')).toBeVisible();
+  await page.getByRole('searchbox').fill('');
+  await expect(page.locator('#project-rows tr:visible')).toHaveCount(3);
   await page.goto('/styles/examples/onboarding.html');
   await page.getByRole('button', { name: 'Experimentar cadastro' }).click();
   await expect(page.locator('#name')).toBeFocused();
