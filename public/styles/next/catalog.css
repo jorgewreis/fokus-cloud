@@ -13,3 +13,7 @@
 #provenance{font-size:12px;overflow-wrap:anywhere} :focus-visible{outline:3px solid var(--showcase-accent);outline-offset:3px}
 [hidden]{display:none!important}
 @media(max-width:700px){.catalog-layout{grid-template-columns:1fr}#catalog-list{max-height:250px}#catalog-detail{padding:16px}.catalog-filters{align-items:stretch}}
+/* Native disclosure triangles are directional icons too; keep textual controls. */
+#catalog-detail summary{list-style:none;border-bottom:1px solid var(--showcase-border)}
+#catalog-detail summary::marker{content:""}
+#catalog-detail summary::-webkit-details-marker{display:none}

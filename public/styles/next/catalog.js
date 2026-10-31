@@ -40,7 +40,7 @@ function showContract() {
   if (!contract.examples?.length) element('p', 'Nenhuma demonstração executável revisada para este contrato. Consulte a documentação e os trechos abaixo.', detail);
   for (const example of contract.examples || []) {
     element('h4', example.title, detail);
-    if (example.coverage) element('p', typeof example.coverage === 'string' ? example.coverage : JSON.stringify(example.coverage), detail);
+    if (example.coverage) element('p', Array.isArray(example.coverage) ? example.coverage.join(' · ') : String(example.coverage), detail);
     for (const limitation of example.limitations || []) element('p', limitation, detail);
     const frame = element('iframe', undefined, detail); frame.title = `${contract.title}: ${example.title} · piloto isolado`; frame.setAttribute('sandbox', 'allow-scripts'); frame.referrerPolicy = 'no-referrer'; frame.srcdoc = previewDocument(example);
     const reset = element('button', 'Reiniciar exemplo', detail); reset.type = 'button'; reset.className = 'fs-btn'; reset.addEventListener('click', () => { frame.srcdoc = previewDocument(example); });
