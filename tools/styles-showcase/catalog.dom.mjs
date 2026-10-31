@@ -20,6 +20,8 @@ for (const c of catalog.contracts) {
  assert.equal(w.document.querySelectorAll('#catalog-detail iframe').length,c.examples.length);
  assert.deepEqual([...w.document.querySelectorAll('.catalog-example-limitations li')].map(el=>el.textContent),c.examples.flatMap(e=>e.limitations));
  for(const frame of w.document.querySelectorAll('iframe')) {assert.equal(frame.getAttribute('sandbox'),'allow-scripts'); assert.match(frame.srcdoc,/form-action 'none'/); assert.match(frame.srcdoc,/img-src data: blob:/); assert.ok(!frame.srcdoc.includes('allow-same-origin'));}
+ const exampleCode=[...w.document.querySelectorAll('#catalog-detail details')].filter(d=>/original do exemplo$/.test(d.querySelector('summary').textContent)).map(d=>d.querySelector('code').textContent);
+ assert.deepEqual(exampleCode,c.examples.flatMap(e=>[e.htmlCode,...(e.jsCode?[e.jsCode]:[]),...(e.cssCode?[e.cssCode]:[])]));
  const docs=[...w.document.querySelectorAll('#catalog-detail details')].find(d=>d.querySelector('summary').textContent.startsWith('Ler documentação'));
  assert.equal(docs.querySelector('code').textContent,c.documentation.markdown); docs.querySelector('button').click(); await wait(); assert.equal(copied,c.documentation.markdown);
 }

@@ -68,7 +68,7 @@ function filter() {
   const matches = catalog.contracts.filter(item => (!group || item.group === group) && searchable(item).includes(query));
   list.replaceChildren();
   for (const item of matches) { const link = element('a', item.title, list); link.href = '#' + encodeURIComponent(item.id); if (location.hash === link.hash) link.setAttribute('aria-current', 'true'); }
-  status.textContent = `${matches.length} de ${catalog.contracts.length} contratos · next / piloto.`;
+  status.textContent = `${matches.length} de ${catalog.contracts.length} contratos · ${matches.reduce((total, item) => total + item.examples.length, 0)} exemplos selecionados · next / piloto.`;
   if (!matches.length) element('p', 'Nenhum resultado. Ajuste a busca ou limpe os filtros.', list);
 }
 async function load() {
