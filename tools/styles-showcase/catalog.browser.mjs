@@ -42,7 +42,7 @@ try {
    assert.equal(await child.evaluate(() => typeof FokusStyles),'object');
   }
  }
- assert.equal(previewCount,90);
+ assert.equal(previewCount,125);
  await page.evaluate(hash => {location.hash=hash;}, links[0]);
  await page.waitForFunction(hash => document.querySelector('#catalog-list a[aria-current]')?.hash === hash, links[0]);
  const first = page.locator('#catalog-detail details').first(); await first.locator('summary').click();

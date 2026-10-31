@@ -3,7 +3,7 @@
   "published": false,
   "source": {
     "baselineCommit": "218afe443936e31edd57fdca03b392ac23381d1d",
-    "digest": "aba4d61e443c0b49af4729b09a642f341b10dad0ce6575f8e6083a156b6be330",
+    "digest": "9621bae16bbc39897eed9666217c314eaf2d6808c3d391a0b809e39354eb937d",
     "sassEvidenceCssSha256": "22f780be35e3ecfe3fcb02ab6e7537ca855bb7150f15c514f0f9eb1e7a7e1743",
     "files": [
       {
@@ -12,11 +12,15 @@
       },
       {
         "path": "docs/catalog/examples.json",
-        "sha256": "18bbb15108792bf3bb3f4b851471578554a3354c7b0c44b8e78059d91a0b3b5c"
+        "sha256": "4e06b44cd028e566f76408fdd5fdaaaf9e47cd8ff05ce1684a9e8d274f034221"
+      },
+      {
+        "path": "docs/catalog/feedback-cases.json",
+        "sha256": "88793c8d6c58418a90b9cda0c4a04ad06dc0df7de7fa5c188e544064df606b18"
       },
       {
         "path": "docs/catalog/fixture-provenance.json",
-        "sha256": "f64757ee1a79b66886d6354bf9a1331e1c14fd5222e9558deae683fd4641a3a4"
+        "sha256": "47e412e38e481fb373f5ebd526317160fee3f5a317d0bddb342b0502ad19e14e"
       },
       {
         "path": "docs/catalog/fixtures/accordion/always-open.html",
@@ -111,6 +115,14 @@
         "sha256": "20ce604d5998f4edb81c7f5a8c66ae0b6db434259a0dc42a98ce51056c305532"
       },
       {
+        "path": "docs/catalog/fixtures/breadcrumb/responsive-collapse.html",
+        "sha256": "59422a3ca343108e27bea33a6fcf10214670e70f7d17a32b4caedc196d498353"
+      },
+      {
+        "path": "docs/catalog/fixtures/breadcrumb/responsive-collapse.js",
+        "sha256": "8b56f5c1b2f5c1ada6b14ad6749570278423a22fc7743657c5fa9e80ec6302df"
+      },
+      {
         "path": "docs/catalog/fixtures/button-group/basic.html",
         "sha256": "56af881d9a34842277aab0015c8c61174723e9dbb32b2486892add4e366489af"
       },
@@ -187,6 +199,22 @@
         "sha256": "e6627413be159c5aa8a1340de0f1147f6692d2d67fbd539bf10aa080f5c10a0d"
       },
       {
+        "path": "docs/catalog/fixtures/code/tokens.css",
+        "sha256": "805df163236b5031d22d3a786d1ed227cbd4c1d035553bc9571be86fcf0f714b"
+      },
+      {
+        "path": "docs/catalog/fixtures/code/tokens.html",
+        "sha256": "3f9c9e45651b3aa9e4ffe80176fff090affad11e9a9d1899eef51ae225cb52ca"
+      },
+      {
+        "path": "docs/catalog/fixtures/code/variants.css",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      {
+        "path": "docs/catalog/fixtures/code/variants.html",
+        "sha256": "f18eea3951a3ec25b0bb65809dd2e6751b0777da79750f35b034d87be48b18ed"
+      },
+      {
         "path": "docs/catalog/fixtures/collapse/basic.html",
         "sha256": "b8f51d8bc595a386224f05f585d26feedb8c2628c584ea69084b33c22202dbc6"
       },
@@ -217,6 +245,14 @@
       {
         "path": "docs/catalog/fixtures/command-palette/basic.js",
         "sha256": "2652ecea099a424e50228d9d351ca04786353a5ed3678f90eb6caa9a0061a179"
+      },
+      {
+        "path": "docs/catalog/fixtures/command-palette/shortcut-empty.html",
+        "sha256": "54cca51496cd55754ac5303f9b8944d321dcd5df7d5f015c0dea0605e765b2dc"
+      },
+      {
+        "path": "docs/catalog/fixtures/command-palette/shortcut-empty.js",
+        "sha256": "6e978f69435404cb9cda5041c64cec823ce9ad9b8e67a989959fb8150d58e0d8"
       },
       {
         "path": "docs/catalog/fixtures/datatable/basic.html",
@@ -279,6 +315,22 @@
         "sha256": "86c42d2168817abc637c92001430ae915f141d4518fefabfd00fc9c0c071118c"
       },
       {
+        "path": "docs/catalog/fixtures/divider/tokens.css",
+        "sha256": "3fedcbf24845d08b356f6b4f78717f2266f20cfde3298a4dbef2d5ca47884215"
+      },
+      {
+        "path": "docs/catalog/fixtures/divider/tokens.html",
+        "sha256": "3b4ffa21dc4df17e421849c61019d81f879a790555c2846dea1824f0c0b0f5ee"
+      },
+      {
+        "path": "docs/catalog/fixtures/divider/variants.css",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      {
+        "path": "docs/catalog/fixtures/divider/variants.html",
+        "sha256": "e53311a0819f21f19cd54d1013096356292da4e2fb7912b4d6972fe55e19b88e"
+      },
+      {
         "path": "docs/catalog/fixtures/dropdown/basic.html",
         "sha256": "f3c3981a43f5f87920e91f1cb77a02304134cde7b8e002df9901fbfb4e9d1c75"
       },
@@ -305,6 +357,14 @@
       {
         "path": "docs/catalog/fixtures/empty-state/basic.html",
         "sha256": "131414ad58752193047f08411e977a6ff5eab04a6ec76ef53da3fb521447e850"
+      },
+      {
+        "path": "docs/catalog/fixtures/empty-state/recoverable.html",
+        "sha256": "e477fabd7f9694326b286aefbe5d42e553c55f07c20a16fa1b40cb62ff50b00e"
+      },
+      {
+        "path": "docs/catalog/fixtures/empty-state/recoverable.js",
+        "sha256": "87fd8db42c44a8c2b154fae21b001aeaf21eff30937df5268a0b8b99d8912f5c"
       },
       {
         "path": "docs/catalog/fixtures/file-upload-advanced/basic.html",
@@ -343,8 +403,36 @@
         "sha256": "ec704cce2676115fcafaf3296ba3495cd060bf341eb38a38a5d843b964b00b22"
       },
       {
+        "path": "docs/catalog/fixtures/list-group/tokens.css",
+        "sha256": "e5af1cdcb3594131d67717c9e69a3df7b9805b0793bfd50d2c2da6a566147685"
+      },
+      {
+        "path": "docs/catalog/fixtures/list-group/tokens.html",
+        "sha256": "6ce538eb9d63236bd08f81e59a361c86de13b2b33b7b2cfd7cdf51c9f9db3dfc"
+      },
+      {
+        "path": "docs/catalog/fixtures/list-group/variants.css",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      {
+        "path": "docs/catalog/fixtures/list-group/variants.html",
+        "sha256": "d548d4af5968655e6f6ab69e46eb0d6a569c9e33cfd540668251e8764113610f"
+      },
+      {
         "path": "docs/catalog/fixtures/menu/basic.html",
         "sha256": "c2a5c756e23092b4391d89e433c2dbd803246d05e8151825ade83ab7b4d54a4c"
+      },
+      {
+        "path": "docs/catalog/fixtures/menu/compact-nested.html",
+        "sha256": "78e1a1f67450404e773ebbe587fa720224b8d0c0f33e1df7cb89c095ace1ab52"
+      },
+      {
+        "path": "docs/catalog/fixtures/menu/local-tokens.css",
+        "sha256": "7ce26624ee088a43c2352059f519e39440323ee1a07facd462531a0e94a08b05"
+      },
+      {
+        "path": "docs/catalog/fixtures/menu/local-tokens.html",
+        "sha256": "4b365ded05215493a168edf5de866020466c2b004b64bf635f8c7746a9d46f07"
       },
       {
         "path": "docs/catalog/fixtures/modal/basic.html",
@@ -379,6 +467,18 @@
         "sha256": "6074e84cbdb3d1a414994b1e3007ff617554afc8b3710d9bf1cc0f339782bace"
       },
       {
+        "path": "docs/catalog/fixtures/navbar/responsive-states.html",
+        "sha256": "63b6f552bed01a65e5c09f604b28371ce59c4dcc24df5eef851ffb5ef7834d1b"
+      },
+      {
+        "path": "docs/catalog/fixtures/navbar/responsive-states.js",
+        "sha256": "a1488afef25d572a43b0166bede13b4e3ad59ea828563ca971fec5ce86c6b853"
+      },
+      {
+        "path": "docs/catalog/fixtures/navbar/static-disabled.html",
+        "sha256": "fbacd5e4dc1e3829fcd8bbe91ade213ac271e49a47f7810cdf31a94d18e5659d"
+      },
+      {
         "path": "docs/catalog/fixtures/nested-menu/basic.html",
         "sha256": "3fd00b6c46c56adfdeadcaf6e9dfea5a02cd312c98ac78992e561fc56d811448"
       },
@@ -387,12 +487,28 @@
         "sha256": "a0732f1a721fb29f0464bd34b5a84a784cb8874aaa3317e84e93b8578caf25f5"
       },
       {
+        "path": "docs/catalog/fixtures/nested-menu/recursive-end.html",
+        "sha256": "175bb4da6d0519ffab1fde83d7d7478bda5f4f26721b55afbb1722203ac41be7"
+      },
+      {
+        "path": "docs/catalog/fixtures/nested-menu/recursive-end.js",
+        "sha256": "fec83b1e864c5751b964b1d41454e12946a38641ff44cfc0ee8eaad679328486"
+      },
+      {
         "path": "docs/catalog/fixtures/notification-center/basic.html",
         "sha256": "d400137a9004f6b616360ee06e3bc6dd6d46feb126d7c1c9d0cca3306a0993a0"
       },
       {
         "path": "docs/catalog/fixtures/notification-center/basic.js",
         "sha256": "1821f14b67a390d66979a525340d47a8a020488bdf9ac46f6ddb607066bf8a4d"
+      },
+      {
+        "path": "docs/catalog/fixtures/notification-center/history-actions.html",
+        "sha256": "84c3e47e98154b74995c76e4c305f9418b33ee08ab86fdf17b0c865c0274074f"
+      },
+      {
+        "path": "docs/catalog/fixtures/notification-center/history-actions.js",
+        "sha256": "67d810892c584bfd4eb70ba70811d98aa305911936120a36331807e583352641"
       },
       {
         "path": "docs/catalog/fixtures/offcanvas/basic.html",
@@ -407,8 +523,24 @@
         "sha256": "94707ca23825f6946c6bae5990ef00370a5845eecddb68f7c8a3ca048c2476bf"
       },
       {
+        "path": "docs/catalog/fixtures/pagination/bordered-small.html",
+        "sha256": "c77cb3cf7437b9c940fbb58b9dfabea0dfff91cf88438ccb70b671b71fb10f22"
+      },
+      {
+        "path": "docs/catalog/fixtures/pagination/rounded-large.html",
+        "sha256": "80ae5c40f9ecfb8377f4ad98db2f9b6f6da87e9909ba39b90874cff48594916e"
+      },
+      {
         "path": "docs/catalog/fixtures/placeholder/basic.html",
         "sha256": "7d0ddcae303263d2d6be825a38c7e4375f59ed1886e9c516a9ba8a9f68499e14"
+      },
+      {
+        "path": "docs/catalog/fixtures/placeholder/loading-complete.html",
+        "sha256": "81ba5f741618c90de8c5add9cf4af02f54548c19aae30dff0670d497127a879d"
+      },
+      {
+        "path": "docs/catalog/fixtures/placeholder/loading-complete.js",
+        "sha256": "b1f67b7825e847d8dac7faef67392435a7fce04eb9f16e13cbdabf44e9d65c84"
       },
       {
         "path": "docs/catalog/fixtures/popover/basic.html",
@@ -421,6 +553,14 @@
       {
         "path": "docs/catalog/fixtures/progress/basic.html",
         "sha256": "c0407f433130d477f2529d8f737cf90c212ef9943173667a68f68719c29d7e13"
+      },
+      {
+        "path": "docs/catalog/fixtures/progress/determinate-states.html",
+        "sha256": "09b600e131875108505b69c9e64a594b7b62caee9690b6816c64ff1cf8648b79"
+      },
+      {
+        "path": "docs/catalog/fixtures/progress/indeterminate.html",
+        "sha256": "575706718f0c81c43dbd627e4d9d105e14d8f58546e1117b004dbdfd03630bc2"
       },
       {
         "path": "docs/catalog/fixtures/radio/basic.html",
@@ -447,8 +587,40 @@
         "sha256": "dbd5232d5bf0ac90eba3cebe3d928e7c73d34c841f868ca75d6279dbfa1818bd"
       },
       {
+        "path": "docs/catalog/fixtures/ratio/tokens.css",
+        "sha256": "1247e0a093a3845a7bc38caa2ddd9ba9bf3c04db7fb85efb0d4712a844b886dd"
+      },
+      {
+        "path": "docs/catalog/fixtures/ratio/tokens.html",
+        "sha256": "1da01c96e52057220eb7536c1a059340d3d4994187d08ea9ff68f486a0ef6869"
+      },
+      {
+        "path": "docs/catalog/fixtures/ratio/variants.css",
+        "sha256": "725ee5428c50db64a6c2e01b2997b91e5e618d0d9e9a9ff4b243b2052557d05c"
+      },
+      {
+        "path": "docs/catalog/fixtures/ratio/variants.html",
+        "sha256": "7923ad945fdc3d77fea8a0dcffc8424832b90f42594116ff72dcc92b7636a06a"
+      },
+      {
         "path": "docs/catalog/fixtures/responsive/basic.html",
         "sha256": "729f4d2dcf23af7eef2de794ee38e416181ea6d7a18eec5a2f828ea120b63219"
+      },
+      {
+        "path": "docs/catalog/fixtures/responsive/tokens.css",
+        "sha256": "4649aa756b025b7c2a4cd5f3617375af9751ece106defab5ad7beb7f9824f007"
+      },
+      {
+        "path": "docs/catalog/fixtures/responsive/tokens.html",
+        "sha256": "e1391befbd4e9172b4e9fa0779ba65ab5afd969878b05884a5d01b732b4bae62"
+      },
+      {
+        "path": "docs/catalog/fixtures/responsive/variants.css",
+        "sha256": "a18416c3ccc0bdfefecf51ace95bff398672f4786558203973c29971b3deadb2"
+      },
+      {
+        "path": "docs/catalog/fixtures/responsive/variants.html",
+        "sha256": "6b07aa8bbfa8a3495dae31bacc2856350beece18ada6861ec72eb767c26c6c82"
       },
       {
         "path": "docs/catalog/fixtures/scrollspy/basic.html",
@@ -456,6 +628,18 @@
       },
       {
         "path": "docs/catalog/fixtures/scrollspy/basic.js",
+        "sha256": "537faa1590629d89831fe1de8301d97766b663a7bba16eb4fe9c747f467a4e09"
+      },
+      {
+        "path": "docs/catalog/fixtures/scrollspy/long-sections.css",
+        "sha256": "e5315d892a2438de50dc178645f2698e5cb8b86712214d178d4cd260956c4f1d"
+      },
+      {
+        "path": "docs/catalog/fixtures/scrollspy/long-sections.html",
+        "sha256": "254d46e5b5171a2d7aafe57c80af435c5f4f2bf7d3d5a96d039aab3ec4e3a01c"
+      },
+      {
+        "path": "docs/catalog/fixtures/scrollspy/long-sections.js",
         "sha256": "537faa1590629d89831fe1de8301d97766b663a7bba16eb4fe9c747f467a4e09"
       },
       {
@@ -483,12 +667,40 @@
         "sha256": "d8d1fc7d365ecd657c2a725b17b6e689c2064d142ecd3b9a9f066c26c4a323a3"
       },
       {
+        "path": "docs/catalog/fixtures/skeleton/loading-complete.html",
+        "sha256": "ac14005ce3161a24a1978302c1caf4f2e3d6dd80537d32d1ad53264cd07cd239"
+      },
+      {
+        "path": "docs/catalog/fixtures/skeleton/loading-complete.js",
+        "sha256": "b1f67b7825e847d8dac7faef67392435a7fce04eb9f16e13cbdabf44e9d65c84"
+      },
+      {
+        "path": "docs/catalog/fixtures/skeleton/shapes-wave.html",
+        "sha256": "7b60c7bbe044b56674767ef7ddd5721ee51ebe0049e265d57b61a55786f449af"
+      },
+      {
         "path": "docs/catalog/fixtures/stepper/basic.html",
         "sha256": "cb04a74daba3800a0acf08cb70debea7b7c5035ffd8e77a9dc3a6783c22e346b"
       },
       {
         "path": "docs/catalog/fixtures/stepper/basic.js",
         "sha256": "06e91f17eca0a8b51bbeb6d4715e9b76d936bc2240cf0c6eee4e3c85372968e2"
+      },
+      {
+        "path": "docs/catalog/fixtures/stepper/nonlinear-vertical.html",
+        "sha256": "863b664042f0b67d74662fe206ed132509ce1185d2a73dcbc244e33f646d63ce"
+      },
+      {
+        "path": "docs/catalog/fixtures/stepper/nonlinear-vertical.js",
+        "sha256": "af6608cdf9c5cd86641564bef7d93867261dece0ef7fa01b812f032c9c6b8626"
+      },
+      {
+        "path": "docs/catalog/fixtures/stepper/validation-error.html",
+        "sha256": "b7f5f89be370248e445ed9702b344512458abe06d42603d9f74b2cc3babf9b0f"
+      },
+      {
+        "path": "docs/catalog/fixtures/stepper/validation-error.js",
+        "sha256": "af6608cdf9c5cd86641564bef7d93867261dece0ef7fa01b812f032c9c6b8626"
       },
       {
         "path": "docs/catalog/fixtures/switch/basic.html",
@@ -555,8 +767,28 @@
         "sha256": "4d0218ac209b6dd77b88c93c3675e4b8bbe1e7dc526b1a46c870f4fc706b1a3b"
       },
       {
+        "path": "docs/catalog/fixtures/tile/tokens.css",
+        "sha256": "b678d159bc83f14087d1b30a92938d7c80c6453d471576ad8edc8e049a75ec4a"
+      },
+      {
+        "path": "docs/catalog/fixtures/tile/tokens.html",
+        "sha256": "94f605e2816020738b4d880d4205be5e3d52041a07dc86cd55c2d6fc15b5c5a6"
+      },
+      {
+        "path": "docs/catalog/fixtures/tile/variants.css",
+        "sha256": "a18416c3ccc0bdfefecf51ace95bff398672f4786558203973c29971b3deadb2"
+      },
+      {
+        "path": "docs/catalog/fixtures/tile/variants.html",
+        "sha256": "b7d6394a5689b183fe8f89476231910d50d9c8cddc80c7b6ee7ed6a0e6c5874e"
+      },
+      {
         "path": "docs/catalog/fixtures/timeline/basic.html",
         "sha256": "2a0beff748cd5dbd5cc33da1e12bd9593b148dd7e44267c67dfdafd34b282fce"
+      },
+      {
+        "path": "docs/catalog/fixtures/timeline/horizontal-states.html",
+        "sha256": "04af8e7f53287ae71abfd030a37024808d968c2bc5dbdd88e7142053ea877469"
       },
       {
         "path": "docs/catalog/fixtures/toast/basic.html",
@@ -565,6 +797,22 @@
       {
         "path": "docs/catalog/fixtures/toast/basic.js",
         "sha256": "e7f134ce1c3a6211d2cb4aab90ee2c2b5a693042fff9fbc4c35f114a8acae1a3"
+      },
+      {
+        "path": "docs/catalog/fixtures/toast/persistent-variants.html",
+        "sha256": "32da1794e7904ad4d8893de22d50c3d42dc78640c142ea20db552257d1556aea"
+      },
+      {
+        "path": "docs/catalog/fixtures/toast/persistent-variants.js",
+        "sha256": "00d7eb0851ffcd4fd4fb68a88a2c8bb09e5fb832a3df2a2a19ddea3d60bacb3e"
+      },
+      {
+        "path": "docs/catalog/fixtures/toast/timed-progress.html",
+        "sha256": "a7a8e32ee6d0c258cd1cefa082370760c1f6caadc8be19c05dea6bdea3c28489"
+      },
+      {
+        "path": "docs/catalog/fixtures/toast/timed-progress.js",
+        "sha256": "00d7eb0851ffcd4fd4fb68a88a2c8bb09e5fb832a3df2a2a19ddea3d60bacb3e"
       },
       {
         "path": "docs/catalog/fixtures/tooltip/basic.html",
@@ -605,6 +853,18 @@
       {
         "path": "docs/catalog/fixtures/tree-view/basic.js",
         "sha256": "69c655df1040387ce24ffff4533e8c2f63a33482c8319688a9058f5e1703f9e2"
+      },
+      {
+        "path": "docs/catalog/fixtures/tree-view/expanded-values.html",
+        "sha256": "cc2cde67ecc2c7e09b498a1eab002682ff48fc05aed365b79b878da242df0e07"
+      },
+      {
+        "path": "docs/catalog/fixtures/tree-view/expanded-values.js",
+        "sha256": "dd3d8c29c3d47ae3a148c38d21d3c2ec8703097a3ddbc3c6ebf97d49d9e52776"
+      },
+      {
+        "path": "docs/catalog/navigation-provenance.json",
+        "sha256": "856912bc89c2260d0bc51a002720bb574f217895c76067bebbe5ce93aaf9264b"
       },
       {
         "path": "docs/components/accordion.md",
@@ -1679,7 +1939,7 @@
   "files": {
     "catalog.json": {
       "source": "docs/generated/next/catalog.json",
-      "sha256": "a35aee5ae62eb612f69efdd9eab72d6839ca4deff9b7677d2805d093213e556c"
+      "sha256": "960d2721f3b1e59229eadaf46af422933fdf28af14706a95759ffe166c074d37"
     },
     "fokus.css": {
       "source": "dist/css/fokus.css",
