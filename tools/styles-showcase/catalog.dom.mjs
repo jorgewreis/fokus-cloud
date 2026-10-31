@@ -15,9 +15,15 @@ $('#catalog-search').value='zzzzz-absent'; $('#catalog-search').dispatchEvent(ne
 $('#catalog-reset').click(); assert.equal(w.document.querySelectorAll('#catalog-list a').length,56);
 $('#catalog-group').value='Formulários'; $('#catalog-group').dispatchEvent(new w.Event('change')); assert.equal(w.document.querySelectorAll('#catalog-list a').length,catalog.contracts.filter(c=>c.group==='Formulários').length);
 $('#catalog-reset').click();
+const firstLink = $('#catalog-list a'); firstLink.focus(); firstLink.click(); await wait();
+assert.equal(w.document.activeElement,$('#catalog-detail h2'));
+assert.equal($('#catalog-detail').getAttribute('aria-labelledby'),'catalog-detail-title');
+firstLink.focus(); firstLink.click(); await wait(); assert.equal(w.document.activeElement,$('#catalog-detail h2'));
 for (const c of catalog.contracts) {
  w.location.hash=c.id; await wait(); assert.equal($('#catalog-detail h2').textContent,c.title);
  assert.equal(w.document.querySelectorAll('#catalog-detail iframe').length,c.examples.length);
+ const names=[...w.document.querySelectorAll('#catalog-detail button')].map(b=>b.getAttribute('aria-label'));
+ assert.ok(names.every(Boolean)); assert.equal(new Set(names).size,names.length);
  assert.deepEqual([...w.document.querySelectorAll('.catalog-example-limitations li')].map(el=>el.textContent),c.examples.flatMap(e=>e.limitations));
  for(const frame of w.document.querySelectorAll('iframe')) {assert.equal(frame.getAttribute('sandbox'),'allow-scripts'); assert.match(frame.srcdoc,/form-action 'none'/); assert.match(frame.srcdoc,/img-src data: blob:/); assert.ok(!frame.srcdoc.includes('allow-same-origin'));}
  const exampleCode=[...w.document.querySelectorAll('#catalog-detail details')].filter(d=>/original do exemplo$/.test(d.querySelector('summary').textContent)).map(d=>d.querySelector('code').textContent);

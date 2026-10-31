@@ -1,6 +1,6 @@
 # Fokus Styles next / piloto
 
-Snapshot separado da vitrine publicada v2.7.0. Não é release, instalação npm nem prova de cobertura completa. Os 56 contratos têm 125 exemplos no total (ao menos uma fixture mínima por contrato, com variações selecionadas) e permanecem com cobertura parcial; não há cobertura exaustiva de variantes, estados, temas ou acessibilidade manual.
+Snapshot separado da vitrine publicada v2.7.0. Não é release, instalação npm nem prova de cobertura completa. Os 56 contratos têm 137 exemplos no total (ao menos uma fixture mínima por contrato, com variações selecionadas) e permanecem com cobertura parcial; não há cobertura exaustiva de variantes, estados, temas ou acessibilidade manual.
 
 A fonte canônica é `docs/generated/next/catalog.json` no repositório `jorgewreis/fokus-styles`. Não editar manualmente a cópia JSON ou os bundles. Em um checkout confiável e revisado, gerar catálogo e bundles, depois executar:
 

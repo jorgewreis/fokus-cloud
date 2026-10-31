@@ -88,3 +88,24 @@ test('WCAG AA automated checks of homepage and complete examples', async ({ page
     }
   }
 });
+
+test('next catalog keyboard focus and shell accessibility in both themes', async ({ page }, info) => {
+  await page.goto('/styles/next/');
+  const first = page.locator('#catalog-list a').first();
+  await expect(first).toBeVisible();
+  await first.focus(); await page.keyboard.press('Enter');
+  await expect(page.locator('#catalog-detail h2')).toBeFocused();
+  // Repeat activation of the same hash must still reach the loaded content.
+  await first.focus(); await page.keyboard.press('Enter');
+  await expect(page.locator('#catalog-detail h2')).toBeFocused();
+  await expect(page.locator('#catalog-detail')).toHaveAttribute('aria-labelledby', 'catalog-detail-title');
+  const names = await page.locator('#catalog-detail button').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label')));
+  expect(names.every(Boolean)).toBe(true); expect(new Set(names).size).toBe(names.length);
+  for (const theme of ['dark', 'light']) {
+    await page.locator('html').evaluate((html, theme) => html.dataset.theme = theme, theme);
+    // Scope is the catalog shell; opaque sandbox previews require separate audits.
+    const result = await new AxeBuilder({ page }).exclude('iframe').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+    await info.attach(`catalog-shell-${theme}-axe.json`, {body:JSON.stringify(result,null,2),contentType:'application/json'});
+    expect.soft(result.violations, `catalog shell ${theme}`).toEqual([]);
+  }
+});

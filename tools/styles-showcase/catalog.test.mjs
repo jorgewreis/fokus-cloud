@@ -7,7 +7,7 @@ test('snapshot identity, provenance and distinct published assets', async () => 
  const catalog = JSON.parse(await readFile(new URL('catalog.json', base)));
  assert.equal(catalog.schemaVersion, 1); assert.equal(catalog.channel, 'next'); assert.equal(catalog.published, false);
  assert.equal(catalog.contracts.length, 56); assert.equal(new Set(catalog.contracts.map(c => c.id)).size, 56);
- assert.equal(catalog.contracts.reduce((total,c)=>total+c.examples.length,0),125);
+ assert.equal(catalog.contracts.reduce((total,c)=>total+c.examples.length,0),137);
  const provenance = JSON.parse(await readFile(new URL('provenance.json', base)));
  assert.deepEqual(provenance.source, catalog.source);
  for (const [file, value] of Object.entries(provenance.files)) assert.equal(createHash('sha256').update(await readFile(new URL(file, base))).digest('hex'), value.sha256);

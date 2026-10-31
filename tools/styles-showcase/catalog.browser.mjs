@@ -42,7 +42,7 @@ try {
    assert.equal(await child.evaluate(() => typeof FokusStyles),'object');
   }
  }
- assert.equal(previewCount,125);
+ assert.equal(previewCount,137);
  await page.evaluate(hash => {location.hash=hash;}, links[0]);
  await page.waitForFunction(hash => document.querySelector('#catalog-list a[aria-current]')?.hash === hash, links[0]);
  const first = page.locator('#catalog-detail details').first(); await first.locator('summary').click();
@@ -65,7 +65,7 @@ try {
  assert.ok(await thumbnail.evaluate(img=>img.complete && img.naturalWidth > 0));
  const siblingUpload = page.locator('#catalog-detail iframe').nth(1).contentFrame();
  await siblingUpload.locator('input[type=file]').setInputFiles({name:'sibling.txt',mimeType:'text/plain',buffer:Buffer.from('local fixture')});
- await page.locator('#catalog-detail').getByRole('button',{name:'Reiniciar exemplo',exact:true}).first().click();
+ await page.locator('#catalog-detail').getByRole('button',{name:/^Reiniciar exemplo:/}).first().click();
  await upload.locator('input[type=file]').waitFor();
  assert.equal(await upload.locator('input[type=file]').evaluate(input=>input.files.length),0);
  assert.equal(await siblingUpload.locator('input[type=file]').evaluate(input=>input.files.length),1);

@@ -1,15 +1,17 @@
 const $ = selector => document.querySelector(selector);
 const list = $('#catalog-list'), detail = $('#catalog-detail'), status = $('#catalog-status');
 let catalog;
+let focusSelection = false;
 const element = (tag, text, parent) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; parent?.append(node); return node; };
 const searchable = contract => JSON.stringify(contract).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-function codeBlock(parent, title, code) {
+function codeBlock(parent, title, code, context = '') {
   const section = element('details', undefined, parent);
   element('summary', title, section);
   const pre = element('pre', undefined, section); pre.tabIndex = 0;
   element('code', code, pre);
   const button = element('button', 'Copiar código', section); button.type = 'button'; button.className = 'fs-btn';
+  button.setAttribute('aria-label', `Copiar código: ${title}${context ? ' — ' + context : ''} — ${detail.querySelector('h2')?.textContent || 'catálogo'}`);
   const feedback = element('p', '', section); feedback.setAttribute('role', 'status');
   button.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(code); feedback.textContent = 'Código original copiado.'; }
@@ -28,10 +30,14 @@ function showContract() {
   if (!catalog) return;
   let id; try { id = decodeURIComponent(location.hash.slice(1)); } catch { id = ''; }
   const contract = catalog.contracts.find(item => item.id === id);
+  detail.removeAttribute('aria-labelledby');
   detail.replaceChildren();
   list.querySelectorAll('a').forEach(link => { if (link.hash === '#' + encodeURIComponent(id)) link.setAttribute('aria-current', 'true'); else link.removeAttribute('aria-current'); });
   if (!contract) { element('p', id ? 'Contrato não encontrado. Escolha um item da lista.' : 'Escolha um contrato para consultar sua documentação.', detail); return; }
-  element('h2', contract.title, detail);
+  const heading = element('h2', contract.title, detail);
+  heading.id = 'catalog-detail-title'; heading.tabIndex = -1;
+  detail.setAttribute('aria-labelledby', heading.id);
+  if (focusSelection) { heading.focus(); focusSelection = false; }
   element('p', `${contract.group} · next / piloto · ${contract.status === 'partial' ? 'Cobertura parcial' : contract.status}`, detail);
   element('p', 'Não publicado. Evidência de implementação não significa cobertura completa de comportamento ou acessibilidade.', detail);
   const limitations = element('ul', undefined, detail);
@@ -46,17 +52,17 @@ function showContract() {
     for (const limitation of example.limitations || []) element('li', limitation, exampleLimitations);
     if (contract.id === 'file-upload-advanced') element('p', 'Nesta integração, a prévia permite imagens blob: locais para miniaturas. O aviso de CSP acima é preservado da fonte; envio de arquivos e conexões de rede continuam bloqueados.', detail);
     const frame = element('iframe', undefined, detail); frame.title = `${contract.title}: ${example.title} · piloto isolado`; frame.setAttribute('sandbox', 'allow-scripts'); frame.referrerPolicy = 'no-referrer'; frame.srcdoc = previewDocument(example);
-    const reset = element('button', 'Reiniciar exemplo', detail); reset.type = 'button'; reset.className = 'fs-btn'; reset.addEventListener('click', () => { frame.srcdoc = previewDocument(example); });
-    codeBlock(detail, 'HTML original do exemplo', example.htmlCode || '');
-    if (example.jsCode) codeBlock(detail, 'JavaScript original do exemplo', example.jsCode);
-    if (example.cssCode) codeBlock(detail, 'CSS original do exemplo', example.cssCode);
+    const reset = element('button', 'Reiniciar exemplo', detail); reset.type = 'button'; reset.className = 'fs-btn'; reset.setAttribute('aria-label', `Reiniciar exemplo: ${example.title}`); reset.addEventListener('click', () => { frame.srcdoc = previewDocument(example); });
+    codeBlock(detail, 'HTML original do exemplo', example.htmlCode || '', example.title);
+    if (example.jsCode) codeBlock(detail, 'JavaScript original do exemplo', example.jsCode, example.title);
+    if (example.cssCode) codeBlock(detail, 'CSS original do exemplo', example.cssCode, example.title);
   }
   element('h3', 'Documentação de origem', detail);
   element('p', contract.documentation.path, detail);
   codeBlock(detail, 'Ler documentação completa (Markdown)', contract.documentation.markdown);
   element('h3', 'Trechos documentais', detail);
   element('p', 'Transcrição fiel. Estes trechos históricos podem ser incompletos e não são executados automaticamente.', detail);
-  for (const snippet of contract.snippets || []) codeBlock(detail, `${snippet.section || snippet.id} · ${snippet.language || 'texto'}`, snippet.code);
+  for (const snippet of contract.snippets || []) codeBlock(detail, `${snippet.section || snippet.id} · ${snippet.language || 'texto'}`, snippet.code, snippet.id);
   element('h3', 'Evidências CSS', detail);
   codeBlock(detail, 'Seletores, condições e declarações', JSON.stringify(contract.cssEvidence, null, 2));
   codeBlock(detail, 'Evidência interna de runtime (não representa nova API pública)', JSON.stringify(contract.runtimeEvidence || [], null, 2));
@@ -84,6 +90,12 @@ async function load() {
     filter(); showContract();
   } catch { status.textContent = 'Não foi possível carregar o catálogo. Tente novamente ou baixe o JSON.'; $('#catalog-retry').hidden = false; }
 }
+list.addEventListener('click', event => {
+  const link = event.target.closest('a');
+  if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  if (location.hash === link.hash) { event.preventDefault(); detail.querySelector('h2')?.focus(); }
+  else focusSelection = true;
+});
 $('#catalog-search').addEventListener('input', () => catalog && filter());
 $('#catalog-group').addEventListener('change', () => catalog && filter());
 $('#catalog-reset').addEventListener('click', () => { $('#catalog-search').value = ''; $('#catalog-group').value = ''; if (catalog) filter(); $('#catalog-search').focus(); });
