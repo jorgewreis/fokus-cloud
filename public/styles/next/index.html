@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Catálogo next · piloto | Fokus Styles</title>
+<script src="/assets/js/styles-theme.js"></script>
+<link rel="stylesheet" href="/styles/vendor/fokus-2.7.0.min.css">
+<link rel="stylesheet" href="/assets/css/modules/styles-docs/styles-docs.css">
+<link rel="stylesheet" href="/assets/css/modules/styles-showcase.css">
+<link rel="stylesheet" href="/styles/next/catalog.css">
+<script type="module" src="/styles/next/catalog.js"></script>
+</head>
+<body class="styles-docs styles-showcase">
+<a class="showcase-skip" href="#main">Ir para o conteúdo</a>
+<header class="showcase-header"><div class="showcase-wrap showcase-nav">
+<a class="showcase-wordmark" href="/styles/">FOKUS <span>STYLES</span></a>
+<span class="showcase-product">next · piloto</span>
+<nav aria-label="Navegação principal"><a href="/styles/">Vitrine publicada</a><a href="catalog.json" download>Catálogo JSON</a></nav>
+<button class="fs-btn" data-theme-toggle type="button" aria-label="Ativar tema claro" aria-pressed="true">Claro / escuro</button>
+</div></header>
+<main id="main" class="showcase-wrap">
+<section class="showcase-section"><span class="showcase-kicker">NEXT · PILOTO NÃO PUBLICADO</span>
+<h1>Explore os contratos.</h1><p>Documentação, evidências CSS e exemplos revisados em um único catálogo. Este snapshot de desenvolvimento não é a versão publicada no npm. A vitrine e seus exemplos continuam usando v2.7.0.</p>
+<p id="provenance"></p>
+<p>Arquivos deste piloto: <a href="catalog.json" download>JSON canônico</a> · <a href="fokus.css" download>CSS next</a> · <a href="fokus.js" download>JavaScript next</a> · <a href="provenance.json">Proveniência e hashes</a>. Não substituem o pacote publicado.</p>
+<div class="catalog-filters"><label>Buscar contrato<input id="catalog-search" type="search" placeholder="Nome, classe ou documentação" autocomplete="off"></label>
+<label>Grupo<select id="catalog-group"><option value="">Todos os grupos</option></select></label>
+<button class="fs-btn" id="catalog-reset" type="button">Limpar filtros</button></div>
+<p id="catalog-status" role="status" aria-live="polite">Carregando catálogo…</p>
+<button class="fs-btn" id="catalog-retry" type="button" hidden>Tentar novamente</button>
+<div class="catalog-layout"><nav id="catalog-list" aria-label="Contratos do catálogo"></nav><article id="catalog-detail" aria-label="Detalhes do contrato"><p>Escolha um contrato para consultar sua documentação.</p></article></div>
+<noscript>Ative JavaScript ou baixe o catálogo JSON para consultar os contratos.</noscript>
+</section></main></body></html>

@@ -31,9 +31,13 @@ jobs:
       - name: Static and DOM contracts
         run: |
           node tools/styles-showcase/test-dom.mjs
+          node --test tools/styles-showcase/catalog.test.mjs
+          node tools/styles-showcase/catalog.dom.mjs
           node tools/sync-seo.mjs --check
           python tools/styles-showcase/build-examples.py
           git diff --exit-code -- public/styles/examples/fokus-styles-examples.zip
+      - name: Next catalog browser contracts
+        run: node tools/styles-showcase/catalog.browser.mjs
       - name: Browser, screenshots and accessibility
         run: ./node_modules/.bin/playwright test --config tools/styles-showcase/playwright.config.mjs
       - uses: actions/upload-artifact@v4
