@@ -2,10 +2,13 @@
 from pathlib import Path
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 root = Path(__file__).resolve().parents[2] / 'public/styles'
-for name in ['fokus-2.7.0.min.css', 'LICENSE-fokus-styles.txt']:
+published_assets = ['fokus-2.7.0.min.css', 'LICENSE-fokus-styles.txt']
+for name in published_assets:
     if not (root/'assets'/name).is_file():
         raise FileNotFoundError(f'Missing published asset: assets/{name}')
-files = sorted([*(root/'examples').glob('*.html'), *(root/'examples').glob('*.md'), *(root/'examples').glob('*.css'), *(root/'assets').glob('*')])
+# The standalone examples use CSS and local inline behavior. Do not silently
+# add assets used only by documentation pages to their portable download.
+files = sorted([*(root/'examples').glob('*.html'), *(root/'examples').glob('*.md'), *(root/'examples').glob('*.css'), *(root/'assets'/name for name in published_assets)])
 with ZipFile(root/'examples/fokus-styles-examples.zip', 'w', ZIP_DEFLATED) as archive:
     for path in files:
         info = ZipInfo(str(path.relative_to(root)), (2026, 10, 30, 0, 0, 0))

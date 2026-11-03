@@ -82,6 +82,7 @@
   ]
 }</script>
         <!-- /SEO -->
+            <link rel="stylesheet" href="/assets/css/modules/styles-documentation.css?v=0679d77b137e" />
     </head>
     <body class="styles-docs styles-showcase">
 <a class="showcase-skip" href="#main">Ir para o conteúdo</a>
@@ -92,8 +93,7 @@
 <span class="showcase-product">Fokus Styles</span>
 <nav aria-label="Navegação principal">
 <a href="#exemplos">Exemplos</a>
-<a href="#documentacao">Documentação</a>
-<a href="/styles/next/">Catálogo next · piloto</a>
+<a href="/docs">Documentação</a>
 <a href="https://github.com/jorgewreis/fokus-styles">GitHub</a>
 </nav>
 <button class="fs-btn" data-theme-toggle type="button" aria-label="Ativar tema claro" aria-pressed="true">Claro / escuro</button>
@@ -128,7 +128,7 @@
 <div class="showcase-strip" aria-label="Recursos">
 <span>Tokens compartilhados</span><span>Componentes reutilizáveis</span><span>Código aberto · MIT</span><span>HTML, CSS e JavaScript</span>
 </div>
-<p class="showcase-meta">Em desenvolvimento: <a href="/styles/next/">catálogo next · piloto</a>. Documentação e exemplos revisados do snapshot, separados do pacote publicado v2.7.0.</p>
+<p class="showcase-meta">Conheça os <a href="/docs#guias">guias de uso</a>, a <a href="/docs#componentes">referência de componentes em desenvolvimento</a> e os <a href="/docs#exemplos">exemplos</a> na documentação.</p>
 <section class="showcase-section showcase-components" aria-labelledby="components-title">
 <div class="showcase-section-head">
 <div><span class="showcase-kicker">DO DESIGN AO CÓDIGO</span>
@@ -260,7 +260,9 @@ import 'fokus-styles';</code>
 </section>
 <section class="showcase-section" id="documentacao">
 <span class="showcase-kicker">MENOS ADIVINHAÇÃO. MAIS REFERÊNCIA.</span>
-<h2>Uma linguagem para sua interface.</h2>
+<div class="showcase-section-head"><div><h2>Uma linguagem para sua interface.</h2>
+<p>Guias, referência por componente e exemplos reunidos na documentação.</p></div>
+<a class="fs-btn fs-btn-primary" href="/docs">Abrir documentação</a></div>
 <div class="showcase-docs">
 <a href="/layout">
 <span>01</span>
@@ -288,6 +290,10 @@ import 'fokus-styles';</code>
 <p>Espaçamento, cores e ajustes de composição.</p>
 </a>
 </div>
+<aside class="styles-doc-callout" aria-label="Referência em desenvolvimento">
+<div><span class="styles-doc-status">Em desenvolvimento</span><h3>Referência de componentes</h3><p>56 contratos e 137 exemplos revisados do snapshot de desenvolvimento, com código, evidências e limitações. Esta referência é separada do npm 2.7.0.</p></div>
+<a class="styles-doc-text-link" href="/styles/next/">Consultar a referência em desenvolvimento</a>
+</aside>
 <p class="showcase-note">Acessibilidade é um trabalho de composição e verificação: teste teclado, contraste, conteúdo e estados no seu contexto. O framework não certifica automaticamente um produto.</p>
 </section>
 </main>

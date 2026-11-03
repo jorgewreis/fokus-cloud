@@ -32,7 +32,7 @@ let changedAssets = 0;
 
 for (const htmlPath of htmlFiles) {
   const original = readFileSync(htmlPath, "utf8");
-  const updated = original.replace(/((?:href|src)=")(\/assets\/[^"?]+)(?:\?[^" ]*)?("\s*\/?\s*>)/g, (match, prefix, assetPath, suffix) => {
+  const updated = original.replace(/((?:href|src)=")(\/assets\/[^"?]+)(?:\?[^" ]*)?("[^>]*>)/g, (match, prefix, assetPath, suffix) => {
     try {
       const version = assetVersion(assetPath);
       changedAssets += 1;
