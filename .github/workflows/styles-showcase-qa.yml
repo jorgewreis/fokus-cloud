@@ -1,0 +1,52 @@
+name: Styles showcase QA (no deploy)
+on:
+  pull_request:
+    paths:
+      - 'public/styles/**'
+      - 'public/assets/css/modules/styles-*/**'
+      - 'public/assets/css/modules/styles-showcase.css'
+      - 'public/assets/js/styles-*.js'
+      - 'tools/styles-showcase/**'
+      - '.github/workflows/styles-showcase-qa.yml'
+permissions:
+  contents: read
+concurrency:
+  group: styles-showcase-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  static-browser-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Install isolated QA dependencies
+        run: |
+          mkdir -p /tmp/styles-qa
+          npm install --prefix /tmp/styles-qa --ignore-scripts @playwright/test@1.57.0 jsdom@26.1.0 @axe-core/playwright@4.10.2
+          ln -s /tmp/styles-qa/node_modules node_modules
+          ./node_modules/.bin/playwright install --with-deps chromium
+      - name: Static and DOM contracts
+        run: |
+          node tools/styles-showcase/test-dom.mjs
+          node --test tools/styles-showcase/catalog.test.mjs
+          node tools/styles-showcase/catalog.dom.mjs
+          node tools/sync-seo.mjs --check
+          python tools/styles-showcase/build-examples.py
+          git diff --exit-code -- public/styles/examples/fokus-styles-examples.zip
+      - name: Next catalog browser contracts
+        run: node tools/styles-showcase/catalog.browser.mjs
+      - name: Browser, screenshots and accessibility
+        run: ./node_modules/.bin/playwright test --config tools/styles-showcase/playwright.config.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: styles-showcase-evidence
+          path: |
+            tools/styles-showcase/test-results/
+            tools/styles-showcase/playwright-report/
+            test-results/
+            playwright-report/
+          retention-days: 14

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gestão de registros · Exemplo Fokus Styles</title>
+<link rel="stylesheet" href="../vendor/fokus-2.7.0.min.css">
+<link rel="stylesheet" href="composition.css">
+</head>
+<body>
+<main class="demo-shell">
+<header class="demo-top">
+<strong>FOKUS DESK / DEMO</strong>
+<span>Fokus Styles 2.7.0</span>
+</header>
+<span class="demo-kicker">Gestão de registros</span>
+<h1>Encontre. Selecione. Continue.</h1>
+<p>Busca local e detalhes, sem banco de dados.</p>
+<section class="demo-panel" aria-label="Diretório de contatos">
+<div class="demo-toolbar">
+<div>
+<label for="search">Buscar por nome ou área</label>
+<input class="fs-form-control" id="search" type="search" placeholder="Experimente: design">
+</div>
+<span id="count" role="status" aria-live="polite">3 registros</span>
+</div>
+<div class="demo-scroll" tabindex="0" role="region" aria-label="Tabela de contatos, role horizontalmente em telas pequenas">
+<table class="fs-table">
+<thead>
+<tr>
+<th scope="col">Nome</th>
+<th scope="col">Área</th>
+<th scope="col">Detalhes</th>
+</tr>
+</thead>
+<tbody>
+<tr data-record="Ana Lima Design">
+<td>Ana Lima</td>
+<td>Design</td>
+<td>
+<button class="fs-btn fs-btn-outline-primary" data-name="Ana Lima" data-email="ana@example.com" aria-label="Ver detalhes de Ana Lima">Ver</button>
+</td>
+</tr>
+<tr data-record="Rui Costa Engenharia">
+<td>Rui Costa</td>
+<td>Engenharia</td>
+<td>
+<button class="fs-btn fs-btn-outline-primary" data-name="Rui Costa" data-email="rui@example.com" aria-label="Ver detalhes de Rui Costa">Ver</button>
+</td>
+</tr>
+<tr data-record="Lia Alves Produto">
+<td>Lia Alves</td>
+<td>Produto</td>
+<td>
+<button class="fs-btn fs-btn-outline-primary" data-name="Lia Alves" data-email="lia@example.com" aria-label="Ver detalhes de Lia Alves">Ver</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p id="empty" hidden>Nenhum registro encontrado. Tente outro termo.</p>
+<div class="demo-selected" id="detail" role="status" aria-live="polite">Selecione um registro para consultar os detalhes.</div>
+</section>
+<p class="demo-caption">Dados fictícios · HTML completo com composição CSS e interações locais próprias. Não é um produto conectado.</p>
+</main>
+<script>const search=document.querySelector('#search');const rows=[...document.querySelectorAll('[data-record]')];const normalize=value=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();search.addEventListener('input',()=>{let count=0;for(const row of rows){row.hidden=!normalize(row.dataset.record).includes(normalize(search.value));if(!row.hidden)count++;}document.querySelector('#count').textContent=count+' registro'+(count===1?'':'s');document.querySelector('#empty').hidden=count!==0;document.querySelector('#detail').textContent='Selecione um registro para consultar os detalhes.';});document.querySelectorAll('[data-name]').forEach(button=>button.addEventListener('click',()=>{document.querySelector('#detail').textContent=button.dataset.name+' · '+button.dataset.email;}));</script>
+</body>
+</html>

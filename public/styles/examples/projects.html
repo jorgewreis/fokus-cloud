@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Painel de projetos · Exemplo Fokus Styles</title>
+<link rel="stylesheet" href="../vendor/fokus-2.7.0.min.css">
+<link rel="stylesheet" href="composition.css">
+</head>
+<body class="desk-demo">
+<div class="desk-layout">
+<aside class="desk-sidebar" aria-label="Navegação da demonstração">
+<a class="desk-brand" href="#overview" aria-label="Fokus Desk, visão geral"><span aria-hidden="true">f.</span> fokus desk</a>
+<p class="desk-workspace">WORKSPACE<br><strong>Estúdio Aurora</strong></p>
+<nav aria-label="Seções do painel">
+<a href="#overview" aria-current="page"><span aria-hidden="true">▦</span> Visão geral</a>
+<a href="#activity"><span aria-hidden="true">▥</span> Atividade</a>
+<a href="#projects"><span aria-hidden="true">▤</span> Projetos <small>3</small></a>
+</nav>
+<div class="desk-sidebar-note"><span class="desk-dot" aria-hidden="true"></span> Ambiente de exemplo<br><small>Sem dados reais</small></div>
+<div class="desk-profile"><span aria-hidden="true">AL</span><div>Ana Lima<small>Design & produto</small></div></div>
+</aside>
+<main class="desk-main" id="overview">
+<header class="desk-topbar"><span>Workspace <b>/ Visão geral</b></span><span class="desk-version">DEMO · 2.7.0</span></header>
+<div class="desk-welcome"><div><p class="demo-kicker">Seu trabalho, em foco</p><h1>Bom dia, Ana.</h1><p>Uma visão clara do que vem a seguir.</p></div><a class="fs-btn fs-btn-primary" href="#projects">Ver projetos</a></div>
+<div class="demo-stats desk-stats">
+<div class="demo-stat"><span>Projetos ativos</span><strong>08</strong><small>Visão do workspace</small></div>
+<div class="demo-stat"><span>Entregas na semana</span><strong>12</strong><small>4 acima da semana anterior</small></div>
+<div class="demo-stat"><span>Etapas concluídas</span><strong>72<em>%</em></strong><small>Meta do período: 80%</small></div>
+</div>
+<section class="desk-chart-panel" id="activity" aria-labelledby="activity-title">
+<div class="desk-section-head"><div><h2 id="activity-title">Ritmo da equipe</h2><p>Entregas concluídas · últimas 6 semanas</p></div><span class="desk-chart-key"><i aria-hidden="true"></i> Entregas</span></div>
+<figure class="desk-chart"><svg viewBox="0 0 600 138" preserveAspectRatio="none" role="img" aria-labelledby="chart-title chart-desc"><title id="chart-title">Evolução ilustrativa das entregas</title><desc id="chart-desc">Nas semanas 1 a 6: 3, 6, 4, 9, 8 e 12 entregas. Dados fictícios.</desc><defs><linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5cec9a" stop-opacity=".22"/><stop offset="1" stop-color="#5cec9a" stop-opacity="0"/></linearGradient></defs><g fill="none" stroke="#23352d" stroke-width="1"><path d="M16 16H584M16 49H584M16 82H584M16 115H584"/></g><path d="M16 92L130 66L244 83L358 41L472 49L584 16V115H16Z" fill="url(#chart-fill)"/><path d="M16 92L130 66L244 83L358 41L472 49L584 16" fill="none" stroke="#5cec9a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><g fill="#5cec9a" stroke="#102019" stroke-width="3"><circle cx="16" cy="92" r="4"/><circle cx="130" cy="66" r="4"/><circle cx="244" cy="83" r="4"/><circle cx="358" cy="41" r="4"/><circle cx="472" cy="49" r="4"/><circle cx="584" cy="16" r="5"/></g><g fill="#acbeb3" font-size="11" font-family="system-ui,sans-serif"><text x="16" y="135">S1</text><text x="130" y="135">S2</text><text x="244" y="135">S3</text><text x="358" y="135">S4</text><text x="472" y="135">S5</text><text x="572" y="135">S6</text></g></svg><figcaption>Dados ilustrativos: 3, 6, 4, 9, 8 e 12 entregas.</figcaption></figure>
+</section>
+<section class="desk-projects" id="projects" aria-labelledby="projects-title">
+<div class="desk-section-head"><h2 id="projects-title">Prioridades da equipe</h2><span class="fs-badge fs-badge-soft-success">Esta semana</span></div>
+<div class="desk-search"><label for="project-search">Buscar projeto ou responsável</label><input class="fs-input" id="project-search" type="search" placeholder="Ex.: Aurora ou Ana" aria-controls="project-rows"><span id="project-count" role="status" aria-live="polite">3 projetos</span></div>
+<div class="demo-scroll" tabindex="0" role="region" aria-label="Tabela de projetos, role horizontalmente em telas pequenas">
+<table class="fs-table"><thead><tr><th scope="col">Projeto</th><th scope="col">Responsável</th><th scope="col">Etapa</th></tr></thead><tbody id="project-rows">
+<tr><td><span class="desk-project-mark" aria-hidden="true">A</span>Portal Aurora</td><td>Ana Lima</td><td><span class="fs-badge fs-badge-soft-success">Em revisão</span></td></tr>
+<tr><td><span class="desk-project-mark desk-project-mark-blue" aria-hidden="true">B</span>Biblioteca visual</td><td>Rui Costa</td><td><span class="fs-badge fs-badge-soft-info">Em andamento</span></td></tr>
+<tr><td><span class="desk-project-mark desk-project-mark-gold" aria-hidden="true">O</span>Onboarding</td><td>Lia Alves</td><td><span class="fs-badge fs-badge-soft-warning">Planejado</span></td></tr>
+</tbody></table></div>
+<p id="project-empty" hidden>Nenhum projeto encontrado. Tente outro termo.</p>
+</section>
+<p class="demo-caption">Dados fictícios · pesquisa local · composição de exemplo com Fokus Styles. Não é um produto conectado.</p>
+</main>
+</div>
+<script>
+const search = document.getElementById('project-search');
+const rows = [...document.querySelectorAll('#project-rows tr')];
+const normalize = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+search.addEventListener('input', () => {
+  const term = normalize(search.value.trim());
+  let count = 0;
+  rows.forEach(row => { row.hidden = !normalize(row.textContent).includes(term); if (!row.hidden) count++; });
+  document.getElementById('project-count').textContent = `${count} ${count === 1 ? 'projeto' : 'projetos'}`;
+  document.getElementById('project-empty').hidden = count !== 0;
+});
+</script>
+</body>
+</html>

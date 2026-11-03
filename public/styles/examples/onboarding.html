@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cadastro e preferências · Exemplo Fokus Styles</title>
+<link rel="stylesheet" href="../vendor/fokus-2.7.0.min.css">
+<link rel="stylesheet" href="composition.css">
+</head>
+<body>
+<main class="demo-shell">
+<header class="demo-top">
+<strong>FOKUS DESK / DEMO</strong>
+<span>Fokus Styles 2.7.0</span>
+</header>
+<span class="demo-kicker">Cadastro e preferências</span>
+<h1>Comece com o essencial.</h1>
+<p>Experimente a validação. Nada é enviado ou salvo.</p>
+<form class="demo-panel" id="demo-form" novalidate>
+<div class="demo-grid">
+<div class="demo-field">
+<label for="name">Nome completo (obrigatório)</label>
+<input class="fs-form-control" id="name" name="name" autocomplete="name" required aria-describedby="name-error">
+<span id="name-error" class="demo-error" hidden>Informe seu nome.</span>
+</div>
+<div class="demo-field">
+<label for="email">E-mail (obrigatório)</label>
+<input class="fs-form-control" id="email" name="email" type="email" autocomplete="email" required aria-describedby="email-error">
+<span id="email-error" class="demo-error" hidden>Informe um e-mail válido.</span>
+</div>
+</div>
+<div class="demo-field">
+<label for="role">Seu foco</label>
+<select class="fs-form-select" id="role" name="role">
+<option>Desenvolvimento</option>
+<option>Design de produto</option>
+<option>Gestão de projetos</option>
+</select>
+</div>
+<label class="demo-check">
+<input type="checkbox" name="news"> Quero receber novidades (demonstração)</label>
+<div class="demo-toolbar">
+<button class="fs-btn fs-btn-primary" type="submit">Experimentar cadastro</button>
+<button class="fs-btn fs-btn-outline-primary" type="reset">Limpar</button>
+</div>
+<p id="form-status" class="demo-status" role="status" aria-live="polite">
+</p>
+</form>
+<p class="demo-caption">Dados fictícios · HTML completo com composição CSS e interações locais próprias. Não é um produto conectado.</p>
+</main>
+<script>const form=document.querySelector('#demo-form');const status=document.querySelector('#form-status');function clear(){for(const input of form.querySelectorAll('[required]')){input.removeAttribute('aria-invalid');document.getElementById(input.id+'-error').hidden=true;}status.textContent='';}form.addEventListener('submit',event=>{event.preventDefault();clear();let first;for(const input of form.querySelectorAll('[required]')){if(!input.checkValidity()||!input.value.trim()){input.setAttribute('aria-invalid','true');document.getElementById(input.id+'-error').hidden=false;first??=input;}}if(first){status.textContent='Revise os campos indicados.';first.focus();}else status.textContent='Cadastro validado nesta demonstração. Nenhum dado foi enviado.';});form.addEventListener('reset',clear);</script>
+</body>
+</html>

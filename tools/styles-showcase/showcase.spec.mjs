@@ -1,0 +1,111 @@
+import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+import { readFileSync } from 'node:fs';
+const example = slug => readFileSync(new URL(`../../public/styles/examples/${slug}.html`, import.meta.url), 'utf8');
+for (const width of [1440, 1165, 768, 390]) {
+  test(`showcase real screenshots, theme and no overflow at ${width}`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/styles/index.html');
+    await page.evaluate(() => document.fonts.ready);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.locator('body')).not.toContainText(/[↗→➜➔]/u);
+    expect(await page.locator('.showcase-strip span').evaluateAll(elements =>
+      elements.every(el => ['none', 'normal', '""'].includes(getComputedStyle(el, '::before').content))
+    )).toBe(true);
+    expect(await page.locator('.showcase-wordmark').first().evaluate(el => getComputedStyle(el).fontFamily)).toContain('Bebas Neue');
+    expect(await page.locator('body').evaluate(el => getComputedStyle(el).fontFamily)).toContain('Google Sans');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    for (const preview of await page.locator('.showcase-mini iframe').all()) {
+      await preview.scrollIntoViewIfNeeded();
+      await expect(preview.contentFrame().locator('h1')).toBeVisible();
+    }
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: info.outputPath(`showcase-B-${width}-dark.png`), fullPage: true });
+    await page.getByRole('button', { name: 'Ativar tema claro' }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    // Wait for nested-frame painting after the parent theme switch, not only DOM state.
+    await page.locator('.showcase-preview iframe').contentFrame().locator('body').evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await page.screenshot({ path: info.outputPath(`showcase-B-${width}-light.png`), fullPage: true, animations: 'disabled' });
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  });
+}
+test('exact source, keyboard, form validation and reset, search and no-results', async ({ page }) => {
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.addInitScript(() => { Object.defineProperty(navigator, 'clipboard', { value: { writeText: async value => { window.copied = value; } } }); });
+  await page.goto('/styles/index.html');
+  await page.getByRole('button', { name: 'Botão primário', exact: true }).click();
+  await expect(page.locator('#component-feedback')).toContainText('acionado');
+  await page.getByRole('textbox', { name: 'E-mail', exact: true }).fill('teste@example.com');
+  await expect(page.locator('#component-email')).toHaveValue('teste@example.com');
+  for (const slug of ['projects', 'onboarding', 'records']) {
+    await page.locator(`[data-example="${slug}"]`).focus(); await page.keyboard.press('Enter');
+    await expect(page.locator('#example-source')).toHaveText(example(slug));
+    await page.getByRole('button', { name: 'Copiar HTML' }).click();
+    expect(await page.evaluate(() => window.copied)).toBe(example(slug));
+    await page.getByRole('button', { name: 'Fechar código' }).click();
+    await expect(page.locator(`[data-example="${slug}"]`)).toBeFocused();
+  }
+  await page.goto('/styles/examples/projects.html');
+  await page.getByRole('searchbox', { name: 'Buscar projeto ou responsável' }).fill('Ana');
+  await expect(page.locator('#project-rows tr:visible')).toHaveCount(1);
+  await page.getByRole('searchbox').fill('zzzz');
+  await expect(page.locator('#project-empty')).toBeVisible();
+  await page.getByRole('searchbox').fill('');
+  await expect(page.locator('#project-rows tr:visible')).toHaveCount(3);
+  await page.goto('/styles/examples/onboarding.html');
+  await page.getByRole('button', { name: 'Experimentar cadastro' }).click();
+  await expect(page.locator('#name')).toBeFocused();
+  await expect(page.locator('[aria-invalid=true]')).toHaveCount(2);
+  await page.getByLabel('Nome completo').fill('Ana Lima');
+  await page.getByLabel('E-mail (obrigatório)').fill('ana@example.com');
+  await page.getByRole('button', { name: 'Experimentar cadastro' }).click();
+  await expect(page.getByRole('status')).toContainText('Nenhum dado foi enviado');
+  await page.getByRole('button', { name: 'Limpar' }).click();
+  await expect(page.getByLabel('Nome completo')).toHaveValue('');
+  await page.goto('/styles/examples/records.html');
+  await page.getByRole('searchbox').fill('LÍA');
+  await expect(page.locator('[data-record]:visible')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Ver detalhes de Lia Alves' }).click();
+  await expect(page.locator('#detail')).toContainText('lia@example.com');
+  await page.getByRole('searchbox').fill('zzzzz');
+  await expect(page.locator('#empty')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('WCAG AA automated checks of homepage and complete examples', async ({ page }, info) => {
+  for (const path of ['/styles/index.html', '/styles/examples/projects.html', '/styles/examples/onboarding.html', '/styles/examples/records.html']) {
+    await page.goto(path);
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+    await info.attach(path.replaceAll('/', '_') + '-axe.json', { body: JSON.stringify(results, null, 2), contentType: 'application/json' });
+    expect.soft(results.violations, path).toEqual([]);
+    if (path === '/styles/index.html') {
+      await page.getByRole('button', { name: 'Ativar tema claro' }).click();
+      await expect.poll(() => page.locator('.showcase-hero .fs-btn-primary').evaluate(el => ({ color: getComputedStyle(el).color, background: getComputedStyle(el).backgroundColor }))).toEqual({ color: 'rgb(255, 255, 255)', background: 'rgb(21, 108, 67)' });
+      const light = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+      await info.attach('homepage-light-axe.json', { body: JSON.stringify(light, null, 2), contentType: 'application/json' });
+      expect.soft(light.violations, 'homepage light').toEqual([]);
+    }
+  }
+});
+
+test('next catalog keyboard focus and shell accessibility in both themes', async ({ page }, info) => {
+  await page.goto('/styles/next/');
+  const first = page.locator('#catalog-list a').first();
+  await expect(first).toBeVisible();
+  await first.focus(); await page.keyboard.press('Enter');
+  await expect(page.locator('#catalog-detail h2')).toBeFocused();
+  // Repeat activation of the same hash must still reach the loaded content.
+  await first.focus(); await page.keyboard.press('Enter');
+  await expect(page.locator('#catalog-detail h2')).toBeFocused();
+  await expect(page.locator('#catalog-detail')).toHaveAttribute('aria-labelledby', 'catalog-detail-title');
+  const names = await page.locator('#catalog-detail button').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label')));
+  expect(names.every(Boolean)).toBe(true); expect(new Set(names).size).toBe(names.length);
+  for (const theme of ['dark', 'light']) {
+    await page.locator('html').evaluate((html, theme) => html.dataset.theme = theme, theme);
+    // Scope is the catalog shell; opaque sandbox previews require separate audits.
+    const result = await new AxeBuilder({ page }).exclude('iframe').withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+    await info.attach(`catalog-shell-${theme}-axe.json`, {body:JSON.stringify(result,null,2),contentType:'application/json'});
+    expect.soft(result.violations, `catalog shell ${theme}`).toEqual([]);
+  }
+});
