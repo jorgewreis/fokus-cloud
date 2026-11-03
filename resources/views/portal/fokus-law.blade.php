@@ -8,7 +8,7 @@
   <title>Fokus Law | Fokus Cloud</title>
   <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20261009-select-menu-options-v1" />
   <link rel="stylesheet" href="/marketing/products/fokus-law.css?v=20261008-primary-outline-buttons-v1" />
-  <link rel="stylesheet" href="/portal/assets/fokus-law-shell.css?v=20261014-square-rail-icons-v1" />
+  <link rel="stylesheet" href="/portal/assets/fokus-law-shell.css?v={{ substr(hash_file('sha256', public_path('portal/assets/fokus-law-shell.css')), 0, 16) }}" />
 </head>
 <body class="fokus-law-shell-page">
   <a class="law-shell-skip" href="#law-workspace">Pular para o conteúdo principal</a>
@@ -112,7 +112,7 @@
   <script src="/assets/js/brazilian-documents.js?v=20260930-document-validation-v1"></script>
   <script src="/portal/assets/fokus-law-select.js?v=20261008-select-options-full-width-v1"></script>
   <script src="/portal/assets/fokus-law-access.js?v=20261008-primary-outline-buttons-v2" defer></script>
-  <script src="/portal/assets/fokus-law-contacts.js?v=20261008-contact-detail-edit-permissions-v1" defer></script>
+  <script src="/portal/assets/fokus-law-contacts.js?v={{ substr(hash_file('sha256', public_path('portal/assets/fokus-law-contacts.js')), 0, 16) }}" defer></script>
   <script src="/portal/assets/law-record-ui.js?v=20261008-primary-outline-buttons-v2" defer></script>
   <script src="/portal/assets/fokus-law-processes.js?v=20261008-admin-processes-v1" defer></script>
   <script src="/portal/assets/fokus-law-shell.js?v=20261014-square-rail-icons-v1" defer></script>
