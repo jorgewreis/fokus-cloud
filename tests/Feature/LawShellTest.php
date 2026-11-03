@@ -60,6 +60,8 @@ class LawShellTest extends TestCase
         $response = $this->actingAs($this->user)->withSession(['active_company_id' => $this->companyId])->get('/portal/fokus-law');
 
         $response->assertOk()->assertViewIs('portal.fokus-law');
+        $this->assertTrue($response->headers->hasCacheControlDirective('private'));
+        $this->assertTrue($response->headers->hasCacheControlDirective('no-store'));
         $this->assertStringContainsString('Fokus Law', $response->getContent());
         $this->get('/portal/fokus-law.html')->assertNotFound();
     }

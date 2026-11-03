@@ -11,7 +11,13 @@ name: Ephemeral security homologation
       - 'config/**'
       - 'database/**'
       - 'routes/**'
+      - 'resources/views/portal/fokus-law.blade.php'
+      - 'public/assets/css/shared/fokus.css'
+      - 'public/assets/js/**'
+      - 'public/marketing/products/fokus-law.css'
+      - 'public/portal/assets/**'
       - 'tests/**'
+      - 'tools/generate-fokus-law-assets.mjs'
       - 'composer.json'
       - 'composer.lock'
       - 'package.json'
@@ -28,7 +34,13 @@ name: Ephemeral security homologation
       - 'config/**'
       - 'database/**'
       - 'routes/**'
+      - 'resources/views/portal/fokus-law.blade.php'
+      - 'public/assets/css/shared/fokus.css'
+      - 'public/assets/js/**'
+      - 'public/marketing/products/fokus-law.css'
+      - 'public/portal/assets/**'
       - 'tests/**'
+      - 'tools/generate-fokus-law-assets.mjs'
       - 'composer.json'
       - 'composer.lock'
       - 'package.json'
@@ -115,6 +127,7 @@ jobs:
         run: |
           composer install --no-interaction --prefer-dist --optimize-autoloader
           npm ci
+          npm run law:assets:prepare
           npx playwright install --with-deps chromium
 
       - name: Check isolated contact forms with synthetic browser data
