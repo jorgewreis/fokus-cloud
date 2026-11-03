@@ -19,6 +19,17 @@ async function evidence(page, info, name) {
 }
 const colorProperties = ['color', 'backgroundColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor'];
 async function componentColors(page, selector) {
+  await page.locator('body').evaluate(async (body, selector) => {
+    // Flush the loaded package styles before collecting transitions. Compare
+    // their final colors, without disabling the framework's motion defaults.
+    for (const node of body.querySelectorAll(selector)) {
+      getComputedStyle(node).backgroundColor;
+      getComputedStyle(node).color;
+    }
+    const finiteAnimations = body.getAnimations({ subtree: true }).filter(animation =>
+      Number.isFinite(animation.effect.getComputedTiming().endTime));
+    await Promise.all(finiteAnimations.map(animation => animation.finished));
+  }, selector);
   return page.locator(selector).evaluateAll((nodes, properties) => nodes.map(node => {
     const css = getComputedStyle(node);
     return { tag: node.tagName, classes: node.className, colors: Object.fromEntries(properties.map(name => [name, css[name]])) };
@@ -38,7 +49,7 @@ for (const width of [1440, 390, 320]) for (const theme of ['light', 'dark']) for
       const body = getComputedStyle(document.body);
       const probe = document.createElement('i'); document.body.append(probe);
       const colors = {};
-      for (const token of ['bg', 'text', 'accent', 'code-bg', 'code-text']) {
+      for (const token of ['bg', 'text', 'accent', 'on-accent', 'code-bg', 'code-text']) {
         probe.style.color = `var(--site-${token})`; colors[token] = getComputedStyle(probe).color;
       }
       probe.remove();
@@ -72,6 +83,54 @@ for (const width of [1440, 390, 320]) for (const theme of ['light', 'dark']) for
       await expect(page.locator('.demo-site-nav')).toBeVisible();
       await expect(page.locator('[data-theme-toggle]')).toHaveAttribute('aria-pressed', String(theme === 'dark'));
     }
+    if (route === '/' || route === '/docs') {
+      const ctas = page.locator('.styles-site-cta');
+      await expect(ctas).toHaveCount(3);
+      await componentColors(page, '.styles-site-cta');
+      for (const cta of await ctas.all()) {
+        const outline = await cta.evaluate(node => node.classList.contains('fs-btn-outline-primary'));
+        await expect(cta).toHaveCSS('border-top-color', values.colors.accent);
+        await expect(cta).toHaveCSS('color', values.colors[outline ? 'accent' : 'on-accent']);
+        await expect(cta).toHaveCSS('background-color', outline ? 'rgba(0, 0, 0, 0)' : values.colors.accent);
+      }
+      const audit = await new AxeBuilder({ page }).include('.styles-site-cta').withRules(['color-contrast']).analyze();
+      await info.attach('editorial-cta-contrast.json', { body: JSON.stringify(audit, null, 2), contentType: 'application/json' });
+      expect(audit.violations, 'Editorial CTA text contrast').toEqual([]);
+    }
+    if (route.endsWith('/projects.html') || route.endsWith('/records.html')) {
+      const scroll = page.locator('.demo-scroll');
+      const hintId = await scroll.getAttribute('aria-describedby');
+      expect(hintId).toMatch(/^(projects|records)-scroll-hint$/);
+      const hint = page.locator(`#${hintId}`);
+      await expect(hint).toContainText('Deslize a tabela');
+      await expect(scroll).toHaveAttribute('tabindex', '0');
+      await expect(scroll).toHaveAttribute('role', 'region');
+      if (width <= 390) {
+        await expect(hint).toBeVisible();
+        const hintBox = await hint.boundingBox();
+        expect(hintBox.x).toBeGreaterThanOrEqual(0);
+        expect(hintBox.x + hintBox.width).toBeLessThanOrEqual(width + 1);
+        await expect(scroll).toHaveCSS('overflow-x', 'auto');
+      }
+      if (route.endsWith('/records.html')) await expect(hint).toContainText('botão Ver');
+    }
+    if (route.endsWith('/projects.html')) {
+      const chart = page.locator('.desk-chart svg');
+      await expect(chart).toHaveAttribute('preserveAspectRatio', 'xMidYMid meet');
+      const scale = await chart.evaluate(node => {
+        const matrix = node.getScreenCTM();
+        return { x: Math.hypot(matrix.a, matrix.b), y: Math.hypot(matrix.c, matrix.d) };
+      });
+      expect(scale.x).toBeGreaterThan(0);
+      expect(scale.x, 'Chart must not stretch differently along its axes').toBeCloseTo(scale.y, 6);
+      const labels = page.locator('.desk-chart-labels span');
+      await expect(labels).toHaveText(['S1', 'S2', 'S3', 'S4', 'S5', 'S6']);
+      const metrics = await labels.evaluateAll(nodes => nodes.map(node => ({ font: parseFloat(getComputedStyle(node).fontSize), left: node.getBoundingClientRect().left, right: node.getBoundingClientRect().right })));
+      for (const [index, metric] of metrics.entries()) {
+        expect(metric.font, 'HTML chart labels remain readable on mobile').toBeGreaterThanOrEqual(12);
+        if (index) expect(metric.left).toBeGreaterThanOrEqual(metrics[index - 1].right);
+      }
+    }
     // This gate covers the newly styled editorial structure, not the unchanged
     // legacy labs/component fixtures. Existing showcase and component gates remain.
     if (guide) {
@@ -100,6 +159,25 @@ for (const theme of ['light', 'dark']) {
         const actual = await componentColors(page, selector);
         expect(actual.length, `${slug}: comparison must include real components`).toBeGreaterThan(0);
         expect(actual, `${slug}: editorial CSS must not recolor package components`).toEqual(await componentColors(control, selector));
+        if (slug === 'helpers') {
+          for (const document of [page, control]) {
+            const link = document.locator('main a.fs-btn.fs-btn-primary');
+            await expect(link).toHaveCount(1);
+            const foreground = await link.evaluate(node => {
+              const css = getComputedStyle(node);
+              const token = css.getPropertyValue('--fs-btn-color').trim();
+              const probe = document.createElement('span');
+              probe.style.color = 'var(--fs-btn-color)';
+              node.append(probe);
+              const expected = getComputedStyle(probe).color;
+              probe.remove();
+              return { actual: css.color, expected, token, body: getComputedStyle(document.body).color };
+            });
+            expect(foreground.token, 'Helpers link must expose its framework foreground token').not.toBe('');
+            expect(foreground.actual, 'Helpers link uses --fs-btn-color').toBe(foreground.expected);
+            expect(foreground.actual, 'The editorial anchor reset must not replace the button foreground with body text').not.toBe(foreground.body);
+          }
+        }
       }
     } finally { await control.close(); }
   });

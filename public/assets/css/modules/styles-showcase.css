@@ -593,3 +593,34 @@
 [data-theme=light] .showcase-nav {
   --fs-color-on-primary:var(--site-on-accent);
 }
+
+/* Explicit editorial CTAs only; demonstration buttons keep package colors. */
+.styles-showcase .styles-site-cta {
+  --fs-btn-color: var(--site-on-accent);
+  --fs-btn-bg: var(--site-accent);
+  --fs-btn-border-color: var(--site-accent);
+  color: var(--site-on-accent);
+  background: var(--site-accent);
+  border-color: var(--site-accent);
+}
+.styles-showcase .styles-site-cta.fs-btn-outline-primary {
+  --fs-btn-color: var(--site-accent);
+  --fs-btn-bg: transparent;
+  color: var(--site-accent);
+  background: transparent;
+}
+.styles-showcase .styles-site-cta:hover,
+.styles-showcase .styles-site-cta:active {
+  background: color-mix(in srgb, var(--site-accent) 88%, var(--site-on-accent));
+  border-color: var(--site-accent);
+}
+.styles-showcase .styles-site-cta.fs-btn-outline-primary:hover,
+.styles-showcase .styles-site-cta.fs-btn-outline-primary:active {
+  background: var(--site-accent-soft);
+}
+.styles-showcase .styles-site-cta:focus-visible {
+  outline: 3px solid var(--site-accent);
+  outline-offset: 4px;
+  border-color: var(--site-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--site-accent) 22%, transparent);
+}

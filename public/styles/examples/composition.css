@@ -42,6 +42,7 @@ html[data-embedded="true"] .demo-site-nav { display:none; }
 .demo-stat span { font-size:12px; color:var(--demo-muted); }
 .demo-panel { border:1px solid var(--demo-border); border-radius:var(--demo-radius); padding:24px; background:var(--demo-surface); }
 .demo-scroll { overflow-x:auto; margin-top:16px; }
+.demo-scroll-hint { display:none; margin:12px 0 0; color:var(--demo-muted); font-size:12px; }
 .demo-scroll .fs-table { min-width:420px; }
 .demo-scroll .fs-table th,.demo-scroll .fs-table td { padding:12px; text-align:left; }
 .demo-progress { accent-color:var(--demo-accent); width:100%; height:8px; }
@@ -99,7 +100,9 @@ html[data-embedded="true"] .demo-site-nav { display:none; }
 .desk-chart-key { font-size:12px; color:var(--desk-muted); white-space:nowrap; }
 .desk-chart-key i { display:inline-block; background:var(--demo-accent); width:8px; height:8px; border-radius:50%; margin-right:4px; }
 .desk-chart { margin:16px 0 0; }
-.desk-chart svg { width:100%; height:150px; display:block; }
+.desk-chart svg { width:100%; height:auto; aspect-ratio:600 / 122; display:block; }
+/* HTML labels keep their readable size independently of the SVG scale. */
+.desk-chart-labels { display:flex; justify-content:space-between; padding-inline:2.6667%; margin-top:4px; color:var(--desk-muted); font-size:12px; line-height:1.5; }
 .desk-chart figcaption { font-size:12px; color:var(--desk-muted); margin-top:8px; }
 .desk-search { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px 12px; margin-top:16px; align-items:center; }
 .desk-search label { grid-column:1/-1; font-size:13px; }
@@ -113,6 +116,8 @@ html[data-embedded="true"] .demo-site-nav { display:none; }
 .desk-main>.demo-caption { margin:0; }
 #project-empty { font-size:14px; margin-top:16px; }
 @media(max-width:640px) {
+  .demo-scroll-hint { display:block; }
+  .demo-scroll-hint + .demo-scroll { margin-top:8px; }
   .demo-site-nav,.demo-shell { padding:16px; }
   .demo-grid { grid-template-columns:1fr; }
   .demo-panel { padding:16px; }

@@ -7,7 +7,7 @@
 <title>Gestão de registros · Exemplo Fokus Styles</title>
 <link rel="stylesheet" href="../assets/fokus-2.7.0.min.css">
 <link rel="stylesheet" href="../assets/site-palette.css?v=78761f104e71">
-<link rel="stylesheet" href="composition.css?v=c06b6969f06b">
+<link rel="stylesheet" href="composition.css?v=727ce6f2cc2d">
 </head>
 <body>
 <nav class="demo-site-nav" aria-label="Documentação e aparência">
@@ -30,7 +30,8 @@
 </div>
 <span id="count" role="status" aria-live="polite">3 registros</span>
 </div>
-<div class="demo-scroll" tabindex="0" role="region" aria-label="Tabela de contatos, role horizontalmente em telas pequenas">
+<p class="demo-scroll-hint" id="records-scroll-hint">↔ Deslize a tabela para os lados para ver Detalhes e o botão Ver.</p>
+<div class="demo-scroll" aria-describedby="records-scroll-hint" tabindex="0" role="region" aria-label="Tabela de contatos, role horizontalmente em telas pequenas">
 <table class="fs-table">
 <thead>
 <tr>

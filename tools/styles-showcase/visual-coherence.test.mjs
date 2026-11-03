@@ -109,3 +109,38 @@ test('static same-origin thumbnails receive theme without allowing scripts', asy
   assert.equal(preview.contentDocument.documentElement.dataset.embedded, 'true');
   assert.equal(preview.contentDocument.documentElement.style.colorScheme, 'light');
 });
+
+
+test('six editorial CTAs are explicitly scoped and keep framework demonstrations unbranded', () => {
+  for (const path of ['public/styles/index.html', 'public/styles/docs/index.html']) {
+    const dom = new JSDOM(read(path));
+    try {
+      const d = dom.window.document;
+      const ctas = [...d.querySelectorAll('.styles-site-cta')];
+      assert.equal(ctas.length, 3, path);
+      assert.ok(ctas.every(node => node.matches('a.fs-btn[href]')), path);
+      assert.equal(d.querySelectorAll('[data-component-demo].styles-site-cta').length, 0);
+      assert.equal(ctas.filter(node => node.classList.contains('fs-btn-outline-primary')).length, path.endsWith('/docs/index.html') ? 0 : 2);
+    } finally { dom.window.close(); }
+  }
+});
+
+test('portable tables explain horizontal scrolling and the chart preserves its proportions', () => {
+  for (const model of ['projects', 'records']) {
+    const dom = new JSDOM(read(`public/styles/examples/${model}.html`));
+    try {
+      const d = dom.window.document;
+      const region = d.querySelector('.demo-scroll');
+      assert.equal(region.getAttribute('tabindex'), '0');
+      assert.equal(region.getAttribute('role'), 'region');
+      const hint = d.getElementById(region.getAttribute('aria-describedby'));
+      assert.ok(hint?.matches('.demo-scroll-hint'));
+      assert.match(hint.textContent, /Deslize a tabela/);
+      if (model === 'records') assert.match(hint.textContent, /botão Ver/);
+      if (model === 'projects') {
+        assert.equal(d.querySelector('.desk-chart svg').getAttribute('preserveAspectRatio'), 'xMidYMid meet');
+        assert.deepEqual([...d.querySelectorAll('.desk-chart-labels span')].map(node => node.textContent), ['S1', 'S2', 'S3', 'S4', 'S5', 'S6']);
+      }
+    } finally { dom.window.close(); }
+  }
+});
