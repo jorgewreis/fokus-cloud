@@ -130,6 +130,9 @@ jobs:
           npm run law:assets:prepare
           npx playwright install --with-deps chromium
 
+      - name: Verify immutable asset retention with rsync
+        run: node tests/Deployment/fokus-law-assets-rsync.mjs
+
       - name: Check isolated contact forms with synthetic browser data
         run: node tests/Frontend/law-contact-visual.cjs
 
