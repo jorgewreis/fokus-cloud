@@ -3,11 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="../assets/styles-theme.js?v=43beb173291c"></script>
 <title>Gestão de registros · Exemplo Fokus Styles</title>
 <link rel="stylesheet" href="../assets/fokus-2.7.0.min.css">
-<link rel="stylesheet" href="composition.css">
+<link rel="stylesheet" href="../assets/site-palette.css?v=78761f104e71">
+<link rel="stylesheet" href="composition.css?v=727ce6f2cc2d">
 </head>
 <body>
+<nav class="demo-site-nav" aria-label="Documentação e aparência">
+<a href="https://styles.fokuscloud.com.br/docs">← Documentação Fokus Styles</a>
+<button class="demo-theme-toggle" type="button" data-theme-toggle aria-label="Alternar tema claro e escuro">Alternar tema</button>
+</nav>
 <main class="demo-shell">
 <header class="demo-top">
 <strong>FOKUS DESK / DEMO</strong>
@@ -24,7 +30,8 @@
 </div>
 <span id="count" role="status" aria-live="polite">3 registros</span>
 </div>
-<div class="demo-scroll" tabindex="0" role="region" aria-label="Tabela de contatos, role horizontalmente em telas pequenas">
+<p class="demo-scroll-hint" id="records-scroll-hint">↔ Deslize a tabela para os lados para ver Detalhes e o botão Ver.</p>
+<div class="demo-scroll" aria-describedby="records-scroll-hint" tabindex="0" role="region" aria-label="Tabela de contatos, role horizontalmente em telas pequenas">
 <table class="fs-table">
 <thead>
 <tr>

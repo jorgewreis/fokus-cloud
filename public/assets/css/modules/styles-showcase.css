@@ -1,12 +1,12 @@
 /* Styles-only marketing composition. Framework components use pinned 2.7.0. */
 .styles-showcase {
-  --showcase-bg:#090f0c;
+  --showcase-bg:var(--site-bg);
   --fs-control-transition:none;
-  --showcase-surface:#121c17;
-  --showcase-border:#2b3c32;
-  --showcase-text:#eef5f0;
-  --showcase-muted:#b0c1b6;
-  --showcase-accent:#70e5ad;
+  --showcase-surface:var(--site-surface);
+  --showcase-border:var(--site-border);
+  --showcase-text:var(--site-text);
+  --showcase-muted:var(--site-muted);
+  --showcase-accent:var(--site-accent);
   background:var(--showcase-bg);
   color:var(--showcase-text);
   font-size:16px;
@@ -14,12 +14,12 @@
 }
 
 [data-theme=light] .styles-showcase {
-  --showcase-bg:#f7faf7;
-  --showcase-surface:#fff;
-  --showcase-border:#c4d4c8;
-  --showcase-text:#14261b;
-  --showcase-muted:#4b6253;
-  --showcase-accent:#156c43
+  --showcase-bg:var(--site-bg);
+  --showcase-surface:var(--site-surface);
+  --showcase-border:var(--site-border);
+  --showcase-text:var(--site-text);
+  --showcase-muted:var(--site-muted);
+  --showcase-accent:var(--site-accent)
 }
 
 .styles-showcase * {
@@ -165,7 +165,7 @@
   min-width:0;
   border:1px solid var(--showcase-border);
   border-radius:14px;
-  background:#0b1410;
+  background:var(--site-bg);
   box-shadow:0 0 90px #3bb77812;
   overflow:hidden
 }
@@ -177,18 +177,18 @@
   padding:14px 18px;
   font-size:11px;
   border-bottom:1px solid var(--showcase-border);
-  color:#c4dace
+  color:var(--site-muted)
 }
 .showcase-preview-bar i {
   display:inline-block;
   width:6px;
   height:6px;
   border-radius:50%;
-  background:#70e5ad;
+  background:var(--site-accent);
   margin-right:7px
 }
 .showcase-preview-bar a {
-  color:#a4edc6!important;
+  color:var(--site-accent)!important;
   text-decoration:underline!important;
   text-underline-offset:3px
 }
@@ -199,11 +199,11 @@
   display:block
 }
 .showcase-preview>p {
-  color:#a9bbb2;
+  color:var(--site-muted);
   font-size:10px;
   margin:0;
   padding:10px 18px;
-  border-top:1px solid #2b3c32
+  border-top:1px solid var(--site-border)
 }
 .showcase-strip {
   display:flex;
@@ -247,7 +247,7 @@
 .showcase-mini {
   height:200px;
   overflow:hidden;
-  background:#0b1410;
+  background:var(--site-bg);
   border-bottom:1px solid var(--showcase-border);
   pointer-events:none
 }
@@ -486,10 +486,10 @@
 
 /* Direction B: a broad, luminous product canvas rather than a flat brochure. */
 .styles-showcase {
-  --showcase-bg:#050b09;
-  --showcase-surface:#0b1513;
-  --showcase-accent:#43f18b;
-  --showcase-border:#20372e;
+  --showcase-bg:var(--site-bg);
+  --showcase-surface:var(--site-surface);
+  --showcase-accent:var(--site-accent);
+  --showcase-border:var(--site-border);
   background:radial-gradient(ellipse at 78% 13%,#0b3b2629,transparent 42%),var(--showcase-bg);
 }
 .styles-showcase h1,.styles-showcase h2 {
@@ -501,7 +501,7 @@
 .styles-showcase h1 {font-size:clamp(42px,4.1vw,64px)}
 .styles-showcase h2 {font-size:clamp(28px,3vw,42px)}
 .showcase-wrap {max-width:1512px;padding-inline:42px}
-.showcase-header {background:#050b09d9;position:relative;z-index:2}
+.showcase-header {background:var(--site-bg);position:relative;z-index:2}
 .showcase-nav {min-height:78px}
 .showcase-hero {
   position:relative;isolation:isolate;
@@ -524,7 +524,7 @@
   box-shadow:-8px 0 30px #43f18b20,0 -3px 20px #43f18b17,0 36px 70px #0009;
 }
 .showcase-hero>.showcase-preview:focus-within {transform:none}
-.showcase-preview-bar {padding:10px 16px;background:#09120f}
+.showcase-preview-bar {padding:10px 16px;background:var(--site-surface)}
 .showcase-preview>p {font-size:10px;padding:8px 16px}
 .showcase-hero .fs-btn-primary {box-shadow:0 0 25px #43f18b26}
 .showcase-strip {font-size:11px;padding-block:18px}
@@ -549,8 +549,8 @@
 .showcase-component .fs-table th,.showcase-component .fs-table td {padding:10px 5px;color:var(--showcase-text)}
 .showcase-component .fs-table caption {font-size:10px;text-align:left;color:var(--showcase-muted);margin-bottom:8px}
 .showcase-component .fs-badge {font-size:10px}
-[data-theme=light] .styles-showcase {--showcase-bg:#f7faf7;--showcase-surface:#fff;--showcase-accent:#156c43;--showcase-border:#c4d4c8;}
-[data-theme=light] .showcase-header {background:#f7faf7}
+[data-theme=light] .styles-showcase {--showcase-bg:var(--site-bg);--showcase-surface:var(--site-surface);--showcase-accent:var(--site-accent);--showcase-border:var(--site-border);}
+[data-theme=light] .showcase-header {background:var(--site-bg)}
 [data-theme=light] .showcase-hero>.showcase-preview {box-shadow:0 24px 60px #16332222}
 @media(max-width:1100px) {
  .showcase-wrap {padding-inline:24px}
@@ -575,7 +575,7 @@
  .styles-showcase h1 {font-size:42px}
 }
 
-/* The install header follows the active theme, unlike the dark dashboard. */
+/* Preview chrome follows the active site theme, as do the portable models. */
 .showcase-terminal .showcase-preview-bar {background:var(--showcase-surface)}
 
 
@@ -583,7 +583,7 @@
 .showcase-actions,
 .showcase-nav {
   --fs-color-primary:var(--showcase-accent);
-  --fs-color-on-primary:#032b15;
+  --fs-color-on-primary:var(--site-on-accent);
   --fs-color-text-primary:var(--showcase-text);
   --fs-color-bg-subtle:var(--showcase-surface);
   --fs-color-border-default:var(--showcase-border);
@@ -591,5 +591,36 @@
 }
 [data-theme=light] .showcase-actions,
 [data-theme=light] .showcase-nav {
-  --fs-color-on-primary:#fff;
+  --fs-color-on-primary:var(--site-on-accent);
+}
+
+/* Explicit editorial CTAs only; demonstration buttons keep package colors. */
+.styles-showcase .styles-site-cta {
+  --fs-btn-color: var(--site-on-accent);
+  --fs-btn-bg: var(--site-accent);
+  --fs-btn-border-color: var(--site-accent);
+  color: var(--site-on-accent);
+  background: var(--site-accent);
+  border-color: var(--site-accent);
+}
+.styles-showcase .styles-site-cta.fs-btn-outline-primary {
+  --fs-btn-color: var(--site-accent);
+  --fs-btn-bg: transparent;
+  color: var(--site-accent);
+  background: transparent;
+}
+.styles-showcase .styles-site-cta:hover,
+.styles-showcase .styles-site-cta:active {
+  background: color-mix(in srgb, var(--site-accent) 88%, var(--site-on-accent));
+  border-color: var(--site-accent);
+}
+.styles-showcase .styles-site-cta.fs-btn-outline-primary:hover,
+.styles-showcase .styles-site-cta.fs-btn-outline-primary:active {
+  background: var(--site-accent-soft);
+}
+.styles-showcase .styles-site-cta:focus-visible {
+  outline: 3px solid var(--site-accent);
+  outline-offset: 4px;
+  border-color: var(--site-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--site-accent) 22%, transparent);
 }

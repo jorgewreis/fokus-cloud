@@ -1,13 +1,10 @@
 /* Documentation information architecture. No framework component overrides. */
 .styles-documentation {
-    --docs-surface: var(--showcase-surface, var(--fs-color-subtle));
-    --docs-border: var(--showcase-border, var(--fs-color-border));
-    --docs-text: var(--showcase-text, var(--fs-color-text));
-    --docs-muted: var(--showcase-muted, var(--fs-color-muted));
-    --docs-accent: var(--showcase-accent, var(--styles-green));
-}
-[data-theme="light"] .styles-documentation {
-    --docs-accent: #156c43;
+    --docs-surface: var(--site-surface);
+    --docs-border: var(--site-border);
+    --docs-text: var(--site-text);
+    --docs-muted: var(--site-muted);
+    --docs-accent: var(--site-accent);
 }
 .styles-doc-skip {
     position: fixed;
@@ -38,7 +35,7 @@
 .styles-showcase .styles-doc-breadcrumb { padding-top: 28px; }
 .styles-doc-breadcrumb a:hover { text-decoration: underline; text-underline-offset: 4px; }
 .styles-doc-hero { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: center; gap: 64px; padding-block: 48px 64px; }
-.styles-documentation .styles-doc-hero h1 { font-size: clamp(52px, 6vw, 86px); }
+.styles-documentation .styles-doc-hero h1 { font-size: clamp(42px, 4.1vw, 64px); }
 .styles-doc-hero h1 em { font-style: normal; color: var(--docs-accent); }
 .styles-doc-lead { max-width: 600px; font-size: 18px; }
 .styles-doc-start { padding: 28px; border: 1px solid var(--docs-border); border-radius: 12px; background: var(--docs-surface); }
@@ -119,3 +116,312 @@
     .styles-doc-breadcrumb { font-size: 12px; }
 }
 .styles-documentation .styles-hero p a { text-decoration: underline; text-underline-offset: 4px; }
+
+/* The five guides share the product shell, not the showcase's demo overrides.
+   Keep package tokens untouched: only editorial elements consume site tokens. */
+.styles-docs.styles-documentation {
+    background: var(--site-bg);
+    color: var(--site-text);
+    font-family: var(--site-font-sans);
+    font-size: 16px;
+    line-height: 1.6;
+}
+.styles-documentation .styles-shell {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 1512px;
+    margin-inline: auto;
+    padding-inline: 42px;
+}
+.styles-documentation .styles-topbar {
+    background: var(--site-bg);
+    border-color: var(--docs-border);
+}
+.styles-documentation .styles-topbar-inner {
+    min-height: 78px;
+    box-sizing: border-box;
+}
+.styles-documentation .styles-brand { color: var(--docs-text); }
+.styles-documentation .styles-doc-global-nav { color: var(--docs-muted); }
+.styles-documentation .styles-doc-global-nav a:hover { color: var(--docs-accent); }
+.styles-documentation .styles-doc-theme {
+    --fs-btn-color: var(--docs-text);
+    --fs-btn-bg: var(--docs-surface);
+    --fs-btn-border-color: var(--docs-border);
+    --fs-btn-hover-bg: var(--site-accent-soft);
+    --fs-btn-active-bg: var(--site-accent-soft);
+    color: var(--docs-text);
+    background: var(--docs-surface);
+    border: 1px solid var(--docs-border);
+    border-radius: 6px;
+    font-family: var(--site-font-sans);
+    font-weight: 600;
+}
+.styles-documentation .styles-doc-theme:hover {
+    color: var(--docs-accent);
+    background: var(--site-accent-soft);
+    border-color: var(--docs-accent);
+}
+.styles-documentation .styles-sidebar-layout {
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 32px;
+    padding-block: 32px 64px;
+}
+.styles-documentation .styles-sidebar a { color: var(--docs-muted); }
+.styles-documentation .styles-sidebar strong,
+.styles-documentation .styles-sidebar a:hover,
+.styles-documentation .styles-sidebar a.is-active { color: var(--docs-accent); }
+.styles-documentation .styles-sidebar-subnav { border-color: var(--docs-border); }
+.styles-documentation .styles-sidebar-subnav a { font-size: 13px; }
+.styles-documentation .styles-doc-version { margin-block: 24px; border-radius: var(--site-radius); }
+.styles-documentation .styles-hero { padding-block: 12px 48px; }
+.styles-documentation .styles-hero h1 {
+    max-width: 900px;
+    margin-block: 16px 24px;
+    color: var(--docs-text);
+    font-family: var(--site-font-sans);
+    font-size: clamp(42px, 4.1vw, 64px);
+    font-weight: 700;
+    line-height: 1.06;
+    letter-spacing: -.045em;
+}
+.styles-documentation .styles-hero h1 span,
+.styles-documentation .styles-eyebrow { color: var(--docs-accent); }
+.styles-documentation .styles-hero p { color: var(--docs-muted); }
+.styles-documentation :is(.layout-doc-section, .forms-doc-section, .styles-component-section) {
+    padding-block: 48px;
+    border-color: var(--docs-border);
+}
+.styles-documentation :is(.layout-doc-heading, .forms-doc-heading, .styles-component-heading) { margin-bottom: 24px; }
+.styles-documentation :is(.layout-doc-heading, .forms-doc-heading, .styles-component-heading) h2 {
+    margin-block: 14px 16px;
+    color: var(--docs-text);
+    font-family: var(--site-font-sans);
+    font-size: clamp(28px, 3vw, 42px);
+    font-weight: 700;
+    line-height: 1.12;
+    letter-spacing: -.045em;
+}
+.styles-documentation :is(.layout-doc-heading, .forms-doc-heading, .styles-component-heading) p,
+.styles-documentation :is(.layout-doc-principles, .layout-doc-guidance, .forms-doc-guidance) p,
+.styles-documentation .styles-reference-grid > article:not(.styles-utility-surface) > p,
+.styles-documentation .styles-component-caption { color: var(--docs-muted); }
+.styles-documentation .styles-reference-grid > article:not(.styles-utility-surface) > h3 {
+    color: var(--docs-text);
+    font-family: var(--site-font-sans);
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+.styles-documentation :is(.layout-doc-principles, .styles-reference-grid) {
+    gap: 16px;
+    border: 0;
+    background: transparent;
+}
+.styles-documentation :is(.layout-doc-principles, .styles-reference-grid) > article:not(.styles-utility-surface),
+.styles-documentation :is(.layout-doc-guidance, .forms-doc-guidance) > div {
+    padding: 24px;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--site-radius);
+    background: var(--docs-surface);
+}
+.styles-documentation .layout-doc-principles > article { min-height: 0; }
+.styles-documentation .layout-doc-principles strong { color: var(--docs-accent); }
+.styles-documentation :is(.forms-foundation-quote, .forms-lab-intro, .styles-component-note) {
+    padding: 24px;
+    border-color: var(--docs-accent);
+    border-radius: var(--site-radius);
+    background: var(--site-accent-soft);
+    color: var(--docs-muted);
+}
+.styles-documentation :is(.forms-foundation-quote, .forms-lab-intro) strong {
+    color: var(--docs-text);
+    font-family: var(--site-font-sans);
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -.02em;
+}
+.styles-documentation .forms-foundation-quote p,
+.styles-documentation .forms-lab-intro > span:last-child { color: var(--docs-muted); }
+.styles-documentation .styles-component-note strong { color: var(--docs-text); }
+.styles-documentation :is(.layout-doc-note, .forms-lab-principles) {
+    border-color: var(--docs-border);
+    border-radius: var(--site-radius);
+    background: var(--docs-border);
+    overflow: hidden;
+}
+.styles-documentation :is(.layout-doc-note, .forms-lab-principles) > * {
+    background: var(--docs-surface);
+    color: var(--docs-muted);
+}
+.styles-documentation :is(.layout-doc-note, .forms-lab-principles) > strong { color: var(--docs-accent); }
+.styles-documentation :is(.forms-doc-note, .forms-checklist) {
+    border-color: var(--docs-border);
+    border-radius: var(--site-radius);
+    background: var(--docs-surface);
+    color: var(--docs-muted);
+}
+.styles-documentation .forms-doc-note span { color: var(--docs-muted); }
+.styles-documentation .forms-doc-note strong,
+.styles-documentation .forms-checklist li::marker { color: var(--docs-accent); }
+.styles-documentation .layout-doc-label.is-good { background: var(--site-accent-soft); color: var(--docs-accent); }
+.styles-documentation :is(.styles-token-list, .styles-token-list div) { border-color: var(--docs-border); }
+.styles-documentation .styles-token-list dt { color: var(--docs-accent); }
+.styles-documentation .styles-token-list dd { color: var(--docs-muted); }
+/* These are example containers and toolbar chrome, never the component itself. */
+.styles-documentation :is(.styles-component-demo, .forms-structure-demo, .forms-field-showcase, .forms-validation-demo, .forms-check-showcase) {
+    border-color: var(--docs-border);
+    border-radius: var(--site-radius);
+    background: var(--docs-surface);
+}
+.styles-documentation :is(.styles-lab, .layout-lab-playground, .forms-lab-playground) {
+    border-color: var(--docs-border);
+    border-radius: var(--site-radius);
+}
+.styles-documentation :is(.styles-lab-toolbar, .layout-lab-toolbar, .forms-lab-toolbar) {
+    border-color: var(--docs-border);
+    background: var(--docs-surface);
+    color: var(--docs-text);
+}
+.styles-documentation :is(.styles-lab-toolbar, .layout-lab-toolbar, .forms-lab-toolbar) small,
+.styles-documentation .layout-lab-kicker { color: var(--docs-muted); }
+/* Explicit foreground and background remain paired in both site themes. */
+.styles-documentation .styles-code,
+.styles-documentation .styles-component-code pre,
+.styles-documentation .styles-lab-code {
+    border: 1px solid var(--docs-border);
+    border-radius: var(--site-radius);
+    background: var(--site-code-bg);
+    color: var(--site-code-text);
+}
+.styles-documentation .styles-code code,
+.styles-documentation .styles-component-code code,
+.styles-documentation .styles-lab-code code { color: inherit; }
+.styles-documentation .layout-code-heading { color: var(--docs-muted); }
+.styles-documentation .layout-copy-status { color: var(--docs-accent); }
+.styles-documentation :is(.styles-hero, .layout-doc-heading, .forms-doc-heading, .styles-component-heading, .styles-doc-version, .styles-component-note) code,
+.styles-documentation .styles-reference-grid > article:not(.styles-utility-surface) > p code { color: var(--docs-accent); }
+.styles-documentation .styles-doc-pager { border-color: var(--docs-border); }
+.styles-documentation .styles-doc-pager :is(a, span) { color: var(--docs-muted); }
+.styles-documentation .styles-doc-pager a:hover,
+.styles-documentation .styles-doc-pager span[aria-current="page"] { color: var(--docs-accent); }
+.styles-documentation .styles-footer { border-color: var(--docs-border); color: var(--docs-muted); }
+.styles-documentation .styles-footer-brand { color: var(--docs-text) !important; }
+.styles-documentation .styles-footer-brand:hover { color: var(--docs-accent) !important; }
+@media (max-width: 1100px) {
+    .styles-documentation .styles-shell { padding-inline: 24px; }
+    .styles-documentation .styles-sidebar-layout { gap: 24px; }
+    .styles-documentation :is(.layout-doc-principles, .styles-reference-grid) { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+    .styles-documentation .styles-sidebar-layout { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+    .styles-documentation .styles-hero { padding-block: 8px 32px; }
+    .styles-documentation :is(.layout-doc-section, .forms-doc-section, .styles-component-section) { padding-block: 32px; }
+}
+@media (max-width: 520px) {
+    .styles-documentation .styles-shell { padding-inline: 20px; }
+    .styles-documentation .styles-topbar-inner { gap: 12px; }
+    .styles-documentation .styles-doc-product { padding-left: 12px; font-size: 12px; }
+    .styles-documentation .styles-doc-global-nav { gap: 16px; }
+    .styles-documentation .styles-doc-theme { padding-inline: 12px; font-size: 12px; }
+    .styles-documentation :is(.layout-doc-principles, .styles-reference-grid) > article:not(.styles-utility-surface) { padding: 20px; }
+}
+
+/* The utility board labels are editorial; its right-hand samples stay native. */
+.styles-documentation :is(.styles-utility-board, .styles-utility-row) {
+    border-color: var(--docs-border);
+    background: var(--docs-border);
+}
+.styles-documentation .styles-utility-row > strong {
+    background: var(--docs-surface);
+    color: var(--docs-accent);
+}
+
+/* Local teaching diagrams and playground composition share the site palette.
+   Native fs-* controls, semantic warning/info states and utility samples do not. */
+.styles-documentation :is(.layout-lab-stage, .styles-lab-stage) {
+    background: var(--site-bg);
+    color: var(--site-text);
+}
+.styles-documentation :is(.layout-lab-sidebar, .layout-lab-metrics article, .layout-lab-panel, .layout-lab-footer, .styles-lab-output, .forms-lab-playground) {
+    background: var(--site-surface);
+    border-color: var(--site-border);
+    color: var(--site-text);
+}
+.styles-documentation .layout-lab-project-grid article {
+    background: var(--site-bg);
+    border-color: var(--site-border);
+    color: var(--site-text);
+}
+.styles-documentation .layout-lab-sidebar a,
+.styles-documentation .layout-lab-header p,
+.styles-documentation .layout-lab-metrics :is(span, small),
+.styles-documentation .layout-lab-project-grid :is(p, small),
+.styles-documentation .layout-lab-next p,
+.styles-documentation .layout-lab-person small,
+.styles-documentation .layout-lab-footer div span,
+.styles-documentation .layout-lab-api,
+.styles-documentation .styles-lab-output { color: var(--site-muted); }
+.styles-documentation .layout-lab-sidebar a.is-current,
+.styles-documentation .layout-lab-status.is-green {
+    color: var(--site-accent);
+    background: var(--site-accent-soft);
+}
+.styles-documentation .layout-lab-sidebar-note {
+    color: var(--site-accent);
+    border-color: var(--site-border);
+}
+.styles-documentation .layout-lab-metrics strong,
+.styles-documentation .layout-lab-footer strong { color: var(--site-accent); }
+.styles-documentation .layout-lab-mark,
+.styles-documentation .layout-lab-person > span {
+    color: var(--site-on-accent);
+    background: var(--site-accent);
+}
+.styles-documentation .layout-lab-progress { background: var(--site-border); }
+.styles-documentation .layout-lab-progress i { background: var(--site-accent); }
+.styles-documentation .layout-demo-frame {
+    border-color: var(--site-border);
+    background: repeating-linear-gradient(135deg, transparent 0 16px, color-mix(in srgb, var(--site-accent) 6%, transparent) 16px 17px);
+}
+.styles-documentation .layout-demo-container {
+    border-color: var(--site-accent);
+    background: var(--site-surface);
+}
+.styles-documentation .layout-demo-container span { color: var(--site-accent); }
+.styles-documentation .layout-demo-container small,
+.styles-documentation .layout-responsive-demos small { color: var(--site-muted); }
+.styles-documentation :is(.layout-demo-grid, .layout-demo-flex, .layout-responsive-demos article) {
+    border-color: var(--site-border);
+    background: var(--site-surface);
+}
+.styles-documentation .layout-demo-grid div,
+.styles-documentation .layout-demo-flex span,
+.styles-documentation .layout-demo-stack div {
+    border-color: var(--site-accent);
+    color: var(--site-accent);
+    background: var(--site-bg);
+}
+.styles-documentation .layout-demo-flex span:nth-child(2) { color: var(--site-text); }
+.styles-documentation .layout-demo-stack {
+    border-color: var(--site-accent);
+    background: var(--site-accent-soft);
+}
+.styles-documentation .layout-responsive-demos article > span { color: var(--site-accent); }
+.styles-documentation :is(.responsive-card-stack, .responsive-card-grid) i {
+    border-color: var(--site-accent);
+    color: var(--site-accent);
+}
+.styles-documentation :is(.forms-group-demo, .forms-lab-form, .forms-lab-success) {
+    border-color: var(--site-accent);
+    background: var(--site-accent-soft);
+}
+.styles-documentation .forms-lab-success strong,
+.styles-documentation .forms-lab-status,
+.styles-documentation .forms-range-output { color: var(--site-accent); }
+.styles-documentation .forms-lab-success span { color: var(--site-muted); }
+.styles-documentation .layout-doc-label.is-bad {
+    color: var(--site-danger);
+    background: var(--site-danger-soft);
+}
