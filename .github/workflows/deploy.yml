@@ -4,6 +4,7 @@ name: Deploy Fokus Cloud Laravel
   push:
     branches:
       - main
+  pull_request:
   workflow_dispatch:
 
 concurrency:
