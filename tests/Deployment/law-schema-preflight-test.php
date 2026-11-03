@@ -10,7 +10,7 @@ $script = realpath($argv[2]);
 require $root . '/vendor/autoload.php';
 $app = require $root . '/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-if (config('database.connections.mysql.database') !== 'fokuscloud_schema_test') {
+if (config('database.default') !== 'mysql' || config('database.connections.mysql.host') !== '127.0.0.1' || config('database.connections.mysql.database') !== 'fokuscloud_schema_test') {
     throw new RuntimeException('Unexpected configured database.');
 }
 $name = '2026_10_30_160000_add_encrypted_details_to_law_contacts';
@@ -20,6 +20,9 @@ $run = static function (int $expected) use ($root, $script): void {
     $process = new Symfony\Component\Process\Process([PHP_BINARY, $script, $root]);
     $process->run();
     $ok = $process->getExitCode() === 0;
+    if (!$ok && $expected !== 0 && !str_contains($process->getErrorOutput() . $process->getOutput(), 'Schema and migration ledger disagree')) {
+        throw new RuntimeException('Failure was not the expected schema divergence guard.');
+    }
     if ($ok !== ($expected === 0)) {
         throw new RuntimeException('Unexpected prepublication check exit status.');
     }
