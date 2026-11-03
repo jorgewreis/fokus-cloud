@@ -585,6 +585,8 @@
       if (current && !options.some(([value]) => value === current)) options.push([current, `Valor atual preservado: ${current}`]);
       options.push([otherValue, 'Outra instituição / banco não listado']);
       const initialOptions = [...options];
+      const otherOption = initialOptions.find(([value]) => value === otherValue);
+      const searchableOptions = initialOptions.filter(([value]) => value !== '' && value !== otherValue);
       const config = {
         options,
         selected: current || '',
@@ -593,14 +595,15 @@
           const search = input('', 'Buscar por nome ou código', 180); search.type = 'search'; search.setAttribute('aria-label', 'Buscar banco por nome ou código'); search.classList.add('law-bank-search');
           control.setAttribute('aria-label', 'Banco / instituição (número-código BCB)');
           controlField.insertBefore(search, control);
+          const noMatches = $('small', 'law-bank-search-empty', 'Nenhum banco encontrado'); noMatches.hidden = true; controlField.append(noMatches);
           const normalizeSearch = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
           search.addEventListener('input', () => {
             const query = normalizeSearch(search.value);
-            const matches = query ? initialOptions.filter(([value, label]) => normalizeSearch(`${value} ${label}`).includes(query)) : initialOptions;
-            const visible = [...matches];
+            const matches = query ? searchableOptions.filter(([value, label]) => normalizeSearch(`${value} ${label}`).includes(query)) : searchableOptions;
+            const visible = [initialOptions[0], ...matches, otherOption];
             const selectedOption = initialOptions.find(([value]) => value === control.value);
             if (selectedOption && !visible.some(([value]) => value === selectedOption[0])) visible.push(selectedOption);
-            if (query && matches.length === 0) visible.unshift(['', 'Nenhum banco encontrado']);
+            noMatches.hidden = !query || matches.length > 0;
             const selected = control.value;
             control.replaceChildren(...visible.map(([value, label]) => new Option(label, value)));
             control.value = selected;

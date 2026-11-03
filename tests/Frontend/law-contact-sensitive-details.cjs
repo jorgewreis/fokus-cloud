@@ -106,19 +106,24 @@ bankSearch.dispatch('input');
 assert(bankSelect.options.some(([value]) => value === '001 - BCO DO BRASIL S.A.'), 'bank search must match the three-digit code');
 bankSearch.value = 'no-bank-matches-this';
 bankSearch.dispatch('input');
-assert(bankSelect.options.some(([_, label]) => label === 'Nenhum banco encontrado'));
+assert(bankSelect.options.some(([value]) => value === ''), 'the bank placeholder must stay visible for empty results');
+const otherBank = bankSelect.options.find(([_, label]) => label === 'Outra instituição / banco não listado');
+assert(otherBank, 'the unlisted-bank option must stay visible for every filter');
+assert.equal(bankField.children[2].hidden, false, 'an empty-result hint should be shown separately from selectable values');
 assert.equal(bankSelect.value, 'Synthetic legacy bank', 'an empty search result must not clear a legacy selection');
+bankSelect.value = otherBank[0];
+bankSelect.dispatch('change');
+accountRow.children[1].children[0].value = 'Synthetic unlisted bank';
+assert.equal(serialize().bank_accounts[0].bank, 'Synthetic unlisted bank', 'unlisted bank should be selectable without clearing the active search');
+assert(!serialize().bank_accounts[0].bank.startsWith('__fokus_other_bank_'), 'manual bank choices must never serialize internal sentinel values');
+assert.equal(accountRow.children[1].hidden, false, 'choosing an unlisted bank should expose its name input');
+bankSelect.value = 'Synthetic legacy bank';
+bankSelect.dispatch('change');
 bankSearch.value = '';
 bankSearch.dispatch('input');
 assert(bankSelect.options.some(([value]) => value === '001 - BCO DO BRASIL S.A.'), 'clearing search must restore the full list');
 assert.equal(bankSelect.value, 'Synthetic legacy bank', 'clearing search must preserve the selected legacy value');
-const otherBank = bankSelect.options.find(([_, label]) => label === 'Outra instituição / banco não listado');
-bankSelect.value = otherBank[0];
-bankSelect.dispatch('change');
-accountRow.children[1].children[0].value = 'Synthetic unlisted bank';
-assert.equal(serialize().bank_accounts[0].bank, 'Synthetic unlisted bank', 'unlisted institution should be stored as entered');
-assert(!serialize().bank_accounts[0].bank.startsWith('__fokus_other_bank_'), 'manual bank choices must never serialize internal sentinel values');
-assert.equal(accountRow.children[1].hidden, false, 'choosing an unlisted bank should expose its name input');
+assert.equal(bankField.children[2].hidden, true, 'clearing search should hide the empty-result hint');
 
 const fullParentage = context.sensitiveDetailsEditor({ parentage: [
   { name: 'Synthetic Father', relationship: 'Pai' },
