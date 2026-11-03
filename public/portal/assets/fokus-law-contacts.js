@@ -544,8 +544,10 @@
           const config = typeof options === 'function' ? options(item[key] || '') : null;
           const choices = config?.options || options;
           const control = choices ? select(choices, config?.selected ?? item[key] ?? choices[0]?.[0] ?? '') : input(item[key] || '', '', length);
-          control.autocomplete = 'off'; controls[key] = { control, read: config?.readValue || (() => control.value.trim()) }; row.append(field(key === 'bank' ? 'Banco (código COMPE)' : title, control));
-          config?.setup?.(control, row);
+          control.autocomplete = 'off'; controls[key] = { control, read: config?.readValue || (() => control.value.trim()) };
+          const controlField = field(key === 'bank' ? 'Banco / instituição (número-código BCB)' : title, control);
+          row.append(controlField);
+          config?.setup?.(control, row, controlField);
         });
         row.readValue = () => Object.fromEntries(Object.entries(controls).map(([key, item]) => [key, item.read(item.control)]));
         row.append(button('Remover', 'fs-btn fs-btn-danger law-contact-remove', () => row.remove())); rows.append(row);
@@ -571,7 +573,9 @@
       return roles + parentageRows().filter((item) => item.name || item.relationship).length < 4;
     });
     [...parentageRows.rows.children].forEach((row, index) => { row.originalParentageIndex = additionalIndices[index]; });
-    const bankCatalog = Array.isArray(window.FokusLawBankCatalog?.banks) ? window.FokusLawBankCatalog.banks : [];
+    const bankCatalog = Array.isArray(window.FokusLawBankCatalog?.banks)
+      ? [...window.FokusLawBankCatalog.banks].sort((left, right) => left.code.localeCompare(right.code))
+      : [];
     let otherBankSequence = 0;
     const bankInputs = new WeakMap();
     const bankField = (current) => {
@@ -580,11 +584,27 @@
       const options = [['', 'Selecione um banco'], ...bankCatalog.map(({ code, name }) => [`${code} - ${name}`, `${code} - ${name}`])];
       if (current && !options.some(([value]) => value === current)) options.push([current, `Valor atual preservado: ${current}`]);
       options.push([otherValue, 'Outra instituição / banco não listado']);
+      const initialOptions = [...options];
       const config = {
         options,
         selected: current || '',
         readValue: (control) => control.value === otherValue ? (bankInputs.get(control)?.value || '').trim() : control.value.trim(),
-        setup: (control, row) => {
+        setup: (control, row, controlField) => {
+          const search = input('', 'Buscar por nome ou código', 180); search.type = 'search'; search.setAttribute('aria-label', 'Buscar banco por nome ou código'); search.classList.add('law-bank-search');
+          control.setAttribute('aria-label', 'Banco / instituição (número-código BCB)');
+          controlField.insertBefore(search, control);
+          const normalizeSearch = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
+          search.addEventListener('input', () => {
+            const query = normalizeSearch(search.value);
+            const matches = query ? initialOptions.filter(([value, label]) => normalizeSearch(`${value} ${label}`).includes(query)) : initialOptions;
+            const visible = [...matches];
+            const selectedOption = initialOptions.find(([value]) => value === control.value);
+            if (selectedOption && !visible.some(([value]) => value === selectedOption[0])) visible.push(selectedOption);
+            if (query && matches.length === 0) visible.unshift(['', 'Nenhum banco encontrado']);
+            const selected = control.value;
+            control.replaceChildren(...visible.map(([value, label]) => new Option(label, value)));
+            control.value = selected;
+          });
           const otherInput = input('', 'Informe o nome da instituição', 180);
           const otherField = field('Instituição não listada', otherInput); otherField.hidden = control.value !== otherValue;
           control.addEventListener('change', () => { otherField.hidden = control.value !== otherValue; });
