@@ -8,6 +8,8 @@
   --site-accent: #43f18b;
   --site-accent-soft: #113b24;
   --site-on-accent: #032b15;
+  --site-danger: #ffb8b8;
+  --site-danger-soft: #3b1b20;
   --site-code-bg: #0b1513;
   --site-code-text: #eef5f0;
   --site-radius: 12px;
@@ -22,6 +24,8 @@
   --site-accent: #156c43;
   --site-accent-soft: #e4f3e8;
   --site-on-accent: #ffffff;
+  --site-danger: #a51e2c;
+  --site-danger-soft: #fce8eb;
   --site-code-bg: #edf4ee;
   --site-code-text: #14261b;
 }

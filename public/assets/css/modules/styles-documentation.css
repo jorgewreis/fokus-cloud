@@ -337,3 +337,91 @@
     background: var(--docs-surface);
     color: var(--docs-accent);
 }
+
+/* Local teaching diagrams and playground composition share the site palette.
+   Native fs-* controls, semantic warning/info states and utility samples do not. */
+.styles-documentation :is(.layout-lab-stage, .styles-lab-stage) {
+    background: var(--site-bg);
+    color: var(--site-text);
+}
+.styles-documentation :is(.layout-lab-sidebar, .layout-lab-metrics article, .layout-lab-panel, .layout-lab-footer, .styles-lab-output, .forms-lab-playground) {
+    background: var(--site-surface);
+    border-color: var(--site-border);
+    color: var(--site-text);
+}
+.styles-documentation .layout-lab-project-grid article {
+    background: var(--site-bg);
+    border-color: var(--site-border);
+    color: var(--site-text);
+}
+.styles-documentation .layout-lab-sidebar a,
+.styles-documentation .layout-lab-header p,
+.styles-documentation .layout-lab-metrics :is(span, small),
+.styles-documentation .layout-lab-project-grid :is(p, small),
+.styles-documentation .layout-lab-next p,
+.styles-documentation .layout-lab-person small,
+.styles-documentation .layout-lab-footer div span,
+.styles-documentation .layout-lab-api,
+.styles-documentation .styles-lab-output { color: var(--site-muted); }
+.styles-documentation .layout-lab-sidebar a.is-current,
+.styles-documentation .layout-lab-status.is-green {
+    color: var(--site-accent);
+    background: var(--site-accent-soft);
+}
+.styles-documentation .layout-lab-sidebar-note {
+    color: var(--site-accent);
+    border-color: var(--site-border);
+}
+.styles-documentation .layout-lab-metrics strong,
+.styles-documentation .layout-lab-footer strong { color: var(--site-accent); }
+.styles-documentation .layout-lab-mark,
+.styles-documentation .layout-lab-person > span {
+    color: var(--site-on-accent);
+    background: var(--site-accent);
+}
+.styles-documentation .layout-lab-progress { background: var(--site-border); }
+.styles-documentation .layout-lab-progress i { background: var(--site-accent); }
+.styles-documentation .layout-demo-frame {
+    border-color: var(--site-border);
+    background: repeating-linear-gradient(135deg, transparent 0 16px, color-mix(in srgb, var(--site-accent) 6%, transparent) 16px 17px);
+}
+.styles-documentation .layout-demo-container {
+    border-color: var(--site-accent);
+    background: var(--site-surface);
+}
+.styles-documentation .layout-demo-container span { color: var(--site-accent); }
+.styles-documentation .layout-demo-container small,
+.styles-documentation .layout-responsive-demos small { color: var(--site-muted); }
+.styles-documentation :is(.layout-demo-grid, .layout-demo-flex, .layout-responsive-demos article) {
+    border-color: var(--site-border);
+    background: var(--site-surface);
+}
+.styles-documentation .layout-demo-grid div,
+.styles-documentation .layout-demo-flex span,
+.styles-documentation .layout-demo-stack div {
+    border-color: var(--site-accent);
+    color: var(--site-accent);
+    background: var(--site-bg);
+}
+.styles-documentation .layout-demo-flex span:nth-child(2) { color: var(--site-text); }
+.styles-documentation .layout-demo-stack {
+    border-color: var(--site-accent);
+    background: var(--site-accent-soft);
+}
+.styles-documentation .layout-responsive-demos article > span { color: var(--site-accent); }
+.styles-documentation :is(.responsive-card-stack, .responsive-card-grid) i {
+    border-color: var(--site-accent);
+    color: var(--site-accent);
+}
+.styles-documentation :is(.forms-group-demo, .forms-lab-form, .forms-lab-success) {
+    border-color: var(--site-accent);
+    background: var(--site-accent-soft);
+}
+.styles-documentation .forms-lab-success strong,
+.styles-documentation .forms-lab-status,
+.styles-documentation .forms-range-output { color: var(--site-accent); }
+.styles-documentation .forms-lab-success span { color: var(--site-muted); }
+.styles-documentation .layout-doc-label.is-bad {
+    color: var(--site-danger);
+    background: var(--site-danger-soft);
+}

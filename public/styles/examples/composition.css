@@ -12,10 +12,10 @@
   --demo-radius:var(--site-radius,12px);
   /* System fonts keep the downloadable examples independent of webfonts. */
   --demo-font:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  --demo-error:#ffb8b8;
+  --demo-error:var(--site-danger);
   color-scheme:dark;
 }
-:root[data-theme="light"] { --demo-error:#a51e2c; color-scheme:light; }
+:root[data-theme="light"] { color-scheme:light; }
 * { box-sizing:border-box; }
 body { margin:0; font:14px/1.55 var(--demo-font); background:var(--demo-bg); color:var(--demo-text); }
 a:not(.fs-btn) { color:var(--demo-accent); }
