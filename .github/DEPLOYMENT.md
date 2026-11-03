@@ -28,6 +28,32 @@ servidor. O diretorio `resources/views` deve existir mesmo quando a aplicacao
 servir HTML estatico por `public/`, pois o cache de views do Laravel valida
 esse caminho durante a otimizacao.
 
+## Assets do shell autenticado do Fokus Law
+
+O shell autenticado usa a allowlist explicita de 14 arquivos em
+`tools/generate-fokus-law-assets.mjs`. `npm run law:assets:prepare` gera um
+manifesto deterministico em `config/fokus-law-assets.json` e copias irmas com
+SHA-256 completo no nome, mantendo os arquivos originais e o mesmo diretorio
+para preservar caminhos relativos de CSS. O manifesto e as copias geradas sao
+artefatos locais ignorados pelo Git; `npm run dev` e `npm run build` os geram.
+
+No deploy, a mesma geracao cria um payload temporario. O workflow transfere
+somente as copias imutaveis antes de sincronizar a aplicacao e verifica seus
+SHA-256 no destino. Somente depois disso o `rsync` principal envia o manifesto
+e o Blade que os referencia. O filtro receiver-side protege apenas nomes das
+14 fontes permitidas com um segmento hexadecimal de 64 caracteres; ele nao
+exclui os originais nem outros arquivos do envio. Quando o deploy usa esse
+filtro receiver-side, as versoes antigas permanecem no destino para abas
+abertas e rollback. Um workflow de deploy sem o filtro pode removê-las durante
+o `--delete-delay`; manter o mecanismo de retenção nos fluxos de deploy é
+necessário para preservar essa garantia. Nao ha limpeza automatica dessas
+copias: qualquer coleta futura precisa de uma janela de retencao revisada e
+nao deve remover os arquivos originais.
+
+As respostas autenticadas servidas pelo shell Fokus Law incluem
+`Cache-Control: private, no-store` para impedir que a pagina HTML seja
+armazenada em cache compartilhado.
+
 ## Alias de acesso do Fokus Law
 
 `https://law.fokuscloud.com.br` é um endereço de entrada para o mesmo app

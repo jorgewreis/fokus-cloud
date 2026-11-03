@@ -4,11 +4,12 @@ name: Deploy Fokus Cloud Laravel
   push:
     branches:
       - main
+  pull_request:
   workflow_dispatch:
 
 concurrency:
-  group: production-deploy
-  cancel-in-progress: true
+  group: ${{ github.event_name == 'pull_request' && format('law-validation-pr-{0}', github.event.pull_request.number) || 'production-deploy' }}
+  cancel-in-progress: false
 
 jobs:
   validate:
@@ -20,6 +21,17 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v5
+
+      - name: Setup Node for deterministic Fokus Law asset generation
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: Generate content-addressed Fokus Law assets for tests
+        run: npm run law:assets:prepare
+
+      - name: Verify immutable asset retention filter
+        run: node tests/Deployment/fokus-law-assets-rsync.mjs
 
       - name: Setup PHP with SQLite
         uses: shivammathur/setup-php@v2
@@ -43,11 +55,6 @@ jobs:
 
       - name: Run automated tests
         run: php artisan test
-
-      - name: Setup Node for Backoffice and SEO validation
-        uses: actions/setup-node@v5
-        with:
-          node-version: '24'
 
       - name: Install Node dependencies
         run: npm ci
@@ -82,6 +89,7 @@ jobs:
         run: npm run seo:check
 
   deploy:
+    if: github.ref == 'refs/heads/main'
     name: Publish Laravel application
     needs: validate
     runs-on: ubuntu-latest
@@ -95,6 +103,14 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v5
+
+      - name: Setup Node for immutable Fokus Law assets
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: Generate immutable assets and one-shot deploy payload
+        run: node tools/generate-fokus-law-assets.mjs --output-root "$GITHUB_WORKSPACE" --staging-dir "$RUNNER_TEMP/fokus-law-assets"
 
       - name: Configure SSH
         env:
@@ -117,6 +133,42 @@ jobs:
           chmod 600 ~/.ssh/known_hosts
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" exit
 
+      - name: Verify Law schema before publishing application code
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          # Reviewed additive migration only. Changing it requires a new review.
+          migration=database/migrations/2026_10_30_160000_add_encrypted_details_to_law_contacts.php
+          echo "2db13e1a8d350ac81577c042e915bdfea4bafe821b188ded125f2201e3e8b4d9  $migration" | sha256sum --check --status
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9_./-]+$ ]]
+          remote_dir="/tmp/fokuscloud-law-schema-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          ssh_args=(-o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT")
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          ssh "${ssh_args[@]}" "$target" "set -eu; test -f '$DEPLOY_PATH/vendor/autoload.php'; test -f '$DEPLOY_PATH/.env'; mkdir -m 700 '$remote_dir'"
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -P "$DEPLOY_PORT" "$migration" deploy/prepublish-law-schema.php "$target:$remote_dir/"
+          ssh "${ssh_args[@]}" "$target" "set -eu; cd '$DEPLOY_PATH'; php '$remote_dir/prepublish-law-schema.php' '$DEPLOY_PATH'; rm -f '$remote_dir/prepublish-law-schema.php' '$remote_dir/2026_10_30_160000_add_encrypted_details_to_law_contacts.php'; rmdir '$remote_dir'"
+
+      - name: Stage immutable Fokus Law assets before application references
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9_./-]+$ ]]
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          rsync -rlDz --relative \
+            --files-from="$RUNNER_TEMP/fokus-law-assets/files.txt" \
+            -e "ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p $DEPLOY_PORT" \
+            "$RUNNER_TEMP/fokus-law-assets/" "$target:$DEPLOY_PATH/"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$target" \
+            "set -eu; cd '$DEPLOY_PATH'; sha256sum --check -" < "$RUNNER_TEMP/fokus-law-assets/checksums.sha256"
+
       - name: Sync application source
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -128,6 +180,7 @@ jobs:
           test -n "$DEPLOY_PATH"
           ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH'"
           rsync -rlDzvc --delete-delay \
+            --filter="merge $RUNNER_TEMP/fokus-law-assets/protect.rules" \
             --exclude '.git/' \
             --exclude '.github/' \
             --exclude '.gitignore' \

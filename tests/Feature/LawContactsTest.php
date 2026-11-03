@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -249,6 +250,7 @@ class LawContactsTest extends TestCase
         $sourceSession = ['active_company_id' => $this->sessionCompanyId];
         $contact = $this->actingAs($this->admin)->withSession($sourceSession)->postJson('/api/law/contacts', [
             'legal_nature' => 'pf', 'display_name' => 'Advogada Compartilhada', 'professions' => ['Advogada'],
+            'sensitive_details' => ['birth_date' => '1985-02-03', 'pix_keys' => [['type' => 'email', 'value' => 'private-pix@example.test']]],
             'channels' => [['type' => 'email', 'value' => 'advogada@example.test', 'personal' => false]],
         ])->assertCreated()->json('contact');
         $this->actingAs($this->admin)->withSession($sourceSession)->putJson('/api/law/contact-sharing', ['policies' => [[
@@ -265,7 +267,13 @@ class LawContactsTest extends TestCase
         $this->actingAs($recipientAdmin)->withSession($recipientSession)->getJson('/api/law/contacts')
             ->assertOk()->assertJsonPath('contacts.0.is_shared', true)
             ->assertJsonPath('contacts.0.source_company_name', 'Empresa Contatos')
-            ->assertJsonPath('contacts.0.channels.0.value', 'advogada@example.test');
+            ->assertJsonPath('contacts.0.channels.0.value', 'advogada@example.test')
+            ->assertJsonMissingPath('contacts.0.sensitive_details');
+        $this->actingAs($recipientAdmin)->withSession($recipientSession)->getJson('/api/law/contacts/'.$contact['id'])
+            ->assertOk()->assertJsonMissingPath('contact.sensitive_details')->assertJsonMissing(['value' => 'private-pix@example.test']);
+        $this->actingAs($recipientAdmin)->withSession($recipientSession)->patchJson('/api/law/contacts/'.$contact['id'], [
+            'sensitive_details' => ['birth_date' => '1990-01-01'],
+        ])->assertNotFound();
 
         $this->actingAs($this->admin)->withSession($sourceSession)->putJson('/api/law/contact-sharing', ['policies' => []])->assertOk();
         $this->actingAs($recipientAdmin)->withSession($recipientSession)->getJson('/api/law/contacts')
@@ -278,6 +286,7 @@ class LawContactsTest extends TestCase
         $session = ['active_company_id' => $this->sessionCompanyId];
         $created = $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
             'legal_nature' => 'pf', 'display_name' => 'Maria de Souza',
+            'sensitive_details' => ['birth_date' => '1980-01-01', 'bank_accounts' => [['bank' => 'Banco Sintético', 'account' => '98765-4']]],
             'documents' => [['type' => 'cpf', 'number' => '52998224725']],
             'channels' => [
                 ['type' => 'phone', 'value' => '71999990000', 'personal' => true],
@@ -311,12 +320,153 @@ class LawContactsTest extends TestCase
 
         $this->actingAs($operator)->withSession($session)->getJson('/api/law/contacts/'.$created['id'])->assertOk()
             ->assertJsonPath('contact.documents.0.number', '•••••••4725')
+            ->assertJsonMissingPath('contact.sensitive_details')
             ->assertJsonMissing(['street' => 'Rua Um'])->assertJsonMissing(['value' => '71999990000']);
         $this->actingAs($operator)->withSession($session)->patchJson('/api/law/contacts/'.$created['id'], [
             'display_name' => 'Maria de Oliveira', 'addresses' => [['type' => 'residential', 'street' => 'Rua Intrusa', 'city' => 'Salvador', 'state' => 'BA']],
         ])->assertForbidden();
+        $ciphertext = DB::table('law_contacts')->where('id', $created['id'])->value('sensitive_details_encrypted');
+        $this->actingAs($operator)->withSession($session)->patchJson('/api/law/contacts/'.$created['id'], [
+            'sensitive_details' => ['birth_date' => null],
+        ])->assertForbidden();
+        $this->actingAs($operator)->withSession($session)->patchJson('/api/law/contacts/'.$created['id'], [
+            'display_name' => 'Maria de Oliveira',
+        ])->assertOk()->assertJsonMissingPath('contact.sensitive_details');
+        $this->assertSame($ciphertext, DB::table('law_contacts')->where('id', $created['id'])->value('sensitive_details_encrypted'));
         $this->assertDatabaseHas('law_contact_addresses', ['law_contact_id' => $created['id'], 'street' => 'Rua Um']);
         $this->assertDatabaseHas('law_contact_documents', ['law_contact_id' => $created['id']]);
         $this->assertDatabaseHas('law_contact_channels', ['law_contact_id' => $created['id'], 'channel_value' => '71999990000', 'is_personal' => true]);
     }
+
+    public function test_sensitive_details_are_encrypted_and_omission_preserves_them(): void
+    {
+        $session = ['active_company_id' => $this->sessionCompanyId];
+        $details = [
+            'birth_date' => '1988-07-10',
+            'parentage' => [['name' => 'Pessoa Sintética', 'relationship' => 'Mãe']],
+            'bank_accounts' => [['bank' => 'Banco Sintético', 'branch' => '0001', 'account' => '123456-7', 'account_type' => 'Corrente', 'holder_name' => 'Cliente Sintético']],
+            'pix_keys' => [['type' => 'email', 'value' => 'synthetic-pix@example.test']],
+        ];
+        $contact = $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'legal_nature' => 'pf', 'display_name' => 'Cliente Sintético', 'sensitive_details' => $details,
+        ])->assertCreated()->assertJsonPath('contact.sensitive_details.birth_date', '1988-07-10')->json('contact');
+        $ciphertext = DB::table('law_contacts')->where('id', $contact['id'])->value('sensitive_details_encrypted');
+        $this->assertIsString($ciphertext);
+        $this->assertStringNotContainsString('synthetic-pix', $ciphertext);
+        $this->assertStringNotContainsString('123456-7', $ciphertext);
+        $this->assertSame($details, json_decode(Crypt::decryptString($ciphertext), true));
+
+        $this->actingAs($this->admin)->withSession($session)->getJson('/api/law/contacts')
+            ->assertOk()->assertJsonMissingPath('contacts.0.sensitive_details');
+        $this->actingAs($this->admin)->withSession($session)->patchJson('/api/law/contacts/'.$contact['id'], [
+            'display_name' => 'Cliente Renomeado',
+        ])->assertOk()->assertJsonPath('contact.sensitive_details.pix_keys.0.value', 'synthetic-pix@example.test');
+        $this->assertSame($ciphertext, DB::table('law_contacts')->where('id', $contact['id'])->value('sensitive_details_encrypted'));
+        $this->actingAs($this->admin)->withSession($session)->getJson('/api/law/contacts/'.$contact['id'])
+            ->assertOk()->assertJsonPath('contact.sensitive_details.bank_accounts.0.account', '123456-7');
+        foreach (DB::table('audit_events')->where('company_id', $this->companyId)->get() as $event) {
+            $this->assertStringNotContainsString('synthetic-pix', json_encode($event));
+            $this->assertStringNotContainsString('123456-7', json_encode($event));
+        }
+    }
+
+    public function test_sensitive_details_reject_incompatible_natures_and_unknown_secret_fields(): void
+    {
+        $session = ['active_company_id' => $this->sessionCompanyId];
+        $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'legal_nature' => 'pj', 'display_name' => 'Organização Teste', 'sensitive_details' => ['birth_date' => '1990-01-01'],
+        ])->assertUnprocessable();
+        $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'legal_nature' => 'pf', 'display_name' => 'Cliente Teste', 'sensitive_details' => ['gov_password' => 'never-store-this'],
+        ])->assertUnprocessable();
+        $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'legal_nature' => 'pf', 'display_name' => 'Cliente Teste', 'sensitive_details' => ['birth_date' => '2999-01-01'],
+        ])->assertUnprocessable();
+        $parent = $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'legal_nature' => 'pj', 'display_name' => 'Organização Teste',
+        ])->assertCreated()->json('contact');
+        $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'record_kind' => 'unit', 'display_name' => 'Unidade Teste', 'parent_contact_id' => $parent['id'],
+            'sensitive_details' => ['pix_keys' => [['type' => 'email', 'value' => 'unit@example.test']]],
+        ])->assertUnprocessable();
+    }
+
+    public function test_sensitive_detail_collection_limits_and_nested_keys_are_validated(): void
+    {
+        $session = ['active_company_id' => $this->sessionCompanyId];
+        $invalidDetails = [
+            ['parentage' => array_fill(0, 5, ['name' => 'Ascendente Sintético', 'relationship' => 'Mãe'])],
+            ['bank_accounts' => array_fill(0, 6, ['bank' => 'Banco Sintético', 'account' => '12345'])],
+            ['pix_keys' => array_fill(0, 11, ['type' => 'email', 'value' => 'synthetic@example.test'])],
+            ['pix_keys' => [['type' => 'unsupported', 'value' => 'synthetic@example.test']]],
+            ['bank_accounts' => [['bank' => 'Banco Sintético', 'account' => '12345', 'password' => 'never-store-this']]],
+        ];
+        foreach ($invalidDetails as $details) {
+            $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+                'legal_nature' => 'pf', 'display_name' => 'Cliente Limites', 'sensitive_details' => $details,
+            ])->assertUnprocessable();
+        }
+        $this->assertDatabaseCount('law_contacts', 0);
+    }
+
+    public function test_expanded_document_and_email_limits_keep_identifiers_distinct(): void
+    {
+        $session = ['active_company_id' => $this->sessionCompanyId];
+        $documents = array_map(fn ($type) => ['type' => $type, 'number' => '12345678901'], ['pis', 'pasep', 'nit', 'nis', 'cadunico', 'cnh', 'cin']);
+        for ($i = count($documents); $i < 20; $i++) $documents[] = ['type' => 'other', 'number' => 'TEST-'.$i];
+        $channels = array_map(fn ($i) => ['type' => 'email', 'value' => 'synthetic'.$i.'@example.test'], range(1, 10));
+        $contact = $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'legal_nature' => 'pf', 'display_name' => 'Múltiplos Documentos', 'documents' => $documents, 'channels' => $channels,
+        ])->assertCreated()->assertJsonCount(20, 'contact.documents')->assertJsonCount(10, 'contact.channels')->json('contact');
+        foreach (['pis', 'nit', 'nis', 'cadunico'] as $type) {
+            $this->assertDatabaseHas('law_contact_documents', ['company_id' => $this->companyId, 'law_contact_id' => $contact['id'], 'document_type' => $type]);
+        }
+        $this->actingAs($this->admin)->withSession($session)->patchJson('/api/law/contacts/'.$contact['id'], [
+            'documents' => [...$documents, ['type' => 'other', 'number' => 'OVER-LIMIT']],
+        ])->assertUnprocessable();
+        $this->actingAs($this->admin)->withSession($session)->patchJson('/api/law/contacts/'.$contact['id'], [
+            'channels' => [...$channels, ['type' => 'email', 'value' => 'overflow@example.test']],
+        ])->assertUnprocessable();
+        $this->actingAs($this->admin)->withSession($session)->patchJson('/api/law/contacts/'.$contact['id'], [
+            'channels' => array_fill(0, 5, ['type' => 'phone', 'value' => '71999990000']),
+        ])->assertUnprocessable();
+        $this->assertDatabaseCount('law_contact_documents', 20);
+        $this->assertDatabaseCount('law_contact_channels', 10);
+    }
+
+    public function test_nature_change_requires_explicit_prior_review_of_personal_details(): void
+    {
+        $session = ['active_company_id' => $this->sessionCompanyId];
+        $contact = $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'legal_nature' => 'pf', 'display_name' => 'Mudança Sintética', 'sensitive_details' => ['birth_date' => '1980-01-01'],
+        ])->assertCreated()->json('contact');
+        $this->actingAs($this->admin)->withSession($session)->patchJson('/api/law/contacts/'.$contact['id'], [
+            'legal_nature' => 'pj', 'sensitive_details' => ['birth_date' => null, 'parentage' => []],
+        ])->assertUnprocessable();
+        $this->actingAs($this->admin)->withSession($session)->getJson('/api/law/contacts/'.$contact['id'])
+            ->assertOk()->assertJsonPath('contact.sensitive_details.birth_date', '1980-01-01');
+        $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'legal_nature' => 'pj', 'display_name' => 'Documento Incompatível', 'documents' => [['type' => 'nit', 'number' => '12345678901']],
+        ])->assertUnprocessable();
+    }
+
+    public function test_merge_does_not_silently_drop_sensitive_details(): void
+    {
+        $session = ['active_company_id' => $this->sessionCompanyId];
+        $source = $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'legal_nature' => 'pf', 'display_name' => 'Origem Sintética', 'sensitive_details' => ['birth_date' => '1980-01-01'],
+        ])->assertCreated()->json('contact');
+        $target = $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'legal_nature' => 'pf', 'display_name' => 'Destino Sintético',
+        ])->assertCreated()->json('contact');
+        $response = $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts/'.$source['id'].'/merge', [
+            'target_contact_id' => $target['id'], 'reason' => 'Revisão sintética de duplicidade',
+        ]);
+        $this->assertContains($response->status(), [409, 422]);
+        $this->assertDatabaseHas('law_contacts', ['id' => $source['id'], 'merged_into_id' => null, 'deleted_at' => null]);
+        $this->actingAs($this->admin)->withSession($session)->getJson('/api/law/contacts/'.$source['id'])
+            ->assertOk()->assertJsonPath('contact.sensitive_details.birth_date', '1980-01-01');
+    }
+
 }
+

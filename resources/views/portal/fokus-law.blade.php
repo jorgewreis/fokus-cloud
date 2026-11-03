@@ -6,9 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1b1028" />
   <title>Fokus Law | Fokus Cloud</title>
-  <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20261009-select-menu-options-v1" />
-  <link rel="stylesheet" href="/marketing/products/fokus-law.css?v=20261008-primary-outline-buttons-v1" />
-  <link rel="stylesheet" href="/portal/assets/fokus-law-shell.css?v=20261014-square-rail-icons-v1" />
+  <link rel="stylesheet" href="{{ \App\Support\FokusLawAssets::url('assets/css/shared/fokus.css') }}" />
+  <link rel="stylesheet" href="{{ \App\Support\FokusLawAssets::url('marketing/products/fokus-law.css') }}" />
+  <link rel="stylesheet" href="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-shell.css') }}" />
 </head>
 <body class="fokus-law-shell-page">
   <a class="law-shell-skip" href="#law-workspace">Pular para o conteúdo principal</a>
@@ -107,15 +107,16 @@
   <template id="law-profile-template">
     @include('portal.partials.fokus-law-profile')
   </template>
-  <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script>
-  <script src="/assets/js/api-client.js"></script>
-  <script src="/assets/js/brazilian-documents.js?v=20260930-document-validation-v1"></script>
-  <script src="/portal/assets/fokus-law-select.js?v=20261008-select-options-full-width-v1"></script>
-  <script src="/portal/assets/fokus-law-access.js?v=20261008-primary-outline-buttons-v2" defer></script>
-  <script src="/portal/assets/fokus-law-contacts.js?v=20261008-contact-detail-edit-permissions-v1" defer></script>
-  <script src="/portal/assets/law-record-ui.js?v=20261008-primary-outline-buttons-v2" defer></script>
-  <script src="/portal/assets/fokus-law-processes.js?v=20261008-admin-processes-v1" defer></script>
-  <script src="/portal/assets/fokus-law-shell.js?v=20261014-square-rail-icons-v1" defer></script>
-  <script src="/assets/js/portal-profile.js?v=20260925-profile-v4" defer></script>
+<script src="{{ \App\Support\FokusLawAssets::url('assets/js/fokus.min.js') }}"></script>
+<script src="{{ \App\Support\FokusLawAssets::url('assets/js/api-client.js') }}"></script>
+<script src="{{ \App\Support\FokusLawAssets::url('assets/js/brazilian-documents.js') }}"></script>
+<script src="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-select.js') }}"></script>
+<script src="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-access.js') }}" defer></script>
+<script src="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-bank-catalog.js') }}" defer></script>
+<script src="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-contacts.js') }}" defer></script>
+<script src="{{ \App\Support\FokusLawAssets::url('portal/assets/law-record-ui.js') }}" defer></script>
+<script src="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-processes.js') }}" defer></script>
+<script src="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-shell.js') }}" defer></script>
+<script src="{{ \App\Support\FokusLawAssets::url('assets/js/portal-profile.js') }}" defer></script>
 </body>
 </html>

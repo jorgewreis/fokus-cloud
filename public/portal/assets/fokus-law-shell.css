@@ -488,6 +488,7 @@
 .law-contact-channel-privacy { display: grid; grid-column: 1 / -1; grid-row: 2; grid-template-columns: minmax(180px, max-content) minmax(0, 1fr); align-items: center; gap: 12px; min-width: 0; padding-top: 2px; border-top: 1px solid #eee8f2; }
 .law-contact-channel-privacy .law-record-help { margin: 0; }
 .law-contact-remove { flex: 0 0 auto; white-space: nowrap; }
+.law-contact-repeat-row > .law-contact-remove { align-self: end; margin-block-end: 0; }
 .law-contact-address-row, .law-contact-department-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; padding: 12px; border: 1px solid var(--law-shell-line); border-radius: 10px; }
 .law-contact-address-row > .law-record-field { width: 100%; min-width: 0; }
 .law-contact-address-row > .law-record-field:has(input.fs-width-800) { grid-column: span 2; }
@@ -1043,4 +1044,24 @@
   .law-record-recent-item { padding: 7px; }
   .law-contact-repeat-row.law-contact-channel-row { grid-template-columns: minmax(0, 1fr); }
   .law-contact-repeat-row.law-contact-channel-row > .law-record-field, .law-contact-repeat-row.law-contact-channel-row > .law-contact-channel-privacy, .law-contact-repeat-row.law-contact-channel-row > .law-contact-remove { grid-column: 1; grid-row: auto; }
+}
+
+
+/* Contact editor controls must shrink within mobile modal cards. */
+.law-record-editor .law-record-form-section > .fs-card-body { min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.law-record-editor .law-record-field input,
+.law-record-editor .law-record-field select,
+.law-record-editor .law-record-field textarea { box-sizing: border-box; min-width: 0; max-width: 100%; }
+@media (max-width: 600px) {
+  .law-record-editor .law-record-field,
+  .law-record-editor .law-record-name-fields { width: 100%; max-width: 100%; }
+  .law-record-editor .law-record-field [class*="fs-width-"] { width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+}
+
+/* Form-row actions must override the shared button auto-layout contract.
+   Scope this exception to labelled contact rows, never relationship headers. */
+.law-record-editor .law-contact-repeat-row > .law-contact-remove,
+.law-record-editor .law-contact-relationship-entry > .law-contact-chip-remove {
+  align-self: end !important;
+  margin-block: 0;
 }
