@@ -7,13 +7,6 @@
   --showcase-text:#eef5f0;
   --showcase-muted:#b0c1b6;
   --showcase-accent:#70e5ad;
-  --fs-color-primary:#70e5ad;
-  --fs-color-on-primary:#092819;
-  --fs-color-text-primary:#eef5f0;
-  --fs-color-bg-subtle:#17261d;
-  --fs-color-border-default:#455b4d;
-  --fs-color-primary-bg-subtle:#163322;
-  --fs-alert-primary-text:#9af0c6;
   background:var(--showcase-bg);
   color:var(--showcase-text);
   font-size:16px;
@@ -26,14 +19,7 @@
   --showcase-border:#c4d4c8;
   --showcase-text:#14261b;
   --showcase-muted:#4b6253;
-  --showcase-accent:#156c43;
-  --fs-color-primary:#156c43;
-  --fs-color-on-primary:#fff;
-  --fs-color-text-primary:#14261b;
-  --fs-color-bg-subtle:#e9f2ec;
-  --fs-color-border-default:#91aa99;
-  --fs-color-primary-bg-subtle:#e0f2e7;
-  --fs-alert-primary-text:#156c43
+  --showcase-accent:#156c43
 }
 
 .styles-showcase * {
@@ -79,7 +65,7 @@
   font-size:14px;
   white-space:normal
 }
-.styles-showcase .fs-btn-outline-primary {
+.showcase-actions .fs-btn-outline-primary {
   --fs-btn-color:var(--showcase-accent);
   --fs-btn-border-color:var(--showcase-border)
 }
@@ -503,8 +489,6 @@
   --showcase-bg:#050b09;
   --showcase-surface:#0b1513;
   --showcase-accent:#43f18b;
-  --fs-color-primary:#43f18b;
-  --fs-color-on-primary:#032b15;
   --showcase-border:#20372e;
   background:radial-gradient(ellipse at 78% 13%,#0b3b2629,transparent 42%),var(--showcase-bg);
 }
@@ -565,7 +549,7 @@
 .showcase-component .fs-table th,.showcase-component .fs-table td {padding:10px 5px;color:var(--showcase-text)}
 .showcase-component .fs-table caption {font-size:10px;text-align:left;color:var(--showcase-muted);margin-bottom:8px}
 .showcase-component .fs-badge {font-size:10px}
-[data-theme=light] .styles-showcase {--showcase-bg:#f7faf7;--showcase-surface:#fff;--showcase-accent:#156c43;--showcase-border:#c4d4c8;--fs-color-primary:#156c43;--fs-color-on-primary:#fff}
+[data-theme=light] .styles-showcase {--showcase-bg:#f7faf7;--showcase-surface:#fff;--showcase-accent:#156c43;--showcase-border:#c4d4c8;}
 [data-theme=light] .showcase-header {background:#f7faf7}
 [data-theme=light] .showcase-hero>.showcase-preview {box-shadow:0 24px 60px #16332222}
 @media(max-width:1100px) {
@@ -593,3 +577,19 @@
 
 /* The install header follows the active theme, unlike the dark dashboard. */
 .showcase-terminal .showcase-preview-bar {background:var(--showcase-surface)}
+
+
+/* Brand colors belong to site controls, not to the framework demonstrations. */
+.showcase-actions,
+.showcase-nav {
+  --fs-color-primary:var(--showcase-accent);
+  --fs-color-on-primary:#032b15;
+  --fs-color-text-primary:var(--showcase-text);
+  --fs-color-bg-subtle:var(--showcase-surface);
+  --fs-color-border-default:var(--showcase-border);
+  --fs-alert-primary-text:var(--showcase-accent);
+}
+[data-theme=light] .showcase-actions,
+[data-theme=light] .showcase-nav {
+  --fs-color-on-primary:#fff;
+}

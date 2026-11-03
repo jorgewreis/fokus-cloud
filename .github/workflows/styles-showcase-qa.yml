@@ -7,6 +7,8 @@ on:
       - 'public/assets/css/modules/styles-showcase.css'
       - 'public/assets/js/styles-*.js'
       - 'tools/styles-showcase/**'
+      - 'tools/generate-fokus-law-assets.mjs'
+      - '.github/workflows/deploy.yml'
       - '.github/workflows/styles-showcase-qa.yml'
 permissions:
   contents: read
@@ -30,6 +32,7 @@ jobs:
           ./node_modules/.bin/playwright install --with-deps chromium
       - name: Static and DOM contracts
         run: |
+          node --test tools/styles-showcase/deployment.test.mjs
           node tools/styles-showcase/test-dom.mjs
           node --test tools/styles-showcase/catalog.test.mjs
           node tools/styles-showcase/catalog.dom.mjs

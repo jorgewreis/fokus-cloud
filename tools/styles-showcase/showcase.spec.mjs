@@ -1,11 +1,148 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { PUBLISHED_ASSETS, PUBLISHED_CSS_PATH } from './published-assets.mjs';
 const example = slug => readFileSync(new URL(`../../public/styles/examples/${slug}.html`, import.meta.url), 'utf8');
+
+async function expectPublishedStylesLoaded(document) {
+  await expect.poll(() => document.evaluate(path => {
+    const sheet = [...window.document.styleSheets].find(sheet => sheet.href && new URL(sheet.href).pathname === path);
+    return Boolean(sheet && !sheet.disabled && sheet.cssRules.length > 0);
+  }, PUBLISHED_CSS_PATH), { message: 'Published stylesheet must be loaded and enabled, not merely linked' }).toBe(true);
+}
+
+const colors = locator => locator.evaluate(element => {
+  const style = getComputedStyle(element);
+  return {
+    background: style.backgroundColor, color: style.color,
+    borderColor: style.borderTopColor, borderStyle: style.borderTopStyle, borderWidth: style.borderTopWidth,
+  };
+});
+const transparent = color => color === 'transparent' || /(?:rgba?\([^)]*,\s*0\)|\/\s*0\))$/.test(color);
+
+test('published stylesheet and MIT license are served intact over HTTP', async ({ request }) => {
+  for (const [asset, sha256] of Object.entries(PUBLISHED_ASSETS)) {
+    const response = await request.get(asset);
+    expect(response.status(), asset).toBe(200);
+    if (asset.endsWith('.css')) expect(response.headers()['content-type']).toContain('text/css');
+    expect(createHash('sha256').update(await response.body()).digest('hex'), asset).toBe(sha256);
+  }
+});
+
+test('component cards use published button colors and real table styling in both themes', async ({ page, context }) => {
+  await page.goto('/styles/index.html');
+  await expectPublishedStylesLoaded(page);
+  const reference = await context.newPage();
+  try {
+    // Independent control: same browser/theme, only the unmodified published
+    // framework. Marketing CSS and its tokens must not redefine these demos.
+    await reference.route('**/__styles_framework_reference__', route => route.fulfill({
+      contentType: 'text/html', body: `<!doctype html><html lang="pt-BR" data-theme="dark"><head>
+        <link rel="stylesheet" href="${PUBLISHED_CSS_PATH}"></head><body>
+        <button id="primary" class="fs-btn fs-btn-primary">Primário</button>
+        <button id="outline" class="fs-btn fs-btn-outline-primary">Outline</button>
+        <button id="native">Sem framework</button>
+        <table class="fs-table"><thead><tr><th>Projeto</th><th>Status</th></tr></thead><tbody>
+        <tr><td>Portal</td><td><span class="fs-badge fs-badge-soft-success">Ativo</span></td></tr>
+        <tr><td>Biblioteca</td><td><span class="fs-badge fs-badge-soft-warning">Revisão</span></td></tr>
+        <tr><td>Interface</td><td><span class="fs-badge fs-badge-soft-info">Novo</span></td></tr>
+        </tbody></table></body></html>`,
+    }));
+    await reference.goto(new URL('/__styles_framework_reference__', page.url()).href);
+    await expectPublishedStylesLoaded(reference);
+    for (const theme of ['dark', 'light']) {
+      for (const document of [page, reference]) {
+        await document.locator('html').evaluate((html, theme) => html.dataset.theme = theme, theme);
+        await document.locator('body').evaluate(async body => {
+          // Flush the theme change and wait for real CSS transitions before
+          // measuring. The reference uses the framework's own motion defaults.
+          getComputedStyle(body.querySelector('.fs-btn')).backgroundColor;
+          await Promise.all(body.getAnimations({ subtree: true }).map(animation => animation.finished));
+        });
+      }
+      const primary = page.locator('[data-component-demo="primary"]');
+      const outline = page.locator('[data-component-demo="outline"]');
+      await expect(primary).toBeVisible();
+      await expect(outline).toBeVisible();
+      const expectedPrimary = await colors(reference.locator('#primary'));
+      const expectedOutline = await colors(reference.locator('#outline'));
+      await expect.poll(() => colors(primary), { message: `${theme}: primary must match published defaults` }).toEqual(expectedPrimary);
+      await expect.poll(() => colors(outline), { message: `${theme}: outline must match published defaults` }).toEqual(expectedOutline);
+      expect(transparent(expectedPrimary.background)).toBe(false);
+      expect(transparent(expectedOutline.background)).toBe(true);
+      expect(expectedPrimary.background).not.toBe((await colors(reference.locator('#native'))).background);
+      expect(expectedPrimary.background).not.toBe(expectedOutline.background);
+      expect(Number.parseFloat(expectedOutline.borderWidth)).toBeGreaterThan(0);
+      expect(expectedOutline.borderStyle).toBe('solid');
+
+      const table = page.locator('.showcase-component .fs-table');
+      await expect(table).toBeVisible();
+      await expect(table.locator('tbody tr')).toHaveCount(3);
+      const layout = await table.evaluate(element => {
+        const parent = element.parentElement;
+        const parentStyle = getComputedStyle(parent);
+        return {
+          tableWidth: element.getBoundingClientRect().width,
+          availableWidth: parent.clientWidth - parseFloat(parentStyle.paddingLeft) - parseFloat(parentStyle.paddingRight),
+          borderCollapse: getComputedStyle(element).borderCollapse,
+        };
+      });
+      expect(Math.abs(layout.tableWidth - layout.availableWidth), `${theme}: table must fill the card`).toBeLessThanOrEqual(1);
+      expect(layout.borderCollapse).toBe('collapse');
+      for (const selector of ['thead th', 'tbody td']) {
+        const border = locator => locator.evaluate(element => {
+          const style = getComputedStyle(element);
+          return { color: style.borderBottomColor, style: style.borderBottomStyle, width: style.borderBottomWidth };
+        });
+        const actual = await border(table.locator(selector).first());
+        expect(actual).toEqual(await border(reference.locator(`.fs-table ${selector}`).first()));
+        expect(actual.style).toBe('solid');
+        expect(Number.parseFloat(actual.width)).toBeGreaterThan(0);
+        expect(transparent(actual.color)).toBe(false);
+      }
+      const backgrounds = [];
+      for (const variant of ['success', 'warning', 'info']) {
+        const badge = table.locator(`.fs-badge-soft-${variant}`);
+        await expect(badge).toBeVisible();
+        const actual = await colors(badge);
+        expect(actual).toEqual(await colors(reference.locator(`.fs-badge-soft-${variant}`)));
+        expect(transparent(actual.background)).toBe(false);
+        expect(actual.color).not.toBe(actual.background);
+        expect(await badge.evaluate(element => getComputedStyle(element).display)).toBe('inline-flex');
+        backgrounds.push(actual.background);
+      }
+      expect(new Set(backgrounds).size).toBe(3);
+    }
+  } finally { await reference.close(); }
+});
+
+test('published CSS is applied in each standalone example and the next catalog shell', async ({ page }) => {
+  for (const path of ['/styles/examples/projects.html', '/styles/examples/onboarding.html',
+    '/styles/examples/records.html', '/styles/next/']) {
+    await page.goto(path);
+    await expectPublishedStylesLoaded(page);
+    const button = page.locator('.fs-btn').first();
+    await expect(button).toBeVisible();
+    const style = await button.evaluate(element => {
+      const computed = getComputedStyle(element);
+      return { display: computed.display, alignItems: computed.alignItems,
+        borderStyle: computed.borderTopStyle, backgroundToken: computed.getPropertyValue('--fs-btn-bg').trim() };
+    });
+    // Flex/grid items are blockified by layout, so inline-flex computes to flex.
+    // Both still require the framework's flex alignment, border and color token.
+    expect(['inline-flex', 'flex'], path).toContain(style.display);
+    expect(style.alignItems, path).toBe('center');
+    expect(style.borderStyle, path).toBe('solid');
+    expect(style.backgroundToken, path).not.toBe('');
+  }
+});
+
 for (const width of [1440, 1165, 768, 390]) {
   test(`showcase real screenshots, theme and no overflow at ${width}`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/styles/index.html');
+    await expectPublishedStylesLoaded(page);
     await page.evaluate(() => document.fonts.ready);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page.locator('body')).not.toContainText(/[↗→➜➔]/u);
@@ -18,6 +155,8 @@ for (const width of [1440, 1165, 768, 390]) {
     for (const preview of await page.locator('.showcase-mini iframe').all()) {
       await preview.scrollIntoViewIfNeeded();
       await expect(preview.contentFrame().locator('h1')).toBeVisible();
+      const frame = await (await preview.elementHandle()).contentFrame();
+      await expectPublishedStylesLoaded(frame);
     }
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: info.outputPath(`showcase-B-${width}-dark.png`), fullPage: true });
