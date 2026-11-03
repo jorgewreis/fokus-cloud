@@ -4,9 +4,13 @@ on:
     paths:
       - 'public/styles/**'
       - 'public/assets/css/modules/styles-*/**'
+      - 'public/assets/css/modules/styles-*.css'
       - 'public/assets/css/modules/styles-showcase.css'
       - 'public/assets/js/styles-*.js'
       - 'tools/styles-showcase/**'
+      - 'tools/cache-bust-styles-pages.mjs'
+      - 'routes/web.php'
+      - 'resources/seo/pages.json'
       - 'tools/generate-fokus-law-assets.mjs'
       - '.github/workflows/deploy.yml'
       - '.github/workflows/styles-showcase-qa.yml'
@@ -34,6 +38,7 @@ jobs:
         run: |
           node --test tools/styles-showcase/deployment.test.mjs
           node tools/styles-showcase/test-dom.mjs
+          node --test tools/styles-showcase/documentation.test.mjs
           node --test tools/styles-showcase/catalog.test.mjs
           node tools/styles-showcase/catalog.dom.mjs
           node tools/sync-seo.mjs --check

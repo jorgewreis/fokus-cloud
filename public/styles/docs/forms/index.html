@@ -4,7 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <script src="/assets/js/styles-theme.js?v=7026fb4963ff"></script>
-        <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20261009-select-menu-options-v1" />
+        <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=bab781acdb04" />
         <link rel="stylesheet" href="/assets/css/modules/styles-docs/styles-docs.css?v=a4273cef1203" />
         <link rel="stylesheet" href="/assets/css/modules/styles-layout/styles-layout.css?v=872d2564b4c5" />
         <link rel="stylesheet" href="/assets/css/modules/styles-forms/styles-forms.css?v=73300e07e998" />
@@ -101,24 +101,43 @@
   ]
 }</script>
         <!-- /SEO -->
+        <link rel="stylesheet" href="/assets/css/modules/styles-documentation.css?v=22651a9c0324" />
     </head>
-    <body class="styles-docs styles-forms-doc">
-        <header class="styles-topbar"><div class="styles-shell styles-topbar-inner"><a class="styles-brand" href="https://www.fokuscloud.com.br/" aria-label="Fokus Cloud, página inicial">FOKUS <span>CLOUD</span></a><span class="styles-eyebrow">Documentação · Forms</span><button class="styles-theme-toggle" type="button" data-theme-toggle hidden aria-label="Alternar tema"><span class="styles-theme-toggle-icon styles-theme-toggle-icon-sunny" aria-hidden="true"></span><span class="styles-theme-toggle-icon styles-theme-toggle-icon-cloud" aria-hidden="true"></span></button><nav class="styles-doc-pager styles-doc-pager-top" aria-label="Navegação entre páginas da documentação"><a href="/layout" aria-label="Voltar para a página anterior: Layout"><span class="styles-doc-pager-icon styles-doc-pager-icon-left" aria-hidden="true"></span>Anterior: Layout</a><a href="/components" aria-label="Ir para a próxima página: Components">Próxima: Components<span class="styles-doc-pager-icon styles-doc-pager-icon-right" aria-hidden="true"></span></a></nav></div></header>
+    <body class="styles-docs styles-forms-doc styles-documentation">
+<a class="styles-doc-skip" href="#main">Ir para o conteúdo</a>
+        <header class="styles-topbar">
+    <div class="styles-shell styles-topbar-inner">
+        <a class="styles-brand" href="https://www.fokuscloud.com.br/" aria-label="Fokus Cloud, página inicial">FOKUS <span>CLOUD</span></a>
+        <span class="styles-doc-product">Fokus Styles</span>
+        <nav class="styles-doc-global-nav" aria-label="Navegação principal">
+            <a href="/">Início</a>
+            <a href="/docs" aria-current="true">Documentação</a>
+            <a href="https://github.com/jorgewreis/fokus-styles">GitHub</a>
+        </nav>
+        <button class="fs-btn styles-doc-theme" type="button" data-theme-toggle aria-label="Ativar tema claro" aria-pressed="true">Claro / escuro</button>
+    </div>
+</header>
 
         <div class="styles-shell styles-sidebar-layout">
             <aside class="styles-sidebar" aria-label="Navegação da documentação">
-                <strong>Documentação</strong>
-                <a class="styles-sidebar-page" href="/">Início</a>
-                <a class="styles-sidebar-page" href="/layout">Layout</a>
-                <a class="styles-sidebar-page is-active" href="/forms" aria-current="page">Forms</a>
-                <nav class="styles-sidebar-subnav" aria-label="Seções de Forms"><a href="#intro">Visão geral</a><a href="#fundamentos">01 · Fundamentos</a><a href="#estrutura">02 · Estrutura</a><a href="#campos">03 · Campos</a><a href="#agrupamento">04 · Agrupamento</a><a href="#validacao">05 · Validação</a><a href="#estados">06 · Estados</a><a href="#acessibilidade">07 · Acessibilidade</a><a href="#laboratorio">08 · Laboratório</a></nav>
-                <a class="styles-sidebar-page" href="/components">Components</a>
+                <a class="styles-doc-sidebar-home" href="/docs">Documentação</a>
+<strong>Guias de uso</strong>
+                                <a class="styles-sidebar-page" href="/layout">Layout</a>
+                <a class="styles-sidebar-page is-active" href="/forms" aria-current="page">Formulários</a>
+                <nav class="styles-sidebar-subnav" aria-label="Seções de Formulários"><a href="#intro">Visão geral</a><a href="#fundamentos">01 · Fundamentos</a><a href="#estrutura">02 · Estrutura</a><a href="#campos">03 · Campos</a><a href="#agrupamento">04 · Agrupamento</a><a href="#validacao">05 · Validação</a><a href="#estados">06 · Estados</a><a href="#acessibilidade">07 · Acessibilidade</a><a href="#laboratorio">08 · Laboratório</a></nav>
+                <a class="styles-sidebar-page" href="/components">Componentes</a>
                 <a class="styles-sidebar-page" href="/helpers">Helpers</a>
-                <a class="styles-sidebar-page" href="/utilities">Utilities</a>
-            </aside>
+                <a class="styles-sidebar-page" href="/utilities">Utilitários</a>
+            <div class="styles-doc-sidebar-more">
+    <strong>Referência e exemplos</strong>
+    <a href="/docs#componentes">Referência de componentes <span class="styles-doc-status">Em desenvolvimento</span></a>
+    <a href="/docs#exemplos">Exemplos de interfaces</a>
+</div>
+</aside>
 
-            <main>
-                <nav aria-label="Caminho da página"><a href="/">Fokus Styles</a> / <span aria-current="page">Forms</span></nav>
+            <main id="main" tabindex="-1">
+                <nav class="styles-doc-breadcrumb" aria-label="Caminho da página"><a href="/">Fokus Styles</a><span aria-hidden="true">/</span><a href="/docs">Documentação</a><span aria-hidden="true">/</span><span aria-current="page">Formulários</span></nav>
+                <aside class="styles-doc-version" aria-label="Versão e composição deste guia"><strong>Guia de uso · Base npm 2.7.0</strong><p>Esta página combina a base publicada com CSS e JavaScript de composição do site. Os exemplos ilustram padrões de uso; não representam toda a API do pacote. <a href="/docs#versoes">Entenda as versões da documentação.</a></p></aside>
                 <section class="styles-hero forms-doc-hero" id="intro">
                     <span class="styles-eyebrow">Documentação do sistema de formulários</span>
                     <h1>Formulários que <span>orientam</span>.</h1>
@@ -205,11 +224,11 @@
 &lt;/fieldset&gt;</code></pre><p class="layout-copy-status" role="status" aria-live="polite"></p></div>
                     <div class="forms-lab-principles"><strong>O que esta composição demonstra</strong><span>Semântica nativa antes da aparência.</span><span>Erro associado ao campo e foco previsível.</span><span>Estados de loading e sucesso sem ambiguidade.</span><span>Controles reais, responsivos e acessíveis.</span></div>
                 </section>
-                <nav class="styles-doc-pager styles-doc-pager-bottom" aria-label="Navegação entre páginas da documentação"><a href="/layout" aria-label="Voltar para Layout, página anterior"><span class="styles-doc-pager-icon styles-doc-pager-icon-left" aria-hidden="true"></span>Layout</a><span aria-current="page">Forms</span><a href="/components" aria-label="Ir para Components, próxima página">Components<span class="styles-doc-pager-icon styles-doc-pager-icon-right" aria-hidden="true"></span></a></nav>
+                <nav class="styles-doc-pager styles-doc-pager-bottom" aria-label="Navegação entre páginas da documentação"><a href="/layout" aria-label="Voltar para Layout, página anterior">Layout</a><span aria-current="page">Formulários</span><a href="/components" aria-label="Ir para Componentes, próxima página">Componentes</a></nav>
             </main>
         </div>
 
-        <footer class="styles-footer"><div class="styles-shell styles-footer-inner"><a class="styles-footer-brand" href="https://www.fokuscloud.com.br/" aria-label="Fokus Cloud, página inicial">FOKUS <span>CLOUD</span></a><span>Fokus Styles · Documentação de Forms.</span></div></footer>
-        <script type="module" src="/assets/js/styles-layout-doc.js?v=360d9c3bc951"></script>
+        <footer class="styles-footer"><div class="styles-shell styles-footer-inner"><a class="styles-footer-brand" href="https://www.fokuscloud.com.br/" aria-label="Fokus Cloud, página inicial">FOKUS <span>CLOUD</span></a><span>Fokus Styles · Guia de Formulários.</span><a class="styles-doc-footer-link" href="/docs">Documentação</a></div></footer>
+        <script type="module" src="/assets/js/styles-layout-doc.js?v=8b35f780e30a"></script>
     </body>
 </html>

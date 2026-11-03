@@ -72,6 +72,14 @@
     "type": "WebPage"
   },
   {
+    "file": "styles/docs/index.html",
+    "url": "https://styles.fokuscloud.com.br/docs",
+    "site": "Fokus Styles",
+    "title": "Documentação: guias, componentes e exemplos | Fokus Styles",
+    "description": "Consulte os guias, a referência de componentes e os exemplos do Fokus Styles em um só lugar, com distinção entre o pacote npm 2.7.0 e a versão em desenvolvimento.",
+    "type": "CollectionPage"
+  },
+  {
     "file": "styles/docs/layout/index.html",
     "url": "https://styles.fokuscloud.com.br/layout",
     "site": "Fokus Styles",

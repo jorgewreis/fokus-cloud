@@ -83,7 +83,7 @@ test('Styles uses the unchanged published CSS/license and existing deployable de
     assert.equal(digest(await readFile(publicFile(asset))), sha256, `${asset}: published bytes changed`);
   }
   const assets = await requiredAssets();
-  for (const page of ['/styles/index.html', '/styles/next/index.html',
+  for (const page of ['/styles/index.html', '/styles/docs/index.html', '/styles/next/index.html',
     ...['projects', 'onboarding', 'records'].map(slug => `/styles/examples/${slug}.html`)]) {
     const html = await readFile(publicFile(page), 'utf8');
     const links = [...html.matchAll(/<link\b[^>]*href=["']([^"']+)["']/gi)]
