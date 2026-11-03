@@ -3,11 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="../assets/styles-theme.js?v=43beb173291c"></script>
 <title>Painel de projetos · Exemplo Fokus Styles</title>
 <link rel="stylesheet" href="../assets/fokus-2.7.0.min.css">
-<link rel="stylesheet" href="composition.css">
+<link rel="stylesheet" href="../assets/site-palette.css?v=ca812299fe1e">
+<link rel="stylesheet" href="composition.css?v=4e2dd71272ec">
 </head>
 <body class="desk-demo">
+<nav class="demo-site-nav" aria-label="Documentação e aparência">
+<a href="https://styles.fokuscloud.com.br/docs">← Documentação Fokus Styles</a>
+<button class="demo-theme-toggle" type="button" data-theme-toggle aria-label="Alternar tema claro e escuro">Alternar tema</button>
+</nav>
 <div class="desk-layout">
 <aside class="desk-sidebar" aria-label="Navegação da demonstração">
 <a class="desk-brand" href="#overview" aria-label="Fokus Desk, visão geral"><span aria-hidden="true">f.</span> fokus desk</a>
@@ -30,11 +36,11 @@
 </div>
 <section class="desk-chart-panel" id="activity" aria-labelledby="activity-title">
 <div class="desk-section-head"><div><h2 id="activity-title">Ritmo da equipe</h2><p>Entregas concluídas · últimas 6 semanas</p></div><span class="desk-chart-key"><i aria-hidden="true"></i> Entregas</span></div>
-<figure class="desk-chart"><svg viewBox="0 0 600 138" preserveAspectRatio="none" role="img" aria-labelledby="chart-title chart-desc"><title id="chart-title">Evolução ilustrativa das entregas</title><desc id="chart-desc">Nas semanas 1 a 6: 3, 6, 4, 9, 8 e 12 entregas. Dados fictícios.</desc><defs><linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5cec9a" stop-opacity=".22"/><stop offset="1" stop-color="#5cec9a" stop-opacity="0"/></linearGradient></defs><g fill="none" stroke="#23352d" stroke-width="1"><path d="M16 16H584M16 49H584M16 82H584M16 115H584"/></g><path d="M16 92L130 66L244 83L358 41L472 49L584 16V115H16Z" fill="url(#chart-fill)"/><path d="M16 92L130 66L244 83L358 41L472 49L584 16" fill="none" stroke="#5cec9a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><g fill="#5cec9a" stroke="#102019" stroke-width="3"><circle cx="16" cy="92" r="4"/><circle cx="130" cy="66" r="4"/><circle cx="244" cy="83" r="4"/><circle cx="358" cy="41" r="4"/><circle cx="472" cy="49" r="4"/><circle cx="584" cy="16" r="5"/></g><g fill="#acbeb3" font-size="11" font-family="system-ui,sans-serif"><text x="16" y="135">S1</text><text x="130" y="135">S2</text><text x="244" y="135">S3</text><text x="358" y="135">S4</text><text x="472" y="135">S5</text><text x="572" y="135">S6</text></g></svg><figcaption>Dados ilustrativos: 3, 6, 4, 9, 8 e 12 entregas.</figcaption></figure>
+<figure class="desk-chart"><svg viewBox="0 0 600 138" preserveAspectRatio="none" role="img" aria-labelledby="chart-title chart-desc"><title id="chart-title">Evolução ilustrativa das entregas</title><desc id="chart-desc">Nas semanas 1 a 6: 3, 6, 4, 9, 8 e 12 entregas. Dados fictícios.</desc><defs><linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--demo-accent)" stop-opacity=".22"/><stop offset="1" stop-color="var(--demo-accent)" stop-opacity="0"/></linearGradient></defs><g fill="none" stroke="var(--demo-border)" stroke-width="1"><path d="M16 16H584M16 49H584M16 82H584M16 115H584"/></g><path d="M16 92L130 66L244 83L358 41L472 49L584 16V115H16Z" fill="url(#chart-fill)"/><path d="M16 92L130 66L244 83L358 41L472 49L584 16" fill="none" stroke="var(--demo-accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><g fill="var(--demo-accent)" stroke="var(--demo-surface)" stroke-width="3"><circle cx="16" cy="92" r="4"/><circle cx="130" cy="66" r="4"/><circle cx="244" cy="83" r="4"/><circle cx="358" cy="41" r="4"/><circle cx="472" cy="49" r="4"/><circle cx="584" cy="16" r="5"/></g><g fill="var(--demo-muted)" font-size="11" font-family="system-ui,sans-serif"><text x="16" y="135">S1</text><text x="130" y="135">S2</text><text x="244" y="135">S3</text><text x="358" y="135">S4</text><text x="472" y="135">S5</text><text x="572" y="135">S6</text></g></svg><figcaption>Dados ilustrativos: 3, 6, 4, 9, 8 e 12 entregas.</figcaption></figure>
 </section>
 <section class="desk-projects" id="projects" aria-labelledby="projects-title">
 <div class="desk-section-head"><h2 id="projects-title">Prioridades da equipe</h2><span class="fs-badge fs-badge-soft-success">Esta semana</span></div>
-<div class="desk-search"><label for="project-search">Buscar projeto ou responsável</label><input class="fs-input" id="project-search" type="search" placeholder="Ex.: Aurora ou Ana" aria-controls="project-rows"><span id="project-count" role="status" aria-live="polite">3 projetos</span></div>
+<div class="desk-search"><label for="project-search">Buscar projeto ou responsável</label><input class="fs-form-control" id="project-search" type="search" placeholder="Ex.: Aurora ou Ana" aria-controls="project-rows"><span id="project-count" role="status" aria-live="polite">3 projetos</span></div>
 <div class="demo-scroll" tabindex="0" role="region" aria-label="Tabela de projetos, role horizontalmente em telas pequenas">
 <table class="fs-table"><thead><tr><th scope="col">Projeto</th><th scope="col">Responsável</th><th scope="col">Etapa</th></tr></thead><tbody id="project-rows">
 <tr><td><span class="desk-project-mark" aria-hidden="true">A</span>Portal Aurora</td><td>Ana Lima</td><td><span class="fs-badge fs-badge-soft-success">Em revisão</span></td></tr>

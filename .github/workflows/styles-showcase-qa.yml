@@ -39,6 +39,7 @@ jobs:
           node --test tools/styles-showcase/deployment.test.mjs
           node tools/styles-showcase/test-dom.mjs
           node --test tools/styles-showcase/documentation.test.mjs
+          node --test tools/styles-showcase/visual-coherence.test.mjs
           node --test tools/styles-showcase/catalog.test.mjs
           node tools/styles-showcase/catalog.dom.mjs
           node tools/sync-seo.mjs --check
