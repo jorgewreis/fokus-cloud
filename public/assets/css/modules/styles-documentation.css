@@ -6,6 +6,9 @@
     --docs-muted: var(--showcase-muted, var(--fs-color-muted));
     --docs-accent: var(--showcase-accent, var(--styles-green));
 }
+[data-theme="light"] .styles-documentation {
+    --docs-accent: #156c43;
+}
 .styles-doc-skip {
     position: fixed;
     z-index: 100;
@@ -84,6 +87,9 @@
 .styles-documentation .styles-sidebar { max-height: calc(100vh - 40px); overflow-y: auto; padding: 4px; }
 .styles-documentation .styles-sidebar .styles-doc-sidebar-home { font-weight: 600; color: var(--docs-text); }
 .styles-doc-sidebar-more { border-top: 1px solid var(--docs-border); margin-top: 20px; }
+.styles-documentation .styles-doc-sidebar-more strong,
+.styles-documentation .styles-doc-sidebar-more a:hover,
+.styles-documentation .styles-doc-sidebar-home:hover { color: var(--docs-accent); }
 .styles-doc-sidebar-more .styles-doc-status { display: block; margin-top: 8px; font-size: 10px; }
 .styles-documentation .styles-sidebar a:focus-visible { outline-offset: 0; }
 .styles-doc-reference > h1 { margin-top: 18px; }
