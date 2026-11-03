@@ -90,7 +90,8 @@ $serveFokusLawShell = function (string $page = 'overview', bool $redirectProfile
         return redirect('/portal/fokus-law/perfil');
     }
 
-    return response()->view('portal.fokus-law', ['initialPage' => $page]);
+    return response()->view('portal.fokus-law', ['initialPage' => $page])
+        ->header('Cache-Control', 'private, no-store');
 };
 Route::get('/portal/fokus-law', fn () => $serveFokusLawShell());
 Route::get('/portal/fokus-lead', function () {
