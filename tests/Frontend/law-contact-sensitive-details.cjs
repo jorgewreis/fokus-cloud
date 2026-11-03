@@ -38,7 +38,7 @@ const sample = {
     { name: 'Synthetic Grandparent', relationship: 'Avó' },
     { name: 'Synthetic Mother', relationship: 'Mãe' },
     { name: 'Synthetic Father', relationship: 'Pai' },
-    { name: 'Second Synthetic Father', relationship: 'Pai' },
+    { name: 'Second Synthetic Mother', relationship: 'Mãe' },
   ],
   bank_accounts: [{ bank: 'Synthetic legacy bank', branch: '1234', account: '1234-5', account_type: 'Synthetic legacy type', holder_name: 'Synthetic Holder' }],
   pix_keys: [{ type: 'email', value: 'synthetic@example.invalid' }],
@@ -58,7 +58,7 @@ assert.equal(personalControls[2].value, 'Synthetic Mother');
 personalControls[1].value = 'Updated Synthetic Father';
 const editedParents = serialize().parentage;
 assert.equal(editedParents[2].name, 'Updated Synthetic Father');
-assert.deepEqual(editedParents[3], { name: 'Second Synthetic Father', relationship: 'Pai' }, 'duplicate explicit parentage records must remain');
+assert.deepEqual(editedParents[3], { name: 'Second Synthetic Mother', relationship: 'Mãe' }, 'duplicate explicit parentage records must remain');
 assert.deepEqual(editedParents[0], sample.parentage[0], 'unclassified parentage must not be inferred as father or mother');
 
 const withoutExplicitRoles = context.sensitiveDetailsEditor({ parentage: [{ name: 'First Synthetic Record', relationship: '' }, { name: 'Second Synthetic Record', relationship: 'Responsável' }] });
@@ -92,6 +92,7 @@ bankSelect.value = otherBank[0];
 bankSelect.dispatch('change');
 accountRow.children[1].value = 'Synthetic unlisted bank';
 assert.equal(serialize().bank_accounts[0].bank, 'Synthetic unlisted bank', 'unlisted institution should be stored as entered');
+assert(!serialize().bank_accounts[0].bank.startsWith('__fokus_other_bank_'), 'manual bank choices must never serialize internal sentinel values');
 
 const fullParentage = context.sensitiveDetailsEditor({ parentage: [
   { name: 'Synthetic Father', relationship: 'Pai' },
@@ -119,12 +120,19 @@ assert.equal(pj.parentage.length, 0);
 assert.equal(pj.bank_accounts.length, 1);
 const empty = context.sensitiveDetailsEditor(null).serialize('pf');
 assert.equal(empty.birth_date, null);
+assert.deepEqual(JSON.parse(JSON.stringify(empty.parentage)), [], 'empty father and mother fields must not create records');
 assert.equal(empty.pix_keys.length, 0);
+const cancelledEditor = context.sensitiveDetailsEditor(sample);
+cancelledEditor.sections[0].content.children[1].value = 'Uncommitted Synthetic Father';
+assert.deepEqual(JSON.parse(JSON.stringify(context.sensitiveDetailsEditor(sample).serialize('pf'))), sample, 'discarding an editor must not persist or mutate source values');
+assert.deepEqual(serialize().parentage, editedParents, 'switching PF/PJ visibility must not mutate the editor parentage values');
+assert.equal(sample.bank_accounts[0].bank, 'Synthetic legacy bank', 'editor selection changes must not mutate stored source values');
 
 assert.equal(catalogContext.window.FokusLawBankCatalog.banks.length, 459);
 assert.equal(catalogContext.window.FokusLawBankCatalog.updatedAt, '2026-11-03');
 assert(catalogContext.window.FokusLawBankCatalog.banks.every((bank) => /^\d{3}$/.test(bank.code)));
 assert(!catalogContext.window.FokusLawBankCatalog.banks.some((bank) => bank.code === '000'));
+assert(!catalogContext.window.FokusLawBankCatalog.banks.some((bank) => bank.code === '0'));
 assert(source.includes("Object.prototype.hasOwnProperty.call(contact, 'sensitive_details')"));
 assert(source.includes('if (protectedEditor && recordKind.value !== \'unit\') body.sensitive_details'));
 assert(source.includes('documentRows.children.length < 20'));
