@@ -1,12 +1,36 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import assert from 'node:assert/strict';
 
 const selectFokusOption = async (page, label, option) => {
     await page.getByRole('button', { name: label, exact: true }).click();
     await page.getByRole('option', { name: option, exact: true }).click();
 };
 
-const shellView = await readFile(new URL('../../resources/views/portal/fokus-law.blade.php', import.meta.url), 'utf8');
+const shellTemplate = await readFile(new URL('../../resources/views/portal/fokus-law.blade.php', import.meta.url), 'utf8');
+const assetManifest = JSON.parse(await readFile(new URL('../../config/fokus-law-assets.json', import.meta.url), 'utf8'));
+const assetUrls = new Map();
+assert.equal(assetManifest.version, 1);
+assert.equal(assetManifest.algorithm, 'sha256');
+for (const [source, entry] of Object.entries(assetManifest.assets)) {
+    assert.match(entry.sha256, /^[a-f0-9]{64}$/);
+    const dot = source.lastIndexOf('.');
+    const expectedPath = source.slice(0, dot) + '.' + entry.sha256 + source.slice(dot);
+    assert.equal(entry.path, expectedPath);
+    assert.ok(!source.includes('..') && !source.startsWith('/'));
+    const bytes = await readFile(new URL('../../public/' + entry.path, import.meta.url));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), entry.sha256);
+    assetUrls.set(source, '/' + entry.path);
+}
+let resolvedAssets = 0;
+const shellView = shellTemplate.replace(/{{\s*\\App\\Support\\FokusLawAssets::url\('([^']+)'\)\s*}}/g, (_, source) => {
+    assert.ok(assetUrls.has(source), 'Missing generated asset: ' + source);
+    resolvedAssets += 1;
+    return assetUrls.get(source);
+});
+assert.equal(resolvedAssets, 14, 'Resolve every real Blade asset reference for the static browser fixture.');
+assert.ok(!shellView.includes('FokusLawAssets::url'), 'Do not serve unresolved Blade asset helpers.');
 const profileView = await readFile(new URL('../../resources/views/portal/partials/fokus-law-profile.blade.php', import.meta.url), 'utf8');
 const renderedShell = shellView
     .replace("{{ $initialPage ?? 'overview' }}", 'profile')

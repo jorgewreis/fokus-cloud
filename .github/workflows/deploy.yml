@@ -4,10 +4,11 @@ name: Deploy Fokus Cloud Laravel
   push:
     branches:
       - main
+  pull_request:
   workflow_dispatch:
 
 concurrency:
-  group: production-deploy
+  group: ${{ github.event_name == 'pull_request' && format('law-validation-pr-{0}', github.event.pull_request.number) || 'production-deploy' }}
   cancel-in-progress: false
 
 jobs:
