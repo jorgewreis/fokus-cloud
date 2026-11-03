@@ -1,6 +1,6 @@
 # Exemplos Fokus Styles — versão 2.7.0
 
-Extraia o ZIP preservando `examples/` e `vendor/`. Abra qualquer HTML de `examples/` no navegador. Os exemplos não precisam de Laravel, npm, fontes externas ou rede. A folha original, não modificada, `vendor/fokus-2.7.0.min.css` veio do pacote npm `fokus-styles@2.7.0`; a licença MIT está no mesmo diretório.
+Extraia o ZIP preservando `examples/` e `assets/`. Abra qualquer HTML de `examples/` no navegador. Os exemplos não precisam de Laravel, npm, fontes externas ou rede. A folha original, não modificada, `assets/fokus-2.7.0.min.css` veio do pacote npm `fokus-styles@2.7.0`; a licença MIT está no mesmo diretório.
 
 O CSS compartilhado em `examples/composition.css` é composição e tema próprios desta demonstração, não novos componentes nativos do framework. O JavaScript dentro do HTML implementa busca, seleção ou validação local. Não há envio ou persistência de dados. Nomes, métricas e e-mails são fictícios.
 

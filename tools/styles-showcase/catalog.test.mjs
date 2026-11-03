@@ -16,5 +16,5 @@ test('snapshot identity, provenance and distinct published assets', async () => 
    for (const snippet of contract.snippets) assert.equal(snippet.executable, false);
  }
  const main = await readFile(new URL('../index.html', base), 'utf8');
- assert.ok(main.includes('/styles/vendor/fokus-2.7.0.min.css')); assert.ok(main.includes('/styles/next/'));
+ assert.ok(main.includes('/styles/assets/fokus-2.7.0.min.css')); assert.ok(main.includes('/styles/next/'));
 });
