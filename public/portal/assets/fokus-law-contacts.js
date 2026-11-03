@@ -497,6 +497,8 @@
       const nonemptyChannels = [...channelRows.children].filter((row) => row.querySelector('[data-channel-value]').value.trim());
       const emailCount = nonemptyChannels.filter((row) => row.querySelector('[data-channel-type]').value === 'email').length;
       if (emailCount > 10 || nonemptyChannels.length - emailCount > 4) { message.dataset.state = 'error'; message.textContent = 'Cadastre no máximo 10 e-mails e 4 telefones.'; return; }
+      const sensitiveError = protectedEditor?.validationError(nature.value);
+      if (sensitiveError) { message.dataset.state = 'error'; message.textContent = sensitiveError; return; }
       save.disabled = true;
       const body = {
         record_kind: recordKind.value, legal_nature: recordKind.value === 'unit' ? null : nature.value,
@@ -532,31 +534,131 @@
     details = details || {};
     const personal = section('Nascimento e filiação');
     const financial = section('Dados bancários e Pix — acesso restrito');
-    financial.content.append($('p', 'law-contact-field-hint', 'Não cadastre senhas, tokens ou credenciais bancárias.'));
     const birthDate = input(details.birth_date || '', '', 10); birthDate.type = 'date';
     personal.content.append(field('Data de nascimento', birthDate));
-    const repeat = (container, label, existing, limit, schema) => {
+    const repeat = (container, label, existing, limit, schema, canAdd = null) => {
       const rows = $('div', 'law-contact-repeat-list');
       const add = (item = {}) => {
         const row = $('div', 'law-contact-repeat-row'); const controls = {};
         schema.forEach(([key, title, length, options]) => {
-          const control = options ? select(options, item[key] || options[0][0]) : input(item[key] || '', '', length);
-          control.autocomplete = 'off'; controls[key] = control; row.append(field(title, control));
+          const config = typeof options === 'function' ? options(item[key] || '') : null;
+          const choices = config?.options || options;
+          const control = choices ? select(choices, config?.selected ?? item[key] ?? choices[0]?.[0] ?? '') : input(item[key] || '', '', length);
+          control.autocomplete = 'off'; controls[key] = { control, read: config?.readValue || (() => control.value.trim()) };
+          const controlField = field(key === 'bank' ? 'Banco / instituição (número-código BCB)' : title, control);
+          row.append(controlField);
+          config?.setup?.(control, row, controlField);
         });
-        row.readValue = () => Object.fromEntries(Object.entries(controls).map(([key, control]) => [key, control.value.trim()]));
+        row.readValue = () => Object.fromEntries(Object.entries(controls).map(([key, item]) => [key, item.read(item.control)]));
         row.append(button('Remover', 'fs-btn fs-btn-danger law-contact-remove', () => row.remove())); rows.append(row);
       };
       (Array.isArray(existing) ? existing : []).forEach(add);
-      container.append(rows, button(label, 'fs-btn fs-btn-outline-primary', () => { if (rows.children.length < limit) add(); }));
-      return () => [...rows.children].map((row) => row.readValue());
+      container.append(rows, button(label, 'fs-btn fs-btn-outline-primary', () => { if (rows.children.length < limit && (!canAdd || canAdd())) add(); }));
+      const values = () => [...rows.children].map((row) => row.readValue());
+      values.rows = rows;
+      return values;
     };
-    const parentage = repeat(personal.content, 'Adicionar filiação', details.parentage, 4, [['name', 'Nome', 180], ['relationship', 'Vínculo de filiação', 80]]);
-    const accounts = repeat(financial.content, 'Adicionar conta bancária', details.bank_accounts, 5, [['bank', 'Banco', 180], ['branch', 'Agência', 80], ['account', 'Conta (com dígito)', 80], ['account_type', 'Tipo de conta', 80], ['holder_name', 'Titular', 180]]);
+    const originalParentage = Array.isArray(details.parentage) ? details.parentage.map((item) => ({ ...item })) : [];
+    const normalizeParentRole = (value) => String(value || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+    const fatherIndex = originalParentage.findIndex((item) => normalizeParentRole(item.relationship) === 'pai');
+    const motherIndex = originalParentage.findIndex((item) => normalizeParentRole(item.relationship) === 'mae');
+    const father = input(fatherIndex >= 0 ? originalParentage[fatherIndex].name || '' : '', '', 180);
+    const mother = input(motherIndex >= 0 ? originalParentage[motherIndex].name || '' : '', '', 180);
+    personal.content.append(field('Pai', father), field('Mãe', mother));
+    const additionalIndices = originalParentage.map((_, index) => index).filter((index) => index !== fatherIndex && index !== motherIndex);
+    const additionalParentage = additionalIndices.map((index) => originalParentage[index]);
+    let parentageRows;
+    parentageRows = repeat(personal.content, 'Adicionar outra filiação', additionalParentage, 4, [['name', 'Nome', 180], ['relationship', 'Vínculo de filiação', 80]], () => {
+      const roles = Number(Boolean(father.value.trim())) + Number(Boolean(mother.value.trim()));
+      return roles + parentageRows().filter((item) => item.name || item.relationship).length < 4;
+    });
+    [...parentageRows.rows.children].forEach((row, index) => { row.originalParentageIndex = additionalIndices[index]; });
+    const bankCatalog = Array.isArray(window.FokusLawBankCatalog?.banks)
+      ? [...window.FokusLawBankCatalog.banks].sort((left, right) => left.code.localeCompare(right.code))
+      : [];
+    let otherBankSequence = 0;
+    const bankInputs = new WeakMap();
+    const bankField = (current) => {
+      let otherValue;
+      do { otherValue = `__fokus_other_bank_${++otherBankSequence}__`; } while (current === otherValue);
+      const options = [['', 'Selecione um banco'], ...bankCatalog.map(({ code, name }) => [`${code} - ${name}`, `${code} - ${name}`])];
+      if (current && !options.some(([value]) => value === current)) options.push([current, `Valor atual preservado: ${current}`]);
+      options.push([otherValue, 'Outra instituição / banco não listado']);
+      const initialOptions = [...options];
+      const otherOption = initialOptions.find(([value]) => value === otherValue);
+      const searchableOptions = initialOptions.filter(([value]) => value !== '' && value !== otherValue);
+      const config = {
+        options,
+        selected: current || '',
+        readValue: (control) => control.value === otherValue ? (bankInputs.get(control)?.value || '').trim() : control.value.trim(),
+        setup: (control, row, controlField) => {
+          const search = input('', 'Buscar por nome ou código', 180); search.type = 'search'; search.setAttribute('aria-label', 'Buscar banco por nome ou código'); search.classList.add('law-bank-search');
+          control.setAttribute('aria-label', 'Banco / instituição (número-código BCB)');
+          controlField.insertBefore(search, control);
+          const noMatches = $('small', 'law-bank-search-empty', 'Nenhum banco encontrado'); noMatches.hidden = true; controlField.append(noMatches);
+          const normalizeSearch = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
+          search.addEventListener('input', () => {
+            const query = normalizeSearch(search.value);
+            const matches = query ? searchableOptions.filter(([value, label]) => normalizeSearch(`${value} ${label}`).includes(query)) : searchableOptions;
+            const visible = [initialOptions[0], ...matches, otherOption];
+            const selectedOption = initialOptions.find(([value]) => value === control.value);
+            if (selectedOption && !visible.some(([value]) => value === selectedOption[0])) visible.push(selectedOption);
+            noMatches.hidden = !query || matches.length > 0;
+            const selected = control.value;
+            control.replaceChildren(...visible.map(([value, label]) => new Option(label, value)));
+            control.value = selected;
+          });
+          const otherInput = input('', 'Informe o nome da instituição', 180);
+          const otherField = field('Instituição não listada', otherInput); otherField.hidden = control.value !== otherValue;
+          control.addEventListener('change', () => { otherField.hidden = control.value !== otherValue; });
+          bankInputs.set(control, otherInput); row.append(otherField);
+        },
+      };
+      return config;
+    };
+    const accountTypeOptions = [['', 'Selecione o tipo de conta'], ['Conta corrente', 'Conta corrente'], ['Poupança', 'Poupança'], ['Conta de pagamento', 'Conta de pagamento'], ['Outro', 'Outro']];
+    const accountTypeField = (current) => {
+      const options = [...accountTypeOptions];
+      if (current && !options.some(([value]) => value === current)) options.push([current, `Tipo atual preservado: ${current}`]);
+      return { options, selected: current || '' };
+    };
+    const accounts = repeat(financial.content, 'Adicionar conta bancária', details.bank_accounts, 5, [['bank', 'Banco', 180, bankField], ['branch', 'Agência', 80], ['account', 'Conta (com dígito)', 80], ['account_type', 'Tipo de conta', 80, accountTypeField], ['holder_name', 'Titular', 180]]);
     const pix = repeat(financial.content, 'Adicionar chave Pix', details.pix_keys, 10, [['type', 'Tipo de chave', 0, [['cpf', 'CPF'], ['cnpj', 'CNPJ'], ['email', 'E-mail'], ['phone', 'Telefone'], ['random', 'Aleatória']]], ['value', 'Chave Pix', 255]]);
     return {
       sections: [personal, financial],
       updateNature: (isUnit, nature) => { personal.hidden = isUnit || nature !== 'pf'; financial.hidden = isUnit; },
-      serialize: (nature) => ({ birth_date: nature === 'pf' ? birthDate.value || null : null, parentage: nature === 'pf' ? parentage().filter((item) => item.name || item.relationship) : [], bank_accounts: accounts().filter((item) => Object.values(item).some(Boolean)), pix_keys: pix().filter((item) => item.value) }),
+      validationError: (nature) => {
+        if (nature === 'pf' && parentageRows().filter((item) => item.name || item.relationship).length + Number(Boolean(father.value.trim())) + Number(Boolean(mother.value.trim())) > 4) return 'Cadastre no máximo 4 vínculos de filiação. Remova um registro adicional para continuar.';
+        if (accounts().filter((item) => Object.values(item).some(Boolean)).length > 5) return 'Cadastre no máximo 5 contas bancárias.';
+        if (pix().filter((item) => item.value).length > 10) return 'Cadastre no máximo 10 chaves Pix.';
+        return '';
+      },
+      serialize: (nature) => {
+        const parentage = [];
+        const extraRowsByIndex = new Map([...parentageRows.rows.children]
+          .filter((row) => Number.isInteger(row.originalParentageIndex))
+          .map((row) => [row.originalParentageIndex, row.readValue()]));
+        originalParentage.forEach((item, index) => {
+          if (index === fatherIndex) { if (father.value.trim()) parentage.push({ ...item, name: father.value.trim() }); }
+          else if (index === motherIndex) { if (mother.value.trim()) parentage.push({ ...item, name: mother.value.trim() }); }
+          else if (additionalIndices.includes(index)) {
+            const changed = extraRowsByIndex.get(index);
+            if (changed && (changed.name || changed.relationship)) parentage.push({ ...item, ...changed });
+          }
+        });
+        if (fatherIndex < 0 && father.value.trim()) parentage.push({ name: father.value.trim(), relationship: 'Pai' });
+        if (motherIndex < 0 && mother.value.trim()) parentage.push({ name: mother.value.trim(), relationship: 'Mãe' });
+        parentage.push(...[...parentageRows.rows.children]
+          .filter((row) => !Number.isInteger(row.originalParentageIndex))
+          .map((row) => row.readValue())
+          .filter((item) => item.name || item.relationship));
+        return {
+          birth_date: nature === 'pf' ? birthDate.value || null : null,
+          parentage: nature === 'pf' ? parentage : [],
+          bank_accounts: accounts().filter((item) => Object.values(item).some(Boolean)),
+          pix_keys: pix().filter((item) => item.value),
+        };
+      },
     };
   }
 

@@ -11,7 +11,7 @@ class LawAssetVersionTest extends TestCase
     {
         $template = file_get_contents(resource_path('views/portal/fokus-law.blade.php'));
 
-        foreach (['portal/assets/fokus-law-contacts.js', 'portal/assets/fokus-law-shell.css'] as $asset) {
+        foreach (['portal/assets/fokus-law-contacts.js', 'portal/assets/fokus-law-bank-catalog.js', 'portal/assets/fokus-law-shell.css'] as $asset) {
             $lines = array_values(array_filter(
                 explode("\n", $template),
                 static fn (string $line): bool => str_contains($line, '/'.$asset.'?v=')
