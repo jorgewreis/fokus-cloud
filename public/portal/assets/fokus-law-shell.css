@@ -1057,3 +1057,11 @@
   .law-record-editor .law-record-name-fields { width: 100%; max-width: 100%; }
   .law-record-editor .law-record-field [class*="fs-width-"] { width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
 }
+
+/* Form-row actions must override the shared button auto-layout contract.
+   Scope this exception to labelled contact rows, never relationship headers. */
+.law-record-editor .law-contact-repeat-row > .law-contact-remove,
+.law-record-editor .law-contact-relationship-entry > .law-contact-chip-remove {
+  align-self: end !important;
+  margin-block: 0;
+}
