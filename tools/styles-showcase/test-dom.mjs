@@ -46,6 +46,37 @@ for (const slug of ['projects', 'onboarding', 'records']) {
 }
 const dom = new JSDOM(home, { runScripts: 'outside-only', url: 'https://styles.fokuscloud.com.br/' });
 const w = dom.window, d = w.document;
+const documentationLinks = [
+  ['/layout', 'Layout'],
+  ['/forms', 'Formulários'],
+  ['/components', 'Componentes'],
+  ['/helpers', 'Helpers'],
+  ['/utilities', 'Utilitários'],
+];
+function assertDocumentationLinks(document) {
+  for (const [href, label] of documentationLinks) {
+    const links = document.querySelectorAll(`#documentacao a[href="${href}"]`);
+    assert.equal(links.length, 1, `Documentation must contain one link to ${href}`);
+    assert.ok(links[0].textContent.includes(label), `Documentation link ${href} must identify ${label}`);
+  }
+}
+assertDocumentationLinks(d);
+// Missing, misdirected and unlabelled links must fail even when the other cards remain.
+for (const [href] of documentationLinks) {
+  for (const mutate of [
+    link => link.remove(),
+    link => link.setAttribute('href', '#' + href.slice(1)),
+    link => { link.textContent = 'Leia mais'; },
+  ]) {
+    const broken = d.cloneNode(true);
+    mutate(broken.querySelector(`#documentacao a[href="${href}"]`));
+    assert.throws(() => assertDocumentationLinks(broken), { name: 'AssertionError' });
+  }
+}
+// A link elsewhere on the page cannot stand in for its documentation card.
+const misplaced = d.cloneNode(true);
+misplaced.body.append(misplaced.querySelector('#documentacao a[href="/helpers"]'));
+assert.throws(() => assertDocumentationLinks(misplaced), { name: 'AssertionError' });
 w.HTMLElement.prototype.scrollIntoView = () => {};
 w.navigator.clipboard = { writeText: async value => { w.copied = value; } };
 let resolvers = [];
@@ -77,4 +108,4 @@ resolvers.shift().resolve({ ok: false }); await tick();
 assert.equal(d.querySelector('#copy-source').disabled, true);
 assert.match(d.querySelector('#copy-status').textContent, /Não foi possível/);
 w.close();
-console.log('PASS: published classes, IDs/labels, validation/reset, normalized search/empty/details, 3 exact source copies, request race, dismissal/focus, failed fetch.');
+console.log('PASS: 5 labelled documentation links with negative controls, published classes, IDs/labels, validation/reset, normalized search/empty/details, 3 exact source copies, request race, dismissal/focus, failed fetch.');

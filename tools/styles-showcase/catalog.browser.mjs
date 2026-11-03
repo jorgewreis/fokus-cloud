@@ -52,6 +52,17 @@ try {
  await page.waitForFunction(hash => location.hash === hash && document.querySelector('#catalog-list a[aria-current]')?.hash === hash, links[0]);
  await page.setViewportSize({width:390,height:844});
  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+ // History rebuilds the previews. Wait for actual Accordion content and paint,
+ // rather than capturing empty frames immediately after the shell changes.
+ assert.equal(links[0], '#accordion');
+ for (const frame of await page.locator('#catalog-detail iframe').all()) {
+  await frame.scrollIntoViewIfNeeded();
+  const child = await (await frame.elementHandle()).contentFrame();
+  await child.getByRole('button', {name:'Pergunta 1', exact:true}).waitFor({state:'visible'});
+  await child.getByRole('button', {name:'Pergunta 2', exact:true}).waitFor({state:'visible'});
+  await child.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+ }
+ await page.evaluate(() => window.scrollTo(0, 0));
  await mkdir(resolve(import.meta.dirname, 'test-results'),{recursive:true});
  await page.screenshot({path:process.env.STYLES_SCREENSHOT || resolve(import.meta.dirname, 'test-results/styles-next-mobile.png'),fullPage:true});
  await page.goto(base + '/styles/next/#file-upload-advanced');
