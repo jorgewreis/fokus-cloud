@@ -124,7 +124,17 @@ test('published CSS is applied in each standalone example and the next catalog s
     await expectPublishedStylesLoaded(page);
     const button = page.locator('.fs-btn').first();
     await expect(button).toBeVisible();
-    expect(await button.evaluate(element => getComputedStyle(element).display), path).toBe('inline-flex');
+    const style = await button.evaluate(element => {
+      const computed = getComputedStyle(element);
+      return { display: computed.display, alignItems: computed.alignItems,
+        borderStyle: computed.borderTopStyle, backgroundToken: computed.getPropertyValue('--fs-btn-bg').trim() };
+    });
+    // Flex/grid items are blockified by layout, so inline-flex computes to flex.
+    // Both still require the framework's flex alignment, border and color token.
+    expect(['inline-flex', 'flex'], path).toContain(style.display);
+    expect(style.alignItems, path).toBe('center');
+    expect(style.borderStyle, path).toBe('solid');
+    expect(style.backgroundToken, path).not.toBe('');
   }
 });
 
