@@ -1,7 +1,7 @@
 (() => {
-  const DOCUMENTS = { cpf: 'CPF', cnpj: 'CNPJ', state_registration: 'Inscrição estadual', oab: 'OAB', rg: 'RG', registration: 'Matrícula', cadastro: 'Cadastro', voter_title: 'Título de eleitor', passport: 'Passaporte', other: 'Outro' };
-  const DOCUMENT_TYPES_BY_NATURE = { pf: ['cpf', 'oab', 'rg', 'registration', 'cadastro', 'voter_title', 'passport', 'other'], pj: ['cnpj', 'state_registration', 'other'] };
-  const DOCUMENT_TYPES_WITHOUT_STATE = ['cpf', 'cnpj', 'registration', 'cadastro', 'passport', 'voter_title'];
+  const DOCUMENTS = { cpf: 'CPF', cnpj: 'CNPJ', state_registration: 'Inscrição estadual', oab: 'OAB', rg: 'RG', registration: 'Matrícula', cadastro: 'Cadastro', voter_title: 'Título de eleitor', passport: 'Passaporte', pis: 'PIS', pasep: 'PASEP', nit: 'NIT', nis: 'NIS', cadunico: 'CadÚnico (código familiar)', cnh: 'CNH', cin: 'CIN', other: 'Outro' };
+  const DOCUMENT_TYPES_BY_NATURE = { pf: ['cpf', 'oab', 'rg', 'registration', 'cadastro', 'voter_title', 'passport', 'pis', 'pasep', 'nit', 'nis', 'cadunico', 'cnh', 'cin', 'other'], pj: ['cnpj', 'state_registration', 'other'] };
+  const DOCUMENT_TYPES_WITHOUT_STATE = ['cpf', 'cnpj', 'registration', 'cadastro', 'passport', 'voter_title', 'pis', 'pasep', 'nit', 'nis', 'cadunico', 'cnh', 'cin'];
   const DOCUMENT_TYPES_WITHOUT_LABEL = [...DOCUMENT_TYPES_WITHOUT_STATE, 'state_registration'];
   const STATES = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map((uf) => [uf, uf]);
   const CONTACT_ICONS = '/backoffice/assets/icons/';
@@ -256,7 +256,15 @@
           const actions = $('td', 'law-record-actions');
           const actionList = $('div', 'law-record-action-list');
           actionList.append(iconButton('Ver detalhes', 'Folder-File--Streamline-Ultimate.png', (event) => openDetails(root, contact.id, contact.is_shared, refresh, event.currentTarget, can('law.contacts.update'), { relationshipOptions, designationOptions, competencyOptions })));
-          if (!contact.is_shared && can('law.contacts.update')) actionList.append(iconButton('Editar contato', 'Common-File-Edit--Streamline-Ultimate.png', (event) => openEditor(root, contact, refresh, event.currentTarget, relationshipOptions, designationOptions, competencyOptions)));
+          if (!contact.is_shared && can('law.contacts.update')) actionList.append(iconButton('Editar contato', 'Common-File-Edit--Streamline-Ultimate.png', async (event) => {
+            const trigger = event.currentTarget; trigger.disabled = true;
+            try {
+              const detail = await window.FokusApi.request(`/law/contacts/${encodeURIComponent(contact.id)}`);
+              if (!detail.contact || detail.contact.is_shared) throw new Error('Contato indisponível para edição.');
+              openEditor(root, detail.contact, refresh, trigger, relationshipOptions, designationOptions, competencyOptions);
+            } catch (error) { state.textContent = error.message || 'Não foi possível carregar o contato para edição.'; }
+            finally { trigger.disabled = false; }
+          }));
           if (!contact.is_shared && can('law.contacts.delete')) actionList.append(iconButton('Excluir contato', 'Common-File-Remove--Streamline-Ultimate.png', async (event) => {
             if (!await confirmAction(root, 'Excluir contato', 'O cadastro será removido da base ativa e deixará de consumir capacidade. A trilha de auditoria será preservada.', 'Excluir contato', event.currentTarget)) return;
             try { await window.FokusApi.request(`/law/contacts/${encodeURIComponent(contact.id)}`, { method: 'DELETE' }); await refresh(); }
@@ -407,14 +415,16 @@
       documentSection = section('Documentos');
       documentRows = $('div', 'law-contact-repeat-list');
       (contact?.documents || []).filter((doc) => DOCUMENT_TYPES_BY_NATURE[nature.value].includes(doc.type)).forEach((doc) => documentRows.append(documentRow(doc, nature.value)));
-      documentSection.content.append(documentRows, button('Adicionar documento', 'fs-btn fs-btn-outline-primary', () => { if (documentRows.children.length < 4) documentRows.append(documentRow({}, nature.value)); }));
+      documentSection.content.append(documentRows, button('Adicionar documento', 'fs-btn fs-btn-outline-primary', () => { if (documentRows.children.length < 20) documentRows.append(documentRow({}, nature.value)); }));
     }
+    const protectedEditor = window.lawContactsCanSensitive && !contact?.is_shared && (!contact || Object.prototype.hasOwnProperty.call(contact, 'sensitive_details')) ? sensitiveDetailsEditor(contact?.sensitive_details) : null;
     const channelSection = section('Telefones e e-mails');
     const channelRows = $('div', 'law-contact-repeat-list'); (contact?.channels || []).filter((item) => window.lawContactsCanSensitive || !item.personal).forEach((item) => channelRows.append(channelRow(item)));
     enforceSinglePrimary(channelRows, (row) => row.querySelector('[data-channel-type]').value === 'email' ? 'email' : 'phone', true);
     channelSection.content.append(channelRows, button('Adicionar telefone ou e-mail', 'fs-btn fs-btn-outline-primary', () => {
-      if (channelRows.children.length >= 6) return;
-      const row = channelRow(); channelRows.append(row);
+      if (channelRows.children.length >= 14) return;
+      const phoneCount = [...channelRows.children].filter((item) => item.querySelector('[data-channel-type]').value !== 'email').length;
+      const row = channelRow({ type: phoneCount >= 4 ? 'email' : 'phone' }); channelRows.append(row);
       const group = row.querySelector('[data-channel-type]').value === 'email' ? 'email' : 'phone';
       if (![...channelRows.children].some((other) => other !== row && (other.querySelector('[data-channel-type]').value === 'email' ? 'email' : 'phone') === group && other.querySelector('[data-primary]').value === '1')) row.querySelector('[data-primary]').value = '1';
     }));
@@ -439,6 +449,7 @@
     modal.footer.append(cancel, save);
     form.append(basic, professionSection, institutionalSection, relationshipSection);
     if (documentSection) form.append(documentSection);
+    if (protectedEditor) form.append(...protectedEditor.sections);
     form.append(channelSection, addressSection);
     form.append(tags);
     // Notes remain editable only for a profile that can read protected personal data.
@@ -455,6 +466,7 @@
       professionSection.hidden = isUnit || nature.value === 'pj';
       relationshipSection.hidden = isUnit;
       if (documentSection) documentSection.hidden = isUnit;
+      protectedEditor?.updateNature(isUnit, nature.value);
       if (window.lawContactsCanSensitive) notesSection.hidden = false;
       updateInstitutional();
       if (documentRows) [...documentRows.children].forEach((row) => {
@@ -482,6 +494,9 @@
         return !valid;
       });
       if (invalidDocument) { message.dataset.state = 'error'; message.textContent = `Informe um ${invalidDocument.querySelector('[data-doc-type]').value.toUpperCase()} válido, com os dígitos verificadores corretos.`; invalidDocument.querySelector('[data-doc-number]').focus(); return; }
+      const nonemptyChannels = [...channelRows.children].filter((row) => row.querySelector('[data-channel-value]').value.trim());
+      const emailCount = nonemptyChannels.filter((row) => row.querySelector('[data-channel-type]').value === 'email').length;
+      if (emailCount > 10 || nonemptyChannels.length - emailCount > 4) { message.dataset.state = 'error'; message.textContent = 'Cadastre no máximo 10 e-mails e 4 telefones.'; return; }
       save.disabled = true;
       const body = {
         record_kind: recordKind.value, legal_nature: recordKind.value === 'unit' ? null : nature.value,
@@ -500,6 +515,7 @@
       if (window.lawContactsCanSensitive) {
         body.documents = [...documentRows.children].map((row) => { const type = row.querySelector('[data-doc-type]').value; const noUf = DOCUMENT_TYPES_WITHOUT_STATE.includes(type); const noLabel = DOCUMENT_TYPES_WITHOUT_LABEL.includes(type); return { type, number: row.querySelector('[data-doc-number]').value.trim(), state: noUf ? null : (row.querySelector('[data-doc-state]').value || null), label: noLabel ? null : (row.querySelector('[data-doc-label]').value.trim() || null) }; }).filter((doc) => doc.number);
         body.notes = notes.value.trim() || null;
+        if (protectedEditor && recordKind.value !== 'unit') body.sensitive_details = protectedEditor.serialize(nature.value);
       }
       if (contact) body.sharing_excluded = form.elements.namedItem('sharing_excluded').checked;
       try {
@@ -509,6 +525,39 @@
       finally { save.disabled = false; }
     });
     modal.body.append(form); name.focus();
+  }
+
+  // Protected fields never enter the editor or PATCH payload without read permission.
+  function sensitiveDetailsEditor(details = {}) {
+    details = details || {};
+    const personal = section('Nascimento e filiação');
+    const financial = section('Dados bancários e Pix — acesso restrito');
+    financial.content.append($('p', 'law-contact-field-hint', 'Não cadastre senhas, tokens ou credenciais bancárias.'));
+    const birthDate = input(details.birth_date || '', '', 10); birthDate.type = 'date';
+    personal.content.append(field('Data de nascimento', birthDate));
+    const repeat = (container, label, existing, limit, schema) => {
+      const rows = $('div', 'law-contact-repeat-list');
+      const add = (item = {}) => {
+        const row = $('div', 'law-contact-repeat-row'); const controls = {};
+        schema.forEach(([key, title, length, options]) => {
+          const control = options ? select(options, item[key] || options[0][0]) : input(item[key] || '', '', length);
+          control.autocomplete = 'off'; controls[key] = control; row.append(field(title, control));
+        });
+        row.readValue = () => Object.fromEntries(Object.entries(controls).map(([key, control]) => [key, control.value.trim()]));
+        row.append(button('Remover', 'fs-btn fs-btn-danger law-contact-remove', () => row.remove())); rows.append(row);
+      };
+      (Array.isArray(existing) ? existing : []).forEach(add);
+      container.append(rows, button(label, 'fs-btn fs-btn-outline-primary', () => { if (rows.children.length < limit) add(); }));
+      return () => [...rows.children].map((row) => row.readValue());
+    };
+    const parentage = repeat(personal.content, 'Adicionar filiação', details.parentage, 4, [['name', 'Nome', 180], ['relationship', 'Vínculo de filiação', 80]]);
+    const accounts = repeat(financial.content, 'Adicionar conta bancária', details.bank_accounts, 5, [['bank', 'Banco', 180], ['branch', 'Agência', 80], ['account', 'Conta (com dígito)', 80], ['account_type', 'Tipo de conta', 80], ['holder_name', 'Titular', 180]]);
+    const pix = repeat(financial.content, 'Adicionar chave Pix', details.pix_keys, 10, [['type', 'Tipo de chave', 0, [['cpf', 'CPF'], ['cnpj', 'CNPJ'], ['email', 'E-mail'], ['phone', 'Telefone'], ['random', 'Aleatória']]], ['value', 'Chave Pix', 255]]);
+    return {
+      sections: [personal, financial],
+      updateNature: (isUnit, nature) => { personal.hidden = isUnit || nature !== 'pf'; financial.hidden = isUnit; },
+      serialize: (nature) => ({ birth_date: nature === 'pf' ? birthDate.value || null : null, parentage: nature === 'pf' ? parentage().filter((item) => item.name || item.relationship) : [], bank_accounts: accounts().filter((item) => Object.values(item).some(Boolean)), pix_keys: pix().filter((item) => item.value) }),
+    };
   }
 
   function documentRow(doc = {}, nature = 'pf') {
@@ -522,7 +571,7 @@
     const label = setWidth(input(doc.label || '', 'Identificação', 80), 400); label.dataset.docLabel = '1';
     const stateField = field('UF de emissão', state); const labelField = field('Identificação', label);
     const numberMask = window.FokusDocuments?.bind(number, () => type.value);
-    const update = () => { const noUf = DOCUMENT_TYPES_WITHOUT_STATE.includes(type.value); const noLabel = DOCUMENT_TYPES_WITHOUT_LABEL.includes(type.value); stateField.hidden = noUf; state.required = type.value === 'state_registration'; labelField.hidden = noLabel; number.placeholder = type.value === 'cpf' ? '000.000.000-00' : type.value === 'cnpj' ? '00.000.000/0000-00' : 'Número do documento'; number.inputMode = type.value === 'cpf' ? 'numeric' : type.value === 'cnpj' ? 'text' : 'text'; number.maxLength = type.value === 'cpf' ? 14 : type.value === 'cnpj' ? 18 : 120; numberMask?.apply(); };
+    const update = () => { const noUf = DOCUMENT_TYPES_WITHOUT_STATE.includes(type.value); const noLabel = DOCUMENT_TYPES_WITHOUT_LABEL.includes(type.value); stateField.hidden = noUf; state.required = type.value === 'state_registration'; labelField.hidden = noLabel; number.placeholder = type.value === 'cpf' ? '000.000.000-00' : type.value === 'cnpj' ? '00.000.000/0000-00' : type.value === 'cadunico' ? 'Código familiar (não é o NIS)' : 'Número do documento'; number.inputMode = type.value === 'cpf' ? 'numeric' : type.value === 'cnpj' ? 'text' : 'text'; number.maxLength = type.value === 'cpf' ? 14 : type.value === 'cnpj' ? 18 : 120; numberMask?.apply(); };
     type.addEventListener('change', update); update();
     row.append(field('Tipo', type), field('Número', number), stateField, labelField, button('Remover', 'fs-btn fs-btn-danger law-contact-remove', () => row.remove())); return row;
   }
@@ -755,6 +804,31 @@
           items.append(row);
       });
     }
+    if (window.lawContactsCanSensitive && !contact.is_shared && contact.record_kind !== 'unit' && contact.sensitive_details) {
+      const data = contact.sensitive_details;
+      const lines = [];
+      if (contact.legal_nature === 'pf') {
+        if (data.birth_date) lines.push(['Nascimento', String(data.birth_date).split('-').reverse().join('/'), false]);
+        (data.parentage || []).forEach((item) => lines.push([item.relationship || 'Filiação', item.name, false]));
+      }
+      (data.bank_accounts || []).forEach((item) => lines.push(['Conta bancária', [item.bank, item.branch && `Agência ${item.branch}`, item.account && `Conta ${item.account}`, item.account_type, item.holder_name].filter(Boolean).join(' · '), true]));
+      const pixLabels = { cpf: 'CPF', cnpj: 'CNPJ', email: 'E-mail', phone: 'Telefone', random: 'Aleatória' };
+      (data.pix_keys || []).forEach((item) => lines.push([`Pix — ${pixLabels[item.type] || 'Chave'}`, item.value, true]));
+      if (lines.length) {
+        const items = addSection('Dados pessoais e bancários restritos', 'PRIV', lines.length);
+        lines.forEach(([label, value, masked]) => {
+          const row = $('article', 'law-record-detail-document-copy');
+          row.append($('span', '', label));
+          const display = $('strong', '', masked ? '••••••••' : value); row.append(display);
+          if (masked) {
+            let revealed = false;
+            const toggle = button('Exibir', 'fs-btn fs-btn-outline-primary', () => { revealed = !revealed; display.textContent = revealed ? value : '••••••••'; toggle.textContent = revealed ? 'Ocultar' : 'Exibir'; toggle.setAttribute('aria-pressed', String(revealed)); });
+            toggle.setAttribute('aria-label', `Exibir ou ocultar ${label}`); toggle.setAttribute('aria-pressed', 'false'); row.append(toggle);
+          }
+          items.append(row);
+        });
+      }
+    }
     if (contact.documents?.length) {
       const items = addSection('Documentos', 'ID', contact.documents.length, 'law-record-detail-documents');
       contact.documents.forEach((doc) => {
@@ -763,7 +837,7 @@
         item.append($('span', 'law-record-detail-document-type', Array.from(type).slice(0, 4).join('').toLocaleUpperCase('pt-BR')));
         const detail = $('div', 'law-record-detail-document-copy');
         detail.append($('strong', '', formatContactDocument(doc)));
-        detail.append($('span', '', [doc.label, doc.state].filter(Boolean).join(' · ') || 'Documento cadastrado'));
+        detail.append($('span', '', [type, doc.label, doc.state].filter(Boolean).join(' · ') || 'Documento cadastrado'));
         item.append(detail); items.append(item);
       });
     }
@@ -1148,3 +1222,4 @@
     openSearchedContact: (root, id, isShared, opener = null, canEdit = window.lawContactsCanUpdate) => openDetails(root, id, isShared, () => render(root, context), opener, canEdit),
   };
 })();
+

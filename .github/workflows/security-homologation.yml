@@ -117,6 +117,18 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
 
+      - name: Check isolated contact forms with synthetic browser data
+        run: node tests/Frontend/law-contact-visual.cjs
+
+      - name: Upload synthetic contact form screenshots
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: law-contact-visual-${{ github.run_id }}
+          path: test-results/law-contact-visual/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Run feature and unit suite on MySQL and Redis
         run: |
           set +e
@@ -222,3 +234,4 @@ jobs:
         if: ${{ always() }}
         run: |
           if [ -f "$RUNNER_TEMP/security-app.pid" ]; then kill "$(cat "$RUNNER_TEMP/security-app.pid")" 2>/dev/null || true; fi
+
