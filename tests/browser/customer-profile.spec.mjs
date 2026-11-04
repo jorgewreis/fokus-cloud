@@ -119,6 +119,22 @@ test('perfil do cliente adapta as três seções a desktop, tablet e celular', a
     }
 });
 
+test('dashboard exibe módulos com ícones coloridos de 32px e sem botão de abertura', async ({ page }) => {
+    await openProfile(page);
+    const dashboardShell = shellView.replace("{{ $initialPage ?? 'overview' }}", 'overview').replace("@include('portal.partials.fokus-law-profile')", profileView);
+    await page.route('**/portal/fokus-law', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: dashboardShell }));
+    await page.goto('/portal/fokus-law');
+    await expect(page.locator('.law-dashboard-widget-mark img')).toHaveCount(2);
+    await expect(page.getByRole('button', { name: 'Abrir módulo' })).toHaveCount(0);
+    for (const image of await page.locator('.law-dashboard-widget-mark img').all()) {
+        const styles = await image.evaluate((node) => ({ width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height, filter: getComputedStyle(node).filter, background: getComputedStyle(node.parentElement).backgroundColor, border: getComputedStyle(node.parentElement).borderWidth, src: node.currentSrc, loaded: node.complete && node.naturalWidth > 0 }));
+        expect(styles).toMatchObject({ width: 32, height: 32, filter: 'none', background: 'rgba(0, 0, 0, 0)', border: '0px', loaded: true });
+        expect(styles.src).toContain('Streamline-Ultimate-Colors.png');
+    }
+    await page.getByRole('button', { name: 'Contatos', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Contatos', exact: true })).toHaveAttribute('aria-expanded', 'true');
+});
+
 test('perfil em acesso de suporte fica somente para leitura', async ({ page }) => {
     await openProfile(page, { active: true, company: 'Menezes Advocacia', reason: 'Atendimento' });
     await expect(page.locator('#profile-support-notice')).toBeVisible();

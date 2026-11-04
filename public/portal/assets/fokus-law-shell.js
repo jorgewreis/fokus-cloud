@@ -6,6 +6,8 @@
     settings: 'Cog--Streamline-Ultimate.png',
     processes: 'Zip-File--Streamline-Ultimate-Regular.svg',
     contacts: 'Customer-Relationship-Management-List-Document-Share--Streamline-Ultimate.png',
+    contactsColor: 'Single-Neutral-Phone-Book--Streamline-Ultimate-Colors.png',
+    processesColor: 'Legal-Scale-Unequal--Streamline-Ultimate-Colors.png',
     filings: 'Common-File-Quill--Streamline-Ultimate.png',
     hearings: 'Alarm-Bell--Streamline-Ultimate-Regular.png',
     tasks: 'Single-Man-Actions-Time--Streamline-Ultimate.png',
@@ -271,16 +273,13 @@
     contentRegion.append(grid);
     const contactsEnabled = visibleModules().some((module) => String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos'));
     if (contactsEnabled && canLawPermission('law.contacts.view')) {
-      const contactModule = visibleModules().find((module) => String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos'));
       const card = element('article', 'fs-card law-dashboard-module-widget law-dashboard-contacts');
       const header = element('header', 'law-dashboard-widget-header');
       const identity = element('div', 'law-dashboard-widget-identity');
-      const mark = element('span', 'law-dashboard-widget-mark'); mark.append(icon('contacts'));
+      const mark = element('span', 'law-dashboard-widget-mark'); mark.append(icon('contactsColor'));
       const title = element('div'); title.append(element('span', 'law-dashboard-widget-kicker', 'BASE JURÍDICA'), element('h3', '', 'Gestão de Contatos'));
       identity.append(mark, title);
-      const open = element('button', 'law-dashboard-widget-open', 'Abrir módulo'); open.type = 'button'; open.append(icon('chevron', 'law-diagonal-chevron'));
-      open.addEventListener('click', () => { if (contactModule) { activeGroup = `module:${contactModule.id}`; renderNavigation(); closeMobileNav(); contentRegion.focus({ preventScroll: true }); } });
-      header.append(identity, open);
+      header.append(identity);
       const body = element('div', 'law-dashboard-widget-body');
       body.append(element('p', 'law-contact-loading', 'Carregando seus indicadores…'));
       card.append(header, body);
@@ -334,12 +333,10 @@
     const card = element('article', 'fs-card law-dashboard-module-widget law-dashboard-module-wide');
     const header = element('header', 'law-dashboard-widget-header');
     const identity = element('div', 'law-dashboard-widget-identity');
-    const mark = element('span', 'law-dashboard-widget-mark'); mark.append(icon('processes'));
+    const mark = element('span', 'law-dashboard-widget-mark'); mark.append(icon('processesColor'));
     const title = element('div'); title.append(element('span', 'law-dashboard-widget-kicker', 'GESTÃO DE PROCESSOS'), element('h3', '', 'Gestão de Processos'));
     identity.append(mark, title);
-    const open = element('button', 'law-dashboard-widget-open', 'Abrir módulo'); open.type = 'button'; open.append(icon('chevron', 'law-diagonal-chevron'));
-    open.addEventListener('click', () => { activeGroup = `module:${module.id}`; contactsView = 'module'; renderNavigation(); closeMobileNav(); contentRegion.focus({ preventScroll: true }); });
-    header.append(identity, open);
+    header.append(identity);
     const body = element('div', 'law-dashboard-widget-body'); body.append(element('p', 'law-contact-loading', 'Carregando seus indicadores…'));
     card.append(header, body); grid.append(card);
     FokusApi.request(module.context_code === 'orgao_publico' ? '/law/admin-cases/dashboard' : '/law/cases/dashboard').then(({ summary }) => {
