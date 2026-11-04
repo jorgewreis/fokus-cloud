@@ -139,6 +139,13 @@ class LawCaseController extends Controller
         return $global->union($local)->all();
     }
 
+    private function proceduralPrioritiesFor(Request $request): array
+    {
+        return $request->attributes->get('law_case_context_code') === 'escritorio'
+            ? array_values(array_diff(self::PROCEDURAL_PRIORITIES, ['defendant_detained']))
+            : self::PROCEDURAL_PRIORITIES;
+    }
+
     public function references(Request $request, LawCaseManagementService $cases)
     {
         $data = $request->validate(['law_unit_id' => ['required', 'string', 'max:30'], 'contact_search' => ['nullable', 'string', 'max:100']]);
@@ -156,6 +163,10 @@ class LawCaseController extends Controller
         $catalogOptions = fn (string $type) => DB::table('law_cnj_metadata_options')->where('type', $type)->where('is_active', true)->orderBy('code')->get(['code', 'name'])
             ->concat(DB::table('law_case_metadata_options')->where('company_id', $companyId)->where('type', $type)->orderBy('code')->get(['code', 'name']))
             ->unique('code')->values();
+        $roles = DB::table('law_case_role_options')->where('company_id', $companyId)->where('law_unit_id', $unit->id)->where('is_active', true);
+        if ($request->attributes->get('law_case_context_code') === 'escritorio') {
+            $roles->whereNotIn('code', ['autoridade_policial', 'promotor', 'vitima', 'testemunha_defesa', 'testemunha_denuncia']);
+        }
 
         return response()->json([
             'units' => DB::table('law_units')->where('company_id', $companyId)->where('status', 'ativo')->orderBy('name')->get(['id', 'name']),
@@ -163,7 +174,7 @@ class LawCaseController extends Controller
             'can_configure' => $this->mayManageUnit($request, (string) $unit->id),
             'statuses' => DB::table('law_case_status_options')->where('company_id', $companyId)->where('law_unit_id', $unit->id)->where('is_active', true)->orderBy('sort_order')->orderBy('label')->get(['id', 'code', 'label', 'is_system']),
             'tags' => DB::table('law_case_tags')->where('company_id', $companyId)->where('law_unit_id', $unit->id)->where('is_active', true)->orderBy('name')->get(['id', 'name']),
-            'roles' => DB::table('law_case_role_options')->where('company_id', $companyId)->where('law_unit_id', $unit->id)->where('is_active', true)->orderBy('is_system', 'desc')->orderBy('label')->get(['id', 'code', 'label', 'is_system']),
+            'roles' => $roles->orderBy('is_system', 'desc')->orderBy('label')->get(['id', 'code', 'label', 'is_system']),
             'cnj_defaults' => DB::table('law_case_cnj_defaults')->where('company_id', $companyId)->where('law_unit_id', $unit->id)->first(['segment', 'court', 'origin']),
             'cnj_segments' => LawCnjNumbering::segments(),
             'cnj_courts' => LawCnjNumbering::courts(),
@@ -174,7 +185,8 @@ class LawCaseController extends Controller
                 ->where('users.status', 'ativa')->orderBy('users.name')->get(['membership.id', 'users.name']),
             'contacts' => $contacts->orderBy('display_name')->limit(60)->get(['id', 'display_name', 'contact_type']),
             'priorities' => self::PRIORITIES,
-            'procedural_priorities' => collect(self::PROCEDURAL_PRIORITY_LABELS)->map(fn (string $label, string $code): array => ['code' => $code, 'label' => $label])->values(),
+            'context_code' => (string) $request->attributes->get('law_case_context_code', ''),
+            'procedural_priorities' => collect(self::PROCEDURAL_PRIORITY_LABELS)->only($this->proceduralPrioritiesFor($request))->map(fn (string $label, string $code): array => ['code' => $code, 'label' => $label])->values(),
             'confidentiality_levels' => [['code' => 'public', 'label' => 'Público'], ['code' => 'confidential', 'label' => 'Sigiloso'], ['code' => 'secret', 'label' => 'Secreto']],
         ]);
     }
@@ -346,7 +358,7 @@ class LawCaseController extends Controller
             'operational_status' => ['sometimes', 'required', Rule::exists('law_case_status_options', 'code')->where('company_id', $current->company_id)->where('law_unit_id', $current->law_unit_id)],
             'operational_priority' => ['sometimes', 'required', Rule::in(self::PRIORITIES)],
             'procedural_priorities' => ['sometimes', 'array', 'max:6'],
-            'procedural_priorities.*' => ['string', 'distinct', Rule::in(self::PROCEDURAL_PRIORITIES)],
+            'procedural_priorities.*' => ['string', 'distinct', Rule::in($this->proceduralPrioritiesFor($request))],
             'confidentiality_level' => ['sometimes', 'required', Rule::in(self::CONFIDENTIALITY)],
             'responsible_membership_id' => ['sometimes', 'nullable', 'string', 'max:30'],
         ]);
@@ -551,6 +563,9 @@ class LawCaseController extends Controller
         $current = $this->findCase($request, $case, $cases, true);
         $data = $request->validate(['law_contact_id' => ['required', 'string', 'max:30'], 'case_role' => ['required', 'string', 'max:48']]);
         $role = DB::table('law_case_role_options')->where('company_id', $current->company_id)->where('law_unit_id', $current->law_unit_id)->where('code', $data['case_role'])->where('is_active', true)->first();
+        if ($request->attributes->get('law_case_context_code') === 'escritorio') {
+            abort_if(in_array($data['case_role'], ['autoridade_policial', 'promotor', 'vitima', 'testemunha_defesa', 'testemunha_denuncia'], true), 422, 'Este papel processual não está disponível para o contexto de Advocacia.');
+        }
         abort_unless($role, 422, 'Selecione um papel processual disponível.');
         $contact = DB::table('law_contacts')->where('company_id', $current->company_id)->where('record_kind', 'contact')->where('id', $data['law_contact_id'])
             ->where('status', 'ativo')->whereNull('deleted_at')->whereNull('merged_into_id')

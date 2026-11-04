@@ -14,6 +14,7 @@ class LawCaseManagementService
     private const ROLE_OPTIONS = [
         'advogado' => 'Advogado', 'autoridade_policial' => 'Autoridade policial',
         'defensor_publico' => 'Defensor público', 'outro' => 'Outro',
+        'cliente' => 'Cliente', 'parte_contraria' => 'Parte contrária', 'advogado_contrario' => 'Advogado da parte contrária',
         'parte_autora' => 'Parte autora', 'parte_re' => 'Parte ré',
         'promotor' => 'Promotor de Justiça', 'vitima' => 'Vítima',
         'testemunha_defesa' => 'Testemunha da Defesa', 'testemunha_denuncia' => 'Testemunha da Denúncia',

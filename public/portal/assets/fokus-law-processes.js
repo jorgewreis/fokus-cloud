@@ -13,9 +13,10 @@
   let generation = 0;
 
   async function render(root, context, initialCaseId = null, pageView = 'module', processModule = null) {
-    const adminVariant = processModule?.context_code === 'orgao_publico' || ((context.modules || []).some((module) => String(module.family || '').startsWith('processos') && module.context_code === 'orgao_publico') && !(context.modules || []).some((module) => String(module.family || '').startsWith('processos') && ['judiciario', 'vara_criminal'].includes(module.context_code)));
+    const advocacyVariant = processModule?.context_code === 'escritorio' || (context.modules || []).some((module) => String(module.family || '').startsWith('processos') && module.context_code === 'escritorio');
+    const adminVariant = processModule?.context_code === 'orgao_publico' || ((context.modules || []).some((module) => String(module.family || '').startsWith('processos') && module.context_code === 'orgao_publico') && !(context.modules || []).some((module) => String(module.family || '').startsWith('processos') && ['judiciario', 'vara_criminal', 'escritorio'].includes(module.context_code)));
     apiRoot = adminVariant ? '/law/admin-cases' : '/law/cases';
-    const pageTitles = { module: adminVariant ? 'Processos administrativos' : 'Processos', 'processes-settings': adminVariant ? 'Configurações do órgão' : 'Configurações da unidade', 'processes-access': 'Autorizações' };
+    const pageTitles = { module: adminVariant ? 'Processos administrativos' : 'Processos', 'processes-settings': adminVariant ? 'Configurações do órgão' : advocacyVariant ? 'Configurações do escritório' : 'Configurações da unidade', 'processes-access': 'Autorizações' };
     document.title = `${pageTitles[pageView] || pageTitles.module} | Fokus Law`;
     const session = ++generation;
     const { node: $, button, input, select, field, detailSection: section, message, dialog: openDialog, bindForm, compositionChart, metricCards } = UI();
@@ -47,7 +48,7 @@
       refreshTimer = setTimeout(poll, 5000);
     }
     const notice = message();
-    const heading = $('header', 'law-page-heading law-record-page-heading'); heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE PROCESSOS'), $('h2', '', pageTitles[pageView] || pageTitles.module), $('p', 'law-page-lede', pageView === 'processes-settings' ? (adminVariant ? 'Configure tipos de processo, campos e opções compartilhados pelo órgão.' : 'Gerencie os padrões e as opções processuais de cada unidade.') : pageView === 'processes-access' ? 'Gerencie quem pode consultar processos secretos nas unidades que você administra.' : adminVariant ? 'Cadastre e acompanhe processos administrativos de todas as unidades do órgão.' : 'Judiciário criminal · Consulte os processos da empresa e organize o trabalho de cada unidade.'));
+    const heading = $('header', 'law-page-heading law-record-page-heading'); heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE PROCESSOS'), $('h2', '', pageTitles[pageView] || pageTitles.module), $('p', 'law-page-lede', pageView === 'processes-settings' ? (adminVariant ? 'Configure tipos de processo, campos e opções compartilhados pelo órgão.' : advocacyVariant ? 'Gerencie os padrões e as opções processuais do escritório.' : 'Gerencie os padrões e as opções processuais de cada unidade.') : pageView === 'processes-access' ? 'Gerencie quem pode consultar processos secretos nas unidades que você administra.' : adminVariant ? 'Cadastre e acompanhe processos administrativos de todas as unidades do órgão.' : advocacyVariant ? 'Consulte processos judiciais, vincule clientes e partes e organize o trabalho do escritório.' : 'Consulte processos judiciais e organize o trabalho de cada unidade.'));
     const headingActions = $('div', 'law-record-heading-actions');
     if (pageView === 'module') heading.append(headingActions);
     const body = $('div'); root.replaceChildren(heading, notice, body);

@@ -28,10 +28,12 @@ class SyncLawCaseDatajud extends Command
                     ->join('subscriptions as subscription', 'subscription.id', '=', 'item.subscription_id')
                     ->join('products as product', 'product.id', '=', 'subscription.product_id')
                     ->join('modules as module', 'module.id', '=', 'item.module_id')
+                    ->leftJoin('module_segments as segment', 'segment.module_id', '=', 'module.id')
             ->whereNull('item.deleted_at')
                     ->whereColumn('subscription.company_id', 'law_cases.company_id')->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
                     ->whereIn('product.code', ['law', 'fokus-law'])->where('module.status', 'ativo')->where('module.publication_state', 'publicado')
-                    ->whereIn('module.context_code', ['judiciario', 'vara_criminal'])
+                    ->where(fn ($context) => $context->whereIn('module.context_code', ['judiciario', 'vara_criminal'])
+                        ->orWhere(fn ($advocacy) => $advocacy->where('module.context_code', 'escritorio')->where('segment.segment_code', 'advocacia')))
                     ->whereRaw("COALESCE(module.module_code, module.code) = ?", ['processos']);
             })
             ->orderBy('last_datajud_checked_at')->orderBy('id')->limit(max(1, min(5000, (int) $this->option('limit'))));
