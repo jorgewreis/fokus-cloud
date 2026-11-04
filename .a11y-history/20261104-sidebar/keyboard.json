@@ -1,0 +1,20 @@
+{
+  "skill": "keyboard-navigator",
+  "scope": ["resources/views/portal/fokus-law.blade.php", "public/portal/assets/fokus-law-shell.js", "public/portal/assets/fokus-law-shell.css"],
+  "findings": [],
+  "passed": [
+    "Module disclosure triggers use native buttons with aria-controls and synchronized aria-expanded.",
+    "Collapsed module panels and closed account panels use hidden backed by an explicit display:none !important rule.",
+    "Account actions use native links or buttons with ordinary Tab navigation.",
+    "Escape closes the account disclosure before closing mobile navigation and restores focus to the correct trigger.",
+    "Sidebar buttons and links have visible focus outlines.",
+    "Closed mobile sidebar is inert; breakpoint changes synchronize inert state for desktop access.",
+    "Both selected and unselected Contatos activation handlers focus the content region after rebuilding navigation.",
+    "Mobile sidebar Tab and Shift+Tab cycle between visible focusable endpoints; Escape provides an exit."
+  ],
+  "notes": [
+    "Static source review only; authenticated browser keyboard interaction was not exercised.",
+    "All three findings from the first review are resolved in the reviewed source.",
+    "The account disclosure avoids role=menu, so ordinary Tab navigation is appropriate."
+  ]
+}

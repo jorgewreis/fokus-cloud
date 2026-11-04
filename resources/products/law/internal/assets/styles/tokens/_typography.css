@@ -1,0 +1,214 @@
+/* TYPOGRAPHY TOKENS */
+:root {
+
+    /* -- FAMÍLIAS */
+    --font-family-base: "Google Sans", sans-serif;
+    --font-family-heading: "Bebas Neue", sans-serif;
+    --font-family-monospace: "Syne Mono", monospace;
+    --font-family-code: "Atkinson Hyperlegible Mono", monospace;
+    --font-style-normal: normal;
+    --font-style-italic: italic;
+    --font-style-oblique: oblique;
+}
+
+/* -- PESOS */
+:root {
+    --font-weight-extrathin: 100;
+    --font-weight-thin: 200;
+    --font-weight-light: 300;
+    --font-weight-regular: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --font-weight-extrabold: 800;
+    --font-weight-black: 900;
+}
+
+/* -- TAMANHOS */
+:root {
+    --font-size-2xs: 0.5rem;   /* 8px */
+    --font-size-xs: 0.625rem;  /* 10px */
+    --font-size-sm: 0.75rem;   /* 12px */
+    --font-size-md: 0.875rem;  /* 14px */
+    --font-size-lg: 1rem;      /* 16px */
+    --font-size-xl: 1.125rem;  /* 18px */
+    --font-size-2xl: 1.25rem;  /* 20px */
+    --font-size-3xl: 1.5rem;   /* 24px */
+    --font-size-4xl: 1.875rem; /* 30px */
+    --font-size-5xl: 2.25rem;  /* 36px */
+    --font-size-6xl: 3rem;     /* 48px */
+    --font-size-7xl: 3.75rem;  /* 60px */
+    --font-size-heading-1: 3rem;
+    --font-size-heading-2: 2.5rem;
+    --font-size-heading-3: 2rem;
+    --font-size-heading-4: 1.5rem;
+    --font-size-heading-5: 1rem;
+    --font-size-heading-6: 1.25rem;
+    --font-size-headline-1: 6.5rem;
+    --font-size-headline-2: 5.5rem;
+    --font-size-headline-3: 4.5rem;
+    --font-size-headline-4: 3.5rem;
+    --font-size-display-1: 7.5rem;
+    --font-size-display-2: 6rem;
+    --font-size-display-3: 4.5rem;
+    --font-size-display-4: 3.5rem;
+    --font-size-display-5: 2.5rem;
+    --font-size-display-6: 2rem;
+}
+
+/* -- ALTURAS DE LINHA */
+:root {
+    --line-height-none: 1;
+    --line-height-tight: 1.15;
+    --line-height-snug: 1.3;
+    --line-height-normal: 1.5;
+    --line-height-relaxed: 1.7;
+    --line-height-heading: 1.2;
+    --line-height-headline: 1.05;
+    --line-height-display: 1;
+    --line-height-lead: 1.6;
+    --line-height-caption: 1.35;
+    --line-height-blockquote: 1.6;
+}
+
+/* -- ESPAÇAMENTO DE LETRAS */
+:root {
+    --letter-spacing-tighter: -0.04em;
+    --letter-spacing-tight: -0.025em;
+    --letter-spacing-normal: 0;
+    --letter-spacing-wide: 0.04em;
+    --letter-spacing-wider: 0.08em;
+    --letter-spacing-widest: 0.12em;
+    --letter-spacing-tightest: -0.075em;
+    --letter-spacing-tighter-cirrus: -0.05em;
+    --letter-spacing-loose: 0.025em;
+    --letter-spacing-looser: 0.05em;
+    --letter-spacing-loosest: 0.1em;
+}
+
+/* -- TIPOGRAFIA SEMÂNTICA */
+:root {
+    /* -- TEXTO BASE */
+    --text-body: var(--font-size-md);
+    --text-body-line-height: var(--line-height-normal);
+    --text-body-weight: var(--font-weight-regular);
+    --text-body-letter-spacing: var(--letter-spacing-normal);
+    --text-body-family: var(--font-family-base);
+
+    --text-body-sm: var(--font-size-sm);
+    --text-body-sm-line-height: var(--line-height-relaxed);
+    --text-body-sm-weight: var(--font-weight-regular);
+
+    /* -- HEADINGS */
+    --text-heading-1: var(--font-size-6xl);
+    --text-heading-2: var(--font-size-5xl);
+    --text-heading-3: var(--font-size-4xl);
+    --text-heading-4: var(--font-size-3xl);
+    --text-heading-5: var(--font-size-2xl);
+    --text-heading-6: var(--font-size-xl);
+    --text-heading-line-height: var(--line-height-tight);
+    --text-heading-weight: var(--font-weight-bold);
+    --text-heading-letter-spacing: var(--letter-spacing-tight);
+    --text-heading-family: var(--font-family-heading);
+    --text-cirrus-heading-1: var(--font-size-heading-1);
+    --text-cirrus-heading-2: var(--font-size-heading-2);
+    --text-cirrus-heading-3: var(--font-size-heading-3);
+    --text-cirrus-heading-4: var(--font-size-heading-4);
+    --text-cirrus-heading-5: var(--font-size-heading-5);
+    --text-cirrus-heading-6: var(--font-size-heading-6);
+    --text-headline-1: var(--font-size-headline-1);
+    --text-headline-2: var(--font-size-headline-2);
+    --text-headline-3: var(--font-size-headline-3);
+    --text-headline-4: var(--font-size-headline-4);
+
+    /* -- DISPLAY */
+    --text-display-1: var(--font-size-7xl);
+    --text-display-2: var(--font-size-6xl);
+    --text-display-3: var(--font-size-5xl);
+    --text-display-4: var(--font-size-4xl);
+    --text-display-5: var(--font-size-3xl);
+    --text-display-6: var(--font-size-2xl);
+    --text-display-line-height: var(--line-height-tight);
+    --text-display-weight: var(--font-weight-extrabold);
+    --text-display-letter-spacing: var(--letter-spacing-tighter);
+    --text-display-family: var(--font-family-base);
+    --text-display-cirrus-1: var(--font-size-display-1);
+    --text-display-cirrus-2: var(--font-size-display-2);
+    --text-display-cirrus-3: var(--font-size-display-3);
+    --text-display-cirrus-4: var(--font-size-display-4);
+    --text-display-cirrus-5: var(--font-size-display-5);
+    --text-display-cirrus-6: var(--font-size-display-6);
+
+    /* -- DESTAQUES E DESCRIÇÕES */
+    --text-lead: var(--font-size-lg);
+    --text-lead-line-height: var(--line-height-relaxed);
+    --text-lead-weight: var(--font-weight-regular);
+    --text-description: var(--font-size-sm);
+    --text-description-line-height: var(--line-height-relaxed);
+    --text-description-weight: var(--font-weight-regular);
+
+    /* -- ELEMENTOS INLINE */
+    --text-link-weight: var(--font-weight-medium);
+    --text-link-decoration: underline;
+    --text-link-decoration-hover: underline;
+    --text-link-underline-offset: 0.15em;
+    --text-emphasis-weight: var(--font-weight-semibold);
+    --text-strong-weight: var(--font-weight-bold);
+    --text-code: var(--font-family-code);
+    --text-code-size: var(--font-size-sm);
+
+    /* -- RÓTULOS E AUXILIARES */
+    --text-label: var(--font-size-sm);
+    --text-label-line-height: var(--line-height-snug);
+    --text-label-weight: var(--font-weight-semibold);
+    --text-caption: var(--font-size-xs);
+    --text-caption-line-height: var(--line-height-normal);
+    --text-caption-weight: var(--font-weight-regular);
+    --text-legend: var(--font-size-xs);
+    --text-legend-line-height: var(--line-height-normal);
+    --text-legend-weight: var(--font-weight-medium);
+    --text-helper: var(--font-size-xs);
+    --text-helper-line-height: var(--line-height-normal);
+    --text-helper-weight: var(--font-weight-regular);
+    --text-overline: var(--font-size-xs);
+    --text-overline-line-height: var(--line-height-snug);
+    --text-overline-weight: var(--font-weight-bold);
+    --text-overline-letter-spacing: var(--letter-spacing-widest);
+    --text-overline-transform: uppercase;
+
+    /* -- ELEMENTOS AUXILIARES */
+    --text-eyebrow: var(--font-size-xs);
+    --text-eyebrow-weight: var(--font-weight-bold);
+    --text-eyebrow-letter-spacing: var(--letter-spacing-widest);
+    --text-kicker: var(--font-size-xs);
+    --text-kicker-weight: var(--font-weight-semibold);
+    --text-kicker-transform: uppercase;
+    --text-badge: var(--font-size-2xs);
+    --text-badge-weight: var(--font-weight-bold);
+    --text-badge-letter-spacing: var(--letter-spacing-wide);
+    --text-italic-style: var(--font-style-italic);
+    --text-truncate-lines: 2;
+    --text-wrap: normal;
+    --text-overflow-wrap: anywhere;
+    --text-underline-offset: 0.15em;
+
+    /* -- COMPOSIÇÕES */
+    --type-body: var(--font-style-normal) var(--text-body-weight) var(--text-body) / var(--text-body-line-height) var(--text-body-family);
+    --type-heading-1: var(--font-style-normal) var(--text-heading-weight) var(--text-heading-1) / var(--text-heading-line-height) var(--text-heading-family);
+    --type-heading-2: var(--font-style-normal) var(--text-heading-weight) var(--text-heading-2) / var(--text-heading-line-height) var(--text-heading-family);
+    --type-heading-3: var(--font-style-normal) var(--text-heading-weight) var(--text-heading-3) / var(--text-heading-line-height) var(--text-heading-family);
+    --type-heading-4: var(--font-style-normal) var(--text-heading-weight) var(--text-heading-4) / var(--text-heading-line-height) var(--text-heading-family);
+    --type-heading-5: var(--font-style-normal) var(--text-heading-weight) var(--text-heading-5) / var(--text-heading-line-height) var(--text-heading-family);
+    --type-heading-6: var(--font-style-normal) var(--text-heading-weight) var(--text-heading-6) / var(--text-heading-line-height) var(--text-heading-family);
+    --type-display-1: var(--font-style-normal) var(--text-display-weight) var(--text-display-1) / var(--text-display-line-height) var(--text-display-family);
+    --type-display-2: var(--font-style-normal) var(--text-display-weight) var(--text-display-2) / var(--text-display-line-height) var(--text-display-family);
+    --type-display-3: var(--font-style-normal) var(--text-display-weight) var(--text-display-3) / var(--text-display-line-height) var(--text-display-family);
+    --type-display-4: var(--font-style-normal) var(--text-display-weight) var(--text-display-4) / var(--text-display-line-height) var(--text-display-family);
+    --type-display-5: var(--font-style-normal) var(--text-display-weight) var(--text-display-5) / var(--text-display-line-height) var(--text-display-family);
+    --type-display-6: var(--font-style-normal) var(--text-display-weight) var(--text-display-6) / var(--text-display-line-height) var(--text-display-family);
+    --type-lead: var(--font-style-normal) var(--text-lead-weight) var(--text-lead) / var(--text-lead-line-height) var(--text-body-family);
+    --type-description: var(--font-style-normal) var(--text-description-weight) var(--text-description) / var(--text-description-line-height) var(--text-body-family);
+    --type-caption: var(--font-style-normal) var(--text-caption-weight) var(--text-caption) / var(--text-caption-line-height) var(--text-body-family);
+    --type-label: var(--font-style-normal) var(--text-label-weight) var(--text-label) / var(--text-label-line-height) var(--text-body-family);
+    --type-overline: var(--font-style-normal) var(--text-overline-weight) var(--text-overline) / var(--text-overline-line-height) var(--text-body-family);
+}

@@ -1,0 +1,10 @@
+/* BORDER TOKENS */
+
+/* -- LARGURAS PRIMITIVAS */
+:root {
+    --border-width-0: 0;
+    --border-width-1: 1px;
+    --border-width-2: 2px;
+    --border-width-3: 3px;
+    --border-width-4: 4px;
+}

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+
+<!-- OPTIONS = PT-BR LIGHT/DARK LAW/LEAD -->
+<html lang="pt-BR" data-theme="light" data-product="law">
+
+    <!-- HEAD -->
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+        <!-- IMPORT STYLES -->
+        <link rel="stylesheet" href="./../assets/styles/base/_index_base.css">
+        <link rel="stylesheet" href="./../assets/styles/layout/_index_layout.css">
+        <link rel="stylesheet" href="./../assets/styles/tokens/_index_tokens.css">
+
+        <!-- IMPORT FONTS -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Google+Sans+Code:ital,wght,MONO@0,300..800,1;1,300..800,1&family=Google+Sans+Flex:opsz,wght@6..144,1..1000&family=Syne+Mono&display=swap" rel="stylesheet">
+
+    </head>
+
+
+    <!-- BODY -->
+    <body>
+
+        <!-- PAGE -->
+        <div class="container-hero container-fluid">
+            <header class="container-header">
+                <div class="header-top">
+                    <div class="h-top-left">
+                        <div class="ht-left-logo">
+                            <div class="logo-names">
+                                <span class="name-system">fokus cloud</span>
+                                <span class="name-product">law</span>
+                                <span class="name-signature">essential</span>
+                            </div>
+                        </div>
+                        <div class="ht-left-search"></div>
+                    </div>
+                    <div class="h-top-center"></div>
+                    <div class="h-top-right">
+                        <div class="ht-right-alerts"></div>
+                        <div class="ht-right-user">
+                            <div class="user-avatar">
+                                <img class="img-user-avatar" src="./../assets/icons/User-Story--Streamline-Ultimate.png" alt="user-avatar">
+                            </div>
+                            <div class="user-details">
+                                <span class="u-details-nome">Jorge Wanderley Reis de Menezes</span>
+                                <span class="u-details-perfil">Administrador | Usuário Senior</span>
+                            </div>
+                            <div class="user-dropbox-icon">
+                                <img class="img-user-arrow" src="./../assets/icons/Arrow-Down-1--Streamline-Ultimate.png" alt="icon-arrow">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="header-bottom">
+                    <div class="h-bottom-left">
+                        <div class="hb-left-office">
+                            <div class="office-names">
+                                <span class="name-office">Primeira Vara Crime de Ilhéus</span>
+                                <span class="name-owner">Tribunal de Justiça do Estado da Bahia</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="h-bottom-center"></div>
+                    <div class="h-bottom-right">
+                        <div class="hb-right-sector">
+                            <span class="office-sector">Cartorio</span>
+                        </div>
+                        <div class="hb-right-links">
+                            <div class="hbr-link active">
+                                <span class="link-text">Expedições</span>
+                                <div class="line-bottom"></div>
+                            </div>
+                            <div class="hbr-link">
+                                <span class="link-text">Contatos</span>
+                            </div>
+                            <div class="hbr-link disabled">
+                                <span class="link-text">Tarefas</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+        </div>
+
+        <!-- BACKDROP -->
+        <div class="backdrop"></div>
+
+        <!-- LOAD -->
+        <div class="loading active">
+            <span class="loading-text">aguarde, carregando elementos da página...</span>
+        </div>
+
+        <!-- SCRIPTS -->
+        <!-- IMPORT SCRIPTS -->
+        <script src="./../assets/scripts/shared.js"></script>
+        <script>
+            // REMOVE LOADING FRAME
+            document.addEventListener("DOMContentLoaded", function () {
+                loadHome();
+            });
+
+        </script>
+    </body>
+
+</html>

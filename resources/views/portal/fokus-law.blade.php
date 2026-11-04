@@ -20,17 +20,6 @@
   <div class="law-shell" id="law-shell" data-initial-page="{{ $initialPage ?? 'overview' }}" hidden>
     <div class="law-mobile-scrim" id="mobile-scrim" hidden></div>
     <aside class="law-sidebar" id="law-sidebar" aria-label="Navegação do Fokus Law">
-      <nav class="law-rail" aria-label="Grupos e módulos">
-        <a class="law-mark" href="/portal" aria-label="Fokus Cloud, voltar ao portal">
-          <span aria-hidden="true">F</span>
-        </a>
-        <div class="law-rail-items" id="rail-items"></div>
-        <div class="law-rail-spacer"></div>
-        <a class="law-rail-link" href="/produtos/fokus-law" aria-label="Sobre o Fokus Law" title="Sobre o Fokus Law">
-          <img src="/backoffice/assets/icons/Programming-User-Chat--Streamline-Ultimate.png" alt="" />
-        </a>
-      </nav>
-
       <div class="law-nav-panel">
         <header class="law-system-context">
           <a class="law-system-brand" href="/portal" aria-label="Fokus Cloud Law, voltar ao portal"><span>FOKUS CLOUD</span><b>LAW</b></a>
@@ -58,11 +47,17 @@
         </nav>
 
         <footer class="law-user-footer">
-          <div class="law-user-avatar fs-avatar fs-avatar-sm" id="user-avatar" aria-hidden="true">—</div>
-          <div class="law-user-meta"><strong id="user-name">—</strong><span id="user-email">—</span></div>
-          <a class="law-profile-link" href="/portal/fokus-law/perfil" aria-label="Meu perfil" title="Meu perfil">
-            <img src="/backoffice/assets/icons/Settings-User--Streamline-Ultimate.png" alt="" />
-          </a>
+          <button class="law-account-toggle" id="account-toggle" type="button" aria-expanded="false" aria-controls="account-panel">
+            <span class="law-user-avatar fs-avatar fs-avatar-sm" id="user-avatar" aria-hidden="true">—</span>
+            <span class="law-user-meta"><strong id="user-name">—</strong><span id="user-email">—</span></span>
+            <span aria-hidden="true">⌃</span>
+          </button>
+          <div class="law-account-panel" id="account-panel" hidden>
+            <a class="law-nav-item" href="/portal/fokus-law/perfil">Meu perfil</a>
+            <button class="law-nav-item" id="account-preferences" type="button">Preferências</button>
+            <button class="law-nav-item" id="account-settings" type="button" hidden>Configurações</button>
+            <button class="law-nav-item law-account-logout" id="logout-button" type="button">Sair</button>
+          </div>
         </footer>
       </div>
     </aside>
@@ -94,9 +89,7 @@
               <span>Os avisos dos módulos aparecerão aqui.</span>
             </section>
           </div>
-          <button class="law-exit-button fs-btn fs-btn-outline-primary" id="logout-button" type="button">
-            <img src="/backoffice/assets/icons/User-Logout--Streamline-Ultimate-Regular.png" alt="" /><span>Sair</span>
-          </button>
+
         </div>
       </header>
 

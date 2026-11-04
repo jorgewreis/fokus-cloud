@@ -26,8 +26,10 @@
   };
   const shell = document.querySelector('#law-shell');
   const loading = document.querySelector('#shell-loading');
-  const railItems = document.querySelector('#rail-items');
-  const pageItems = document.querySelector('#page-items');
+  // Build the active page links separately before placing them in its module group.
+  const pageItems = document.createElement('div');
+  const navigationItems = document.querySelector('#page-items');
+  const expandedModules = new Set();
   const sectionTitle = document.querySelector('#section-title');
   const contentRegion = document.querySelector('#content-region');
   const sidebar = document.querySelector('#law-sidebar');
@@ -66,30 +68,11 @@
   function closeMobileNav(returnFocus = false) {
     const wasOpen = sidebar.classList.contains('is-open');
     sidebar.classList.remove('is-open');
+    sidebar.inert = window.matchMedia('(max-width: 720px)').matches;
     mobileScrim.hidden = true;
     mobileButton.setAttribute('aria-expanded', 'false');
     mobileButton.setAttribute('aria-label', 'Abrir menu');
     if (returnFocus && wasOpen) mobileButton.focus();
-  }
-
-  function addRailButton(group, label, iconName) {
-    const button = element('button', 'law-rail-button fs-btn-icon');
-    button.type = 'button';
-    button.dataset.group = group;
-    button.setAttribute('aria-label', label);
-    button.title = label;
-    button.append(icon(iconName));
-    const tooltip = element('span', 'law-rail-tooltip', label);
-    tooltip.setAttribute('aria-hidden', 'true');
-    button.append(tooltip);
-    button.addEventListener('click', () => {
-      activeGroup = group;
-      if (group === 'settings') settingsView = 'settings';
-      renderNavigation();
-      closeMobileNav();
-      contentRegion.focus({ preventScroll: true });
-    });
-    railItems.append(button);
   }
 
   function activeModule() {
@@ -106,16 +89,6 @@
       if (family.startsWith('processos')) return canLawPermission('law.cases.view');
       return !family.startsWith('contatos') || canLawPermission('law.contacts.view');
     });
-  }
-
-  function renderRail() {
-    railItems.replaceChildren();
-    addRailButton('overview', 'Visão geral', 'overview');
-    visibleModules().forEach((module) => {
-      const descriptor = getModuleDescriptor(module);
-      addRailButton(`module:${module.id}`, descriptor.label, descriptor.icon);
-    });
-    if (context.permissions.manage_settings || context.permissions.manage_company_users || context.permissions.transfer_admin) addRailButton('settings', 'Configurações', 'settings');
   }
 
   function appendNavLink(container, label, href, iconName, selected = false, disabled = false) {
@@ -148,20 +121,72 @@
   }
 
   function renderNavigation() {
-    let headingIcon = 'overview';
-    railItems.querySelectorAll('[data-group]').forEach((button) => {
-      if (button.dataset.group === activeGroup) button.setAttribute('aria-current', 'page');
-      else button.removeAttribute('aria-current');
+    renderCurrentPage();
+    if (activeGroup === 'settings') {
+      const settingsNavigation = element('nav', 'law-settings-navigation');
+      settingsNavigation.setAttribute('aria-label', 'Páginas de configurações');
+      settingsNavigation.append(...pageItems.childNodes);
+      contentRegion.prepend(settingsNavigation);
+    }
+    if (localStorage.getItem(preferenceKey(context.user.id, 'remember-group')) === 'true') {
+      localStorage.setItem(preferenceKey(context.user.id, 'last-group'), activeGroup);
+    }
+    navigationItems.replaceChildren();
+    appendNavLink(navigationItems, 'Dashboard', '/portal/fokus-law', 'overview', activeGroup === 'overview' && initialPage !== 'profile' && settingsView !== 'preferences');
+    const modules = visibleModules().slice().sort((a, b) => {
+      const rank = (item) => getModuleDescriptor(item).label === 'Contatos' ? 0 : getModuleDescriptor(item).label === 'Processos' ? 1 : 2;
+      return rank(a) - rank(b);
     });
+    modules.forEach((module, index) => {
+      const descriptor = getModuleDescriptor(module);
+      const group = `module:${module.id}`;
+      const selected = activeGroup === group;
+      if (selected) expandedModules.add(group);
+      const section = element('div', 'law-module-group');
+      const toggle = element('button', 'law-nav-item law-module-toggle');
+      toggle.type = 'button';
+      const panel = element('div', 'law-module-pages');
+      panel.id = `law-module-pages-${index}`;
+      panel.hidden = !expandedModules.has(group);
+      toggle.setAttribute('aria-controls', panel.id);
+      toggle.setAttribute('aria-expanded', String(!panel.hidden));
+      toggle.append(icon(descriptor.icon), element('span', '', descriptor.label), element('span', 'law-module-chevron', '⌄'));
+      toggle.lastChild.setAttribute('aria-hidden', 'true');
+      toggle.addEventListener('click', () => {
+        panel.hidden = !panel.hidden;
+        toggle.setAttribute('aria-expanded', String(!panel.hidden));
+        if (panel.hidden) expandedModules.delete(group); else expandedModules.add(group);
+      });
+      if (selected) panel.append(...pageItems.childNodes);
+      else {
+        const family = String(module.family || module.module_code || module.code || '').toLowerCase();
+        if (family.startsWith('contatos')) {
+          appendNavButton(panel, 'Cadastro e consulta', 'contactsCreate', false, () => {
+            activeGroup = group; contactsView = 'module'; renderNavigation(); closeMobileNav(); contentRegion.focus({ preventScroll: true });
+          });
+          if (canLawPermission('law.contacts.share.manage')) appendNavLink(panel, 'Compartilhamentos', '/portal/fokus-law/contatos/compartilhamentos', 'contactsShare');
+          appendNavLink(panel, 'Revisão e qualidade', '/portal/fokus-law/contatos/revisao-e-qualidade', 'contactsQuality');
+        } else if (family.startsWith('processos')) {
+          appendNavLink(panel, 'Cadastro e consulta', '/portal/fokus-law/processos', 'processes');
+          if (canLawPermission('law.cases.configure')) appendNavLink(panel, module.context_code === 'orgao_publico' ? 'Configurações do órgão' : 'Configurações da unidade', '/portal/fokus-law/processos/configuracoes', 'settings');
+          if (module.context_code !== 'orgao_publico' && canLawPermission('law.cases.access.manage')) appendNavLink(panel, 'Autorizações', '/portal/fokus-law/processos/autorizacoes', 'users');
+        } else panel.append(element('p', 'law-nav-description', 'As páginas funcionais deste módulo serão adicionadas aqui.'));
+      }
+      section.append(toggle, panel);
+      navigationItems.append(section);
+    });
+    document.querySelector('#account-settings').hidden = !context.permissions.manage_settings && !context.permissions.manage_company_users && !context.permissions.transfer_admin;
+  }
+
+  function renderCurrentPage() {
+    let headingIcon = 'overview';
     pageItems.replaceChildren();
 
     if (activeGroup === 'overview') {
       sectionTitle.textContent = 'Visão geral';
       document.querySelector('#section-icon').src = ICON_ROOT + ICONS.overview;
       appendNavButton(pageItems, 'Dashboard', 'overview', initialPage !== 'profile', () => window.location.assign('/portal/fokus-law'));
-      appendNavLink(pageItems, 'Meu perfil', '/portal/fokus-law/perfil', 'profile', initialPage === 'profile');
-      appendNavButton(pageItems, 'Preferências do Fokus Law', 'settings', settingsView === 'preferences', () => { settingsView = 'preferences'; renderContent('preferences'); });
-      renderContent(initialPage === 'profile' ? 'profile' : settingsView === 'preferences' ? 'preferences' : 'overview');
+      renderContent(settingsView === 'preferences' ? 'preferences' : initialPage === 'profile' ? 'profile' : 'overview');
       return;
     }
 
@@ -207,7 +232,7 @@
     headingIcon = descriptor.icon;
     const isContactsModule = String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos');
     if (isContactsModule) {
-      appendNavButton(pageItems, 'Cadastro e consulta', 'contactsCreate', contactsView === 'module', () => { contactsView = 'module'; renderNavigation(); });
+      appendNavButton(pageItems, 'Cadastro e consulta', 'contactsCreate', contactsView === 'module', () => { contactsView = 'module'; renderNavigation(); closeMobileNav(); contentRegion.focus({ preventScroll: true }); });
       if (canLawPermission('law.contacts.share.manage')) appendNavLink(pageItems, 'Compartilhamentos', '/portal/fokus-law/contatos/compartilhamentos', 'contactsShare', contactsView === 'contacts-sharing');
       if (canLawPermission('law.contacts.view')) appendNavLink(pageItems, 'Revisão e qualidade', '/portal/fokus-law/contatos/revisao-e-qualidade', 'contactsQuality', contactsView === 'contacts-quality');
     } else if (String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('processos')) {
@@ -324,7 +349,7 @@
       const links = element('div', 'law-dashboard-recent-list');
       (summary.recent || []).forEach((item) => {
         const link = element('button', 'law-dashboard-recent-link', item.case_number_formatted); link.type = 'button';
-        link.addEventListener('click', () => { activeGroup = `module:${module.id}`; contactsView = 'module'; renderRail(); renderNavigation(); window.FokusLawProcesses?.openCase(contentRegion, context, item.id, module); closeMobileNav(); }); links.append(link);
+        link.addEventListener('click', () => { activeGroup = `module:${module.id}`; contactsView = 'module'; renderNavigation(); window.FokusLawProcesses?.openCase(contentRegion, context, item.id, module); closeMobileNav(); }); links.append(link);
       });
       if (!(summary.recent || []).length) links.append(element('span', 'law-dashboard-recent-empty', 'Seus processos cadastrados aparecerão aqui.'));
       recent.append(links); body.replaceChildren(distribution, recent);
@@ -1606,8 +1631,38 @@
         notificationButton.setAttribute('aria-expanded', 'false');
         companyOptions.hidden = true;
         companySwitch.setAttribute('aria-expanded', 'false');
-        closeMobileNav(true);
+        if (document.querySelector('#account-panel').hidden) closeMobileNav(true);
       }
+    });
+
+    const accountToggle = document.querySelector('#account-toggle');
+    const accountPanel = document.querySelector('#account-panel');
+    const closeAccount = (returnFocus = false) => {
+      const wasOpen = !accountPanel.hidden;
+      accountPanel.hidden = true;
+      accountToggle.setAttribute('aria-expanded', 'false');
+      if (wasOpen && returnFocus) accountToggle.focus();
+    };
+    accountToggle.addEventListener('click', () => {
+      accountPanel.hidden = !accountPanel.hidden;
+      accountToggle.setAttribute('aria-expanded', String(!accountPanel.hidden));
+    });
+    document.addEventListener('click', (event) => {
+      if (!event.target.closest('.law-user-footer')) closeAccount();
+    });
+    document.addEventListener('focusin', (event) => {
+      if (!event.target.closest('.law-user-footer')) closeAccount();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !accountPanel.hidden) closeAccount(true);
+    });
+    document.querySelector('#account-preferences').addEventListener('click', () => {
+      closeAccount(); activeGroup = 'overview'; settingsView = 'preferences';
+      renderNavigation(); closeMobileNav(); contentRegion.focus({ preventScroll: true });
+    });
+    document.querySelector('#account-settings').addEventListener('click', () => {
+      closeAccount(); activeGroup = 'settings'; settingsView = 'settings';
+      renderNavigation(); closeMobileNav(); contentRegion.focus({ preventScroll: true });
     });
 
     document.querySelector('#logout-button').addEventListener('click', async (event) => {
@@ -1619,14 +1674,30 @@
 
     mobileButton.addEventListener('click', () => {
       const open = !sidebar.classList.contains('is-open');
+      sidebar.inert = false;
       sidebar.classList.toggle('is-open', open);
+      if (!open) sidebar.inert = window.matchMedia('(max-width: 720px)').matches;
       mobileScrim.hidden = !open;
       mobileButton.setAttribute('aria-expanded', String(open));
       mobileButton.setAttribute('aria-label', open ? 'Fechar menu' : 'Abrir menu');
-      if (open) sidebar.querySelector('.law-rail-button')?.focus();
+      if (open) sidebar.querySelector('#page-items a, #page-items button')?.focus();
     });
-    mobileScrim.addEventListener('click', closeMobileNav);
-    document.querySelectorAll('.law-profile-link').forEach((link) => link.addEventListener('click', closeMobileNav));
+    const mobileViewport = window.matchMedia('(max-width: 720px)');
+    const syncSidebar = () => {
+      sidebar.inert = mobileViewport.matches && !sidebar.classList.contains('is-open');
+      if (!mobileViewport.matches) closeMobileNav();
+    };
+    mobileViewport.addEventListener('change', syncSidebar);
+    syncSidebar();
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Tab' || !mobileViewport.matches || !sidebar.classList.contains('is-open')) return;
+      const focusable = [...sidebar.querySelectorAll('a[href], button:not([disabled]), select, input, [tabindex="0"]')].filter((node) => node.getClientRects().length && !node.closest('[hidden]'));
+      const first = focusable[0]; const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    });
+    mobileScrim.addEventListener('click', () => closeMobileNav(true));
+    document.querySelectorAll('#account-panel a').forEach((link) => link.addEventListener('click', closeMobileNav));
   }
 
   async function loadLawNotifications(button, panel) {
@@ -1669,7 +1740,6 @@
       if (processesModule) activeGroup = `module:${processesModule.id}`;
     }
     if (localStorage.getItem(preferenceKey(context.user.id, 'reduced-motion')) === 'true') document.documentElement.classList.add('law-pref-reduced-motion');
-    renderRail();
     renderNavigation();
     initializeInteractions();
     if (context.support_mode) {
@@ -1687,11 +1757,7 @@
         }
       });
     }
-    railItems.addEventListener('click', () => {
-      if (localStorage.getItem(preferenceKey(context.user.id, 'remember-group')) === 'true') {
-        localStorage.setItem(preferenceKey(context.user.id, 'last-group'), activeGroup);
-      }
-    });
+
   }
 
 FokusApi.request('/law/shell-context').then((value) => {
