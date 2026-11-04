@@ -1075,3 +1075,11 @@
 .law-settings-navigation ul { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0; }
 
 .law-settings-navigation .law-nav-item:focus-visible { outline: 2px solid var(--law-shell-sage); outline-offset: -2px; }
+
+/* Streamline Ultimate Bold navigation indicators. */
+.law-page-navigation .law-nav-item { width: 100% !important; min-height: 40px; font: inherit; font-size: 13px; }
+.law-nav-item .law-module-chevron, .law-chevron { display: block; width: 10px; height: 10px; flex: 0 0 10px; object-fit: contain; filter: brightness(0) invert(1); }
+.law-account-toggle[aria-expanded="true"] .law-account-chevron, .law-company-switch[aria-expanded="true"] .law-chevron { transform: rotate(180deg); }
+.law-mobile-menu img { width: 18px; height: 18px; object-fit: contain; }
+.law-dashboard-widget-open .law-diagonal-chevron { width: 10px; height: 10px; filter: brightness(0) invert(1); transform: rotate(225deg); }
+.law-settings-link > .law-right-chevron { width: 10px; height: 10px; transform: rotate(-90deg); }

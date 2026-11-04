@@ -50,7 +50,7 @@ async function openProfile(page, supportMode = null) {
         company: { id: 'CMP_VISUAL', name: 'Menezes Advocacia', role: 'admin' },
         active_company_id: 'CMP_VISUAL', companies: profile.companies,
         subscription: null, permissions: { manage_company_users: true, manage_settings: true },
-        modules: [], support_mode: supportMode,
+        modules: [{ id: 'C1', family: 'contatos' }, { id: 'P1', family: 'processos' }], support_mode: supportMode,
     } }));
     await page.route('**/api/auth/me', (route) => route.fulfill({ json: { ...profile, support_mode: supportMode } }));
     await page.route('**/api/csrf-token', (route) => route.fulfill({ json: { token: 'profile-test-token' } }));
@@ -76,7 +76,23 @@ test('perfil do cliente adapta as três seções a desktop, tablet e celular', a
         await expect(page.locator('.law-rail')).toHaveCount(0);
         await expect(page.getByLabel('Sobre o Fokus Law')).toHaveCount(0);
         if (viewport.width <= 720) await page.getByRole('button', { name: 'Abrir menu' }).click();
+        const dashboard = page.getByRole('link', { name: 'Dashboard', exact: true });
+        const contacts = page.getByRole('button', { name: 'Contatos', exact: true });
+        const processes = page.getByRole('button', { name: 'Processos', exact: true });
+        const dimensions = await Promise.all([dashboard, contacts, processes].map((item) => item.evaluate((node) => {
+            const bounds = node.getBoundingClientRect();
+            const style = getComputedStyle(node);
+            return [bounds.width, bounds.height, style.fontSize];
+        })));
+        expect(dimensions[1]).toEqual(dimensions[0]);
+        expect(dimensions[2]).toEqual(dimensions[0]);
+        await expect(contacts.locator('img.law-module-chevron')).toHaveAttribute('src', /Arrow-Button-Down--Streamline-Ultimate-Bold\.png$/);
+        await contacts.click();
+        await expect(contacts).toHaveAttribute('aria-expanded', 'true');
+        await processes.click();
+        await expect(processes).toHaveAttribute('aria-expanded', 'true');
         await page.locator('#account-toggle').click();
+        await expect(page.locator('#account-toggle img.law-account-chevron')).toHaveAttribute('src', /Arrow-Button-Down--Streamline-Ultimate-Bold\.png$/);
         await expect(page.locator('#account-panel').getByRole('link', { name: 'Meu perfil' })).toHaveAttribute('href', '/portal/fokus-law/perfil');
         await expect(page.locator('#account-panel').getByRole('button', { name: 'Preferências' })).toBeVisible();
         await expect(page.locator('#account-panel').getByRole('button', { name: 'Configurações' })).toBeVisible();

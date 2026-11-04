@@ -2,6 +2,7 @@
   const ICON_ROOT = '/backoffice/assets/icons/';
   const ICONS = {
     overview: 'Layout-Dashboard--Streamline-Ultimate.png',
+    chevron: 'Arrow-Button-Down--Streamline-Ultimate-Bold.png',
     settings: 'Cog--Streamline-Ultimate.png',
     processes: 'Zip-File--Streamline-Ultimate-Regular.svg',
     contacts: 'Customer-Relationship-Management-List-Document-Share--Streamline-Ultimate.png',
@@ -150,7 +151,7 @@
       panel.hidden = !expandedModules.has(group);
       toggle.setAttribute('aria-controls', panel.id);
       toggle.setAttribute('aria-expanded', String(!panel.hidden));
-      toggle.append(icon(descriptor.icon), element('span', '', descriptor.label), element('span', 'law-module-chevron', '⌄'));
+      toggle.append(icon(descriptor.icon), element('span', '', descriptor.label), icon('chevron', 'law-module-chevron'));
       toggle.lastChild.setAttribute('aria-hidden', 'true');
       toggle.addEventListener('click', () => {
         panel.hidden = !panel.hidden;
@@ -277,7 +278,7 @@
       const mark = element('span', 'law-dashboard-widget-mark'); mark.append(icon('contacts'));
       const title = element('div'); title.append(element('span', 'law-dashboard-widget-kicker', 'BASE JURÍDICA'), element('h3', '', 'Gestão de Contatos'));
       identity.append(mark, title);
-      const open = element('button', 'law-dashboard-widget-open', 'Abrir módulo'); open.type = 'button'; open.append(element('span', '', '↗'));
+      const open = element('button', 'law-dashboard-widget-open', 'Abrir módulo'); open.type = 'button'; open.append(icon('chevron', 'law-diagonal-chevron'));
       open.addEventListener('click', () => { if (contactModule) { activeGroup = `module:${contactModule.id}`; renderNavigation(); closeMobileNav(); contentRegion.focus({ preventScroll: true }); } });
       header.append(identity, open);
       const body = element('div', 'law-dashboard-widget-body');
@@ -336,7 +337,7 @@
     const mark = element('span', 'law-dashboard-widget-mark'); mark.append(icon('processes'));
     const title = element('div'); title.append(element('span', 'law-dashboard-widget-kicker', 'GESTÃO DE PROCESSOS'), element('h3', '', 'Gestão de Processos'));
     identity.append(mark, title);
-    const open = element('button', 'law-dashboard-widget-open', 'Abrir módulo'); open.type = 'button'; open.append(element('span', '', '↗'));
+    const open = element('button', 'law-dashboard-widget-open', 'Abrir módulo'); open.type = 'button'; open.append(icon('chevron', 'law-diagonal-chevron'));
     open.addEventListener('click', () => { activeGroup = `module:${module.id}`; contactsView = 'module'; renderNavigation(); closeMobileNav(); contentRegion.focus({ preventScroll: true }); });
     header.append(identity, open);
     const body = element('div', 'law-dashboard-widget-body'); body.append(element('p', 'law-contact-loading', 'Carregando seus indicadores…'));
@@ -398,7 +399,7 @@
       text.append(element('strong', '', title));
       text.append(element('small', '', description));
       link.append(text);
-      link.append(element('span', '', '›'));
+      link.append(icon('chevron', 'law-right-chevron'));
       list.append(link);
     });
     const units = element('button', 'law-settings-link law-settings-action');
@@ -407,7 +408,7 @@
     const unitText = element('span');
     unitText.append(element('strong', '', 'Setores da empresa'));
     unitText.append(element('small', '', 'Cadastre os setores e escolha quais ficam ativos no Fokus Law.'));
-    units.append(unitText, element('span', '', '›'));
+    units.append(unitText, icon('chevron', 'law-right-chevron'));
     units.addEventListener('click', () => { settingsView = 'units'; renderNavigation(); });
     list.append(units);
     contentRegion.append(list);

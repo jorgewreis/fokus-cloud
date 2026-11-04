@@ -27,7 +27,7 @@
           <div class="law-company-context">
             <span class="law-context-caption">Sistema ativo</span>
             <button class="law-company-switch" id="company-switch" type="button" aria-haspopup="listbox" aria-expanded="false" hidden>
-              <span id="company-name">—</span><span aria-hidden="true">⌄</span>
+              <span id="company-name">—</span><img class="law-chevron" src="/backoffice/assets/icons/Arrow-Button-Down--Streamline-Ultimate-Bold.png" alt="" />
             </button>
             <strong class="law-company-name" id="company-name-static">—</strong>
             <div class="law-company-options" id="company-options" role="listbox" aria-label="Empresas disponíveis" hidden></div>
@@ -50,7 +50,7 @@
           <button class="law-account-toggle" id="account-toggle" type="button" aria-expanded="false" aria-controls="account-panel">
             <span class="law-user-avatar fs-avatar fs-avatar-sm" id="user-avatar" aria-hidden="true">—</span>
             <span class="law-user-meta"><strong id="user-name">—</strong><span id="user-email">—</span></span>
-            <span aria-hidden="true">⌃</span>
+            <img class="law-chevron law-account-chevron" src="/backoffice/assets/icons/Arrow-Button-Down--Streamline-Ultimate-Bold.png" alt="" />
           </button>
           <div class="law-account-panel" id="account-panel" hidden>
             <a class="law-nav-item" href="/portal/fokus-law/perfil">Meu perfil</a>
@@ -69,7 +69,7 @@
       </section>
       <header class="law-topbar" aria-label="Barra de ferramentas">
         <button class="law-mobile-menu fs-btn fs-btn-outline-primary fs-btn-icon" id="mobile-menu-button" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="law-sidebar">
-          <span aria-hidden="true">☰</span>
+          <img src="/backoffice/assets/icons/Navigation-Menu-3--Streamline-Ultimate-Bold.png" alt="" />
         </button>
         <div class="law-search-wrap">
           <img src="/backoffice/assets/icons/Search-Bar--Streamline-Ultimate.png" alt="" />
