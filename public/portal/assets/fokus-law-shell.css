@@ -73,7 +73,7 @@
 .law-system-brand b { color: var(--law-shell-lilac); font-weight: 700; }
 .law-subscription-label { overflow: hidden; margin: 0 0 14px; color: #d9cedd; font-size: 11px; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .law-company-context { display: grid; min-width: 0; gap: 2px; text-transform: uppercase; }
-.law-context-caption { color: #68e1ce; font-size: 10px; text-transform: uppercase; }
+.law-context-caption { color: #ffffff50; font-size: 10px; text-transform: uppercase; }
 .law-unit-context { display: grid; min-width: 0; gap: 2px; margin-top: 5px; }
 .law-unit-select { display: none; }
 #unit-context { --fs-control-border-color: rgba(255,255,255,.24); --fs-control-bg: transparent; --fs-control-radius: 4px; --fs-color-text: #fff; --fs-focus-color: var(--law-shell-sage); }
@@ -1083,3 +1083,5 @@
 .law-mobile-menu img { width: 18px; height: 18px; object-fit: contain; }
 .law-dashboard-widget-open .law-diagonal-chevron { width: 10px; height: 10px; filter: brightness(0) invert(1); transform: rotate(225deg); }
 .law-settings-link > .law-right-chevron { width: 10px; height: 10px; transform: rotate(-90deg); }
+
+.law-unit-context .fs-form-select-dropdown > .fs-form-select { border-radius: 0; }
