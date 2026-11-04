@@ -6,8 +6,10 @@
     settings: 'Cog--Streamline-Ultimate.png',
     processes: 'Zip-File--Streamline-Ultimate-Regular.svg',
     contacts: 'Customer-Relationship-Management-List-Document-Share--Streamline-Ultimate.png',
-    contactsColor: 'Single-Neutral-Phone-Book--Streamline-Ultimate-Colors.png',
-    processesColor: 'Legal-Scale-Unequal--Streamline-Ultimate-Colors.png',
+    contactsColor: 'Single-Man-Phone-Book--Streamline-Ultimate-Colors.png',
+    processesColor: 'Archive-Books--Streamline-Ultimate-Colors.png',
+    filingsColor: 'Copy-Paste-1--Streamline-Ultimate-Colors.png',
+    tasksColor: 'Task-Checklist-Write--Streamline-Ultimate-Colors.png',
     filings: 'Common-File-Quill--Streamline-Ultimate.png',
     hearings: 'Alarm-Bell--Streamline-Ultimate-Regular.png',
     tasks: 'Single-Man-Actions-Time--Streamline-Ultimate.png',
@@ -20,11 +22,11 @@
     contactsQuality: 'Like-Ribbon-1--Streamline-Ultimate-Regular.png',
   };
   const MODULES = {
-    processos: { label: 'Processos', icon: 'processes' },
-    contatos: { label: 'Contatos', icon: 'contacts' },
-    expedicoes: { label: 'Expedientes', icon: 'filings' },
+    processos: { label: 'Processos', icon: 'processes', dashboardIcon: 'processesColor' },
+    contatos: { label: 'Contatos', icon: 'contacts', dashboardIcon: 'contactsColor' },
+    expedicoes: { label: 'Expedientes', icon: 'filings', dashboardIcon: 'filingsColor' },
     audiencias: { label: 'Audiências', icon: 'hearings' },
-    tarefas: { label: 'Tarefas e prazos', icon: 'tasks' },
+    tarefas: { label: 'Tarefas e prazos', icon: 'tasks', dashboardIcon: 'tasksColor' },
     relatorios: { label: 'Relatórios', icon: 'reports' },
   };
   const shell = document.querySelector('#law-shell');
@@ -276,7 +278,7 @@
       const card = element('article', 'fs-card law-dashboard-module-widget law-dashboard-contacts');
       const header = element('header', 'law-dashboard-widget-header');
       const identity = element('div', 'law-dashboard-widget-identity');
-      const mark = element('span', 'law-dashboard-widget-mark'); mark.append(icon('contactsColor'));
+      const mark = element('span', 'law-dashboard-widget-mark'); mark.append(icon(MODULES.contatos.dashboardIcon));
       const title = element('div'); title.append(element('span', 'law-dashboard-widget-kicker', 'BASE JURÍDICA'), element('h3', '', 'Gestão de Contatos'));
       identity.append(mark, title);
       header.append(identity);
@@ -333,7 +335,7 @@
     const card = element('article', 'fs-card law-dashboard-module-widget law-dashboard-module-wide');
     const header = element('header', 'law-dashboard-widget-header');
     const identity = element('div', 'law-dashboard-widget-identity');
-    const mark = element('span', 'law-dashboard-widget-mark'); mark.append(icon('processesColor'));
+    const mark = element('span', 'law-dashboard-widget-mark'); mark.append(icon(MODULES.processos.dashboardIcon));
     const title = element('div'); title.append(element('span', 'law-dashboard-widget-kicker', 'GESTÃO DE PROCESSOS'), element('h3', '', 'Gestão de Processos'));
     identity.append(mark, title);
     header.append(identity);

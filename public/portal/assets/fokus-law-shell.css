@@ -1083,3 +1083,5 @@
 .law-settings-link > .law-right-chevron { width: 10px; height: 10px; transform: rotate(-90deg); }
 
 .law-unit-context .fs-form-select-dropdown > .fs-form-select { border-radius: 0; }
+
+.law-nav-item .law-module-chevron { width: 8px; height: 8px; flex-basis: 8px; }

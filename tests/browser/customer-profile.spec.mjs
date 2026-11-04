@@ -87,6 +87,8 @@ test('perfil do cliente adapta as três seções a desktop, tablet e celular', a
         expect(dimensions[1]).toEqual(dimensions[0]);
         expect(dimensions[2]).toEqual(dimensions[0]);
         await expect(contacts.locator('img.law-module-chevron')).toHaveAttribute('src', /Arrow-Button-Down--Streamline-Ultimate-Bold\.png$/);
+        await expect(contacts.locator('img.law-module-chevron')).toHaveCSS('width', '8px');
+        await expect(contacts.locator('img.law-module-chevron')).toHaveCSS('height', '8px');
         await contacts.click();
         await expect(contacts).toHaveAttribute('aria-expanded', 'true');
         await processes.click();
@@ -125,6 +127,8 @@ test('dashboard exibe módulos com ícones coloridos de 32px e sem botão de abe
     await page.route('**/portal/fokus-law', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: dashboardShell }));
     await page.goto('/portal/fokus-law');
     await expect(page.locator('.law-dashboard-widget-mark img')).toHaveCount(2);
+    await expect(page.locator('.law-dashboard-contacts .law-dashboard-widget-mark img')).toHaveAttribute('src', /Single-Man-Phone-Book--Streamline-Ultimate-Colors\.png$/);
+    await expect(page.locator('.law-dashboard-module-wide .law-dashboard-widget-mark img')).toHaveAttribute('src', /Archive-Books--Streamline-Ultimate-Colors\.png$/);
     await expect(page.getByRole('button', { name: 'Abrir módulo' })).toHaveCount(0);
     for (const image of await page.locator('.law-dashboard-widget-mark img').all()) {
         const styles = await image.evaluate((node) => ({ width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height, filter: getComputedStyle(node).filter, background: getComputedStyle(node.parentElement).backgroundColor, border: getComputedStyle(node.parentElement).borderWidth, src: node.currentSrc, loaded: node.complete && node.naturalWidth > 0 }));
