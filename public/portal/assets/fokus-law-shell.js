@@ -279,7 +279,7 @@
       const header = element('header', 'law-dashboard-widget-header');
       const identity = element('div', 'law-dashboard-widget-identity');
       const mark = element('span', 'law-dashboard-widget-mark'); mark.append(icon(MODULES.contatos.dashboardIcon));
-      const title = element('div'); title.append(element('span', 'law-dashboard-widget-kicker', 'BASE JURÍDICA'), element('h3', '', 'Gestão de Contatos'));
+      const title = element('div'); title.append(element('h3', 'law-dashboard-widget-kicker', 'Gestão de Contatos'));
       identity.append(mark, title);
       header.append(identity);
       const body = element('div', 'law-dashboard-widget-body');
@@ -336,7 +336,7 @@
     const header = element('header', 'law-dashboard-widget-header');
     const identity = element('div', 'law-dashboard-widget-identity');
     const mark = element('span', 'law-dashboard-widget-mark'); mark.append(icon(MODULES.processos.dashboardIcon));
-    const title = element('div'); title.append(element('span', 'law-dashboard-widget-kicker', 'GESTÃO DE PROCESSOS'), element('h3', '', 'Gestão de Processos'));
+    const title = element('div'); title.append(element('h3', 'law-dashboard-widget-kicker', 'Gestão de Processos'));
     identity.append(mark, title);
     header.append(identity);
     const body = element('div', 'law-dashboard-widget-body'); body.append(element('p', 'law-contact-loading', 'Carregando seus indicadores…'));

@@ -130,6 +130,9 @@ test('dashboard exibe módulos com ícones coloridos de 32px e sem botão de abe
     await expect(page.locator('.law-dashboard-contacts .law-dashboard-widget-mark img')).toHaveAttribute('src', /Single-Man-Phone-Book--Streamline-Ultimate-Colors\.png$/);
     await expect(page.locator('.law-dashboard-module-wide .law-dashboard-widget-mark img')).toHaveAttribute('src', /Archive-Books--Streamline-Ultimate-Colors\.png$/);
     await expect(page.getByRole('button', { name: 'Abrir módulo' })).toHaveCount(0);
+    await expect(page.locator('.law-dashboard-contacts header')).toHaveText('Gestão de Contatos');
+    await expect(page.locator('.law-dashboard-module-wide header')).toHaveText('Gestão de Processos');
+    await expect(page.locator('.law-dashboard-widget-header h3.law-dashboard-widget-kicker')).toHaveCount(2);
     for (const image of await page.locator('.law-dashboard-widget-mark img').all()) {
         const styles = await image.evaluate((node) => ({ width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height, filter: getComputedStyle(node).filter, background: getComputedStyle(node.parentElement).backgroundColor, border: getComputedStyle(node.parentElement).borderWidth, src: node.currentSrc, loaded: node.complete && node.naturalWidth > 0 }));
         expect(styles).toMatchObject({ width: 32, height: 32, filter: 'none', background: 'rgba(0, 0, 0, 0)', border: '0px', loaded: true });
