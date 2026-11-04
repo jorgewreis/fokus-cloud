@@ -1105,7 +1105,7 @@
 
   function renderModulePlaceholder(module) {
     if (String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('processos')) {
-      if (!['judiciario', 'vara_criminal', 'orgao_publico'].includes(module.context_code) && !String(module.code || '').includes('vara-criminal')) {
+      if (!['judiciario', 'vara_criminal', 'orgao_publico', 'escritorio'].includes(module.context_code) && !String(module.code || '').includes('vara-criminal')) {
         contentRegion.append(element('h2', '', 'Processos'), element('p', 'fs-alert fs-alert-info', 'Este contexto de Processos não está disponível para esta assinatura.'));
         return;
       }
