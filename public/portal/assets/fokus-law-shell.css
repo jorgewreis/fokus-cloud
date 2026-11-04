@@ -1066,7 +1066,7 @@
 .law-account-toggle { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; border: 0; border-radius: 7px; background: transparent; color: inherit; text-align: left; cursor: pointer; }
 .law-account-toggle .law-user-meta { flex: 1; min-width: 0; }
 .law-account-panel { position: absolute; z-index: 35; bottom: calc(100% + 8px); left: 0; right: 0; display: grid; gap: 4px; max-height: min(320px, 65dvh); overflow: auto; padding: 10px; border: 1px solid rgba(255,255,255,.25); border-radius: 10px; background: var(--law-shell-raised); box-shadow: 0 10px 30px rgba(0,0,0,.3); }
-.law-account-panel .law-nav-item { width: 100%; min-height: 44px; }
+.law-account-panel .law-nav-item { width: 100% !important; min-height: 44px; }
 .law-account-logout { border-top: 1px solid rgba(255,255,255,.2); }
 .law-sidebar :is(button, a):focus-visible { outline: 2px solid var(--law-shell-sage); outline-offset: -2px; }
 @media (prefers-reduced-motion: reduce) { .law-module-chevron { transition: none; } }
@@ -1079,7 +1079,9 @@
 /* Streamline Ultimate Bold navigation indicators. */
 .law-page-navigation .law-nav-item { width: 100% !important; min-height: 40px; font: inherit; font-size: 13px; }
 .law-nav-item .law-module-chevron, .law-chevron { display: block; width: 10px; height: 10px; flex: 0 0 10px; object-fit: contain; filter: brightness(0) invert(1); }
-.law-account-toggle[aria-expanded="true"] .law-account-chevron, .law-company-switch[aria-expanded="true"] .law-chevron { transform: rotate(180deg); }
+.law-account-chevron { transform: rotate(180deg); }
+.law-account-toggle[aria-expanded="true"] .law-account-chevron { transform: none; }
+.law-company-switch[aria-expanded="true"] .law-chevron { transform: rotate(180deg); }
 .law-mobile-menu img { width: 18px; height: 18px; object-fit: contain; }
 .law-dashboard-widget-open .law-diagonal-chevron { width: 10px; height: 10px; filter: brightness(0) invert(1); transform: rotate(225deg); }
 .law-settings-link > .law-right-chevron { width: 10px; height: 10px; transform: rotate(-90deg); }

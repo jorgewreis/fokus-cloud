@@ -91,7 +91,12 @@ test('perfil do cliente adapta as três seções a desktop, tablet e celular', a
         await expect(contacts).toHaveAttribute('aria-expanded', 'true');
         await processes.click();
         await expect(processes).toHaveAttribute('aria-expanded', 'true');
+        await expect(page.locator('#account-toggle img.law-account-chevron')).toHaveCSS('transform', 'matrix(-1, 0, 0, -1, 0, 0)');
         await page.locator('#account-toggle').click();
+        await expect(page.locator('#account-toggle img.law-account-chevron')).toHaveCSS('transform', 'none');
+        const accountWidths = await page.locator('#account-panel .law-nav-item').evaluateAll((items) => items.map((item) => item.getBoundingClientRect().width));
+        expect(accountWidths).toHaveLength(4);
+        expect(new Set(accountWidths).size).toBe(1);
         await expect(page.locator('#account-toggle img.law-account-chevron')).toHaveAttribute('src', /Arrow-Button-Down--Streamline-Ultimate-Bold\.png$/);
         await expect(page.locator('#account-panel').getByRole('link', { name: 'Meu perfil' })).toHaveAttribute('href', '/portal/fokus-law/perfil');
         await expect(page.locator('#account-panel').getByRole('button', { name: 'Preferências' })).toBeVisible();
