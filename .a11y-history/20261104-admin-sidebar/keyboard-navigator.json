@@ -1,0 +1,15 @@
+{
+  "skill": "keyboard-navigator",
+  "scope": [
+    "public/assets/css/shared/fokus.css",
+    "public/backoffice/index.html",
+    "public/backoffice/assets/css/layout/sidebar.css",
+    "public/backoffice/assets/css/pages/admin-dashboard.css"
+  ],
+  "findings": [],
+  "passed": [
+    "A alteração só exclui .sidebar-button da regra global que força botões a terem largura ajustada ao conteúdo; os botões existentes mantêm semântica e operação por teclado.",
+    "Os estilos existentes da barra lateral definem :focus-visible com indicador visual. A alteração não modifica foco, ordem de tabulação ou ativação por teclado."
+  ],
+  "notes": []
+}

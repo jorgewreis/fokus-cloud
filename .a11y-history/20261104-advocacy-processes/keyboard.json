@@ -1,0 +1,10 @@
+{
+  "skill": "keyboard-navigator",
+  "scope": [
+    "public/portal/assets/fokus-law-shell.js:1108-1112"
+  ],
+  "findings": [],
+  "notes": [
+    "The context guard only selects between the informational message and the existing page renderer; allowing escritorio introduces no new keyboard interaction. Static source review only; runtime keyboard behavior was not tested."
+  ]
+}
