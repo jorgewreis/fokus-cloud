@@ -37,7 +37,7 @@ const directionalIconPolicy = `
 const compactButtonPolicy = `
 
 /* Action buttons stay content-sized across desktop and compact layouts. */
-button:not(.fs-form-select):not(.fs-dropdown-item):not(.fs-btn-icon):not(.fs-btn-close):not(.fs-table-action),
+button:not(.fs-form-select):not(.fs-dropdown-item):not(.fs-btn-icon):not(.fs-btn-close):not(.fs-table-action):not(.sidebar-button),
 .fs-btn:not(.fs-btn-icon):not(.fs-btn-close):not(.fs-table-action),
 .btn:not(.btn-icon),
 input[type="button"],
