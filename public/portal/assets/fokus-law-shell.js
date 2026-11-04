@@ -155,7 +155,7 @@
       panel.hidden = !expandedModules.has(group);
       toggle.setAttribute('aria-controls', panel.id);
       toggle.setAttribute('aria-expanded', String(!panel.hidden));
-      toggle.append(icon(descriptor.icon), element('span', '', descriptor.label), icon('chevron', 'law-module-chevron'));
+      toggle.append(icon(descriptor.dashboardIcon || descriptor.icon, 'law-module-icon'), element('span', '', descriptor.label), icon('chevron', 'law-module-chevron'));
       toggle.lastChild.setAttribute('aria-hidden', 'true');
       toggle.addEventListener('click', () => {
         panel.hidden = !panel.hidden;
@@ -177,6 +177,7 @@
           if (module.context_code !== 'orgao_publico' && canLawPermission('law.cases.access.manage')) appendNavLink(panel, 'Autorizações', '/portal/fokus-law/processos/autorizacoes', 'users');
         } else panel.append(element('p', 'law-nav-description', 'As páginas funcionais deste módulo serão adicionadas aqui.'));
       }
+      panel.querySelectorAll('.law-nav-item > img').forEach((image) => image.remove());
       section.append(toggle, panel);
       navigationItems.append(section);
     });

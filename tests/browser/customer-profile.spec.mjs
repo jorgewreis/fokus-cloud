@@ -93,6 +93,14 @@ test('perfil do cliente adapta as três seções a desktop, tablet e celular', a
         await expect(contacts).toHaveAttribute('aria-expanded', 'true');
         await processes.click();
         await expect(processes).toHaveAttribute('aria-expanded', 'true');
+        await expect(contacts.locator('img.law-module-icon')).toHaveAttribute('src', /Single-Man-Phone-Book--Streamline-Ultimate-Colors\.png$/);
+        await expect(processes.locator('img.law-module-icon')).toHaveAttribute('src', /Archive-Books--Streamline-Ultimate-Colors\.png$/);
+        for (const toggle of [contacts, processes]) {
+            const panelId = await toggle.getAttribute('aria-controls');
+            const panel = page.locator(`#${panelId}`);
+            await expect(panel.locator('.law-nav-item > img')).toHaveCount(0);
+            await expect(panel.locator('.law-nav-item').first()).toHaveCSS('font-size', '12px');
+        }
         await expect(page.locator('#account-toggle img.law-account-chevron')).toHaveCSS('transform', 'matrix(-1, 0, 0, -1, 0, 0)');
         await page.locator('#account-toggle').click();
         await expect(page.locator('#account-toggle img.law-account-chevron')).toHaveCSS('transform', 'none');
