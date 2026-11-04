@@ -73,25 +73,17 @@ test('perfil do cliente adapta as três seções a desktop, tablet e celular', a
         await expect(page.getByRole('heading', { name: 'Segurança' })).toBeVisible();
         await expect(page.locator('#law-sidebar')).toBeVisible();
         await expect(page.locator('.law-topbar')).toBeVisible();
-        await expect(page.locator('.law-rail')).toBeVisible();
-        const railItemSizes = await page.locator('.law-rail-button, .law-rail-link').evaluateAll((items) => items.map((item) => {
-            const { width, height } = item.getBoundingClientRect();
-            return [width, height];
-        }));
-        expect(railItemSizes.length).toBeGreaterThan(0);
-        for (const [width, height] of railItemSizes) {
-            expect(width).toBe(44);
-            expect(height).toBe(44);
-        }
-        const railIconSizes = await page.locator('.law-rail-button img, .law-rail-link img').evaluateAll((icons) => icons.map((icon) => {
-            const { width, height } = icon.getBoundingClientRect();
-            return [width, height];
-        }));
-        for (const [width, height] of railIconSizes) {
-            expect(width).toBe(20);
-            expect(height).toBe(20);
-        }
-        await expect(page.locator('#page-items a[aria-current="page"]')).toHaveAttribute('href', '/portal/fokus-law/perfil');
+        await expect(page.locator('.law-rail')).toHaveCount(0);
+        await expect(page.getByLabel('Sobre o Fokus Law')).toHaveCount(0);
+        if (viewport.width <= 720) await page.getByRole('button', { name: 'Abrir menu' }).click();
+        await page.locator('#account-toggle').click();
+        await expect(page.locator('#account-panel').getByRole('link', { name: 'Meu perfil' })).toHaveAttribute('href', '/portal/fokus-law/perfil');
+        await expect(page.locator('#account-panel').getByRole('button', { name: 'Preferências' })).toBeVisible();
+        await expect(page.locator('#account-panel').getByRole('button', { name: 'Configurações' })).toBeVisible();
+        await expect(page.locator('#account-panel').getByRole('button', { name: 'Sair' })).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(page.locator('#account-toggle')).toBeFocused();
+        if (viewport.width <= 720) await page.keyboard.press('Escape');
         expect(await page.locator('.law-shell').evaluate((element) => getComputedStyle(element).display)).toBe(viewport.width <= 720 ? 'block' : 'grid');
         expect(await page.locator('body').evaluate((element) => getComputedStyle(element).fontFamily)).toContain('Google Sans');
         const personalFieldWidths = await page.locator('#profile-name').evaluate((element) => [element.getBoundingClientRect().width, element.parentElement.getBoundingClientRect().width]);
@@ -99,7 +91,8 @@ test('perfil do cliente adapta as três seções a desktop, tablet e celular', a
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
         expect(overflow).toBe(false);
         if (viewport.width <= 720) await page.getByRole('button', { name: 'Abrir menu' }).click();
-        await page.locator('#rail-items [data-group="settings"]').click();
+        await page.locator('#account-toggle').click();
+        await page.locator('#account-settings').click();
         await expect(page.locator('#content-region h2')).toHaveText('Configurações');
         await expect(page.locator('#content-region .law-settings-link[href="/portal/fokus-law/perfil"]')).toHaveCount(0);
     }
@@ -204,11 +197,11 @@ async function openUsers(page, viewport) {
 test('gestão de usuários integrada ao shell funciona em desktop, tablet e celular', async ({ page }) => {
     for (const viewport of [{ width: 1365, height: 900 }, { width: 768, height: 1024 }, { width: 375, height: 812 }]) {
         const { mutations } = await openUsers(page, viewport);
-        await expect(page.locator('#page-items a[aria-current="page"]')).toHaveAttribute('href', '/portal/usuarios');
+        await expect(page.locator('.law-settings-navigation a[aria-current="page"]')).toHaveAttribute('href', '/portal/usuarios');
         await expect(page.getByRole('heading', { name: 'Perfis de Setor Central' })).toBeVisible();
         await expect(page.getByText('Ana Operadora')).toBeVisible();
         await expect(page.getByText('111.***.***-35')).toHaveCount(0);
-        await expect(page.locator('#content-region').getByRole('link', { name: 'Transferir administração' })).toBeVisible();
+        await expect(page.locator('#content-region .law-users-transfer')).toBeVisible();
 
         await page.getByLabel('Nome completo').fill('Pessoa Nova');
         await page.getByLabel('CPF').fill('11111111111');
@@ -262,7 +255,7 @@ test('perfis personalizados e transferir administração funcionam dentro do she
 
     await page.goto('/portal/transferir-administracao');
     await expect(page.getByRole('heading', { name: 'Transferir administração' })).toBeVisible();
-    await expect(page.locator('#page-items a[aria-current="page"]')).toHaveAttribute('href', '/portal/transferir-administracao');
+    await expect(page.locator('.law-settings-navigation a[aria-current="page"]')).toHaveAttribute('href', '/portal/transferir-administracao');
     await expect(page.getByRole('heading', { name: 'Histórico de administração' })).toBeVisible();
 });
 
