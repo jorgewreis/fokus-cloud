@@ -388,7 +388,7 @@
           const values = [...new Set([...Object.keys(before), ...Object.keys(after)])].map((key) => [labels[key] || key, `${display(key, before[key])} → ${display(key, after[key])}`]);
           if (values.length) article.append(keyValues(values)); history.body.append(article);
         });
-        if (!result.events.length) history.body.append($('p', 'law-record-detail-empty', 'As alterações e atualizações deste processo aparecerão aqui.'));
+        if (!result.events.length) history.body.append($('p', 'law-record-detail-empty', 'Nenhuma alteração registrada neste processo.'));
         paginate(history.body, result.history_total, 50, result.history_page, (value) => detail(id, value), 'eventos'); body.append(history);
         if (changedRecord) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); heading.scrollIntoView({ block: 'start' }); }
         if (c.datajud_sync_status === 'pending') watchDatajud(id, token, historyPage);

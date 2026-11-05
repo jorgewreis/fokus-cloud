@@ -320,15 +320,39 @@ class LawCaseController extends Controller
         $tags = DB::table('law_case_tag_assignments as assignment')->join('law_case_tags as tag', function ($join): void {
             $join->on('tag.company_id', '=', 'assignment.company_id')->on('tag.law_unit_id', '=', 'assignment.law_unit_id')->on('tag.id', '=', 'assignment.law_case_tag_id');
         })->where('assignment.company_id', $companyId)->where('assignment.law_case_id', $case)->orderBy('tag.name')->get(['tag.id', 'tag.name']);
-        $events = DB::table('law_case_events as event')->leftJoin('users', 'users.id', '=', 'event.actor_user_id')
-            ->where('event.company_id', $companyId)->where('event.law_case_id', $case)->orderByDesc('event.created_at')->orderByDesc('event.id')->offset((max(1, $request->integer('history_page', 1)) - 1) * 50)->limit(50)
+        $historyPage = max(1, $request->integer('history_page', 1));
+        $datajudEventTypes = ['datajud_initial_sync', 'datajud_manual_sync', 'datajud_monthly_sync', 'datajud_sync'];
+        $allEvents = DB::table('law_case_events as event')->leftJoin('users', 'users.id', '=', 'event.actor_user_id')
+            ->where('event.company_id', $companyId)->where('event.law_case_id', $case)->orderByDesc('event.created_at')->orderByDesc('event.id')
             ->get(['event.id', 'event.event_type', 'event.title', 'event.reason', 'event.before_state', 'event.after_state', 'event.created_at', 'users.name as actor_name'])
-            ->map(fn (object $row): array => [
-                'id' => (string) $row->id, 'event_type' => (string) $row->event_type, 'title' => (string) $row->title,
-                'reason' => $row->reason, 'before_state' => json_decode((string) ($row->before_state ?? ''), true) ?: [],
-                'after_state' => json_decode((string) ($row->after_state ?? ''), true) ?: [], 'created_at' => $cases->timestamp($row->created_at),
-                'actor_name' => $row->actor_name,
-            ])->values();
+            ->map(function (object $row) use ($datajudEventTypes, $cases): ?array {
+                $before = json_decode((string) ($row->before_state ?? ''), true) ?: [];
+                $after = json_decode((string) ($row->after_state ?? ''), true) ?: [];
+                $isDatajud = in_array((string) $row->event_type, $datajudEventTypes, true);
+
+                // Failed, incomplete, and empty Datajud attempts are not process changes.
+                if ($isDatajud && ($after['datajud_sync_status'] ?? null) !== 'synced') return null;
+
+                $changed = [];
+                foreach (array_unique([...array_keys($before), ...array_keys($after)]) as $key) {
+                    if ($isDatajud && str_starts_with((string) $key, 'datajud_')) continue;
+                    $beforeValue = $before[$key] ?? null;
+                    $afterValue = $after[$key] ?? null;
+                    if ($beforeValue === $afterValue) continue;
+                    $changed[$key] = true;
+                }
+                if ($changed === []) return null;
+
+                return [
+                    'id' => (string) $row->id, 'event_type' => (string) $row->event_type, 'title' => (string) $row->title,
+                    'reason' => $isDatajud ? null : $row->reason,
+                    'before_state' => array_intersect_key($before, $changed),
+                    'after_state' => array_intersect_key($after, $changed),
+                    'created_at' => $cases->timestamp($row->created_at), 'actor_name' => $row->actor_name,
+                ];
+            })->filter()->values();
+        $historyTotal = $allEvents->count();
+        $events = $allEvents->forPage($historyPage, 50)->values();
 
         $latestDatajud = DB::table('law_case_events')->where('company_id', $companyId)->where('law_case_id', $case)
             ->whereIn('event_type', ['datajud_initial_sync', 'datajud_manual_sync', 'datajud_monthly_sync', 'datajud_sync'])
@@ -339,8 +363,8 @@ class LawCaseController extends Controller
             'case' => $cases->caseArray($current), 'contacts' => $contacts, 'relations' => $relations,
             'datajud' => ['status' => (string) $current->datajud_sync_status, 'code' => $latestDatajudState['datajud_result_code'] ?? null, 'message' => $latestDatajud->reason ?? null],
             'tags' => $tags, 'events' => $events,
-            'history_page' => max(1, $request->integer('history_page', 1)),
-            'history_total' => DB::table('law_case_events')->where('company_id', $companyId)->where('law_case_id', $case)->count(),
+            'history_page' => $historyPage,
+            'history_total' => $historyTotal,
             'can_manage_access' => $this->mayManageUnit($request, (string) $current->law_unit_id),
         ]);
     }
