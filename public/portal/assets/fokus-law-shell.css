@@ -533,7 +533,9 @@
 .law-record-detail-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px; }
 .law-record-detail-hierarchy .law-record-detail-items { grid-template-columns: minmax(0, 1fr); }
 .law-record-detail-cases .law-record-detail-linked-contact { grid-column: 1 / -1; }
-.law-record-detail-case-link { box-sizing: border-box; width: 100%; color: var(--law-shell-ink); background: #fff; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease; }
+.law-record-detail-case-link { display: grid; box-sizing: border-box; width: 100%; justify-content: initial; gap: 4px; color: var(--law-shell-ink); background: #fff; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease; }
+.law-record-detail-case-number { color: var(--law-shell-ink); font-size: 12px; font-weight: 700; line-height: 1.35; }
+.law-record-detail-case-location, .law-record-detail-case-summary { display: block; color: var(--law-shell-muted); font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
 .law-record-detail-case-link:hover { border-color: var(--law-shell-purple); background: #fcfaff; box-shadow: 0 2px 8px rgba(48, 26, 68, .08); }
 .law-record-detail-case-link:focus-visible { outline: 2px solid var(--law-shell-purple); outline-offset: 2px; }
 .law-record-detail-institution .law-record-detail-items { grid-template-columns: repeat(3, minmax(0, 1fr)); }

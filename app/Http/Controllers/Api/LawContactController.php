@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\AuditRecorder;
 use App\Services\LawAuthorizationService;
+use App\Services\LawCaseManagementService;
+use App\Services\LawCnjNumbering;
 use App\Services\LawUsageMeter;
 use App\Services\PrefixedUlid;
 use App\Support\BrazilianDocuments;
@@ -178,7 +180,7 @@ class LawContactController extends Controller
         ]);
     }
 
-    public function show(Request $request, string $contactId, LawAuthorizationService $authorization)
+    public function show(Request $request, string $contactId, LawAuthorizationService $authorization, LawCaseManagementService $cases)
     {
         $companyId = (string) $request->attributes->get('active_company_id');
         $this->assertModuleEnabled($companyId);
@@ -190,6 +192,7 @@ class LawContactController extends Controller
             $this->recordActivity($companyId, $contactId, (string) $request->user()->id, $request->boolean('from_search') ? 'search_opened' : 'viewed');
             $payload = $this->contactPayload($companyId, $contact, $canSensitive, $canMerge, includePrivateDetails: true);
             $membershipId = (string) ($request->attributes->get('active_membership')?->id ?? '');
+            $tribunalNames = collect(LawCnjNumbering::courts())->keyBy(fn (array $item): string => $item['segment'].':'.$item['code']);
             $payload['cases'] = DB::table('law_case_contacts as link')
                 ->join('law_cases as law_case', function ($join): void {
                     $join->on('law_case.company_id', '=', 'link.company_id')->on('law_case.id', '=', 'link.law_case_id');
@@ -206,7 +209,21 @@ class LawContactController extends Controller
                     });
                 })
                 ->orderBy('law_case.case_number')->get(['law_case.id', 'law_case.case_number', 'law_case.case_class', 'law_case.court_name', 'law_case.official_status_text', 'link.case_role_label', 'unit.name as unit_name'])
-                ->map(fn ($row): array => ['id' => (string) $row->id, 'case_number' => (string) $row->case_number, 'case_class' => $row->case_class, 'court_name' => $row->court_name, 'official_status_text' => $row->official_status_text, 'case_role' => (string) $row->case_role_label, 'unit_name' => $row->unit_name])
+                ->map(function ($row) use ($cases, $tribunalNames): array {
+                    $caseNumber = (string) $row->case_number;
+                    $tribunal = $tribunalNames->get(substr($caseNumber, 13, 1).':'.substr($caseNumber, 14, 2));
+                    return [
+                        'id' => (string) $row->id,
+                        'case_number' => $caseNumber,
+                        'case_number_formatted' => $cases->formatCaseNumber($caseNumber),
+                        'tribunal_name' => $tribunal['name'] ?? null,
+                        'case_class' => $row->case_class,
+                        'court_name' => $row->court_name,
+                        'official_status_text' => $row->official_status_text,
+                        'case_role' => (string) $row->case_role_label,
+                        'unit_name' => $row->unit_name,
+                    ];
+                })
                 ->all();
             return response()->json(['contact' => $payload]);
         }

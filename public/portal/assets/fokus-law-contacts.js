@@ -889,14 +889,15 @@
         const row = $(canOpenCase ? 'button' : 'article', `law-record-detail-linked-contact${canOpenCase ? ' law-record-detail-case-link' : ''}`);
         if (canOpenCase) {
           row.type = 'button';
-          row.setAttribute('aria-label', `Abrir processo ${linkedCase.case_number}`);
+          row.setAttribute('aria-label', `Abrir processo ${linkedCase.case_number_formatted || linkedCase.case_number}`);
           row.addEventListener('click', () => {
             modal.onHidden(() => window.FokusLawNavigation?.openCase(linkedCase.id));
             modal.close();
           });
         }
-        row.append($('strong', '', linkedCase.case_number));
-        row.append($('span', '', [linkedCase.case_role, linkedCase.case_class, linkedCase.court_name, linkedCase.unit_name, linkedCase.official_status_text].filter(Boolean).join(' · ')));
+        row.append($('strong', 'law-record-detail-case-number', linkedCase.case_number_formatted || linkedCase.case_number));
+        row.append($('span', 'law-record-detail-case-location', [linkedCase.tribunal_name, linkedCase.court_name || 'Vara não informada'].filter(Boolean).join(' · ')));
+        row.append($('span', 'law-record-detail-case-summary', [linkedCase.case_class || 'Classe não informada', linkedCase.official_status_text || 'Status não informado'].join(' · ')));
         items.append(row);
       });
     }
