@@ -156,11 +156,17 @@ class LawCaseManagementService
         $updates = [
             'djen_sync_status' => $result['status'],
             'last_djen_checked_at' => $checkedAt,
+            'djen_sync_message' => $result['message'] ?? null,
         ];
-        if (in_array($result['status'], ['synced', 'not_found'], true)) {
+        $successful = in_array($result['status'], ['synced', 'not_found'], true);
+        $retryableCodes = ['rate_limited', 'timeout', 'service_unavailable', 'connection_failed', 'internal_error', 'invalid_response', 'invalid_result', 'incomplete_response', 'inconsistent_response', 'result_limit'];
+        $retryCount = (int) ($case->djen_retry_count ?? 0);
+        $updates['djen_retry_count'] = $successful ? 0 : min(65535, $retryCount + 1);
+        $updates['djen_retryable'] = $successful || in_array($result['code'] ?? '', $retryableCodes, true);
+        if ($successful) {
             $updates['djen_metadata'] = json_encode($result['metadata'] ?? [], JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
         }
-        if ($result['status'] === 'synced') $updates['last_djen_synced_at'] = $checkedAt;
+        if ($successful) $updates['last_djen_synced_at'] = $checkedAt;
 
         DB::table('law_cases')->where('company_id', $case->company_id)->where('id', $case->id)->update($updates);
         return $result;
@@ -213,6 +219,8 @@ class LawCaseManagementService
             'djen_sync_status' => (string) ($case->djen_sync_status ?? 'not_requested'),
             'last_djen_checked_at' => $this->timestamp($case->last_djen_checked_at ?? null),
             'last_djen_synced_at' => $this->timestamp($case->last_djen_synced_at ?? null),
+            'djen_sync_message' => $case->djen_sync_message ?? null,
+            'djen_retry_count' => (int) ($case->djen_retry_count ?? 0),
             'trackjud_metadata' => json_decode((string) ($case->trackjud_metadata ?? ''), true) ?: [],
             'last_trackjud_synced_at' => $this->timestamp($case->last_trackjud_synced_at ?? null),
             'official_fields' => array_values(array_intersect(

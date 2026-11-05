@@ -58,7 +58,17 @@
           if (!valid()) return;
           if (result.case.datajud_sync_status !== 'pending' && result.case.djen_sync_status !== 'pending') {
             for (const element of dialogs) if (!element.isConnected) dialogs.delete(element);
-            if (!dialogs.size) { await detail(id, historyPage); return; }
+            if (!dialogs.size) {
+              const focused = document.activeElement;
+              const focusOnDjenAction = focused?.textContent?.trim() === 'Consulta DJEN pendente' || focused?.textContent?.trim() === 'Consultar publicações DJEN';
+              if (root.contains(focused) && !focusOnDjenAction) { refreshTimer = setTimeout(poll, 5000); return; }
+              await detail(id, historyPage);
+              if (focusOnDjenAction) {
+                const resultHeading = [...document.querySelectorAll('h4')].find((heading) => heading.textContent.trim() === 'Publicações recentes do DJEN');
+                if (resultHeading) { resultHeading.tabIndex = -1; resultHeading.focus(); }
+              }
+              return;
+            }
           }
         } catch (_) { /* Keep the saved record visible while the connection recovers. */ }
         if (valid()) refreshTimer = setTimeout(poll, 5000);
@@ -350,7 +360,11 @@
             const consultDjen = button('Consultar publicações DJEN', action(async (event) => {
               const control = event?.currentTarget;
               if (control) { control.textContent = 'Consultando DJEN…'; control.setAttribute('aria-busy', 'true'); }
-              try { await request(`${apiPath(id)}/djen`, { method: 'POST' }); await detail(id); }
+              try {
+                await request(`${apiPath(id)}/djen`, { method: 'POST' }); await detail(id);
+                const resultHeading = [...document.querySelectorAll('h4')].find((heading) => heading.textContent.trim() === 'Publicações recentes do DJEN');
+                if (resultHeading) { resultHeading.tabIndex = -1; resultHeading.focus(); }
+              }
               finally { if (control?.isConnected) { control.textContent = 'Consultar publicações DJEN'; control.removeAttribute('aria-busy'); } }
             }));
             if (c.djen_sync_status === 'pending') { consultDjen.disabled = true; consultDjen.textContent = 'Consulta DJEN pendente'; }
@@ -414,19 +428,19 @@
           const publicationsHeading = $('h4', 'law-record-detail-section-subheading', 'Publicações recentes do DJEN');
           movementHistory.body.append(publicationsHeading);
           if (c.djen_sync_status === 'pending') movementHistory.body.append($('p', 'fs-alert fs-alert-info', 'O DJEN está sendo consultado em segundo plano.'));
-          else if (c.djen_sync_status === 'error') movementHistory.body.append($('p', 'fs-alert fs-alert-warning', 'A consulta ao DJEN não foi concluída. Você pode tentar novamente.'));
-          else {
-            const publications = Array.isArray(djenMetadata.publications) ? djenMetadata.publications : [];
-            if (!publications.length) movementHistory.body.append($('p', 'law-record-detail-empty', 'O DJEN não disponibilizou publicações para este processo.'));
-            publications.forEach((publication) => {
+          if (c.djen_sync_status === 'error') movementHistory.body.append($('p', 'fs-alert fs-alert-warning', c.djen_sync_message || 'A consulta ao DJEN não foi concluída. Os dados anteriores foram preservados; você pode tentar novamente.'));
+          const publications = Array.isArray(djenMetadata.publications) ? djenMetadata.publications : [];
+          if (djenMetadata.complete === false) movementHistory.body.append($('p', 'fs-alert fs-alert-warning', djenMetadata.coverage_note || 'Esta lista é parcial e pode não incluir todas as publicações. Consulte o DJEN novamente para atualizar.'));
+          if (!publications.length && c.djen_sync_status !== 'pending' && c.djen_sync_status !== 'error') movementHistory.body.append($('p', 'law-record-detail-empty', 'O DJEN não disponibilizou publicações para este processo.'));
+          if (c.djen_sync_status !== 'pending') publications.forEach((publication) => {
               const entry = $('article', 'law-record-history-entry');
               entry.append($('h4', '', [publication.type, publication.document_type].filter(Boolean).join(' · ') || 'Publicação processual'));
-              entry.append($('p', 'law-record-detail-empty', `${dateOnly(publication.publication_date)} · ${publication.tribunal || 'Tribunal não informado'}${publication.court_name ? ` · ${publication.court_name}` : ''}`));
+              const dateLabels = [publication.availability_date ? `Disponibilizada em ${dateOnly(publication.availability_date)}` : null, publication.publication_date ? `Publicada em ${dateOnly(publication.publication_date)}` : null].filter(Boolean);
+              entry.append($('p', 'law-record-detail-empty', `${dateLabels.join(' · ') || 'Datas não informadas'} · ${publication.tribunal || 'Tribunal não informado'}${publication.court_name ? ` · ${publication.court_name}` : ''}`));
               if (publication.case_class) entry.append($('p', '', `Classe: ${publication.case_class}`));
               if (publication.link) { const link = $('a', 'fs-u-fs-sm', 'Abrir referência oficial'); link.href = publication.link; link.target = '_blank'; link.rel = 'noopener noreferrer'; entry.append(link); }
               movementHistory.body.append(entry);
-            });
-          }
+          });
           movementHistory.body.append($('p', 'law-record-detail-empty', 'As publicações do DJEN são complementares; não alteram a situação oficial nem calculam prazos.'));
         }
         const trackJudRecord = c.trackjud_metadata?.record || {};

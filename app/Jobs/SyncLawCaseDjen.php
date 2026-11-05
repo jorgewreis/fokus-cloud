@@ -28,9 +28,12 @@ class SyncLawCaseDjen implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        $case = DB::table('law_cases')->where('company_id', $this->companyId)->where('id', $this->caseId)->first();
+        if (! $case || $case->djen_sync_status !== 'pending') return;
         DB::table('law_cases')->where('company_id', $this->companyId)->where('id', $this->caseId)
             ->where('djen_sync_status', 'pending')->update([
-                'djen_sync_status' => 'error', 'last_djen_checked_at' => now(),
+                'djen_sync_status' => 'error', 'last_djen_checked_at' => now(), 'djen_retry_count' => min(65535, (int) ($case->djen_retry_count ?? 0) + 1), 'djen_retryable' => true,
+                'djen_sync_message' => 'A tarefa de consulta não foi concluída; os dados anteriores foram preservados.',
             ]);
     }
 }

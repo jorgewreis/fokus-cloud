@@ -19,7 +19,20 @@ class SyncLawCaseDjen extends Command
 
         $cases = DB::table('law_cases')->where('operational_status', '!=', 'archived')
             ->where('djen_sync_status', '!=', 'pending')
-            ->where(fn ($q) => $q->whereNull('last_djen_checked_at')->orWhere('last_djen_checked_at', '<=', now()->subMonthNoOverflow()))
+            ->where(function ($q): void {
+                $q->where(function ($monthly): void {
+                    $monthly->whereIn('djen_sync_status', ['synced', 'not_found'])
+                        ->where(fn ($due) => $due->whereNull('last_djen_synced_at')->orWhere('last_djen_synced_at', '<=', now()->subMonthNoOverflow()));
+                })->orWhere(function ($retry): void {
+                    $retry->where('djen_sync_status', 'error')->where('djen_retryable', true)
+                        ->where(function ($due): void {
+                            $due->whereNull('last_djen_checked_at')
+                                ->orWhere(function ($first): void { $first->where('djen_retry_count', '<=', 1)->where('last_djen_checked_at', '<=', now()->subHour()); })
+                                ->orWhere(function ($second): void { $second->where('djen_retry_count', 2)->where('last_djen_checked_at', '<=', now()->subHours(6)); })
+                                ->orWhere(function ($later): void { $later->where('djen_retry_count', '>=', 3)->where('last_djen_checked_at', '<=', now()->subDay()); });
+                        });
+                });
+            })
             ->whereExists(function ($q): void {
                 $q->selectRaw('1')->from('subscription_items as item')
                     ->join('subscriptions as subscription', 'subscription.id', '=', 'item.subscription_id')

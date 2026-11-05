@@ -585,7 +585,7 @@ class LawCaseController extends Controller
     {
         $current = $this->findCase($request, $case, $cases, true);
         $result = $cases->syncDatajud($current, (string) $request->user()->id, $datajud, 'datajud_manual_sync');
-        DB::table('law_cases')->where('company_id', $current->company_id)->where('id', $current->id)->update(['djen_sync_status' => 'pending']);
+        DB::table('law_cases')->where('company_id', $current->company_id)->where('id', $current->id)->update(['djen_sync_status' => 'pending', 'djen_sync_message' => null]);
         SyncLawCaseDjen::dispatch((string) $current->company_id, (string) $current->id)
             ->onConnection('law-datajud')->onQueue('law-datajud');
         return response()->json(['case' => $cases->caseArray($this->findCase($request, $case, $cases)), 'datajud' => array_intersect_key($result, array_flip(['status', 'code', 'message']))]);
@@ -594,7 +594,7 @@ class LawCaseController extends Controller
     public function syncDjen(Request $request, string $case, LawCaseManagementService $cases)
     {
         $current = $this->findCase($request, $case, $cases, true);
-        DB::table('law_cases')->where('company_id', $current->company_id)->where('id', $current->id)->update(['djen_sync_status' => 'pending']);
+        DB::table('law_cases')->where('company_id', $current->company_id)->where('id', $current->id)->update(['djen_sync_status' => 'pending', 'djen_sync_message' => null]);
         SyncLawCaseDjen::dispatch((string) $current->company_id, (string) $current->id)
             ->onConnection('law-datajud')->onQueue('law-datajud');
         return response()->json(['djen' => ['status' => 'pending', 'message' => 'A consulta ao DJEN foi agendada.']]);
