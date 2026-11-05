@@ -139,9 +139,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/law/contacts/quality/review', [LawContactController::class, 'qualityReview'])->middleware('law.permission:law.contacts.view');
         Route::post('/law/contacts/quality/suggestions', [LawContactController::class, 'duplicateSuggestions'])->middleware('law.permission:law.contacts.create');
         Route::get('/law/contacts/{contactId}', [LawContactController::class, 'show'])->middleware('law.permission:law.contacts.view');
-        Route::post('/law/contacts/{contactId}/trackjud/preview', [LawContactController::class, 'trackJudPreview'])->middleware('law.permission:law.contacts.update');
-        Route::post('/law/contacts/{contactId}/trackjud', [LawContactController::class, 'trackJudConsult'])->middleware(['law.permission:law.contacts.update', 'throttle:5,1,law-contact-trackjud']);
-        Route::get('/law/contacts/{contactId}/trackjud/{consultId}', [LawContactController::class, 'trackJudConsultStatus'])->middleware('law.permission:law.contacts.update');
         Route::post('/law/contacts', [LawContactController::class, 'store'])->middleware('law.permission:law.contacts.create');
         Route::patch('/law/contacts/{contactId}', [LawContactController::class, 'update'])->middleware('law.permission:law.contacts.update');
         Route::delete('/law/contacts/{contactId}', [LawContactController::class, 'destroy'])->middleware('law.permission:law.contacts.delete');

@@ -53,11 +53,6 @@ return [
         'timeout' => (int) env('DJEN_TIMEOUT', 15),
     ],
 
-    'trackjud' => [
-        'api_key' => env('TRACKJUD_API_KEY'),
-        'base_url' => env('TRACKJUD_API_BASE_URL', 'https://vigilant.trackjud.com.br/api/v1'),
-        'timeout' => (int) env('TRACKJUD_TIMEOUT', 20),
-    ],
 
     'resend' => [
         'key' => env('RESEND_API_KEY'),

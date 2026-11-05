@@ -1053,56 +1053,6 @@
       });
       modal.footer.append(edit);
     }
-    const hasCpf = (contact.documents || []).some((document) => document.type === 'cpf');
-    if (!isShared && !contact.is_shared && window.lawContactsCanUpdate && window.lawContactsCanSensitive && contact.legal_nature === 'pf' && hasCpf && contact.cases?.length) {
-      const feedback = $('p', 'law-contact-feedback');
-      feedback.setAttribute('role', 'status');
-      const sync = button('Atualizar processos vinculados pelo TrackJud', 'fs-btn fs-btn-outline-primary', async () => {
-        sync.disabled = true;
-        feedback.dataset.state = 'info';
-        feedback.textContent = 'Verificando saldo e tribunais vinculados aos processos.';
-        try {
-          const preview = await window.FokusApi.request(`/law/contacts/${encodeURIComponent(contact.id)}/trackjud/preview`, { method: 'POST', body: {} });
-          if (!preview.can_consult) {
-            feedback.dataset.state = 'error';
-            feedback.textContent = preview.message || `Saldo disponível: ${preview.available_credits || 0} créditos. A consulta exige pelo menos ${preview.minimum_credits || 0}.`;
-            return;
-          }
-          const courts = (preview.court_names || []).map((court) => `${court.name}${court.status === 'unavailable' ? ' (temporariamente indisponível)' : ''}`).join(', ');
-          const accepted = window.confirm(`A consulta manual pesquisará ${courts}. O custo mínimo é ${preview.minimum_credits} crédito(s), podendo aumentar se forem encontrados mais de 10 processos por tribunal. Saldo disponível: ${preview.available_credits}. Deseja continuar?`);
-          if (!accepted) {
-            feedback.textContent = 'Consulta cancelada. Nenhum crédito foi consumido.';
-            return;
-          }
-          const started = await window.FokusApi.request(`/law/contacts/${encodeURIComponent(contact.id)}/trackjud`, { method: 'POST', body: {} });
-          let consult = started.consult;
-          while (consult && consult.status !== 'completed') {
-            feedback.textContent = 'Consulta em andamento no TrackJud. Os dados existentes serão preservados; somente campos vazios serão complementados.';
-            await new Promise((resolve) => setTimeout(resolve, 3000));
-            const state = await window.FokusApi.request(`/law/contacts/${encodeURIComponent(contact.id)}/trackjud/${encodeURIComponent(consult.id)}`);
-            consult = state.consult;
-          }
-          const result = consult?.result || {};
-          feedback.dataset.state = 'success';
-          feedback.textContent = result.updated_count
-            ? `Consulta concluída. ${result.found_count || 0} processo(s) encontrado(s); ${result.updated_count} cadastro(s) de processos vinculados foram complementados.`
-            : `Consulta concluída. ${result.found_count || 0} processo(s) encontrado(s); nenhum campo vazio dos processos vinculados precisou ser complementado.`;
-          sync.disabled = false;
-          window.setTimeout(() => {
-            if (!modal.overlay.isConnected) return;
-            modal.onHidden(() => { onChanged(); openDetails(root, id, isShared, onChanged, opener, canEdit, editorOptions); });
-            modal.close();
-          }, 1200);
-        } catch (error) {
-          feedback.dataset.state = 'error';
-          feedback.textContent = error.message || 'Não foi possível concluir a consulta manual ao TrackJud.';
-        } finally {
-          sync.disabled = false;
-        }
-      });
-      modal.body.append(feedback);
-      modal.footer.append(sync);
-    }
     if (!isShared && window.lawContactsCanMerge && contact.has_possible_duplicates) {
       const merge = button('Mesclar com outro contato', 'fs-btn fs-btn-outline-primary', () => openMerge(modal, root, contact, onChanged)); modal.footer.append(merge);
     }

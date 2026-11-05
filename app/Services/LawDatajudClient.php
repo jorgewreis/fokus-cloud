@@ -48,7 +48,7 @@ class LawDatajudClient
                     'orgaoJulgador.codigo', 'orgaoJulgador.nome', 'tribunal', 'situacaoProcessual.codigo',
                     'orgaoJulgador.codigoMunicipioIBGE', 'situacaoProcessual.nome', 'situacao.codigo', 'situacao.nome', 'situacaoAtual',
                     'grau', 'sistema', 'formato', 'dataAjuizamento', 'dataHoraUltimaAtualizacao', '@timestamp',
-                    'movimentos.codigo', 'movimentos.nome', 'movimentos.dataHora',
+                    'movimentos.codigo', 'movimentos.nome', 'movimentos.dataHora', 'movimentos.complementosTabelados',
                 ],
                 'sort' => ['@timestamp'],
                 'query' => ['match' => ['numeroProcesso' => $digits]],
@@ -128,6 +128,10 @@ class LawDatajudClient
                     'code' => isset($item['codigo']) ? (string) $item['codigo'] : null,
                     'name' => trim((string) $item['nome']),
                     'occurred_at' => $this->normalizeDateTime($item['dataHora'] ?? null),
+                    'complements' => collect($item['complementosTabelados'] ?? [])->filter(fn ($value) => is_array($value))->map(fn (array $value) => array_filter([
+                        'description' => is_scalar($value['descricao'] ?? null) ? trim((string) $value['descricao']) : null,
+                        'name' => is_scalar($value['nome'] ?? null) ? trim((string) $value['nome']) : null,
+                    ]))->filter()->values()->all(),
                     'degree' => $item['grau'] ?? null,
                     'court_name' => $item['orgaoJulgadorNome'] ?? null,
                 ], static fn ($value): bool => $value !== null && $value !== ''))

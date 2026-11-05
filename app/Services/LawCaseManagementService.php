@@ -221,8 +221,6 @@ class LawCaseManagementService
             'last_djen_synced_at' => $this->timestamp($case->last_djen_synced_at ?? null),
             'djen_sync_message' => $case->djen_sync_message ?? null,
             'djen_retry_count' => (int) ($case->djen_retry_count ?? 0),
-            'trackjud_metadata' => json_decode((string) ($case->trackjud_metadata ?? ''), true) ?: [],
-            'last_trackjud_synced_at' => $this->timestamp($case->last_trackjud_synced_at ?? null),
             'official_fields' => array_values(array_intersect(
                 array_keys(json_decode((string) ($case->datajud_metadata ?? ''), true) ?: []),
                 ['case_class', 'case_class_code', 'subjects', 'court_name', 'court_code', 'official_status_code', 'official_status_text'],

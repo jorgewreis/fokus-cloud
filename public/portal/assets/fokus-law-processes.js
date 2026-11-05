@@ -64,7 +64,7 @@
               if (root.contains(focused) && !focusOnDjenAction) { refreshTimer = setTimeout(poll, 5000); return; }
               await detail(id, historyPage);
               if (focusOnDjenAction) {
-                const resultHeading = [...document.querySelectorAll('h4')].find((heading) => heading.textContent.trim() === 'Publicações recentes do DJEN');
+                const resultHeading = document.getElementById('law-movement-history-heading');
                 if (resultHeading) { resultHeading.tabIndex = -1; resultHeading.focus(); }
               }
               return;
@@ -363,7 +363,7 @@
               if (control) { control.textContent = 'Consultando DJEN…'; control.setAttribute('aria-busy', 'true'); }
               try {
                 await request(`${apiPath(id)}/djen`, { method: 'POST' }); await detail(id);
-                const resultHeading = [...document.querySelectorAll('h4')].find((heading) => heading.textContent.trim() === 'Publicações recentes do DJEN');
+                const resultHeading = document.getElementById('law-movement-history-heading');
                 if (resultHeading) { resultHeading.tabIndex = -1; resultHeading.focus(); }
               }
               finally { if (control?.isConnected) { control.textContent = 'Consultar publicações DJEN'; control.removeAttribute('aria-busy'); } }
@@ -403,7 +403,7 @@
         columns.append(leftColumn, rightColumn); body.append(columns);
         const main = section('Dados processuais', 'CNJ', 'Classe, assuntos e informações oficiais');
         main.classList.add('law-record-detail-data');
-        const movementHistory = section('Histórico de movimentações', 'MOV', 'Movimentações do DataJud, DJEN e TrackJud');
+        const movementHistory = section('Histórico de movimentações', 'MOV', 'Movimentações e publicações do DataJud e DJEN');
         movementHistory.classList.add('law-record-detail-movements');
         const officialMetadata = c.official_metadata || {}; const djenMetadata = c.djen_metadata || {};
         const djenProcessData = djenMetadata.process_data || {};
@@ -416,78 +416,60 @@
         feedback.setAttribute('role', 'status'); feedback.setAttribute('aria-live', 'polite'); main.body.append(feedback);
         const source = $('a', 'fs-u-fs-sm', 'Metadados oficiais: CNJ · DataJud'); source.href = 'https://datajud-wiki.cnj.jus.br/api-publica/'; source.target = '_blank'; source.rel = 'noopener noreferrer'; main.body.append(source);
         const movements = Array.isArray(officialMetadata.recent_movements) ? officialMetadata.recent_movements : [];
-        if (movements.length) {
-          const movementHeading = $('h4', 'law-record-detail-section-subheading', 'Movimentações recentes informadas pelo DataJud');
-          const movementList = $('div', 'law-record-history-list');
-          movements.forEach((movement) => {
-            const entry = $('article', 'law-record-history-entry'); entry.append($('h4', '', movement.name));
-            entry.append($('p', 'law-record-detail-empty', `${date(movement.occurred_at)}${movement.code ? ` · Código ${movement.code}` : ''}`)); movementList.append(entry);
-          });
-          movementHistory.body.append(movementHeading);
-          if (officialMetadata.movements_truncated) movementHistory.body.append($('p', 'fs-alert fs-alert-warning', 'O DataJud retornou mais de 5.000 movimentações. São exibidas as 5.000 mais recentes.'));
-          movementHistory.body.append(movementList);
-        }
-        if (c.djen_sync_status !== 'not_requested') {
-          const publicationsHeading = $('h4', 'law-record-detail-section-subheading', 'Publicações recentes do DJEN');
-          movementHistory.body.append(publicationsHeading);
-          if (c.djen_sync_status === 'pending') movementHistory.body.append($('p', 'fs-alert fs-alert-info', 'O DJEN está sendo consultado em segundo plano.'));
-          if (c.djen_sync_status === 'error') movementHistory.body.append($('p', 'fs-alert fs-alert-warning', c.djen_sync_message || 'A consulta ao DJEN não foi concluída. Os dados anteriores foram preservados; você pode tentar novamente.'));
-          const publications = Array.isArray(djenMetadata.publications) ? djenMetadata.publications : [];
-          if (djenMetadata.complete === false) movementHistory.body.append($('p', 'fs-alert fs-alert-warning', djenMetadata.coverage_note || 'Esta lista é parcial e pode não incluir todas as publicações. Consulte o DJEN novamente para atualizar.'));
-          if (!publications.length && c.djen_sync_status !== 'pending' && c.djen_sync_status !== 'error') movementHistory.body.append($('p', 'law-record-detail-empty', 'O DJEN não disponibilizou publicações para este processo.'));
-          if (c.djen_sync_status !== 'pending') publications.forEach((publication) => {
-              let officialLink = null;
-              try { const url = new URL(publication.link); if (url.protocol === 'https:') officialLink = url.href; } catch (_) { /* Sem referência oficial válida. */ }
-              const entry = $(officialLink ? 'a' : 'article', `law-record-history-entry${officialLink ? ' law-record-djen-link' : ''}`);
-              const type = String(publication.type || publication.document_type || '').trim().toLocaleLowerCase('pt-BR');
-              const title = !type || /^publica(?:ção|cao)$/.test(type) ? 'Publicação no DJEN' : `Publicação de ${type} no DJEN`;
-              entry.append($('h4', '', title));
-              const dateLabel = publication.availability_date ? `Disponibilizada no DJEN em ${dateOnly(publication.availability_date)}` : publication.publication_date ? `Publicada no DJEN em ${dateOnly(publication.publication_date)}` : 'Data não informada';
-              entry.append($('p', 'law-record-detail-empty', dateLabel));
-              if (officialLink) {
-                entry.href = officialLink; entry.target = '_blank'; entry.rel = 'noopener noreferrer';
-                entry.append($('span', 'fs-u-visually-hidden', ' (abre o documento oficial em outra aba)'));
-              }
-              movementHistory.body.append(entry);
-          });
-          movementHistory.body.append($('p', 'law-record-detail-empty', 'As publicações do DJEN são complementares; não alteram a situação oficial nem calculam prazos.'));
-        }
-        const trackJudRecord = c.trackjud_metadata?.record || {};
-        if (Object.keys(trackJudRecord).length) {
-          const trackJudHeading = $('h4', 'law-record-detail-section-subheading', 'Dados processuais complementares do TrackJud');
-          const trackJudParties = Array.isArray(trackJudRecord.partes) ? trackJudRecord.partes : [];
-          const trackJudMovements = Array.isArray(trackJudRecord.movimentos) ? trackJudRecord.movimentos.slice(-20).reverse() : [];
-          const trackJudSubjects = Array.isArray(trackJudRecord.assuntos) ? trackJudRecord.assuntos.map((item) => item?.ds_assunto || item?.name || item).filter(Boolean).join('; ') : '';
-          main.body.append(trackJudHeading, keyValues([
-            ['Tribunal', text(trackJudRecord.court)], ['Sistema consultado', text(trackJudRecord.system)],
-            ['Instância', trackJudRecord.instance === '1' ? '1ª instância' : trackJudRecord.instance === '2' ? '2ª instância' : text(trackJudRecord.instance)],
-            ['Classe', text(trackJudRecord.classe)], ['Situação', text(trackJudRecord.situacao)],
-            ['Órgão / competência', text(trackJudRecord.competencia)], ['Distribuição', text(trackJudRecord.distribuido_em)],
-            ['Valor da causa', text(trackJudRecord.valor_causa)], ['Área', text(trackJudRecord.area)],
-            ['Fase', text(trackJudRecord.fase)], ['Assuntos', text(trackJudSubjects)],
-            ['Última consulta TrackJud', date(c.last_trackjud_synced_at)],
-          ]));
-          if (trackJudParties.length) {
-            main.body.append($('h5', 'law-record-detail-section-subheading', 'Partes retornadas pelo TrackJud'));
-            trackJudParties.slice(0, 100).forEach((party) => {
-              if (!party || typeof party !== 'object') return;
-              const values = [party.tipo, party.nome, party.representante].filter(Boolean);
-              if (values.length) main.body.append($('p', 'law-record-detail-empty', values.join(', ')));
-            });
+        const publications = Array.isArray(djenMetadata.publications) ? djenMetadata.publications : [];
+        const movementHeading = $('h4', 'law-record-detail-section-subheading', 'Movimentações e publicações');
+        movementHeading.id = 'law-movement-history-heading';
+        movementHistory.body.append(movementHeading);
+        if (officialMetadata.movements_truncated) movementHistory.body.append($('p', 'fs-alert fs-alert-warning', 'O DataJud retornou mais de 5.000 movimentações. São exibidas as 5.000 mais recentes.'));
+        if (c.djen_sync_status === 'pending') movementHistory.body.append($('p', 'fs-alert fs-alert-info', 'O DJEN está sendo consultado em segundo plano.'));
+        if (c.djen_sync_status === 'error') movementHistory.body.append($('p', 'fs-alert fs-alert-warning', c.djen_sync_message || 'A consulta ao DJEN não foi concluída. Os dados anteriores foram preservados; você pode tentar novamente.'));
+        if (djenMetadata.complete === false) movementHistory.body.append($('p', 'fs-alert fs-alert-warning', djenMetadata.coverage_note || 'Esta lista é parcial e pode não incluir todas as publicações. Consulte o DJEN novamente para atualizar.'));
+        const events = [
+          ...movements.map((item) => ({ source: 'DataJud', item, when: item.occurred_at || '' })),
+          ...publications.map((item) => ({ source: 'DJEN', item, when: item.availability_date || item.publication_date || '' })),
+        ];
+        // Dates without a time remain date-only; within a day, timed events precede them.
+        events.sort((a, b) => {
+          const timeA = String(a.when).length > 10 ? Date.parse(String(a.when).replace(' ', 'T')) : NaN;
+          const timeB = String(b.when).length > 10 ? Date.parse(String(b.when).replace(' ', 'T')) : NaN;
+          const localDay = (when, time) => Number.isFinite(time) ? new Date(time).toLocaleDateString('sv-SE') : String(when).slice(0, 10);
+          const dayA = localDay(a.when, timeA); const dayB = localDay(b.when, timeB);
+          if (dayA !== dayB) return dayB.localeCompare(dayA);
+          if (Number.isFinite(timeA) && Number.isFinite(timeB)) return timeB - timeA;
+          if (Number.isFinite(timeA)) return -1;
+          if (Number.isFinite(timeB)) return 1;
+          return 0;
+        });
+        if (!events.length) movementHistory.body.append($('p', 'law-record-detail-empty', 'Nenhuma movimentação ou publicação disponível.'));
+        const eventList = $('div', 'law-record-history-list');
+        events.forEach(({ source, item }) => {
+          let officialLink = null;
+          if (source === 'DJEN') try { const url = new URL(item.link); if (url.protocol === 'https:') officialLink = url.href; } catch (_) { /* Sem referência oficial válida. */ }
+          const entry = $(officialLink ? 'a' : 'article', `law-record-history-entry${officialLink ? ' law-record-djen-link' : ''}`);
+          let title; let kind; let detail;
+          if (source === 'DJEN') {
+            const type = String(item.type || item.document_type || '').trim().toLocaleLowerCase('pt-BR');
+            title = !type || /^publica(?:ção|cao)$/.test(type) ? 'Publicação no DJEN' : `Publicação de ${type} no DJEN`;
+            kind = 'Publicação';
+            detail = item.availability_date ? `Disponibilizada em ${dateOnly(item.availability_date)}` : item.publication_date ? `Publicada em ${dateOnly(item.publication_date)}` : 'Data não informada';
+          } else {
+            title = String(item.name || 'Movimentação processual').trim();
+            const documentComplement = (Array.isArray(item.complements) ? item.complements : []).find((part) => /(?:tipo|nome).*documento/i.test(String(part.description || '').replace(/_/g, ' ')) && part.name);
+            if (/^expedição de documento$/i.test(title) && documentComplement) title = `Expedição de ${documentComplement.name}`;
+            if (/^juntada de documento$/i.test(title) && documentComplement) title = `Juntada de ${documentComplement.name}`;
+            kind = /^expedição/i.test(title) ? 'Expedição de documento' : /^juntada/i.test(title) ? 'Juntada de documento' : 'Movimentação';
+            if (item.code !== undefined && item.code !== null && String(item.code).trim()) title = `${item.code} - ${title}`;
+            detail = item.occurred_at ? date(item.occurred_at) : 'Data não informada';
           }
-          if (trackJudMovements.length) {
-            movementHistory.body.append($('h5', 'law-record-detail-section-subheading', 'Movimentações retornadas pelo TrackJud'));
-            const trackJudMovementList = $('div', 'law-record-history-list');
-            trackJudMovements.forEach((movement) => {
-              const entry = $('article', 'law-record-history-entry');
-              entry.append($('h4', '', movement.descricao || movement.movimento || 'Movimentação processual'));
-              if (movement.data_movimento) entry.append($('p', 'law-record-detail-empty', movement.data_movimento));
-              trackJudMovementList.append(entry);
-            });
-            movementHistory.body.append(trackJudMovementList);
+          entry.append($('h4', '', title), $('p', 'law-record-detail-empty', `${kind} · ${source} · ${detail}`));
+          if (officialLink) {
+            entry.href = officialLink; entry.target = '_blank'; entry.rel = 'noopener noreferrer';
+            entry.append($('span', 'fs-u-visually-hidden', ' (abre o documento oficial em outra aba)'));
           }
-          main.body.append($('p', 'law-record-detail-empty', 'Os dados do TrackJud complementam o processo vinculado e preservam os valores já cadastrados. A consulta é manual e não cria novos processos.'));
-        }
+          eventList.append(entry);
+        });
+        movementHistory.body.append(eventList);
+        if (c.djen_sync_status !== 'not_requested') movementHistory.body.append($('p', 'law-record-detail-empty', 'As publicações do DJEN são complementares; não alteram a situação oficial nem calculam prazos.'));
         const operational = section('Organização interna', 'ORG', 'Acompanhamento do trabalho da unidade'); operational.classList.add('law-record-detail-organization'); operational.body.append(keyValues([['Unidade', c.unit_name], ['Estado operacional', c.operational_status_label], ['Prioridade operacional', text(c.operational_priority)], ['Prioridades processuais', (c.procedural_priorities || []).map((code) => local.procedural_priorities?.find((item) => item.code === code)?.label || code).join('; ') || 'Nenhuma'], ['Responsável principal', local.members.find((item) => item.id === c.responsible_membership_id)?.name || 'Sem responsável'], ['Sigilo', text(c.confidentiality_level)]]));
         if (c.operational_status === 'archived') operational.body.append(keyValues([['Justificativa do arquivamento', c.archive_reason]])); operational.body.append($('p', 'law-record-detail-empty', 'A situação oficial do Datajud e o estado operacional são independentes.')); leftColumn.append(main, movementHistory); rightColumn.append(operational);
         let conflictsCard = null;
