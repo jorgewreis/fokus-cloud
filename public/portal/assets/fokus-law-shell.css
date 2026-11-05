@@ -532,6 +532,7 @@
 .law-record-detail-section-heading > span { display: grid; min-width: 21px; height: 21px; place-items: center; padding: 0 5px; border-radius: 6px; background: #f3eff6; color: #675476; font-size: 10px; font-weight: 700; }
 .law-record-detail-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px; }
 .law-record-detail-hierarchy .law-record-detail-items { grid-template-columns: minmax(0, 1fr); }
+.law-record-detail-cases .law-record-detail-linked-contact { grid-column: 1 / -1; }
 .law-record-detail-institution .law-record-detail-items { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .law-record-detail-links { grid-column: 1 / -1; }
 .law-record-detail-links .law-record-detail-items, .law-record-detail-addresses .law-record-detail-items { grid-template-columns: minmax(0, 1fr); }

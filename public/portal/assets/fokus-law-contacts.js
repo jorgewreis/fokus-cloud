@@ -883,7 +883,7 @@
       });
     }
     if (contact.cases?.length) {
-      const items = addSection('Processos vinculados', 'PROC', contact.cases.length, 'law-record-detail-cases');
+      const items = addSection('Processos vinculados', 'PRC', contact.cases.length, 'law-record-detail-cases');
       contact.cases.forEach((linkedCase) => {
         const row = $('article', 'law-record-detail-linked-contact');
         row.append($('strong', '', linkedCase.case_number));
