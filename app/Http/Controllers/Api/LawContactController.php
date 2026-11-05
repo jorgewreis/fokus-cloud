@@ -727,7 +727,7 @@ class LawContactController extends Controller
             'notes' => ['sometimes', 'nullable', 'string', 'max:4000'],
             'sharing_excluded' => ['sometimes', 'boolean'],
             'status' => ['prohibited'],
-            'documents' => ['sometimes', 'array', 'max:20'],
+            'documents' => ['sometimes', 'array', 'max:10'],
             'documents.*.type' => ['required', Rule::in(self::DOCUMENT_TYPES)],
             'documents.*.number' => ['required', 'string', 'max:120'],
             'documents.*.label' => ['nullable', 'string', 'max:80'],

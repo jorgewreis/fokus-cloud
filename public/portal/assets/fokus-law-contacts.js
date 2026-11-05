@@ -415,7 +415,7 @@
       documentSection = section('Documentos');
       documentRows = $('div', 'law-contact-repeat-list');
       (contact?.documents || []).filter((doc) => DOCUMENT_TYPES_BY_NATURE[nature.value].includes(doc.type)).forEach((doc) => documentRows.append(documentRow(doc, nature.value)));
-      documentSection.content.append(documentRows, button('Adicionar documento', 'fs-btn fs-btn-outline-primary', () => { if (documentRows.children.length < 20) documentRows.append(documentRow({}, nature.value)); }));
+      documentSection.content.append(documentRows, button('Adicionar documento', 'fs-btn fs-btn-outline-primary', () => { if (documentRows.children.length < 10) documentRows.append(documentRow({}, nature.value)); }));
     }
     const protectedEditor = window.lawContactsCanSensitive && !contact?.is_shared && (!contact || Object.prototype.hasOwnProperty.call(contact, 'sensitive_details')) ? sensitiveDetailsEditor(contact?.sensitive_details) : null;
     const channelSection = section('Telefones e e-mails');

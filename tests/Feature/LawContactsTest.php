@@ -413,11 +413,11 @@ class LawContactsTest extends TestCase
     {
         $session = ['active_company_id' => $this->sessionCompanyId];
         $documents = array_map(fn ($type) => ['type' => $type, 'number' => '12345678901'], ['pis', 'pasep', 'nit', 'nis', 'cadunico', 'cnh', 'cin']);
-        for ($i = count($documents); $i < 20; $i++) $documents[] = ['type' => 'other', 'number' => 'TEST-'.$i];
+        for ($i = count($documents); $i < 10; $i++) $documents[] = ['type' => 'other', 'number' => 'TEST-'.$i];
         $channels = array_map(fn ($i) => ['type' => 'email', 'value' => 'synthetic'.$i.'@example.test'], range(1, 10));
         $contact = $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
             'legal_nature' => 'pf', 'display_name' => 'Múltiplos Documentos', 'documents' => $documents, 'channels' => $channels,
-        ])->assertCreated()->assertJsonCount(20, 'contact.documents')->assertJsonCount(10, 'contact.channels')->json('contact');
+        ])->assertCreated()->assertJsonCount(10, 'contact.documents')->assertJsonCount(10, 'contact.channels')->json('contact');
         foreach (['pis', 'nit', 'nis', 'cadunico'] as $type) {
             $this->assertDatabaseHas('law_contact_documents', ['company_id' => $this->companyId, 'law_contact_id' => $contact['id'], 'document_type' => $type]);
         }
@@ -430,7 +430,7 @@ class LawContactsTest extends TestCase
         $this->actingAs($this->admin)->withSession($session)->patchJson('/api/law/contacts/'.$contact['id'], [
             'channels' => array_fill(0, 5, ['type' => 'phone', 'value' => '71999990000']),
         ])->assertUnprocessable();
-        $this->assertDatabaseCount('law_contact_documents', 20);
+        $this->assertDatabaseCount('law_contact_documents', 10);
         $this->assertDatabaseCount('law_contact_channels', 10);
     }
 
