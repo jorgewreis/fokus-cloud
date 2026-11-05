@@ -37,6 +37,7 @@ class SyncLawCaseDatajud implements ShouldQueue
             $now = now();
             DB::table('law_cases')->where('id', $case->id)->where('company_id', $this->companyId)->update([
                 'datajud_sync_status' => 'error', 'last_datajud_checked_at' => $now,
+                'datajud_retry_count' => min(65535, (int) ($case->datajud_retry_count ?? 0) + 1), 'datajud_retryable' => true,
                 'version' => DB::raw('version + 1'), 'updated_at' => $now,
             ]);
             DB::table('law_case_events')->insert([

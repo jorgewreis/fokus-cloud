@@ -97,20 +97,35 @@ class LawCaseManagementService
                 }
             }
 
-            foreach (['tribunal', 'degree', 'system', 'format', 'filing_date', 'source_updated_at', 'court_municipality_code', 'recent_movements'] as $field) {
+            foreach (['tribunal', 'degree', 'system', 'format', 'filing_date', 'source_updated_at', 'court_municipality_code', 'recent_movements', 'records', 'movements_truncated'] as $field) {
                 if (array_key_exists($field, $result['metadata'] ?? [])) $official[$field] = $result['metadata'][$field];
             }
 
             $checkedAt = now();
+            $successful = in_array($result['status'], ['synced', 'not_found'], true);
+            $retryCount = (int) ($current->datajud_retry_count ?? 0);
+            if ($successful) $retryCount = 0;
+            else $retryCount = min(65535, $retryCount + 1);
+            $retryableCodes = ['timeout', 'rate_limited', 'service_busy', 'source_timeout', 'partial_response', 'service_unavailable', 'connection_failed', 'secure_connection_failed', 'internal_error', 'invalid_response', 'result_limit'];
             $updates = [
                 'datajud_metadata' => json_encode($official, JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}',
                 'manual_metadata' => json_encode($manual, JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}',
                 'datajud_sync_status' => $result['status'],
                 'last_datajud_checked_at' => $checkedAt,
+                'datajud_retry_count' => $retryCount,
+                'datajud_retryable' => $successful || in_array($result['code'] ?? '', $retryableCodes, true),
                 'version' => DB::raw('version + 1'),
                 'updated_at' => $checkedAt,
             ];
-            if ($result['status'] === 'synced') $updates['last_datajud_synced_at'] = $checkedAt;
+            if ($successful) $updates['last_datajud_synced_at'] = $checkedAt;
+            if ($successful && ! array_key_exists('official_status_text', $result['metadata'] ?? []) && ! array_key_exists('official_status_text', $manual)) {
+                $updates['official_status_text'] = null;
+                $official['official_status_text'] = null;
+            }
+            if ($successful && ! array_key_exists('official_status_code', $result['metadata'] ?? []) && ! array_key_exists('official_status_code', $manual)) {
+                $official['official_status_code'] = null;
+            }
+            if ($successful) $updates['datajud_metadata'] = json_encode($official, JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
             DB::table('law_cases')->where('company_id', $companyId)->where('id', $caseId)->update($updates);
 
             $title = match ($result['status']) {

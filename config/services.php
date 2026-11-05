@@ -45,6 +45,7 @@ return [
         'base_url' => env('DATAJUD_API_BASE_URL', 'https://api-publica.datajud.cnj.jus.br'),
         'timeout' => (int) env('DATAJUD_TIMEOUT', 50),
         'connect_timeout' => (int) env('DATAJUD_CONNECT_TIMEOUT', 10),
+        'page_size' => (int) env('DATAJUD_PAGE_SIZE', 1000),
     ],
 
     'djen' => [

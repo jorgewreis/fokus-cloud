@@ -263,7 +263,7 @@ class LawCaseController extends Controller
                     'id' => $id, 'company_id' => $companyId, 'law_unit_id' => $unit->id, 'case_number' => $caseNumber,
                     'case_class' => null, 'case_class_code' => $class['code'] ?? null,
                     'comarca' => $comarca,
-                    'official_status_text' => 'Em andamento',
+                    'official_status_text' => null,
                     'subjects' => json_encode($subjectCodes, JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]',
                     'datajud_metadata' => '{}', 'djen_metadata' => '{}', 'manual_metadata' => json_encode(array_filter(['case_class_code' => $class['code'] ?? null, 'subjects' => $subjectCodes], fn ($v) => $v !== null && $v !== []), JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}', 'datajud_sync_status' => 'pending', 'djen_sync_status' => 'pending',
                     'filing_date' => $data['filing_date'] ?? null, 'distribution_date' => $data['distribution_date'] ?? null,
@@ -273,7 +273,7 @@ class LawCaseController extends Controller
                 DB::table('law_case_events')->insert([
                     'id' => PrefixedUlid::make('LCE'), 'company_id' => $companyId, 'law_case_id' => $id,
                     'actor_user_id' => $userId, 'event_type' => 'created', 'title' => 'Processo cadastrado',
-                    'after_state' => json_encode(['law_unit_id' => $unit->id, 'operational_status' => 'active', 'official_status_text' => 'Em andamento'], JSON_INVALID_UTF8_SUBSTITUTE),
+                    'after_state' => json_encode(['law_unit_id' => $unit->id, 'operational_status' => 'active'], JSON_INVALID_UTF8_SUBSTITUTE),
                     'created_at' => $now,
                 ]);
                 SyncLawCaseDatajud::dispatch($companyId, $id, $userId)

@@ -298,9 +298,9 @@
       for (const [name, label] of [['court_name', 'Tribunal / órgão julgador'], ['official_status_text', 'Situação oficial']]) {
         if (!(c.official_fields || []).includes(name)) {
           const statuses = ['Em andamento', 'Suspenso', 'Arquivado', 'Em grau de recurso'];
-          const currentStatus = statuses.includes(c.official_status_text) ? c.official_status_text : 'Em andamento';
+          const currentStatus = statuses.includes(c.official_status_text) ? c.official_status_text : '';
           add(metadata, label, name, name === 'official_status_text'
-            ? select(statuses.map((status) => [status, status]), currentStatus)
+            ? select([['', 'Não informada'], ...statuses.map((status) => [status, status])], currentStatus)
             : input(c[name]));
         }
         else metadata.body.append(keyValues([[label, text(c[name])]]));
