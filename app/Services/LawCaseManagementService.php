@@ -97,6 +97,10 @@ class LawCaseManagementService
                 }
             }
 
+            foreach (['tribunal', 'degree', 'system', 'format', 'filing_date', 'source_updated_at', 'court_municipality_code', 'recent_movements'] as $field) {
+                if (array_key_exists($field, $result['metadata'] ?? [])) $official[$field] = $result['metadata'][$field];
+            }
+
             $checkedAt = now();
             $updates = [
                 'datajud_metadata' => json_encode($official, JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}',
@@ -127,6 +131,23 @@ class LawCaseManagementService
             ]);
         });
 
+        return $result;
+    }
+
+    public function syncDjen(object $case, LawDjenClient $client): array
+    {
+        $result = $client->lookup((string) $case->case_number);
+        $checkedAt = now();
+        $updates = [
+            'djen_sync_status' => $result['status'],
+            'last_djen_checked_at' => $checkedAt,
+        ];
+        if (in_array($result['status'], ['synced', 'not_found'], true)) {
+            $updates['djen_metadata'] = json_encode($result['metadata'] ?? [], JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
+        }
+        if ($result['status'] === 'synced') $updates['last_djen_synced_at'] = $checkedAt;
+
+        DB::table('law_cases')->where('company_id', $case->company_id)->where('id', $case->id)->update($updates);
         return $result;
     }
 
@@ -174,7 +195,13 @@ class LawCaseManagementService
             'last_datajud_checked_at' => $this->timestamp($case->last_datajud_checked_at),
             'last_datajud_synced_at' => $this->timestamp($case->last_datajud_synced_at),
             'datajud_sync_status' => (string) $case->datajud_sync_status,
-            'official_fields' => array_keys(json_decode((string) ($case->datajud_metadata ?? ''), true) ?: []),
+            'djen_sync_status' => (string) ($case->djen_sync_status ?? 'not_requested'),
+            'last_djen_checked_at' => $this->timestamp($case->last_djen_checked_at ?? null),
+            'last_djen_synced_at' => $this->timestamp($case->last_djen_synced_at ?? null),
+            'official_fields' => array_values(array_intersect(
+                array_keys(json_decode((string) ($case->datajud_metadata ?? ''), true) ?: []),
+                ['case_class', 'case_class_code', 'subjects', 'court_name', 'court_code', 'official_status_code', 'official_status_text'],
+            )),
             'manual_fields' => array_keys($manual),
             'metadata_conflicts' => $conflicts,
             'version' => (int) $case->version,

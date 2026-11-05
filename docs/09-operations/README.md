@@ -11,6 +11,7 @@ Esta pasta documenta ambientes, deploy, testes, qualidade, releases, monitoramen
 - [Monitoramento, suporte e operacao do Backoffice](backoffice-monitoring-and-support.md)
 - [Operacao do Fokus Law](fokus-law-operations.md)
 - [Operacao do Datajud em Processos](law-case-datajud.md)
+- [Operacao do DJEN em Processos](law-case-djen.md)
 - [MCP do Mercado Pago](mercado-pago-mcp.md)
 - [Runbook de seguranca em producao](production-security-runbook.md)
 - [Visibilidade nas buscas](search-visibility.md)

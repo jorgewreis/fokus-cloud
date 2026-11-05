@@ -5,6 +5,7 @@
   Object.assign(labels, { error: 'Falha na consulta', synced: 'Dados atualizados', not_found: 'Sem dados públicos', law_unit_id: 'Unidade', contact_id: 'Contato', related_case_id: 'Processo relacionado', source_case_id: 'Processo de origem', contact_search: 'Pesquisa de contato', datajud_case_class: 'Classe oficial (Datajud)', datajud_subjects: 'Assuntos oficiais (Datajud)', datajud_court_name: 'Órgão julgador oficial (Datajud)', datajud_official_status_text: 'Situação oficial (Datajud)' });
   const text = (value) => value === null || value === undefined || value === '' || (Array.isArray(value) && !value.length) ? 'Não informado' : Array.isArray(value) ? value.map((item) => item.name || String(item)).join('; ') : labels[value] || String(value);  Object.assign(labels, { datajud_result_code: 'Resultado da consulta', initial_sync_failed: 'Consulta automática não concluída', queued: 'Consulta agendada', not_configured: 'Consulta não configurada', invalid_number: 'Número CNJ incompleto', unsupported_tribunal: 'Tribunal sem consulta configurada', authentication_failed: 'Chave recusada pelo CNJ', rate_limited: 'Consultas limitadas pelo Datajud', service_busy: 'Datajud sobrecarregado', source_timeout: 'Busca não concluída pelo Datajud', partial_response: 'Resposta incompleta do Datajud', timeout: 'Tempo de espera excedido', service_unavailable: 'Falha temporária do Datajud', endpoint_not_found: 'Endereço de consulta não encontrado', request_rejected: 'Consulta recusada pelo Datajud', invalid_response: 'Resposta incompatível', connection_failed: 'Falha de conexão', secure_connection_failed: 'Falha na conexão segura', internal_error: 'Falha interna na consulta', no_metadata: 'Processo encontrado sem metadados disponíveis' });
   const date = (value) => value ? new Date(String(value).replace(' ', 'T')).toLocaleString('pt-BR') : 'Ainda não consultado';
+  const dateOnly = (value) => value ? new Date(`${String(value).slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR') : 'Data não informada';
   const cnj = (v) => String(v).replace(/^(\d{7})(\d{2})(\d{4})(\d)(\d{2})(\d{4})$/, '$1-$2.$3.$4.$5.$6');
   const confidentialityAlert = 'Este processo tem prioridade para criança ou adolescente (menor) ou violência doméstica e precisa estar como Sigiloso ou Secreto.';
   const needsConfidentialityAlert = (priorities, level) => (priorities || []).some((code) => ['child_adolescent', 'domestic_violence'].includes(code)) && !['confidential', 'secret'].includes(level);
@@ -38,7 +39,7 @@
         try {
           const result = await request(`${apiPath(id)}?history_page=${historyPage}`);
           if (!valid()) return;
-          if (result.case.datajud_sync_status !== 'pending') {
+          if (result.case.datajud_sync_status !== 'pending' && result.case.djen_sync_status !== 'pending') {
             for (const element of dialogs) if (!element.isConnected) dialogs.delete(element);
             if (!dialogs.size) { await detail(id, historyPage); return; }
           }
@@ -328,6 +329,16 @@
             if (c.datajud_sync_status === 'pending') { consult.disabled = true; consult.textContent = 'Consulta automática pendente'; }
             actions.append(consult);
           }
+          if (!adminVariant) {
+            const consultDjen = button('Consultar publicações DJEN', action(async (event) => {
+              const control = event?.currentTarget;
+              if (control) { control.textContent = 'Consultando DJEN…'; control.setAttribute('aria-busy', 'true'); }
+              try { await request(`${apiPath(id)}/djen`, { method: 'POST' }); await detail(id); }
+              finally { if (control?.isConnected) { control.textContent = 'Consultar publicações DJEN'; control.removeAttribute('aria-busy'); } }
+            }));
+            if (c.djen_sync_status === 'pending') { consultDjen.disabled = true; consultDjen.textContent = 'Consulta DJEN pendente'; }
+            actions.append(consultDjen);
+          }
         }
         const archiveAction = c.operational_status === 'archived' ? 'reopen' : 'archive';
         if (can(archiveAction)) actions.append(button(archiveAction === 'archive' ? 'Arquivar' : 'Reabrir', action((event) => {
@@ -355,12 +366,46 @@
         [text(c.operational_priority), text(c.confidentiality_level)].filter(Boolean).forEach((label) => badges.append($('span', 'law-record-detail-chip', label))); copy.append(badges); identity.append(symbol, copy); body.append(identity);
         if (needsConfidentialityAlert(c.procedural_priorities, c.confidentiality_level)) { const alert = $('p', 'fs-alert fs-alert-warning', confidentialityAlert); alert.setAttribute('role', 'alert'); body.append(alert); }
         const main = section('Dados processuais', 'CNJ', 'Classe, assuntos e informações oficiais');
-        main.body.append(keyValues([['Classe judicial', text(c.case_class)], ['Tribunal / órgão julgador', text(c.court_name)], ['Comarca', text(c.comarca)], ['Assuntos', text(c.subjects)], ['Situação oficial', text(c.official_status_text)], ['Autuação', c.filing_date ? new Date(`${c.filing_date}T12:00:00`).toLocaleDateString('pt-BR') : 'Não informada'], ['Distribuição', c.distribution_date ? new Date(`${c.distribution_date}T12:00:00`).toLocaleDateString('pt-BR') : 'Não informada'], ['Última consulta ao Datajud', date(c.last_datajud_checked_at)]]));
+        const officialMetadata = c.official_metadata || {}; const djenMetadata = c.djen_metadata || {};
+        const displayedClass = c.case_class || djenMetadata.suggested_case_class;
+        const displayedCourt = c.court_name || djenMetadata.suggested_court_name;
+        const classLabel = c.case_class ? 'Classe judicial' : djenMetadata.suggested_case_class ? 'Classe indicada pelo DJEN' : 'Classe judicial';
+        const courtLabel = c.court_name ? 'Tribunal / órgão julgador' : djenMetadata.suggested_court_name ? 'Órgão julgador indicado pelo DJEN' : 'Tribunal / órgão julgador';
+        main.body.append(keyValues([[classLabel, text(displayedClass)], [courtLabel, text(displayedCourt)], ['Tribunal', text(officialMetadata.tribunal || djenMetadata.tribunal)], ['Grau no DataJud', text(officialMetadata.degree)], ['Sistema processual no DataJud', text(officialMetadata.system)], ['Comarca', text(c.comarca)], ['Assuntos', text(c.subjects)], ['Situação oficial', text(c.official_status_text)], ['Autuação', c.filing_date ? dateOnly(c.filing_date) : officialMetadata.filing_date ? dateOnly(officialMetadata.filing_date) : 'Não informada'], ['Distribuição', c.distribution_date ? dateOnly(c.distribution_date) : 'Não informada'], ['Atualização da base DataJud', date(officialMetadata.source_updated_at)], ['Última consulta ao DataJud', date(c.last_datajud_checked_at)]]));
         main.body.append(keyValues([['Resultado da consulta', c.datajud_sync_status === 'pending' ? 'Aguardando consulta' : text(result.datajud?.code || c.datajud_sync_status)], ['Última atualização bem-sucedida', c.last_datajud_synced_at ? date(c.last_datajud_synced_at) : 'Ainda não houve atualização pelo Datajud']]));
         const fallbackMessage = c.datajud_sync_status === 'pending' ? 'Processo cadastrado. A consulta ao Datajud será feita em segundo plano e pode levar alguns minutos. Você pode continuar trabalhando; os dados aparecerão aqui automaticamente.' : c.datajud_sync_status === 'not_found' ? 'A consulta foi concluída, mas o Datajud não disponibilizou dados públicos para este processo. Você pode preencher os campos ausentes manualmente.' : c.datajud_sync_status === 'synced' ? 'A última consulta ao Datajud foi concluída. Os campos não fornecidos pelo CNJ podem ser preenchidos manualmente.' : 'A última consulta ao Datajud falhou. Consulte o histórico para conferir o motivo ou tente novamente.';
         const feedback = $('p', `fs-alert ${['pending', 'not_found'].includes(c.datajud_sync_status) ? 'fs-alert-info' : c.datajud_sync_status === 'synced' ? 'fs-alert-success' : 'fs-alert-warning'}`, `${(c.datajud_sync_status === 'pending' ? fallbackMessage : result.datajud?.message) || fallbackMessage}${c.datajud_sync_status === 'error' ? ' O cadastro e os dados já registrados foram preservados.' : ''}`);
         feedback.setAttribute('role', 'status'); feedback.setAttribute('aria-live', 'polite'); main.body.append(feedback);
         const source = $('a', 'fs-u-fs-sm', 'Metadados oficiais: CNJ · DataJud'); source.href = 'https://datajud-wiki.cnj.jus.br/api-publica/'; source.target = '_blank'; source.rel = 'noopener noreferrer'; main.body.append(source); body.append(main);
+        const movements = Array.isArray(officialMetadata.recent_movements) ? officialMetadata.recent_movements : [];
+        if (movements.length) {
+          const movementHeading = $('h4', 'law-record-detail-section-subheading', 'Movimentações recentes informadas pelo DataJud');
+          const movementList = $('div', 'law-record-history-list');
+          movements.forEach((movement) => {
+            const entry = $('article', 'law-record-history-entry'); entry.append($('h4', '', movement.name));
+            entry.append($('p', 'law-record-detail-empty', `${date(movement.occurred_at)}${movement.code ? ` · Código ${movement.code}` : ''}`)); movementList.append(entry);
+          });
+          main.body.append(movementHeading, movementList);
+        }
+        if (c.djen_sync_status !== 'not_requested') {
+          const publicationsHeading = $('h4', 'law-record-detail-section-subheading', 'Publicações recentes do DJEN');
+          main.body.append(publicationsHeading);
+          if (c.djen_sync_status === 'pending') main.body.append($('p', 'fs-alert fs-alert-info', 'O DJEN está sendo consultado em segundo plano.'));
+          else if (c.djen_sync_status === 'error') main.body.append($('p', 'fs-alert fs-alert-warning', 'A consulta ao DJEN não foi concluída. Você pode tentar novamente.'));
+          else {
+            const publications = Array.isArray(djenMetadata.publications) ? djenMetadata.publications : [];
+            if (!publications.length) main.body.append($('p', 'law-record-detail-empty', 'O DJEN não disponibilizou publicações para este processo.'));
+            publications.forEach((publication) => {
+              const entry = $('article', 'law-record-history-entry');
+              entry.append($('h4', '', [publication.type, publication.document_type].filter(Boolean).join(' · ') || 'Publicação processual'));
+              entry.append($('p', 'law-record-detail-empty', `${dateOnly(publication.publication_date)} · ${publication.tribunal || 'Tribunal não informado'}${publication.court_name ? ` · ${publication.court_name}` : ''}`));
+              if (publication.case_class) entry.append($('p', '', `Classe: ${publication.case_class}`));
+              if (publication.link) { const link = $('a', 'fs-u-fs-sm', 'Abrir referência oficial'); link.href = publication.link; link.target = '_blank'; link.rel = 'noopener noreferrer'; entry.append(link); }
+              main.body.append(entry);
+            });
+          }
+          main.body.append($('p', 'law-record-detail-empty', 'As publicações do DJEN são complementares; não alteram a situação oficial nem calculam prazos.'));
+        }
         const operational = section('Organização interna', 'ORG', 'Acompanhamento do trabalho da unidade'); operational.body.append(keyValues([['Unidade', c.unit_name], ['Estado operacional', c.operational_status_label], ['Prioridade operacional', text(c.operational_priority)], ['Prioridades processuais', (c.procedural_priorities || []).map((code) => local.procedural_priorities?.find((item) => item.code === code)?.label || code).join('; ') || 'Nenhuma'], ['Responsável principal', local.members.find((item) => item.id === c.responsible_membership_id)?.name || 'Sem responsável'], ['Sigilo', text(c.confidentiality_level)]]));
         if (c.operational_status === 'archived') operational.body.append(keyValues([['Justificativa do arquivamento', c.archive_reason]])); operational.body.append($('p', 'law-record-detail-empty', 'A situação oficial do Datajud e o estado operacional são independentes.')); body.append(operational);
         if (c.metadata_conflicts?.length) {
@@ -391,7 +436,7 @@
         if (!result.events.length) history.body.append($('p', 'law-record-detail-empty', 'Nenhuma alteração registrada neste processo.'));
         paginate(history.body, result.history_total, 50, result.history_page, (value) => detail(id, value), 'eventos'); body.append(history);
         if (changedRecord) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); heading.scrollIntoView({ block: 'start' }); }
-        if (c.datajud_sync_status === 'pending') watchDatajud(id, token, historyPage);
+        if (c.datajud_sync_status === 'pending' || c.djen_sync_status === 'pending') watchDatajud(id, token, historyPage);
       } catch (error) { report(error); } finally { body.removeAttribute('aria-busy'); }
     }
     function linkedSection(title, items, remove, add) {

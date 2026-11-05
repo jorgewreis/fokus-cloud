@@ -101,6 +101,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/{case}/archive', [LawCaseController::class, 'archive'])->middleware('law.permission:law.cases.archive');
             Route::post('/{case}/reopen', [LawCaseController::class, 'reopen'])->middleware('law.permission:law.cases.reopen');
             Route::post('/{case}/datajud', [LawCaseController::class, 'syncDatajud'])->middleware(['law.permission:law.cases.update', 'throttle:10,1,law-case-datajud']);
+            Route::post('/{case}/djen', [LawCaseController::class, 'syncDjen'])->middleware(['law.permission:law.cases.update', 'throttle:10,1,law-case-djen']);
             Route::post('/{case}/conflicts/{conflict}', [LawCaseController::class, 'resolveConflict'])->middleware('law.permission:law.cases.update');
             Route::post('/{case}/contacts', [LawCaseController::class, 'addContact'])->middleware('law.permission:law.cases.update');
             Route::delete('/{case}/contacts/{link}', [LawCaseController::class, 'removeContact'])->middleware('law.permission:law.cases.update');

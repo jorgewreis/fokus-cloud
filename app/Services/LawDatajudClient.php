@@ -41,7 +41,9 @@ class LawDatajudClient
                 '_source' => [
                     'numeroProcesso', 'classe.codigo', 'classe.nome', 'assuntos.codigo', 'assuntos.nome',
                     'orgaoJulgador.codigo', 'orgaoJulgador.nome', 'tribunal', 'situacaoProcessual.codigo',
-                    'situacaoProcessual.nome', 'situacao.codigo', 'situacao.nome', 'situacaoAtual',
+                    'orgaoJulgador.codigoMunicipioIBGE', 'situacaoProcessual.nome', 'situacao.codigo', 'situacao.nome', 'situacaoAtual',
+                    'grau', 'sistema', 'formato', 'dataAjuizamento', 'dataHoraUltimaAtualizacao', '@timestamp',
+                    'movimentos.codigo', 'movimentos.nome', 'movimentos.dataHora',
                 ],
                 'query' => ['match' => ['numeroProcesso' => $digits]],
             ]);
@@ -88,6 +90,16 @@ class LawDatajudClient
                 ->filter(fn ($item): bool => is_array($item) && trim((string) ($item['nome'] ?? '')) !== '')
                 ->map(fn (array $item): array => ['code' => (string) ($item['codigo'] ?? ''), 'name' => trim((string) $item['nome'])])
                 ->values()->all();
+            $movements = collect(data_get($source, 'movimentos', []))
+                ->filter(fn ($item): bool => is_array($item) && trim((string) ($item['nome'] ?? '')) !== '')
+                ->map(fn (array $item): array => array_filter([
+                    'code' => isset($item['codigo']) ? (string) $item['codigo'] : null,
+                    'name' => trim((string) $item['nome']),
+                    'occurred_at' => $this->normalizeDateTime($item['dataHora'] ?? null),
+                ], static fn ($value): bool => $value !== null && $value !== ''))
+                ->sortByDesc('occurred_at')->take(10)->values()->all();
+            $systemValue = $source['sistema'] ?? null;
+            $formatValue = $source['formato'] ?? null;
 
             $metadata = array_filter([
                 'case_class' => is_array($class) ? trim((string) ($class['nome'] ?? '')) : null,
@@ -97,6 +109,14 @@ class LawDatajudClient
                 'court_code' => is_array($court) && isset($court['codigo']) ? (string) $court['codigo'] : null,
                 'official_status_code' => is_array($status) && isset($status['codigo']) ? (string) $status['codigo'] : null,
                 'official_status_text' => is_array($status) ? trim((string) ($status['nome'] ?? '')) : (is_string($status) ? trim($status) : null),
+                'tribunal' => isset($source['tribunal']) ? trim((string) $source['tribunal']) : null,
+                'degree' => isset($source['grau']) ? trim((string) $source['grau']) : null,
+                'system' => is_array($systemValue) ? trim((string) ($systemValue['nome'] ?? '')) : (is_scalar($systemValue) ? trim((string) $systemValue) : null),
+                'format' => is_array($formatValue) ? trim((string) ($formatValue['nome'] ?? '')) : (is_scalar($formatValue) ? trim((string) $formatValue) : null),
+                'filing_date' => $this->normalizeDateTime($source['dataAjuizamento'] ?? null),
+                'source_updated_at' => $this->normalizeDateTime($source['dataHoraUltimaAtualizacao'] ?? $source['@timestamp'] ?? null),
+                'court_municipality_code' => isset($court['codigoMunicipioIBGE']) ? (string) $court['codigoMunicipioIBGE'] : null,
+                'recent_movements' => $movements ?: null,
             ], static fn ($value): bool => $value !== null && $value !== '');
 
             return [
@@ -132,6 +152,18 @@ class LawDatajudClient
         return $seconds > 0 && $seconds <= 86400
             ? 'O CNJ orienta aguardar pelo menos '.(int) ceil($seconds / 60).' minuto(s) antes de tentar novamente.'
             : 'Aguarde alguns minutos antes de tentar novamente.';
+    }
+
+    private function normalizeDateTime(mixed $value): ?string
+    {
+        $value = trim((string) $value);
+        if ($value === '') return null;
+        try {
+            if (preg_match('/^\d{14}$/', $value)) return \Carbon\Carbon::createFromFormat('YmdHis', $value)->toIso8601String();
+            return \Carbon\Carbon::parse($value)->toIso8601String();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function aliasFor(string $digits): ?string

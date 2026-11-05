@@ -47,6 +47,11 @@ return [
         'connect_timeout' => (int) env('DATAJUD_CONNECT_TIMEOUT', 10),
     ],
 
+    'djen' => [
+        'base_url' => env('DJEN_API_BASE_URL', 'https://comunicaapi.pje.jus.br/api/v1'),
+        'timeout' => (int) env('DJEN_TIMEOUT', 15),
+    ],
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],

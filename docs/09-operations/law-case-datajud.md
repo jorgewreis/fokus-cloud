@@ -43,12 +43,12 @@ A consulta usa `match` pelo número CNJ completo, sem duplicar a condição de
 busca em um `bool.should`. O tribunal é
 determinado pelo próprio número; não há tentativa em outro tribunal. Uma
 resposta que informe um número diferente é rejeitada. São solicitados somente
-os metadados desta etapa, sem movimentações.
+os metadados desta etapa, com até dez movimentações recentes e sem complementos pessoais.
 
 As respostas de cadastro e consulta manual incluem `datajud.status`,
 `datajud.code` e `datajud.message`. O detalhe recupera o resultado da última
 consulta diretamente do histórico autorizado, independentemente da página de
-histórico exibida. Nenhuma migration adicional é necessária.
+histórico exibida. A migration de metadados do DJEN é necessária para os campos complementares.
 
 Respostas HTTP 200 com `timed_out: true` ou fragmentos da busca em falha
 (`_shards.failed > 0`) são tratadas como consultas incompletas. Não confirmam
