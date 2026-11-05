@@ -7,6 +7,7 @@ use App\Services\AuditRecorder;
 use App\Services\LawAuthorizationService;
 use App\Services\LawCaseManagementService;
 use App\Services\LawCnjNumbering;
+use App\Services\LawContactAgeTagService;
 use App\Services\LawUsageMeter;
 use App\Services\PrefixedUlid;
 use App\Services\TrackJudCaseEnrichmentService;
@@ -512,7 +513,7 @@ class LawContactController extends Controller
         return response()->json(['candidates' => array_slice($candidates, 0, 10)]);
     }
 
-    public function store(Request $request, LawUsageMeter $usage, AuditRecorder $audit, LawAuthorizationService $authorization)
+    public function store(Request $request, LawUsageMeter $usage, AuditRecorder $audit, LawAuthorizationService $authorization, LawContactAgeTagService $ageTags)
     {
         $companyId = (string) $request->attributes->get('active_company_id');
         $this->assertModuleEnabled($companyId);
@@ -540,7 +541,7 @@ class LawContactController extends Controller
         $userId = (string) $request->user()->id;
 
         try {
-        DB::transaction(function () use ($usage, $companyId, $contactId, $userId, $data, $request, $audit, $recordKind, $nature): void {
+        DB::transaction(function () use ($usage, $companyId, $contactId, $userId, $data, $request, $audit, $recordKind, $nature, $ageTags): void {
             $usage->assertContactCapacityAvailable($companyId, 1);
             DB::table('law_contacts')->insert([
                 'id' => $contactId, 'company_id' => $companyId, 'law_unit_id' => null, 'parent_contact_id' => $data['parent_contact_id'] ?? null,
@@ -551,6 +552,7 @@ class LawContactController extends Controller
                 'created_by' => $userId, 'updated_by' => $userId, 'created_at' => now(), 'updated_at' => now(),
             ]);
             $this->syncChildren($companyId, $contactId, $userId, $data, creating: true);
+            $ageTags->syncContact($companyId, $contactId);
             if ($nature !== null) {
                 $this->syncContactLinks($companyId, $contactId, $nature, $data['linked_contact_ids'] ?? []);
                 $this->syncRelationshipMetadata($companyId, $contactId, $nature, $data['linked_relationships'] ?? []);
@@ -567,7 +569,7 @@ class LawContactController extends Controller
         return response()->json(['contact' => $this->contactPayload($companyId, DB::table('law_contacts')->where('id', $contactId)->first(), $authorization->can($request, 'law.contacts.sensitive.view'), includePrivateDetails: true)], 201);
     }
 
-    public function update(Request $request, string $contactId, LawUsageMeter $usage, AuditRecorder $audit, LawAuthorizationService $authorization)
+    public function update(Request $request, string $contactId, LawUsageMeter $usage, AuditRecorder $audit, LawAuthorizationService $authorization, LawContactAgeTagService $ageTags)
     {
         $companyId = (string) $request->attributes->get('active_company_id');
         $this->assertModuleEnabled($companyId);
@@ -596,7 +598,7 @@ class LawContactController extends Controller
         $this->assertDocumentsUnique($companyId, $data['documents'] ?? [], $contactId);
 
         try {
-        DB::transaction(function () use ($companyId, $contactId, $contact, $data, $request, $audit, $usage, $canSensitive, $nature, $recordKind): void {
+        DB::transaction(function () use ($companyId, $contactId, $contact, $data, $request, $audit, $usage, $canSensitive, $nature, $recordKind, $ageTags): void {
             $current = DB::table('law_contacts')->where('company_id', $companyId)->where('id', $contactId)->whereNull('deleted_at')->whereNull('merged_into_id')->lockForUpdate()->first();
             abort_unless($current, 409, 'O contato foi excluído ou mesclado. Recarregue o cadastro.');
             abort_if($current->legal_nature !== $contact->legal_nature, 409, 'A natureza do contato mudou. Recarregue o cadastro.');
@@ -611,6 +613,7 @@ class LawContactController extends Controller
             if ($recordKind === 'unit') { $changes['legal_nature'] = null; $changes['contact_type'] = 'unit'; $changes['sharing_excluded'] = true; }
             DB::table('law_contacts')->where('id', $contactId)->where('company_id', $companyId)->update($changes);
             $this->syncChildren($companyId, $contactId, (string) $request->user()->id, $data, creating: false, canSensitive: $canSensitive);
+            $ageTags->syncContact($companyId, $contactId);
             if ($nature !== null && array_key_exists('linked_contact_ids', $data)) $this->syncContactLinks($companyId, $contactId, $nature, $data['linked_contact_ids']);
             if ($nature !== null && array_key_exists('linked_relationships', $data)) $this->syncRelationshipMetadata($companyId, $contactId, $nature, $data['linked_relationships']);
             $this->syncInstitutionalData($companyId, $contactId, $data);
@@ -1179,7 +1182,8 @@ class LawContactController extends Controller
         }
         if (array_key_exists('tags', $data)) {
             DB::table('law_contact_tag_assignments')->where('company_id', $companyId)->where('law_contact_id', $contactId)->delete();
-            foreach (array_unique(array_map(fn ($tag) => trim($tag), $data['tags'])) as $tagName) {
+            $manualTags = array_filter(array_map(fn ($tag) => trim($tag), $data['tags']), fn ($tagName) => ! LawContactAgeTagService::isAutomaticTag($tagName));
+            foreach (array_unique($manualTags) as $tagName) {
                 if ($tagName === '') continue;
                 $normalized = $this->normalizeTag($tagName);
                 $tag = DB::table('law_contact_tags')->where('company_id', $companyId)->where('normalized_name', $normalized)->first();
@@ -1204,6 +1208,7 @@ class LawContactController extends Controller
     {
         $professions = DB::table('law_contact_profession_assignments as assignment')->join('law_contact_professions as profession', 'profession.id', '=', 'assignment.profession_id')->where('assignment.company_id', $companyId)->where('assignment.law_contact_id', $contact->id)->orderBy('profession.name')->pluck('profession.name')->all();
         $tags = DB::table('law_contact_tag_assignments as assignment')->join('law_contact_tags as tag', 'tag.id', '=', 'assignment.law_contact_tag_id')->where('assignment.law_contact_id', $contact->id)->orderBy('tag.name')->pluck('tag.name')->all();
+        $automaticTags = array_values(array_filter($tags, fn ($tag) => LawContactAgeTagService::isAutomaticTag((string) $tag)));
         $channels = DB::table('law_contact_channels')->where('company_id', $companyId)->where('law_contact_id', $contact->id)->whereNull('law_contact_department_id')->orderBy('sort_order')->get();
         $addresses = DB::table('law_contact_addresses')->where('company_id', $companyId)->where('law_contact_id', $contact->id)->orderByDesc('is_primary')->get();
         $documents = DB::table('law_contact_documents')->where('company_id', $companyId)->where('law_contact_id', $contact->id)->get();
@@ -1232,7 +1237,7 @@ class LawContactController extends Controller
             ...($canSensitive && $includePrivateDetails && ($contact->record_kind ?? 'contact') !== 'unit' ? ['sensitive_details' => $this->privateDetails($contact)] : []),
             'linked_contacts' => $linked,
             'institutional_data' => $institutional,
-            'tags' => $tags, 'channels' => $channels->map(fn ($channel) => $this->channelPayload($channel, $canSensitive))->all(),
+            'tags' => $tags, 'automatic_tags' => $automaticTags, 'channels' => $channels->map(fn ($channel) => $this->channelPayload($channel, $canSensitive))->all(),
             'addresses' => $addresses->filter(fn ($address) => $canSensitive || $address->address_type !== 'residential')->map(fn ($address) => ['id' => $address->id, 'type' => $address->address_type, 'postal_code' => $canSensitive ? $address->postal_code : null, 'street' => $address->street, 'number' => $address->number, 'complement' => $address->complement, 'district' => $address->district, 'city' => $address->city, 'state' => $address->state, 'country' => $address->country, 'primary' => (bool) $address->is_primary])->values()->all(),
             'documents' => $canSensitive ? $documents->map(fn ($document) => ['id' => $document->id, 'type' => $document->document_type, 'label' => $document->label, 'number' => Crypt::decryptString($document->document_number_encrypted), 'state' => $document->issuing_state])->all() : $documents->map(fn ($document) => ['id' => $document->id, 'type' => $document->document_type, 'label' => $document->label, 'number' => $this->maskedDocument(Crypt::decryptString($document->document_number_encrypted)), 'state' => $document->issuing_state])->all(),
             'departments' => $departments, 'sharing_excluded' => (bool) ($contact->sharing_excluded ?? false), 'is_shared' => false,
@@ -1331,6 +1336,7 @@ class LawContactController extends Controller
                 $payload['institutional_data'] = [];
                 $payload['notes'] = null;
                 $payload['tags'] = [];
+                $payload['automatic_tags'] = [];
                 $payload['sharing_excluded'] = false;
                 $payload['is_shared'] = true;
                 $payload['source_company_id'] = $policy->source_company_id;
@@ -1358,7 +1364,7 @@ class LawContactController extends Controller
             if (! in_array('documents', $fields, true) || ! $canSensitive) $payload['documents'] = [];
             $payload['linked_contacts'] = [];
             $payload['institutional_data'] = [];
-            $payload['notes'] = null; $payload['tags'] = []; $payload['sharing_excluded'] = false; $payload['is_shared'] = true;
+            $payload['notes'] = null; $payload['tags'] = []; $payload['automatic_tags'] = []; $payload['sharing_excluded'] = false; $payload['is_shared'] = true;
             $payload['source_company_id'] = $policy->source_company_id;
             $payload['source_company_name'] = (string) (DB::table('companies')->where('id', $policy->source_company_id)->value('display_name') ?: DB::table('companies')->where('id', $policy->source_company_id)->value('legal_name'));
             return $payload;

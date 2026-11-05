@@ -436,8 +436,17 @@
       const row = addressRow(); addressRows.append(row);
       if (![...addressRows.children].some((other) => other !== row && other.querySelector('[data-primary]').value === '1')) row.querySelector('[data-primary]').value = '1';
     }));
-    const tagField = input((contact?.tags || []).join(', '), 'Ex.: testemunha, urgente, comarca', 400); tagField.name = 'tags';
-    const tags = section('Tags'); tags.content.append(field('Tags', tagField));
+    const automaticTags = contact?.automatic_tags || [];
+    const automaticTagSet = new Set(automaticTags.map((tag) => String(tag).trim().toLocaleLowerCase('pt-BR')));
+    const tagField = input((contact?.tags || []).filter((tag) => !automaticTagSet.has(String(tag).trim().toLocaleLowerCase('pt-BR'))).join(', '), 'Ex.: testemunha, urgente, comarca', 400); tagField.name = 'tags';
+    const tags = section('Tags'); tags.content.append(field('Tags manuais', tagField));
+    if (automaticTags.length) {
+      const automaticTagGroup = $('div', 'law-record-detail-chip-groups');
+      const automaticTagList = $('div', 'law-record-detail-chip-group law-record-detail-chip-tags law-contact-automatic-tags');
+      automaticTags.forEach((tag) => automaticTagList.append($('span', 'law-record-detail-chip', tag)));
+      automaticTagGroup.append(automaticTagList, $('p', 'law-contact-automatic-tags-note', 'Etiquetas calculadas pela data de nascimento; não podem ser removidas manualmente.'));
+      tags.content.append(automaticTagGroup);
+    }
     const notes = document.createElement('textarea'); notes.className = 'fs-form-control'; notes.maxLength = 4000; notes.value = contact?.notes || ''; notes.name = 'notes';
     const notesSection = section('Notas privadas'); notesSection.content.append(field('Notas', notes));
     const message = $('p', 'law-contact-feedback'); message.setAttribute('role', 'status');

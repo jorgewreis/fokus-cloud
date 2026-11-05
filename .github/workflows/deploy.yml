@@ -252,6 +252,15 @@ jobs:
         run: |
           ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; cd '$DEPLOY_PATH'; php artisan optimize"
 
+      - name: Synchronize automatic contact age tags
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; cd '$DEPLOY_PATH'; php artisan law:sync-contact-age-tags --no-interaction"
+
       - name: Check Datajud configuration and public endpoint
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}

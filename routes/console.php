@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('fokus:prune-expired-data')->daily();
 Schedule::command('law:sync-case-datajud')->dailyAt('03:15')->withoutOverlapping(120);
 Schedule::command('law:sync-case-djen')->dailyAt('03:45')->withoutOverlapping(120);
+Schedule::command('law:sync-contact-age-tags')->dailyAt('04:15')->withoutOverlapping(120);
 Schedule::command('queue:work law-datajud --queue=law-datajud --stop-when-empty --max-time=50 --timeout=70 --tries=1')
     ->everyMinute()->withoutOverlapping(5)->runInBackground();
 Schedule::command('fokus:expire-support-sessions')->everyFiveMinutes();
