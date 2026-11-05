@@ -485,6 +485,9 @@
 .law-contact-address-row legend, .law-contact-department-row legend { padding: 0 6px; color: var(--law-shell-purple); font-size: 12px; font-weight: 700; }
 .law-contact-department-row .law-contact-repeat-row { grid-template-columns: minmax(100px, .6fr) minmax(180px, 1.5fr) minmax(120px, 1fr) auto; }
 .law-record-detail-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 12px; }
+.law-process-detail-body { grid-template-columns: minmax(0, 1fr); }
+.law-process-detail-columns { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 12px; min-width: 0; }
+.law-process-detail-column { display: grid; min-width: 0; align-content: start; gap: 12px; }
 /* Record compositions shared by Contacts and Processes, using the approved
    Contacts geometry. These arrange domain information, not FS primitives. */
 .law-record-section-body { display: grid; min-width: 0; gap: 12px; padding: 14px; }
@@ -533,10 +536,7 @@
 .law-process-status-badge[data-tone="warning"] { border-color: transparent; background-color: var(--fs-color-warning); color: var(--fs-alert-info-text); }
 .law-record-detail-chip-tags .law-record-detail-chip { border-color: rgba(249, 213, 139, .32); background: rgba(183, 132, 38, .18); }
 .law-record-detail-card { min-width: 0; margin: 0; overflow: hidden; border: 1px solid #e6dfeb; border-radius: 12px; background: #fff; box-shadow: 0 4px 14px rgba(40, 20, 59, .035); }
-.law-record-detail-data, .law-record-detail-movements, .law-record-detail-updates { grid-column: 1; }
-.law-record-detail-organization, .law-record-detail-contacts, .law-record-detail-tags, .law-record-detail-relations, .law-record-detail-conflicts { grid-column: 2; }
-.law-record-detail-alert-wide { grid-column: 1 / -1; }
-.law-record-detail-institution { grid-column: 2; }
+.law-record-detail-institution { grid-column: 1 / -1; }
 .law-record-detail-section-header { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-bottom: 1px solid #eee8f2; background: linear-gradient(100deg, #fbf9fd, #fff); }
 .law-record-detail-section-mark { display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border-radius: 9px; background: #f0e8f7; color: #583774; font-size: 10px; font-weight: 800; letter-spacing: .02em; }
 .law-record-detail-section-heading { display: flex; min-width: 0; flex: 1; align-items: center; justify-content: space-between; gap: 8px; }
@@ -671,6 +671,7 @@ button.law-record-detail-case-link:not(.fs-form-select):not(.fs-dropdown-item):n
   .law-contact-sharing-actions { align-items: flex-start; flex-direction: column-reverse; }
   .law-contact-sharing-actions .fs-btn { width: auto; max-width: 100%; }
   .law-record-detail-body { grid-template-columns: minmax(0, 1fr); }
+  .law-process-detail-columns { grid-template-columns: minmax(0, 1fr); }
   .law-record-detail-summary { grid-template-columns: 46px minmax(0, 1fr); gap: 11px; padding: 14px; }
   .law-record-detail-avatar { width: 46px; height: 46px; border-radius: 8px; font-size: 17px; }
   .law-record-detail-name { font-size: 17px; }
@@ -680,10 +681,7 @@ button.law-record-detail-case-link:not(.fs-form-select):not(.fs-dropdown-item):n
   .law-record-detail-linked-company { grid-template-columns: minmax(0, 1fr); }
   .law-record-detail-items { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 8px; }
   .law-record-detail-card, .law-record-detail-notes { grid-column: 1; }
-  .law-record-detail-data, .law-record-detail-movements, .law-record-detail-updates,
-  .law-record-detail-organization, .law-record-detail-contacts, .law-record-detail-tags,
-  .law-record-detail-relations, .law-record-detail-conflicts, .law-record-detail-alert-wide,
-  .law-record-detail-institution { grid-column: 1; }
+  .law-record-detail-institution { grid-column: 1 / -1; }
   .law-record-detail-institution .law-record-detail-items { grid-template-columns: minmax(0, 1fr); }
 }
 .law-notification-count { position: absolute; top: -5px; right: -5px; display: grid; min-width: 17px; height: 17px; place-items: center; padding: 0 4px; border-radius: 999px; background: #b42318; color: #fff; font-size: 10px; font-weight: 700; }

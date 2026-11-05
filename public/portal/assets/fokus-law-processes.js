@@ -332,7 +332,7 @@
       try {
         const result = await request(`${apiPath(id)}?history_page=${historyPage}`); const local = await references(result.case.law_unit_id);
         if (!active() || token !== viewToken) return;
-        detailData = result; refs = local; currentId = id; body.replaceChildren(); body.className = 'law-record-detail-body'; headingActions.replaceChildren(); const c = result.case;
+        detailData = result; refs = local; currentId = id; body.replaceChildren(); body.className = 'law-record-detail-body law-process-detail-body'; headingActions.replaceChildren(); const c = result.case;
         const actions = toolbar(); actions.append(button('Voltar à lista', action(list)));
         if (can('update')) {
           actions.append(button('Editar processo', action(edit), true));
@@ -382,6 +382,10 @@
         if (statusLabel) { const statusBadge = $('span', 'law-record-detail-chip law-process-status-badge', statusLabel); statusBadge.dataset.tone = statusTone; badges.append(statusBadge); }
         [text(c.operational_priority), text(c.confidentiality_level)].filter(Boolean).forEach((label) => badges.append($('span', 'law-record-detail-chip', label))); copy.append(badges); identity.append(symbol, copy); body.append(identity);
         if (needsConfidentialityAlert(c.procedural_priorities, c.confidentiality_level)) { const alert = $('p', 'fs-alert fs-alert-warning law-record-detail-alert-wide', confidentialityAlert); alert.setAttribute('role', 'alert'); body.append(alert); }
+        const columns = $('div', 'law-record-detail-columns');
+        const leftColumn = $('div', 'law-record-detail-column law-record-detail-column-main');
+        const rightColumn = $('div', 'law-record-detail-column law-record-detail-column-related');
+        columns.append(leftColumn, rightColumn); body.append(columns);
         const main = section('Dados processuais', 'CNJ', 'Classe, assuntos e informações oficiais');
         main.classList.add('law-record-detail-data');
         const movementHistory = section('Histórico de movimentações', 'MOV', 'Movimentações do DataJud, DJEN e TrackJud');
@@ -462,7 +466,7 @@
           main.body.append($('p', 'law-record-detail-empty', 'Os dados do TrackJud complementam o processo vinculado e preservam os valores já cadastrados. A consulta é manual e não cria novos processos.'));
         }
         const operational = section('Organização interna', 'ORG', 'Acompanhamento do trabalho da unidade'); operational.classList.add('law-record-detail-organization'); operational.body.append(keyValues([['Unidade', c.unit_name], ['Estado operacional', c.operational_status_label], ['Prioridade operacional', text(c.operational_priority)], ['Prioridades processuais', (c.procedural_priorities || []).map((code) => local.procedural_priorities?.find((item) => item.code === code)?.label || code).join('; ') || 'Nenhuma'], ['Responsável principal', local.members.find((item) => item.id === c.responsible_membership_id)?.name || 'Sem responsável'], ['Sigilo', text(c.confidentiality_level)]]));
-        if (c.operational_status === 'archived') operational.body.append(keyValues([['Justificativa do arquivamento', c.archive_reason]])); operational.body.append($('p', 'law-record-detail-empty', 'A situação oficial do Datajud e o estado operacional são independentes.')); body.append(main, operational, movementHistory);
+        if (c.operational_status === 'archived') operational.body.append(keyValues([['Justificativa do arquivamento', c.archive_reason]])); operational.body.append($('p', 'law-record-detail-empty', 'A situação oficial do Datajud e o estado operacional são independentes.')); leftColumn.append(main, movementHistory); rightColumn.append(operational);
         let conflictsCard = null;
         if (c.metadata_conflicts?.length) {
           const conflicts = section('Divergências com o Datajud'); conflicts.body.append($('p', '', 'O preenchimento manual foi preservado. Escolha o valor que deve permanecer em cada campo.'));
@@ -471,8 +475,8 @@
             if (can('update')) { const row = toolbar(); ['manual', 'official'].forEach((choice) => row.append(button(text(choice), action(async () => { await request(`${apiPath(id)}/conflicts/${item.id}`, { method: 'POST', body: { choice, version: c.version } }); await detail(id); })))); box.append(row); } conflicts.body.append(box);
           }); conflictsCard = conflicts; conflicts.classList.add('law-record-detail-conflicts');
         }
-        renderContacts(result, local); renderTags(result, local); renderRelations(result);
-        if (result.can_manage_access && c.confidentiality_level === 'secret') await renderAccess(result, local);
+        renderContacts(result, local, rightColumn); renderTags(result, local, rightColumn); renderRelations(result, rightColumn);
+        if (result.can_manage_access && c.confidentiality_level === 'secret') await renderAccess(result, local, rightColumn);
         const history = section('Histórico de atualizações do processo', 'HIS', 'Alterações internas e atualizações de metadados'); history.classList.add('law-record-detail-updates');
         result.events.forEach((item) => {
           const article = $('article', 'law-record-history-entry'); article.append($('h4', '', item.title), $('p', 'law-record-detail-empty', `${date(item.created_at)} · ${item.actor_name || 'Atualização automática'}`));
@@ -490,13 +494,13 @@
           if (values.length) article.append(keyValues(values)); history.body.append(article);
         });
         if (!result.events.length) history.body.append($('p', 'law-record-detail-empty', 'Nenhuma alteração registrada neste processo.'));
-        paginate(history.body, result.history_total, 50, result.history_page, (value) => detail(id, value), 'eventos'); body.append(history);
-        if (conflictsCard) body.append(conflictsCard);
+        paginate(history.body, result.history_total, 50, result.history_page, (value) => detail(id, value), 'eventos'); leftColumn.append(history);
+        if (conflictsCard) rightColumn.append(conflictsCard);
         if (changedRecord) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); heading.scrollIntoView({ block: 'start' }); }
         if (c.datajud_sync_status === 'pending' || c.djen_sync_status === 'pending') watchDatajud(id, token, historyPage);
       } catch (error) { report(error); } finally { body.removeAttribute('aria-busy'); }
     }
-    function linkedSection(title, items, remove, add, layoutClass = '') {
+    function linkedSection(title, items, remove, add, host, layoutClass = '') {
       const box = section(title, 'VÍN');
       if (layoutClass) box.classList.add(layoutClass);
       if (!items.length) box.body.append($('p', 'law-record-detail-empty', 'Nenhum vínculo registrado.'));
@@ -518,18 +522,18 @@
         }
         box.body.append(row);
       });
-      if (can('update') && add) box.body.append(button('Adicionar', action(add))); body.append(box); return box;
+      if (can('update') && add) box.body.append(button('Adicionar', action(add))); host.append(box); return box;
     }
-    function renderTags(result, local) {
+    function renderTags(result, local, host) {
       const id = result.case.id;
       linkedSection('Etiquetas', result.tags.map((item) => ({ ...item, label: item.name })), (item) => request(`${apiPath(id)}/tags/${item.id}`, { method: 'DELETE' }), (event) => {
         const options = local.tags.filter((item) => !result.tags.some((used) => used.id === item.id));
         if (!options.length) throw new Error('Não há etiquetas disponíveis. A chefia ou o administrador pode cadastrá-las nas configurações da unidade.');
         const tag = select(options.map((v) => [v.id, v.name]));
         simpleForm('Adicionar etiqueta', [['Etiqueta', tag, 'tag_id']], async () => { await request(`${apiPath(id)}/tags`, { method: 'POST', body: { tag_id: tag.value } }); await detail(id); }, 'Adicionar etiqueta', event?.currentTarget);
-      }, 'law-record-detail-tags');
+      }, host, 'law-record-detail-tags');
     }
-    function renderContacts(result, local) {
+    function renderContacts(result, local, host) {
       const id = result.case.id;
       linkedSection('Partes processuais vinculadas', result.contacts.map((item) => ({ ...item, label: item.display_name, detail: `${text(item.case_role_label)}${item.company_name ? ` - ${item.company_name}` : ''}` })), (item) => request(`${apiPath(id)}/contacts/${item.id}`, { method: 'DELETE' }), (event) => {
         const search = input('', 'search', 100); const contact = select([['', 'Selecione um contato']]); contact.required = true;
@@ -538,17 +542,17 @@
         const populate = (items) => { contact.replaceChildren(new Option('Selecione um contato', ''), ...items.map((v) => new Option(v.display_name, v.id))); }; populate(local.contacts);
         const modal = simpleForm('Vincular contato', [['Pesquisar contato', search, 'contact_search', 'Reutilize o cadastro de Contatos. Informe o nome e escolha Pesquisar.'], ['Contato', contact, 'law_contact_id'], ['Papel processual', role, 'case_role']], async () => { await request(`${apiPath(id)}/contacts`, { method: 'POST', body: { law_contact_id: contact.value, case_role: role.value } }); await detail(id); }, 'Vincular contato', event?.currentTarget);
         const find = button('Pesquisar contatos', action(async () => { const requestToken = ++token; const data = await references(result.case.law_unit_id, search.value); if (modal.element.isConnected && token === requestToken) populate(data.contacts); })); modal.body.prepend(find);
-      }, 'law-record-detail-contacts');
+      }, host, 'law-record-detail-contacts');
     }
-    function renderRelations(result) {
+    function renderRelations(result, host) {
       const id = result.case.id;
       linkedSection('Processos relacionados', result.relations.map((item) => ({ ...item, label: `${text(item.relation_type)} · ${cnj(item.case_number)}` })), (item) => request(`${apiPath(id)}/relations/${item.id}`, { method: 'DELETE' }), (event) => {
         const number = input('', 'text', 25); number.required = true;
         const kind = select(['dependent', 'apenso'].map((v) => [v, text(v)]));
         simpleForm('Relacionar processo', [['Número CNJ relacionado', number, 'related_case_number'], ['Tipo de vínculo', kind, 'relation_type', 'Vínculo informativo. Estado, sigilo e autorizações continuam independentes.']], async () => { await request(`${apiPath(id)}/relations`, { method: 'POST', body: { related_case_number: number.value, relation_type: kind.value } }); await detail(id); }, 'Relacionar processo', event?.currentTarget);
-      }, 'law-record-detail-relations');
+      }, host, 'law-record-detail-relations');
     }
-    async function renderAccess(result, local) {
+    async function renderAccess(result, local, host) {
       const id = result.case.id; const accesses = await request(`${apiPath(id)}/access`); if (!active() || currentId !== id) return;
       const box = section('Autorizações nominais'); box.body.append($('p', '', 'Somente as pessoas autorizadas abaixo podem consultar este processo, inclusive em outras unidades.'));
       accesses.users.forEach((item) => { const row = toolbar(); row.append($('span', '', item.name), button('Revogar acesso', action(async () => {
@@ -557,7 +561,7 @@
       const available = local.members.filter((v) => !accesses.users.some((a) => a.company_membership_id === v.id));
       if (available.length) box.body.append(button('Conceder acesso', action((event) => {
         const member = select(available.map((v) => [v.id, v.name])); simpleForm('Conceder autorização nominal', [['Usuário da empresa', member, 'company_membership_id']], async () => { await request(`${apiPath(id)}/access`, { method: 'POST', body: { company_membership_id: member.value } }); await detail(id); }, 'Conceder acesso', event?.currentTarget);
-      }))); body.append(box);
+      }))); host.append(box);
     }
     async function configure() {
       if (!refs?.units?.length) { body.append($('p', 'fs-alert fs-alert-info', 'Selecione uma unidade ativa no menu para consultar as configurações disponíveis.')); return; }
