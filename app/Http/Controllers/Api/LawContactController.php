@@ -9,6 +9,8 @@ use App\Services\LawCaseManagementService;
 use App\Services\LawCnjNumbering;
 use App\Services\LawUsageMeter;
 use App\Services\PrefixedUlid;
+use App\Services\TrackJudCaseEnrichmentService;
+use App\Services\TrackJudClient;
 use App\Support\BrazilianDocuments;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -231,6 +233,153 @@ class LawContactController extends Controller
         $shared = $this->findSharedContact($companyId, $contactId, $canSensitive);
         abort_unless($shared, 404, 'Contato não encontrado.');
         return response()->json(['contact' => $shared]);
+    }
+
+    public function trackJudPreview(Request $request, string $contactId, LawAuthorizationService $authorization, TrackJudClient $trackJud, TrackJudCaseEnrichmentService $enrichment)
+    {
+        $companyId = (string) $request->attributes->get('active_company_id');
+        $this->assertModuleEnabled($companyId);
+        $contact = $this->trackJudContactWithCpf($request, $contactId, $authorization);
+        $eligible = $this->trackJudLinkedCases($request, $companyId, $contactId, $authorization);
+        abort_if($eligible->isEmpty(), 422, 'NÃ£o hÃ¡ processos vinculados e autorizados para atualizar pelo TrackJud.');
+        abort_unless($trackJud->configured(), 503, 'A integraÃ§Ã£o TrackJud ainda nÃ£o estÃ¡ configurada.');
+
+        try {
+            $balanceResponse = $trackJud->balance();
+            $courtsResponse = $trackJud->courts();
+        } catch (\Throwable) {
+            return response()->json(['message' => 'NÃ£o foi possÃ­vel consultar saldo e tribunais do TrackJud agora. Nenhum crÃ©dito foi consumido.'], 502);
+        }
+        if (! $balanceResponse->successful() || ! $courtsResponse->successful()) {
+            return response()->json(['message' => 'O TrackJud estÃ¡ indisponÃ­vel para consultar saldo ou tribunais. Nenhum crÃ©dito foi consumido.'], 502);
+        }
+        $availableCourts = collect($courtsResponse->json('data', []))->filter(fn ($court) => is_array($court) && ($court['status'] ?? null) === 'active')->keyBy('court_code');
+        $requested = $eligible->map(fn ($case) => $enrichment->courtCode((string) $case->case_number))->filter()->unique()->values();
+        $courts = $requested->filter(fn ($code) => $availableCourts->has($code))->values()->all();
+        $credits = (int) ($balanceResponse->json('data.available') ?? 0);
+
+        return response()->json([
+            'contact_id' => (string) $contact->id,
+            'courts' => $courts,
+            'court_names' => collect($courts)->map(fn ($code) => ['code' => $code, 'name' => $availableCourts->get($code)['name'] ?? $code])->all(),
+            'minimum_credits' => count($courts),
+            'available_credits' => $credits,
+            'can_consult' => $courts !== [] && $credits >= count($courts),
+            'message' => $courts === [] ? 'NÃ£o foi possÃ­vel identificar tribunais TrackJud ativos a partir dos CNJs vinculados.' : null,
+        ]);
+    }
+
+    public function trackJudConsult(Request $request, string $contactId, LawAuthorizationService $authorization, TrackJudClient $trackJud, TrackJudCaseEnrichmentService $enrichment)
+    {
+        $companyId = (string) $request->attributes->get('active_company_id');
+        $this->assertModuleEnabled($companyId);
+        $contact = $this->trackJudContactWithCpf($request, $contactId, $authorization);
+        $eligible = $this->trackJudLinkedCases($request, $companyId, $contactId, $authorization);
+        abort_if($eligible->isEmpty(), 422, 'NÃ£o hÃ¡ processos vinculados e autorizados para atualizar pelo TrackJud.');
+        abort_unless($trackJud->configured(), 503, 'A integraÃ§Ã£o TrackJud ainda nÃ£o estÃ¡ configurada.');
+
+        $pending = DB::table('law_contact_trackjud_consults')->where('company_id', $companyId)->where('law_contact_id', $contactId)->whereIn('status', ['pending', 'in_progress'])->first();
+        if ($pending) return response()->json(['consult' => ['id' => $pending->provider_consult_id, 'status' => $pending->status, 'minimum_credits' => count(json_decode((string) $pending->courts, true) ?: [])]], 202);
+
+        $preview = $this->trackJudPreview($request, $contactId, $authorization, $trackJud, $enrichment);
+        $quote = $preview->getData(true);
+        abort_if($preview->getStatusCode() !== 200, $preview->getStatusCode(), $quote['message'] ?? 'NÃ£o foi possÃ­vel preparar a consulta TrackJud.');
+        $courts = $quote['courts'] ?? [];
+        abort_if(empty($courts), 422, $quote['message'] ?? 'NÃ£o hÃ¡ tribunais compatÃ­veis para consultar.');
+        abort_if(! ($quote['can_consult'] ?? false), 402, 'Saldo TrackJud insuficiente para consultar os tribunais dos processos vinculados.');
+
+        $cpf = $this->trackJudCpf($contact);
+        try {
+            $response = $trackJud->createConsult($cpf, $courts);
+        } catch (\Throwable) {
+            return response()->json(['message' => 'NÃ£o foi possÃ­vel iniciar a consulta TrackJud. Confira o histÃ³rico antes de tentar novamente.'], 502);
+        }
+        if (! in_array($response->status(), [200, 202], true)) {
+            $status = $response->status() === 402 ? 402 : ($response->status() === 422 ? 422 : 502);
+            return response()->json(['message' => $status === 402 ? 'O TrackJud recusou a consulta por saldo insuficiente.' : 'O TrackJud nÃ£o aceitou a consulta. Nenhum processo foi alterado.'], $status);
+        }
+        $data = $response->json('data', []);
+        $consultId = (string) ($data['consult_id'] ?? '');
+        abort_if($consultId === '', 502, 'O TrackJud nÃ£o retornou o identificador da consulta.');
+        $status = $response->status() === 202 ? 'pending' : 'completed';
+        $summary = null;
+        if ($status === 'completed') {
+            $summary = $this->applyTrackJudConsult($companyId, $contactId, $data, (string) $request->user()->id, $authorization, $request, $enrichment);
+        }
+        DB::table('law_contact_trackjud_consults')->insert([
+            'id' => PrefixedUlid::make('LTC'), 'company_id' => $companyId, 'law_contact_id' => $contactId,
+            'requested_by' => (string) $request->user()->id, 'provider_consult_id' => $consultId,
+            'courts' => json_encode($courts), 'status' => $status,
+            'result_summary' => $summary ? json_encode($summary, JSON_INVALID_UTF8_SUBSTITUTE) : null,
+            'completed_at' => $status === 'completed' ? now() : null, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        return response()->json(['consult' => ['id' => $consultId, 'status' => $status, 'minimum_credits' => count($courts), 'result' => $summary]], $status === 'pending' ? 202 : 200);
+    }
+
+    public function trackJudConsultStatus(Request $request, string $contactId, string $consultId, LawAuthorizationService $authorization, TrackJudClient $trackJud, TrackJudCaseEnrichmentService $enrichment)
+    {
+        $companyId = (string) $request->attributes->get('active_company_id');
+        $this->assertModuleEnabled($companyId);
+        $this->trackJudContactWithCpf($request, $contactId, $authorization, requireCpf: false);
+        $consult = DB::table('law_contact_trackjud_consults')->where('company_id', $companyId)->where('law_contact_id', $contactId)->where('provider_consult_id', $consultId)->first();
+        abort_unless($consult, 404, 'Consulta TrackJud nÃ£o encontrada.');
+        if ($consult->status === 'completed') return response()->json(['consult' => ['id' => $consultId, 'status' => 'completed', 'result' => json_decode((string) $consult->result_summary, true) ?: []]]);
+        abort_unless($trackJud->configured(), 503, 'A integraÃ§Ã£o TrackJud ainda nÃ£o estÃ¡ configurada.');
+
+        try { $response = $trackJud->consult($consultId); } catch (\Throwable) {
+            return response()->json(['message' => 'NÃ£o foi possÃ­vel verificar o andamento no TrackJud. Tente novamente em instantes.'], 502);
+        }
+        if (! $response->successful()) return response()->json(['message' => 'O TrackJud estÃ¡ temporariamente indisponÃ­vel para consultar este resultado.'], 502);
+        $data = $response->json('data', []);
+        $providerStatus = (string) ($data['status'] ?? 'pending');
+        if (! in_array($providerStatus, ['done', 'canceled'], true)) {
+            DB::table('law_contact_trackjud_consults')->where('id', $consult->id)->update(['status' => $providerStatus === 'in_progress' ? 'in_progress' : 'pending', 'updated_at' => now()]);
+            return response()->json(['consult' => ['id' => $consultId, 'status' => $providerStatus === 'in_progress' ? 'in_progress' : 'pending']]);
+        }
+        $summary = $providerStatus === 'done'
+            ? $this->applyTrackJudConsult($companyId, $contactId, $data, (string) $consult->requested_by, $authorization, $request, $enrichment)
+            : ['updated_cases' => [], 'updated_count' => 0, 'found_count' => 0, 'status' => 'canceled'];
+        DB::table('law_contact_trackjud_consults')->where('id', $consult->id)->update([
+            'status' => 'completed', 'result_summary' => json_encode($summary, JSON_INVALID_UTF8_SUBSTITUTE), 'completed_at' => now(), 'updated_at' => now(),
+        ]);
+        return response()->json(['consult' => ['id' => $consultId, 'status' => 'completed', 'result' => $summary]]);
+    }
+
+    private function trackJudContactWithCpf(Request $request, string $contactId, LawAuthorizationService $authorization, bool $requireCpf = true): object
+    {
+        $companyId = (string) $request->attributes->get('active_company_id');
+        $contact = DB::table('law_contacts')->where('company_id', $companyId)->where('id', $contactId)->whereNull('deleted_at')->whereNull('merged_into_id')->first();
+        abort_unless($contact && $contact->legal_nature === 'pf', 404, 'Contato pessoa fÃ­sica nÃ£o encontrado.');
+        $unitId = $authorization->activeUnitId($request);
+        $authorization->authorize($request, 'law.contacts.sensitive.view', $unitId);
+        if ($requireCpf) abort_unless(BrazilianDocuments::cpf($this->trackJudCpf($contact)), 422, 'Cadastre um CPF vÃ¡lido para este contato antes de consultar o TrackJud.');
+        return $contact;
+    }
+
+    private function trackJudCpf(object $contact): string
+    {
+        $document = DB::table('law_contact_documents')->where('company_id', $contact->company_id)->where('law_contact_id', $contact->id)->where('document_type', 'cpf')->first();
+        if (! $document) return '';
+        try { $cpf = BrazilianDocuments::digits(Crypt::decryptString($document->document_number_encrypted)); } catch (\Throwable) { return ''; }
+        return strlen($cpf) === 11 && BrazilianDocuments::cpf($cpf) ? $cpf : '';
+    }
+
+    private function trackJudLinkedCases(Request $request, string $companyId, string $contactId, LawAuthorizationService $authorization)
+    {
+        $membershipId = (string) ($request->attributes->get('active_membership')?->id ?? '');
+        return DB::table('law_case_contacts as link')->join('law_cases as c', function ($join): void { $join->on('c.company_id', '=', 'link.company_id')->on('c.id', '=', 'link.law_case_id'); })
+            ->where('link.company_id', $companyId)->where('link.law_contact_id', $contactId)
+            ->where(function ($query) use ($membershipId): void {
+                $query->where('c.confidentiality_level', '!=', 'secret')->orWhereExists(fn ($access) => $access->selectRaw('1')->from('law_confidential_case_accesses as access')->whereColumn('access.company_id', 'c.company_id')->whereColumn('access.law_case_id', 'c.id')->where('access.company_membership_id', $membershipId)->whereNull('access.revoked_at'));
+            })->get(['c.id', 'c.law_unit_id', 'c.case_number'])
+            ->filter(fn ($case) => $authorization->can($request, 'law.cases.update', (string) $case->law_unit_id))->values();
+    }
+
+    private function applyTrackJudConsult(string $companyId, string $contactId, array $data, string $actorId, LawAuthorizationService $authorization, Request $request, TrackJudCaseEnrichmentService $enrichment): array
+    {
+        $records = collect($data['courts'] ?? [])->flatMap(fn ($court) => is_array($court) && is_array($court['processes'] ?? null) ? $court['processes'] : [])->all();
+        $updated = $enrichment->apply($companyId, $contactId, $records, $actorId, $authorization, $request);
+        return ['found_count' => count($records), 'updated_cases' => $updated, 'updated_count' => count($updated), 'partial' => (bool) ($data['partial'] ?? false), 'partial_message' => $data['partial_message'] ?? null];
     }
 
     public function dashboard(Request $request, LawUsageMeter $usage)

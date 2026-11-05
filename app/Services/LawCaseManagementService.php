@@ -198,6 +198,8 @@ class LawCaseManagementService
             'djen_sync_status' => (string) ($case->djen_sync_status ?? 'not_requested'),
             'last_djen_checked_at' => $this->timestamp($case->last_djen_checked_at ?? null),
             'last_djen_synced_at' => $this->timestamp($case->last_djen_synced_at ?? null),
+            'trackjud_metadata' => json_decode((string) ($case->trackjud_metadata ?? ''), true) ?: [],
+            'last_trackjud_synced_at' => $this->timestamp($case->last_trackjud_synced_at ?? null),
             'official_fields' => array_values(array_intersect(
                 array_keys(json_decode((string) ($case->datajud_metadata ?? ''), true) ?: []),
                 ['case_class', 'case_class_code', 'subjects', 'court_name', 'court_code', 'official_status_code', 'official_status_text'],

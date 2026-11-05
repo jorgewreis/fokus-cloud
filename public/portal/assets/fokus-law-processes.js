@@ -421,6 +421,42 @@
           }
           main.body.append($('p', 'law-record-detail-empty', 'As publicações do DJEN são complementares; não alteram a situação oficial nem calculam prazos.'));
         }
+        const trackJudRecord = c.trackjud_metadata?.record || {};
+        if (Object.keys(trackJudRecord).length) {
+          const trackJudHeading = $('h4', 'law-record-detail-section-subheading', 'Dados processuais complementares do TrackJud');
+          const trackJudParties = Array.isArray(trackJudRecord.partes) ? trackJudRecord.partes : [];
+          const trackJudMovements = Array.isArray(trackJudRecord.movimentos) ? trackJudRecord.movimentos.slice(-20).reverse() : [];
+          const trackJudSubjects = Array.isArray(trackJudRecord.assuntos) ? trackJudRecord.assuntos.map((item) => item?.ds_assunto || item?.name || item).filter(Boolean).join('; ') : '';
+          main.body.append(trackJudHeading, keyValues([
+            ['Tribunal', text(trackJudRecord.court)], ['Sistema consultado', text(trackJudRecord.system)],
+            ['Instância', trackJudRecord.instance === '1' ? '1ª instância' : trackJudRecord.instance === '2' ? '2ª instância' : text(trackJudRecord.instance)],
+            ['Classe', text(trackJudRecord.classe)], ['Situação', text(trackJudRecord.situacao)],
+            ['Órgão / competência', text(trackJudRecord.competencia)], ['Distribuição', text(trackJudRecord.distribuido_em)],
+            ['Valor da causa', text(trackJudRecord.valor_causa)], ['Área', text(trackJudRecord.area)],
+            ['Fase', text(trackJudRecord.fase)], ['Assuntos', text(trackJudSubjects)],
+            ['Última consulta TrackJud', date(c.last_trackjud_synced_at)],
+          ]));
+          if (trackJudParties.length) {
+            main.body.append($('h5', 'law-record-detail-section-subheading', 'Partes retornadas pelo TrackJud'));
+            trackJudParties.slice(0, 100).forEach((party) => {
+              if (!party || typeof party !== 'object') return;
+              const values = [party.tipo, party.nome, party.representante].filter(Boolean);
+              if (values.length) main.body.append($('p', 'law-record-detail-empty', values.join(', ')));
+            });
+          }
+          if (trackJudMovements.length) {
+            main.body.append($('h5', 'law-record-detail-section-subheading', 'Movimentações retornadas pelo TrackJud'));
+            const trackJudMovementList = $('div', 'law-record-history-list');
+            trackJudMovements.forEach((movement) => {
+              const entry = $('article', 'law-record-history-entry');
+              entry.append($('h4', '', movement.descricao || movement.movimento || 'Movimentação processual'));
+              if (movement.data_movimento) entry.append($('p', 'law-record-detail-empty', movement.data_movimento));
+              trackJudMovementList.append(entry);
+            });
+            main.body.append(trackJudMovementList);
+          }
+          main.body.append($('p', 'law-record-detail-empty', 'Os dados do TrackJud complementam o processo vinculado e preservam os valores já cadastrados. A consulta é manual e não cria novos processos.'));
+        }
         const operational = section('Organização interna', 'ORG', 'Acompanhamento do trabalho da unidade'); operational.body.append(keyValues([['Unidade', c.unit_name], ['Estado operacional', c.operational_status_label], ['Prioridade operacional', text(c.operational_priority)], ['Prioridades processuais', (c.procedural_priorities || []).map((code) => local.procedural_priorities?.find((item) => item.code === code)?.label || code).join('; ') || 'Nenhuma'], ['Responsável principal', local.members.find((item) => item.id === c.responsible_membership_id)?.name || 'Sem responsável'], ['Sigilo', text(c.confidentiality_level)]]));
         if (c.operational_status === 'archived') operational.body.append(keyValues([['Justificativa do arquivamento', c.archive_reason]])); operational.body.append($('p', 'law-record-detail-empty', 'A situação oficial do Datajud e o estado operacional são independentes.')); body.append(operational);
         if (c.metadata_conflicts?.length) {
