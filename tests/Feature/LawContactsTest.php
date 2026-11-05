@@ -73,7 +73,7 @@ class LawContactsTest extends TestCase
             ['number' => '00000010020268050103', 'case_class_code' => 'TEST-EMPRESA', 'manual_metadata' => json_encode(['case_class_code' => 'TEST-CNJ']), 'expected' => 'Classe CNJ'],
             ['number' => '00000020020268050103', 'case_class_code' => 'TEST-EMPRESA', 'expected' => 'Classe da empresa'],
             ['number' => '00000030020268050103', 'case_class' => 'Classe cadastrada', 'expected' => 'Classe cadastrada'],
-            ['number' => '00000040020268050103', 'djen_metadata' => json_encode(['process_data' => ['case_class' => 'Classe DJEN']]), 'expected' => 'Classe DJEN'],
+            ['number' => '00000040020268050103', 'djen_metadata' => json_encode(['process_data' => ['case_class' => 'AÇÃO PENAL - PROCEDIMENTO ORDINÁRIO']]), 'expected' => 'Ação Penal - Procedimento Ordinário'],
             ['number' => '00000050020268050103', 'case_class' => 'Classe sigilosa', 'secret' => true, 'expected' => null],
         ];
         foreach ($fixtures as $fixture) {

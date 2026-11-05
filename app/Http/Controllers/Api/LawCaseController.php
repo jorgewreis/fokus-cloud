@@ -11,6 +11,7 @@ use App\Services\LawCaseManagementService;
 use App\Services\LawCnjNumbering;
 use App\Services\LawDatajudClient;
 use App\Services\PrefixedUlid;
+use App\Support\LawDjenClassName;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -388,7 +389,7 @@ class LawCaseController extends Controller
         return response()->json([
             'case' => array_merge($cases->caseArray($current), [
                 'official_metadata' => json_decode((string) ($current->datajud_metadata ?? ''), true) ?: [],
-                'djen_metadata' => json_decode((string) ($current->djen_metadata ?? ''), true) ?: [],
+                'djen_metadata' => LawDjenClassName::metadata(json_decode((string) ($current->djen_metadata ?? ''), true) ?: []),
             ]), 'contacts' => $contacts, 'relations' => $relations,
             'datajud' => ['status' => (string) $current->datajud_sync_status, 'code' => $latestDatajudState['datajud_result_code'] ?? null, 'message' => $latestDatajud->reason ?? null],
             'djen' => ['status' => (string) ($current->djen_sync_status ?? 'not_requested')],

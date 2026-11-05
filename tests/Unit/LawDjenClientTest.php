@@ -3,12 +3,28 @@
 namespace Tests\Unit;
 
 use App\Services\LawDjenClient;
+use App\Support\LawDjenClassName;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class LawDjenClientTest extends TestCase
 {
+    public function test_djen_class_names_follow_the_cnj_catalog_and_existing_metadata_is_presented_consistently(): void
+    {
+        $raw = 'AçãO PENAL - PROCEDIMENTO ORDINáRIO';
+        $metadata = ['suggested_case_class' => $raw, 'process_data' => ['case_class' => $raw], 'publications' => [['case_class' => $raw, 'id' => '1']], 'complete' => true];
+        $presented = LawDjenClassName::metadata($metadata);
+        $expected = 'Ação Penal - Procedimento Ordinário';
+        $this->assertSame($expected, $presented['suggested_case_class']);
+        $this->assertSame($expected, $presented['process_data']['case_class']);
+        $this->assertSame($expected, $presented['publications'][0]['case_class']);
+        $this->assertSame($raw, $metadata['suggested_case_class']);
+        $this->assertSame('Classe DJEN', LawDjenClassName::format('Classe DJEN'));
+        $this->assertSame('Procedimento Especial do TJBA', LawDjenClassName::format('PROCEDIMENTO ESPECIAL DO TJBA'));
+        $this->assertNull(LawDjenClassName::format(null));
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

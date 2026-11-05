@@ -13,6 +13,7 @@ use App\Services\PrefixedUlid;
 use App\Services\TrackJudCaseEnrichmentService;
 use App\Services\TrackJudClient;
 use App\Support\BrazilianDocuments;
+use App\Support\LawDjenClassName;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
@@ -233,7 +234,7 @@ class LawContactController extends Controller
                         'case_number' => $caseNumber,
                         'case_number_formatted' => $cases->formatCaseNumber($caseNumber),
                         'tribunal_name' => $tribunal['name'] ?? null,
-                        'case_class' => $className ?: (data_get($djen, 'process_data.case_class') ?: data_get($djen, 'suggested_case_class')),
+                        'case_class' => $className ?: LawDjenClassName::format(data_get($djen, 'process_data.case_class') ?: data_get($djen, 'suggested_case_class')),
                         'court_name' => $row->court_name,
                         'official_status_text' => $row->official_status_text,
                         'case_role' => (string) $row->case_role_label,
