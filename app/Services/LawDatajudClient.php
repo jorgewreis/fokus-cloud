@@ -122,7 +122,7 @@ class LawDatajudClient
                 ->filter(fn ($item): bool => is_array($item) && trim((string) ($item['nome'] ?? '')) !== '')
                 ->map(fn (array $item): array => ['code' => (string) ($item['codigo'] ?? ''), 'name' => trim((string) $item['nome'])])
                 ->values()->all();
-            $movements = collect($sources)->flatMap(fn (array $record) => collect(data_get($record, 'movimentos', []))->map(fn ($movement) => is_array($movement) ? $movement + ['grau' => $record['grau'] ?? null, 'orgaoJulgadorNome' => data_get($record, 'orgaoJulgador.nome')] : $movement))
+            $allMovements = collect($sources)->flatMap(fn (array $record) => collect(data_get($record, 'movimentos', []))->map(fn ($movement) => is_array($movement) ? $movement + ['grau' => $record['grau'] ?? null, 'orgaoJulgadorNome' => data_get($record, 'orgaoJulgador.nome')] : $movement))
                 ->filter(fn ($item): bool => is_array($item) && trim((string) ($item['nome'] ?? '')) !== '')
                 ->map(fn (array $item): array => array_filter([
                     'code' => isset($item['codigo']) ? (string) $item['codigo'] : null,
@@ -131,7 +131,8 @@ class LawDatajudClient
                     'degree' => $item['grau'] ?? null,
                     'court_name' => $item['orgaoJulgadorNome'] ?? null,
                 ], static fn ($value): bool => $value !== null && $value !== ''))
-                ->sortByDesc('occurred_at')->take(self::MAX_MOVEMENTS)->values()->all();
+                ->sortByDesc('occurred_at')->values();
+            $movements = $allMovements->take(self::MAX_MOVEMENTS)->all();
             $systemValue = $source['sistema'] ?? null;
             $formatValue = $source['formato'] ?? null;
 
@@ -151,6 +152,7 @@ class LawDatajudClient
                 'source_updated_at' => $this->normalizeDateTime($source['dataHoraUltimaAtualizacao'] ?? $source['@timestamp'] ?? null),
                 'court_municipality_code' => isset($court['codigoMunicipioIBGE']) ? (string) $court['codigoMunicipioIBGE'] : null,
                 'recent_movements' => $movements ?: null,
+                'movements_truncated' => $allMovements->count() > self::MAX_MOVEMENTS,
                 'records' => array_map(fn (array $record): array => array_filter([
                     'degree' => isset($record['grau']) ? trim((string) $record['grau']) : null,
                     'court_name' => trim((string) data_get($record, 'orgaoJulgador.nome')) ?: null,
@@ -159,7 +161,7 @@ class LawDatajudClient
                 ], static fn ($value) => $value !== null && $value !== ''), $sources),
             ], static fn ($value): bool => $value !== null && $value !== '');
 
-            $hasMetadata = (bool) array_filter($metadata, static fn ($value, $key): bool => ! in_array($key, ['records', 'recent_movements'], true) && $value !== null && $value !== '', ARRAY_FILTER_USE_BOTH);
+            $hasMetadata = (bool) array_filter($metadata, static fn ($value, $key): bool => ! in_array($key, ['records', 'movements_truncated'], true) && $value !== null && $value !== '', ARRAY_FILTER_USE_BOTH);
             return [
                 'status' => $hasMetadata ? 'synced' : 'not_found', 'code' => $hasMetadata ? 'synced' : 'no_metadata', 'metadata' => $hasMetadata ? $metadata : [],
                 'message' => $hasMetadata

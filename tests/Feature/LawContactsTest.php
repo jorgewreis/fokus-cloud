@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Jobs\SyncLawCaseDjen;
+use App\Services\LawCaseManagementService;
+use App\Services\LawDjenClient;
 use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -141,6 +143,29 @@ class LawContactsTest extends TestCase
             $this->assertSame($fixture['due'] ? 'pending' : $fixture['status'], DB::table('law_cases')->where('id', $fixture['id'])->value('djen_sync_status'));
         }
         $this->assertLessThan(config('queue.connections.law-datajud.retry_after'), (new SyncLawCaseDjen($this->companyId, $fixtures[0]['id']))->timeout);
+    }
+
+    public function test_failed_djen_sync_preserves_previously_saved_publications_and_success_time(): void
+    {
+        $unitId = PrefixedUlid::make('LUN');
+        DB::table('law_units')->insert(['id' => $unitId, 'company_id' => $this->companyId, 'name' => 'Unidade', 'status' => 'ativo', 'created_by' => $this->admin->id, 'created_at' => now(), 'updated_at' => now()]);
+        $caseId = PrefixedUlid::make('LCS');
+        $previous = json_encode(['publications' => [['id' => 'documento-anterior']]]);
+        $lastSuccess = now()->subDays(3)->startOfSecond();
+        DB::table('law_cases')->insert([
+            'id' => $caseId, 'company_id' => $this->companyId, 'law_unit_id' => $unitId, 'case_number' => '10016228320244013301',
+            'djen_sync_status' => 'pending', 'djen_metadata' => $previous, 'last_djen_synced_at' => $lastSuccess,
+            'created_by' => $this->admin->id, 'updated_by' => $this->admin->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $client = \Mockery::mock(LawDjenClient::class);
+        $client->shouldReceive('lookup')->once()->andReturn(['status' => 'error', 'code' => 'invalid_response', 'message' => 'Resposta inválida', 'metadata' => []]);
+        app(LawCaseManagementService::class)->syncDjen(DB::table('law_cases')->where('id', $caseId)->first(), $client);
+        $saved = DB::table('law_cases')->where('id', $caseId)->first();
+        $this->assertSame(json_decode($previous, true), json_decode($saved->djen_metadata, true));
+        $this->assertSame($lastSuccess->toDateTimeString(), (string) $saved->last_djen_synced_at);
+        $this->assertSame('error', $saved->djen_sync_status);
+        $this->assertTrue((bool) $saved->djen_retryable);
+        $this->assertSame(1, (int) $saved->djen_retry_count);
     }
 
     public function test_authenticated_user_can_look_up_a_brazilian_address_by_cep(): void

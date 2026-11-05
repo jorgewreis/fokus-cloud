@@ -78,4 +78,27 @@ class LawDjenClientTest extends TestCase
         $this->assertSame([], $result['metadata']['publications']);
         $this->assertTrue($result['metadata']['complete']);
     }
+
+    public function test_it_rejects_a_publication_for_a_different_process(): void
+    {
+        Http::fake(['djen.test/*' => Http::response(['count' => 1, 'items' => [['id' => 1, 'numeroProcesso' => '00000000000000000000']]])]);
+        $result = app(LawDjenClient::class)->lookup('10016228320244013301');
+        $this->assertSame('error', $result['status']);
+        $this->assertSame('invalid_result', $result['code']);
+        $this->assertArrayNotHasKey('publications', $result['metadata']);
+    }
+
+    public function test_it_does_not_return_a_partial_list_when_a_later_page_fails(): void
+    {
+        $first = array_map(fn ($i) => ['id' => $i, 'numeroProcesso' => '10016228320244013301'], range(1, 50));
+        Http::fake(function (Request $request) use ($first) {
+            parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+            return (int) ($query['pagina'] ?? 1) === 1 ? Http::response(['count' => 51, 'items' => $first]) : Http::response([], 503);
+        });
+        $result = app(LawDjenClient::class)->lookup('10016228320244013301');
+        $this->assertSame('error', $result['status']);
+        $this->assertSame('service_unavailable', $result['code']);
+        $this->assertArrayNotHasKey('publications', $result['metadata']);
+        Http::assertSentCount(2);
+    }
 }

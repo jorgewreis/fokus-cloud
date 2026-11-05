@@ -423,7 +423,9 @@
             const entry = $('article', 'law-record-history-entry'); entry.append($('h4', '', movement.name));
             entry.append($('p', 'law-record-detail-empty', `${date(movement.occurred_at)}${movement.code ? ` · Código ${movement.code}` : ''}`)); movementList.append(entry);
           });
-          movementHistory.body.append(movementHeading, movementList);
+          movementHistory.body.append(movementHeading);
+          if (officialMetadata.movements_truncated) movementHistory.body.append($('p', 'fs-alert fs-alert-warning', 'O DataJud retornou mais de 5.000 movimentações. São exibidas as 5.000 mais recentes.'));
+          movementHistory.body.append(movementList);
         }
         if (c.djen_sync_status !== 'not_requested') {
           const publicationsHeading = $('h4', 'law-record-detail-section-subheading', 'Publicações recentes do DJEN');
