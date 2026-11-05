@@ -488,7 +488,7 @@
 .law-record-detail-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 12px; }
 .law-process-detail-body { grid-template-columns: minmax(0, 1fr); }
 .law-record-detail-columns { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; min-width: 0; }
-.law-record-detail-column { display: grid; min-width: 0; align-content: start; gap: 12px; }
+.law-record-detail-column { display: flex; min-width: 0; flex-direction: column; gap: 15px; }
 /* Record compositions shared by Contacts and Processes, using the approved
    Contacts geometry. These arrange domain information, not FS primitives. */
 .law-record-section-body { display: grid; min-width: 0; gap: 12px; padding: 14px; }
