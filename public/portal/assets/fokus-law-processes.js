@@ -434,12 +434,18 @@
           if (djenMetadata.complete === false) movementHistory.body.append($('p', 'fs-alert fs-alert-warning', djenMetadata.coverage_note || 'Esta lista é parcial e pode não incluir todas as publicações. Consulte o DJEN novamente para atualizar.'));
           if (!publications.length && c.djen_sync_status !== 'pending' && c.djen_sync_status !== 'error') movementHistory.body.append($('p', 'law-record-detail-empty', 'O DJEN não disponibilizou publicações para este processo.'));
           if (c.djen_sync_status !== 'pending') publications.forEach((publication) => {
-              const entry = $('article', 'law-record-history-entry');
-              entry.append($('h4', '', [publication.type, publication.document_type].filter(Boolean).join(' · ') || 'Publicação processual'));
-              const dateLabels = [publication.availability_date ? `Disponibilizada em ${dateOnly(publication.availability_date)}` : null, publication.publication_date ? `Publicada em ${dateOnly(publication.publication_date)}` : null].filter(Boolean);
-              entry.append($('p', 'law-record-detail-empty', `${dateLabels.join(' · ') || 'Datas não informadas'} · ${publication.tribunal || 'Tribunal não informado'}${publication.court_name ? ` · ${publication.court_name}` : ''}`));
-              if (publication.case_class) entry.append($('p', '', `Classe: ${publication.case_class}`));
-              if (publication.link) { const link = $('a', 'fs-u-fs-sm', 'Abrir referência oficial'); link.href = publication.link; link.target = '_blank'; link.rel = 'noopener noreferrer'; entry.append(link); }
+              let officialLink = null;
+              try { const url = new URL(publication.link); if (url.protocol === 'https:') officialLink = url.href; } catch (_) { /* Sem referência oficial válida. */ }
+              const entry = $(officialLink ? 'a' : 'article', `law-record-history-entry${officialLink ? ' law-record-djen-link' : ''}`);
+              const type = String(publication.type || publication.document_type || '').trim().toLocaleLowerCase('pt-BR');
+              const title = !type || /^publica(?:ção|cao)$/.test(type) ? 'Publicação no DJEN' : `Publicação de ${type} no DJEN`;
+              entry.append($('h4', '', title));
+              const dateLabel = publication.availability_date ? `Disponibilizada no DJEN em ${dateOnly(publication.availability_date)}` : publication.publication_date ? `Publicada no DJEN em ${dateOnly(publication.publication_date)}` : 'Data não informada';
+              entry.append($('p', 'law-record-detail-empty', dateLabel));
+              if (officialLink) {
+                entry.href = officialLink; entry.target = '_blank'; entry.rel = 'noopener noreferrer';
+                entry.append($('span', 'fs-u-visually-hidden', ' (abre o documento oficial em outra aba)'));
+              }
               movementHistory.body.append(entry);
           });
           movementHistory.body.append($('p', 'law-record-detail-empty', 'As publicações do DJEN são complementares; não alteram a situação oficial nem calculam prazos.'));
