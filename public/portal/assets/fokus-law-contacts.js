@@ -885,7 +885,16 @@
     if (contact.cases?.length) {
       const items = addSection('Processos vinculados', 'PRC', contact.cases.length, 'law-record-detail-cases');
       contact.cases.forEach((linkedCase) => {
-        const row = $('article', 'law-record-detail-linked-contact');
+        const canOpenCase = Boolean(window.FokusLawNavigation?.canOpenCases);
+        const row = $(canOpenCase ? 'button' : 'article', `law-record-detail-linked-contact${canOpenCase ? ' law-record-detail-case-link' : ''}`);
+        if (canOpenCase) {
+          row.type = 'button';
+          row.setAttribute('aria-label', `Abrir processo ${linkedCase.case_number}`);
+          row.addEventListener('click', () => {
+            modal.onHidden(() => window.FokusLawNavigation?.openCase(linkedCase.id));
+            modal.close();
+          });
+        }
         row.append($('strong', '', linkedCase.case_number));
         row.append($('span', '', [linkedCase.case_role, linkedCase.case_class, linkedCase.court_name, linkedCase.unit_name, linkedCase.official_status_text].filter(Boolean).join(' · ')));
         items.append(row);

@@ -1487,6 +1487,18 @@
     const searchState = document.querySelector('#search-state');
     const contactsModule = visibleModules().find((module) => String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('contatos'));
     const processesModule = visibleModules().find((module) => String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('processos'));
+    window.FokusLawNavigation = {
+      canOpenCases: Boolean(processesModule),
+      openCase: async (caseId) => {
+        if (!processesModule || !caseId) return;
+        activeGroup = `module:${processesModule.id}`;
+        processesView = 'module';
+        renderNavigation();
+        closeMobileNav();
+        contentRegion.focus({ preventScroll: true });
+        await window.FokusLawProcesses?.openCase(contentRegion, context, caseId, processesModule);
+      },
+    };
     const canSearchContacts = Boolean(contactsModule && canLawPermission('law.contacts.view'));
     const canSearchProcesses = Boolean(processesModule && canLawPermission('law.cases.view'));
     const canSearch = canSearchContacts || canSearchProcesses;
