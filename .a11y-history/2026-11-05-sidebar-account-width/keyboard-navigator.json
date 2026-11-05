@@ -1,0 +1,1 @@
+{"skill":"keyboard-navigator","scope":["public/portal/assets/fokus-law-shell.css","resources/views/portal/fokus-law.blade.php"],"findings":[],"passed":["The account toggle remains a native button reachable and operable by keyboard.","The sizing changes preserve the visible focus indicator and do not alter focus order or keyboard behavior."]}

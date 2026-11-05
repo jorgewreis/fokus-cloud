@@ -20,9 +20,9 @@ class SyncLawCaseDjen extends Command
         $cases = DB::table('law_cases')->where('operational_status', '!=', 'archived')
             ->where('djen_sync_status', '!=', 'pending')
             ->where(function ($q): void {
-                $q->where(function ($monthly): void {
-                    $monthly->whereIn('djen_sync_status', ['synced', 'not_found'])
-                        ->where(fn ($due) => $due->whereNull('last_djen_synced_at')->orWhere('last_djen_synced_at', '<=', now()->subMonthNoOverflow()));
+                $q->where('djen_sync_status', 'not_requested')->orWhere(function ($daily): void {
+                    $daily->whereIn('djen_sync_status', ['synced', 'not_found'])
+                        ->where(fn ($due) => $due->whereNull('last_djen_synced_at')->orWhere('last_djen_synced_at', '<=', now()->subDay()));
                 })->orWhere(function ($retry): void {
                     $retry->where('djen_sync_status', 'error')->where('djen_retryable', true)
                         ->where(function ($due): void {

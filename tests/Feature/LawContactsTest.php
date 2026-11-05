@@ -3,12 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Jobs\SyncLawCaseDjen;
 use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class LawContactsTest extends TestCase
@@ -98,6 +100,47 @@ class LawContactsTest extends TestCase
             $this->assertSame($fixture['expected'], $linkedCases[$fixture['number']]['case_class']);
         }
         $this->assertFalse($linkedCases->has($fixtures[4]['number']));
+    }
+
+    public function test_djen_scheduler_refreshes_daily_and_retries_failures_without_waiting_a_month(): void
+    {
+        Queue::fake();
+        $module = DB::table('modules')->where('module_code', 'processos')->whereIn('context_code', ['judiciario', 'vara_criminal', 'escritorio'])->where('status', 'ativo')->where('publication_state', 'publicado')->first();
+        $this->assertNotNull($module);
+        $subscriptionId = DB::table('subscriptions')->where('company_id', $this->companyId)->value('id');
+        DB::table('subscription_items')->insert([
+            'id' => PrefixedUlid::make('ITM'), 'company_id' => $this->companyId, 'subscription_id' => $subscriptionId,
+            'module_id' => $module->id, 'name_snapshot' => $module->name, 'quantity' => 1,
+            'unit_price_snapshot' => $module->monthly_price, 'conditions_snapshot' => '{}', 'version' => 1,
+            'created_by' => $this->admin->id, 'updated_by' => $this->admin->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $unitId = PrefixedUlid::make('LUN');
+        DB::table('law_units')->insert(['id' => $unitId, 'company_id' => $this->companyId, 'name' => 'Unidade', 'status' => 'ativo', 'created_by' => $this->admin->id, 'created_at' => now(), 'updated_at' => now()]);
+        $fixtures = [
+            ['status' => 'synced', 'synced' => now()->subHours(25), 'checked' => now()->subHours(25), 'due' => true],
+            ['status' => 'not_found', 'synced' => now()->subHours(25), 'checked' => now()->subHours(25), 'due' => true],
+            ['status' => 'synced', 'synced' => now()->subHours(23), 'checked' => now()->subHours(23), 'due' => false],
+            ['status' => 'error', 'synced' => now()->subDays(10), 'checked' => now()->subMinutes(61), 'due' => true],
+            ['status' => 'error', 'synced' => now()->subDays(10), 'checked' => now()->subMinutes(30), 'due' => false],
+            ['status' => 'not_requested', 'synced' => null, 'checked' => null, 'due' => true],
+        ];
+        foreach ($fixtures as $index => &$fixture) {
+            $fixture['id'] = PrefixedUlid::make('LCS');
+            DB::table('law_cases')->insert([
+                'id' => $fixture['id'], 'company_id' => $this->companyId, 'law_unit_id' => $unitId,
+                'case_number' => str_pad((string) ($index + 1), 20, '0', STR_PAD_LEFT), 'confidentiality_level' => 'public',
+                'djen_sync_status' => $fixture['status'], 'djen_retryable' => true, 'djen_retry_count' => 1,
+                'last_djen_synced_at' => $fixture['synced'], 'last_djen_checked_at' => $fixture['checked'],
+                'created_by' => $this->admin->id, 'updated_by' => $this->admin->id, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        unset($fixture);
+        $this->artisan('law:sync-case-djen')->assertSuccessful();
+        Queue::assertPushed(SyncLawCaseDjen::class, 4);
+        foreach ($fixtures as $fixture) {
+            $this->assertSame($fixture['due'] ? 'pending' : $fixture['status'], DB::table('law_cases')->where('id', $fixture['id'])->value('djen_sync_status'));
+        }
+        $this->assertLessThan(config('queue.connections.law-datajud.retry_after'), (new SyncLawCaseDjen($this->companyId, $fixtures[0]['id']))->timeout);
     }
 
     public function test_authenticated_user_can_look_up_a_brazilian_address_by_cep(): void

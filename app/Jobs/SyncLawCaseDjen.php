@@ -13,7 +13,8 @@ class SyncLawCaseDjen implements ShouldQueue
 {
     use Queueable;
 
-    public int $timeout = 20;
+    // Must remain below the law-datajud queue's retry_after (120 seconds).
+    public int $timeout = 100;
     public int $tries = 1;
     public bool $failOnTimeout = true;
 
