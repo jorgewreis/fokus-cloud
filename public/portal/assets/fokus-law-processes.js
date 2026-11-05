@@ -367,11 +367,10 @@
         if (needsConfidentialityAlert(c.procedural_priorities, c.confidentiality_level)) { const alert = $('p', 'fs-alert fs-alert-warning', confidentialityAlert); alert.setAttribute('role', 'alert'); body.append(alert); }
         const main = section('Dados processuais', 'CNJ', 'Classe, assuntos e informações oficiais');
         const officialMetadata = c.official_metadata || {}; const djenMetadata = c.djen_metadata || {};
-        const displayedClass = c.case_class || djenMetadata.suggested_case_class;
-        const displayedCourt = c.court_name || djenMetadata.suggested_court_name;
-        const classLabel = c.case_class ? 'Classe judicial' : djenMetadata.suggested_case_class ? 'Classe indicada pelo DJEN' : 'Classe judicial';
-        const courtLabel = c.court_name ? 'Tribunal / órgão julgador' : djenMetadata.suggested_court_name ? 'Órgão julgador indicado pelo DJEN' : 'Tribunal / órgão julgador';
-        main.body.append(keyValues([[classLabel, text(displayedClass)], [courtLabel, text(displayedCourt)], ['Tribunal', text(officialMetadata.tribunal || djenMetadata.tribunal)], ['Grau no DataJud', text(officialMetadata.degree)], ['Sistema processual no DataJud', text(officialMetadata.system)], ['Comarca', text(c.comarca)], ['Assuntos', text(c.subjects)], ['Situação oficial', text(c.official_status_text)], ['Autuação', c.filing_date ? dateOnly(c.filing_date) : officialMetadata.filing_date ? dateOnly(officialMetadata.filing_date) : 'Não informada'], ['Distribuição', c.distribution_date ? dateOnly(c.distribution_date) : 'Não informada'], ['Atualização da base DataJud', date(officialMetadata.source_updated_at)], ['Última consulta ao DataJud', date(c.last_datajud_checked_at)]]));
+        const djenProcessData = djenMetadata.process_data || {};
+        const displayedClass = c.case_class || djenProcessData.case_class || djenMetadata.suggested_case_class;
+        const displayedCourt = c.court_name || djenProcessData.court_name || djenMetadata.suggested_court_name;
+        main.body.append(keyValues([['Classe judicial', text(displayedClass)], ['Tribunal / órgão julgador', text(displayedCourt)], ['Tribunal', text(officialMetadata.tribunal || djenProcessData.tribunal || djenMetadata.tribunal)], ['Grau no DataJud', text(officialMetadata.degree)], ['Sistema processual no DataJud', text(officialMetadata.system)], ['Comarca', text(c.comarca)], ['Assuntos', text(c.subjects)], ['Situação oficial', text(c.official_status_text)], ['Autuação', c.filing_date ? dateOnly(c.filing_date) : officialMetadata.filing_date ? dateOnly(officialMetadata.filing_date) : 'Não informada'], ['Distribuição', c.distribution_date ? dateOnly(c.distribution_date) : 'Não informada'], ['Atualização da base DataJud', date(officialMetadata.source_updated_at)], ['Última consulta ao DataJud', date(c.last_datajud_checked_at)]]));
         main.body.append(keyValues([['Resultado da consulta', c.datajud_sync_status === 'pending' ? 'Aguardando consulta' : text(result.datajud?.code || c.datajud_sync_status)], ['Última atualização bem-sucedida', c.last_datajud_synced_at ? date(c.last_datajud_synced_at) : 'Ainda não houve atualização pelo Datajud']]));
         const fallbackMessage = c.datajud_sync_status === 'pending' ? 'Processo cadastrado. A consulta ao Datajud será feita em segundo plano e pode levar alguns minutos. Você pode continuar trabalhando; os dados aparecerão aqui automaticamente.' : c.datajud_sync_status === 'not_found' ? 'A consulta foi concluída, mas o Datajud não disponibilizou dados públicos para este processo. Você pode preencher os campos ausentes manualmente.' : c.datajud_sync_status === 'synced' ? 'A última consulta ao Datajud foi concluída. Os campos não fornecidos pelo CNJ podem ser preenchidos manualmente.' : 'A última consulta ao Datajud falhou. Consulte o histórico para conferir o motivo ou tente novamente.';
         const feedback = $('p', `fs-alert ${['pending', 'not_found'].includes(c.datajud_sync_status) ? 'fs-alert-info' : c.datajud_sync_status === 'synced' ? 'fs-alert-success' : 'fs-alert-warning'}`, `${(c.datajud_sync_status === 'pending' ? fallbackMessage : result.datajud?.message) || fallbackMessage}${c.datajud_sync_status === 'error' ? ' O cadastro e os dados já registrados foram preservados.' : ''}`);
@@ -386,21 +385,6 @@
             entry.append($('p', 'law-record-detail-empty', `${date(movement.occurred_at)}${movement.code ? ` · Código ${movement.code}` : ''}`)); movementList.append(entry);
           });
           main.body.append(movementHeading, movementList);
-        }
-        const djenProcessData = djenMetadata.process_data || {};
-        const djenRecipients = Array.isArray(djenProcessData.communication_recipients) ? djenProcessData.communication_recipients : [];
-        const djenAttorneys = Array.isArray(djenProcessData.communication_recipient_attorneys) ? djenProcessData.communication_recipient_attorneys : [];
-        if (djenProcessData.case_number || djenProcessData.tribunal || djenProcessData.court_name || djenProcessData.case_class || djenRecipients.length || djenAttorneys.length) {
-          const djenDataHeading = $('h4', 'law-record-detail-section-subheading', 'Dados processuais complementares do DJEN');
-          main.body.append(djenDataHeading, keyValues([
-            ['Número do processo informado pelo DJEN', text(djenProcessData.case_number)],
-            ['Tribunal informado pelo DJEN', text(djenProcessData.tribunal)],
-            ['Órgão julgador informado pelo DJEN', text(djenProcessData.court_name)],
-            ['Classe informada pelo DJEN', text(djenProcessData.case_class)],
-            ['Destinatários nas comunicações', djenRecipients.map((item) => `${item.name}${item.pole ? ` (${item.pole})` : ''}`).join('; ')],
-            ['Advogados destinatários', djenAttorneys.map((item) => item.name).join('; ')],
-          ]));
-          main.body.append($('p', 'law-record-detail-empty', 'Esses dados vêm das comunicações localizadas no DJEN e podem não representar a composição completa ou atual do processo. Eles são exibidos como complemento e não substituem os dados oficiais nem os contatos cadastrados.'));
         }
         if (c.djen_sync_status !== 'not_requested') {
           const publicationsHeading = $('h4', 'law-record-detail-section-subheading', 'Publicações recentes do DJEN');
