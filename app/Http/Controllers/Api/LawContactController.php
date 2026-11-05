@@ -254,19 +254,22 @@ class LawContactController extends Controller
         if (! $balanceResponse->successful() || ! $courtsResponse->successful()) {
             return response()->json(['message' => 'O TrackJud estÃ¡ indisponÃ­vel para consultar saldo ou tribunais. Nenhum crÃ©dito foi consumido.'], 502);
         }
-        $availableCourts = collect($courtsResponse->json('data', []))->filter(fn ($court) => is_array($court) && ($court['status'] ?? null) === 'active')->keyBy('court_code');
-        $requested = $eligible->map(fn ($case) => $enrichment->courtCode((string) $case->case_number))->filter()->unique()->values();
+        $availableCourts = collect($courtsResponse->json('data', []))
+            ->filter(fn ($court) => is_array($court) && in_array($court['status'] ?? null, ['active', 'unavailable'], true))
+            ->keyBy(fn (array $court): string => strtoupper(trim((string) ($court['court_code'] ?? ''))));
+        $requested = $eligible->map(fn ($case) => $enrichment->courtCode((string) $case->case_number))
+            ->filter()->map(fn (string $code): string => strtoupper(trim($code)))->unique()->values();
         $courts = $requested->filter(fn ($code) => $availableCourts->has($code))->values()->all();
         $credits = (int) ($balanceResponse->json('data.available') ?? 0);
 
         return response()->json([
             'contact_id' => (string) $contact->id,
             'courts' => $courts,
-            'court_names' => collect($courts)->map(fn ($code) => ['code' => $code, 'name' => $availableCourts->get($code)['name'] ?? $code])->all(),
+            'court_names' => collect($courts)->map(fn ($code) => ['code' => $code, 'name' => $availableCourts->get($code)['name'] ?? $code, 'status' => $availableCourts->get($code)['status'] ?? 'active'])->all(),
             'minimum_credits' => count($courts),
             'available_credits' => $credits,
             'can_consult' => $courts !== [] && $credits >= count($courts),
-            'message' => $courts === [] ? 'NÃ£o foi possÃ­vel identificar tribunais TrackJud ativos a partir dos CNJs vinculados.' : null,
+            'message' => $courts === [] ? 'Os CNJs vinculados nÃ£o correspondem a tribunais disponÃ­veis para consulta no TrackJud.' : null,
         ]);
     }
 
