@@ -21,6 +21,23 @@
     document.title = `${pageTitles[pageView] || pageTitles.module} | Fokus Law`;
     const session = ++generation;
     const { node: $, button, input, select, field, detailSection: section, message, dialog: openDialog, bindForm, compositionChart, metricCards } = UI();
+    const processTableColumns = (widths) => {
+      const colgroup = $('colgroup');
+      widths.forEach((width, index) => {
+        const col = $('col');
+        col.style.width = `${width}px`;
+        if (index === 0) col.className = 'law-record-process-number-column';
+        colgroup.append(col);
+      });
+      return colgroup;
+    };
+    const processTableScrollRegion = (label) => {
+      const region = $('div', 'fs-table-responsive law-record-table-wrap');
+      region.tabIndex = 0;
+      region.setAttribute('role', 'region');
+      region.setAttribute('aria-label', label);
+      return region;
+    };
     const dialogs = new Set();
     const dialog = (...args) => { const modal = openDialog(...args); dialogs.add(modal.element); return modal; };
     const can = (code) => context.company?.role === 'admin' || (context.law_permissions || []).includes(`law.cases.${code}`);
@@ -100,10 +117,10 @@
           if (refs.can_create) headingActions.append(button('Novo processo', action(adminCreate), true));
           const controls = toolbar(); const search = input(q, 'search', 100); search.placeholder = 'Buscar por número, assunto ou contato'; const searchButton = button('Buscar', action(async () => { q = search.value.trim(); page = 1; await adminList(); })); const archived = button(includeArchived ? 'Ocultar arquivados' : 'Exibir arquivados', action(async () => { includeArchived = !includeArchived; await adminList(); })); controls.append(field('Pesquisar', search, 'q'), searchButton, archived); body.append(controls);
           const filters = toolbar(); const addFilter = (key, label, options) => { const control = select([['', `Todos: ${label.toLowerCase()}`], ...options], adminFilters[key] || ''); control.addEventListener('change', action(async () => { if (control.value) adminFilters[key] = control.value; else delete adminFilters[key]; page = 1; await adminList(); })); filters.append(field(label, control, key)); }; addFilter('type_id', 'Tipo', refs.types.map((v) => [v.id, v.name])); addFilter('law_unit_id', 'Unidade', refs.units.map((v) => [v.id, v.name])); addFilter('status', 'Status', refs.statuses.map((v) => [v.label, v.label])); addFilter('priority', 'Prioridade', [['normal', 'Normal'], ['high', 'Alta'], ['urgent', 'Urgente']]); addFilter('tag_id', 'Etiqueta', refs.tags.map((v) => [v.id, v.name])); body.append(filters);
-          const table = $('table', 'fs-table'); const caption = $('caption', 'fs-sr-only', 'Processos administrativos'); const head = $('thead'); const hr = $('tr'); ['Número oficial', 'Tipo', 'Assunto', 'Unidade', 'Status', 'Prioridade', ''].forEach((label) => hr.append($('th', '', label))); head.append(hr); const tb = $('tbody');
+          const table = $('table', 'fs-table law-record-process-table law-record-admin-list-table'); const caption = $('caption', 'fs-sr-only', 'Processos administrativos'); const head = $('thead'); const hr = $('tr'); ['Número oficial', 'Tipo', 'Assunto', 'Unidade', 'Status', 'Prioridade', 'Ações'].forEach((label) => { const th = $('th', '', label); th.scope = 'col'; hr.append(th); }); head.append(hr); const tb = $('tbody');
           result.cases.forEach((item) => { const row = $('tr'); const number = $('td'); number.append(button(item.number, action(() => adminDetail(item.id)))); row.append(number); [item.type_name, item.subject || 'Não informado', item.unit_name, item.archived_at ? 'Arquivado' : item.status, text(item.priority)].forEach((value) => row.append($('td', '', value))); const actionCell = $('td', 'law-record-actions'); actionCell.append(button('Abrir', action(() => adminDetail(item.id)))); row.append(actionCell); tb.append(row); });
           if (!result.cases.length) { const row = $('tr'); const cell = $('td', 'fs-table-empty law-record-empty', 'Nenhum processo administrativo encontrado.'); cell.colSpan = 7; row.append(cell); tb.append(row); }
-          table.append(caption, head, tb); const tableWrap = $('div', 'law-record-table-wrap'); tableWrap.append(table); body.append(tableWrap);
+          table.append(caption, processTableColumns([220, 190, 360, 160, 160, 140, 96]), head, tb); const tableWrap = processTableScrollRegion('Tabela de processos administrativos'); tableWrap.append(table); body.append(tableWrap);
           paginate(body, result.pagination.total, result.pagination.per_page, result.pagination.page, async (value) => { page = value; await adminList(); });
         } catch (error) { report(error); }
       }
@@ -201,10 +218,10 @@
         const archivedField = $('div', 'fs-check'); archivedField.append(archived, archivedLabel);
         const submit = button('Pesquisar', null, true); submit.type = 'submit';
         const searchField = field('Pesquisar processo', search, 'q'); searchField.className = 'law-record-field';
-        form.append(searchField, archivedField, submit);
+        form.append(searchField, submit, archivedField);
         form.addEventListener('submit', (event) => { event.preventDefault(); q = search.value.trim(); includeArchived = archived.checked; page = 1; list(); });
         body.append(form);
-        const wrap = $('div', 'fs-table-responsive law-record-table-wrap'); const table = $('table', 'fs-table law-record-table');
+        const wrap = processTableScrollRegion('Tabela de processos cadastrados'); const table = $('table', 'fs-table law-record-table law-record-process-table law-record-case-list-table');
         const caption = $('caption', 'fs-u-visually-hidden', 'Processos cadastrados · registros mais recentes primeiro'); const head = $('thead'); const tr = $('tr');
         ['Número CNJ', 'Classe', 'Unidade', 'Situação oficial', 'Estado operacional', 'Sigilo', 'Ações'].forEach((label) => { const th = $('th', '', label); th.scope = 'col'; tr.append(th); }); head.append(tr);
         const tbody = $('tbody'); result.cases.forEach((item) => {
@@ -217,7 +234,7 @@
           const td = $('td', 'law-record-actions'); const actionList = $('div', 'law-record-action-list'); const view = button('', action(() => detail(item.id))); view.className = 'fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action'; view.setAttribute('aria-label', `Ver detalhes do processo ${item.case_number_formatted}`); view.title = 'Ver detalhes'; const icon = $('img'); icon.src = '/backoffice/assets/icons/Folder-File--Streamline-Ultimate.png'; icon.alt = ''; view.append(icon); actionList.append(view); td.append(actionList); row.append(td); tbody.append(row);
         });
         if (!result.cases.length) { const row = $('tr'); const cell = $('td', 'fs-table-empty law-record-empty', q ? 'Nenhum processo acessível corresponde ao número pesquisado.' : 'Nenhum processo cadastrado nesta consulta. Cadastre o primeiro processo para começar.'); cell.colSpan = 7; row.append(cell); tbody.append(row); }
-        table.append(caption, head, tbody); wrap.append(table); body.append(wrap);
+        table.append(caption, processTableColumns([220, 360, 170, 190, 190, 140, 96]), head, tbody); wrap.append(table); body.append(wrap);
         paginate(body, result.pagination.total, result.pagination.per_page, page, async (value) => { page = value; await list(); });
       } catch (error) { report(error); } finally { body.removeAttribute('aria-busy'); }
     }
@@ -364,8 +381,11 @@
         const badges = $('div', 'law-record-detail-chip-groups');
         if (statusLabel) { const statusBadge = $('span', 'law-record-detail-chip law-process-status-badge', statusLabel); statusBadge.dataset.tone = statusTone; badges.append(statusBadge); }
         [text(c.operational_priority), text(c.confidentiality_level)].filter(Boolean).forEach((label) => badges.append($('span', 'law-record-detail-chip', label))); copy.append(badges); identity.append(symbol, copy); body.append(identity);
-        if (needsConfidentialityAlert(c.procedural_priorities, c.confidentiality_level)) { const alert = $('p', 'fs-alert fs-alert-warning', confidentialityAlert); alert.setAttribute('role', 'alert'); body.append(alert); }
+        if (needsConfidentialityAlert(c.procedural_priorities, c.confidentiality_level)) { const alert = $('p', 'fs-alert fs-alert-warning law-record-detail-alert-wide', confidentialityAlert); alert.setAttribute('role', 'alert'); body.append(alert); }
         const main = section('Dados processuais', 'CNJ', 'Classe, assuntos e informações oficiais');
+        main.classList.add('law-record-detail-data');
+        const movementHistory = section('Histórico de movimentações', 'MOV', 'Movimentações do DataJud, DJEN e TrackJud');
+        movementHistory.classList.add('law-record-detail-movements');
         const officialMetadata = c.official_metadata || {}; const djenMetadata = c.djen_metadata || {};
         const djenProcessData = djenMetadata.process_data || {};
         const displayedClass = c.case_class || djenProcessData.case_class || djenMetadata.suggested_case_class;
@@ -375,7 +395,7 @@
         const fallbackMessage = c.datajud_sync_status === 'pending' ? 'Processo cadastrado. A consulta ao Datajud será feita em segundo plano e pode levar alguns minutos. Você pode continuar trabalhando; os dados aparecerão aqui automaticamente.' : c.datajud_sync_status === 'not_found' ? 'A consulta foi concluída, mas o Datajud não disponibilizou dados públicos para este processo. Você pode preencher os campos ausentes manualmente.' : c.datajud_sync_status === 'synced' ? 'A última consulta ao Datajud foi concluída. Os campos não fornecidos pelo CNJ podem ser preenchidos manualmente.' : 'A última consulta ao Datajud falhou. Consulte o histórico para conferir o motivo ou tente novamente.';
         const feedback = $('p', `fs-alert ${['pending', 'not_found'].includes(c.datajud_sync_status) ? 'fs-alert-info' : c.datajud_sync_status === 'synced' ? 'fs-alert-success' : 'fs-alert-warning'}`, `${(c.datajud_sync_status === 'pending' ? fallbackMessage : result.datajud?.message) || fallbackMessage}${c.datajud_sync_status === 'error' ? ' O cadastro e os dados já registrados foram preservados.' : ''}`);
         feedback.setAttribute('role', 'status'); feedback.setAttribute('aria-live', 'polite'); main.body.append(feedback);
-        const source = $('a', 'fs-u-fs-sm', 'Metadados oficiais: CNJ · DataJud'); source.href = 'https://datajud-wiki.cnj.jus.br/api-publica/'; source.target = '_blank'; source.rel = 'noopener noreferrer'; main.body.append(source); body.append(main);
+        const source = $('a', 'fs-u-fs-sm', 'Metadados oficiais: CNJ · DataJud'); source.href = 'https://datajud-wiki.cnj.jus.br/api-publica/'; source.target = '_blank'; source.rel = 'noopener noreferrer'; main.body.append(source);
         const movements = Array.isArray(officialMetadata.recent_movements) ? officialMetadata.recent_movements : [];
         if (movements.length) {
           const movementHeading = $('h4', 'law-record-detail-section-subheading', 'Movimentações recentes informadas pelo DataJud');
@@ -384,26 +404,26 @@
             const entry = $('article', 'law-record-history-entry'); entry.append($('h4', '', movement.name));
             entry.append($('p', 'law-record-detail-empty', `${date(movement.occurred_at)}${movement.code ? ` · Código ${movement.code}` : ''}`)); movementList.append(entry);
           });
-          main.body.append(movementHeading, movementList);
+          movementHistory.body.append(movementHeading, movementList);
         }
         if (c.djen_sync_status !== 'not_requested') {
           const publicationsHeading = $('h4', 'law-record-detail-section-subheading', 'Publicações recentes do DJEN');
-          main.body.append(publicationsHeading);
-          if (c.djen_sync_status === 'pending') main.body.append($('p', 'fs-alert fs-alert-info', 'O DJEN está sendo consultado em segundo plano.'));
-          else if (c.djen_sync_status === 'error') main.body.append($('p', 'fs-alert fs-alert-warning', 'A consulta ao DJEN não foi concluída. Você pode tentar novamente.'));
+          movementHistory.body.append(publicationsHeading);
+          if (c.djen_sync_status === 'pending') movementHistory.body.append($('p', 'fs-alert fs-alert-info', 'O DJEN está sendo consultado em segundo plano.'));
+          else if (c.djen_sync_status === 'error') movementHistory.body.append($('p', 'fs-alert fs-alert-warning', 'A consulta ao DJEN não foi concluída. Você pode tentar novamente.'));
           else {
             const publications = Array.isArray(djenMetadata.publications) ? djenMetadata.publications : [];
-            if (!publications.length) main.body.append($('p', 'law-record-detail-empty', 'O DJEN não disponibilizou publicações para este processo.'));
+            if (!publications.length) movementHistory.body.append($('p', 'law-record-detail-empty', 'O DJEN não disponibilizou publicações para este processo.'));
             publications.forEach((publication) => {
               const entry = $('article', 'law-record-history-entry');
               entry.append($('h4', '', [publication.type, publication.document_type].filter(Boolean).join(' · ') || 'Publicação processual'));
               entry.append($('p', 'law-record-detail-empty', `${dateOnly(publication.publication_date)} · ${publication.tribunal || 'Tribunal não informado'}${publication.court_name ? ` · ${publication.court_name}` : ''}`));
               if (publication.case_class) entry.append($('p', '', `Classe: ${publication.case_class}`));
               if (publication.link) { const link = $('a', 'fs-u-fs-sm', 'Abrir referência oficial'); link.href = publication.link; link.target = '_blank'; link.rel = 'noopener noreferrer'; entry.append(link); }
-              main.body.append(entry);
+              movementHistory.body.append(entry);
             });
           }
-          main.body.append($('p', 'law-record-detail-empty', 'As publicações do DJEN são complementares; não alteram a situação oficial nem calculam prazos.'));
+          movementHistory.body.append($('p', 'law-record-detail-empty', 'As publicações do DJEN são complementares; não alteram a situação oficial nem calculam prazos.'));
         }
         const trackJudRecord = c.trackjud_metadata?.record || {};
         if (Object.keys(trackJudRecord).length) {
@@ -429,7 +449,7 @@
             });
           }
           if (trackJudMovements.length) {
-            main.body.append($('h5', 'law-record-detail-section-subheading', 'Movimentações retornadas pelo TrackJud'));
+            movementHistory.body.append($('h5', 'law-record-detail-section-subheading', 'Movimentações retornadas pelo TrackJud'));
             const trackJudMovementList = $('div', 'law-record-history-list');
             trackJudMovements.forEach((movement) => {
               const entry = $('article', 'law-record-history-entry');
@@ -437,22 +457,23 @@
               if (movement.data_movimento) entry.append($('p', 'law-record-detail-empty', movement.data_movimento));
               trackJudMovementList.append(entry);
             });
-            main.body.append(trackJudMovementList);
+            movementHistory.body.append(trackJudMovementList);
           }
           main.body.append($('p', 'law-record-detail-empty', 'Os dados do TrackJud complementam o processo vinculado e preservam os valores já cadastrados. A consulta é manual e não cria novos processos.'));
         }
-        const operational = section('Organização interna', 'ORG', 'Acompanhamento do trabalho da unidade'); operational.body.append(keyValues([['Unidade', c.unit_name], ['Estado operacional', c.operational_status_label], ['Prioridade operacional', text(c.operational_priority)], ['Prioridades processuais', (c.procedural_priorities || []).map((code) => local.procedural_priorities?.find((item) => item.code === code)?.label || code).join('; ') || 'Nenhuma'], ['Responsável principal', local.members.find((item) => item.id === c.responsible_membership_id)?.name || 'Sem responsável'], ['Sigilo', text(c.confidentiality_level)]]));
-        if (c.operational_status === 'archived') operational.body.append(keyValues([['Justificativa do arquivamento', c.archive_reason]])); operational.body.append($('p', 'law-record-detail-empty', 'A situação oficial do Datajud e o estado operacional são independentes.')); body.append(operational);
+        const operational = section('Organização interna', 'ORG', 'Acompanhamento do trabalho da unidade'); operational.classList.add('law-record-detail-organization'); operational.body.append(keyValues([['Unidade', c.unit_name], ['Estado operacional', c.operational_status_label], ['Prioridade operacional', text(c.operational_priority)], ['Prioridades processuais', (c.procedural_priorities || []).map((code) => local.procedural_priorities?.find((item) => item.code === code)?.label || code).join('; ') || 'Nenhuma'], ['Responsável principal', local.members.find((item) => item.id === c.responsible_membership_id)?.name || 'Sem responsável'], ['Sigilo', text(c.confidentiality_level)]]));
+        if (c.operational_status === 'archived') operational.body.append(keyValues([['Justificativa do arquivamento', c.archive_reason]])); operational.body.append($('p', 'law-record-detail-empty', 'A situação oficial do Datajud e o estado operacional são independentes.')); body.append(main, operational, movementHistory);
+        let conflictsCard = null;
         if (c.metadata_conflicts?.length) {
           const conflicts = section('Divergências com o Datajud'); conflicts.body.append($('p', '', 'O preenchimento manual foi preservado. Escolha o valor que deve permanecer em cada campo.'));
           c.metadata_conflicts.forEach((item) => {
             const box = $('div', 'fs-stack fs-stack-gap-2'); box.append(keyValues([['Campo', labels[item.field] || item.field], ['Preenchimento manual', text(item.manual_value)], ['Dado oficial', text(item.official_value)]]));
             if (can('update')) { const row = toolbar(); ['manual', 'official'].forEach((choice) => row.append(button(text(choice), action(async () => { await request(`${apiPath(id)}/conflicts/${item.id}`, { method: 'POST', body: { choice, version: c.version } }); await detail(id); })))); box.append(row); } conflicts.body.append(box);
-          }); body.append(conflicts);
+          }); conflictsCard = conflicts; conflicts.classList.add('law-record-detail-conflicts');
         }
-        renderTags(result, local); renderContacts(result, local); renderRelations(result);
+        renderContacts(result, local); renderTags(result, local); renderRelations(result);
         if (result.can_manage_access && c.confidentiality_level === 'secret') await renderAccess(result, local);
-        const history = section('Histórico do processo', 'HIS', 'Alterações internas e atualizações de metadados'); history.classList.add('law-record-section-wide');
+        const history = section('Histórico de atualizações do processo', 'HIS', 'Alterações internas e atualizações de metadados'); history.classList.add('law-record-detail-updates');
         result.events.forEach((item) => {
           const article = $('article', 'law-record-history-entry'); article.append($('h4', '', item.title), $('p', 'law-record-detail-empty', `${date(item.created_at)} · ${item.actor_name || 'Atualização automática'}`));
           if (item.reason) article.append($('p', '', item.reason));
@@ -470,12 +491,14 @@
         });
         if (!result.events.length) history.body.append($('p', 'law-record-detail-empty', 'Nenhuma alteração registrada neste processo.'));
         paginate(history.body, result.history_total, 50, result.history_page, (value) => detail(id, value), 'eventos'); body.append(history);
+        if (conflictsCard) body.append(conflictsCard);
         if (changedRecord) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); heading.scrollIntoView({ block: 'start' }); }
         if (c.datajud_sync_status === 'pending' || c.djen_sync_status === 'pending') watchDatajud(id, token, historyPage);
       } catch (error) { report(error); } finally { body.removeAttribute('aria-busy'); }
     }
-    function linkedSection(title, items, remove, add) {
+    function linkedSection(title, items, remove, add, layoutClass = '') {
       const box = section(title, 'VÍN');
+      if (layoutClass) box.classList.add(layoutClass);
       if (!items.length) box.body.append($('p', 'law-record-detail-empty', 'Nenhum vínculo registrado.'));
       items.forEach((item) => {
         const row = $('div', 'law-record-linked-row');
@@ -504,18 +527,18 @@
         if (!options.length) throw new Error('Não há etiquetas disponíveis. A chefia ou o administrador pode cadastrá-las nas configurações da unidade.');
         const tag = select(options.map((v) => [v.id, v.name]));
         simpleForm('Adicionar etiqueta', [['Etiqueta', tag, 'tag_id']], async () => { await request(`${apiPath(id)}/tags`, { method: 'POST', body: { tag_id: tag.value } }); await detail(id); }, 'Adicionar etiqueta', event?.currentTarget);
-      });
+      }, 'law-record-detail-tags');
     }
     function renderContacts(result, local) {
       const id = result.case.id;
-      linkedSection('Contatos e papéis processuais', result.contacts.map((item) => ({ ...item, label: item.display_name, detail: `${text(item.case_role_label)}${item.company_name ? ` - ${item.company_name}` : ''}` })), (item) => request(`${apiPath(id)}/contacts/${item.id}`, { method: 'DELETE' }), (event) => {
+      linkedSection('Partes processuais vinculadas', result.contacts.map((item) => ({ ...item, label: item.display_name, detail: `${text(item.case_role_label)}${item.company_name ? ` - ${item.company_name}` : ''}` })), (item) => request(`${apiPath(id)}/contacts/${item.id}`, { method: 'DELETE' }), (event) => {
         const search = input('', 'search', 100); const contact = select([['', 'Selecione um contato']]); contact.required = true;
         const role = select(local.roles.map((v) => [v.code, v.label])); role.required = true;
         let token = 0;
         const populate = (items) => { contact.replaceChildren(new Option('Selecione um contato', ''), ...items.map((v) => new Option(v.display_name, v.id))); }; populate(local.contacts);
         const modal = simpleForm('Vincular contato', [['Pesquisar contato', search, 'contact_search', 'Reutilize o cadastro de Contatos. Informe o nome e escolha Pesquisar.'], ['Contato', contact, 'law_contact_id'], ['Papel processual', role, 'case_role']], async () => { await request(`${apiPath(id)}/contacts`, { method: 'POST', body: { law_contact_id: contact.value, case_role: role.value } }); await detail(id); }, 'Vincular contato', event?.currentTarget);
         const find = button('Pesquisar contatos', action(async () => { const requestToken = ++token; const data = await references(result.case.law_unit_id, search.value); if (modal.element.isConnected && token === requestToken) populate(data.contacts); })); modal.body.prepend(find);
-      });
+      }, 'law-record-detail-contacts');
     }
     function renderRelations(result) {
       const id = result.case.id;
@@ -523,7 +546,7 @@
         const number = input('', 'text', 25); number.required = true;
         const kind = select(['dependent', 'apenso'].map((v) => [v, text(v)]));
         simpleForm('Relacionar processo', [['Número CNJ relacionado', number, 'related_case_number'], ['Tipo de vínculo', kind, 'relation_type', 'Vínculo informativo. Estado, sigilo e autorizações continuam independentes.']], async () => { await request(`${apiPath(id)}/relations`, { method: 'POST', body: { related_case_number: number.value, relation_type: kind.value } }); await detail(id); }, 'Relacionar processo', event?.currentTarget);
-      });
+      }, 'law-record-detail-relations');
     }
     async function renderAccess(result, local) {
       const id = result.case.id; const accesses = await request(`${apiPath(id)}/access`); if (!active() || currentId !== id) return;

@@ -152,6 +152,9 @@
 
     const state = $('p', 'law-contact-feedback'); state.setAttribute('role', 'status'); root.append(state);
     const tableWrap = $('div', 'fs-table-responsive law-record-table-wrap');
+    tableWrap.tabIndex = 0;
+    tableWrap.setAttribute('role', 'region');
+    tableWrap.setAttribute('aria-label', 'Tabela de contatos');
     const table = $('table', 'fs-table law-record-table');
     const thead = $('thead'); const headerRow = $('tr');
     ['Nome', 'Cadastro', 'Profissão / vínculo', 'Tags', 'Ações'].forEach((label) => headerRow.append($('th', '', label)));
