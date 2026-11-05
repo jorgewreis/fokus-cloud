@@ -534,6 +534,7 @@
 .law-record-detail-hierarchy .law-record-detail-items, .law-record-detail-cases .law-record-detail-items { grid-template-columns: minmax(0, 1fr); }
 .law-record-detail-cases .law-record-detail-linked-contact { grid-column: 1 / -1; }
 .law-record-detail-case-link { display: grid; box-sizing: border-box; width: 100%; justify-content: initial; gap: 4px; color: var(--law-shell-ink); background: #fff; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease; }
+button.law-record-detail-case-link:not(.fs-form-select):not(.fs-dropdown-item):not(.fs-btn-icon):not(.fs-btn-close):not(.fs-table-action):not(.sidebar-button) { width: 100%; inline-size: 100%; flex: none; align-self: stretch; justify-self: stretch; }
 .law-record-detail-case-number { color: var(--law-shell-ink); font-size: 12px; font-weight: 700; line-height: 1.35; }
 .law-record-detail-case-location, .law-record-detail-case-summary { display: block; color: var(--law-shell-muted); font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
 .law-record-detail-case-link:hover { border-color: var(--law-shell-purple); background: #fcfaff; box-shadow: 0 2px 8px rgba(48, 26, 68, .08); }
