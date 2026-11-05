@@ -1065,7 +1065,7 @@
             feedback.textContent = preview.message || `Saldo disponível: ${preview.available_credits || 0} créditos. A consulta exige pelo menos ${preview.minimum_credits || 0}.`;
             return;
           }
-          const courts = (preview.court_names || []).map((court) => `${court.name}${court.status === 'unavailable' ? ' (temporariamente indisponível; pode consumir crédito sem resultado)' : ''}`).join(', ');
+          const courts = (preview.court_names || []).map((court) => `${court.name}${court.status === 'unavailable' ? ' (temporariamente indisponível)' : ''}`).join(', ');
           const accepted = window.confirm(`A consulta manual pesquisará ${courts}. O custo mínimo é ${preview.minimum_credits} crédito(s), podendo aumentar se forem encontrados mais de 10 processos por tribunal. Saldo disponível: ${preview.available_credits}. Deseja continuar?`);
           if (!accepted) {
             feedback.textContent = 'Consulta cancelada. Nenhum crédito foi consumido.';
