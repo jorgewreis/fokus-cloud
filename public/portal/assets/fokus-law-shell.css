@@ -521,6 +521,8 @@
 .law-record-detail-summary::after { position: absolute; right: -24px; bottom: -74px; width: 188px; height: 188px; border: 1px solid rgba(255,255,255,.12); border-radius: 50%; content: ""; box-shadow: 0 0 0 22px rgba(255,255,255,.035), 0 0 0 45px rgba(255,255,255,.025); pointer-events: none; }
 .law-record-detail-avatar { display: grid; width: 58px; height: 58px; place-items: center; border: 0; border-radius: 8px; background: rgba(255, 255, 255, .05); color: #fff; font-size: 20px; font-weight: 750; letter-spacing: .02em; }
 .law-record-detail-avatar img { width: 28px; height: 28px; object-fit: contain; filter: brightness(0) invert(1); }
+.law-process-detail-avatar { background: transparent; }
+.law-process-detail-avatar img { filter: none; }
 .law-record-detail-summary-copy { position: relative; z-index: 1; min-width: 0; padding-right: 28px; }
 .law-record-detail-eyebrow { display: block; margin-bottom: 5px; padding-right: 112px; color: #d5c1e8; font-size: 10px; font-weight: 750; letter-spacing: .13em; }
 .law-record-detail-name { margin: 0; color: #fff; font-size: 20px; font-weight: 680; line-height: 1.2; overflow-wrap: anywhere; }

@@ -380,7 +380,7 @@
           }, archiveAction === 'archive' ? 'Arquivar processo' : 'Reabrir processo', event?.currentTarget);
         })));
         headingActions.append(...actions.children);
-        const identity = $('section', 'law-record-detail-summary'); const symbol = $('span', 'law-record-detail-avatar'); const image = $('img'); image.src = '/backoffice/assets/icons/Zip-File--Streamline-Ultimate-Regular.svg'; image.alt = ''; symbol.append(image);
+        const identity = $('section', 'law-record-detail-summary'); const symbol = $('span', 'law-record-detail-avatar law-process-detail-avatar'); const image = $('img'); image.src = '/backoffice/assets/icons/Office-Folder--Streamline-Ultimate-Colors.png'; image.alt = ''; symbol.append(image);
         const copy = $('div', 'law-record-detail-summary-copy'); copy.append($('span', 'law-record-detail-eyebrow', 'JUDICIÁRIO CRIMINAL'), $('h3', 'law-record-detail-name', c.case_number_formatted), $('p', 'law-record-detail-legal-name', `${text(c.case_class)} · ${c.unit_name}`));
         const operationalStatus = String(c.operational_status_label || '').trim();
         const officialStatus = String(c.official_status_text || '').trim();
