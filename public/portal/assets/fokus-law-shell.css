@@ -146,7 +146,7 @@
 .law-popover > span { color: var(--law-shell-muted); font-size: 11px; }
 .law-mobile-menu { display: none; }
 
-.law-content { width: min(100%, 1100px); flex: 1; align-self: center; padding: clamp(26px, 5vh, 52px) 0 36px; }
+.law-content { width: min(100%, 1600px); flex: 1; align-self: center; padding: clamp(26px, 5vh, 52px) 0 36px; }
 .law-page-eyebrow { margin: 0 0 6px; color: var(--law-shell-purple); font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
 .law-content h2 { margin: 0; color: var(--law-shell-ink); font-size: clamp(22px, 3vw, 30px); font-weight: 600; letter-spacing: -.025em; }
 .law-page-lede { max-width: 650px; margin: 9px 0 26px; color: #6f6574; font-size: 13px; }
@@ -1066,8 +1066,8 @@ button.law-record-detail-case-link:not(.fs-form-select):not(.fs-dropdown-item):n
 .law-module-toggle[aria-expanded="true"] .law-module-chevron { transform: rotate(180deg); }
 .law-module-pages { display: grid; gap: 5px; margin: 5px 0 10px 15px; padding-left: 10px; border-left: 1px solid rgba(255,255,255,.2); }
 .law-module-pages .law-nav-item { font-size: 12px; }
-.law-user-footer { position: relative; display: block; }
-.law-account-toggle { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; border: 0; border-radius: 7px; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.law-user-footer { position: relative; display: block; width: 100%; align-self: stretch; }
+.law-account-toggle { display: flex; box-sizing: border-box; align-items: center; gap: 10px; width: 100%; min-width: 0; min-height: 48px; padding-inline: 8px; border: 0; border-radius: 7px; background: transparent; color: inherit; text-align: left; cursor: pointer; }
 .law-account-toggle .law-user-meta { flex: 1; min-width: 0; }
 .law-account-panel { position: absolute; z-index: 35; bottom: calc(100% + 8px); left: 0; right: 0; display: grid; gap: 4px; max-height: min(320px, 65dvh); overflow: auto; padding: 10px; border: 1px solid rgba(255,255,255,.25); border-radius: 10px; background: var(--law-shell-raised); box-shadow: 0 10px 30px rgba(0,0,0,.3); }
 .law-account-panel .law-nav-item { width: 100% !important; min-height: 44px; }
