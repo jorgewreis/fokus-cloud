@@ -157,6 +157,7 @@ class LawCaseManagementService
             'subjects' => $this->presentSubjects(json_decode((string) ($case->subjects ?? ''), true) ?: [], (string) $case->company_id),
             'court_name' => $case->court_name,
             'court_code' => $case->court_code,
+            'comarca' => $case->comarca ?? null,
             'official_status_code' => $case->official_status_code,
             'official_status_text' => $case->official_status_text,
             'filing_date' => $case->filing_date,
@@ -191,6 +192,43 @@ class LawCaseManagementService
     {
         if (strlen($digits) !== 20) return $digits;
         return substr($digits, 0, 7).'-'.substr($digits, 7, 2).'.'.substr($digits, 9, 4).'.'.substr($digits, 13, 1).'.'.substr($digits, 14, 2).'.'.substr($digits, 16, 4);
+    }
+
+    public function comarcaForCaseNumber(string $caseNumber): ?string
+    {
+        $identity = $this->originIdentity($caseNumber);
+        if ($identity === null) return null;
+        return DB::table('law_case_origin_comarcas')->where('justice_branch', $identity[0])
+            ->where('tribunal_code', $identity[1])->where('origin_code', $identity[2])->value('comarca_name');
+    }
+
+    public function saveComarcaMapping(string $caseNumber, string $comarca, string $actorId, string $companyId, ?string $excludeCaseId = null): void
+    {
+        $identity = $this->originIdentity($caseNumber);
+        if ($identity === null) return;
+        [$branch, $tribunal, $origin] = $identity;
+        $comarca = trim($comarca);
+        DB::table('law_case_origin_comarcas')->insertOrIgnore([
+            'justice_branch' => $branch, 'tribunal_code' => $tribunal, 'origin_code' => $origin,
+            'comarca_name' => $comarca, 'created_by' => $actorId, 'created_company_id' => $companyId,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $mapping = DB::table('law_case_origin_comarcas')->where('justice_branch', $branch)->where('tribunal_code', $tribunal)->where('origin_code', $origin)->lockForUpdate()->first();
+        if (! $mapping || mb_strtolower(trim((string) $mapping->comarca_name)) !== mb_strtolower($comarca)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['comarca' => 'Este código de unidade de origem já está associado a outra comarca. Revise o cadastro antes de alterar o vínculo.']);
+        }
+        DB::table('law_cases')->whereNull('comarca')->when($excludeCaseId, fn ($query) => $query->where('id', '<>', $excludeCaseId))
+            ->whereRaw('SUBSTRING(case_number, 14, 1) = ?', [$branch])
+            ->whereRaw('SUBSTRING(case_number, 15, 2) = ?', [$tribunal])
+            ->whereRaw('SUBSTRING(case_number, 17, 4) = ?', [$origin])
+            ->update(['comarca' => $mapping->comarca_name, 'version' => DB::raw('version + 1'), 'updated_at' => now()]);
+    }
+
+    private function originIdentity(string $caseNumber): ?array
+    {
+        $digits = preg_replace('/\D+/', '', $caseNumber) ?? '';
+        if (strlen($digits) !== 20) return null;
+        return [substr($digits, 13, 1), substr($digits, 14, 2), substr($digits, 16, 4)];
     }
 
     private function upsertConflict(string $companyId, string $caseId, string $field, mixed $manualValue, mixed $officialValue): void

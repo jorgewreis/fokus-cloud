@@ -223,6 +223,7 @@ class LawCaseController extends Controller
         abort_unless($unit, 422, 'Selecione uma unidade ativa da empresa.');
         $caseNumber = $this->normalizeCaseNumber($data['case_number'], $companyId, (string) $unit->id);
         $this->assertValidCnj($caseNumber);
+        $comarca = $cases->comarcaForCaseNumber($caseNumber);
         abort_if(DB::table('law_cases')->where('company_id', $companyId)->where('case_number', $caseNumber)->exists(), 409, 'Já existe um processo com este número nesta empresa.');
         $class = $this->resolveMetadataOption($companyId, 'class', $data['case_class_code'] ?? null, $data['case_class'] ?? null, (string) $request->user()->id);
         $subjects = collect($data['subjects'] ?? [])->map(fn (array $subject) => $this->resolveMetadataOption($companyId, 'subject', $subject['code'], $subject['name'] ?? null, (string) $request->user()->id))->values()->all();
@@ -233,10 +234,11 @@ class LawCaseController extends Controller
         $userId = (string) $request->user()->id;
         $now = now();
         try {
-            DB::transaction(function () use ($data, $caseNumber, $companyId, $unit, $id, $userId, $now, $class, $subjects, $subjectCodes): void {
+            DB::transaction(function () use ($data, $caseNumber, $comarca, $companyId, $unit, $id, $userId, $now, $class, $subjects, $subjectCodes): void {
                 DB::table('law_cases')->insert([
                     'id' => $id, 'company_id' => $companyId, 'law_unit_id' => $unit->id, 'case_number' => $caseNumber,
                     'case_class' => null, 'case_class_code' => $class['code'] ?? null,
+                    'comarca' => $comarca,
                     'official_status_text' => 'Em andamento',
                     'subjects' => json_encode($subjectCodes, JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]',
                     'datajud_metadata' => '{}', 'manual_metadata' => json_encode(array_filter(['case_class_code' => $class['code'] ?? null, 'subjects' => $subjectCodes], fn ($v) => $v !== null && $v !== []), JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}', 'datajud_sync_status' => 'pending',
@@ -352,6 +354,7 @@ class LawCaseController extends Controller
             'case_class_code' => ['sometimes', 'nullable', 'string', 'max:32'],
             'subjects' => ['sometimes', 'array', 'max:30'], 'subjects.*.code' => ['nullable', 'string', 'max:32'], 'subjects.*.name' => ['required_with:subjects', 'string', 'max:180'],
             'court_name' => ['sometimes', 'nullable', 'string', 'max:180'], 'court_code' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'comarca' => ['sometimes', 'nullable', 'string', 'max:180'],
             'official_status_code' => ['sometimes', 'nullable', 'string', 'max:48'],
             'official_status_text' => ['sometimes', 'nullable', Rule::in(['Em andamento', 'Suspenso', 'Arquivado', 'Em grau de recurso'])],
             'filing_date' => ['sometimes', 'nullable', 'date'], 'distribution_date' => ['sometimes', 'nullable', 'date'],
@@ -362,6 +365,10 @@ class LawCaseController extends Controller
             'confidentiality_level' => ['sometimes', 'required', Rule::in(self::CONFIDENTIALITY)],
             'responsible_membership_id' => ['sometimes', 'nullable', 'string', 'max:30'],
         ]);
+        if (array_key_exists('comarca', $data) && trim((string) $data['comarca']) === '') {
+            $mappedComarca = $cases->comarcaForCaseNumber((string) $current->case_number);
+            if ($mappedComarca !== null) $data['comarca'] = $mappedComarca;
+        }
         unset($data['version']);
         if (isset($data['operational_status']) && $data['operational_status'] !== $current->operational_status) {
             abort_if($data['operational_status'] === 'archived' || $current->operational_status === 'archived', 422, 'Use a ação Arquivar ou Reabrir e informe o motivo.');
@@ -379,7 +386,7 @@ class LawCaseController extends Controller
         $metadataFields = ['case_class', 'case_class_code', 'subjects', 'court_name', 'court_code', 'official_status_code', 'official_status_text'];
         foreach ($metadataFields as $field) {
             if (! array_key_exists($field, $data)) continue;
-            if (array_key_exists($field, $official)) {
+            if ($field !== 'comarca' && array_key_exists($field, $official)) {
                 throw ValidationException::withMessages([$field => 'Este dado foi retornado pelo Datajud e não pode ser editado.']);
             }
         }
@@ -429,14 +436,18 @@ class LawCaseController extends Controller
             $old = in_array($field, ['subjects', 'procedural_priorities'], true) ? $cases->caseArray($current)[$field] : ($current->{$field} ?? null);
             if ($old !== $value) { $before[$field] = $old; $after[$field] = $value; }
         }
-        if (! $after) return response()->json(['case' => $cases->caseArray($current)]);
+        if (! $after) {
+            if (! empty($data['comarca'])) DB::transaction(fn () => $cases->saveComarcaMapping((string) $current->case_number, (string) $data['comarca'], (string) $request->user()->id, (string) $current->company_id, (string) $current->id));
+            return response()->json(['case' => $cases->caseArray($this->findCase($request, $case, $cases))]);
+        }
 
-        DB::transaction(function () use ($current, $columns, $before, $after, $data, $request, $audit): void {
+        DB::transaction(function () use ($current, $columns, $before, $after, $data, $request, $audit, $cases): void {
             $columns['updated_by'] = $request->user()->id;
             $columns['version'] = DB::raw('version + 1');
             $columns['updated_at'] = now();
             $changed = DB::table('law_cases')->where('company_id', $current->company_id)->where('id', $current->id)->where('version', $current->version)->update($columns);
             abort_if($changed !== 1, 409, 'O processo foi alterado por outra pessoa. Atualize a página antes de salvar.');
+            if (! empty($data['comarca'])) $cases->saveComarcaMapping((string) $current->case_number, (string) $data['comarca'], (string) $request->user()->id, (string) $current->company_id, (string) $current->id);
             if (array_key_exists('procedural_priorities', $data)) {
                 $selected = array_values(array_unique($data['procedural_priorities']));
                 $existing = DB::table('law_case_procedural_priorities')->where('company_id', $current->company_id)->where('law_case_id', $current->id)->get(['id', 'code']);

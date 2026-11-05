@@ -188,7 +188,27 @@ class LawContactController extends Controller
         $contact = DB::table('law_contacts')->where('company_id', $companyId)->where('id', $contactId)->whereNull('deleted_at')->whereNull('merged_into_id')->first();
         if ($contact) {
             $this->recordActivity($companyId, $contactId, (string) $request->user()->id, $request->boolean('from_search') ? 'search_opened' : 'viewed');
-            return response()->json(['contact' => $this->contactPayload($companyId, $contact, $canSensitive, $canMerge, includePrivateDetails: true)]);
+            $payload = $this->contactPayload($companyId, $contact, $canSensitive, $canMerge, includePrivateDetails: true);
+            $membershipId = (string) ($request->attributes->get('active_membership')?->id ?? '');
+            $payload['cases'] = DB::table('law_case_contacts as link')
+                ->join('law_cases as law_case', function ($join): void {
+                    $join->on('law_case.company_id', '=', 'link.company_id')->on('law_case.id', '=', 'link.law_case_id');
+                })
+                ->leftJoin('law_units as unit', function ($join): void {
+                    $join->on('unit.company_id', '=', 'law_case.company_id')->on('unit.id', '=', 'law_case.law_unit_id');
+                })
+                ->where('link.company_id', $companyId)->where('link.law_contact_id', $contactId)
+                ->where(function ($query) use ($membershipId): void {
+                    $query->where('law_case.confidentiality_level', '!=', 'secret')->orWhereExists(function ($access) use ($membershipId): void {
+                        $access->selectRaw('1')->from('law_confidential_case_accesses as access')
+                            ->whereColumn('access.company_id', 'law_case.company_id')->whereColumn('access.law_case_id', 'law_case.id')
+                            ->where('access.company_membership_id', $membershipId)->whereNull('access.revoked_at');
+                    });
+                })
+                ->orderBy('law_case.case_number')->get(['law_case.id', 'law_case.case_number', 'law_case.case_class', 'law_case.court_name', 'law_case.official_status_text', 'link.case_role_label', 'unit.name as unit_name'])
+                ->map(fn ($row): array => ['id' => (string) $row->id, 'case_number' => (string) $row->case_number, 'case_class' => $row->case_class, 'court_name' => $row->court_name, 'official_status_text' => $row->official_status_text, 'case_role' => (string) $row->case_role_label, 'unit_name' => $row->unit_name])
+                ->all();
+            return response()->json(['contact' => $payload]);
         }
         abort_unless($authorization->can($request, 'law.contacts.shared.view', $unitId), 404, 'Contato não encontrado.');
         $shared = $this->findSharedContact($companyId, $contactId, $canSensitive);

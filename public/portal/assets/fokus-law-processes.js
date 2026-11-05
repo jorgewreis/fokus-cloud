@@ -277,7 +277,7 @@
         metadata.body.append(field('Assuntos cadastrados', editor.subjectsSelect, 'subjects', 'Use Ctrl ou Command para selecionar mais de um assunto.'), button('Adicionar outro assunto', () => editor.addCustom()), editor.customHost);
       } else metadata.body.append(keyValues([['Assuntos', text(c.subjects)]]));
       controls._metadataEditor = editor;
-      for (const [name, label] of [['court_name', 'Órgão julgador'], ['official_status_text', 'Situação oficial']]) {
+      for (const [name, label] of [['court_name', 'Tribunal / órgão julgador'], ['official_status_text', 'Situação oficial']]) {
         if (!(c.official_fields || []).includes(name)) {
           const statuses = ['Em andamento', 'Suspenso', 'Arquivado', 'Em grau de recurso'];
           const currentStatus = statuses.includes(c.official_status_text) ? c.official_status_text : 'Em andamento';
@@ -287,6 +287,7 @@
         }
         else metadata.body.append(keyValues([[label, text(c[name])]]));
       }
+      add(metadata, 'Comarca', 'comarca', input(c.comarca), 'Informe a comarca vinculada ao processo.');
       add(metadata, 'Data de autuação', 'filing_date', input(c.filing_date, 'date'));
       add(metadata, 'Data de distribuição', 'distribution_date', input(c.distribution_date, 'date'));
       metadata.body.append($('p', 'fs-u-color-secondary', 'Os campos retornados pelo Datajud ficam disponíveis para consulta. Campos ausentes podem ser preenchidos manualmente.'));
@@ -354,7 +355,7 @@
         [text(c.operational_priority), text(c.confidentiality_level)].filter(Boolean).forEach((label) => badges.append($('span', 'law-record-detail-chip', label))); copy.append(badges); identity.append(symbol, copy); body.append(identity);
         if (needsConfidentialityAlert(c.procedural_priorities, c.confidentiality_level)) { const alert = $('p', 'fs-alert fs-alert-warning', confidentialityAlert); alert.setAttribute('role', 'alert'); body.append(alert); }
         const main = section('Dados processuais', 'CNJ', 'Classe, assuntos e informações oficiais');
-        main.body.append(keyValues([['Classe judicial', text(c.case_class)], ['Órgão julgador', text(c.court_name)], ['Assuntos', text(c.subjects)], ['Situação oficial', text(c.official_status_text)], ['Autuação', c.filing_date ? new Date(`${c.filing_date}T12:00:00`).toLocaleDateString('pt-BR') : 'Não informada'], ['Distribuição', c.distribution_date ? new Date(`${c.distribution_date}T12:00:00`).toLocaleDateString('pt-BR') : 'Não informada'], ['Última consulta ao Datajud', date(c.last_datajud_checked_at)]]));
+        main.body.append(keyValues([['Classe judicial', text(c.case_class)], ['Tribunal / órgão julgador', text(c.court_name)], ['Comarca', text(c.comarca)], ['Assuntos', text(c.subjects)], ['Situação oficial', text(c.official_status_text)], ['Autuação', c.filing_date ? new Date(`${c.filing_date}T12:00:00`).toLocaleDateString('pt-BR') : 'Não informada'], ['Distribuição', c.distribution_date ? new Date(`${c.distribution_date}T12:00:00`).toLocaleDateString('pt-BR') : 'Não informada'], ['Última consulta ao Datajud', date(c.last_datajud_checked_at)]]));
         main.body.append(keyValues([['Resultado da consulta', c.datajud_sync_status === 'pending' ? 'Aguardando consulta' : text(result.datajud?.code || c.datajud_sync_status)], ['Última atualização bem-sucedida', c.last_datajud_synced_at ? date(c.last_datajud_synced_at) : 'Ainda não houve atualização pelo Datajud']]));
         const fallbackMessage = c.datajud_sync_status === 'pending' ? 'Processo cadastrado. A consulta ao Datajud será feita em segundo plano e pode levar alguns minutos. Você pode continuar trabalhando; os dados aparecerão aqui automaticamente.' : c.datajud_sync_status === 'not_found' ? 'A consulta foi concluída, mas o Datajud não disponibilizou dados públicos para este processo. Você pode preencher os campos ausentes manualmente.' : c.datajud_sync_status === 'synced' ? 'A última consulta ao Datajud foi concluída. Os campos não fornecidos pelo CNJ podem ser preenchidos manualmente.' : 'A última consulta ao Datajud falhou. Consulte o histórico para conferir o motivo ou tente novamente.';
         const feedback = $('p', `fs-alert ${['pending', 'not_found'].includes(c.datajud_sync_status) ? 'fs-alert-info' : c.datajud_sync_status === 'synced' ? 'fs-alert-success' : 'fs-alert-warning'}`, `${(c.datajud_sync_status === 'pending' ? fallbackMessage : result.datajud?.message) || fallbackMessage}${c.datajud_sync_status === 'error' ? ' O cadastro e os dados já registrados foram preservados.' : ''}`);
@@ -497,7 +498,7 @@
           });
           box.body.append(list);
           const form = $('form', 'law-process-settings-add-form'); const name = input('', 'text', type === 'tags' ? 64 : 80); name.required = true; name.placeholder = type === 'tags' ? 'Ex.: Prioridade' : 'Digite um nome'; const error = message(); const save = button('Adicionar', null, true); save.type = 'submit'; form.append(field(type === 'tags' ? 'Nome da etiqueta' : 'Nome da opção', name, property), error, save); box.body.append(form);
-          bindForm(form, save, error, async () => { await request(`/options/${type}`, { method: 'POST', body: { law_unit_id: unit.value, [property]: name.value.trim() } }); await draw(); }); host.append(box);
+          bindForm(form, save, error, async () => { const fieldName = adminVariant ? 'label' : property; await request(`/options/${type}`, { method: 'POST', body: { law_unit_id: unit.value, [fieldName]: name.value.trim() } }); await draw(); }); host.append(box);
         }
       }
       unit.addEventListener('change', action(draw)); await draw();

@@ -882,6 +882,15 @@
         hierarchyItems.append(row);
       });
     }
+    if (contact.cases?.length) {
+      const items = addSection('Processos vinculados', 'PROC', contact.cases.length, 'law-record-detail-cases');
+      contact.cases.forEach((linkedCase) => {
+        const row = $('article', 'law-record-detail-linked-contact');
+        row.append($('strong', '', linkedCase.case_number));
+        row.append($('span', '', [linkedCase.case_role, linkedCase.case_class, linkedCase.court_name, linkedCase.unit_name, linkedCase.official_status_text].filter(Boolean).join(' · ')));
+        items.append(row);
+      });
+    }
     (contact.institutional_data || []).forEach((institution) => {
       const items = addSection(`${institution.primary ? 'Tipo institucional principal · ' : ''}${institution.type === 'court_unit' ? 'Dados da unidade judiciária' : 'Dados do órgão público'}`, 'INS', '', 'law-record-detail-institution');
       const values = institution.type === 'court_unit'
