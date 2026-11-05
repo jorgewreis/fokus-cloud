@@ -387,6 +387,21 @@
           });
           main.body.append(movementHeading, movementList);
         }
+        const djenProcessData = djenMetadata.process_data || {};
+        const djenRecipients = Array.isArray(djenProcessData.communication_recipients) ? djenProcessData.communication_recipients : [];
+        const djenAttorneys = Array.isArray(djenProcessData.communication_recipient_attorneys) ? djenProcessData.communication_recipient_attorneys : [];
+        if (djenProcessData.case_number || djenProcessData.tribunal || djenProcessData.court_name || djenProcessData.case_class || djenRecipients.length || djenAttorneys.length) {
+          const djenDataHeading = $('h4', 'law-record-detail-section-subheading', 'Dados processuais complementares do DJEN');
+          main.body.append(djenDataHeading, keyValues([
+            ['Número do processo informado pelo DJEN', text(djenProcessData.case_number)],
+            ['Tribunal informado pelo DJEN', text(djenProcessData.tribunal)],
+            ['Órgão julgador informado pelo DJEN', text(djenProcessData.court_name)],
+            ['Classe informada pelo DJEN', text(djenProcessData.case_class)],
+            ['Destinatários nas comunicações', djenRecipients.map((item) => `${item.name}${item.pole ? ` (${item.pole})` : ''}`).join('; ')],
+            ['Advogados destinatários', djenAttorneys.map((item) => item.name).join('; ')],
+          ]));
+          main.body.append($('p', 'law-record-detail-empty', 'Esses dados vêm das comunicações localizadas no DJEN e podem não representar a composição completa ou atual do processo. Eles são exibidos como complemento e não substituem os dados oficiais nem os contatos cadastrados.'));
+        }
         if (c.djen_sync_status !== 'not_requested') {
           const publicationsHeading = $('h4', 'law-record-detail-section-subheading', 'Publicações recentes do DJEN');
           main.body.append(publicationsHeading);

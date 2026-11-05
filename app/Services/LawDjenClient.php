@@ -36,7 +36,7 @@ class LawDjenClient
             }
 
             $publications = collect($items)
-                ->filter(fn ($item): bool => is_array($item) && preg_replace('/\D+/', '', (string) ($item['numeroProcesso'] ?? '')) === $digits)
+                ->filter(fn ($item): bool => is_array($item) && preg_replace('/\D+/', '', (string) ($item['numeroProcesso'] ?? $item['numero_processo'] ?? '')) === $digits)
                 ->map(fn (array $item): array => $this->normalizePublication($item))
                 ->filter(fn (array $item): bool => $item['publication_date'] !== null || $item['type'] !== null || $item['court_name'] !== null)
                 ->unique(fn (array $item): string => (string) ($item['hash'] ?: implode('|', [$item['publication_date'], $item['type'], $item['court_name']])))
@@ -50,6 +50,10 @@ class LawDjenClient
             }
 
             $latest = $publications[0];
+            $recipients = collect($publications)->flatMap(fn (array $item): array => $item['recipients'])
+                ->unique(fn (array $item): string => mb_strtolower($item['name'].'|'.($item['pole'] ?? '')))->values()->all();
+            $recipientAttorneys = collect($publications)->flatMap(fn (array $item): array => $item['recipient_attorneys'])
+                ->unique(fn (array $item): string => mb_strtolower($item['name']))->values()->all();
             return [
                 'status' => 'synced', 'code' => 'synced',
                 'metadata' => [
@@ -57,8 +61,16 @@ class LawDjenClient
                     'suggested_case_class' => $latest['case_class'],
                     'suggested_court_name' => $latest['court_name'],
                     'tribunal' => $latest['tribunal'],
+                    'process_data' => array_filter([
+                        'case_number' => $digits,
+                        'tribunal' => $latest['tribunal'],
+                        'court_name' => $latest['court_name'],
+                        'case_class' => $latest['case_class'],
+                        'communication_recipients' => $recipients,
+                        'communication_recipient_attorneys' => $recipientAttorneys,
+                    ], static fn ($value): bool => $value !== null && $value !== []),
                 ],
-                'message' => 'Publicações recentes do DJEN atualizadas. Elas são exibidas separadamente dos dados oficiais do processo.',
+                'message' => 'Dados de identificação e nomes das comunicações recentes do DJEN atualizados. Esses dados complementares permanecem separados dos dados oficiais do processo.',
             ];
         } catch (ConnectionException $exception) {
             $timedOut = preg_match('/cURL error 28|timed?\s*out|timeout/i', $exception->getMessage()) === 1;
@@ -85,7 +97,32 @@ class LawDjenClient
             'type' => $this->shortText($item['tipoComunicacao'] ?? null, 120),
             'document_type' => $this->shortText($item['tipoDocumento'] ?? null, 120),
             'link' => $link !== '' ? $link : null,
+            'recipients' => $this->normalizeRecipients($item['destinatarios'] ?? []),
+            'recipient_attorneys' => $this->normalizeAttorneys($item['destinatarioadvogados'] ?? []),
         ];
+    }
+
+    private function normalizeRecipients(mixed $items): array
+    {
+        if (! is_array($items)) return [];
+        return collect($items)->map(function ($item): ?array {
+            if (is_scalar($item)) $item = ['nome' => $item];
+            if (! is_array($item)) return null;
+            $name = $this->shortText($item['nome'] ?? $item['name'] ?? null, 180);
+            if ($name === null) return null;
+            return array_filter(['name' => $name, 'pole' => $this->shortText($item['polo'] ?? null, 40)], static fn ($value) => $value !== null);
+        })->filter()->unique(fn (array $item): string => mb_strtolower($item['name'].'|'.($item['pole'] ?? '')))->take(100)->values()->all();
+    }
+
+    private function normalizeAttorneys(mixed $items): array
+    {
+        if (! is_array($items)) return [];
+        return collect($items)->map(function ($item): ?array {
+            if (! is_array($item)) return null;
+            $attorney = is_array($item['advogado'] ?? null) ? $item['advogado'] : $item;
+            $name = $this->shortText($attorney['nome'] ?? $item['nome'] ?? null, 180);
+            return $name === null ? null : ['name' => $name];
+        })->filter()->unique(fn (array $item): string => mb_strtolower($item['name']))->take(100)->values()->all();
     }
 
     private function shortText(mixed $value, int $limit): ?string

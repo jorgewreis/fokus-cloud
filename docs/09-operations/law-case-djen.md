@@ -4,7 +4,7 @@
 
 O DJEN complementa o DataJud com metadados de comunicações e publicações. A consulta é feita pelo número CNJ completo e retorna apenas dados descritivos: data de disponibilização, tribunal, órgão, classe indicada, tipo de comunicação/documento e link HTTPS quando fornecido.
 
-O conteúdo da publicação e dados pessoais de destinatários não são armazenados. Resultados do DJEN ficam em `djen_metadata`, separados dos campos oficiais mantidos pelo DataJud e dos valores editáveis pelo usuário. Classe ou órgão podem ser sugeridos na tela quando o cadastro estiver vazio; o DJEN não altera classe, tribunal, comarca, situação processual nem calcula prazos.
+O sistema não armazena o teor integral da publicação nem documentos. Em `djen_metadata`, guarda apenas metadados da comunicação, nomes e polos dos destinatários e nomes dos advogados destinatários, quando fornecidos. Classe, tribunal e órgão julgador são exibidos como complementos identificados pela fonte, sem sobrescrever o cadastro, os dados do DataJud ou os contatos vinculados. O DJEN não fornece situação processual consolidada nem permite calcular prazos com segurança.
 
 O usuário pode iniciar uma consulta pelo detalhe do processo. Cadastros novos também enfileiram a consulta automaticamente. A fila `law-datajud` processa o trabalho junto às consultas DataJud. O scheduler executa `law:sync-case-djen` diariamente às 03:45, limitado a 500 processos por execução, ajustável com `--limit`. Processos ativos são atualizados no máximo uma vez por mês; falhas contam como tentativa e não apagam metadados anteriores.
 
@@ -16,7 +16,7 @@ O estado da última tentativa fica em `djen_sync_status` (`not_requested`, `pend
 
 ## Limitações
 
-O DJEN centraliza comunicações publicadas no diário eletrônico, mas não substitui a consulta de metadados e movimentações do DataJud nem garante cobertura de todo ato processual. A ausência de publicação não prova ausência de movimentação ou de prazo. Uma publicação pode não trazer classe, órgão ou link.
+O endpoint público do DJEN consulta comunicações e publicações; não é uma API geral de capa processual. A resposta das comunicações pode complementar a identificação do processo com tribunal, órgão julgador, classe e destinatários ou advogados indicados naquela comunicação. Isso não representa necessariamente a composição completa e atual do processo. O DJEN não substitui a consulta de metadados e movimentações do DataJud nem garante cobertura de todo ato processual. A ausência de publicação não prova ausência de movimentação ou de prazo. Uma publicação pode não trazer classe, órgão ou link.
 
 O MNI do TJBA não faz parte desta integração porque o acesso foi negado. Não há consulta MNI nem tentativa de contornar o controle do tribunal. DataJud e DJEN são fontes independentes e sua disponibilidade pode variar.
 
