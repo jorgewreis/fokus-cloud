@@ -228,7 +228,8 @@
         const archivedField = $('div', 'fs-check'); archivedField.append(archived, archivedLabel);
         const submit = button('Pesquisar', null, true); submit.type = 'submit';
         const searchField = field('Pesquisar processo', search, 'q'); searchField.className = 'law-record-field';
-        form.append(searchField, submit, archivedField);
+        const searchRow = $('div', 'law-record-search-row'); searchRow.append(searchField, submit);
+        form.append(searchRow, archivedField);
         form.addEventListener('submit', (event) => { event.preventDefault(); q = search.value.trim(); includeArchived = archived.checked; page = 1; list(); });
         body.append(form);
         const wrap = processTableScrollRegion('Tabela de processos cadastrados'); const table = $('table', 'fs-table law-record-table law-record-process-table law-record-case-list-table');
