@@ -91,9 +91,22 @@ class LawCaseController extends Controller
             ->where('law_cases.company_id', $companyId);
 
         if (! $request->boolean('include_archived')) $query->where('law_cases.operational_status', '!=', 'archived');
-        $request->validate(['q' => ['nullable', 'string', 'max:30', 'regex:/^[0-9.\-\s]+$/']]);
-        $digits = preg_replace('/\D+/', '', (string) $request->query('q', '')) ?: '';
-        if ($digits !== '') $query->where('law_cases.case_number', 'like', '%'.$digits.'%');
+        $request->validate(['q' => ['nullable', 'string', 'max:100']]);
+        $term = trim((string) $request->query('q', ''));
+        $digits = preg_replace('/\D+/', '', $term) ?: '';
+        if ($term !== '') $query->where(function ($matches) use ($term, $digits): void {
+            if ($digits !== '') $matches->where('law_cases.case_number', 'like', '%'.$digits.'%');
+            $matches->orWhereExists(function ($party) use ($term): void {
+                $party->selectRaw('1')->from('law_case_contacts as link')
+                    ->join('law_contacts as contact', function ($join): void {
+                        $join->on('contact.id', '=', 'link.law_contact_id')->on('contact.company_id', '=', 'link.company_id');
+                    })
+                    ->whereColumn('link.law_case_id', 'law_cases.id')
+                    ->whereColumn('link.company_id', 'law_cases.company_id')
+                    ->whereNull('contact.deleted_at')->whereNull('contact.merged_into_id')
+                    ->where('contact.display_name', 'like', '%'.$term.'%');
+            });
+        });
 
         $summaryQuery = clone $query;
         $classRows = $summaryQuery->selectRaw('law_cases.case_class_code, law_cases.case_class, COUNT(*) as total')
@@ -121,8 +134,18 @@ class LawCaseController extends Controller
                     ->whereIn('priority.code', ['child_adolescent', 'domestic_violence']);
             })->distinct()->count('law_cases.id');
 
+        $caseRows = $paginator->getCollection();
+        $partyNames = DB::table('law_case_contacts as link')
+            ->join('law_contacts as contact', function ($join): void {
+                $join->on('contact.id', '=', 'link.law_contact_id')->on('contact.company_id', '=', 'link.company_id');
+            })
+            ->where('link.company_id', $companyId)->whereIn('link.law_case_id', $caseRows->pluck('id'))
+            ->whereNull('contact.deleted_at')->whereNull('contact.merged_into_id')
+            ->orderBy('contact.display_name')->get(['link.law_case_id', 'contact.display_name'])
+            ->groupBy('law_case_id')->map(fn ($parties) => $parties->pluck('display_name')->unique()->take(3)->values()->all());
+
         return response()->json([
-            'cases' => $paginator->getCollection()->map(fn (object $row): array => $cases->caseArray($row))->values(),
+            'cases' => $caseRows->map(fn (object $row): array => $cases->caseArray($row) + ['parties' => $partyNames->get($row->id, [])])->values(),
             'pagination' => ['page' => $paginator->currentPage(), 'per_page' => $paginator->perPage(), 'total' => $paginator->total()],
             'summary_by_class' => $summary,
             'summary' => ['units' => (int) ($counts->units ?? 0), 'secret' => (int) ($counts->secret ?? 0), 'recent' => $recent],

@@ -1537,9 +1537,9 @@
         result.setAttribute('aria-selected', 'false');
         result.dataset.searchResult = String(index);
         result.dataset.searchType = type;
-        const name = element('strong', '', type === 'case' ? item.case_number : (item.display_name || 'Contato sem nome'));
+        const name = element('strong', '', type === 'case' ? (item.case_number_formatted || item.case_number || item.number) : (item.display_name || 'Contato sem nome'));
         const detail = type === 'case'
-          ? [item.parties?.join(', '), item.case_class, item.unit_name].filter(Boolean).join(' · ')
+          ? [item.parties?.join(', '), item.case_class || item.type_name, item.unit_name].filter(Boolean).join(' · ')
           : [item.legal_nature === 'pj' ? 'Pessoa jurídica' : 'Pessoa física', (item.professions || []).slice(0, 2).join(', '), item.status === 'inativo' ? 'Inativo' : 'Ativo'].filter(Boolean).join(' · ');
         result.append(name, element('span', '', detail));
         result.addEventListener('click', async () => {
@@ -1598,9 +1598,9 @@
       const requestId = ++searchRequest;
       searchTimer = window.setTimeout(async () => {
         try {
-          const params = new URLSearchParams({ q: query, page: '1', per_page: '10' });
+          const params = new URLSearchParams({ q: query, page: '1', per_page: '15' });
           const [caseResult, contactResult] = await Promise.all([
-            canSearchProcesses ? FokusApi.request(`${processesModule?.context_code === 'orgao_publico' ? '/law/admin-cases' : '/law/cases'}/search?q=${encodeURIComponent(query)}`) : Promise.resolve({ cases: [] }),
+            canSearchProcesses ? FokusApi.request(`${processesModule?.context_code === 'orgao_publico' ? '/law/admin-cases' : '/law/cases'}?${params.toString()}`) : Promise.resolve({ cases: [] }),
             canSearchContacts ? FokusApi.request(`/law/contacts?${params.toString()}`) : Promise.resolve({ contacts: [] }),
           ]);
           if (requestId !== searchRequest || search.value.trim() !== query) return;

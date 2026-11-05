@@ -195,7 +195,7 @@
         const recentCard = $('section', 'law-record-recent-card fs-card'); const recentHead = $('header', 'fs-card-header fs-u-p-3 law-record-recent-header'); recentHead.append($('h3', 'fs-card-title', 'Cadastrados recentemente'));
         const recentBody = $('div', 'fs-card-body law-record-recent'); (summary.recent || []).forEach((item) => { const link = button('', action(() => detail(item.id))); link.className = 'law-record-recent-item'; const meta = $('span', 'law-record-recent-meta'); meta.append($('span', '', 'Cadastrado'), $('time', '', new Date(String(item.created_at).replace(' ', 'T')).toLocaleDateString('pt-BR'))); link.append($('strong', '', item.case_number_formatted), meta); recentBody.append(link); });
         if (!(summary.recent || []).length) recentBody.append($('p', 'law-record-recent-empty', 'Seus processos cadastrados aparecerão aqui.')); recentCard.append(recentHead, recentBody); body.append(recentCard);
-        const form = $('form', 'law-record-filters law-record-filters-search'); const search = input(q, 'search', 30); search.placeholder = 'Buscar pelo número CNJ, completo ou parcial';
+        const form = $('form', 'law-record-filters law-record-filters-search'); const search = input(q, 'search', 100); search.placeholder = 'Buscar por número CNJ ou parte vinculada';
         const archived = input('', 'checkbox'); archived.className = 'fs-check-input'; archived.checked = includeArchived; archived.id = `law-archived-${session}`;
         const archivedLabel = $('label', 'fs-check-label', 'Incluir arquivados'); archivedLabel.htmlFor = archived.id;
         const archivedField = $('div', 'fs-check'); archivedField.append(archived, archivedLabel);
