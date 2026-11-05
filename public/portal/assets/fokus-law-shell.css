@@ -486,7 +486,7 @@
 .law-contact-department-row .law-contact-repeat-row { grid-template-columns: minmax(100px, .6fr) minmax(180px, 1.5fr) minmax(120px, 1fr) auto; }
 .law-record-detail-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 12px; }
 .law-process-detail-body { grid-template-columns: minmax(0, 1fr); }
-.law-process-detail-columns { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 12px; min-width: 0; }
+.law-record-detail-columns { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; min-width: 0; }
 .law-process-detail-column { display: grid; min-width: 0; align-content: start; gap: 12px; }
 /* Record compositions shared by Contacts and Processes, using the approved
    Contacts geometry. These arrange domain information, not FS primitives. */
@@ -671,7 +671,7 @@ button.law-record-detail-case-link:not(.fs-form-select):not(.fs-dropdown-item):n
   .law-contact-sharing-actions { align-items: flex-start; flex-direction: column-reverse; }
   .law-contact-sharing-actions .fs-btn { width: auto; max-width: 100%; }
   .law-record-detail-body { grid-template-columns: minmax(0, 1fr); }
-  .law-process-detail-columns { grid-template-columns: minmax(0, 1fr); }
+  .law-record-detail-columns { grid-template-columns: minmax(0, 1fr); }
   .law-record-detail-summary { grid-template-columns: 46px minmax(0, 1fr); gap: 11px; padding: 14px; }
   .law-record-detail-avatar { width: 46px; height: 46px; border-radius: 8px; font-size: 17px; }
   .law-record-detail-name { font-size: 17px; }
