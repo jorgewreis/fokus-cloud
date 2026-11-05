@@ -196,7 +196,7 @@ class LawContactController extends Controller
             $payload = $this->contactPayload($companyId, $contact, $canSensitive, $canMerge, includePrivateDetails: true);
             $membershipId = (string) ($request->attributes->get('active_membership')?->id ?? '');
             $tribunalNames = collect(LawCnjNumbering::courts())->keyBy(fn (array $item): string => $item['segment'].':'.$item['code']);
-            $payload['cases'] = DB::table('law_case_contacts as link')
+            $linkedCases = DB::table('law_case_contacts as link')
                 ->join('law_cases as law_case', function ($join): void {
                     $join->on('law_case.company_id', '=', 'link.company_id')->on('law_case.id', '=', 'link.law_case_id');
                 })
@@ -211,16 +211,29 @@ class LawContactController extends Controller
                             ->where('access.company_membership_id', $membershipId)->whereNull('access.revoked_at');
                     });
                 })
-                ->orderBy('law_case.case_number')->get(['law_case.id', 'law_case.case_number', 'law_case.case_class', 'law_case.court_name', 'law_case.official_status_text', 'link.case_role_label', 'unit.name as unit_name'])
-                ->map(function ($row) use ($cases, $tribunalNames): array {
+                ->orderBy('law_case.case_number')->get(['law_case.id', 'law_case.case_number', 'law_case.case_class', 'law_case.case_class_code', 'law_case.manual_metadata', 'law_case.djen_metadata', 'law_case.court_name', 'law_case.official_status_text', 'link.case_role_label', 'unit.name as unit_name']);
+            $classCodes = $linkedCases->map(function ($row): string {
+                $manual = json_decode((string) ($row->manual_metadata ?? ''), true) ?: [];
+                return trim((string) ($manual['case_class_code'] ?? $row->case_class_code ?? ''));
+            })->filter()->unique()->values();
+            $cnjClassNames = $classCodes->isEmpty() ? collect() : DB::table('law_cnj_metadata_options')
+                ->where('type', 'class')->where('is_active', true)->whereIn('code', $classCodes)->pluck('name', 'code');
+            $companyClassNames = $classCodes->isEmpty() ? collect() : DB::table('law_case_metadata_options')
+                ->where('company_id', $companyId)->where('type', 'class')->whereIn('code', $classCodes)->pluck('name', 'code');
+            $payload['cases'] = $linkedCases
+                ->map(function ($row) use ($cases, $tribunalNames, $cnjClassNames, $companyClassNames): array {
                     $caseNumber = (string) $row->case_number;
                     $tribunal = $tribunalNames->get(substr($caseNumber, 13, 1).':'.substr($caseNumber, 14, 2));
+                    $manual = json_decode((string) ($row->manual_metadata ?? ''), true) ?: [];
+                    $djen = json_decode((string) ($row->djen_metadata ?? ''), true) ?: [];
+                    $classCode = trim((string) ($manual['case_class_code'] ?? $row->case_class_code ?? ''));
+                    $className = $classCode !== '' ? ($cnjClassNames[$classCode] ?? $companyClassNames[$classCode] ?? $row->case_class) : $row->case_class;
                     return [
                         'id' => (string) $row->id,
                         'case_number' => $caseNumber,
                         'case_number_formatted' => $cases->formatCaseNumber($caseNumber),
                         'tribunal_name' => $tribunal['name'] ?? null,
-                        'case_class' => $row->case_class,
+                        'case_class' => $className ?: (data_get($djen, 'process_data.case_class') ?: data_get($djen, 'suggested_case_class')),
                         'court_name' => $row->court_name,
                         'official_status_text' => $row->official_status_text,
                         'case_role' => (string) $row->case_role_label,

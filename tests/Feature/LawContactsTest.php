@@ -59,6 +59,47 @@ class LawContactsTest extends TestCase
         $this->sessionCompanyId = $this->companyId;
     }
 
+    public function test_contact_linked_cases_resolve_class_from_catalogs_and_djen_without_exposing_secret_cases(): void
+    {
+        $session = ['active_company_id' => $this->sessionCompanyId];
+        $contact = $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'legal_nature' => 'pf', 'display_name' => 'Pessoa vinculada',
+        ])->assertCreated()->json('contact');
+        $unitId = PrefixedUlid::make('LUN');
+        DB::table('law_units')->insert(['id' => $unitId, 'company_id' => $this->companyId, 'name' => 'Unidade', 'status' => 'ativo', 'created_by' => $this->admin->id, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('law_cnj_metadata_options')->insert(['id' => PrefixedUlid::make('LCN'), 'type' => 'class', 'code' => 'TEST-CNJ', 'name' => 'Classe CNJ', 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('law_case_metadata_options')->insert(['id' => PrefixedUlid::make('LCM'), 'company_id' => $this->companyId, 'type' => 'class', 'code' => 'TEST-EMPRESA', 'name' => 'Classe da empresa', 'created_at' => now(), 'updated_at' => now()]);
+        $fixtures = [
+            ['number' => '00000010020268050103', 'case_class_code' => 'TEST-EMPRESA', 'manual_metadata' => json_encode(['case_class_code' => 'TEST-CNJ']), 'expected' => 'Classe CNJ'],
+            ['number' => '00000020020268050103', 'case_class_code' => 'TEST-EMPRESA', 'expected' => 'Classe da empresa'],
+            ['number' => '00000030020268050103', 'case_class' => 'Classe cadastrada', 'expected' => 'Classe cadastrada'],
+            ['number' => '00000040020268050103', 'djen_metadata' => json_encode(['process_data' => ['case_class' => 'Classe DJEN']]), 'expected' => 'Classe DJEN'],
+            ['number' => '00000050020268050103', 'case_class' => 'Classe sigilosa', 'secret' => true, 'expected' => null],
+        ];
+        foreach ($fixtures as $fixture) {
+            $caseId = PrefixedUlid::make('LCS');
+            DB::table('law_cases')->insert([
+                'id' => $caseId, 'company_id' => $this->companyId, 'law_unit_id' => $unitId,
+                'case_number' => $fixture['number'], 'case_class' => $fixture['case_class'] ?? null,
+                'case_class_code' => $fixture['case_class_code'] ?? null, 'manual_metadata' => $fixture['manual_metadata'] ?? null,
+                'djen_metadata' => $fixture['djen_metadata'] ?? null, 'confidentiality_level' => ! empty($fixture['secret']) ? 'secret' : 'public',
+                'created_by' => $this->admin->id, 'updated_by' => $this->admin->id, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+            DB::table('law_case_contacts')->insert([
+                'id' => PrefixedUlid::make('LCC'), 'company_id' => $this->companyId, 'law_unit_id' => $unitId,
+                'law_case_id' => $caseId, 'law_contact_id' => $contact['id'], 'case_role' => 'parte', 'case_role_label' => 'Parte',
+                'created_by' => $this->admin->id, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        $response = $this->actingAs($this->admin)->withSession($session)->getJson('/api/law/contacts/'.$contact['id'])->assertOk();
+        $linkedCases = collect($response->json('contact.cases'))->keyBy('case_number');
+        $this->assertCount(4, $linkedCases);
+        foreach (array_slice($fixtures, 0, 4) as $fixture) {
+            $this->assertSame($fixture['expected'], $linkedCases[$fixture['number']]['case_class']);
+        }
+        $this->assertFalse($linkedCases->has($fixtures[4]['number']));
+    }
+
     public function test_authenticated_user_can_look_up_a_brazilian_address_by_cep(): void
     {
         Http::fake(['viacep.com.br/*' => Http::response([
