@@ -1,7 +1,7 @@
 (() => {
   const ICON_ROOT = '/backoffice/assets/icons/';
   const ICONS = {
-    overview: 'Layout-Dashboard--Streamline-Ultimate.png',
+    overview: 'Layout-Dashboard--Streamline-Ultimate-Colors.png',
     chevron: 'Arrow-Button-Down--Streamline-Ultimate-Bold.png',
     settings: 'Cog--Streamline-Ultimate.png',
     processes: 'Zip-File--Streamline-Ultimate-Regular.svg',

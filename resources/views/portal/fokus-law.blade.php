@@ -40,7 +40,7 @@
 
         <div class="law-nav-heading">
           <h1 id="section-title">Visão geral</h1>
-          <img class="law-nav-heading-icon" id="section-icon" src="/backoffice/assets/icons/Layout-Dashboard--Streamline-Ultimate.png" alt="" />
+          <img class="law-nav-heading-icon" id="section-icon" src="/backoffice/assets/icons/Layout-Dashboard--Streamline-Ultimate-Colors.png" alt="" />
         </div>
         <nav class="law-page-navigation" id="page-navigation" aria-label="Páginas e funcionalidades">
           <div id="page-items"></div>
