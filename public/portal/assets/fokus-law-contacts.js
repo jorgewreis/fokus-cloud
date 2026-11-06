@@ -921,7 +921,7 @@
       values.filter(([, value]) => value).forEach(([label, value]) => { const item = $('article', 'law-record-detail-linked-contact'); item.append($('strong', '', label), $('span', '', value)); items.append(item); });
     });
     if (contact.linked_contacts?.length) {
-      const items = addSection(contact.legal_nature === 'pj' ? 'Pessoas vinculadas' : 'Empresas vinculadas', 'VÍN', contact.linked_contacts.length, 'law-record-detail-links');
+      const items = addSection(contact.legal_nature === 'pj' ? 'Pessoas vinculadas' : 'Empresas vinculadas', 'EMP', contact.linked_contacts.length, 'law-record-detail-links');
       if (contact.legal_nature === 'pj') items.remove();
       else contact.linked_contacts.forEach((linked) => {
           const row = $('article', 'law-record-detail-linked-contact law-record-detail-linked-company');
@@ -963,7 +963,7 @@
       }
     }
     if (contact.documents?.length) {
-      const items = addSection('Documentos', 'ID', contact.documents.length, 'law-record-detail-documents');
+      const items = addSection('Documentos', 'DOC', contact.documents.length, 'law-record-detail-documents');
       contact.documents.forEach((doc) => {
         const item = $('article', 'law-record-detail-document');
         const type = DOCUMENTS[doc.type] || doc.type || 'Documento';

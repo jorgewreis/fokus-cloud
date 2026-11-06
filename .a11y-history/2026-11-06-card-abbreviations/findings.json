@@ -1,0 +1,14 @@
+{
+  "skill": "keyboard-navigator",
+  "scope": [
+    "public/portal/assets/fokus-law-contacts.js",
+    "public/portal/assets/fokus-law-processes.js"
+  ],
+  "findings": [],
+  "passed": [
+    "As alterações apenas modificam siglas visíveis dos cards e não alteram a interação ou a ordem de foco."
+  ],
+  "notes": [
+    "Revisão estática."
+  ]
+}
