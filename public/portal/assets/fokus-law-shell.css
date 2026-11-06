@@ -514,7 +514,7 @@
 .law-record-filters-search { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
 .law-record-search-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 11px; min-width: 0; }
 .law-record-search-row > .law-record-field { min-width: 0; }
-.law-record-search-row > .fs-btn { width: auto; align-self: end; }
+.law-record-search-row > .fs-btn { width: auto; align-self: end !important; }
 @media (max-width: 600px) {
   .law-record-filters-search, .law-record-search-row, .law-record-facts { grid-template-columns: minmax(0, 1fr); }
   .law-record-search-row > .fs-btn { justify-self: start; }
