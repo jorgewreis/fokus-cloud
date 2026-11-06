@@ -467,7 +467,9 @@
             if (item.code !== undefined && item.code !== null && String(item.code).trim()) title = `${item.code} - ${title}`;
             detail = item.occurred_at ? `PJE · Movimentação realizada em ${date(item.occurred_at).replace(', ', ' - ')}` : 'PJE · Data não informada';
           }
-          entry.append($('h4', '', title), $('p', 'law-record-detail-empty', detail));
+          entry.append($('h4', '', title));
+          if (source === 'DJEN' && typeof item.excerpt === 'string' && item.excerpt.trim()) entry.append($('span', 'law-record-djen-excerpt', item.excerpt));
+          entry.append($('p', 'law-record-detail-empty', detail));
           if (officialLink) {
             entry.href = officialLink; entry.target = '_blank'; entry.rel = 'noopener noreferrer';
             entry.append($('span', 'fs-u-visually-hidden', ' (abre o documento oficial em outra aba)'));

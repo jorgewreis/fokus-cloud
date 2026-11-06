@@ -1,0 +1,14 @@
+{
+  "skill": "keyboard-navigator",
+  "scope": [
+    "public/portal/assets/fokus-law-processes.js",
+    "public/portal/assets/fokus-law-shell.css"
+  ],
+  "findings": [],
+  "passed": [
+    "O trecho não interativo mantém os links nativos e a ordem de foco."
+  ],
+  "notes": [
+    "Revisão estática."
+  ]
+}

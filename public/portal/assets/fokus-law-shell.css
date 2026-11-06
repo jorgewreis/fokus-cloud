@@ -510,6 +510,7 @@
 .law-record-history-entry.law-record-djen-link { padding: 5px 10px; }
 .law-record-history-entry h4 { margin: 0; color: var(--law-shell-ink); font: inherit; font-size: 12px; font-weight: 650; }
 .law-record-djen-link { color: inherit; text-decoration: none; border-radius: 0; }
+.law-record-djen-excerpt { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: 11px; line-height: 1.4; }
 .law-record-djen-link:hover { background: #f7f3fa; }
 .law-record-djen-link:focus-visible { outline: 2px solid var(--law-shell-purple); outline-offset: 3px; }
 .law-record-filters-search { grid-template-columns: minmax(0, 1fr); align-items: stretch; }

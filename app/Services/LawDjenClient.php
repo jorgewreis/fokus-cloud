@@ -113,10 +113,21 @@ class LawDjenClient
             'case_class' => $this->shortText($item['nomeClasse'] ?? $item['classeProcessual'] ?? $item['classe'] ?? null, 180),
             'type' => $this->shortText($item['tipoComunicacao'] ?? null, 120),
             'document_type' => $this->shortText($item['tipoDocumento'] ?? null, 120),
+            'excerpt' => $this->publicationExcerpt($item['texto'] ?? null),
             'link' => $link !== '' ? $link : null,
             'recipients' => $this->normalizeRecipients($item['destinatarios'] ?? []),
             'recipient_attorneys' => $this->normalizeAttorneys($item['destinatarioadvogados'] ?? []),
         ];
+    }
+
+    private function publicationExcerpt(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') return null;
+        $text = preg_replace('/<\s*(?:br|\/p|\/div|\/li|\/tr)\b[^>]*>/iu', ' ', $value) ?? $value;
+        $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = trim(preg_replace('/[\s\p{Z}]+/u', ' ', $text) ?? '');
+        if ($text === '') return null;
+        return mb_strlen($text) > 500 ? rtrim(mb_substr($text, 0, 499)).'…' : $text;
     }
 
     private function normalizeRecipients(mixed $items): array
