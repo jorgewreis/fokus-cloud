@@ -142,6 +142,31 @@ class CompanyAdminTest extends TestCase
         $this->actingAs($admin, 'platform')->postJson('/api/backoffice/companies', [])->assertForbidden();
     }
 
+    public function test_company_detail_exposes_separate_lead_usage_only_after_platform_authorization(): void
+    {
+        $admin = $this->platformAdmin();
+        $company = $this->companyFixture('Empresa Lead', '98765432000100', 'lead-metrics@example.test');
+        $reader = \Mockery::mock(\App\Integrations\Lead\LeadUsageReader::class);
+        $reader->shouldReceive('forCompany')->once()->with($company)->andReturn(['available' => false, 'reason' => 'not_configured', 'metrics' => null]);
+        $this->app->instance(\App\Integrations\Lead\LeadUsageReader::class, $reader);
+        $this->getJson('/api/backoffice/companies/'.$company)->assertUnauthorized();
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/companies/'.$company)
+            ->assertOk()->assertJsonPath('company.data_volume.lead.available', false)
+            ->assertJsonPath('company.data_volume.lead.metrics', null);
+    }
+
+    public function test_company_detail_permission_is_checked_before_reading_lead_usage(): void
+    {
+        $admin = $this->platformAdmin('administrador_comercial');
+        $company = $this->companyFixture('Empresa Restrita', '98765432000100', 'restrita@example.test');
+        DB::table('platform_role_permissions')->where('platform_role_id', $admin->platform_role_id)
+            ->where('platform_permission_id', DB::table('platform_permissions')->where('code', 'platform.companies.view')->value('id'))->delete();
+        $reader = \Mockery::mock(\App\Integrations\Lead\LeadUsageReader::class);
+        $reader->shouldNotReceive('forCompany');
+        $this->app->instance(\App\Integrations\Lead\LeadUsageReader::class, $reader);
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/companies/'.$company)->assertForbidden();
+    }
+
     private function platformAdmin(string $role = 'superadministrador'): PlatformAdmin
     {
         return PlatformAdmin::create([

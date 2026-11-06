@@ -1404,6 +1404,7 @@ class BackofficeController extends Controller
             'admin' => $admin ? ['name' => $admin->name, 'cpf' => $admin->cpf, 'email' => $admin->email, 'email_masked' => $this->maskEmail($admin->email)] : null,
             'created_at' => $company->created_at,
             'data_volume' => [
+                'lead' => app(\App\Integrations\Lead\LeadUsageReader::class)->forCompany((string) $company->id),
                 'contacts' => [...$contactUsage, 'registered_count' => $registeredContacts],
                 'contact_data_size_bytes' => $contactDataSizeBytes,
                 'contact_data_size_scope' => 'Estimativa do conteúdo das linhas em law_contacts vinculadas a esta empresa; inclui contatos inativos, excluídos logicamente e unificados ainda armazenados. Não inclui índices, overhead do banco nem outras tabelas.',
