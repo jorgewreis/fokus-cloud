@@ -45,7 +45,7 @@
     let refs; let q = ''; let includeArchived = false; let page = 1; const adminFilters = {};
     let currentId = null; let detailData; let viewToken = 0;
     const apiPath = (id) => `/${encodeURIComponent(id)}`;
-    let refreshTimer;
+    let refreshTimer; let syncAnnouncementPending = false;
     function watchDatajud(id, token, historyPage) {
       clearTimeout(refreshTimer);
       const valid = () => active() && currentId === id && viewToken === token;
@@ -57,13 +57,20 @@
           const result = await request(`${apiPath(id)}?history_page=${historyPage}`);
           if (!valid()) return;
           if (result.case.datajud_sync_status !== 'pending' && result.case.djen_sync_status !== 'pending') {
+            if (syncAnnouncementPending) {
+              const failures = [];
+              if (result.case.datajud_sync_status === 'error') failures.push('DataJud');
+              if (result.case.djen_sync_status === 'error') failures.push('DJEN');
+              syncStatus.textContent = failures.length ? `Sincronização concluída com falha em ${failures.join(' e ')}. Consulte os detalhes.` : 'Sincronização concluída. Consulte os resultados no histórico.';
+              syncAnnouncementPending = false;
+            }
             for (const element of dialogs) if (!element.isConnected) dialogs.delete(element);
             if (!dialogs.size) {
               const focused = document.activeElement;
-              const focusOnDjenAction = focused?.textContent?.trim() === 'Consulta DJEN pendente' || focused?.textContent?.trim() === 'Consultar publicações DJEN';
-              if (root.contains(focused) && !focusOnDjenAction) { refreshTimer = setTimeout(poll, 5000); return; }
+              const focusOnSyncAction = focused?.dataset?.caseSync === 'true' || focused?.id === 'law-movement-history-heading';
+              if (root.contains(focused) && !focusOnSyncAction) { refreshTimer = setTimeout(poll, 5000); return; }
               await detail(id, historyPage);
-              if (focusOnDjenAction) {
+              if (focusOnSyncAction) {
                 const resultHeading = document.getElementById('law-movement-history-heading');
                 if (resultHeading) { resultHeading.tabIndex = -1; resultHeading.focus(); }
               }
@@ -76,10 +83,11 @@
       refreshTimer = setTimeout(poll, 5000);
     }
     const notice = message();
+    const syncStatus = $('p', 'fs-u-visually-hidden'); syncStatus.setAttribute('role', 'status');
     const heading = $('header', 'law-page-heading law-record-page-heading'); heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE PROCESSOS'), $('h2', '', pageTitles[pageView] || pageTitles.module), $('p', 'law-page-lede', pageView === 'processes-settings' ? (adminVariant ? 'Configure tipos de processo, campos e opções compartilhados pelo órgão.' : advocacyVariant ? 'Gerencie os padrões e as opções processuais do escritório.' : 'Gerencie os padrões e as opções processuais de cada unidade.') : pageView === 'processes-access' ? 'Gerencie quem pode consultar processos secretos nas unidades que você administra.' : adminVariant ? 'Cadastre e acompanhe processos administrativos de todas as unidades do órgão.' : advocacyVariant ? 'Consulte processos judiciais, vincule clientes e partes e organize o trabalho do escritório.' : 'Consulte processos judiciais e organize o trabalho de cada unidade.'));
     const headingActions = $('div', 'law-record-heading-actions');
     if (pageView === 'module') heading.append(headingActions);
-    const body = $('div'); root.replaceChildren(heading, notice, body);
+    const body = $('div'); root.replaceChildren(heading, notice, syncStatus, body);
     const report = (error) => { if (active()) { notice.textContent = error.message || 'Não foi possível carregar os processos.'; notice.hidden = false; } };
     const action = (fn) => async (event) => {
       const control = event?.currentTarget; if (control) control.disabled = true; notice.hidden = true;
@@ -347,29 +355,29 @@
         const actions = toolbar(); actions.append(button('Voltar à lista', action(list)));
         if (can('update')) {
           actions.append(button('Editar processo', action(edit), true));
-          if (!(c.official_fields || []).length) {
-            const consult = button('Consultar Datajud', action(async (event) => {
-              const control = event?.currentTarget;
-              if (control) { control.textContent = 'Consultando Datajud…'; control.setAttribute('aria-busy', 'true'); }
-              try { await request(`${apiPath(id)}/datajud`, { method: 'POST' }); await detail(id); }
-              finally { if (control?.isConnected) { control.textContent = 'Consultar Datajud'; control.removeAttribute('aria-busy'); } }
-            }));
-            if (c.datajud_sync_status === 'pending') { consult.disabled = true; consult.textContent = 'Consulta automática pendente'; }
-            actions.append(consult);
-          }
           if (!adminVariant) {
-            const consultDjen = button('Consultar publicações DJEN', action(async (event) => {
+            const sync = button('Sincronizar', action(async (event) => {
               const control = event?.currentTarget;
-              if (control) { control.textContent = 'Consultando DJEN…'; control.setAttribute('aria-busy', 'true'); }
+              if (control) { control.textContent = 'Sincronizando…'; control.setAttribute('aria-busy', 'true'); }
+              syncStatus.textContent = 'Sincronização iniciada. Consultando o DataJud e o DJEN.';
               try {
-                await request(`${apiPath(id)}/djen`, { method: 'POST' }); await detail(id);
+                await request(`${apiPath(id)}/datajud`, { method: 'POST' }); await detail(id, historyPage);
+                syncAnnouncementPending = detailData?.case?.djen_sync_status === 'pending';
+                const failures = [];
+                if (detailData?.case?.datajud_sync_status === 'error') failures.push('DataJud');
+                if (detailData?.case?.djen_sync_status === 'error') failures.push('DJEN');
+                syncStatus.textContent = syncAnnouncementPending
+                  ? 'Consulta ao DataJud finalizada. A consulta ao DJEN está pendente; confira o resultado de cada fonte no histórico.'
+                  : failures.length ? `Sincronização concluída com falha em ${failures.join(' e ')}. Consulte os detalhes.` : 'Sincronização concluída. Consulte os resultados no histórico.';
                 const resultHeading = document.getElementById('law-movement-history-heading');
                 if (resultHeading) { resultHeading.tabIndex = -1; resultHeading.focus(); }
               }
-              finally { if (control?.isConnected) { control.textContent = 'Consultar publicações DJEN'; control.removeAttribute('aria-busy'); } }
+              catch (error) { syncStatus.textContent = 'Não foi possível iniciar a sincronização. Confira a mensagem de erro.'; throw error; }
+              finally { if (control?.isConnected) { control.textContent = 'Sincronizar'; control.removeAttribute('aria-busy'); } }
             }));
-            if (c.djen_sync_status === 'pending') { consultDjen.disabled = true; consultDjen.textContent = 'Consulta DJEN pendente'; }
-            actions.append(consultDjen);
+            sync.dataset.caseSync = 'true';
+            if (c.datajud_sync_status === 'pending' || c.djen_sync_status === 'pending') { sync.disabled = true; sync.textContent = 'Sincronização pendente'; }
+            actions.append(sync);
           }
         }
         const archiveAction = c.operational_status === 'archived' ? 'reopen' : 'archive';
@@ -445,7 +453,7 @@
         events.forEach(({ source, item }) => {
           let officialLink = null;
           if (source === 'DJEN') try { const url = new URL(item.link); if (url.protocol === 'https:') officialLink = url.href; } catch (_) { /* Sem referência oficial válida. */ }
-          const entry = $(officialLink ? 'a' : 'article', `law-record-history-entry${officialLink ? ' law-record-djen-link' : ''}`);
+          const entry = $(officialLink ? 'a' : 'article', `law-record-history-entry${source === 'DataJud' ? ' law-record-history-movement' : ''}${officialLink ? ' law-record-djen-link' : ''}`);
           let title; let detail;
           if (source === 'DJEN') {
             const type = String(item.type || item.document_type || '').trim().toLocaleLowerCase('pt-BR');
