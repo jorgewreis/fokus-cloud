@@ -1,0 +1,13 @@
+{
+  "skill": "keyboard-navigator",
+  "scope": [
+    "public/portal/assets/fokus-law-shell.css"
+  ],
+  "findings": [],
+  "passed": [
+    "A alteração de fonte e limite de linhas não modifica a navegação por teclado."
+  ],
+  "notes": [
+    "Revisão estática."
+  ]
+}

@@ -127,7 +127,7 @@ class LawDjenClient
         $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $text = trim(preg_replace('/[\s\p{Z}]+/u', ' ', $text) ?? '');
         if ($text === '') return null;
-        return mb_strlen($text) > 500 ? rtrim(mb_substr($text, 0, 499)).'…' : $text;
+        return mb_strlen($text) > 1000 ? rtrim(mb_substr($text, 0, 999)).'…' : $text;
     }
 
     private function normalizeRecipients(mixed $items): array
