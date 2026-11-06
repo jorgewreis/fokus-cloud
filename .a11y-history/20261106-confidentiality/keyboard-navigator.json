@@ -1,0 +1,11 @@
+{
+  "skill": "keyboard-navigator",
+  "scope": ["public/portal/assets/fokus-law-processes.js", "public/portal/assets/fokus-law-shell.css"],
+  "findings": [],
+  "passed": [
+    "Confidentiality badges use native details/summary disclosure controls, reachable by keyboard and activatable with Enter or Space.",
+    "The summary has a visible focus outline; the disclosure contains no focusable content that disrupts tab order.",
+    "The confidentiality selector remains a native select control."
+  ],
+  "notes": []
+}

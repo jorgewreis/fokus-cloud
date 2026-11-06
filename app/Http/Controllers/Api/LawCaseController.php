@@ -31,7 +31,7 @@ class LawCaseController extends Controller
         'domestic_violence' => 'Violência doméstica',
         'disability' => 'Pessoa com deficiência',
     ];
-    private const CONFIDENTIALITY = ['public', 'confidential', 'secret'];
+    private const CONFIDENTIALITY = ['public', 'cnj_1', 'cnj_2', 'cnj_3', 'cnj_4', 'cnj_5', 'secret', 'confidential'];
     private const RELATION_TYPES = ['dependent', 'apenso'];
 
     public function search(Request $request, LawCaseManagementService $cases)
@@ -120,7 +120,7 @@ class LawCaseController extends Controller
             ->sortBy('label')->values();
 
         $page = max(1, (int) $request->query('page', 1));
-        $counts = (clone $query)->selectRaw("COUNT(DISTINCT law_cases.law_unit_id) as units, SUM(CASE WHEN law_cases.confidentiality_level = 'secret' THEN 1 ELSE 0 END) as secret")->first();
+        $counts = (clone $query)->selectRaw("COUNT(DISTINCT law_cases.law_unit_id) as units, SUM(CASE WHEN law_cases.confidentiality_level = 'cnj_5' THEN 1 ELSE 0 END) as secret")->first();
         $recentRows = (clone $query)->select('law_cases.id', 'law_cases.case_number', 'law_cases.case_class_code', 'law_cases.case_class', 'law_cases.created_at')->orderByDesc('law_cases.created_at')->orderByDesc('law_cases.id')->limit(5)->get();
         $recentNames = $this->classNames($companyId, $recentRows->pluck('case_class_code')->filter()->unique()->all());
         $recent = $recentRows->map(fn ($row) => ['id' => $row->id, 'case_number_formatted' => $cases->formatCaseNumber($row->case_number), 'case_class' => $recentNames[(string) ($row->case_class_code ?? '')] ?? ($row->case_class ?: 'Não informada'), 'created_at' => $row->created_at]);
@@ -128,7 +128,7 @@ class LawCaseController extends Controller
         $paginator = $query->select('law_cases.*', 'unit.name as unit_name', 'responsible_user.name as responsible_name')
             ->orderByDesc('law_cases.created_at')->orderByDesc('law_cases.id')
             ->paginate($perPage, ['*'], 'page', $page);
-        $confidentialityAlertCount = (clone $query)->whereNotIn('law_cases.confidentiality_level', ['confidential', 'secret'])
+        $confidentialityAlertCount = (clone $query)->where('law_cases.confidentiality_level', 'public')
             ->whereExists(function ($priorities): void {
                 $priorities->selectRaw('1')->from('law_case_procedural_priorities as priority')
                     ->whereColumn('priority.company_id', 'law_cases.company_id')->whereColumn('priority.law_case_id', 'law_cases.id')
@@ -212,7 +212,7 @@ class LawCaseController extends Controller
             'priorities' => self::PRIORITIES,
             'context_code' => (string) $request->attributes->get('law_case_context_code', ''),
             'procedural_priorities' => collect(self::PROCEDURAL_PRIORITY_LABELS)->only($this->proceduralPrioritiesFor($request))->map(fn (string $label, string $code): array => ['code' => $code, 'label' => $label])->values(),
-            'confidentiality_levels' => [['code' => 'public', 'label' => 'Público'], ['code' => 'confidential', 'label' => 'Sigiloso'], ['code' => 'secret', 'label' => 'Secreto']],
+            'confidentiality_levels' => collect(\App\Services\LawCnjConfidentiality::levels())->map(fn (array $level): array => ['code' => \App\Services\LawCnjConfidentiality::codeForLevel($level['level']), 'label' => $level['label'], 'description' => $level['description']])->all(),
         ]);
     }
 
@@ -515,7 +515,7 @@ class LawCaseController extends Controller
                     ]);
                 }
             }
-            if (($after['confidentiality_level'] ?? null) === 'secret') {
+            if (\App\Services\LawCnjConfidentiality::requiresNamedAccess($after['confidentiality_level'] ?? null)) {
                 DB::table('law_confidential_case_accesses')->updateOrInsert([
                     'company_id' => $current->company_id, 'law_case_id' => $current->id,
                     'company_membership_id' => $request->attributes->get('active_membership')->id,
@@ -756,7 +756,7 @@ class LawCaseController extends Controller
         $case = DB::table('law_cases')->where('company_id', $companyId)->where('case_number', $this->normalizeCaseNumber($data['case_number']))->first();
         abort_unless($case, 404, 'Processo não encontrado ou sem autorização de administração.');
         $this->assertMayManageUnit($request, (string) $case->law_unit_id);
-        abort_unless($case->confidentiality_level === 'secret', 422, 'Somente processos secretos exigem autorização nominal.');
+        abort_unless(\App\Services\LawCnjConfidentiality::requiresNamedAccess($case->confidentiality_level), 422, 'Apenas processos em sigilo absoluto exigem autorização nominal.');
         return response()->json(['case_id' => $case->id, 'law_unit_id' => $case->law_unit_id]);
     }
 
@@ -764,7 +764,7 @@ class LawCaseController extends Controller
     {
         $current = $this->findManagedCase($request, $case);
         $this->assertMayManageUnit($request, (string) $current->law_unit_id);
-        abort_unless($current->confidentiality_level === 'secret', 422, 'A autorização nominal só se aplica a processos secretos.');
+        abort_unless(\App\Services\LawCnjConfidentiality::requiresNamedAccess($current->confidentiality_level), 422, 'A autorização nominal só se aplica a processos em sigilo absoluto.');
         $data = $request->validate(['company_membership_id' => ['required', 'string', 'max:30']]);
         $membership = DB::table('company_memberships')->where('company_id', $current->company_id)->where('id', $data['company_membership_id'])->where('status', 'ativo')->whereNull('deleted_at')->first();
         abort_unless($membership, 404, 'Usuário ativo da empresa não encontrado.');
@@ -780,7 +780,7 @@ class LawCaseController extends Controller
                 'company_membership_id' => $membership->id, 'granted_by' => $request->user()->id, 'created_at' => now(), 'updated_at' => now(),
             ]);
         }
-        $this->event($current, $request, 'confidential_access_granted', 'Acesso ao processo secreto concedido', null, ['company_membership_id' => $membership->id]);
+        $this->event($current, $request, 'confidential_access_granted', 'Acesso ao processo em sigilo absoluto concedido', null, ['company_membership_id' => $membership->id]);
         return response()->json(['id' => $id], 201);
     }
 
@@ -791,7 +791,7 @@ class LawCaseController extends Controller
         $row = DB::table('law_confidential_case_accesses')->where('company_id', $current->company_id)->where('law_case_id', $current->id)->where('id', $access)->whereNull('revoked_at')->first();
         abort_unless($row, 404, 'Autorização não encontrada.');
         DB::table('law_confidential_case_accesses')->where('id', $access)->update(['revoked_at' => now(), 'updated_at' => now()]);
-        $this->event($current, $request, 'confidential_access_revoked', 'Acesso ao processo secreto revogado', ['company_membership_id' => $row->company_membership_id], null);
+        $this->event($current, $request, 'confidential_access_revoked', 'Acesso ao processo em sigilo absoluto revogado', ['company_membership_id' => $row->company_membership_id], null);
         return response()->noContent();
     }
 
@@ -906,7 +906,7 @@ class LawCaseController extends Controller
     {
         $membershipId = (string) ($request->attributes->get('active_membership')?->id ?? '');
         return $query->where(function ($visible) use ($membershipId): void {
-            $visible->where('law_cases.confidentiality_level', '!=', 'secret')
+            $visible->where('law_cases.confidentiality_level', '!=', 'cnj_5')
                 ->orWhereExists(function ($access) use ($membershipId): void {
                     $access->selectRaw('1')->from('law_confidential_case_accesses as case_access')
                         ->whereColumn('case_access.company_id', 'law_cases.company_id')
@@ -918,7 +918,7 @@ class LawCaseController extends Controller
 
     private function visibleOther(Request $request, $query): void
     {
-        $query->where('other.confidentiality_level', '!=', 'secret')->orWhereExists(function ($access) use ($request): void {
+        $query->where('other.confidentiality_level', '!=', 'cnj_5')->orWhereExists(function ($access) use ($request): void {
             $access->selectRaw('1')->from('law_confidential_case_accesses as related_access')
                 ->whereColumn('related_access.company_id', 'other.company_id')->whereColumn('related_access.law_case_id', 'other.id')
                 ->where('related_access.company_membership_id', $request->attributes->get('active_membership')->id)->whereNull('related_access.revoked_at');

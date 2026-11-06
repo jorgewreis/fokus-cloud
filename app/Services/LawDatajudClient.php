@@ -47,7 +47,7 @@ class LawDatajudClient
                     'numeroProcesso', 'classe.codigo', 'classe.nome', 'assuntos',
                     'orgaoJulgador.codigo', 'orgaoJulgador.nome', 'tribunal', 'situacaoProcessual.codigo',
                     'orgaoJulgador.codigoMunicipioIBGE', 'situacaoProcessual.nome', 'situacao.codigo', 'situacao.nome', 'situacaoAtual',
-                    'grau', 'sistema', 'formato', 'dataAjuizamento', 'dataHoraUltimaAtualizacao', '@timestamp',
+                    'grau', 'sistema', 'formato', 'nivelSigilo', 'dataAjuizamento', 'dataHoraUltimaAtualizacao', '@timestamp',
                     'movimentos.codigo', 'movimentos.nome', 'movimentos.dataHora', 'movimentos.complementosTabelados',
                 ],
                 'sort' => ['@timestamp'],
@@ -139,6 +139,7 @@ class LawDatajudClient
             $movements = $allMovements->take(self::MAX_MOVEMENTS)->all();
             $systemValue = $source['sistema'] ?? null;
             $formatValue = $source['formato'] ?? null;
+            $confidentialityLevels = collect($sources)->map(fn (array $record) => $this->confidentialityLevel($record['nivelSigilo'] ?? null))->filter(fn ($level): bool => $level !== null);
 
             $metadata = array_filter([
                 'case_class' => is_array($class) ? trim((string) ($class['nome'] ?? '')) : null,
@@ -152,6 +153,7 @@ class LawDatajudClient
                 'degree' => isset($source['grau']) ? trim((string) $source['grau']) : null,
                 'system' => is_array($systemValue) ? trim((string) ($systemValue['nome'] ?? '')) : (is_scalar($systemValue) ? trim((string) $systemValue) : null),
                 'format' => is_array($formatValue) ? trim((string) ($formatValue['nome'] ?? '')) : (is_scalar($formatValue) ? trim((string) $formatValue) : null),
+                'confidentiality_level_cnj' => $confidentialityLevels->isEmpty() ? null : $confidentialityLevels->max(),
                 'filing_date' => $this->normalizeDateTime($source['dataAjuizamento'] ?? null),
                 'source_updated_at' => $this->normalizeDateTime($source['dataHoraUltimaAtualizacao'] ?? $source['@timestamp'] ?? null),
                 'court_municipality_code' => isset($court['codigoMunicipioIBGE']) ? (string) $court['codigoMunicipioIBGE'] : null,
@@ -161,6 +163,7 @@ class LawDatajudClient
                     'degree' => isset($record['grau']) ? trim((string) $record['grau']) : null,
                     'court_name' => trim((string) data_get($record, 'orgaoJulgador.nome')) ?: null,
                     'case_class' => trim((string) data_get($record, 'classe.nome')) ?: null,
+                    'confidentiality_level_cnj' => $this->confidentialityLevel($record['nivelSigilo'] ?? null),
                     'source_updated_at' => $this->normalizeDateTime($record['dataHoraUltimaAtualizacao'] ?? $record['@timestamp'] ?? null),
                 ], static fn ($value) => $value !== null && $value !== ''), $sources),
             ], static fn ($value): bool => $value !== null && $value !== '');
@@ -222,6 +225,13 @@ class LawDatajudClient
         return $seconds > 0 && $seconds <= 86400
             ? 'O CNJ orienta aguardar pelo menos '.(int) ceil($seconds / 60).' minuto(s) antes de tentar novamente.'
             : 'Aguarde alguns minutos antes de tentar novamente.';
+    }
+
+    private function confidentialityLevel(mixed $value): ?int
+    {
+        if (! is_int($value) && ! (is_string($value) && preg_match('/^[0-5]$/D', $value))) return null;
+        $level = (int) $value;
+        return $level >= 0 && $level <= 5 ? $level : null;
     }
 
     private function normalizeDateTime(mixed $value): ?string

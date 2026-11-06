@@ -204,7 +204,7 @@ class LawContactController extends Controller
                 })
                 ->where('link.company_id', $companyId)->where('link.law_contact_id', $contactId)
                 ->where(function ($query) use ($membershipId): void {
-                    $query->where('law_case.confidentiality_level', '!=', 'secret')->orWhereExists(function ($access) use ($membershipId): void {
+                    $query->where('law_case.confidentiality_level', '!=', 'cnj_5')->orWhereExists(function ($access) use ($membershipId): void {
                         $access->selectRaw('1')->from('law_confidential_case_accesses as access')
                             ->whereColumn('access.company_id', 'law_case.company_id')->whereColumn('access.law_case_id', 'law_case.id')
                             ->where('access.company_membership_id', $membershipId)->whereNull('access.revoked_at');

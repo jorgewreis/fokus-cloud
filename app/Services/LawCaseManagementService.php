@@ -97,9 +97,12 @@ class LawCaseManagementService
                 }
             }
 
-            foreach (['tribunal', 'degree', 'system', 'format', 'filing_date', 'source_updated_at', 'court_municipality_code', 'recent_movements', 'records', 'movements_truncated'] as $field) {
+            foreach (['tribunal', 'degree', 'system', 'format', 'confidentiality_level_cnj', 'filing_date', 'source_updated_at', 'court_municipality_code', 'recent_movements', 'records', 'movements_truncated'] as $field) {
                 if (array_key_exists($field, $result['metadata'] ?? [])) $official[$field] = $result['metadata'][$field];
             }
+
+            $cnjLevel = $result['metadata']['confidentiality_level_cnj'] ?? null;
+            $cnjCode = is_int($cnjLevel) && $cnjLevel >= 0 && $cnjLevel <= 5 ? LawCnjConfidentiality::codeForLevel($cnjLevel) : null;
 
             $checkedAt = now();
             $successful = in_array($result['status'], ['synced', 'not_found'], true);
@@ -117,6 +120,31 @@ class LawCaseManagementService
                 'version' => DB::raw('version + 1'),
                 'updated_at' => $checkedAt,
             ];
+            // Do not reinterpret historical local values. New CNJ classifications are
+            // applied automatically when the public API explicitly supplies level 0-5.
+            if ($successful && $cnjCode !== null && in_array($current->confidentiality_level, ['public', 'cnj_1', 'cnj_2', 'cnj_3', 'cnj_4', 'cnj_5'], true)) {
+                $updates['confidentiality_level'] = $cnjCode;
+                if (LawCnjConfidentiality::requiresNamedAccess($cnjCode)) {
+                    $responsibleUserId = $current->responsible_membership_id
+                        ? DB::table('company_memberships')->where('company_id', $companyId)->where('id', $current->responsible_membership_id)->value('user_id')
+                        : null;
+                    $grantorId = $actorId ?: ($responsibleUserId ? (string) $responsibleUserId : null);
+                    $membershipIds = collect([$current->responsible_membership_id])
+                        ->merge($actorId ? DB::table('company_memberships')->where('company_id', $companyId)->where('user_id', $actorId)->where('status', 'ativo')->whereNull('deleted_at')->pluck('id') : [])
+                        ->filter()->unique()->values();
+                    foreach ($membershipIds as $membershipId) {
+                        $existingAccess = DB::table('law_confidential_case_accesses')->where('company_id', $companyId)->where('law_case_id', $caseId)->where('company_membership_id', $membershipId)->first();
+                        if ($existingAccess) {
+                            if ($existingAccess->revoked_at !== null) DB::table('law_confidential_case_accesses')->where('id', $existingAccess->id)->update(['revoked_at' => null, 'granted_by' => $grantorId, 'updated_at' => $checkedAt]);
+                        } else {
+                            DB::table('law_confidential_case_accesses')->insert([
+                                'id' => PrefixedUlid::make('LCA'), 'company_id' => $companyId, 'law_case_id' => $caseId,
+                                'company_membership_id' => $membershipId, 'granted_by' => $grantorId, 'created_at' => $checkedAt, 'updated_at' => $checkedAt,
+                            ]);
+                        }
+                    }
+                }
+            }
             if ($successful) $updates['last_datajud_synced_at'] = $checkedAt;
             if ($successful && ! array_key_exists('official_status_text', $result['metadata'] ?? []) && ! array_key_exists('official_status_text', $manual)) {
                 $updates['official_status_text'] = null;

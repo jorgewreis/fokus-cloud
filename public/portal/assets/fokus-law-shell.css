@@ -505,6 +505,11 @@
 .law-record-linked-label { color: var(--law-shell-ink); }
 .law-record-linked-meta { color: var(--law-shell-muted); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
 .law-record-history-list { display: flex; flex-direction: column; gap: 5px; }
+.law-confidentiality-popover { position: relative; display: inline-block; }
+.law-confidentiality-popover > summary { display: inline-flex; align-items: center; cursor: pointer; list-style: none; }
+.law-confidentiality-popover > summary::-webkit-details-marker { display: none; }
+.law-confidentiality-popover > summary:focus-visible { outline: 2px solid var(--law-shell-purple); outline-offset: 2px; }
+.law-confidentiality-popover-content { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; width: min(280px, 70vw); padding: 10px; border: 1px solid var(--law-shell-line); border-radius: 6px; background: #fff; color: var(--law-shell-ink); box-shadow: var(--law-shell-shadow); font-size: 12px; font-weight: 400; }
 .law-record-history-entry { display: grid; gap: 8px; padding: 0 0 18px 14px; border-left: 2px solid var(--law-shell-lilac); }
 .law-record-history-entry.law-record-history-movement { border-left: 2px solid lightgray; }
 .law-record-history-entry.law-record-djen-link { padding: 5px 10px; }
