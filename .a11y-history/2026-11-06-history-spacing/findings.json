@@ -1,0 +1,17 @@
+{
+  "skill": "keyboard-navigator",
+  "scope": [
+    "public/portal/assets/fokus-law-processes.js",
+    "public/portal/assets/fokus-law-shell.css"
+  ],
+  "findings": [],
+  "passed": [
+    "Documentos oficiais usam links nativos acessíveis por Tab e Enter.",
+    "Os links possuem contorno de foco e descrição de abertura em outra aba.",
+    "O espaçamento preserva a ordem dos itens."
+  ],
+  "notes": [
+    "Revisão estática; foco e navegação na página autenticada não foram verificados em execução.",
+    "Links sem foco ou hover não são visualmente distintos dos demais itens."
+  ]
+}

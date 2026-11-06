@@ -446,22 +446,20 @@
           let officialLink = null;
           if (source === 'DJEN') try { const url = new URL(item.link); if (url.protocol === 'https:') officialLink = url.href; } catch (_) { /* Sem referência oficial válida. */ }
           const entry = $(officialLink ? 'a' : 'article', `law-record-history-entry${officialLink ? ' law-record-djen-link' : ''}`);
-          let title; let kind; let detail;
+          let title; let detail;
           if (source === 'DJEN') {
             const type = String(item.type || item.document_type || '').trim().toLocaleLowerCase('pt-BR');
             title = !type || /^publica(?:ção|cao)$/.test(type) ? 'Publicação no DJEN' : `Publicação de ${type} no DJEN`;
-            kind = 'Publicação';
-            detail = item.availability_date ? `Disponibilizada em ${dateOnly(item.availability_date)}` : item.publication_date ? `Publicada em ${dateOnly(item.publication_date)}` : 'Data não informada';
+            detail = `Diário do Poder Judiciário Eletrônico · ${item.availability_date ? `Disponibilizada em ${dateOnly(item.availability_date)}` : item.publication_date ? `Publicada em ${dateOnly(item.publication_date)}` : 'Data não informada'}`;
           } else {
             title = String(item.name || 'Movimentação processual').trim();
             const documentComplement = (Array.isArray(item.complements) ? item.complements : []).find((part) => /(?:tipo|nome).*documento/i.test(String(part.description || '').replace(/_/g, ' ')) && part.name);
             if (/^expedição de documento$/i.test(title) && documentComplement) title = `Expedição de ${documentComplement.name}`;
             if (/^juntada de documento$/i.test(title) && documentComplement) title = `Juntada de ${documentComplement.name}`;
-            kind = /^expedição/i.test(title) ? 'Expedição de documento' : /^juntada/i.test(title) ? 'Juntada de documento' : 'Movimentação';
             if (item.code !== undefined && item.code !== null && String(item.code).trim()) title = `${item.code} - ${title}`;
-            detail = item.occurred_at ? date(item.occurred_at) : 'Data não informada';
+            detail = item.occurred_at ? `PJE · Movimentação realizada em ${date(item.occurred_at).replace(', ', ' - ')}` : 'PJE · Data não informada';
           }
-          entry.append($('h4', '', title), $('p', 'law-record-detail-empty', `${kind} · ${source} · ${detail}`));
+          entry.append($('h4', '', title), $('p', 'law-record-detail-empty', detail));
           if (officialLink) {
             entry.href = officialLink; entry.target = '_blank'; entry.rel = 'noopener noreferrer';
             entry.append($('span', 'fs-u-visually-hidden', ' (abre o documento oficial em outra aba)'));
