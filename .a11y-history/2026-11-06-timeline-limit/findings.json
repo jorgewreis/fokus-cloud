@@ -1,0 +1,13 @@
+{
+  "skill": "keyboard-navigator",
+  "scope": [
+    "public/portal/assets/fokus-law-processes.js"
+  ],
+  "findings": [],
+  "passed": [
+    "O limite e o aviso não alteram a operação dos links apresentados."
+  ],
+  "notes": [
+    "Revisão estática."
+  ]
+}

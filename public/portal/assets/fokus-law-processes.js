@@ -428,7 +428,7 @@
         const movementHeading = $('h4', 'law-record-detail-section-subheading', 'Movimentações e publicações');
         movementHeading.id = 'law-movement-history-heading';
         movementHistory.body.append(movementHeading);
-        if (officialMetadata.movements_truncated) movementHistory.body.append($('p', 'fs-alert fs-alert-warning', 'O DataJud retornou mais de 5.000 movimentações. São exibidas as 5.000 mais recentes.'));
+        if (officialMetadata.movements_truncated) movementHistory.body.append($('p', 'fs-alert fs-alert-warning', 'O DataJud retornou mais de 5.000 movimentações; a consulta preservou as 5.000 mais recentes.'));
         if (c.djen_sync_status === 'pending') movementHistory.body.append($('p', 'fs-alert fs-alert-info', 'O DJEN está sendo consultado em segundo plano.'));
         if (c.djen_sync_status === 'error') movementHistory.body.append($('p', 'fs-alert fs-alert-warning', c.djen_sync_message || 'A consulta ao DJEN não foi concluída. Os dados anteriores foram preservados; você pode tentar novamente.'));
         if (djenMetadata.complete === false) movementHistory.body.append($('p', 'fs-alert fs-alert-warning', djenMetadata.coverage_note || 'Esta lista é parcial e pode não incluir todas as publicações. Consulte o DJEN novamente para atualizar.'));
@@ -449,8 +449,9 @@
           return 0;
         });
         if (!events.length) movementHistory.body.append($('p', 'law-record-detail-empty', 'Nenhuma movimentação ou publicação disponível.'));
+        if (events.length > 20) movementHistory.body.append($('p', 'law-record-detail-empty', 'Exibindo as 20 movimentações e publicações mais recentes.'));
         const eventList = $('div', 'law-record-history-list');
-        events.forEach(({ source, item }) => {
+        events.slice(0, 20).forEach(({ source, item }) => {
           let officialLink = null;
           if (source === 'DJEN') try { const url = new URL(item.link); if (url.protocol === 'https:') officialLink = url.href; } catch (_) { /* Sem referência oficial válida. */ }
           const entry = $(officialLink ? 'a' : 'article', `law-record-history-entry${source === 'DataJud' ? ' law-record-history-movement' : ''}${officialLink ? ' law-record-djen-link' : ''}`);
