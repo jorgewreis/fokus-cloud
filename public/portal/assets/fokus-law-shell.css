@@ -547,7 +547,7 @@
 .law-record-detail-card { min-width: 0; margin: 0; overflow: hidden; border: 1px solid #e6dfeb; border-radius: 12px; background: #fff; box-shadow: 0 4px 14px rgba(40, 20, 59, .035); }
 .law-record-detail-institution { grid-column: 1 / -1; }
 .law-record-detail-section-header { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-bottom: 1px solid #eee8f2; background: linear-gradient(100deg, #fbf9fd, #fff); }
-.law-record-detail-section-mark { display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border-radius: 9px; background: #f0e8f7; color: #583774; font-size: 10px; font-weight: 800; letter-spacing: .02em; }
+.law-record-detail-section-mark { display: flex; width: 35px; height: 35px; place-items: center; border-radius: 6px; background: #f0e8f7; color: #583774; font-size: 10px; font-weight: 800; letter-spacing: .02em; justify-content: center; align-items: center; }
 .law-record-detail-section-heading { display: flex; min-width: 0; flex: 1; align-items: center; justify-content: space-between; gap: 8px; }
 .law-record-detail-section-heading h3 { margin: 0; color: var(--law-shell-ink); font-size: 12px; font-weight: 700; }
 .law-record-detail-section-heading > span { display: grid; min-width: 21px; height: 21px; place-items: center; padding: 0 5px; border-radius: 6px; background: #f3eff6; color: #675476; font-size: 10px; font-weight: 700; }
