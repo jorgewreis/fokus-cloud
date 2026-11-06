@@ -12,7 +12,8 @@ class LawCnjConfidentiality
 
     public static function requiresNamedAccess(?string $code): bool
     {
-        return $code === 'cnj_5';
+        // `secret` remains an alias for level 5 while any pre-migration row is present.
+        return in_array($code, ['cnj_5', 'secret'], true);
     }
 
     public static function labelForCode(?string $code): string

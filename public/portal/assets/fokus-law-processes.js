@@ -256,7 +256,7 @@
           const row = $('tr'); const numberCell = $('td'); const open = button(item.case_number_formatted, action(() => detail(item.id))); open.className = 'law-record-name'; open.setAttribute('aria-label', `Consultar processo ${item.case_number_formatted}`); numberCell.append(open); row.append(numberCell);
           [text(item.case_class), item.unit_name, text(item.official_status_text)].forEach((value) => row.append($('td', '', value)));
           const statusCell = $('td'); const tone = { active: 'success', pending: 'warning', suspended: 'warning', completed: 'info', archived: 'danger' }[item.operational_status] || 'secondary'; const statusBadge = $('span', `fs-badge fs-badge-soft-${tone} law-process-status-badge`, item.operational_status_label); statusBadge.dataset.tone = item.operational_status === 'archived' ? 'danger' : item.operational_status === 'suspended' ? 'warning' : item.operational_status === 'active' ? 'success' : ''; statusCell.append(statusBadge); row.append(statusCell);
-          const privacy = $('td'); privacy.append(confidentialityBadge(item.confidentiality_level, refs?.confidentiality_levels, `fs-badge fs-badge-soft-${item.confidentiality_level === 'cnj_5' ? 'warning' : item.confidentiality_level === 'public' ? 'secondary' : 'danger'}`));
+          const privacy = $('td'); privacy.append(confidentialityBadge(item.confidentiality_level, refs?.confidentiality_levels, `fs-badge fs-badge-soft-${['cnj_5', 'secret'].includes(item.confidentiality_level) ? 'warning' : item.confidentiality_level === 'public' ? 'secondary' : 'danger'}`));
           if (needsConfidentialityAlert(item.procedural_priorities, item.confidentiality_level)) privacy.append($('span', 'fs-badge fs-badge-soft-warning', 'Sigilo a revisar'));
           row.append(privacy);
           const td = $('td', 'law-record-actions'); const actionList = $('div', 'law-record-action-list'); const view = button('', action(() => detail(item.id))); view.className = 'fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action'; view.setAttribute('aria-label', `Ver detalhes do processo ${item.case_number_formatted}`); view.title = 'Ver detalhes'; const icon = $('img'); icon.src = '/backoffice/assets/icons/Folder-File--Streamline-Ultimate.png'; icon.alt = ''; view.append(icon); actionList.append(view); td.append(actionList); row.append(td); tbody.append(row);
@@ -503,7 +503,7 @@
           }); conflictsCard = conflicts; conflicts.classList.add('law-record-detail-conflicts');
         }
         renderContacts(result, local, rightColumn); renderTags(result, local, rightColumn); renderRelations(result, rightColumn);
-        if (result.can_manage_access && c.confidentiality_level === 'cnj_5') await renderAccess(result, local, rightColumn);
+        if (result.can_manage_access && ['cnj_5', 'secret'].includes(c.confidentiality_level)) await renderAccess(result, local, rightColumn);
         const history = section('Histórico de atualizações do processo', 'HAP', 'Alterações internas e atualizações de metadados'); history.classList.add('law-record-detail-updates');
         result.events.forEach((item) => {
           const article = $('article', 'law-record-history-entry'); article.append($('h4', '', item.title), $('p', 'law-record-detail-empty', `${date(item.created_at)} · ${item.actor_name || 'Atualização automática'}`));

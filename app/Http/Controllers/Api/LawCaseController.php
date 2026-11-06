@@ -120,7 +120,7 @@ class LawCaseController extends Controller
             ->sortBy('label')->values();
 
         $page = max(1, (int) $request->query('page', 1));
-        $counts = (clone $query)->selectRaw("COUNT(DISTINCT law_cases.law_unit_id) as units, SUM(CASE WHEN law_cases.confidentiality_level = 'cnj_5' THEN 1 ELSE 0 END) as secret")->first();
+        $counts = (clone $query)->selectRaw("COUNT(DISTINCT law_cases.law_unit_id) as units, SUM(CASE WHEN law_cases.confidentiality_level IN ('cnj_5', 'secret') THEN 1 ELSE 0 END) as secret")->first();
         $recentRows = (clone $query)->select('law_cases.id', 'law_cases.case_number', 'law_cases.case_class_code', 'law_cases.case_class', 'law_cases.created_at')->orderByDesc('law_cases.created_at')->orderByDesc('law_cases.id')->limit(5)->get();
         $recentNames = $this->classNames($companyId, $recentRows->pluck('case_class_code')->filter()->unique()->all());
         $recent = $recentRows->map(fn ($row) => ['id' => $row->id, 'case_number_formatted' => $cases->formatCaseNumber($row->case_number), 'case_class' => $recentNames[(string) ($row->case_class_code ?? '')] ?? ($row->case_class ?: 'Não informada'), 'created_at' => $row->created_at]);
@@ -906,7 +906,7 @@ class LawCaseController extends Controller
     {
         $membershipId = (string) ($request->attributes->get('active_membership')?->id ?? '');
         return $query->where(function ($visible) use ($membershipId): void {
-            $visible->where('law_cases.confidentiality_level', '!=', 'cnj_5')
+            $visible->whereNotIn('law_cases.confidentiality_level', ['cnj_5', 'secret'])
                 ->orWhereExists(function ($access) use ($membershipId): void {
                     $access->selectRaw('1')->from('law_confidential_case_accesses as case_access')
                         ->whereColumn('case_access.company_id', 'law_cases.company_id')
@@ -918,7 +918,7 @@ class LawCaseController extends Controller
 
     private function visibleOther(Request $request, $query): void
     {
-        $query->where('other.confidentiality_level', '!=', 'cnj_5')->orWhereExists(function ($access) use ($request): void {
+        $query->whereNotIn('other.confidentiality_level', ['cnj_5', 'secret'])->orWhereExists(function ($access) use ($request): void {
             $access->selectRaw('1')->from('law_confidential_case_accesses as related_access')
                 ->whereColumn('related_access.company_id', 'other.company_id')->whereColumn('related_access.law_case_id', 'other.id')
                 ->where('related_access.company_membership_id', $request->attributes->get('active_membership')->id)->whereNull('related_access.revoked_at');

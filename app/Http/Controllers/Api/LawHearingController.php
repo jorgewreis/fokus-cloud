@@ -139,7 +139,7 @@ class LawHearingController extends Controller
                 $secretCase->selectRaw('1')->from('law_cases as secret_case')
                     ->whereColumn('secret_case.company_id', 'law_hearings.company_id')
                     ->whereColumn('secret_case.id', 'law_hearings.law_case_id')
-                    ->where('secret_case.confidentiality_level', 'cnj_5');
+                    ->whereIn('secret_case.confidentiality_level', ['cnj_5', 'secret']);
             })->orWhereExists(function ($authorizedCase) use ($membershipId): void {
                 $authorizedCase->selectRaw('1')->from('law_cases as secret_case')
                     ->join('law_confidential_case_accesses as case_access', function ($join): void {
@@ -148,7 +148,7 @@ class LawHearingController extends Controller
                     })
                     ->whereColumn('secret_case.company_id', 'law_hearings.company_id')
                     ->whereColumn('secret_case.id', 'law_hearings.law_case_id')
-                    ->where('secret_case.confidentiality_level', 'cnj_5')
+                    ->whereIn('secret_case.confidentiality_level', ['cnj_5', 'secret'])
                     ->where('case_access.company_membership_id', $membershipId)->whereNull('case_access.revoked_at');
             });
         });
