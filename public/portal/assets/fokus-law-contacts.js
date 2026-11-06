@@ -967,7 +967,6 @@
       contact.documents.forEach((doc) => {
         const item = $('article', 'law-record-detail-document');
         const type = DOCUMENTS[doc.type] || doc.type || 'Documento';
-        item.append($('span', 'law-record-detail-document-type', Array.from(type).slice(0, 4).join('').toLocaleUpperCase('pt-BR')));
         const detail = $('div', 'law-record-detail-document-copy');
         detail.append($('strong', '', formatContactDocument(doc)));
         detail.append($('span', '', [type, doc.label, doc.state].filter(Boolean).join(' · ') || 'Documento cadastrado'));
