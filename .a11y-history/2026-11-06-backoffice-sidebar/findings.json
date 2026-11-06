@@ -1,0 +1,14 @@
+{
+  "skill": "keyboard-navigator",
+  "scope": [
+    "public/backoffice/index.html",
+    "public/backoffice/assets/css/pages/admin-dashboard.css",
+    "public/backoffice/assets/css/layout/sidebar.css"
+  ],
+  "findings": [],
+  "passed": [
+    "Sidebar navigation controls are native buttons and retain a visible :focus-visible indicator.",
+    "The sidebar width and sizing rules do not alter keyboard order or control activation."
+  ],
+  "notes": []
+}
