@@ -46,12 +46,28 @@ async function requiredAssets() {
   return [...required].sort();
 }
 
+// This is an explicit allowlist of the reviewed, non-publishing workflow, not
+// a YAML parser or a heuristic based on a job name / presence of `exit 1`.
+// Any semantic or textual change (except CRLF) requires review, including new
+// jobs, credentials, conditions, permissive flags, and malformed YAML. Do not
+// infer publication authorization from the presence of a source-sync command.
+const blockedWorkflow = "name: Publication blocked - local reconstruction\n\"on\":\n  workflow_dispatch:\n    inputs:\n      baseline_sha:\n        description: Reviewed baseline full SHA (not publication permission)\n        required: true\n        type: string\npermissions:\n  contents: read\njobs:\n  publication-blocked:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Fail closed before any credentials or deployment\n        run: |\n          echo 'Local reconstruction only. No publication authorization, final commit or approved CI evidence.'\n          echo 'Reviewed baseline: 26daac7c27d246eaef64bb3f0e59499376993f8f'\n          echo 'Recovery requires roll-forward or separately authorized validated backup restoration.'\n          exit 1\n";
+const deployWorkflowPath = path.join(repositoryRoot, '.github/workflows/deploy.yml');
+function assertPublicationBlocked(workflow) {
+  assert.equal(workflow.replaceAll('\r\n', '\n'), blockedWorkflow,
+    'Deployment contract changed: review publication policy before enabling any delivery test');
+  return 'blocked';
+}
+async function deploymentMode(workflowPath = deployWorkflowPath) {
+  return assertPublicationBlocked(await readFile(workflowPath, 'utf8'));
+}
+
 // Read the actual source-sync command, preserving filter order and rsync flags.
 // Only remove SSH transport and replace its two endpoints with local fixtures.
 // Fail closed if the workflow gains unfamiliar arguments rather than testing an
 // approximation that no longer matches production.
-async function deploymentArguments(runnerTemp) {
-  const workflow = await readFile(path.join(repositoryRoot, '.github/workflows/deploy.yml'), 'utf8');
+async function deploymentArguments(runnerTemp, workflow) {
+  workflow ??= await readFile(deployWorkflowPath, 'utf8');
   const step = workflow.split('      - name: Sync application source\n')[1]?.split('\n      - name: ')[0];
   assert.ok(step, 'The deploy workflow must contain its application source sync');
   const command = step.match(/^          rsync (?:[^\n]*\\\n)*[^\n]*/m)?.[0].trim();
@@ -90,11 +106,64 @@ test('Styles uses the unchanged published CSS/license and existing deployable de
       .map(match => new URL(match[1], origin + page).pathname);
     assert.ok(links.includes(PUBLISHED_CSS_PATH), `${page} must load the pinned published CSS`);
   }
-  await deploymentArguments('/tmp/styles-deploy-fixture');
   console.log(`Verified ${assets.length} Styles files and local dependencies, published CSS and MIT license hashes.`);
 });
 
+test('publication remains explicitly fail-closed independently of asset integrity', async () => {
+  assert.equal(await deploymentMode(), 'blocked');
+});
+
+test('publication contract rejects missing, malformed and permissive workflows', async t => {
+  const mutations = {
+    empty: '',
+    malformed: blockedWorkflow.replace('jobs:', 'jobs: ['),
+    'wrong indentation': blockedWorkflow.replace('          exit 1', 'exit 1'),
+    'successful exit': blockedWorkflow.replace('exit 1', 'exit 0'),
+    'no failure': blockedWorkflow.replace('          exit 1\n', ''),
+    'ignored failure': blockedWorkflow.replace('    runs-on:', '    continue-on-error: true\n    runs-on:'),
+    'disabled guard': blockedWorkflow.replace('        run: |', '        if: false\n        run: |'),
+    'publication flag': blockedWorkflow.replace('permissions:', 'env:\n  ALLOW_PUBLICATION: true\npermissions:'),
+    'write permission': blockedWorkflow.replace('contents: read', 'contents: write'),
+    'extra publishing job': blockedWorkflow + '  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo publish\n',
+    'sync step': blockedWorkflow + '      - name: Sync application source\n        run: rsync ./ remote:/\n',
+  };
+  for (const [name, workflow] of Object.entries(mutations)) {
+    await t.test(name, () => assert.throws(() => assertPublicationBlocked(workflow),
+      /Deployment contract changed/));
+  }
+  const directory = await mkdtemp(path.join(tmpdir(), 'styles-missing-workflow-'));
+  try {
+    await t.test('removed workflow', async () => {
+      await assert.rejects(deploymentMode(path.join(directory, 'deploy.yml')), { code: 'ENOENT' });
+    });
+  } finally { await rm(directory, { recursive: true, force: true }); }
+  assert.equal(assertPublicationBlocked(blockedWorkflow.replaceAll('\n', '\r\n')), 'blocked');
+});
+
+// Synthetic parser fixtures only: these are not an approved deploy workflow,
+// do not enable a delivery mode and do not prove rsync execution or transfer.
+test('retained rsync parser preserves filter order and rejects unknown arguments', async () => {
+  const fixture = args => `      - name: Sync application source
+        run: |
+          rsync ${args} ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+      - name: End
+`;
+  const flags = '-rlDzvc --delete-delay --filter="merge $RUNNER_TEMP/fokus-law-assets/protect.rules" --include="public/styles/assets/***" --exclude="vendor/" -e "ssh -p 22"';
+  assert.deepEqual(await deploymentArguments('/fixture', fixture(flags)), [
+    '-rlDzvc', '--delete-delay', '--filter', 'merge /fixture/fokus-law-assets/protect.rules',
+    '--include', 'public/styles/assets/***', '--exclude', 'vendor/',
+  ]);
+  await assert.rejects(deploymentArguments('/fixture', fixture(flags + ' --unknown-publish')), /Review new deploy argument/);
+  await assert.rejects(deploymentArguments('/fixture', fixture(flags.replace('--exclude="vendor/"', ''))), /vendor exclusion/);
+  await assert.rejects(deploymentArguments('/fixture', fixture(flags.replace('$RUNNER_TEMP', '$UNKNOWN'))), /Unresolved deploy filter variable/);
+  await assert.rejects(deploymentArguments('/fixture', blockedWorkflow), /application source sync/);
+});
+
 test('actual deploy rsync filters deliver Styles assets and still exclude vendor directories', async t => {
+  if (await deploymentMode() === 'blocked') {
+    t.skip('Publication is explicitly blocked; no approved source-sync command exists. No rsync transfer executed.');
+    return;
+  }
   const version = spawnSync('rsync', ['--version'], { encoding: 'utf8' });
   if (version.error?.code === 'ENOENT' && !process.env.CI) {
     t.skip('rsync is unavailable locally; required in CI. Static/hash contracts are tested separately.');

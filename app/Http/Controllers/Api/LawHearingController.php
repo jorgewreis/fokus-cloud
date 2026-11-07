@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\LawCaseManagementService;
 use App\Services\PrefixedUlid;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,11 +20,21 @@ class LawHearingController extends Controller
         $query = DB::table('law_hearings')->where('company_id', $companyId)->orderBy('scheduled_at');
         $this->applyCaseVisibility($query, $request);
         $unitId = $this->activeUnitId($request);
-        if ($unitId) $query->where('law_unit_id', $unitId);
-        elseif ($this->hasActiveUnits($companyId)) $query->whereRaw('1 = 0');
-        if ($request->filled('status')) $query->where('status', $request->string('status'));
-        if ($request->filled('from')) $query->where('scheduled_at', '>=', $request->date('from'));
-        if ($request->filled('to')) $query->where('scheduled_at', '<=', $request->date('to')->endOfDay());
+        if ($unitId) {
+            $query->where('law_unit_id', $unitId);
+        } elseif ($this->hasActiveUnits($companyId)) {
+            $query->whereRaw('1 = 0');
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->string('status'));
+        }
+        if ($request->filled('from')) {
+            $query->where('scheduled_at', '>=', $request->date('from'));
+        }
+        if ($request->filled('to')) {
+            $query->where('scheduled_at', '<=', $request->date('to')->endOfDay());
+        }
+
         return response()->json($query->paginate(50));
     }
 
@@ -46,18 +57,17 @@ class LawHearingController extends Controller
             abort_unless(DB::table('law_units')->where('id', $data['law_unit_id'])->where('company_id', $companyId)->where('status', 'ativo')->exists(), 422, 'O setor selecionado não pertence à empresa ativa.');
         }
         if (! empty($data['law_case_id'])) {
-            $case = DB::table('law_cases')->where('company_id', $companyId)->where('id', $data['law_case_id'])->first(['id', 'confidentiality_level']);
-            abort_unless($case, 404, 'Processo não encontrado nesta empresa.');
-            if (\App\Services\LawCnjConfidentiality::requiresNamedAccess($case->confidentiality_level)) {
-                $membershipId = (string) ($request->attributes->get('active_membership')?->id ?? '');
-                abort_unless(DB::table('law_confidential_case_accesses')->where('company_id', $companyId)->where('law_case_id', $case->id)->where('company_membership_id', $membershipId)->whereNull('revoked_at')->exists(), 404, 'Processo não encontrado nesta empresa.');
-            }
+            $query = DB::table('law_cases')->where('id', $data['law_case_id']);
+            $case = app(LawCaseManagementService::class)->visibleQuery($request, $query)->first();
+            abort_unless($case && $case->law_unit_id === ($data['law_unit_id'] ?? null), 404, 'Processo não encontrado nesta unidade.');
         }
-        $id = PrefixedUlid::make('LHE'); $userId = $request->user()->id;
+        $id = PrefixedUlid::make('LHE');
+        $userId = $request->user()->id;
         DB::transaction(function () use ($data, $id, $companyId, $userId): void {
             DB::table('law_hearings')->insert([...$data, 'id' => $id, 'company_id' => $companyId, 'status' => 'scheduled', 'version' => 1, 'created_by' => $userId, 'updated_by' => $userId, 'created_at' => now(), 'updated_at' => now()]);
             DB::table('law_hearing_status_history')->insert(['id' => PrefixedUlid::make('LHS'), 'company_id' => $companyId, 'law_hearing_id' => $id, 'new_status' => 'scheduled', 'origin' => 'internal', 'created_by' => $userId, 'created_at' => now(), 'updated_at' => now()]);
         });
+
         return response()->json(DB::table('law_hearings')->where('id', $id)->first(), 201);
     }
 
@@ -69,25 +79,34 @@ class LawHearingController extends Controller
     public function update(Request $request, string $hearing)
     {
         $current = $this->hearing($request, $hearing);
-        $data = $request->validate(['title' => ['sometimes', 'string', 'max:180'], 'hearing_type' => ['sometimes', 'string', 'max:64'], 'scheduled_at' => ['sometimes', 'date'], 'modality' => ['sometimes', Rule::in(['presencial', 'virtual', 'hibrida'])], 'location' => ['nullable', 'string', 'max:180'], 'room' => ['nullable', 'string', 'max:80'], 'responsible_user_id' => ['nullable', 'string', 'max:30'], 'external_tracking_enabled' => ['boolean']]);
-        if ($data) DB::table('law_hearings')->where('id', $current->id)->where('company_id', $current->company_id)->update([...$data, 'updated_by' => $request->user()->id, 'version' => DB::raw('version + 1'), 'updated_at' => now()]);
+        $data = $request->validate(['version' => ['required', 'integer', 'min:1'], 'title' => ['sometimes', 'string', 'max:180'], 'hearing_type' => ['sometimes', 'string', 'max:64'], 'scheduled_at' => ['sometimes', 'date'], 'modality' => ['sometimes', Rule::in(['presencial', 'virtual', 'hibrida'])], 'location' => ['nullable', 'string', 'max:180'], 'room' => ['nullable', 'string', 'max:80'], 'responsible_user_id' => ['nullable', 'string', 'max:30'], 'external_tracking_enabled' => ['boolean']]);
+        $version = (int) $data['version'];
+        abort_unless((int) $current->version === $version, 409, 'Registro alterado. Recarregue antes de salvar.');
+        unset($data['version']);
+        $changed = DB::table('law_hearings')->where('id', $current->id)->where('company_id', $current->company_id)->where('version', $version)->update([...$data, 'updated_by' => $request->user()->id, 'version' => DB::raw('version + 1'), 'updated_at' => now()]);
+        abort_unless($changed === 1, 409, 'A audiência foi alterada. Recarregue antes de salvar.');
+
         return response()->json($this->hearing($request, $hearing));
     }
 
     public function status(Request $request, string $hearing)
     {
         $current = $this->hearing($request, $hearing);
-        $data = $request->validate(['status' => ['required', Rule::in(self::STATUSES)], 'reason' => ['nullable', 'string', 'max:2000']]);
+        $data = $request->validate(['version' => ['required', 'integer', 'min:1'], 'status' => ['required', Rule::in(self::STATUSES)], 'reason' => ['nullable', 'string', 'max:2000']]);
+        abort_unless((int) $current->version === (int) $data['version'], 409, 'Registro alterado. Recarregue antes de salvar.');
         DB::transaction(function () use ($request, $current, $data): void {
-            DB::table('law_hearings')->where('id', $current->id)->update(['status' => $data['status'], 'cancellation_reason' => $data['status'] === 'cancelled' ? ($data['reason'] ?? null) : $current->cancellation_reason, 'rescheduling_reason' => $data['status'] === 'rescheduled' ? ($data['reason'] ?? null) : $current->rescheduling_reason, 'updated_by' => $request->user()->id, 'version' => DB::raw('version + 1'), 'updated_at' => now()]);
+            $changed = DB::table('law_hearings')->where('id', $current->id)->where('company_id', $current->company_id)->where('version', (int) $data['version'])->update(['status' => $data['status'], 'cancellation_reason' => $data['status'] === 'cancelled' ? ($data['reason'] ?? null) : $current->cancellation_reason, 'rescheduling_reason' => $data['status'] === 'rescheduled' ? ($data['reason'] ?? null) : $current->rescheduling_reason, 'updated_by' => $request->user()->id, 'version' => DB::raw('version + 1'), 'updated_at' => now()]);
+            abort_unless($changed === 1, 409, 'A audiência foi alterada. Recarregue antes de salvar.');
             DB::table('law_hearing_status_history')->insert(['id' => PrefixedUlid::make('LHS'), 'company_id' => $current->company_id, 'law_hearing_id' => $current->id, 'previous_status' => $current->status, 'new_status' => $data['status'], 'reason' => $data['reason'] ?? null, 'origin' => 'internal', 'created_by' => $request->user()->id, 'created_at' => now(), 'updated_at' => now()]);
         });
+
         return response()->json($this->hearing($request, $hearing));
     }
 
     public function timeline(Request $request, string $hearing)
     {
         $current = $this->hearing($request, $hearing);
+
         return response()->json(['status_history' => DB::table('law_hearing_status_history')->where('company_id', $current->company_id)->where('law_hearing_id', $current->id)->orderBy('created_at')->get(), 'alerts' => DB::table('law_hearing_alerts')->where('company_id', $current->company_id)->where('law_hearing_id', $current->id)->orderBy('triggered_at')->get()]);
     }
 
@@ -99,6 +118,7 @@ class LawHearingController extends Controller
         $data = $request->validate(['law_contact_id' => ['nullable', 'string', 'max:30'], 'expires_at' => ['required', 'date', 'after:now']]);
         $plain = Str::random(64);
         DB::table('law_hearing_external_accesses')->insert([...$data, 'id' => PrefixedUlid::make('LHA'), 'company_id' => $current->company_id, 'law_hearing_id' => $current->id, 'token_hash' => hash('sha256', $plain), 'created_at' => now(), 'updated_at' => now()]);
+
         return response()->json(['token' => $plain, 'expires_at' => $data['expires_at']], 201);
     }
 
@@ -106,6 +126,7 @@ class LawHearingController extends Controller
     {
         $current = $this->hearing($request, $hearing);
         DB::table('law_hearing_external_accesses')->where('id', $access)->where('company_id', $current->company_id)->where('law_hearing_id', $current->id)->update(['revoked_at' => now(), 'updated_at' => now()]);
+
         return response()->noContent();
     }
 
@@ -117,6 +138,7 @@ class LawHearingController extends Controller
         abort_unless($hearing, 404, 'Audiência não encontrada.');
         $this->assertPublicExternalAccess($hearing);
         DB::table('law_hearing_external_accesses')->where('id', $access->id)->increment('access_count');
+
         return response()->json(['hearing' => (object) array_intersect_key((array) $hearing, array_flip(['id', 'title', 'hearing_type', 'scheduled_at', 'ended_at', 'modality', 'location', 'room', 'status'])), 'expires_at' => $access->expires_at]);
     }
 
@@ -124,32 +146,26 @@ class LawHearingController extends Controller
     {
         $query = DB::table('law_hearings')->where('id', $id)->where('company_id', $request->attributes->get('active_company_id'));
         $this->applyCaseVisibility($query, $request);
-        if ($unitId = $this->activeUnitId($request)) $query->where('law_unit_id', $unitId);
-        elseif ($this->hasActiveUnits((string) $request->attributes->get('active_company_id'))) $query->whereRaw('1 = 0');
+        if ($unitId = $this->activeUnitId($request)) {
+            $query->where('law_unit_id', $unitId);
+        } elseif ($this->hasActiveUnits((string) $request->attributes->get('active_company_id'))) {
+            $query->whereRaw('1 = 0');
+        }
         $hearing = $query->first();
         abort_unless($hearing, 404, 'Audiência não encontrada.');
+
         return $hearing;
     }
 
     private function applyCaseVisibility($query, Request $request): void
     {
-        $membershipId = (string) ($request->attributes->get('active_membership')?->id ?? '');
-        $query->where(function ($visible) use ($membershipId): void {
-            $visible->whereNotExists(function ($secretCase): void {
-                $secretCase->selectRaw('1')->from('law_cases as secret_case')
-                    ->whereColumn('secret_case.company_id', 'law_hearings.company_id')
-                    ->whereColumn('secret_case.id', 'law_hearings.law_case_id')
-                    ->whereIn('secret_case.confidentiality_level', ['cnj_5', 'secret']);
-            })->orWhereExists(function ($authorizedCase) use ($membershipId): void {
-                $authorizedCase->selectRaw('1')->from('law_cases as secret_case')
-                    ->join('law_confidential_case_accesses as case_access', function ($join): void {
-                        $join->on('case_access.company_id', '=', 'secret_case.company_id')
-                            ->on('case_access.law_case_id', '=', 'secret_case.id');
-                    })
-                    ->whereColumn('secret_case.company_id', 'law_hearings.company_id')
-                    ->whereColumn('secret_case.id', 'law_hearings.law_case_id')
-                    ->whereIn('secret_case.confidentiality_level', ['cnj_5', 'secret'])
-                    ->where('case_access.company_membership_id', $membershipId)->whereNull('case_access.revoked_at');
+        $query->where(function ($visible) use ($request): void {
+            $visible->whereNull('law_hearings.law_case_id')->orWhereExists(function ($cases) use ($request): void {
+                $cases->selectRaw('1')->from('law_cases')
+                    ->whereColumn('law_cases.id', 'law_hearings.law_case_id')
+                    ->whereColumn('law_cases.company_id', 'law_hearings.company_id')
+                    ->whereColumn('law_cases.law_unit_id', 'law_hearings.law_unit_id');
+                app(LawCaseManagementService::class)->visibleQuery($request, $cases);
             });
         });
     }
@@ -164,6 +180,7 @@ class LawHearingController extends Controller
             ->where('active.company_id', $request->attributes->get('active_company_id'))
             ->where('unit.status', 'ativo')
             ->value('active.law_unit_id');
+
         return $unitId ? (string) $unitId : null;
     }
 
@@ -176,8 +193,10 @@ class LawHearingController extends Controller
     {
         abort_unless((bool) $hearing->external_tracking_enabled, 404, 'Acompanhamento externo não disponível.');
         abort_unless(! (bool) $hearing->is_confidential, 404, 'Audiência não disponível para acompanhamento externo.');
-        if (! $hearing->law_case_id) return;
-        $confidentiality = DB::table('law_cases')->where('company_id', $hearing->company_id)->where('id', $hearing->law_case_id)->value('confidentiality_level');
+        if (! $hearing->law_case_id) {
+            return;
+        }
+        $confidentiality = DB::table('law_cases')->where('company_id', $hearing->company_id)->where('id', $hearing->law_case_id)->selectRaw('COALESCE(internal_confidentiality_level, confidentiality_level) as effective_level')->value('effective_level');
         abort_unless($confidentiality === 'public', 404, 'Audiência não disponível para acompanhamento externo.');
     }
 }

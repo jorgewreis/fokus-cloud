@@ -20,10 +20,10 @@ try {
         stagingDir,
     });
 
-    assert.equal(Object.keys(manifest.assets).length, 14);
-    assert.equal(files.length, 14);
+    assert.equal(Object.keys(manifest.assets).length, 15);
+    assert.equal(files.length, 15);
     assert.equal((await readFile(path.join(outputRoot, 'config/fokus-law-assets.json'), 'utf8')).endsWith('\n'), true);
-    assert.equal((await readFile(path.join(stagingDir, 'protect.rules'), 'utf8')).trim().split('\n').length, 14);
+    assert.equal((await readFile(path.join(stagingDir, 'protect.rules'), 'utf8')).trim().split('\n').length, 15);
     for (const source of FOKUS_LAW_ASSETS) {
         const entry = manifest.assets[source];
         assert.match(entry.sha256, /^[a-f0-9]{64}$/);

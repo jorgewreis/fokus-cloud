@@ -101,4 +101,62 @@ class LawDjenClientTest extends TestCase
         $this->assertArrayNotHasKey('publications', $result['metadata']);
         Http::assertSentCount(2);
     }
+
+    public function test_full_content_identity_keeps_divergent_versions_with_same_id_and_excerpt(): void
+    {
+        foreach ([null, 'stable', 'changed'] as $providerHash) {
+            $base = ['id' => 'same-id', 'numeroProcesso' => '10016228320244013301'];
+            $original = $base + ['texto' => str_repeat('á', 1100).' versão original', 'hash' => $providerHash === null ? null : 'stable'];
+            $changed = $base + ['texto' => str_repeat('á', 1100).' versão corrigida', 'hash' => $providerHash];
+            Http::fake(['djen.test/*' => Http::response(['count' => 3, 'items' => [$original, $changed, $original]])]);
+            $rows = app(LawDjenClient::class)->lookup('10016228320244013301')['metadata']['publications'];
+            $this->assertCount(2, $rows);
+            $this->assertSame($rows[0]['excerpt'], $rows[1]['excerpt']);
+            $this->assertSame(1000, mb_strlen($rows[0]['excerpt']));
+            $this->assertNotSame($rows[0]['content_fingerprint'], $rows[1]['content_fingerprint']);
+            $this->assertNotSame(\App\Services\LawCaseWorkflow::publicationKey($rows[0]), \App\Services\LawCaseWorkflow::publicationKey($rows[1]));
+            $this->assertSame(1, $rows[0]['content_fingerprint_version']);
+            $this->assertArrayNotHasKey('texto', $rows[0]);
+            $this->assertStringNotContainsString('versão original', json_encode($rows));
+        }
+    }
+
+    public function test_html_entities_whitespace_and_canonical_unicode_share_identity(): void
+    {
+        $base = ['id' => 'same-id', 'numeroProcesso' => '10016228320244013301'];
+        Http::fake(['djen.test/*' => Http::response(['count' => 3, 'items' => [
+            $base + ['texto' => '<p>Intimação&nbsp; <b>ação</b></p><p>A &amp; B</p>'],
+            $base + ['texto' => " Intimação ação\n A & B "],
+            $base + ['texto' => "Intimação ação A & B"],
+        ]])]);
+        $rows = app(LawDjenClient::class)->lookup('10016228320244013301')['metadata']['publications'];
+        $this->assertCount(1, $rows);
+        $this->assertSame(hash('sha256', 'Intimação ação A & B'), $rows[0]['content_fingerprint']);
+    }
+
+    public function test_missing_empty_or_invalid_text_never_gets_a_content_fingerprint(): void
+    {
+        $normalize = new \ReflectionMethod(LawDjenClient::class, 'normalizePublication');
+        foreach ([null, '', ' <p>&nbsp;</p> ', ['invalid'], "\xFF"] as $text) {
+            $row = $normalize->invoke(new LawDjenClient, ['id' => 'item', 'texto' => $text, 'hash' => 'provider']);
+            $this->assertNull($row['content_fingerprint']);
+            $this->assertNull($row['excerpt']);
+            $this->assertFalse(\App\Services\LawCaseWorkflow::hasContentFingerprint($row));
+        }
+    }
+
+    public function test_descriptive_only_items_are_rejected_without_silently_merging_different_courts(): void
+    {
+        $base = ['numeroProcesso' => '10016228320244013301', 'tipoComunicacao' => 'Intimação', 'siglaTribunal' => 'TJBA'];
+        foreach ([
+            [$base + ['nomeOrgao' => 'Vara A'], $base + ['nomeOrgao' => 'Vara B']],
+            [$base + ['dataPublicacao' => '2026-11-06']],
+        ] as $items) {
+            Http::fake(['djen.test/*' => Http::response(['count' => count($items), 'items' => $items])]);
+            $result = app(LawDjenClient::class)->lookup('10016228320244013301');
+            $this->assertSame('error', $result['status']);
+            $this->assertSame('invalid_result', $result['code']);
+            $this->assertArrayNotHasKey('publications', $result['metadata']);
+        }
+    }
 }

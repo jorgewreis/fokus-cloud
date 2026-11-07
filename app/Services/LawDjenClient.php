@@ -49,8 +49,15 @@ class LawDjenClient
             if ($normalizedItems->contains(fn (array $item): bool => ! ($item['id'] || $item['hash'] || $item['availability_date'] || $item['publication_date'] || $item['type'] || $item['court_name'] || $item['tribunal'] || $item['link']))) {
                 return $this->failure('invalid_result', 'Uma publicação do DJEN não contém dados reconhecíveis. As publicações anteriores foram preservadas.');
             }
+            // Dates and descriptive labels alone cannot distinguish publications.
+            // Reject the entire response rather than silently merging uncertain items.
+            if ($normalizedItems->contains(fn (array $item): bool => ! (
+                $item['id'] || $item['hash'] || $item['link'] || LawCaseWorkflow::hasContentFingerprint($item)
+            ))) {
+                return $this->failure('invalid_result', 'Uma publicação do DJEN não contém identidade suficiente para comparação segura. As publicações anteriores foram preservadas.');
+            }
             $publications = $normalizedItems
-                ->unique(fn (array $item): string => (string) ($item['id'] ?: ($item['hash'] ?: implode('|', [$item['availability_date'], $item['type'], $item['court_name']]))) )
+                ->unique(fn (array $item): string => LawCaseWorkflow::publicationKey($item))
                 ->sortByDesc('availability_date')->values()->all();
 
             if ($expectedCount > 0 && $publications === []) return $this->failure('invalid_result', 'O DJEN informou resultados, mas nenhum item tinha dados reconhecíveis. As publicações anteriores foram preservadas.');
@@ -103,7 +110,11 @@ class LawDjenClient
         $link = trim((string) ($item['link'] ?? $item['linkDocumento'] ?? $item['url'] ?? ''));
         if ($link !== '' && (! filter_var($link, FILTER_VALIDATE_URL) || strtolower((string) parse_url($link, PHP_URL_SCHEME)) !== 'https')) $link = '';
 
+        $text = $this->publicationText($item['texto'] ?? null);
+
         return [
+            'content_fingerprint_version' => 1,
+            'content_fingerprint' => $text === null ? null : hash('sha256', $text),
             'hash' => isset($item['hash']) ? substr(trim((string) $item['hash']), 0, 120) : null,
             'id' => isset($item['id']) ? (string) $item['id'] : null,
             'availability_date' => $this->normalizeDate($item['dataDisponibilizacao'] ?? $item['data_disponibilizacao'] ?? null),
@@ -113,21 +124,23 @@ class LawDjenClient
             'case_class' => $this->shortText($item['nomeClasse'] ?? $item['classeProcessual'] ?? $item['classe'] ?? null, 180),
             'type' => $this->shortText($item['tipoComunicacao'] ?? null, 120),
             'document_type' => $this->shortText($item['tipoDocumento'] ?? null, 120),
-            'excerpt' => $this->publicationExcerpt($item['texto'] ?? null),
+            'excerpt' => $text === null ? null : (mb_strlen($text) > 1000 ? rtrim(mb_substr($text, 0, 999)).'…' : $text),
             'link' => $link !== '' ? $link : null,
             'recipients' => $this->normalizeRecipients($item['destinatarios'] ?? []),
             'recipient_attorneys' => $this->normalizeAttorneys($item['destinatarioadvogados'] ?? []),
         ];
     }
 
-    private function publicationExcerpt(mixed $value): ?string
+    private function publicationText(mixed $value): ?string
     {
-        if (! is_string($value) || trim($value) === '') return null;
+        if (! is_string($value) || ! mb_check_encoding($value, 'UTF-8') || trim($value) === '') return null;
         $text = preg_replace('/<\s*(?:br|\/p|\/div|\/li|\/tr)\b[^>]*>/iu', ' ', $value) ?? $value;
         $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $text = trim(preg_replace('/[\s\p{Z}]+/u', ' ', $text) ?? '');
         if ($text === '') return null;
-        return mb_strlen($text) > 1000 ? rtrim(mb_substr($text, 0, 999)).'…' : $text;
+        // NFC makes canonically equivalent Unicode independent of provider encoding.
+        $normalized = \Normalizer::normalize($text, \Normalizer::FORM_C);
+        return $normalized === false ? null : $normalized;
     }
 
     private function normalizeRecipients(mixed $items): array

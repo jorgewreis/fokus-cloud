@@ -1,253 +1,167 @@
-name: Ephemeral security homologation
+name: Isolated Linux release validation (no deploy)
 
 "on":
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'app/**'
-      - 'bootstrap/**'
-      - 'config/**'
-      - 'database/**'
-      - 'routes/**'
-      - 'resources/views/portal/fokus-law.blade.php'
-      - 'public/assets/css/shared/fokus.css'
-      - 'public/assets/js/**'
-      - 'public/marketing/products/fokus-law.css'
-      - 'public/portal/assets/**'
-      - 'tests/**'
-      - 'tools/generate-fokus-law-assets.mjs'
-      - 'composer.json'
-      - 'composer.lock'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/security-homologation.yml'
-      - 'phpunit.homologation.xml'
-      - 'playwright.security.config.mjs'
-      - 'tools/check-security-canaries.mjs'
-      - 'tools/security-homologation-proxy.mjs'
-  pull_request:
-    paths:
-      - 'app/**'
-      - 'bootstrap/**'
-      - 'config/**'
-      - 'database/**'
-      - 'routes/**'
-      - 'resources/views/portal/fokus-law.blade.php'
-      - 'public/assets/css/shared/fokus.css'
-      - 'public/assets/js/**'
-      - 'public/marketing/products/fokus-law.css'
-      - 'public/portal/assets/**'
-      - 'tests/**'
-      - 'tools/generate-fokus-law-assets.mjs'
-      - 'composer.json'
-      - 'composer.lock'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/security-homologation.yml'
-      - 'phpunit.homologation.xml'
-      - 'playwright.security.config.mjs'
-      - 'tools/check-security-canaries.mjs'
-      - 'tools/security-homologation-proxy.mjs'
+    inputs:
+      candidate_sha:
+        description: Reviewed exact candidate commit, full SHA
+        required: true
+        type: string
+      baseline_sha:
+        description: Reviewed historical baseline, full SHA
+        required: true
+        default: 26daac7c27d246eaef64bb3f0e59499376993f8f
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: security-homologation-${{ github.ref }}
-  cancel-in-progress: true
+  group: linux-release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  security-homologation:
-    name: Security tests with isolated MySQL and Redis
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    environment: homologation
-    services:
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_ROOT_PASSWORD: security-test-only
-          MYSQL_DATABASE: fokuscloud_security
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot --password=security-test-only"
-          --health-interval=10s --health-timeout=5s --health-retries=12
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd="redis-cli ping"
-          --health-interval=10s --health-timeout=5s --health-retries=12
-    env:
-      APP_NAME: FokusCloudSecurityTest
-      APP_ENV: testing
-      APP_DEBUG: false
-      APP_URL: https://localhost:8443
-      BCRYPT_ROUNDS: 4
-      DB_CONNECTION: mysql
-      DB_HOST: 127.0.0.1
-      DB_PORT: 3306
-      DB_DATABASE: fokuscloud_security
-      DB_USERNAME: root
-      DB_PASSWORD: security-test-only
-      CACHE_STORE: redis
-      REDIS_CLIENT: phpredis
-      REDIS_HOST: 127.0.0.1
-      REDIS_PORT: 6379
-      SESSION_DRIVER: database
-      SESSION_LIFETIME: 120
-      MAIL_MAILER: array
-      QUEUE_CONNECTION: sync
-      MERCADO_PAGO_ACCESS_TOKEN: test-token-not-a-credential
-      MERCADO_PAGO_WEBHOOK_SECRET: test-webhook-not-a-credential
-      MERCADO_PAGO_WEBHOOK_RATE_LIMIT: 2
-      FOKUS_USAGE_INGESTION_SECRET: test-usage-not-a-credential
-
+  dependency-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v5
-
-      - name: Setup PHP and isolated database/cache drivers
-        uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
-          php-version: '8.4'
-          extensions: pdo_mysql, redis
-          coverage: none
-
-      - name: Install PHP and browser dependencies
-        uses: actions/setup-node@v5
+          ref: ${{ inputs.candidate_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
-          node-version: '24'
-
-      - name: Install application dependencies
+          node-version: '24.13.0'
+      - name: Require exact source for audit
+        env:
+          EXPECTED_CANDIDATE: ${{ inputs.candidate_sha }}
         run: |
-          composer install --no-interaction --prefer-dist --optimize-autoloader
-          npm ci
-          npm run law:assets:prepare
-          npx playwright install --with-deps chromium
-
-      - name: Verify immutable asset retention with rsync
-        run: node tests/Deployment/fokus-law-assets-rsync.mjs
-
-      - name: Check isolated contact forms with synthetic browser data
-        run: node tests/Frontend/law-contact-visual.cjs
-
-      - name: Upload synthetic contact form screenshots
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: law-contact-visual-${{ github.run_id }}
-          path: test-results/law-contact-visual/
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Run feature and unit suite on MySQL and Redis
+          set -euo pipefail
+          [[ "$EXPECTED_CANDIDATE" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_CANDIDATE"
+          test "$GITHUB_SHA" = "$EXPECTED_CANDIDATE"
+      - name: Audit locked packages without applying fixes
+        shell: bash
         run: |
+          mkdir -p "$RUNNER_TEMP/dependency-audit"
           set +e
-          vendor/bin/phpunit --configuration=phpunit.homologation.xml --log-junit "$RUNNER_TEMP/security-tests.xml" > "$RUNNER_TEMP/security-tests.log" 2>&1
-          status=$?
-          echo "SECURITY_PHPUNIT_STATUS=$status" >> "$GITHUB_ENV"
-          if [ "$status" -ne 0 ]; then
-            php -r '$report = simplexml_load_file($argv[1]); foreach ($report->xpath("//testcase") as $test) { foreach (["failure", "error"] as $kind) { if (isset($test->$kind)) { $failure = $test->$kind[0]; $message = (string) $failure["message"]." ".(string) $failure; $detail = " [".(string) $failure["type"]."]"; if (preg_match("/Expected response status code \\[(\\d+)\\] but received (\\d+)/", $message, $match) || preg_match("/Failed asserting that (\\d+) is identical to (\\d+)/", $message, $match)) { $detail .= " (HTTP assertion {$match[1]} vs {$match[2]})"; } elseif (preg_match("/SQLSTATE\\[([A-Z0-9]+)\\]/", $message, $match)) { $detail .= " (SQLSTATE {$match[1]})"; } elseif (str_contains($message, "two arrays are identical")) { $detail .= " (JSON payload mismatch)"; } printf("Failed test: %s::%s%s\n", (string) $test["class"], (string) $test["name"], $detail); break; } } }' "$RUNNER_TEMP/security-tests.xml"
-            php -r '$messages = []; foreach (glob("storage/logs/*.log") as $path) { $content = file_get_contents($path); if (preg_match_all("/(?:testing|production|local)\\.ERROR: ([A-Za-z0-9_\\\\]+).*?(SQLSTATE\\[[A-Z0-9]+\\])?/s", $content, $matches, PREG_SET_ORDER)) { foreach ($matches as $match) { $messages[(string) $match[1]." ".(string) ($match[2] ?? "")] = true; } } } foreach (array_keys($messages) as $message) { printf("Logged error class: %s\n", $message); }'
-          fi
-          exit 0
-
-      - name: Reset isolated rate-limit cache before browser checks
-        run: php artisan cache:clear
-
-      - name: Prepare isolated browser-test database
-        env:
-          APP_ENV: production
-          APP_DEBUG: false
-          APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
-          APP_URL: https://localhost:8443
-          SESSION_DRIVER: database
-          CACHE_STORE: redis
-        run: php artisan migrate:fresh --seed --force --no-interaction
-
-      - name: Start isolated Laravel HTTP server
-        env:
-          APP_ENV: production
-          APP_DEBUG: false
-          APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
-          APP_URL: https://localhost:8443
-          SESSION_DRIVER: database
-          CACHE_STORE: redis
-          LOG_CHANNEL: single
-          LOG_LEVEL: debug
-        run: |
-          php artisan serve --host=127.0.0.1 --port=8000 > "$RUNNER_TEMP/security-app.log" 2>&1 &
-          echo $! > "$RUNNER_TEMP/security-app.pid"
-          for attempt in {1..30}; do
-            if curl --silent --fail http://127.0.0.1:8000/up >/dev/null; then exit 0; fi
-            sleep 1
-          done
-          echo "Isolated Laravel server did not become ready."
-          exit 1
-
-      - name: Create temporary HTTPS certificate
-        run: |
-          openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
-            -keyout "$RUNNER_TEMP/security-test.key" \
-            -out "$RUNNER_TEMP/security-test.crt" \
-            -subj '/CN=localhost' \
-            -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' >/dev/null 2>&1
-
-      - name: Run dynamic browser checks for CSRF, cookies and limits
-        env:
-          SECURITY_PROXY_CERT: ${{ runner.temp }}/security-test.crt
-          SECURITY_PROXY_KEY: ${{ runner.temp }}/security-test.key
-        run: |
-          set +e
-          npm run test:security:homologation > "$RUNNER_TEMP/security-browser-tests.log" 2>&1
-          status=$?
-          echo "SECURITY_BROWSER_STATUS=$status" >> "$GITHUB_ENV"
-          exit 0
-
-      - name: Scan logs and test outputs for raw canaries
-        id: canary_scan
+          npm audit --package-lock-only --audit-level=high --json > "$RUNNER_TEMP/dependency-audit/npm-app.json" 2> "$RUNNER_TEMP/dependency-audit/npm-app.stderr"
+          app_status=$?
+          (cd tests/Deployment/styles-qa && npm audit --package-lock-only --audit-level=high --json) > "$RUNNER_TEMP/dependency-audit/npm-qa.json" 2> "$RUNNER_TEMP/dependency-audit/npm-qa.stderr"
+          qa_status=$?
+          docker run --rm --read-only --cpus=1 --memory=512m --tmpfs /tmp:rw,size=128m -e COMPOSER_HOME=/tmp/composer -e COMPOSER_CACHE_DIR=/tmp/composer-cache --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/app,readonly" -w /app composer:2.8.12@sha256:0d264a0f1e5be23ba363447768df7b30c33d542711ea12e37770ed7b13bf4eaa --no-plugins --no-scripts audit --locked --format=json > "$RUNNER_TEMP/dependency-audit/composer.json" 2> "$RUNNER_TEMP/dependency-audit/composer.stderr"
+          composer_status=$?
+          printf '{"npm_app":%s,"npm_qa":%s,"composer":%s}\n' "$app_status" "$qa_status" "$composer_status" > "$RUNNER_TEMP/dependency-audit/status.json"
+          test "$app_status" = 0 && test "$qa_status" = 0 && test "$composer_status" = 0
+      - name: Preserve audit readout even when it blocks release
         if: ${{ always() }}
-        run: node tools/check-security-canaries.mjs
-
-      - name: Enforce test outcomes and show sanitized summaries
-        if: ${{ always() }}
-        run: |
-          if [ "${SECURITY_PHPUNIT_STATUS:-1}" != 0 ] || [ "${SECURITY_BROWSER_STATUS:-1}" != 0 ] || [ "${{ steps.canary_scan.outcome }}" != success ]; then
-            echo 'Security homologation tests failed. Raw output was withheld; inspect the canary scan result and fix the failing assertions.'
-            exit 1
-          fi
-          tail -n 24 "$RUNNER_TEMP/security-tests.log"
-          tail -n 18 "$RUNNER_TEMP/security-browser-tests.log"
-
-      - name: Record checks that require external operator evidence
-        if: ${{ success() }}
-        run: |
-          {
-            echo '## Security homologation evidence'
-            echo '- MySQL and Redis-backed feature/unit tests: passed.'
-            echo '- Browser CSRF, session-cookie attributes and rate-limit checks: passed.'
-            echo '- Synthetic canary scan of app logs and workflow outputs: passed.'
-            echo '- Mercado Pago live sandbox exercise: separate finance-owned step in the runbook; not replaced by HTTP mocks.'
-            echo '- Remote log sink coverage: pending unless a dedicated non-production sink was configured and inspected.'
-            echo '- Production credential cutovers: operator-owned; this workflow never reads production secrets.'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload sanitized browser report
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: security-homologation-report-${{ github.run_id }}
-          path: playwright-report/
-          if-no-files-found: ignore
+          name: dependency-audit-${{ github.sha }}
+          path: ${{ runner.temp }}/dependency-audit/
+          if-no-files-found: error
           retention-days: 14
 
-      - name: Stop isolated Laravel server
-        if: ${{ always() }}
+  isolated-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - runtime: compatibility
+            php: '8.4.27'
+            image: fokus-law-linux-qa:20261107-node2413
+            dockerfile: tests/Deployment/linux-runtime/Dockerfile
+          - runtime: target
+            php: '8.5.7'
+            image: fokus-law-linux-qa:20261107-php857-node2413
+            dockerfile: tests/Deployment/linux-runtime/php85/Dockerfile
+    env:
+      RELEASE_DISPOSABLE_TESTS: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+      EXPECTED_CANDIDATE: ${{ inputs.candidate_sha }}
+      EXPECTED_BASELINE: ${{ inputs.baseline_sha }}
+    steps:
+      - name: Checkout exact candidate without persisted credentials
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require exact workflow and candidate identity
+        shell: bash
         run: |
-          if [ -f "$RUNNER_TEMP/security-app.pid" ]; then kill "$(cat "$RUNNER_TEMP/security-app.pid")" 2>/dev/null || true; fi
+          set -euo pipefail
+          [[ "$EXPECTED_CANDIDATE" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_BASELINE" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_CANDIDATE"
+          test "$GITHUB_SHA" = "$EXPECTED_CANDIDATE"
+          python3 tests/Deployment/baseline-gate.py "$EXPECTED_BASELINE"
+          python3 -m unittest discover -s tests/Deployment -p test_linux_release_harness.py
+      - name: Set isolated host Node runtime
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24.13.0'
+      - name: Prepare lockfile host browser clients
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x /usr/bin/google-chrome
+          /usr/bin/google-chrome --version
+          npm ci --ignore-scripts
+          npm ci --prefix tests/Deployment/styles-qa --ignore-scripts
+      - name: Validate isolated Linux backend and actual rsync
+        shell: bash
+        run: python3 tests/Deployment/linux-release.py --build --backend-only --profile "${{ matrix.runtime }}" --image "${{ matrix.image }}" --dockerfile "${{ matrix.dockerfile }}" --report "$RUNNER_TEMP/linux-release-evidence"
+      - name: Require sandboxed host browser and aggregate exact source evidence
+        shell: bash
+        run: python3 tests/Deployment/host-browser/run-ci-host.py --backend-report "$RUNNER_TEMP/linux-release-evidence" --report "$RUNNER_TEMP/linux-release-host-browser" --chrome /usr/bin/google-chrome
+      - name: Scan all collected evidence before upload
+        id: canary_scan
+        if: ${{ always() }}
+        shell: bash
+        run: python3 tests/Deployment/scan-release-canaries.py --root "$RUNNER_TEMP/linux-release-evidence" --root "$RUNNER_TEMP/linux-release-host-browser" --output "$RUNNER_TEMP/security-canary-scan.json"
+      - name: Upload synthetic validation evidence
+        if: ${{ always() && steps.canary_scan.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-release-${{ matrix.runtime }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/linux-release-evidence/
+            ${{ runner.temp }}/linux-release-host-browser/
+            !${{ runner.temp }}/**/fixture.json
+            !${{ runner.temp }}/**/http/runtime/**
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve canary scan without raw values
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: canary-scan-${{ matrix.runtime }}-${{ github.sha }}
+          path: ${{ runner.temp }}/security-canary-scan.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Record scope and immutable revision
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          printf 'PHP CLI runtime: %s. FPM/proxy production remains a separate gate.\n' '${{ matrix.php }}' >> "$GITHUB_STEP_SUMMARY"
+          printf 'Validated exact commit: %s\n' "$EXPECTED_CANDIDATE" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Linux synthetic validation only. No deployment, production credentials, production data, backups or diagnostics. HTTPS browser and destination readiness remain separate gates.\n' >> "$GITHUB_STEP_SUMMARY"
 
+  release-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs: [dependency-audit, isolated-linux]
+    if: ${{ always() }}
+    steps:
+      - name: Require audit and both runtime profiles
+        env:
+          AUDIT_RESULT: ${{ needs.dependency-audit.result }}
+          RUNTIME_RESULT: ${{ needs.isolated-linux.result }}
+        run: |
+          test "$AUDIT_RESULT" = success
+          test "$RUNTIME_RESULT" = success
+          echo 'All synthetic CI gates passed. Production HTTPS/FPM/proxy and deployment authorization remain separate.'

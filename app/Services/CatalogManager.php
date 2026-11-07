@@ -493,6 +493,22 @@ class CatalogManager
 
         $snapshot = json_decode($publication->snapshot, true) ?: [];
 
+        if (in_array($product->code, ['law', 'fokus-law'], true)) {
+            // Retire only the unsupported advocacy hearing offer for new sales.
+            // Published snapshots and existing subscriptions remain unchanged.
+            $retired = collect($snapshot['modules'] ?? [])->filter(fn (array $module): bool =>
+                ($module['code'] ?? '') === 'audiencias-advocacia'
+                || (str_starts_with((string) ($module['module_code'] ?? ''), 'audiencias')
+                    && ($module['context_code'] ?? '') === 'escritorio'))
+                ->pluck('code')->push('audiencias-advocacia')->unique()->all();
+            $snapshot['modules'] = array_values(array_filter($snapshot['modules'] ?? [],
+                fn (array $module): bool => ! in_array($module['code'] ?? '', $retired, true)));
+            // Hide a dependent offer rather than silently changing its price/composition.
+            $snapshot['plans'] = array_values(array_filter($snapshot['plans'] ?? [],
+                fn (array $plan): bool => ($plan['code'] ?? '') !== 'law-audiencias-advocacia'
+                    && array_intersect($plan['module_codes'] ?? [], $retired) === []));
+        }
+
         return [
             ...$snapshot,
             'published_version' => (int) $publication->version,
