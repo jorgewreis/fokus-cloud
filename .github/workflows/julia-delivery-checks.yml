@@ -1,0 +1,69 @@
+name: Julia delivery checks
+
+"on":
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: julia-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  operations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - run: node --test tests/Operations/julia-operations.test.mjs
+
+  application:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite, sqlite3
+          coverage: none
+      - name: Prepare isolated application
+        run: |
+          mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs
+          touch database/database.sqlite
+          cp .env.example .env
+          composer install --no-interaction --prefer-dist
+          npm ci
+          php artisan key:generate --force
+          npm run law:assets:prepare
+      - name: Pint on changed PHP files
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+        run: |
+          set -euo pipefail
+          if [ -z "$BASE_SHA" ]; then
+            git fetch origin main
+            BASE_SHA="$(git merge-base HEAD origin/main)"
+          fi
+          mapfile -d '' files < <(git diff --name-only --diff-filter=ACMR -z "$BASE_SHA" HEAD -- '*.php')
+          if [ "${#files[@]}" -gt 0 ]; then
+            vendor/bin/pint --test -- "${files[@]}"
+          fi
+      - run: php artisan test
+      - run: npm run build
+      - run: npm run tokens:check
+      - run: npm run seo:check
+      - run: npm run backoffice:contract:check
