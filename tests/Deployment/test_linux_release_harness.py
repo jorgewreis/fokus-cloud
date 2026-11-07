@@ -1,4 +1,5 @@
 """Non-destructive negative controls for release harness boundaries and adapters."""
+import ast
 import os
 import io
 import tarfile
@@ -21,6 +22,22 @@ upgrade_spec.loader.exec_module(upgrade)
 
 
 class HarnessContracts(unittest.TestCase):
+    def test_materialization_uses_extractor_ownership_before_qa_handoff(self):
+        source = (common.ROOT / 'tests/Deployment/linux-release.py').read_text(encoding='utf-8')
+        stages = {
+            node.args[0].value: node for node in ast.walk(ast.parse(source))
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            and node.func.id == 'run' and node.args
+            and isinstance(node.args[0], ast.Constant)
+        }
+        materialize = stages['materialize']
+        handoff = stages['prepare-synthetic-ownership']
+        self.assertIn('tar --no-same-owner -xf source.tar', ast.literal_eval(materialize.args[1].args[-1]))
+        self.assertNotIn('safe.directory', source)
+        self.assertIn('chown -R 1000:1000 /work', ast.literal_eval(handoff.args[1].args[-1]))
+        self.assertLess(materialize.lineno, stages['prepare-isolated-upgrade-dependencies'].lineno)
+        self.assertLess(stages['prepare-isolated-upgrade-dependencies'].lineno, handoff.lineno)
+
     def test_missing_disposable_opt_in_fails(self):
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaisesRegex(RuntimeError, 'RELEASE_DISPOSABLE_TESTS'):

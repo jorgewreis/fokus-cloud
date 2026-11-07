@@ -63,7 +63,7 @@ try:
             tar.add(ROOT/'.git',arcname='release/.git')
             tar.add(args.report/'source-manifest.json',arcname='source-manifest.json')
         run('copy-input',docker('cp',str(archive),setup+':/work/source.tar'))
-    run('materialize',docker('exec',setup,'sh','-ec','cd /work && tar -xf source.tar && mkdir -p reports release/storage/framework/cache release/storage/framework/sessions release/storage/framework/views release/storage/logs release/bootstrap/cache && chmod -R u+rwX release/storage release/bootstrap/cache'))
+    run('materialize',docker('exec',setup,'sh','-ec','cd /work && tar --no-same-owner -xf source.tar && mkdir -p reports release/storage/framework/cache release/storage/framework/sessions release/storage/framework/views release/storage/logs release/bootstrap/cache && chmod -R u+rwX release/storage release/bootstrap/cache'))
     run('verify-input',docker('exec','-w','/work/release',setup,'python3','-c',"import json,pathlib,hashlib; m=json.load(open('/work/source-manifest.json')); assert all(hashlib.sha256(pathlib.Path(x['path']).read_bytes()).hexdigest()==x['sha256'] for x in m['files']); print('Verified',len(m['files']),'source files')"))
     install='mkdir -p /work/browsers && composer install --no-interaction --prefer-dist --optimize-autoloader && npm ci --ignore-scripts && npm ci --prefix tests/Deployment/styles-qa --ignore-scripts'
     if not args.backend_only:install+=' && node node_modules/@playwright/test/cli.js install chromium && node tests/Deployment/styles-qa/node_modules/@playwright/test/cli.js install chromium'
