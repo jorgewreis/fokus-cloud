@@ -1,6 +1,6 @@
 <?php
 // Two independent PHP HTTP processes execute the actual app kernel and middleware.
-require dirname(__DIR__).'/safe-network.php';
+require_once dirname(__DIR__).'/safe-network.php';
 $root=getenv('HOMOLOGATION_ROOT');require_once $root.'/vendor/autoload.php';
 $path=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);
 $asset=realpath($root.'/public'.$path);

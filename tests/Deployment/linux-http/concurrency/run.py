@@ -1,6 +1,7 @@
 """HTTP concurrency against dedicated synthetic MySQL. No migration/reset in this adapter."""
 import base64,concurrent.futures,http.cookiejar,json,pathlib,socket,subprocess,sys,time,urllib.request,urllib.error,uuid
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]));import runner
+from readiness import require_csrf_ready
 HERE=pathlib.Path(__file__).resolve().parent
 REPORT=runner.REPORT/'concurrency'
 RUN=runner.REPORT/'runtime/concurrency'
@@ -55,8 +56,9 @@ def main():
    c=Client(port)
    for _ in range(100):
     try:
-     if c.request('GET','/api/csrf-token')['status']==200:break
-    except (OSError,urllib.error.URLError):time.sleep(.1)
+     with c.opener.open(urllib.request.Request(c.base+'/api/csrf-token',headers={'Accept':'application/json'}),timeout=30) as response:
+      if require_csrf_ready(response):break
+    except (OSError,urllib.error.URLError,ValueError):time.sleep(.1)
    else:raise RuntimeError('Server did not become healthy')
    c.login(f);clients.append(c)
   dump(RUN/'server-contract.json',{'ports':[int(c.base.rsplit(':',1)[1]) for c in clients],'pids':[p.pid for p in servers]})

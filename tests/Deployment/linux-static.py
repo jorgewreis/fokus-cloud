@@ -35,7 +35,7 @@ with tempfile.TemporaryDirectory(prefix='fokus-linux-case-') as tmp:
 
 run('psr4-strict', ['composer','dump-autoload','--optimize','--strict-psr','--no-scripts'])
 run('php-lint', ['bash','-o','pipefail','-c',"find app bootstrap config database routes tests -type f -name '*.php' -not -path '*/node_modules/*' -print0 | xargs -0 -n1 php -l"])
-run('law-build', ['npm','run','build'])
+run('law-build', ['node','tests/Deployment/font-cache.mjs','offline'])
 run('law-assets-rsync', ['node','tests/Deployment/fokus-law-assets-rsync.mjs'], env={**os.environ,'CI':'true'})
 run('seo', ['node','tools/sync-seo.mjs','--check'])
 run('tokens', ['node','tools/validate-css-tokens.mjs'])

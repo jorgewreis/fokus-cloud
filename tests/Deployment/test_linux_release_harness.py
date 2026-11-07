@@ -1,5 +1,7 @@
 """Non-destructive negative controls for release harness boundaries and adapters."""
 import os
+import io
+import tarfile
 import importlib.util
 import json
 import xml.etree.ElementTree as ET
@@ -12,6 +14,9 @@ import linux_release_common as common
 spec = importlib.util.spec_from_file_location('linux_suite', common.ROOT / 'tests/Deployment/linux-release-suite.py')
 suite = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(suite)
+upgrade_spec = importlib.util.spec_from_file_location('linux_upgrade', common.ROOT / 'tests/Deployment/linux-upgrade.py')
+upgrade = importlib.util.module_from_spec(upgrade_spec)
+upgrade_spec.loader.exec_module(upgrade)
 
 
 class HarnessContracts(unittest.TestCase):
@@ -105,6 +110,150 @@ class HarnessContracts(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, 'Unexpected'):
                     suite.verify_configuration({}, selected, temporary, 'mysql')
                 writer.assert_not_called()
+
+    def test_database_schema_uses_real_non_destructive_migrations(self):
+        with patch.dict(os.environ, {'RELEASE_CACHE_STORE': 'database', 'RELEASE_DISPOSABLE_TESTS': '1'}):
+            env = common.environment('mysql')
+            with patch.object(suite, 'run') as runner, patch.object(suite, 'write') as writer:
+                suite.prepare_database_schema(env)
+            command, label, migration_env = runner.call_args.args
+            self.assertEqual(command[-4:], ['artisan', 'migrate', '--force', '--no-interaction'])
+            self.assertNotIn('migrate:fresh', command)
+            self.assertEqual(migration_env['CACHE_STORE'], 'array')
+            self.assertEqual(env['CACHE_STORE'], 'database')
+            self.assertTrue(writer.call_args.args[1]['exclusive_suite_lock'])
+
+    def test_schema_rejects_non_synthetic_target_or_missing_opt_in(self):
+        with patch.dict(os.environ, {'RELEASE_CACHE_STORE': 'database', 'RELEASE_DISPOSABLE_TESTS': '1'}):
+            env = common.environment('mysql')
+            for key, value in [('DB_HOST', 'remote'), ('DB_DATABASE', 'real'), ('DB_URL', 'remote'), ('APP_ENV', 'production'), ('DB_PORT', '3307')]:
+                with self.subTest(key=key), patch.object(suite, 'run') as runner:
+                    with self.assertRaisesRegex(RuntimeError, 'Unsafe target'):
+                        suite.prepare_database_schema({**env, key: value})
+                    runner.assert_not_called()
+            with patch.dict(os.environ, {'RELEASE_DISPOSABLE_TESTS': '0'}), patch.object(suite, 'run') as runner:
+                with self.assertRaisesRegex(RuntimeError, 'opt-in'):
+                    suite.prepare_database_schema(env)
+                runner.assert_not_called()
+
+    def test_redis_does_not_prepare_database_cache_schema(self):
+        with patch.dict(os.environ, {'RELEASE_CACHE_STORE': 'redis'}), patch.object(suite, 'run') as runner:
+            suite.prepare_database_schema(common.environment('mysql'))
+            runner.assert_not_called()
+
+    def archive(self, members):
+        data = io.BytesIO()
+        with tarfile.open(fileobj=data, mode='w') as archive:
+            for name, kind, payload in members:
+                member = tarfile.TarInfo(name)
+                member.type = kind
+                member.mode = 0o4777
+                if kind in (tarfile.SYMTYPE, tarfile.LNKTYPE):
+                    member.linkname = payload
+                if kind == tarfile.REGTYPE:
+                    member.size = len(payload)
+                    archive.addfile(member, io.BytesIO(payload))
+                else:
+                    archive.addfile(member)
+        data.seek(0)
+        return tarfile.open(fileobj=data, mode='r')
+
+    def test_safe_archive_roundtrip_without_extractall(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = pathlib.Path(directory)
+            with self.archive([('src/', tarfile.DIRTYPE, b''), ('src/test.php', tarfile.REGTYPE, b'<?php echo 1;')]) as archive, patch.object(archive, 'extractall', side_effect=AssertionError('unsafe extractor called')):
+                evidence = common.safe_extract_source_archive(archive, target)
+            self.assertEqual((target / 'src/test.php').read_bytes(), b'<?php echo 1;')
+            self.assertEqual(evidence['members'], 2)
+
+    def test_safe_archive_rejects_all_unsafe_members_before_writes(self):
+        cases = [('..//escape', tarfile.REGTYPE, b'x'), ('../escape', tarfile.REGTYPE, b'x'), ('/absolute', tarfile.REGTYPE, b'x'), ('C:/absolute', tarfile.REGTYPE, b'x'), ('folder\\escape', tarfile.REGTYPE, b'x'), ('symlink', tarfile.SYMTYPE, '../outside'), ('hardlink', tarfile.LNKTYPE, 'ordinary'), ('device', tarfile.CHRTYPE, b''), ('block', tarfile.BLKTYPE, b''), ('fifo', tarfile.FIFOTYPE, b'')]
+        for case in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as directory:
+                target = pathlib.Path(directory)
+                with self.archive([('ordinary', tarfile.REGTYPE, b'ok'), case]) as archive:
+                    with self.assertRaises(RuntimeError):
+                        common.safe_extract_source_archive(archive, target)
+                self.assertEqual(list(target.iterdir()), [])
+
+    def test_safe_archive_rejects_duplicate_and_nonempty_destination(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = pathlib.Path(directory)
+            with self.archive([('same', tarfile.REGTYPE, b'1'), ('same', tarfile.REGTYPE, b'2')]) as archive:
+                with self.assertRaisesRegex(RuntimeError, 'Duplicate'):
+                    common.safe_extract_source_archive(archive, target)
+            (target / 'existing').write_text('preserve')
+            with self.archive([('new', tarfile.REGTYPE, b'1')]) as archive:
+                with self.assertRaisesRegex(RuntimeError, 'empty real directory'):
+                    common.safe_extract_source_archive(archive, target)
+            self.assertEqual((target / 'existing').read_text(), 'preserve')
+
+    def synthetic_metadata(self):
+        ledger = [['2026_01_01_000000_create_examples', 1]]
+        columns = [['examples', 'id', 'bigint unsigned', 'NO']]
+        data = {'mysql_version': '8.4.10-10', 'migration_ledger': ledger, 'schema_columns': columns, 'migration_ledger_sha256': upgrade.metadata_digest(ledger), 'schema_metadata_sha256': upgrade.metadata_digest(columns)}
+        expected = {'mysql_version': data['mysql_version'], 'migration_ledger_count': 1, 'migration_ledger_sha256': data['migration_ledger_sha256'], 'schema_column_count': 1, 'schema_metadata_sha256': data['schema_metadata_sha256']}
+        return data, expected
+
+    def test_metadata_exact_match_still_does_not_approve_production(self):
+        data, expected = self.synthetic_metadata()
+        result = upgrade.assess_baseline_metadata(data, expected)
+        self.assertEqual(result['origin_equivalence'], 'metadata-and-version-match-only')
+        self.assertTrue(result['literal_metadata_match'])
+        self.assertEqual(result['production_release_gate'], 'not-approved-by-synthetic-test')
+
+    def test_metadata_same_count_different_batch_is_blocked(self):
+        data, expected = self.synthetic_metadata()
+        before = upgrade.assess_baseline_metadata(data, expected)
+        data['migration_ledger'][0][1] = 2
+        data['migration_ledger_sha256'] = upgrade.metadata_digest(data['migration_ledger'])
+        result = upgrade.assess_baseline_metadata(data, expected)
+        self.assertEqual(result['origin_equivalence'], 'blocked')
+        self.assertFalse(result['literal_metadata_match'])
+        self.assertEqual(before['migration_names_sorted_sha256'], result['migration_names_sorted_sha256'])
+        self.assertEqual(result['observed_synthetic']['migration_ledger_count'], expected['migration_ledger_count'])
+
+    def test_metadata_schema_or_version_difference_blocks_equivalence(self):
+        for kind in ('schema', 'version'):
+            with self.subTest(kind=kind):
+                data, expected = self.synthetic_metadata()
+                if kind == 'schema':
+                    data['schema_columns'][0][2] = 'varchar(255)'
+                    data['schema_metadata_sha256'] = upgrade.metadata_digest(data['schema_columns'])
+                else:
+                    data['mysql_version'] = '8.4.13'
+                result = upgrade.assess_baseline_metadata(data, expected)
+                self.assertEqual(result['origin_equivalence'], 'blocked')
+                self.assertTrue(result['sanitized_differences'])
+
+    def test_metadata_invalid_fields_hash_rows_and_order_rejected(self):
+        for kind in ('field', 'hash', 'batch', 'identifier', 'nullability', 'duplicate', 'order'):
+            with self.subTest(kind=kind):
+                data, expected = self.synthetic_metadata()
+                if kind == 'field': data['business_data'] = 'not-permitted'
+                elif kind == 'hash': data['migration_ledger_sha256'] = '0' * 64
+                elif kind == 'batch': data['migration_ledger'][0][1] = -1
+                elif kind == 'identifier': data['schema_columns'][0][0] = 'bad\nname'
+                elif kind == 'nullability': data['schema_columns'][0][3] = 'unknown'
+                elif kind == 'duplicate': data['migration_ledger'] *= 2
+                elif kind == 'order': data['migration_ledger'].append(['0000_first', 1])
+                with self.assertRaises(ValueError):
+                    upgrade.assess_baseline_metadata(data, expected)
+
+    def test_metadata_capture_failure_is_blocked_without_stopping_rehearsal(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(upgrade, 'run', side_effect=RuntimeError('probe failed')), patch.object(upgrade, 'write'):
+            result = upgrade.capture_baseline_metadata(pathlib.Path(directory), {}, pathlib.Path(directory), 'upgrade-mysql-')
+            self.assertEqual(result['origin_equivalence'], 'blocked')
+            self.assertEqual(result['capture_or_validation_error'], 'RuntimeError')
+
+    def test_origin_names_digest_is_compared_independently_of_batch(self):
+        data, expected = self.synthetic_metadata()
+        expected['migration_names_sorted_sha256'] = upgrade.metadata_digest(sorted(r[0] for r in data['migration_ledger']))
+        self.assertFalse(upgrade.assess_baseline_metadata(data, expected)['sanitized_differences'])
+        expected['migration_names_sorted_sha256'] = '0' * 64
+        result = upgrade.assess_baseline_metadata(data, expected)
+        self.assertEqual(result['origin_equivalence'], 'blocked')
+        self.assertEqual(result['sanitized_differences'][0]['field'], 'migration_names_sorted_sha256')
 
     def test_unknown_or_duplicate_adapter_anchor_fails(self):
         with tempfile.TemporaryDirectory() as directory:

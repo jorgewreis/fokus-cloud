@@ -2,6 +2,7 @@
 import sys,os,pathlib,json,subprocess,time,hashlib,urllib.request
 ROOT=pathlib.Path('/work/release');PRIVATE=pathlib.Path('/work/private');REPORT=pathlib.Path('/work/reports')
 sys.path.insert(0,str(ROOT/'tests/Deployment/linux-http'));import runner
+from readiness import require_csrf_ready
 PRIVATE.mkdir(exist_ok=True);REPORT.mkdir(exist_ok=True)
 env=runner.environment();env.update(HOMOLOGATION_ROOT=str(ROOT),HOMOLOGATION_RUN=str(PRIVATE),HOMOLOGATION_WORKER='host-browser',HOMOLOGATION_BROWSER_REPORT=str(REPORT),PYTHONDONTWRITEBYTECODE='1')
 processes=[];logs=[];created=False;steps=[]
@@ -26,8 +27,8 @@ try:
   for i in range(100):
    try:
     with opener.open('http://127.0.0.1:'+str(port)+'/api/csrf-token',timeout=2) as response:
-     if response.status==200:break
-   except OSError:time.sleep(.1)
+     if require_csrf_ready(response):break
+   except (OSError,ValueError):time.sleep(.1)
   else:raise RuntimeError('Server not ready '+str(port))
  style_log=(REPORT/'styles-server.log').open('w');logs.append(style_log)
  style_code="import importlib.util; s=importlib.util.spec_from_file_location('styles_serve','/work/release/tools/styles-showcase/serve.py'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); m.ThreadingHTTPServer(('0.0.0.0',18083),m.Handler).serve_forever()"

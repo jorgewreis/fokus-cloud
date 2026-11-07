@@ -107,7 +107,7 @@ const responseTo = (page,suffix,method) => page.waitForResponse(response => resp
       const response=await pending;assert(response.status()===200,'Invalid CPF preview returns validation rows');
       const preview=await response.json();assert(preview.rows?.length===1&&preview.rows[0].status==='invalid','Alphabetic CPF AAAAAAAAA00 is invalid, never ready');
       assert(await modal(page).locator('.law-contact-import-preview input[type="checkbox"]').isDisabled(),'Invalid CPF row cannot be selected');
-      assert(await modal(page).getByRole('button',{name:'Confirmar importaÃ§Ã£o',exact:true}).isDisabled(),'Invalid-only preview cannot be committed through UI');
+      assert(await modal(page).getByRole('button',{name:'Confirmar importação',exact:true}).isDisabled(),'Invalid-only preview cannot be committed through UI');
       const forced=await api(page,'/law/contacts/import/commit','POST',{batch_id:preview.batch_id,rows:[0],confirmed:true});
       assert(forced.status===409,'Server rejects selection of a non-ready invalid row with409');
       const listed=await api(page,'/law/contacts?q='+encodeURIComponent(invalidName));
@@ -128,9 +128,9 @@ const responseTo = (page,suffix,method) => page.waitForResponse(response => resp
       const preview=responseTo(page,'/law/contacts/import/preview','POST');
       await modal(page).getByLabel('Arquivo de contatos').setInputFiles({name:'synthetic.csv',mimeType:'text/csv',buffer:Buffer.from('display_name,legal_nature,legal_name,cpf,cnpj,email,phone\nQA Import Browser '+Date.now()+',pf,,,,,\n')});
       assert((await preview).status()===200,'Real import preview HTTP200');
-      await modal(page).getByLabel('Revisei as linhas selecionadas e confirmo a importaÃ§Ã£o.').check();
+      await modal(page).getByLabel('Revisei as linhas selecionadas e confirmo a importação.').check();
       const commit=responseTo(page,'/law/contacts/import/commit','POST');
-      await modal(page).getByRole('button',{name:'Confirmar importaÃ§Ã£o',exact:true}).click();
+      await modal(page).getByRole('button',{name:'Confirmar importação',exact:true}).click();
       assert((await commit).status()===201,'Real import commit HTTP201');
     });
     await scenario('portfolio-real-preview-confirm-preserves-existing',async()=>{
@@ -144,7 +144,7 @@ const responseTo = (page,suffix,method) => page.waitForResponse(response => resp
       const preview=await response;assert(preview.status()===200,'Portfolio preview HTTP200');
       const data=await preview.json();assert(data.rows?.length>0,'Portfolio preview has actual validation rows');
       response=responseTo(page,'/law/cases/portfolio/import','POST');
-      await modal(page).getByRole('button',{name:'Confirmar importaÃ§Ã£o',exact:true}).click();
+      await modal(page).getByRole('button',{name:'Confirmar importação',exact:true}).click();
       const confirmed=await response;assert([200,201].includes(confirmed.status()),'Portfolio confirm accepted');
       const result=await confirmed.json();assert(result.created_count>=1,'Valid synthetic process persisted');
       const createdId=result.created_ids[0],before=await api(page,'/law/cases/'+createdId);
@@ -155,10 +155,10 @@ const responseTo = (page,suffix,method) => page.waitForResponse(response => resp
     });
     await scenario('tasks-create-cancel-repeated-submit-edit-back-forward',async()=>{
       await go(page,'tarefas');await page.getByRole('button',{name:'Nova tarefa',exact:true}).click();
-      await modal(page).getByLabel('TÃ­tulo',{exact:true}).fill('Cancelled task');await modal(page).getByRole('button',{name:'Fechar',exact:true}).click();
+      await modal(page).getByLabel('Título',{exact:true}).fill('Cancelled task');await modal(page).getByRole('button',{name:'Fechar',exact:true}).click();
       assert(await page.locator('dialog[open]').count()===0,'Task cancel closes dialog');
       await page.getByRole('button',{name:'Nova tarefa',exact:true}).click();
-      const title='QA Browser Task '+Date.now();await modal(page).getByLabel('TÃ­tulo',{exact:true}).fill(title);await modal(page).getByLabel('DescriÃ§Ã£o',{exact:true}).fill('Synthetic authenticated browser task');
+      const title='QA Browser Task '+Date.now();await modal(page).getByLabel('Título',{exact:true}).fill(title);await modal(page).getByLabel('Descrição',{exact:true}).fill('Synthetic authenticated browser task');
       const save=modal(page).getByRole('button',{name:'Salvar',exact:true});await save.waitFor();
       await page.waitForFunction(()=>[...document.querySelectorAll('dialog[open] button')].some(x=>x.textContent==='Salvar'&&!x.disabled));
       const response=responseTo(page,'/law/tasks','POST');const before=responses.filter(r=>r.path==='/api/law/tasks'&&r.method==='POST').length;
@@ -166,7 +166,7 @@ const responseTo = (page,suffix,method) => page.waitForResponse(response => resp
       const createdData=await created.json();taskId=createdData.task?.id||createdData.id;
       await page.waitForTimeout(250);assert(responses.filter(r=>r.path==='/api/law/tasks'&&r.method==='POST').length===before+1,'Task repeated submit writes once');
       await page.locator('tr').filter({hasText:title}).getByRole('button',{name:'Abrir',exact:true}).click();await page.getByRole('button',{name:'Editar',exact:true}).click();
-      await modal(page).getByLabel('TÃ­tulo',{exact:true}).fill(title+' updated');
+      await modal(page).getByLabel('Título',{exact:true}).fill(title+' updated');
       const patched=responseTo(page,'/law/tasks/'+taskId,'PATCH');await modal(page).getByRole('button',{name:'Salvar',exact:true}).click();assert((await patched).status()===200,'Task real PATCH success');
       await page.getByRole('button',{name:'Voltar',exact:true}).click();await page.goBack();await page.getByRole('button',{name:'Editar',exact:true}).waitFor();assert(page.url().includes('law_task='),'Back restores detail URL');
       await page.goForward();await page.getByRole('button',{name:'Nova tarefa',exact:true}).waitFor();assert(!page.url().includes('law_task='),'Forward restores list URL');

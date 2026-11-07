@@ -1,5 +1,8 @@
 """Utilities for opt-in, synthetic-only Linux release evidence."""
 import hashlib
+import contextlib
+import shutil
+import tempfile
 import json
 import os
 import pathlib
@@ -81,3 +84,54 @@ def adapt(source, destination, replacements):
     destination.write_text(text, encoding='utf-8')
     return {'source': source.relative_to(ROOT).as_posix(), 'source_sha256': sha(source),
             'adapted_sha256': sha(destination), 'replacements': [{'old': old, 'new': new} for old, new in replacements]}
+
+
+def safe_extract_source_archive(archive, destination):
+    """Compatible with Python before tarfile extraction filters; reject links/devices."""
+    destination = pathlib.Path(destination)
+    if destination.is_symlink() or not destination.is_dir() or any(destination.iterdir()):
+        raise RuntimeError('Archive destination must be an empty real directory')
+    root = destination.resolve()
+    members = archive.getmembers()
+    seen = set()
+    for member in members:
+        name = member.name.rstrip('/')
+        parts = name.split('/')
+        if not name or name.startswith('/') or '\\' in name or ':' in name or any(p in ('', '.', '..') for p in parts):
+            raise RuntimeError('Unsafe archive path')
+        if not (member.isdir() or member.isfile()) or member.issym() or member.islnk():
+            raise RuntimeError('Only regular files and directories are allowed in source archives')
+        if name in seen:
+            raise RuntimeError('Duplicate archive path')
+        seen.add(name)
+        target = root.joinpath(*parts)
+        if root not in target.resolve().parents:
+            raise RuntimeError('Archive path escapes destination')
+    # Validate all members before creating any output. Never use extract/extractall.
+    for member in members:
+        target = root.joinpath(*member.name.rstrip('/').split('/'))
+        if member.isdir():
+            target.mkdir(parents=True, exist_ok=True)
+            target.chmod(0o755)
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with archive.extractfile(member) as source, target.open('xb') as output:
+                shutil.copyfileobj(source, output)
+            target.chmod(0o755 if member.mode & 0o100 else 0o644)
+    return {'members': len(members), 'policy': 'regular-files-and-directories-only; full prevalidation; no ownership or special bits'}
+
+
+@contextlib.contextmanager
+def exclusive_suite_lock(env):
+    # Linux-only advisory lock held for the whole run, not just schema preparation.
+    import fcntl
+    path = pathlib.Path(tempfile.gettempdir()) / ('fokus-release-suite-' + env['DB_CONNECTION'] + '.lock')
+    with path.open('a') as handle:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise RuntimeError('Another release suite owns the disposable database') from error
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)

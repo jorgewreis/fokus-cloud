@@ -2,6 +2,7 @@
 import argparse,json,pathlib,socket,subprocess,sys,time,urllib.request,urllib.error
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]))
 import runner
+from readiness import require_csrf_ready
 HERE=pathlib.Path(__file__).resolve().parent
 parser=argparse.ArgumentParser();parser.add_argument('fixture',type=pathlib.Path);parser.add_argument('--report',type=pathlib.Path,default=runner.REPORT/'browser');args=parser.parse_args()
 runner.require_disposable()
@@ -20,8 +21,8 @@ for enabled,script in [('true','run.cjs'),('false','flag-disabled.cjs')]:
   for _ in range(100):
    try:
     with opener.open(origin+'/api/csrf-token',timeout=2) as response:
-     if response.status==200:break
-   except (OSError,urllib.error.URLError):time.sleep(.1)
+     if require_csrf_ready(response):break
+   except (OSError,urllib.error.URLError,ValueError):time.sleep(.1)
   else:raise RuntimeError('Loopback PHP server did not become ready')
   command=['node',str(HERE/script),origin,str(args.fixture),str(args.report)]
   with (args.report/f'browser-tasks-{enabled}.log').open('w',encoding='utf-8') as output:

@@ -100,6 +100,7 @@ jobs:
           test "$GITHUB_SHA" = "$EXPECTED_CANDIDATE"
           python3 tests/Deployment/baseline-gate.py "$EXPECTED_BASELINE"
           python3 -m unittest discover -s tests/Deployment -p test_linux_release_harness.py
+          python3 -m unittest discover -s tests/Deployment/linux-http -p test_readiness.py
       - name: Set isolated host Node runtime
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
@@ -112,6 +113,7 @@ jobs:
           /usr/bin/google-chrome --version
           npm ci --ignore-scripts
           npm ci --prefix tests/Deployment/styles-qa --ignore-scripts
+          node --test tests/Deployment/font-cache.test.mjs
       - name: Validate isolated Linux backend and actual rsync
         shell: bash
         run: python3 tests/Deployment/linux-release.py --build --backend-only --profile "${{ matrix.runtime }}" --image "${{ matrix.image }}" --dockerfile "${{ matrix.dockerfile }}" --report "$RUNNER_TEMP/linux-release-evidence"

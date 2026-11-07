@@ -10,7 +10,89 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
-from linux_release_common import ROOT, REPORT, BASELINE, guard, environment, php, run, adapt, write, sha
+from linux_release_common import ROOT, REPORT, BASELINE, guard, environment, php, run, adapt, write, sha, safe_extract_source_archive
+
+
+ORIGIN_METADATA = {
+    'mysql_version': '8.4.10-10',
+    'migration_ledger_count': 79,
+    'migration_names_sorted_sha256': 'cf89b9fb8d75b4456165f05e1f04aefed383dae439bcdb59134763eb76a992d1',
+    'migration_ledger_sha256': '9ad2b5f92c759eed475ac19dad2352b22363186f420c11bcce50243d2e6bdd45',
+    'schema_column_count': 1110,
+    'schema_metadata_sha256': '323ce5b8442395943f1cfdff9e49f9cfd7710eac6643a42653f279e172798d7f',
+}
+
+
+def metadata_digest(rows):
+    # Mirrors PHP JSON_UNESCAPED_SLASHES: compact, escaped Unicode, original types/order.
+    return hashlib.sha256(json.dumps(rows, ensure_ascii=True, separators=(',', ':')).encode('utf-8')).hexdigest()
+
+
+def assess_baseline_metadata(data, expected=ORIGIN_METADATA):
+    required = {'mysql_version', 'migration_ledger', 'schema_columns', 'migration_ledger_sha256', 'schema_metadata_sha256'}
+    if not isinstance(data, dict) or set(data) != required:
+        raise ValueError('Unexpected synthetic metadata fields')
+    version = data['mysql_version']
+    if not isinstance(version, str) or not version or len(version) > 100 or any(not (c.isascii() and (c.isalnum() or c in '.+_:~ -')) for c in version):
+        raise ValueError('Invalid MySQL version metadata')
+    ledger, columns = data['migration_ledger'], data['schema_columns']
+    if not isinstance(ledger, list) or not isinstance(columns, list) or not ledger or not columns:
+        raise ValueError('Missing synthetic ledger/schema metadata')
+    for row in ledger:
+        if not isinstance(row, list) or len(row) != 2 or not isinstance(row[0], str) or not row[0] or not all(c.isascii() and (c.isalnum() or c == '_') for c in row[0]):
+            raise ValueError('Invalid migration metadata row')
+        if type(row[1]) not in (str, int) or not str(row[1]).isdigit() or int(row[1]) < 1:
+            raise ValueError('Invalid migration batch metadata')
+    if [r[0] for r in ledger] != sorted(r[0] for r in ledger) or len({r[0] for r in ledger}) != len(ledger):
+        raise ValueError('Migration metadata is unordered or duplicated')
+    for row in columns:
+        if not isinstance(row, list) or len(row) != 4 or any(not isinstance(v, str) or not v or len(v) > 4096 or any(ord(c) < 32 or ord(c) == 127 for c in v) for v in row) or row[3] not in ('YES', 'NO'):
+            raise ValueError('Invalid column metadata row')
+        if any(not all(c.isascii() and (c.isalnum() or c == '_') for c in v) for v in row[:2]):
+            raise ValueError('Invalid schema identifier')
+    if [r[0] for r in columns] != sorted(r[0] for r in columns) or len({tuple(r[:2]) for r in columns}) != len(columns):
+        raise ValueError('Column metadata is unordered or duplicated')
+    if data['migration_ledger_sha256'] != metadata_digest(ledger) or data['schema_metadata_sha256'] != metadata_digest(columns):
+        raise ValueError('Synthetic metadata digest does not match captured rows')
+    observed = {'mysql_version': version, 'migration_ledger_count': len(ledger), 'migration_ledger_sha256': data['migration_ledger_sha256'], 'schema_column_count': len(columns), 'schema_metadata_sha256': data['schema_metadata_sha256']}
+    observed['migration_names_sorted_sha256'] = metadata_digest(sorted(r[0] for r in ledger))
+    differences = [{'field': key, 'expected_origin': value, 'observed_synthetic': observed[key]} for key, value in expected.items() if observed[key] != value]
+    metadata_match = all(observed[k] == expected[k] for k in expected if k != 'mysql_version')
+    return {'origin_equivalence': 'blocked' if differences else 'metadata-and-version-match-only',
+            'production_release_gate': 'not-approved-by-synthetic-test',
+            'literal_metadata_match': metadata_match, 'mysql_version_match': version == expected['mysql_version'],
+            'expected_origin': expected, 'observed_synthetic': observed, 'sanitized_differences': differences,
+            'migration_names_sorted_sha256': metadata_digest(sorted(r[0] for r in ledger)),
+            'schema_column_names_sorted_sha256': metadata_digest(sorted([r[:2] for r in columns])),
+            'comparison_limitations': ['Only reviewed origin digests are bundled here; detailed origin metadata is compared separately, never treated as application fixture data.', 'Ledger hash includes batch and PDO value types; historical batch differences require explicit review.', 'Schema query preserves table_name,ordinal_position order; no row data is queried.', 'Even a match does not approve production backup, runtime, release or deployment.']}
+
+
+def capture_baseline_metadata(base, env, sandbox, prefix):
+    # Exact read-only SQL/JSON hashing algorithm from the reviewed origin probe.
+    script = sandbox / 'baseline-metadata.php'
+    script.write_text(r'''<?php
+try {
+    if (getenv('APP_ENV') !== 'testing' || getenv('DB_HOST') !== '127.0.0.1' || !preg_match('/^fokus_upgrade_[a-f0-9]{16}$/D', getenv('DB_DATABASE'))) throw new RuntimeException('guard');
+    $pdo = new PDO('mysql:host=127.0.0.1;port=3306;dbname='.getenv('DB_DATABASE').';charset=utf8mb4', getenv('DB_USERNAME'), getenv('DB_PASSWORD'), [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT=>5, PDO::MYSQL_ATTR_MULTI_STATEMENTS=>false]);
+    $pdo->exec('START TRANSACTION READ ONLY');
+    $version = $pdo->query('SELECT VERSION()')->fetchColumn();
+    $rows = $pdo->query('SELECT migration,batch FROM migrations ORDER BY migration,batch')->fetchAll(PDO::FETCH_NUM);
+    $schema = $pdo->query("SELECT table_name,column_name,column_type,is_nullable FROM information_schema.columns WHERE table_schema=DATABASE() ORDER BY table_name,ordinal_position")->fetchAll(PDO::FETCH_NUM);
+    $pdo->rollBack();
+    echo json_encode(['mysql_version'=>$version, 'migration_ledger'=>$rows, 'schema_columns'=>$schema, 'migration_ledger_sha256'=>hash('sha256',json_encode($rows,JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR)), 'schema_metadata_sha256'=>hash('sha256',json_encode($schema,JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR))], JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR), PHP_EOL;
+} catch (Throwable $error) { fwrite(STDERR, 'Synthetic baseline metadata capture failed'.PHP_EOL); exit(1); }
+''', encoding='utf-8')
+    try:
+        run(php() + [str(script)], prefix + 'baseline-metadata', env, base)
+        data = json.loads((REPORT / (prefix + 'baseline-metadata.log')).read_text(encoding='utf-8'))
+        result = assess_baseline_metadata(data)
+        write(prefix + 'baseline-synthetic-metadata.json', data)
+    except (RuntimeError, ValueError, OSError) as error:
+        result = {'origin_equivalence': 'blocked', 'production_release_gate': 'not-approved-by-synthetic-test', 'capture_or_validation_error': type(error).__name__, 'expected_origin': ORIGIN_METADATA}
+    result['profile_cache_store'] = os.environ.get('RELEASE_CACHE_STORE')
+    result['origin_evidence_source'] = 'Reviewed ledger-allowlist-result.txt; origin production probe read-only metadata only'
+    write(prefix + 'origin-metadata-comparison.json', result)
+    return result
 
 
 def main():
@@ -43,7 +125,8 @@ def main():
         with archive.open('wb') as stream:
             subprocess.run(['git', 'archive', args.baseline_sha], cwd=ROOT, stdout=stream, check=True)
         with tarfile.open(archive) as stream:
-            stream.extractall(base, filter='data')
+            evidence['baseline_archive_extraction'] = safe_extract_source_archive(stream, base)
+        evidence['baseline_archive_sha256'] = sha(archive)
         tracked = subprocess.check_output(['git', 'ls-files', '--cached', '--others', '--exclude-standard', '-z'], cwd=ROOT).split(b'\0')
         rows = []
         for encoded in sorted(set(tracked)):
@@ -97,6 +180,8 @@ def main():
             execute([str(fixture), str(base), 'versions'], 'versions', base)
             execute(['artisan', 'migrate', '--seed', '--force', '--no-interaction'], 'baseline-migrate-seed', base)
             execute([str(fixture), str(base), 'seed'], 'populate-baseline', base)
+            if args.driver == 'mysql':
+                evidence['origin_metadata_comparison'] = capture_baseline_metadata(base, env, sandbox, prefix)
             execute(['artisan', 'migrate', '--force', '--no-interaction'], 'four-migrations')
             execute([str(fixture), str(candidate), 'verify-up'], 'verify-up')
             execute(['artisan', 'migrate', '--force', '--no-interaction'], 'idempotence-migrate')

@@ -68,6 +68,7 @@ try:
     install='mkdir -p /work/browsers && composer install --no-interaction --prefer-dist --optimize-autoloader && npm ci --ignore-scripts && npm ci --prefix tests/Deployment/styles-qa --ignore-scripts'
     if not args.backend_only:install+=' && node node_modules/@playwright/test/cli.js install chromium && node tests/Deployment/styles-qa/node_modules/@playwright/test/cli.js install chromium'
     run('install-locked-dependencies',docker('exec','-e','PLAYWRIGHT_BROWSERS_PATH=/work/browsers','-e','APP_ENV=testing','-e','APP_KEY=base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=','-e','APP_MAINTENANCE_DRIVER=file','-e','DB_CONNECTION=sqlite','-e','DB_DATABASE=:memory:','-e','CACHE_STORE=array','-e','SESSION_DRIVER=array','-e','QUEUE_CONNECTION=sync','-w','/work/release',setup,'sh','-ec',install))
+    run('prepare-reviewed-font-cache',docker('exec','-e','RELEASE_DISPOSABLE_TESTS=1','-e','RELEASE_FONT_SETUP=1','-e','RELEASE_REPORT_DIR=/work/reports','-w','/work/release',setup,'node','tests/Deployment/font-cache.mjs','setup'))
     run('copy-runtime-evidence',docker('exec',setup,'sh','-ec','cp -a /opt/runtime-evidence /work/reports/runtime && du -sh /work/release/vendor /work/release/node_modules /work/release/tests/Deployment/styles-qa/node_modules /work/browsers > /work/reports/dependency-sizes.txt'))
     run('prepare-synthetic-ownership',docker('exec',setup,'sh','-ec','mkdir -p /work/home && chown -R 1000:1000 /work'))
     run('stop-download-environment',docker('stop',setup))
