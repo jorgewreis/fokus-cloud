@@ -121,6 +121,20 @@ jobs:
           npm ci
           php artisan key:generate --force
           npm run law:assets:prepare
+      - name: Create isolated unprivileged agent account
+        run: |
+          set -euo pipefail
+          sudo useradd --create-home --shell /bin/bash julia
+          sudo chmod 755 /home/julia
+          sudo chown -R julia:julia work julia-result
+          sudo -u julia test -r /opt/julia/task-prompt.md
+          sudo -u julia test -r julia-input/task.json
+          sudo -u julia test -w work
+          sudo -u julia test -w julia-result
+          if sudo -u julia sudo -n true 2>/dev/null; then
+            echo 'Agent account unexpectedly has sudo privileges.' >&2
+            exit 1
+          fi
       - name: Implement and record checkpoint
         id: agent
         timeout-minutes: 180
@@ -134,11 +148,17 @@ jobs:
           prompt-file: /opt/julia/task-prompt.md
           output-file: ${{ github.workspace }}/julia-result/agent-report.md
           sandbox: workspace-write
-          safety-strategy: drop-sudo
+          safety-strategy: unprivileged-user
+          codex-user: julia
       - name: Capture bounded patch even after agent failure
         if: always() && steps.agent.outcome != '' && steps.agent.outcome != 'skipped'
         working-directory: work
-        run: node /opt/julia/operations.mjs bundle ../julia-input/task.json ../julia-result "$(cat /opt/julia/base-sha)"
+        env:
+          AGENT_OUTCOME: ${{ steps.agent.outcome }}
+        run: |
+          sudo chown -R "$(id -un):$(id -gn)" . ../julia-result
+          printf '%s' "$AGENT_OUTCOME" > ../julia-result/agent-outcome.txt
+          node /opt/julia/operations.mjs bundle ../julia-input/task.json ../julia-result "$(cat /opt/julia/base-sha)"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
