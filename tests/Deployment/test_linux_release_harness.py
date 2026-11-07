@@ -273,6 +273,62 @@ class HarnessContracts(unittest.TestCase):
         self.assertEqual(result['origin_equivalence'], 'blocked')
         self.assertEqual(result['sanitized_differences'][0]['field'], 'migration_names_sorted_sha256')
 
+    def test_origin_shape_requires_every_reviewed_count_and_digest(self):
+        for field in ('migration_ledger_count', 'migration_names_sorted_sha256', 'schema_column_count', 'schema_metadata_sha256'):
+            with self.subTest(field=field):
+                observed = dict(upgrade.ORIGIN_METADATA)
+                observed[field] = 'wrong'
+                with self.assertRaisesRegex(RuntimeError, 'reviewed names/schema'):
+                    upgrade.require_origin_shape({'observed_synthetic': observed})
+        with self.assertRaises(RuntimeError):
+            upgrade.require_origin_shape({'capture_or_validation_error': 'RuntimeError'})
+
+    def test_origin_shape_discloses_batch_difference_without_fabrication(self):
+        observed = dict(upgrade.ORIGIN_METADATA, migration_ledger_sha256='synthetic-batches')
+        result = upgrade.require_origin_shape({'observed_synthetic': observed})
+        self.assertFalse(result['ledger_batch_equivalence'])
+        self.assertIn('without fabrication', result['batch_limit'])
+        self.assertEqual(result['production_release_gate'], 'not-approved-by-synthetic-test')
+
+    def test_origin_rehearsal_orders_failure_repair_idempotence_and_restore(self):
+        source = (common.ROOT / 'tests/Deployment/linux-upgrade.py').read_text(encoding='utf-8')
+        labels = ['repair-fresh-noop', 'prepare-origin-shape', 'repair-billing-before', 'five-migrations',
+                  'repair-billing-after', 'repair-origin-verify', 'repair-origin-idempotent', 'restored-backup-repair-verify']
+        positions = [source.index("'" + label + "'") for label in labels]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn('require_new_migrations(new)', source)
+        self.assertIn("evidence['reversal_authorized_delta']", source)
+
+    def test_upgrade_requires_exact_five_names_not_just_count(self):
+        upgrade.require_new_migrations(upgrade.EXPECTED_NEW_MIGRATIONS)
+        for names in (upgrade.EXPECTED_NEW_MIGRATIONS[:-1], list(reversed(upgrade.EXPECTED_NEW_MIGRATIONS)),
+                      ['2026_11_06_000200_unreviewed.php', *upgrade.EXPECTED_NEW_MIGRATIONS[1:]]):
+            with self.subTest(names=names), self.assertRaises(RuntimeError):
+                upgrade.require_new_migrations(names)
+
+    def test_origin_fixture_has_explicit_disposable_guards_and_fake_gateway(self):
+        source = (common.ROOT / 'tests/Deployment/origin-shaped-fixture.php').read_text(encoding='utf-8')
+        for anchor in ("getenv('RELEASE_DISPOSABLE_TESTS') === '1'", "getenv('APP_ENV') === 'testing'",
+                       "is_file($sandbox.'/.disposable-upgrade')", '/^fokus_upgrade_[a-f0-9]{16}$/D',
+                       'Http::preventStrayRequests()', 'Http::recorded()->count() === 0',
+                       'new App\\Services\\SubscriptionBillingManager', 'new App\\Http\\Controllers\\Api\\LawSubscriptionController',
+                       "'charges_created' => 0"):
+            self.assertIn(anchor, source)
+        self.assertLess(source.index('explicit disposable guard'), source.index("$mode === 'prepare-origin'"))
+
+    def test_origin_reversal_records_retained_column_instead_of_baseline_equality(self):
+        source = (common.ROOT / 'tests/Deployment/reversal-harness.php').read_text(encoding='utf-8')
+        self.assertIn("['--step'=>5, '--force'=>true]", source)
+        self.assertIn("Schema::hasColumn('payments','provider_checkout_url')", source)
+        self.assertIn("$delta['repair_ledger_absent'] = true", source)
+        self.assertIn("$delta['payments_and_urls_unchanged'] = true", source)
+        self.assertIn('EXPLICIT AUTHORIZED ROLLBACK DELTA', source)
+        self.assertNotIn("dropColumn('provider_checkout_url')", source)
+        contract = (common.ROOT / 'tests/Deployment/origin-schema-contract.php').read_text(encoding='utf-8')
+        self.assertIn("$reversed ? [['payments', 'provider_checkout_url', 'varchar(512)', 'YES']]", contract)
+        self.assertIn("$retained === $before[$kind]", contract)
+        self.assertIn("finally { DB::statement(\"SET SESSION time_zone='+00:00'\"); }", contract)
+
     def dependency_fixture(self, root, version):
         root.mkdir(parents=True)
         (root / 'vendor/composer').mkdir(parents=True)
@@ -326,6 +382,17 @@ class HarnessContracts(unittest.TestCase):
             installed.write_text(json.dumps(data))
             with self.assertRaisesRegex(RuntimeError, 'paired lockfile'):
                 dependencies.check_packages(root)
+
+    def test_metadata_probes_use_nondeprecated_mysql_constant(self):
+        for name in ('linux-upgrade.py', 'baseline-target-metadata.php'):
+            with self.subTest(name=name):
+                source = (common.ROOT / 'tests/Deployment' / name).read_text(encoding='utf-8')
+                self.assertIn('Pdo\\Mysql::ATTR_MULTI_STATEMENTS=>false', source)
+                self.assertNotIn('PDO::MYSQL_ATTR_MULTI_STATEMENTS', source)
+                self.assertNotIn('@json_encode', source)
+                self.assertNotIn('error_reporting(0)', source)
+        source = (common.ROOT / 'tests/Deployment/linux-upgrade.py').read_text(encoding='utf-8')
+        self.assertIn("data = json.loads((REPORT / (prefix + 'baseline-metadata.log')).read_text(encoding='utf-8'))", source)
 
     def test_unknown_or_duplicate_adapter_anchor_fails(self):
         with tempfile.TemporaryDirectory() as directory:

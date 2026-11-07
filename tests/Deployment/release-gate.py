@@ -11,12 +11,20 @@ import pathlib
 import sys
 
 BASELINE = '26daac7c27d246eaef64bb3f0e59499376993f8f'
+EXPECTED_NEW_MIGRATIONS = [
+    '2026_11_06_000200_separate_law_case_confidentiality.php',
+    '2026_11_06_140000_create_law_case_publication_reviews.php',
+    '2026_11_06_160000_create_law_contact_import_batches_table.php',
+    '2026_11_06_170000_create_law_tasks.php',
+    '2026_11_07_000100_repair_payments_provider_checkout_url.php',
+]
 EXCLUDED = {'.git', 'vendor', 'node_modules', 'storage', 'test-results', 'playwright-report', '__pycache__'}
 # These are distinct verified execution results: absence of automatic rollback in
 # delivery, demonstrated destructive loss in an isolated reversal, and a validated
 # backup restore. Migrations themselves do not universally prohibit down().
 CHECKS = {
-    'populated-upgrade', 'old-data-integrity', 'four-migration-ledger',
+    'populated-upgrade', 'old-data-integrity', 'five-migration-ledger',
+    'repair-column-forward-only',
     'schema-confidentiality', 'schema-publication-reviews', 'schema-import-batches',
     'schema-tasks-events-permissions', 'idempotence', 'roll-forward-invariants',
     'automatic-destructive-rollback-disabled', 'reversal-risk-demonstrated',
@@ -95,8 +103,9 @@ def verify(baseline_dir, candidate_dir, baseline_manifest, candidate_manifest, e
     baseline_migrations = {p.name for p in (baseline_dir / 'database/migrations').glob('*.php')}
     candidate_migrations = {p.name for p in (candidate_dir / 'database/migrations').glob('*.php')}
     new = sorted(candidate_migrations - baseline_migrations)
-    if len(new) != 4 or baseline_migrations - candidate_migrations or evidence.get('new_migrations') != new:
-        raise ValueError('Expected exactly four named new migrations and no removed baseline migration')
+    if (new != EXPECTED_NEW_MIGRATIONS
+            or baseline_migrations - candidate_migrations or evidence.get('new_migrations') != new):
+        raise ValueError('Expected exactly five named new migrations including the additive repair and no removed baseline migration')
     if evidence.get('recovery_strategy') not in ('roll-forward', 'validated-backup-restore'):
         raise ValueError('Unsafe or missing recovery strategy')
     if evidence.get('tasks_enabled') is not False or evidence.get('publication_authorized') is not False:

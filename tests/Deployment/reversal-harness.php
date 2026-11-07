@@ -96,7 +96,7 @@ try {
 }
 ensure((array) DB::table('migrations')->where('migration', $name)->first() === $ledger, 'preflight preserves ledger');
 echo "REVERSAL TESTS PASSED; down discards review decisions and is not production recovery.\n";
-// Full four-migration cycle, with real synthetic post-upgrade data present.
+// Full five-migration cycle. The additive repair deliberately retains its column.
 $f = json_decode(file_get_contents($sandbox.'/upgrade-fixture.json'), true);
 $stamp = '2026-11-06 14:00:00';
 $task = App\Services\PrefixedUlid::make('LTA');
@@ -110,8 +110,21 @@ foreach ($tables as $table) ensure(DB::table($table)->count() > 0, 'data present
 $beforeCases = DB::table('law_cases')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all();
 $beforeContacts = DB::table('law_contacts')->orderBy('id')->get()->toJson();
 $beforeAccess = DB::table('law_confidential_case_accesses')->orderBy('id')->get()->toJson();
-ensure(Artisan::call('migrate:rollback', ['--step'=>4, '--force'=>true]) === 0, 'all four candidate migrations reverse');
+$beforePayments = DB::table('payments')->orderBy('id')->get()->toJson();
+ensure(Artisan::call('migrate:rollback', ['--step'=>5, '--force'=>true]) === 0, 'all five candidate migration ledger entries reverse');
 ensure(DB::table('migrations')->count() === $f['migration_count'], 'ledger returns exactly to baseline');
+ensure(!DB::table('migrations')->where('migration','2026_11_07_000100_repair_payments_provider_checkout_url')->exists(), 'repair ledger is removed by normal laboratory rollback');
+ensure(Schema::hasColumn('payments','provider_checkout_url'), 'authorized forward-only delta: checkout column intentionally retained');
+ensure(DB::table('payments')->orderBy('id')->get()->toJson() === $beforePayments, 'repair down preserves every payment field and checkout URL');
+if (is_file($sandbox.'/origin-schema-before.json')) {
+    require $root.'/tests/Deployment/origin-schema-contract.php';
+    $delta = originAssertSchemaDelta(json_decode(file_get_contents($sandbox.'/origin-schema-before.json'), true), originMetadata(), true);
+    $delta['temporal'] = originAssertTimes($sandbox);
+    $delta['repair_ledger_absent'] = true;
+    $delta['payments_and_urls_unchanged'] = true;
+    file_put_contents($sandbox.'/origin-reversal-delta.json', json_encode($delta, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+    echo 'EXPLICIT AUTHORIZED ROLLBACK DELTA '.json_encode($delta, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL;
+}
 foreach ($tables as $table) ensure(!Schema::hasTable($table), 'explicit data loss: '.$table);
 foreach (['internal_confidentiality_level','source_confidentiality_level','last_official_movement_at'] as $column) ensure(!Schema::hasColumn('law_cases',$column), 'explicit projection/provenance loss: '.$column);
 foreach ($beforeCases as $old) {
@@ -119,14 +132,15 @@ foreach ($beforeCases as $old) {
     unset($old['internal_confidentiality_level'], $old['source_confidentiality_level'], $old['last_official_movement_at']);
     ensure($new === $old, 'all legacy case columns and effective restriction preserved');
 }
-ensure(DB::table('law_contacts')->orderBy('id')->get()->toJson() === $beforeContacts, 'ciphertext and legacy contacts preserved after four downs');
-ensure(DB::table('law_confidential_case_accesses')->orderBy('id')->get()->toJson() === $beforeAccess, 'revocations and grants preserved after four downs');
+ensure(DB::table('law_contacts')->orderBy('id')->get()->toJson() === $beforeContacts, 'ciphertext and legacy contacts preserved after five downs');
+ensure(DB::table('law_confidential_case_accesses')->orderBy('id')->get()->toJson() === $beforeAccess, 'revocations and grants preserved after five downs');
 ensure(DB::table('customer_permissions')->where('resource','tasks')->where('product_code','law')->count() === 0, 'task permissions removed by down');
-ensure(Artisan::call('migrate', ['--force'=>true]) === 0, 'all four migrations advance again');
-ensure(DB::table('migrations')->count() === $f['migration_count'] + 4, 'ledger restored to candidate');
+ensure(Artisan::call('migrate', ['--force'=>true]) === 0, 'all five migrations advance again');
+ensure(DB::table('migrations')->count() === $f['migration_count'] + 5, 'ledger restored to candidate');
+ensure(DB::table('payments')->orderBy('id')->get()->toJson() === $beforePayments, 're-applying repair preserves retained payment values');
 foreach (['law_tasks','law_task_events','law_contact_import_batches'] as $table) ensure(DB::table($table)->count() === 0, 're-up cannot recover destroyed data: '.$table);
 ensure(DB::table('law_case_publication_reviews')->where('status','reviewed')->count() === 0, 're-up cannot recover reviewed decisions');
 ensure(DB::table('law_contacts')->orderBy('id')->get()->toJson() === $beforeContacts, 'encrypted contacts survive full cycle');
 foreach ($beforeCases as $old) ensure(DB::table('law_cases')->where('id',$old['id'])->value('confidentiality_level') === $old['confidentiality_level'], 'effective confidentiality survives full cycle');
-ensure(Artisan::call('migrate', ['--force'=>true]) === 0 && DB::table('migrations')->count() === $f['migration_count'] + 4, 'repeated up leaves ledger unchanged');
-echo "FULL FOUR-MIGRATION CYCLE PASSED; task/event/import/review/provenance loss confirmed.\n";
+ensure(Artisan::call('migrate', ['--force'=>true]) === 0 && DB::table('migrations')->count() === $f['migration_count'] + 5, 'repeated up leaves ledger unchanged');
+echo "FULL FIVE-MIGRATION CYCLE PASSED; Law data loss confirmed; checkout column and values deliberately retained. Production is forward-fix-only.\n";

@@ -100,6 +100,8 @@ jobs:
           test "$GITHUB_SHA" = "$EXPECTED_CANDIDATE"
           python3 tests/Deployment/baseline-gate.py "$EXPECTED_BASELINE"
           python3 -m unittest discover -s tests/Deployment -p test_linux_release_harness.py
+          python3 -m unittest discover -s tests/Deployment -p test_linux_package.py
+          python3 -m unittest discover -s tests/Deployment -p test_release_gate.py
           python3 -m unittest discover -s tests/Deployment/linux-http -p test_readiness.py
       - name: Set isolated host Node runtime
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5

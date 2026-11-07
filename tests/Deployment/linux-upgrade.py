@@ -1,4 +1,4 @@
-"""Exercise the historical runtime, four migrations, reversal and synthetic backup restore."""
+"""Exercise origin-shaped history, five migrations, reversal and synthetic restore."""
 import argparse
 import hashlib
 import importlib.util
@@ -22,6 +22,31 @@ ORIGIN_METADATA = {
     'schema_column_count': 1110,
     'schema_metadata_sha256': '323ce5b8442395943f1cfdff9e49f9cfd7710eac6643a42653f279e172798d7f',
 }
+REPAIR_MIGRATION = '2026_11_07_000100_repair_payments_provider_checkout_url.php'
+EXPECTED_NEW_MIGRATIONS = [
+    '2026_11_06_000200_separate_law_case_confidentiality.php',
+    '2026_11_06_140000_create_law_case_publication_reviews.php',
+    '2026_11_06_160000_create_law_contact_import_batches_table.php',
+    '2026_11_06_170000_create_law_tasks.php',
+    REPAIR_MIGRATION,
+]
+
+
+def require_new_migrations(names):
+    if names != EXPECTED_NEW_MIGRATIONS:
+        raise RuntimeError('Expected exactly five named candidate migrations including the additive checkout repair')
+
+
+def require_origin_shape(result):
+    """A batch/version difference stays explicit; schema/name drift stops the run."""
+    observed = result.get('observed_synthetic', {})
+    required = ('migration_ledger_count', 'migration_names_sorted_sha256', 'schema_column_count', 'schema_metadata_sha256')
+    if any(observed.get(key) != ORIGIN_METADATA[key] for key in required):
+        raise RuntimeError('Synthetic origin fixture does not match reviewed names/schema metadata')
+    return {'origin_shape': 'exact-reviewed-names-and-global-column-metadata',
+            'ledger_batch_equivalence': observed.get('migration_ledger_sha256') == ORIGIN_METADATA['migration_ledger_sha256'],
+            'batch_limit': 'Origin batches were not supplied; synthetic batches retained without fabrication.',
+            'production_release_gate': 'not-approved-by-synthetic-test'}
 
 
 def metadata_digest(rows):
@@ -74,7 +99,7 @@ def capture_baseline_metadata(base, env, sandbox, prefix):
     script.write_text(r'''<?php
 try {
     if (getenv('APP_ENV') !== 'testing' || getenv('DB_HOST') !== '127.0.0.1' || !preg_match('/^fokus_upgrade_[a-f0-9]{16}$/D', getenv('DB_DATABASE'))) throw new RuntimeException('guard');
-    $pdo = new PDO('mysql:host=127.0.0.1;port=3306;dbname='.getenv('DB_DATABASE').';charset=utf8mb4', getenv('DB_USERNAME'), getenv('DB_PASSWORD'), [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT=>5, PDO::MYSQL_ATTR_MULTI_STATEMENTS=>false]);
+    $pdo = new PDO('mysql:host=127.0.0.1;port=3306;dbname='.getenv('DB_DATABASE').';charset=utf8mb4', getenv('DB_USERNAME'), getenv('DB_PASSWORD'), [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT=>5, Pdo\Mysql::ATTR_MULTI_STATEMENTS=>false]);
     $pdo->exec('START TRANSACTION READ ONLY');
     $version = $pdo->query('SELECT VERSION()')->fetchColumn();
     $rows = $pdo->query('SELECT migration,batch FROM migrations ORDER BY migration,batch')->fetchAll(PDO::FETCH_NUM);
@@ -116,10 +141,12 @@ def main():
         raise RuntimeError('Unreviewed historical baseline')
     prefix = 'upgrade-' + args.driver + '-'
     env = environment(args.driver)
-    env.update(CACHE_STORE='array', CACHE_LIMITER='array', SESSION_DRIVER='array')
+    env.update(CACHE_STORE='array', CACHE_LIMITER='array', SESSION_DRIVER='array', RELEASE_DISPOSABLE_TESTS='1')
     fixture = ROOT / 'tests/Deployment/upgrade-fixture.php'
+    origin_fixture = ROOT / 'tests/Deployment/origin-shaped-fixture.php'
     reversal = ROOT / 'tests/Deployment/reversal-harness.php'
     evidence.update(fixture_sha256=sha(fixture), reversal_source_sha256=sha(reversal), steps=[])
+    evidence['origin_fixture_sources'] = {path.name: sha(path) for path in (origin_fixture, ROOT / 'tests/Deployment/origin-schema-contract.php')}
     with tempfile.TemporaryDirectory(prefix='fokus-upgrade-') as directory:
         sandbox = pathlib.Path(directory)
         (sandbox / '.disposable-upgrade').touch()
@@ -161,8 +188,7 @@ def main():
             if (runtime / '.env').exists() or (runtime / 'bootstrap/cache/config.php').exists():
                 raise RuntimeError('Unsafe runtime configuration copied')
         new = sorted(p.name for p in (candidate / 'database/migrations').glob('*.php') if not (base / 'database/migrations' / p.name).exists())
-        if len(new) != 4:
-            raise RuntimeError('Expected exactly four candidate migrations')
+        require_new_migrations(new)
         evidence['new_migrations'] = new
         created = False
         mysql_env = dict(env, MYSQL_PWD='security-test-only')
@@ -187,12 +213,19 @@ def main():
             execute([str(fixture), str(base), 'versions'], 'versions', base)
             execute(['artisan', 'migrate', '--seed', '--force', '--no-interaction'], 'baseline-migrate-seed', base)
             execute([str(fixture), str(base), 'seed'], 'populate-baseline', base)
+            execute([str(origin_fixture), str(candidate), 'fresh-noop'], 'repair-fresh-noop')
+            execute([str(origin_fixture), str(candidate), 'prepare-origin'], 'prepare-origin-shape')
             if args.driver == 'mysql':
                 evidence['origin_metadata_comparison'] = capture_baseline_metadata(base, env, sandbox, prefix)
-            execute(['artisan', 'migrate', '--force', '--no-interaction'], 'four-migrations')
+                evidence['origin_shape_gate'] = require_origin_shape(evidence['origin_metadata_comparison'])
+            execute([str(origin_fixture), str(candidate), 'billing-before'], 'repair-billing-before')
+            execute(['artisan', 'migrate', '--force', '--no-interaction'], 'five-migrations')
             execute([str(fixture), str(candidate), 'verify-up'], 'verify-up')
+            execute([str(origin_fixture), str(candidate), 'billing-after'], 'repair-billing-after')
+            execute([str(origin_fixture), str(candidate), 'verify-up'], 'repair-origin-verify')
             execute(['artisan', 'migrate', '--force', '--no-interaction'], 'idempotence-migrate')
             execute([str(fixture), str(candidate), 'verify-up'], 'idempotence-verify')
+            execute([str(origin_fixture), str(candidate), 'verify-idempotent'], 'repair-origin-idempotent')
             if args.driver == 'mysql':
                 with backup.open('wb') as stream, (REPORT / (prefix + 'dump.log')).open('wb') as errors:
                     subprocess.run(['mysqldump', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '--single-transaction', '--hex-blob', '--no-tablespaces', name], env=mysql_env, stdout=stream, stderr=errors, check=True)
@@ -203,6 +236,8 @@ def main():
             evidence['backup_bytes'] = backup.stat().st_size
             execute([str(fixture), str(candidate), 'verify-recovery'], 'roll-forward')
             execute([str(reversal), str(candidate)], 'reversal')
+            if (sandbox / 'origin-reversal-delta.json').exists():
+                evidence['reversal_authorized_delta'] = json.loads((sandbox / 'origin-reversal-delta.json').read_text(encoding='utf-8'))
             if sha(backup) != evidence['backup_sha256']:
                 raise RuntimeError('Backup bytes changed before restoration')
             if args.driver == 'mysql':
@@ -214,6 +249,7 @@ def main():
                     raise RuntimeError('SQLite restore byte verification failed')
                 evidence['restored_database_sha256_before_read'] = sha(db)
             execute([str(fixture), str(candidate), 'verify-up'], 'restored-backup-verify')
+            execute([str(origin_fixture), str(candidate), 'verify-idempotent'], 'restored-backup-repair-verify')
             env['UPGRADE_INJECT_ASSERTION_FAILURE'] = '1'
             execute([str(fixture), str(candidate), 'verify-up'], 'controlled-failure', expected=1)
             if 'controlled fixture failure' not in (REPORT / (prefix + 'controlled-failure.log')).read_text():
@@ -233,6 +269,10 @@ def main():
                 evidence['synthetic_database_needing_cleanup'] = name
                 raise
             finally:
+                for name in ('origin-schema-before', 'origin-schema-after', 'origin-reversal-delta', 'origin-temporal-before'):
+                    path = sandbox / (name + '.json')
+                    if path.is_file():
+                        write(prefix + name + '.json', json.loads(path.read_text(encoding='utf-8')))
                 write(prefix + 'evidence.json', evidence)
 
 

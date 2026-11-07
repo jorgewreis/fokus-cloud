@@ -2,7 +2,7 @@
 // Synthetic-only metadata. Exact SQL/ordering/allowlist of the reviewed read-only origin probe.
 try {
     if (getenv('APP_ENV') !== 'testing' || getenv('DB_HOST') !== '127.0.0.1' || !preg_match('/^fokus_upgrade_[a-f0-9]{16}$/D', getenv('DB_DATABASE'))) throw new RuntimeException('guard');
-    $pdo = new PDO('mysql:host=127.0.0.1;port=3306;dbname='.getenv('DB_DATABASE').';charset=utf8mb4', getenv('DB_USERNAME'), getenv('DB_PASSWORD'), [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT=>5, PDO::MYSQL_ATTR_MULTI_STATEMENTS=>false]);
+    $pdo = new PDO('mysql:host=127.0.0.1;port=3306;dbname='.getenv('DB_DATABASE').';charset=utf8mb4', getenv('DB_USERNAME'), getenv('DB_PASSWORD'), [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT=>5, Pdo\Mysql::ATTR_MULTI_STATEMENTS=>false]);
     $pdo->exec('START TRANSACTION READ ONLY');
     $tables = ['companies','company_memberships','customer_permissions','law_access_role_permissions','law_case_publication_reviews','law_cases','law_contact_import_batches','law_task_events','law_tasks','law_units','users'];
     $marks = implode(',', array_fill(0, count($tables), '?'));

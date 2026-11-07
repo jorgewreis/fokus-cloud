@@ -36,7 +36,7 @@ if($mode==='seed'){
 $f=json_decode(file_get_contents($qa.'/upgrade-fixture.json'),true);
 if($mode==='verify-up'){
  if(getenv('UPGRADE_INJECT_ASSERTION_FAILURE')==='1')throw new RuntimeException('controlled fixture failure');
- check(DB::table('migrations')->count()===$f['migration_count']+4,'exactly four candidate migrations applied');
+ check(DB::table('migrations')->count()===$f['migration_count']+5,'exactly five candidate migrations applied');
  foreach($f['cases'] as $old){$new=(array)DB::table('law_cases')->where('id',$old['id'])->first();check($new['internal_confidentiality_level']===$old['confidentiality_level'] && $new['source_confidentiality_level']===null,'historical confidentiality preserved '.$old['confidentiality_level']);check($new['last_official_movement_at']==='2026-11-04 12:30:00','latest valid movement normalized');foreach($old as $k=>$v)check($new[$k]===$v,'old case column unchanged '.$k);}
  check(DB::table('law_case_publication_reviews')->count()===24,'24 publications projected independently');
  check(DB::table('law_case_publication_reviews')->where('status','pending')->count()===24,'all reviews pending');

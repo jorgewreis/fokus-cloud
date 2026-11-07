@@ -94,8 +94,8 @@ def execute_suite(driver, env):
         report = ET.parse(junit).getroot()
         suites = list(report) if report.tag == 'testsuites' else [report]
         totals = {key: sum(int(s.get(key, 0)) for s in suites) for key in ('tests', 'assertions', 'failures', 'errors', 'skipped')}
-        write('suite-' + driver + '-coverage.json', {**totals, 'junit_sha256': sha(junit), 'expected_tests': 310, 'minimum_assertions': 2689})
-        if totals['tests'] != 310 or totals['assertions'] < 2689 or any(totals[k] for k in ('failures', 'errors', 'skipped')):
+        write('suite-' + driver + '-coverage.json', {**totals, 'junit_sha256': sha(junit), 'expected_tests': 327, 'minimum_assertions': 2753})
+        if totals['tests'] != 327 or totals['assertions'] < 2753 or any(totals[k] for k in ('failures', 'errors', 'skipped')):
             raise RuntimeError('Incomplete or failing suite; coverage gate rejected results')
 
 
