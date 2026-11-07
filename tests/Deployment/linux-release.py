@@ -68,6 +68,8 @@ try:
     install='mkdir -p /work/browsers && composer install --no-interaction --prefer-dist --optimize-autoloader && npm ci --ignore-scripts && npm ci --prefix tests/Deployment/styles-qa --ignore-scripts'
     if not args.backend_only:install+=' && node node_modules/@playwright/test/cli.js install chromium && node tests/Deployment/styles-qa/node_modules/@playwright/test/cli.js install chromium'
     run('install-locked-dependencies',docker('exec','-e','PLAYWRIGHT_BROWSERS_PATH=/work/browsers','-e','APP_ENV=testing','-e','APP_KEY=base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=','-e','APP_MAINTENANCE_DRIVER=file','-e','DB_CONNECTION=sqlite','-e','DB_DATABASE=:memory:','-e','CACHE_STORE=array','-e','SESSION_DRIVER=array','-e','QUEUE_CONNECTION=sync','-w','/work/release',setup,'sh','-ec',install))
+    run('prepare-isolated-upgrade-dependencies',docker('exec','-e','RELEASE_DISPOSABLE_TESTS=1','-e','RELEASE_DEPENDENCY_SETUP=1','-w','/work/release',setup,'python3','tests/Deployment/linux_vendor.py','setup','--destination','/work/release-dependencies'))
+    run('copy-dependency-pair-evidence',docker('exec',setup,'sh','-ec','mkdir -p /work/reports/upgrade-dependencies && cp /work/release-dependencies/setup-evidence.json /work/reports/upgrade-dependency-setup.json && cp /work/release-dependencies/baseline/dependency-receipt.json /work/reports/upgrade-dependencies/baseline-receipt.json && cp /work/release-dependencies/candidate/dependency-receipt.json /work/reports/upgrade-dependencies/candidate-receipt.json'))
     run('prepare-reviewed-font-cache',docker('exec','-e','RELEASE_DISPOSABLE_TESTS=1','-e','RELEASE_FONT_SETUP=1','-e','RELEASE_REPORT_DIR=/work/reports','-w','/work/release',setup,'node','tests/Deployment/font-cache.mjs','setup'))
     run('copy-runtime-evidence',docker('exec',setup,'sh','-ec','cp -a /opt/runtime-evidence /work/reports/runtime && du -sh /work/release/vendor /work/release/node_modules /work/release/tests/Deployment/styles-qa/node_modules /work/browsers > /work/reports/dependency-sizes.txt'))
     run('prepare-synthetic-ownership',docker('exec',setup,'sh','-ec','mkdir -p /work/home && chown -R 1000:1000 /work'))
@@ -80,7 +82,7 @@ try:
         time.sleep(2)
     else:raise RuntimeError('Disposable MySQL did not start')
     env={'RELEASE_DISPOSABLE_TESTS':'1','RELEASE_REPORT_DIR':'/work/reports','PLAYWRIGHT_BROWSERS_PATH':'/work/browsers','CI':'true','APP_ENV':'testing','APP_DEBUG':'false','APP_KEY':'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=','DB_CONNECTION':'mysql','DB_HOST':'127.0.0.1','DB_PORT':'3306','DB_DATABASE':'fokuscloud_security','DB_USERNAME':'root','DB_PASSWORD':'security-test-only','REDIS_HOST':'127.0.0.1','REDIS_PORT':'6379','CACHE_STORE':'array','SESSION_DRIVER':'array','QUEUE_CONNECTION':'sync','MAIL_MAILER':'array','BCRYPT_ROUNDS':'4','LAW_TASKS_ENABLED':'false'}
-    env.update(HOME='/work/home',PYTHONDONTWRITEBYTECODE='1',RELEASE_CACHE_STORE=CACHE_STORE,CACHE_STORE=CACHE_STORE,CACHE_LIMITER=CACHE_STORE,SESSION_DRIVER='database')
+    env.update(RELEASE_DEPENDENCY_ROOT='/work/release-dependencies',HOME='/work/home',PYTHONDONTWRITEBYTECODE='1',RELEASE_CACHE_STORE=CACHE_STORE,CACHE_STORE=CACHE_STORE,CACHE_LIMITER=CACHE_STORE,SESSION_DRIVER='database')
     extra=['--mount','type=volume,src='+volume+',dst=/work','--user','1000:1000','-w','/work/release']
     for key,value in env.items():extra+=['-e',key+'='+value]
     create(test,args.image,'container:'+mysql,extra)

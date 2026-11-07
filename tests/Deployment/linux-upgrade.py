@@ -12,6 +12,7 @@ import tarfile
 import tempfile
 from linux_release_common import ROOT, REPORT, BASELINE, guard, environment, php, run, adapt, write, sha, safe_extract_source_archive
 
+from linux_vendor import copy_verified_vendor
 
 ORIGIN_METADATA = {
     'mysql_version': '8.4.10-10',
@@ -89,6 +90,12 @@ try {
         write(prefix + 'baseline-synthetic-metadata.json', data)
     except (RuntimeError, ValueError, OSError) as error:
         result = {'origin_equivalence': 'blocked', 'production_release_gate': 'not-approved-by-synthetic-test', 'capture_or_validation_error': type(error).__name__, 'expected_origin': ORIGIN_METADATA}
+    try:
+        run(php() + [str(ROOT / 'tests/Deployment/baseline-target-metadata.php')], prefix + 'baseline-target-metadata', env, base)
+        result['detailed_metadata'] = {'status': 'captured-synthetic-only', 'log': prefix + 'baseline-target-metadata.log', 'comparison': 'External comparison required; no origin rows embedded in repository'}
+    except RuntimeError:
+        result['detailed_metadata'] = {'status': 'blocked-capture-failed'}
+        result['origin_equivalence'] = 'blocked'
     result['profile_cache_store'] = os.environ.get('RELEASE_CACHE_STORE')
     result['origin_evidence_source'] = 'Reviewed ledger-allowlist-result.txt; origin production probe read-only metadata only'
     write(prefix + 'origin-metadata-comparison.json', result)
@@ -145,10 +152,10 @@ def main():
         evidence['candidate_source_sha256'] = hashlib.sha256(json.dumps(rows, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
         evidence['candidate_source_hash_method'] = 'sha256 of sorted JSON path+sha256 rows; not a Git commit or another manifest format'
         write(prefix + 'source.json', {'files': rows, 'source_sha256': evidence['candidate_source_sha256']})
-        for runtime in (base, candidate):
-            if (runtime / 'composer.lock').read_bytes() != (ROOT / 'composer.lock').read_bytes():
-                raise RuntimeError('Offline vendor reuse requires identical lockfiles')
-            shutil.copytree(ROOT / 'vendor', runtime / 'vendor')
+        dependencies = pathlib.Path(os.environ.get('RELEASE_DEPENDENCY_ROOT', ROOT.parent / 'release-dependencies')).resolve()
+        evidence['dependency_pairs'] = {}
+        for role, runtime in [('baseline', base), ('candidate', candidate)]:
+            evidence['dependency_pairs'][role] = copy_verified_vendor(dependencies / role, runtime)
             for part in ('bootstrap/cache', 'storage/framework/cache/data', 'storage/framework/sessions', 'storage/framework/views', 'storage/logs', 'storage/app/private', 'storage/app/public'):
                 (runtime / part).mkdir(parents=True, exist_ok=True)
             if (runtime / '.env').exists() or (runtime / 'bootstrap/cache/config.php').exists():

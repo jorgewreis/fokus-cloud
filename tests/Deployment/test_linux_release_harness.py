@@ -9,6 +9,7 @@ import pathlib
 import tempfile
 import unittest
 from unittest.mock import patch
+import linux_vendor as dependencies
 import linux_release_common as common
 
 spec = importlib.util.spec_from_file_location('linux_suite', common.ROOT / 'tests/Deployment/linux-release-suite.py')
@@ -254,6 +255,60 @@ class HarnessContracts(unittest.TestCase):
         result = upgrade.assess_baseline_metadata(data, expected)
         self.assertEqual(result['origin_equivalence'], 'blocked')
         self.assertEqual(result['sanitized_differences'][0]['field'], 'migration_names_sorted_sha256')
+
+    def dependency_fixture(self, root, version):
+        root.mkdir(parents=True)
+        (root / 'vendor/composer').mkdir(parents=True)
+        package = {'name': 'synthetic/package', 'version': version, 'dist': {'reference': 'ref-' + version}}
+        (root / 'composer.json').write_text('{}')
+        (root / 'composer.lock').write_text(json.dumps({'packages': [package], 'packages-dev': []}))
+        (root / 'vendor/composer/installed.json').write_text(json.dumps({'dev': True, 'packages': [package]}))
+        (root / 'vendor/payload.php').write_text('synthetic bytes ' + version)
+        dependencies.receipt(root, {'kind': 'synthetic-unit-fixture'})
+
+    def test_distinct_dependency_pairs_copy_exact_matching_vendor(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            for role, version in [('baseline', '1.0'), ('candidate', '2.0')]:
+                snapshot = root / role
+                self.dependency_fixture(snapshot, version)
+                runtime = root / (role + '-runtime'); runtime.mkdir()
+                for name in ('composer.json', 'composer.lock'):
+                    (runtime / name).write_bytes((snapshot / name).read_bytes())
+                evidence = dependencies.copy_verified_vendor(snapshot, runtime)
+                self.assertTrue(evidence['copy_byte_verified'])
+                self.assertEqual((runtime / 'vendor/payload.php').read_text(), 'synthetic bytes ' + version)
+            self.assertNotEqual((root / 'baseline/composer.lock').read_bytes(), (root / 'candidate/composer.lock').read_bytes())
+
+    def test_dependency_pair_rejects_wrong_lock_and_tampered_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            self.dependency_fixture(root / 'baseline', '1.0')
+            self.dependency_fixture(root / 'candidate', '2.0')
+            with self.assertRaisesRegex(RuntimeError, 'pairing mismatch'):
+                dependencies.verify_snapshot(root / 'candidate', root / 'baseline')
+            (root / 'baseline/vendor/payload.php').write_text('changed')
+            with self.assertRaisesRegex(RuntimeError, 'bytes changed'):
+                dependencies.verify_snapshot(root / 'baseline', root / 'baseline')
+
+    def test_dependency_manifest_rejects_even_internal_symlinks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory) / 'snapshot'
+            self.dependency_fixture(root, '1.0')
+            original = pathlib.Path.is_symlink
+            with patch.object(pathlib.Path, 'is_symlink', lambda path: path.name == 'composer' or original(path)):
+                with self.assertRaisesRegex(RuntimeError, 'reject all symbolic links'):
+                    dependencies.vendor_manifest(root)
+
+    def test_dependency_packages_must_match_lock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory) / 'snapshot'
+            self.dependency_fixture(root, '1.0')
+            installed = root / 'vendor/composer/installed.json'
+            data = json.loads(installed.read_text()); data['packages'][0]['version'] = '2.0'
+            installed.write_text(json.dumps(data))
+            with self.assertRaisesRegex(RuntimeError, 'paired lockfile'):
+                dependencies.check_packages(root)
 
     def test_unknown_or_duplicate_adapter_anchor_fails(self):
         with tempfile.TemporaryDirectory() as directory:
