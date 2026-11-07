@@ -122,43 +122,36 @@ jobs:
           php artisan key:generate --force
           npm run law:assets:prepare
       - name: Create isolated unprivileged agent account
-        run: |
-          set -euo pipefail
-          sudo useradd --create-home --shell /bin/bash julia
-          sudo chmod 755 /home/julia
-          sudo chown -R julia:julia work julia-result
-          sudo -u julia test -r /opt/julia/task-prompt.md
-          sudo -u julia test -r julia-input/task.json
-          sudo -u julia test -w work
-          sudo -u julia test -w julia-result
-          if sudo -u julia sudo -n true 2>/dev/null; then
-            echo 'Agent account unexpectedly has sudo privileges.' >&2
-            exit 1
-          fi
+        run: bash controller/tools/julia/prepare-agent.sh
       - name: Implement and record checkpoint
         id: agent
         timeout-minutes: 180
         continue-on-error: true
+        env:
+          TMPDIR: /tmp
         uses: openai/codex-action@1d82a3dba7c7988ec71ecae1ed5b8e8db96495c5 # v1
         with:
           openai-api-key: ${{ secrets.JULIA_OPENAI_API_KEY }}
           model: ${{ vars.JULIA_CODEX_MODEL }}
           codex-version: ${{ vars.JULIA_CODEX_VERSION }}
-          working-directory: work
+          working-directory: /home/julia/work
           prompt-file: /opt/julia/task-prompt.md
-          output-file: ${{ github.workspace }}/julia-result/agent-report.md
+          output-file: /home/julia/julia-result/agent-report.md
           sandbox: workspace-write
           safety-strategy: unprivileged-user
           codex-user: julia
       - name: Capture bounded patch even after agent failure
         if: always() && steps.agent.outcome != '' && steps.agent.outcome != 'skipped'
-        working-directory: work
+        working-directory: /home/julia/work
         env:
           AGENT_OUTCOME: ${{ steps.agent.outcome }}
         run: |
-          sudo chown -R "$(id -un):$(id -gn)" . ../julia-result
-          printf '%s' "$AGENT_OUTCOME" > ../julia-result/agent-outcome.txt
-          node /opt/julia/operations.mjs bundle ../julia-input/task.json ../julia-result "$(cat /opt/julia/base-sha)"
+          sudo chown -R "$(id -un):$(id -gn)" /home/julia/work /home/julia/julia-result
+          if [ -f /home/julia/julia-result/agent-report.md ] && [ ! -L /home/julia/julia-result/agent-report.md ]; then
+            cp /home/julia/julia-result/agent-report.md "$GITHUB_WORKSPACE/julia-result/agent-report.md"
+          fi
+          printf '%s' "$AGENT_OUTCOME" > "$GITHUB_WORKSPACE/julia-result/agent-outcome.txt"
+          node /opt/julia/operations.mjs bundle /home/julia/julia-input/task.json "$GITHUB_WORKSPACE/julia-result" "$(cat /opt/julia/base-sha)"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
