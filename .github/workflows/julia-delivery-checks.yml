@@ -12,6 +12,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  runner-access:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - name: Verify agent traversal, shell and output access without API credentials
+        run: |
+          mkdir -p work julia-input
+          cp AGENTS.md work/AGENTS.md
+          git -C work init
+          printf '{}' > julia-input/task.json
+          sudo mkdir -p /opt/julia
+          sudo cp tools/julia/task-prompt.md /opt/julia/task-prompt.md
+          sudo chmod 444 /opt/julia/task-prompt.md
+          bash tools/julia/prepare-agent.sh
+          test "$(cat /home/julia/julia-result/preflight.txt)" = accessible
+
   operations:
     runs-on: ubuntu-latest
     timeout-minutes: 5

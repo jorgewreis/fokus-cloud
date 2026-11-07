@@ -153,6 +153,14 @@ Um patch vazio agora falha explicitamente e registra bloqueio, em vez de produzi
 um resumo que sugira criação de PR. Falha do agente com patch recuperável força
 estado blocked mesmo que seu checkpoint declare ready.
 
+O segundo piloto confirmou acesso ao modelo, mas revelou que testes de acesso
+com caminhos relativos não comprovam acesso aos caminhos absolutos sob o HOME
+privado do runner. O checkout, o contrato e a saída do agente ficam agora sob
+`/home/julia`, com `TMPDIR=/tmp`. O contrato é copiado como somente leitura,
+enquanto o controlador continua em `/opt/julia`. O CI executa o mesmo script de
+preparação com fixtures, sem chave de API, e verifica leitura, shell e escrita
+antes de qualquer teste com o modelo.
+
 ## Operação diurna
 
 Trabalhar em branches próprias e enviar alterações ao GitHub antes da passagem
