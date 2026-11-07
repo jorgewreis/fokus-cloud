@@ -114,3 +114,25 @@ test('publicar com main avançada preserva ancestralidade e dispara checks expl�
     globalThis.fetch = originalFetch; process.env = env; process.chdir(oldCwd); rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('patch vazio falha sem simular publicação ou disparar checks', async () => {
+  const originalFetch = globalThis.fetch, env = { ...process.env };
+  const dir = mkdtempSync(join(tmpdir(), 'julia-empty-'));
+  const calls = [];
+  try {
+    const record = { number: 1, body, hash: digest(body), mainSha: 'main' };
+    writeFileSync(join(dir, 'task.json'), JSON.stringify(record));
+    writeFileSync(join(dir, 'change.patch'), '');
+    process.env.GITHUB_REPOSITORY = 'jorgewreis/fokus-cloud';
+    process.env.GH_TOKEN = 'synthetic-not-a-credential';
+    globalThis.fetch = async (url, options = {}) => {
+      calls.push({ url, options });
+      const data = url.includes('/comments?') ? [comment(1, `/julia approve ${digest(body)}`)]
+        : url.endsWith('/git/ref/heads/main') ? { object: { sha: 'main' } }
+          : { number: 1, state: 'open', body };
+      return { ok: true, status: 200, json: async () => data };
+    };
+    await assert.rejects(publish(join(dir, 'task.json'), join(dir, 'change.patch')), /Sem alterações a publicar/);
+    assert.ok(calls.every(c => !c.options.method));
+  } finally { globalThis.fetch = originalFetch; process.env = env; rmSync(dir, { recursive: true, force: true }); }
+});

@@ -123,7 +123,9 @@ Antes do primeiro disparo do agente:
   permanece uma decisão explícita.
 - Disponibilizar `JULIA_OPENAI_API_KEY` como secret dedicado, com acesso restrito;
   não copiar a chave para `.env` nem para o código. A chave é passada apenas à
-  action oficial com `drop-sudo`; os jobs que publicam não recebem a chave.
+  action oficial com `unprivileged-user`, usando a conta efêmera `julia` sem
+  sudo; os jobs que publicam não recebem a chave. O runner administrativo
+  conserva sudo apenas para preparar e recuperar a propriedade dos arquivos.
 - Definir as variables `JULIA_CODEX_MODEL` e `JULIA_CODEX_VERSION` para uma versão
   validada. Ausência deve impedir o piloto, sem selecionar silenciosamente outro
   modelo ou baixar uma versão não revisada.
@@ -143,6 +145,13 @@ workflow ou revogar tarefas; um run já iniciado revalida autorização ao publi
 
 Não criar um lembrete que apenas peça ao usuário para iniciar o trabalho: a
 recorrência deve acionar o executor validado.
+
+No primeiro piloto, a estratégia `drop-sudo` da action oficial falhou ao tentar
+restringir `/run/dbus/system_bus_socket`, antes de executar o modelo. A operação
+passou a usar a estratégia oficial `unprivileged-user`, sem recorrer a `unsafe`.
+Um patch vazio agora falha explicitamente e registra bloqueio, em vez de produzir
+um resumo que sugira criação de PR. Falha do agente com patch recuperável força
+estado blocked mesmo que seu checkpoint declare ready.
 
 ## Operação diurna
 

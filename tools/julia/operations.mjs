@@ -151,8 +151,7 @@ export async function publish(input, patchFile) {
   }
   const patch = readFileSync(patchFile);
   if (!patch.length) {
-    await api(`issues/${record.number}/comments`, { method: 'POST', body: JSON.stringify({ body: `<!-- julia-blocked:${record.hash} -->` }) });
-    console.log('Sem alterações; tarefa bloqueada para seleção automática. Retomar indicando a issue.'); return;
+    throw new Error('Sem alterações a publicar; consultar relatório do agente. O job de falha registrará o bloqueio.');
   }
   if (patch.length > 2 * 1024 * 1024) throw new Error('Patch excede 2 MiB.');
   git('config', 'user.name', 'Julia Fokus'); git('config', 'user.email', 'julia@users.noreply.github.com');
@@ -172,7 +171,9 @@ export async function publish(input, patchFile) {
   const checkpoint = existsSync('.julia-checkpoint.md') ? readFileSync('.julia-checkpoint.md', 'utf8') : '';
   const scopeReport = resolve(patchFile, '..', 'scope-report.json');
   const rejected = existsSync(scopeReport) ? JSON.parse(readFileSync(scopeReport, 'utf8')).rejected : [];
-  const state = rejected.length ? 'blocked' : checkpoint.match(/^Julia-State: (ready|blocked|in_progress)$/m)?.[1] ?? 'blocked';
+  const outcomeFile = resolve(patchFile, '..', 'agent-outcome.txt');
+  const agentFailed = existsSync(outcomeFile) && readFileSync(outcomeFile, 'utf8').trim() !== 'success';
+  const state = rejected.length || agentFailed ? 'blocked' : checkpoint.match(/^Julia-State: (ready|blocked|in_progress)$/m)?.[1] ?? 'blocked';
   const body = `<!-- julia-state:${state} -->\nImplementação autônoma referente à #${record.number}.\n\nContrato autorizado: \`${record.hash}\`.\n\nEstado declarado pelo agente: ${state}; este PR permanece em rascunho até revisão e checks independentes.\n\n[Execução e artefatos](${run}).\n\nNão houve merge nem deploy. A issue permanece aberta até integração e aceite.`;
   if (record.pr) await api(`pulls/${record.pr}`, { method: 'PATCH', body: JSON.stringify({ body }) });
   else await api('pulls', { method: 'POST', body: JSON.stringify({ title: `[Julia] ${record.title}`.slice(0, 240),
