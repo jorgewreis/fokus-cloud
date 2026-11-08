@@ -4,6 +4,10 @@ about: Registrar uma entrega verificável para execução nativa e retomada.
 title: "[Julia] "
 ---
 
+Tarefa oficial no Linear (link):
+
+Esta issue complementa evidências técnicas; o estado oficial fica no Linear.
+
 ## Objetivo e produto
 
 Informe o problema e classifique Cloud, Styles, Law ou Lead; use o repositório correto.

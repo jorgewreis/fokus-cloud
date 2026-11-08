@@ -1,31 +1,44 @@
 # Fila de tarefas de Julia
 
-Coordenação canônica: [issue #45](https://github.com/jorgewreis/fokus-cloud/issues/45).
+A fila oficial e seus estados ficam no [Linear — Fokus Cloud](https://linear.app/reis-developer/project/fokus-cloud-f279b0530261),
+time Reis Developer. Este arquivo é um índice estável, não uma cópia dos estados.
+GitHub guarda código, PRs e resultados de testes; Notion pode guardar decisões e
+resumos com links. Não manter a mesma lista de pendências nas três ferramentas.
 
-Fonte operacional compartilhada entre o trabalho diurno de Jorge e as rotinas de Julia.
-Atualizar a issue/PR canônica antes deste resumo; não manter estados contraditórios.
-Não usar esta lista como autorização para criar funcionalidades não solicitadas.
+## Tarefas iniciais
 
-| Ordem | Tarefa | Escopo e aceite | Estado inicial |
-| --- | --- | --- | --- |
-| 1 | Remover executor de modelos por API | Remover workflows, controlador, testes exclusivos e autorizações por hash; preservar CI normal e documentar modo nativo | em_execucao |
-| 2 | Reconciliar pendências autorizadas | Revisar issues/PRs e checkpoints abertos; registrar objetivo, autorização, critérios faltantes e próxima ação; arquivar piloto API substituído | pendente |
-| 3 | Inspecionar falhas e corrigir regressões | Examinar CI e código ligado às pendências; reproduzir com dados sintéticos; corrigir defeitos comprovados e validar; entregar PR | pendente |
-| 4 | Conciliar documentação | Comparar documentos das áreas tocadas com código/testes; corrigir divergências comprovadas e índices, sem inventar funcionalidades ou status | pendente |
-| 5 | Retomar entregas interrompidas | Verificação horária: continuar critérios pendentes da tarefa autorizada existente e atualizar checkpoint, sem duplicar execução | recorrente |
+| Tarefa Linear | Entrega |
+| --- | --- |
+| [REI-5](https://linear.app/reis-developer/issue/REI-5) | Remover executor API, preservar CI e configurar operação nativa |
+| [REI-6](https://linear.app/reis-developer/issue/REI-6) | Reconciliar e concluir entregas autorizadas incompletas |
+| [REI-7](https://linear.app/reis-developer/issue/REI-7) | Inspecionar e corrigir falhas comprovadas |
+| [REI-8](https://linear.app/reis-developer/issue/REI-8) | Conciliar documentação com código e testes |
+| [REI-9](https://linear.app/reis-developer/issue/REI-9) | Validar primeira execução nativa e remover credenciais antigas |
+
+REI-9 depende da configuração REI-5. Consultar estados e evidências atuais no Linear.
+A [issue GitHub #45](https://github.com/jorgewreis/fokus-cloud/issues/45) registra
+configuração e links; não controla um segundo backlog. O piloto API #39/#42 foi encerrado.
 
 ## Passagem de turno
 
-Jorge pode registrar um pedido diretamente na conversa ou em issue. Julia transforma
-o pedido em tarefa verificável, identifica critérios e consulta decisões existentes
-antes de perguntar. Ao iniciar: registrar dono/sessão, branch/PR, base e critérios.
-Ao terminar ou bloquear: publicar evidências, estado e próxima ação no mesmo registro.
-A rotina de madrugada executa as ordens 2–4; a horária reconcilia e retoma a ordem 5.
+Jorge pode registrar um pedido na conversa ou no Linear. Julia identifica a tarefa
+existente antes de criar outra, transforma o pedido autorizado em critérios
+verificáveis e consulta código/documentação antes de perguntar.
+Ao iniciar: registrar sessão/dono, branch/PR, base e próxima ação na tarefa Linear.
+Ao concluir ou bloquear: atualizar a mesma tarefa com evidências e pendências reais.
+A rotina horária retoma tarefas pendentes; a de madrugada inspeciona e corrige falhas
+e documentação. Se já houver execução ativa, acompanhar em vez de duplicar escrita.
 
-## Registro inicial
+## Regras de uso
 
-- Autorização: pedidos de Jorge em 08/11/2026 para remover o executor por API,
-  criar documentação e rotinas de madrugada de inspeção/correção e retomada horária.
-- Restrição absoluta: nenhum consumo de API de modelos nem compra adicional de créditos.
-- Agendamentos são recursos externos a este arquivo; confirmar criação no ChatGPT.
-- Preservar a rotina existente de memória do Notion; ela tem outro objetivo.
+- Pedidos de Jorge em 08/11/2026 autorizam inspeção, correções comprovadas,
+  documentação e retomada horária, sem confirmações intermediárias no mesmo escopo.
+- Nenhum consumo de API de modelos nem compra adicional de créditos.
+- Não implementar funcionalidades novas sem pedido aplicável; registrar proposta.
+- Usar Todo/Backlog, In Progress, In Review e Done conforme evidência. Registrar
+  bloqueios com dependência e descrição; não fechar tarefa porque código foi escrito.
+- Publicar checkpoints no Linear, com links para commits/PRs/checks do GitHub.
+- Não atribuir a um usuário ou agente inexistente chamado Julia; o nome no título
+  identifica o fluxo, não comprova delegação automática no Linear.
+- Os agendamentos são do ChatGPT e sua primeira execução ainda precisa ser comprovada.
+- Preservar a rotina independente de memória do Notion, que não foi alterada.

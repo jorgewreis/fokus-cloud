@@ -13,7 +13,7 @@
 
 ## Execução até a entrega
 
-- Leia `docs/09-operations/julia-night-operations.md` e a fila em `docs/09-operations/julia-task-queue.md` para execução e retomada de ponta a ponta.
+- Leia `docs/09-operations/julia-night-operations.md` e a fila oficial no Linear, indexada em `docs/09-operations/julia-task-queue.md` para execução e retomada de ponta a ponta.
 - Planeje, implemente, valide, corrija falhas e revise antes de encerrar. Não termine com uma promessa de executar etapas já autorizadas.
 - Preserve trabalho alheio. Use branch própria e não force push. Registre decisões e um checkpoint verificável antes de encerrar por limite ou bloqueio.
 - Se uma etapa estiver bloqueada, conclua trabalho independente autorizado. Diferencie iniciado, bloqueado, pronto para revisão e integrado; código escrito não significa tarefa concluída.
@@ -24,4 +24,4 @@
 ## Custos e retomadas
 
 - Use somente recursos nativos da assinatura do ChatGPT/Codex. Não use chaves de API de modelos, executores pagos, compra de créditos ou serviços pagos adicionais. Ao atingir limite, preserve checkpoint e retome quando disponível.
-- As rotinas de madrugada e de hora em hora seguem o mesmo registro de tarefa e branch; não criem execuções concorrentes para a mesma entrega. Revise instruções mais recentes antes de agir.
+- As rotinas de madrugada e de hora em hora seguem o mesmo registro de tarefa no Linear e a mesma branch; não criem execuções concorrentes para a mesma entrega. Revise instruções mais recentes antes de agir.

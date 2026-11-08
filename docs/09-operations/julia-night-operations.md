@@ -22,7 +22,8 @@ continuar somente o trabalho independente acessível. Não simular testes ou dep
 
 Criação e habilitação confirmadas em 08/11/2026. A execução agendada ainda não foi
 validada; o retorno do agendador não informa detalhes do ambiente herdado.
-O estado atualizado e as evidências ficam na [coordenação #45](https://github.com/jorgewreis/fokus-cloud/issues/45).
+O estado oficial das tarefas fica no [Linear — Fokus Cloud](https://linear.app/reis-developer/project/fokus-cloud-f279b0530261).
+A [issue GitHub #45](https://github.com/jorgewreis/fokus-cloud/issues/45) guarda links e evidências da configuração.
 A rotina de memória do Notion permanece independente e não foi alterada.
 
 ## Fontes e autorização
@@ -73,8 +74,9 @@ Se não houver progresso ou bloqueio novo, não enviar notificação horária.
 
 ## Coordenação e persistência
 
-Uma única issue/PR é a fonte do estado de cada entrega. Registrar nela a sessão/dono,
-a branch, o commit-base e o último checkpoint antes de modificar arquivos. Inspecionar
+Uma única tarefa no Linear é a fonte oficial do estado de cada entrega. Vincular
+issue/PR e registrar na tarefa a sessão/dono, branch, commit-base e último checkpoint
+antes de modificar arquivos. Inspecionar
 atividade e comentários recentes a cada retomada. Quando não for possível confirmar
 exclusividade, acompanhar/registrar a pendência e evitar escrita concorrente.
 Essa coordenação é um procedimento operacional, não um lock distribuído automático.
@@ -85,10 +87,15 @@ independente útil; Julia verifica resultados e continua responsável pela entre
 Arquivos TOML não significam agentes em execução e não impõem isolamento técnico.
 
 Preservar alterações alheias; usar branch própria e nunca force push. Ao parar por
-limite, salvar e publicar checkpoint na issue/PR; um arquivo local isolado não basta.
+limite, salvar e publicar checkpoint na tarefa Linear com links para issue/PR; um arquivo local isolado não basta.
 Não depender da permanência deste checkout entre execuções.
 
 ## Estado e conclusão
+
+Usar os estados existentes do time Reis Developer: Todo/Backlog para pendente,
+In Progress para execução, In Review para revisão e Done apenas após o aceite.
+Bloqueios são dependências e descrição explícita na tarefa; não inventar um estado
+Blocked que o time não possui. Merge e deploy têm evidências separadas.
 
 | Estado | Evidência necessária |
 | --- | --- |
