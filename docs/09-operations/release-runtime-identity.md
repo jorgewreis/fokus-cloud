@@ -143,5 +143,10 @@ bootstrap, arquivos/caches extras, caches config/routes reais, OPcache realmente
 habilitado recusado, conexão indisponível. Fault injection sobre respostas HTTP reais
 exercita replay de cache, instâncias inconsistentes, HTTP não 200, cache header e
 campos extras. São amostras sintéticas locais, não testes FPM reais nem evidência de
-produção/frota. Sem PHP/Composer no executor local, somente testes Python e inspeção
-estática podem ser declarados; PHP, Pint e integração aguardam CI.
+produção/frota. O executor local usado na implementação não possui PHP/Composer;
+nesse ambiente, a validação limita-se a Python e inspeção estática. PHP, Pint e
+integração Laravel real são executados no CI, com evidências vinculadas ao SHA
+exato de cada execução. No [PR #59](https://github.com/jorgewreis/fokus-cloud/pull/59),
+o CI do commit `e5eaca3` passou na integração real com caches habilitados e
+desabilitados (três amostras por modo), nos testes PHP/Python e no Pint. Esses
+resultados validam o cenário isolado de CI, sem atestar FPM, produção ou toda a frota.

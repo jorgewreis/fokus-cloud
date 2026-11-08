@@ -8,7 +8,7 @@ reescrita. A main permanece `8dd9835053b7dc986343e8cfc44b5c35bdde920a`.
 Coordenação: [REI-23](https://linear.app/reis-developer/issue/REI-23) e
 [REI-20](https://linear.app/reis-developer/issue/REI-20).
 
-Componentes fixados nesta composição inicial:
+Componentes fixados nesta composição:
 
 | PR | Responsabilidade | Head |
 | --- | --- | --- |
@@ -16,7 +16,7 @@ Componentes fixados nesta composição inicial:
 | [#56](https://github.com/jorgewreis/fokus-cloud/pull/56) | Schema fail-closed | `8de6de496832684987302271af5112b82a5570ba` |
 | [#57](https://github.com/jorgewreis/fokus-cloud/pull/57) | Confiabilidade operacional | `a8cc9729181471c9f46ccb15d51383e1aceb61ab` |
 | [#58](https://github.com/jorgewreis/fokus-cloud/pull/58) | Contrato de workflow estrito | `ba305af40f3c67e6e2a73ecb6c326b40c0fb1517` |
-| [#59](https://github.com/jorgewreis/fokus-cloud/pull/59) | Identidade dinâmica Laravel | `e5eaca353e066f652e68aa50cc2c8e81ebe4c67e` |
+| [#59](https://github.com/jorgewreis/fokus-cloud/pull/59) | Identidade dinâmica Laravel | `ec058f77015ea67c6379af586b55a2fb2559550f` |
 
 ## Resultados locais e validação real
 
@@ -34,6 +34,20 @@ passaram. O executor local não tem PHP/Composer; não se atribuem a ele testes 
 Pint ou integração Laravel/MySQL. Os workflows CI existentes e o workflow dedicado
 `Release identity tests` validam a árvore composta em runners descartáveis. Resultados
 finais e links dos jobs devem ser lidos no checkpoint do PR para o SHA exato.
+
+No ensaio `32404f2ab0e3da90e394425288550f7955151474`, a integração real
+[Laravel/verificador](https://github.com/jorgewreis/fokus-cloud/actions/runs/42536012862/job/128900349934)
+concluiu os seis testes Python, dez testes PHP/23 assertions e ambos modos de cache.
+Três amostras levaram 0,965s sem caches e 0,881s com config/route cache no runner;
+isso não é benchmark produtivo. O marcador final `release_identity_integration=passed`
+está presente. O verificador foi usado sem alterar seus bytes.
+
+O [schema composto](https://github.com/jorgewreis/fokus-cloud/actions/runs/42536012853/job/128900349951)
+concluiu 16 cenários em PHP/MySQL descartáveis: dois positivos com exit 0 e
+14 negativos com exit 1, marcadores completos de supervisor e harness presentes.
+Não repetiu o falso verde herdado. [Application quality](https://github.com/jorgewreis/fokus-cloud/actions/runs/42536012861)
+também concluiu success. O delta final após esse ensaio é apenas documental;
+os checks automáticos do SHA final são registrados no PR, sem presumir resultado.
 
 O primeiro CI do endpoint detectou preparação incompleta do SQLite sintético e
 estilo Pint de `bootstrap/app.php`. Essas falhas foram corrigidas, não contornadas.
