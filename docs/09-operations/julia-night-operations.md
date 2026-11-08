@@ -44,6 +44,13 @@ dessas mudanças deve ser planejada no ciclo diurno e autorizada separadamente.
 Não é necessário autorizar cada arquivo depois disso. A automação não aprova suas
 próprias tarefas nem fecha issues automaticamente.
 
+Para iniciar ou retomar uma issue já autorizada, o proprietário pode comentar
+exatamente `/julia run` naquela issue. O workflow usa o código da main e revalida
+a aprovação do hash; o comando não concede autorização por si só. Comentários
+em PRs, de terceiros, editados ou com texto adicional não iniciam execução.
+O disparo manual pelo painel Actions continua disponível. Isso permite iniciar
+o executor pelo conector GitHub sem depender de uma sessão de navegador.
+
 ## Ciclo e continuidade
 
 | Etapa | Comportamento |

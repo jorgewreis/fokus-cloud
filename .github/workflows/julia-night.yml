@@ -1,6 +1,8 @@
 name: Julia autonomous delivery (manual pilot)
 
 "on":
+  issue_comment:
+    types: [created]
   workflow_dispatch:
     inputs:
       issue:
@@ -15,12 +17,19 @@ permissions:
   contents: read
 
 concurrency:
-  group: julia-autonomous-delivery
+  group: >-
+    ${{ github.actor == github.repository_owner && github.ref == 'refs/heads/main' &&
+    (github.event_name == 'workflow_dispatch' ||
+    (github.event_name == 'issue_comment' && github.event.comment.body == '/julia run' && !github.event.issue.pull_request)) &&
+    'julia-autonomous-delivery' || format('julia-ignored-{0}', github.run_id) }}
   cancel-in-progress: false
 
 jobs:
   select:
-    if: github.actor == github.repository_owner && github.ref == 'refs/heads/main'
+    if: >-
+      github.actor == github.repository_owner && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' && github.event.comment.body == '/julia run' && !github.event.issue.pull_request))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
