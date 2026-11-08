@@ -8,7 +8,7 @@ import stat
 import subprocess
 import tempfile
 
-AUDIT_DIGEST = '2fafc14ff178547291b57a0dc4e491f44de4a4eef4deefc244d0ffe44016ac3e'
+AUDIT_DIGEST = '1daf0709912eafccb811731f900a0f5906bf98ebf660d5f653070a0cbf453c34'
 
 SKILLS = frozenset(('engineering-research', 'secure-code-audit',
                     'software-architecture-review', 'testing-quality-engineering',
@@ -43,15 +43,26 @@ def knowledge_path(path):
 def audit_digest(ref):
     """Invalidate exemption when any tracked non-knowledge consumer changes.
 
-    The classifier is excluded to avoid a self-referential digest; its own changes
-    are always deployment eligible and require review of this policy.
+    Include the classifier too, normalizing only its exact digest literal to
+    avoid self-reference. Every other script byte and Git mode remains audited.
     """
     digest = hashlib.sha256()
     for entry in filter(None, git('ls-tree', '-r', '-z', ref).split(b'\0')):
         metadata, raw_path = entry.split(b'\t', 1)
         path = raw_path.decode('utf-8')
-        if path == 'tools/ci/classify-deployment.py' or knowledge_path(path):
+        if knowledge_path(path):
             continue
+        if path == 'tools/ci/classify-deployment.py':
+            mode, kind, object_id = metadata.split()
+            if (mode, kind) != (b'100644', b'blob'):
+                raise ValueError('classifier must be a regular non-executable file')
+            content = git('cat-file', 'blob', object_id.decode())
+            normalized, count = re.subn(
+                rb"(?m)^AUDIT_DIGEST = '[0-9a-f]{64}'$",
+                b"AUDIT_DIGEST = '<audited-tree-digest>'", content)
+            if count != 1:
+                raise ValueError('classifier must contain exactly one canonical digest literal')
+            metadata = mode + b' ' + kind + b' sha256:' + hashlib.sha256(normalized).hexdigest().encode()
         digest.update(metadata + b'\t' + raw_path + b'\0')
     return digest.hexdigest()
 

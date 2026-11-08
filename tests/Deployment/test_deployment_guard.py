@@ -218,6 +218,146 @@ class DeploymentGuard(unittest.TestCase):
             self.assertEqual(output.read_text(), f'docs_only={str(proof).lower()}\n')
 
 
+class AdoptionLifecycle(unittest.TestCase):
+    """Explicit synthetic audit fixture, not proof that the live pin is current."""
+    ORIGINAL_MAIN = '8dd9835053b7dc986343e8cfc44b5c35bdde920a'
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='guard-adoption-')
+        self.root = Path(self.temp.name) / 'repo'
+        self.previous = Path.cwd()
+        self.fixture_tree = subprocess.check_output(['git', 'write-tree'], cwd=ROOT).decode().strip()
+        subprocess.run(['git', 'clone', '--shared', '--no-checkout', str(ROOT), str(self.root)],
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        os.chdir(self.root)
+        self.git('config', 'user.email', 'synthetic@example.invalid')
+        self.git('config', 'user.name', 'Synthetic adoption test')
+        # Unit policy only: explicitly audit this temporary fixture. Never rewrite
+        # the deployed script/pin or require every operational PR to refresh it.
+        import types
+        self.policy = types.ModuleType('synthetic_adoption_policy')
+        exec((ROOT / 'tools/ci/classify-deployment.py').read_text(), self.policy.__dict__)
+        self.live_pin = self.policy.AUDIT_DIGEST
+        self.policy.AUDIT_DIGEST = self.policy.audit_digest(self.fixture_tree)
+
+    def tearDown(self):
+        os.chdir(self.previous)
+        self.temp.cleanup()
+
+    def git(self, *args):
+        return subprocess.check_output(['git', *args], stderr=subprocess.PIPE).decode().strip()
+
+    def change(self, path, text):
+        target = self.root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open('a') as output:
+            output.write(text)
+        self.git('add', '-f', '--', path)
+        self.git('commit', '-qm', 'synthetic lifecycle change')
+        return self.git('rev-parse', 'HEAD')
+
+    def integrate(self, tree):
+        feature = self.git('commit-tree', tree, '-p', self.ORIGINAL_MAIN,
+                           '-m', 'synthetic guard feature')
+        merge = self.git('commit-tree', tree, '-p', self.ORIGINAL_MAIN,
+                         '-p', feature, '-m', 'synthetic guard integration')
+        self.git('checkout', '--detach', merge)
+        return merge
+
+    def record(self, module, label, base, head, expected):
+        candidate, reason = module.classify('push', {'before': base, 'after': head})
+        self.assertEqual(candidate, expected, label)
+        import json
+        print('ADOPTION_EVIDENCE ' + json.dumps({
+            'algorithm_version': 'revised-normalized-self',
+            'fingerprint_scope': 'synthetic-audit-fixture',
+            'live_pin': self.live_pin, 'fixture_pin_matches_live': module.AUDIT_DIGEST == self.live_pin,
+            'scenario': label, 'before_digest': module.audit_digest(base),
+            'after_digest': module.audit_digest(head), 'expected_digest': module.AUDIT_DIGEST,
+            'candidate': candidate, 'reason': reason, 'real_build_executed': False,
+            'publication_policy': ('not yet exempt: requires successful real build equality'
+                                   if candidate else 'normal deployment after successful validation'),
+        }, sort_keys=True), flush=True)
+
+    def test_uses_only_durable_main_historical_reference(self):
+        import re
+        fixed_commits = set(re.findall(r'(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])',
+                                       Path(__file__).read_text()))
+        self.assertEqual(fixed_commits, {self.ORIGINAL_MAIN})
+
+    def test_single_parent_squash_or_rebase_adoption(self):
+        integrated = self.git('commit-tree', self.fixture_tree, '-p', self.ORIGINAL_MAIN,
+                              '-m', 'synthetic single-parent adoption')
+        self.git('checkout', '--detach', integrated)
+        self.record(self.policy, 'single-parent adoption', self.ORIGINAL_MAIN, integrated, False)
+        docs = self.change('docs/engineering/lifecycle-synthetic.md', '# Synthetic knowledge\n')
+        self.record(self.policy, 'docs after single-parent adoption', integrated, docs, True)
+
+    def test_revised_adoption_and_operational_invalidation(self):
+        self.assertEqual(self.policy.audit_digest(self.fixture_tree), self.policy.AUDIT_DIGEST)
+        self.assertNotEqual(self.policy.audit_digest(self.ORIGINAL_MAIN), self.policy.AUDIT_DIGEST)
+        integrated = self.integrate(self.fixture_tree)
+        self.record(self.policy, 'revised adoption', self.ORIGINAL_MAIN, integrated, False)
+        docs = self.change('docs/engineering/lifecycle-synthetic.md', '# Synthetic knowledge\n')
+        self.record(self.policy, 'revised post-adoption docs', integrated, docs, True)
+        skills = self.change('.agents/skills/engineering-research/references/lifecycle.md', '# Synthetic reference\n')
+        self.record(self.policy, 'revised post-adoption Skills', docs, skills, True)
+        for path in ('tools/ci/classify-deployment.py', '.github/workflows/deploy.yml',
+                     'tools/ci/validate-knowledge.py', 'tests/Deployment/test_deployment_guard.py',
+                     'config/app.php', 'app/MarkdownConsumer.php'):
+            self.git('checkout', '--detach', skills)
+            operational = self.change(path, '\n# Synthetic operational drift\n')
+            self.record(self.policy, 'operational change: ' + path, skills, operational, False)
+            later_docs = self.change('docs/engineering/lifecycle-synthetic.md', '\nMore knowledge.\n')
+            self.record(self.policy, 'docs after operational change: ' + path, operational, later_docs, False)
+        self.git('checkout', '--detach', skills)
+        self.change('app/MarkdownConsumer.php', '<?php // synthetic consumer\n')
+        mixed = self.change('docs/engineering/lifecycle-synthetic.md', '\nMixed knowledge.\n')
+        self.record(self.policy, 'mixed push', skills, mixed, False)
+
+    def test_stale_live_pin_keeps_successful_normal_deployment_path(self):
+        import json
+        integrated = self.integrate(self.fixture_tree)
+        operational = self.change('app/SyntheticOperationalChange.php', '<?php // synthetic\n')
+        self.assertNotEqual(guard.audit_digest(operational), self.live_pin)
+        event = Path(self.temp.name) / 'event.json'
+        output = Path(self.temp.name) / 'output'
+        summary = Path(self.temp.name) / 'summary'
+        event.write_text(json.dumps({'before': integrated, 'after': operational}))
+        env = dict(os.environ, GITHUB_EVENT_NAME='push', GITHUB_EVENT_PATH=str(event),
+                   GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(summary))
+        result = subprocess.run([sys.executable, 'tools/ci/classify-deployment.py'],
+                                cwd=self.root, env=env, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(output.read_text(), 'docs_only=false\n')
+        # Exercise the permanent adoption regression under a genuinely stale live
+        # script pin, not just a boolean mock of its outcome. No npm/build is run.
+        suite = subprocess.run([sys.executable, '-m', 'unittest', 'discover',
+                                '-s', 'tests/Deployment', '-p', 'test_deployment_guard.py',
+                                '-k', 'test_revised_adoption_and_operational_invalidation', '-v'],
+                               cwd=self.root, capture_output=True, text=True, timeout=60)
+        self.assertEqual(suite.returncode, 0, suite.stdout + suite.stderr)
+        print('STALE_PIN_EVIDENCE classifier_exit=0 docs_only=false '
+              'adoption_regression_exit=0 real_build_executed=false', flush=True)
+
+    def test_normalizes_only_exact_digest_literal(self):
+        integrated = self.integrate(self.fixture_tree)
+        path = self.root / 'tools/ci/classify-deployment.py'
+        before = guard.audit_digest(integrated)
+        import re
+        original = path.read_text()
+        path.write_text(re.sub(r"(?m)^AUDIT_DIGEST = '[0-9a-f]{64}'$",
+                               "AUDIT_DIGEST = '" + '0' * 64 + "'", original))
+        replaced = self.change('tools/ci/classify-deployment.py', '')
+        self.assertEqual(guard.audit_digest(replaced), before)
+        changed = self.change('tools/ci/classify-deployment.py', '\n# Additional source byte\n')
+        self.assertNotEqual(guard.audit_digest(changed), before)
+        path.chmod(0o755)
+        executable = self.change('tools/ci/classify-deployment.py', '')
+        with self.assertRaises(ValueError):
+            guard.audit_digest(executable)
+
+
 class WorkflowContract(unittest.TestCase):
     def test_production_gate_truth_table(self):
         # Contract for the exact expression asserted below; GitHub service execution
