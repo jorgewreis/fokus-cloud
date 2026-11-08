@@ -1,30 +1,30 @@
 ---
 name: Tarefa autônoma Julia
-about: Delimitar uma entrega para execução autônoma com autorização versionada.
+about: Registrar uma entrega verificável para execução nativa e retomada.
 title: "[Julia] "
 ---
 
-## Objetivo
+## Objetivo e produto
 
-Descreva o problema, o comportamento esperado e as restrições. Não inclua dados reais.
+Informe o problema e classifique Cloud, Styles, Law ou Lead; use o repositório correto.
 
-## Contrato
+## Escopo e critérios de aceite
 
-```json
-{
-  "product": "cloud",
-  "allowedPaths": ["docs/09-operations/exemplo.md"],
-  "acceptance": ["Substituir pelo resultado verificável esperado"],
-  "dependencies": []
-}
-```
+- Comportamento esperado e evidência verificável:
+- Caminhos e restrições relevantes:
+- Dependências:
 
-Use arquivos exatos ou diretórios terminados em `/`. Não use curingas.
-`dependencies` contém números de issues que precisam estar fechadas.
-O piloto aceita somente `cloud`; tarefas dos produtos devem ir ao repositório correto.
+## Autorização e execução
 
-## Autorização
+Vincule o pedido de Jorge que autoriza o trabalho. A autorização cobre implementação,
+testes, correções e documentação necessários ao escopo; não exige comandos, hashes
+ou confirmação por etapa. Leia `docs/09-operations/julia-night-operations.md`.
+Use somente recursos nativos da assinatura, sem chamadas pagas de API de modelos.
 
-Após finalizar o texto, obter o SHA-256 do corpo com `node tools/julia/operations.mjs digest <arquivo-do-corpo>`.
-Jorge deve registrar um comentário separado, com exatamente `/julia approve HASH`.
-Alterar o corpo invalida a autorização. `/julia revoke` revoga a autorização.
+## Retomada
+
+Estado: pendente | em_execucao | bloqueada | pronta_para_revisao | integrada
+Branch/PR e commit-base:
+Critérios atendidos e pendentes:
+Comandos/resultados reais:
+Próxima ação e bloqueio, se houver:

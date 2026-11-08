@@ -1,188 +1,106 @@
 # Operação autônoma de Julia
 
-## Estado e escopo
+## Objetivo e execução nativa
 
-Este pacote prepara um piloto manual, sem cron ativo, merge ou deploy automático.
-Sua inclusão no repositório não comprova execução do modelo. A integração com o
-executor, o orçamento e o primeiro ciclo completo precisam ser validados antes
-de ativar recorrência. O executor é Codex via GitHub Actions; não é uma sessão
-permanente da Dot nem herda automaticamente sua memória ou plugins do ChatGPT.
+Julia coordena entregas autorizadas do Fokus Cloud com os recursos nativos da
+assinatura ChatGPT/Codex, sem chave ou cobrança de API de modelos, compra de créditos
+ou contratação de serviços adicionais. Os workflows e scripts do executor anterior
+por API foram removidos. As rotinas são agendadas no ChatGPT, não no GitHub Actions.
+Arquivos neste repositório documentam o método; não iniciam agentes por si mesmos.
 
-Responsabilidade: governança e operação do **Cloud**, sem mudança de runtime,
-banco, catálogo ou preços da aplicação. Domínios Law, Lead e Styles permanecem
-em seus repositórios; o piloto recusa contratos desses produtos.
+A execução depende de ferramentas, permissões, ambiente e limites da assinatura.
+Não prometer processamento contínuo 24 horas. Nunca usar API paga como fallback.
+Se um ambiente não estiver disponível, registrar o impedimento com precisão e
+continuar somente o trabalho independente acessível. Não simular testes ou deploy.
 
-## Autonomia autorizada
+## Fontes e autorização
 
-Uma tarefa aprovada permite implementar, testar, corrigir, documentar e publicar
-uma branch/PR dentro dos caminhos contratados. Decisões técnicas reversíveis
-seguem código e documentação sem confirmações intermediárias. Persistir até
-entregar ou comprovar um impedimento; não esperar respostas opcionais.
+Ler `AGENTS.md`, `docs/README.md`, esta página, a
+[fila de tarefas](julia-task-queue.md), issues/PRs e checkpoints atuais.
+Instruções recentes de Jorge prevalecem sobre a fila. Pedidos de implementação e
+a autorização das rotinas cobrem inspeção e correção de defeitos comprovados,
+testes necessários e documentação correspondente. Não requerer `/julia approve`,
+hash, orçamento ou confirmação por arquivo. Não implementar funcionalidades novas
+apenas porque parecem úteis: registrar como proposta quando não autorizadas.
 
-O executor não pode alterar workflows, ferramentas de execução, instruções,
-segredos, dependências, migrations, políticas de segurança, arquitetura ou
-condições comerciais. Não acessa produção nem dados reais. Uma tarefa que precise
-dessas mudanças deve ser planejada no ciclo diurno e autorizada separadamente.
+Classificar Cloud/Styles/Law/Lead antes de agir. Preservar isolamento multiempresa,
+Policies, CSRF, auditoria e catálogo. Não copiar regras de produtos para o core.
+Usar dados sintéticos. Alterações comerciais, operações destrutivas e acesso a dados
+reais não estão incluídos na rotina. Reutilizar autorização expressa de merge/deploy
+quando ela cobrir a entrega; caso contrário, entregar PR pronto para revisão.
+Um push em main dispara o deploy existente: considerar essa consequência antes de integrar.
 
-## Fila e autorização vinculada ao conteúdo
+## Rotina de madrugada
 
-1. Criar uma issue pelo template **Tarefa autônoma Julia**, com objetivo,
-   contrato JSON único, produto `cloud`, caminhos permitidos, critérios de aceite
-   e dependências (números de issues). Usar arquivos exatos ou diretórios com `/`
-   final; não usar curingas nem caminhos ascendentes.
-2. Obter o corpo exato da issue, preservar seus bytes e calcular SHA-256 com
-   `node tools/julia/operations.mjs digest <arquivo>`. Um agente conectado pode
-   preparar a tarefa e calcular o hash, mas precisa de autorização de Jorge para
-   registrar a aprovação em seu nome.
-3. Jorge comenta exatamente `/julia approve HASH`. O seletor confere a identidade
-   `jorgewreis`, o hash do corpo atual e o último comando válido do proprietário.
-   Comentários de terceiros não autorizam. `/julia revoke` revoga; editar a issue
-   invalida o hash. Comandos devem estar em comentários separados, sem texto extra.
-4. Dependências precisam estar fechadas. PRs não são aceitos como dependência:
-   use uma issue e só a feche após a integração correspondente.
+1. Reconciliar tarefas pendentes e PRs com a main atual; priorizar falhas confirmadas,
+   testes quebrados, segurança e entregas autorizadas interrompidas.
+2. Inspecionar logs de CI acessíveis, diffs, testes e documentação pertinentes.
+   Não fazer varredura invasiva em produção nem consultar dados reais.
+3. Reproduzir defeitos com dados sintéticos antes de corrigir. Escolher a menor
+   correção sustentável, preservar contratos e adicionar teste de regressão quando útil.
+4. Validar conforme impacto: PHPUnit/Laravel, Pint nos PHP alterados, build Vite,
+   tokens, SEO, contratos visuais e MySQL/Redis/migrations quando aplicável.
+   Para documentação isolada, verificar links, coerência e diff; não exigir toda
+   a suíte sem motivo. Distinguir falha preexistente, introduzida e de infraestrutura.
+5. Corrigir documentação divergente do código validado; atualizar índices e fila.
+6. Publicar branch/PR e checkpoint; informar resultados comprovados e próximo passo.
 
-Não é necessário autorizar cada arquivo depois disso. A automação não aprova suas
-próprias tarefas nem fecha issues automaticamente.
+A rotina pode continuar uma tarefa enquanto houver capacidade. Não multiplicar
+execuções nem criar alterações artificiais para demonstrar atividade.
 
-Para iniciar ou retomar uma issue já autorizada, o proprietário pode comentar
-exatamente `/julia run` naquela issue. O workflow usa o código da main e revalida
-a aprovação do hash; o comando não concede autorização por si só. Comentários
-em PRs, de terceiros, editados ou com texto adicional não iniciam execução.
-O disparo manual pelo painel Actions continua disponível. Isso permite iniciar
-o executor pelo conector GitHub sem depender de uma sessão de navegador.
+## Rotina de hora em hora
 
-## Ciclo e continuidade
+Revisar pendências, PRs, CI e checkpoints de entregas autorizadas. Primeiro verificar
+se já há execução ativa da mesma tarefa. Se houver, acompanhar a execução existente;
+não iniciar outro implementador nem disputar a mesma branch.
+Retomar a pendência de maior prioridade que tenha próxima ação executável; acompanhar
+CI, corrigir falhas introduzidas e concluir critérios faltantes. Se estiver bloqueada,
+verificar se o bloqueio mudou e avançar outra tarefa independente autorizada.
+Não repetir a mesma tentativa sem evidência nova. Não fazer perguntas opcionais.
+Se não houver progresso ou bloqueio novo, não enviar notificação horária.
 
-| Etapa | Comportamento |
+## Coordenação e persistência
+
+Uma única issue/PR é a fonte do estado de cada entrega. Registrar nela a sessão/dono,
+a branch, o commit-base e o último checkpoint antes de modificar arquivos. Inspecionar
+atividade e comentários recentes a cada retomada. Quando não for possível confirmar
+exclusividade, acompanhar/registrar a pendência e evitar escrita concorrente.
+Essa coordenação é um procedimento operacional, não um lock distribuído automático.
+
+Usar `.codex/agents/` quando o ambiente oferecer subagentes: Julia coordena,
+implementador executa e revisor examina o diff sem escrita. Delegar somente trabalho
+independente útil; Julia verifica resultados e continua responsável pela entrega.
+Arquivos TOML não significam agentes em execução e não impõem isolamento técnico.
+
+Preservar alterações alheias; usar branch própria e nunca force push. Ao parar por
+limite, salvar e publicar checkpoint na issue/PR; um arquivo local isolado não basta.
+Não depender da permanência deste checkout entre execuções.
+
+## Estado e conclusão
+
+| Estado | Evidência necessária |
 | --- | --- |
-| Selecionar | Proprietário dispara manualmente na `main`; escolhe uma issue indicada ou a mais antiga autorizada e disponível. |
-| Retomar | Reutiliza `julia/issue-N` quando houver PR em rascunho e lê o checkpoint. PR fora de rascunho fica aguardando revisão. |
-| Preparar | Faz merge da `main` na branch retomada, preservando histórico; conflito vira bloqueio. Instala PHP 8.4, Node 24 e dependências sem credenciais de produção. |
-| Implementar | Até 180 minutos de agente; resolve o escopo e atualiza `.julia-checkpoint.md` durante o trabalho. |
-| Capturar | Mesmo após falha do agente, tenta salvar checkpoint e patch limitado a 200 arquivos e 2 MiB. Arquivos novos de `tests/` são capturados apesar do ignore atual; caminhos rejeitados ficam num relatório e fora do patch. |
-| Publicar | Outro runner revalida autorização, hash, main, PR, caminhos e modos; aplica o patch sem executar código proposto, publica sem force e cria/atualiza PR em rascunho. |
-| Validar | Dispara explicitamente `Julia delivery checks` na branch; o `GITHUB_TOKEN` não dispara CI por simples push/abertura de PR. |
-| Revisar | Examinar critérios, checkpoint, checks independentes, homologação necessária e diff. Marcar pronto para revisão somente com evidências suficientes. |
+| pendente | Pedido autorizado, objetivo e critérios registrados |
+| em_execucao | Sessão/dono, branch, base e próxima ação registrados |
+| bloqueada | Causa comprovada, tentativa e condição para retomar |
+| pronta_para_revisao | Critérios atendidos, diff revisado e checks reais publicados |
+| integrada | Commit na main; deploy confirmado separadamente quando aplicável |
 
-O piloto executa uma tarefa por disparo. Tarefas inválidas, não autorizadas,
-dependentes ou já entregues são ignoradas em favor da próxima elegível. Não há
-garantia de terminar uma funcionalidade em uma noite nem de usar toda a janela.
-O timeout total do job de implementação é 210 minutos, reservando tempo para
-preparação/captura. Um encerramento abrupto do runner pode impedir o upload final;
-não confundir recuperação por checkpoint com garantia contra qualquer falha.
+O checkpoint deve conter: tarefa e autorização, produto/escopo, branch/PR/commit,
+critérios atendidos e faltantes, comandos/resultados, decisões, bloqueios e próxima ação.
+Nunca guardar segredos, dados pessoais ou transcrições completas. Não chamar de
+concluída uma implementação sem validação ou uma publicação cujo CI ainda não terminou.
 
-O checkpoint começa com `Julia-State: in_progress`, `Julia-State: blocked` ou
-`Julia-State: ready`. PRs com estado ready/blocked saem da seleção automática;
-um disparo que indique explicitamente a issue pode retomá-los. Falha de preparo
-ou publicação é registrada como comentário de bloqueio na issue, permitindo que
-outras tarefas avancem. Caminhos rejeitados forçam estado blocked mesmo quando
-o agente declarou ready. A indicação ready é declaração local, não aceite.
+Notificar conclusão, falha relevante ou decisão indispensável; agrupar atualizações.
+Ao solicitar ajuda, informar somente o dado/ação que falta e o efeito no trabalho.
 
-Se a main avançar, o PR deixar de ser rascunho ou alguém alterar sua branch,
-recusar publicação e preservar o artefato por 14 dias. Reconciliar sem sobrescrever
-o trabalho diurno. Uma branch sem PR é tratada como publicação interrompida e
-exige reconciliação; nunca apagá-la ou forçar push.
+## Limpeza do executor anterior
 
-## Papéis e procedimentos
-
-- `julia_coordinator`: plano, dependências, critérios, checkpoint e entrega.
-- `fokus_implementer`: implementação delimitada e verificações.
-- `fokus_reviewer`: revisão sem edição, com achados fundamentados.
-- `.agents/skills/fokus-deliver/SKILL.md`: procedimento versionado do projeto,
-  lido explicitamente pelo prompt, inclusive se não houver descoberta automática.
-
-Os arquivos TOML descrevem papéis; o executor só delega se oferecer suporte real.
-No modo sequencial, declarar ausência de revisão por outro agente. O procedimento
-do repositório não foi instalado como skill pessoal nem altera as configurações
-permanentes da Dot.
-
-O revisor recebe instrução de não editar; isso não constitui um sandbox separado.
-Os agentes herdam as permissões do processo principal. A barreira técnica de
-publicação é a conferência de escopo em outro runner, não o nome do papel.
-
-## Validação e critérios de pronto
-
-`julia-delivery-checks.yml` roda os testes do controlador, PHPUnit, Pint nos PHP
-alterados, build Vite, tokens, SEO e contrato de Backoffice, sem secrets. A
-homologação existente em `security-homologation.yml` fornece MySQL/Redis e deve
-ser executada e examinada para mudanças relevantes em acesso, persistência e
-isolamento. O piloto não presume essa cobertura a partir de testes SQLite.
-
-O agente registra verificações locais, mas a evidência independente é o workflow
-executado na branch publicada. Testes verdes não substituem aceite funcional,
-revisão de segurança ou exame no navegador para mudanças de interface.
-
-| Estado | Evidência mínima |
-| --- | --- |
-| Autorizada | Contrato atual com aprovação válida do proprietário. |
-| Em execução | Run com tarefa selecionada. |
-| Bloqueada/parcial | Checkpoint com causa, progresso real e próximo passo; PR em rascunho ou artefato. |
-| Pronta para revisão | Critérios demonstrados, checks pertinentes aprovados e cobertura/limitações explícitas. |
-| Integrada | Merge efetivo; conclusão da issue após aceite. |
-| Publicada | Deploy comprovado, separado do estado do PR. |
-
-## Ativação e custos
-
-Antes do primeiro disparo do agente:
-
-- Integrar este pacote após revisão. `workflow_dispatch` precisa estar disponível
-  na branch padrão; integrar na main aciona o deploy existente, por isso o merge
-  permanece uma decisão explícita.
-- Disponibilizar `JULIA_OPENAI_API_KEY` como secret dedicado, com acesso restrito;
-  não copiar a chave para `.env` nem para o código. A chave é passada apenas à
-  action oficial com `unprivileged-user`, usando a conta efêmera `julia` sem
-  sudo; os jobs que publicam não recebem a chave. O runner administrativo
-  conserva sudo apenas para preparar e recuperar a propriedade dos arquivos.
-- Definir as variables `JULIA_CODEX_MODEL` e `JULIA_CODEX_VERSION` para uma versão
-  validada. Ausência deve impedir o piloto, sem selecionar silenciosamente outro
-  modelo ou baixar uma versão não revisada.
-- Definir orçamento/alertas no projeto OpenAI e verificar limites do provedor.
-  Timeout limita duração, não é teto financeiro rígido. A assinatura ChatGPT não
-  comprova créditos de API para este workflow; nenhum crédito foi provisionado.
-- Habilitar a criação de PRs pelo GitHub Actions nas configurações do repositório,
-  se estiver desabilitada. A política organizacional pode impedir essa operação.
-- Usar uma tarefa pequena e sintética, disparar o piloto e conferir branch,
-  checkpoint, PR, verificações e retomada. Depois testar revogação e conflito com
-  trabalho diurno, sem produção.
-
-Somente após esse aceite, ativar cron às `02:00 UTC` (23h America/Bahia) e adaptar
-a restrição de ator do seletor para o evento agendado, preservando autorização
-por tarefa. O cron permanece comentado de propósito. Para parar, desabilitar o
-workflow ou revogar tarefas; um run já iniciado revalida autorização ao publicar.
-
-Não criar um lembrete que apenas peça ao usuário para iniciar o trabalho: a
-recorrência deve acionar o executor validado.
-
-No primeiro piloto, a estratégia `drop-sudo` da action oficial falhou ao tentar
-restringir `/run/dbus/system_bus_socket`, antes de executar o modelo. A operação
-passou a usar a estratégia oficial `unprivileged-user`, sem recorrer a `unsafe`.
-Um patch vazio agora falha explicitamente e registra bloqueio, em vez de produzir
-um resumo que sugira criação de PR. Falha do agente com patch recuperável força
-estado blocked mesmo que seu checkpoint declare ready.
-
-O segundo piloto confirmou acesso ao modelo, mas revelou que testes de acesso
-com caminhos relativos não comprovam acesso aos caminhos absolutos sob o HOME
-privado do runner. O checkout, o contrato e a saída do agente ficam agora sob
-`/home/julia`, com `TMPDIR=/tmp`. O contrato é copiado como somente leitura,
-enquanto o controlador continua em `/opt/julia`. O CI executa o mesmo script de
-preparação com fixtures, sem chave de API, e verifica leitura, shell e escrita
-antes de qualquer teste com o modelo.
-
-O terceiro piloto comprovou criação de documento, checkpoint, PR em rascunho e
-dispatch de checks, mas registrou falhas locais de subprocessos Git no sandbox.
-As invocações Git do controlador não precisam de stdin: ele é explicitamente
-ignorado, como nos fixtures de integração, mantendo stdout/stderr capturados.
-O CI passa a executar a suíte dentro do sandbox real do Codex, sem modelo nem
-chave, além dos testes no runner comum. Configurações Git usam o diretório XDG
-da conta isolada, em vez de tentar ler o HOME privado do runner.
-
-## Operação diurna
-
-Trabalhar em branches próprias e enviar alterações ao GitHub antes da passagem
-de turno. De manhã, revisar PRs e checkpoints; resolver somente decisões materiais.
-Revalidar branches após qualquer avanço da main. Não reutilizar a branch Julia
-para mudanças humanas enquanto a execução estiver ativa.
-
-Fontes técnicas: [Codex GitHub Action](https://developers.openai.com/codex/github-action)
-e [modo não interativo](https://developers.openai.com/codex/noninteractive), além de
-[configuração de subagentes](https://developers.openai.com/codex/subagents).
+Foram retirados os workflows `julia-night.yml` e `julia-delivery-checks.yml`, o
+controlador `tools/julia/`, seus testes exclusivos e o procedimento de autorização
+por hash. O job de qualidade da aplicação, sem API, foi preservado em `application-quality.yml`
+(PHPUnit, Pint, build, tokens, SEO e contrato). O CI/deploy normal também foi preservado.
+Credenciais e variáveis do executor antigo não são necessárias. Sua remoção no
+provedor deve ser verificada separadamente; não afirmar revogação de uma chave
+apenas porque seu consumidor foi removido. Histórico Git e execuções antigas são
+registros históricos, não componentes ativos.
