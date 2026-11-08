@@ -23,7 +23,10 @@ responde HTTP 200 somente com:
 
 Os campos são exatamente `status`, `release`, `probe`; release é o SHA Git completo
 minúsculo, nunca `.env`, header, parâmetro de request, ref ou arquivo SHA mutável.
-O nonce é ecoado, não persistido. `Cache-Control: no-store, private, max-age=0`, JSON,
+O nonce é ecoado, não persistido. Entry point e middleware usam a mesma regra
+para o request-target: separam a query e removem somente barras externas. Assim,
+variantes com barras iniciais/finais repetidas recebem a mesma proteção pré-bootstrap.
+Não se usa `parse_url` para reinterpretar `//` como autoridade. `Cache-Control: no-store, private, max-age=0`, JSON,
 `Pragma: no-cache` e `X-Robots-Tag` são enviados também nas falhas. Nonce ausente,
 array, maiúsculo, inválido, parâmetros extras ou método diferente retornam 400 com
 `{"status":"invalid_probe","release":null,"probe":null}`. Identidade não confiável
