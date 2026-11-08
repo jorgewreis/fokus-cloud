@@ -30,6 +30,14 @@ final class ReleaseIdentity
 
     private function verifySnapshot(): string
     {
+        // Preloaded classes survive ini_set('opcache.enable', '0'). Check preload
+        // independently of the current enable flags; disk hashes cannot attest it.
+        $opcodeStatus = function_exists('opcache_get_status') ? @opcache_get_status(false) : false;
+        if (trim((string) ini_get('opcache.preload')) !== ''
+            || (is_array($opcodeStatus) && array_key_exists('preload_statistics', $opcodeStatus))) {
+            throw new RuntimeException('release_unavailable');
+        }
+
         // This protocol does not attest cached opcodes or long-lived application servers.
         if (filter_var(ini_get('opcache.enable'), FILTER_VALIDATE_BOOL)
             && (PHP_SAPI !== 'cli' && PHP_SAPI !== 'cli-server'

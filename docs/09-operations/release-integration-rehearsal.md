@@ -16,7 +16,7 @@ Componentes fixados nesta composição:
 | [#56](https://github.com/jorgewreis/fokus-cloud/pull/56) | Schema fail-closed | `8de6de496832684987302271af5112b82a5570ba` |
 | [#57](https://github.com/jorgewreis/fokus-cloud/pull/57) | Confiabilidade operacional | `a8cc9729181471c9f46ccb15d51383e1aceb61ab` |
 | [#58](https://github.com/jorgewreis/fokus-cloud/pull/58) | Contrato de workflow estrito | `485fe638b5fd5ac97fd28675fc00f54882e002e4` |
-| [#59](https://github.com/jorgewreis/fokus-cloud/pull/59) | Identidade dinâmica Laravel | `f7523c36809665c4c375128473284cc10d5dacfa` |
+| [#59](https://github.com/jorgewreis/fokus-cloud/pull/59) | Identidade dinâmica Laravel | `b271260d1e9cf4778bf3304e961db73751a297f1` |
 
 ## Resultados locais e validação real
 
@@ -61,6 +61,16 @@ Revisão adicional alinhou o reconhecimento de REQUEST_URI no entrypoint e middl
 do #59, incluindo barras externas. Isso impede que uma variante alcance o endpoint
 sem passar pela sanitização pré-bootstrap. Aliases implícitos de base URL não são
 parte do endpoint. A integração inclui falha de bootstrap com canário nessas variantes.
+
+Foi reproduzido também no engine PHP 8.4 real que classes preloaded sobrevivem a
+`ini_set('opcache.enable', '0')`. A versão final recusa configuração/estatísticas
+de preload tanto no entrypoint, antes da identidade/autoload, quanto no guard.
+Uma regressão de subprocessos comprova o mesmo snapshot válido sem preload,
+a recusa após preload e desativação, e a fronteira pré-bootstrap com canários que
+nunca são carregados. Os três cenários passaram localmente, inclusive em revisão
+independente; com o guard anterior o teste reproduziu a aceitação incorreta.
+O workflow dedicado executa novamente esses cenários no CI. Isso é evidência
+do mecanismo PHP, não ensaio de workers FPM reais nem configuração de produção.
 
 O primeiro CI do endpoint detectou preparação incompleta do SQLite sintético e
 estilo Pint de `bootstrap/app.php`. Essas falhas foram corrigidas, não contornadas.

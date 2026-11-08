@@ -19,6 +19,13 @@ if ($isReleaseProbe) {
 try {
     // Capture build literals before loading any application or Composer code.
     if ($isReleaseProbe) {
+        // Reject preload before Composer or any potentially preloaded guard class.
+        $opcodeStatus = function_exists('opcache_get_status') ? @opcache_get_status(false) : false;
+        if (trim((string) ini_get('opcache.preload')) !== ''
+            || (is_array($opcodeStatus) && array_key_exists('preload_statistics', $opcodeStatus))) {
+            throw new RuntimeException('release_unavailable');
+        }
+
         $identity = __DIR__.'/../.release/identity.php';
         define('FOKUS_RELEASE_IDENTITY', is_file($identity) ? require $identity : []);
     }
