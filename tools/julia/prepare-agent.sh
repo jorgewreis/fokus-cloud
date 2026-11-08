@@ -6,6 +6,7 @@ set -euo pipefail
 julia_workspace="${GITHUB_WORKSPACE:?GITHUB_WORKSPACE ausente}"
 sudo useradd --create-home --shell /bin/bash julia
 sudo chmod 755 /home/julia
+sudo -u julia mkdir -p /home/julia/.config
 sudo mv "$julia_workspace/work" /home/julia/work
 sudo mkdir /home/julia/julia-input /home/julia/julia-result
 sudo cp "$julia_workspace/julia-input/task.json" /home/julia/julia-input/task.json
@@ -18,7 +19,7 @@ sudo -u julia test -r /home/julia/julia-input/task.json
 sudo -u julia test -r /home/julia/work/AGENTS.md
 sudo -u julia test -w /home/julia/work
 sudo -u julia test -w /home/julia/julia-result
-sudo -u julia /bin/bash -c 'cd /home/julia/work && git status --short && node --version && printf accessible > /home/julia/julia-result/preflight.txt'
+sudo -u julia env HOME=/home/julia XDG_CONFIG_HOME=/home/julia/.config /bin/bash -c 'cd /home/julia/work && git status --short && node --version && printf accessible > /home/julia/julia-result/preflight.txt'
 if sudo -u julia sudo -n true 2>/dev/null; then
   echo 'Agent account unexpectedly has sudo privileges.' >&2
   exit 1
