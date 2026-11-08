@@ -13,6 +13,18 @@ Não prometer processamento contínuo 24 horas. Nunca usar API paga como fallbac
 Se um ambiente não estiver disponível, registrar o impedimento com precisão e
 continuar somente o trabalho independente acessível. Não simular testes ou deploy.
 
+## Agendamentos nativos configurados
+
+| Rotina | Agenda em America/Bahia | Finalidade |
+| --- | --- | --- |
+| Julia — manutenção de madrugada | Diária, referência 03h em janela flexível | Inspecionar, corrigir, validar e conciliar documentação |
+| Julia — concluir pendências | A cada hora, no minuto 20 | Retomar entregas incompletas e acompanhar CI |
+
+Criação e habilitação confirmadas em 08/11/2026. A execução agendada ainda não foi
+validada; o retorno do agendador não informa detalhes do ambiente herdado.
+O estado atualizado e as evidências ficam na [coordenação #45](https://github.com/jorgewreis/fokus-cloud/issues/45).
+A rotina de memória do Notion permanece independente e não foi alterada.
+
 ## Fontes e autorização
 
 Ler `AGENTS.md`, `docs/README.md`, esta página, a
