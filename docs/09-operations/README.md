@@ -5,6 +5,7 @@ Esta pasta documenta ambientes, deploy, testes, qualidade, releases, monitoramen
 ## Arquivos
 
 - [Ambientes e deploy](environments-and-deploy.md)
+- [Confiabilidade operacional e recuperação](deployment-reliability.md)
 - [Operação autônoma de Julia](julia-night-operations.md)
 - [Fila de tarefas de Julia](julia-task-queue.md)
 - [Testes e qualidade](testing-and-quality.md)
