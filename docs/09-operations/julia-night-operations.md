@@ -161,6 +161,14 @@ enquanto o controlador continua em `/opt/julia`. O CI executa o mesmo script de
 preparação com fixtures, sem chave de API, e verifica leitura, shell e escrita
 antes de qualquer teste com o modelo.
 
+O terceiro piloto comprovou criação de documento, checkpoint, PR em rascunho e
+dispatch de checks, mas registrou falhas locais de subprocessos Git no sandbox.
+As invocações Git do controlador não precisam de stdin: ele é explicitamente
+ignorado, como nos fixtures de integração, mantendo stdout/stderr capturados.
+O CI passa a executar a suíte dentro do sandbox real do Codex, sem modelo nem
+chave, além dos testes no runner comum. Configurações Git usam o diretório XDG
+da conta isolada, em vez de tentar ler o HOME privado do runner.
+
 ## Operação diurna
 
 Trabalhar em branches próprias e enviar alterações ao GitHub antes da passagem

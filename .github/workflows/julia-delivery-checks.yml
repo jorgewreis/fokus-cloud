@@ -24,8 +24,10 @@ jobs:
           node-version: '24'
       - name: Verify agent traversal, shell and output access without API credentials
         run: |
-          mkdir -p work julia-input
+          mkdir -p work/tools/julia work/tests/Operations julia-input
           cp AGENTS.md work/AGENTS.md
+          cp tools/julia/operations.mjs work/tools/julia/operations.mjs
+          cp tests/Operations/julia-operations.test.mjs work/tests/Operations/julia-operations.test.mjs
           git -C work init
           printf '{}' > julia-input/task.json
           sudo mkdir -p /opt/julia
@@ -33,6 +35,23 @@ jobs:
           sudo chmod 444 /opt/julia/task-prompt.md
           bash tools/julia/prepare-agent.sh
           test "$(cat /home/julia/julia-result/preflight.txt)" = accessible
+      - name: Verify subprocess tests inside the actual Codex sandbox without a model
+        env:
+          JULIA_CODEX_VERSION: ${{ vars.JULIA_CODEX_VERSION || '0.167.0' }}
+        run: |
+          set -euo pipefail
+          [[ "$JULIA_CODEX_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          npm install --global "@openai/codex@$JULIA_CODEX_VERSION"
+          if sysctl kernel.unprivileged_userns_clone >/dev/null 2>&1; then
+            sudo sysctl -w kernel.unprivileged_userns_clone=1
+          fi
+          if sysctl kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          codex_bin="$(command -v codex)"
+          sudo -u julia env HOME=/home/julia XDG_CONFIG_HOME=/home/julia/.config TMPDIR=/tmp \
+            "$codex_bin" sandbox linux --permission-profile :workspace --cd /home/julia/work \
+            -- node --test tests/Operations/julia-operations.test.mjs
 
   operations:
     runs-on: ubuntu-latest

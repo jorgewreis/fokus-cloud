@@ -41,7 +41,7 @@ export function checkChanges(paths, task) {
     }
   }
 }
-const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 }).trim();
+const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 async function api(path, options = {}) {
   const token = process.env.GH_TOKEN;
   if (!token) throw new Error('GH_TOKEN ausente.');
@@ -136,7 +136,7 @@ export function bundle(input, destination, baseline) {
   // Esvaziar somente o index do runner efêmero; alterações fora de escopo não são publicadas.
   git('reset', baseline, '--', '.');
   if (accepted.length) git('add', '-f', '--', ...accepted);
-  const patch = execFileSync('git', ['diff', '--cached', '--binary', baseline], { maxBuffer: 2 * 1024 * 1024 });
+  const patch = execFileSync('git', ['diff', '--cached', '--binary', baseline], { maxBuffer: 2 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
   writeFileSync(resolve(destination, 'change.patch'), patch);
 }
 export async function publish(input, patchFile) {

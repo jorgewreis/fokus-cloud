@@ -6,6 +6,7 @@ set -euo pipefail
 julia_workspace="${GITHUB_WORKSPACE:?GITHUB_WORKSPACE ausente}"
 sudo useradd --create-home --shell /bin/bash julia
 sudo chmod 755 /home/julia
+sudo -u julia mkdir -p /home/julia/.config
 sudo mv "$julia_workspace/work" /home/julia/work
 sudo mkdir /home/julia/julia-input /home/julia/julia-result
 sudo cp "$julia_workspace/julia-input/task.json" /home/julia/julia-input/task.json

@@ -129,6 +129,7 @@ jobs:
         continue-on-error: true
         env:
           TMPDIR: /tmp
+          XDG_CONFIG_HOME: /home/julia/.config
         uses: openai/codex-action@1d82a3dba7c7988ec71ecae1ed5b8e8db96495c5 # v1
         with:
           openai-api-key: ${{ secrets.JULIA_OPENAI_API_KEY }}
