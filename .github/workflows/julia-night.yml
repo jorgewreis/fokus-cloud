@@ -26,10 +26,8 @@ concurrency:
 
 jobs:
   select:
-    if: >-
-      github.actor == github.repository_owner && github.ref == 'refs/heads/main' &&
-      (github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issue_comment' && github.event.comment.body == '/julia run' && !github.event.issue.pull_request))
+    # Suspenso: o proprietario exige uso nativo da assinatura, sem chamadas de API.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
