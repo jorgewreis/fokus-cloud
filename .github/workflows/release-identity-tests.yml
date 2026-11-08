@@ -1,0 +1,41 @@
+name: Release identity tests
+
+"on":
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite, sqlite3, opcache
+          coverage: none
+      - name: Prepare test dependencies only
+        run: |
+          mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs
+          touch database/database.sqlite
+          cp .env.example .env
+          composer install --no-interaction --prefer-dist
+          php artisan key:generate --force
+      - name: Load pinned PR 57 verifier dependency
+        run: git fetch --no-tags origin a8cc9729181471c9f46ccb15d51383e1aceb61ab
+      - name: Offline preparation regression tests
+        run: python3 tools/ci/test-prepare-release.py
+      - name: Laravel feature and unit tests
+        run: php artisan test tests/Feature/Deployment tests/Unit/Deployment
+      - name: Real Laravel and verifier integration
+        run: python3 tools/ci/test-release-identity.py

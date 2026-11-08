@@ -50,6 +50,8 @@ Após qualquer alteração de sessão, conferir em homologação o login dos doi
 
 ## Backup e restauração
 
+A [auditoria de confiabilidade e matriz de recuperação](deployment-reliability.md) registra as limitações comprovadas em 08/11/2026: falha SSH em 28/09, intervalo superior a 48 horas e recuperação integral ainda não demonstrada. As metas abaixo não são garantias de RPO/RTO.
+
 **Meta inicial:** ponto de recuperação de até 24 horas (RPO) e retorno em até 4 horas (RTO). O responsável por infraestrutura mantém backup diário do banco, `storage/app` e material necessário para reconstruir `.env`/configuração NGINX em cofre separado do servidor. Os arquivos devem ser cifrados, ter acesso restrito, retenção mínima de 30 dias e cópia fora do host de produção.
 
 Antes de clientes reais e depois a cada trimestre:
