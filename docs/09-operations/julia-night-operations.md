@@ -44,6 +44,13 @@ dessas mudanças deve ser planejada no ciclo diurno e autorizada separadamente.
 Não é necessário autorizar cada arquivo depois disso. A automação não aprova suas
 próprias tarefas nem fecha issues automaticamente.
 
+Para iniciar ou retomar uma issue já autorizada, o proprietário pode comentar
+exatamente `/julia run` naquela issue. O workflow usa o código da main e revalida
+a aprovação do hash; o comando não concede autorização por si só. Comentários
+em PRs, de terceiros, editados ou com texto adicional não iniciam execução.
+O disparo manual pelo painel Actions continua disponível. Isso permite iniciar
+o executor pelo conector GitHub sem depender de uma sessão de navegador.
+
 ## Ciclo e continuidade
 
 | Etapa | Comportamento |
@@ -160,6 +167,14 @@ privado do runner. O checkout, o contrato e a saída do agente ficam agora sob
 enquanto o controlador continua em `/opt/julia`. O CI executa o mesmo script de
 preparação com fixtures, sem chave de API, e verifica leitura, shell e escrita
 antes de qualquer teste com o modelo.
+
+O terceiro piloto comprovou criação de documento, checkpoint, PR em rascunho e
+dispatch de checks, mas registrou falhas locais de subprocessos Git no sandbox.
+As invocações Git do controlador não precisam de stdin: ele é explicitamente
+ignorado, como nos fixtures de integração, mantendo stdout/stderr capturados.
+O CI passa a executar a suíte dentro do sandbox real do Codex, sem modelo nem
+chave, além dos testes no runner comum. Configurações Git usam o diretório XDG
+da conta isolada, em vez de tentar ler o HOME privado do runner.
 
 ## Operação diurna
 
