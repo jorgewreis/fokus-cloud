@@ -26,6 +26,13 @@ try {
     if (config('database.default') !== 'mysql' || config('database.connections.mysql.host') !== '127.0.0.1' || config('database.connections.mysql.database') !== 'fokuscloud_schema_test') {
         throw new RuntimeException;
     }
+    // DB_URL/read-write/socket configuration can override the nominal host/database.
+    // Inspect Laravel's resolved connection before any schema inspection or mutation.
+    $case = 'resolved database guard';
+    $connection = DB::connection();
+    if ($connection->getDriverName() !== 'mysql' || $connection->getConfig('host') !== '127.0.0.1' || $connection->getDatabaseName() !== 'fokuscloud_schema_test' || $connection->getConfig('unix_socket') || $connection->getConfig('read') || $connection->getConfig('write')) {
+        throw new RuntimeException;
+    }
     $name = '2026_10_30_160000_add_encrypted_details_to_law_contacts';
     $schema = Schema::getFacadeRoot();
     $db = DB::getFacadeRoot();

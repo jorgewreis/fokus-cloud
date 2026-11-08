@@ -37,6 +37,11 @@ def main():
     reject('harness isolation guard', ['php', str(harness), str(root), str(helper)],
            'Schema preflight regression failed: disposable database guard', {'CI': 'false'})
 
+    for label, overrides in [('URL override', {'DB_URL': 'mysql://SCHEMA_SYNTHETIC_SECRET@localhost/not_disposable'}),
+                             ('socket override', {'DB_SOCKET': '/tmp/schema-not-disposable.sock'})]:
+        reject(label, ['php', str(harness), str(root), str(helper)],
+               'Schema preflight regression failed: resolved database guard', overrides)
+
     # A false-success helper must cause an assertion AFTER Laravel installs its handler.
     # The parent remains outside Laravel, so its own failure cannot be swallowed by that handler.
     with tempfile.TemporaryDirectory(prefix='law-schema-process-') as directory:
@@ -44,8 +49,10 @@ def main():
         for label, source in [('helper false success', '<?php exit(0);'),
                               ('helper wrong failure', '<?php fwrite(STDERR, "wrong guard"); exit(1);')]:
             fake.write_text(source)
-            reject(label, ['php', str(harness), str(root), str(fake)],
-                   'Schema preflight regression failed:')
+            failed = reject(label, ['php', str(harness), str(root), str(fake)],
+                            'Schema preflight regression failed: migration RuntimeException\n')
+            if 'Case migration RuntimeException:' not in failed.stdout:
+                raise RuntimeError(f'{label}: did not reach the post-bootstrap assertion')
     print('Schema CLI process boundaries passed.', flush=True)
 
 
