@@ -100,3 +100,31 @@ conhecimento. A correção de compatibilidade não certifica a árvore operacion
 Não existe atualização automática do pin. Até a reauditoria, a classificação
 conservadora deve manter `docs_only=false`, preservando o caminho normal de
 validação/publicação; isso não autoriza executar uma publicação.
+
+## Determinismo do descarte de fixtures Git
+
+O ensaio de composição no PR #60 passou em todos os testes `WorkflowContract`,
+mas o teardown de `AdoptionLifecycle.test_single_parent_squash_or_rebase_adoption`
+falhou com `OSError: Directory not empty` em `.git/objects/info/commit-graphs`.
+Evidência: [job 128900350709](https://github.com/jorgewreis/fokus-cloud/actions/runs/42536012959/job/128900350709),
+com Git 2.56 e Python 3.14. O erro é compatível com manutenção Git automática
+assíncrona escrevendo durante a remoção da fixture; não foi uma falha do
+contrato do workflow. A corrida exata não foi reproduzida localmente.
+
+As fixtures descartáveis passam `-c gc.auto=0 -c maintenance.auto=false` desde
+`init`/`clone` e em seus comandos Git. O clone também recebe essas configurações
+como opções locais antes de buscar/criar o checkout. Ambas ficam persistidas
+somente no repositório temporário, protegendo os subprocessos do classificador
+que invocam Git sem as opções da fixture. Nenhuma configuração global, do
+checkout de trabalho ou de produção é modificada.
+
+Duas regressões verificam com Git real, sem opções `-c`, os valores locais
+nos repositórios criados por init e clone. O cleanup continua obrigatório:
+não há retry permissivo, captura/supressão de `OSError`, espera arbitrária ou
+relaxamento das asserções. Repetições da suíte completa são registradas no
+checkpoint; esta alteração também requer reauditoria e não atualiza o pin.
+
+Validação local da correção de teardown: Git 2.52.0 / Python 3.12.14.
+Três repetições completas passaram em cada árvore: 31/31 testes por execução
+no #55 e 78/78 por execução na composição #55+#56+#57. A confirmação no
+Git 2.56 / Python 3.14 do runner permanece responsabilidade do novo ensaio CI.

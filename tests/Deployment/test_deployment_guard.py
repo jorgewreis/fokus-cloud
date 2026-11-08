@@ -18,6 +18,28 @@ guard = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(guard)
 
 
+# Prevent Git from leaving asynchronous maintenance writers behind when a
+# disposable repository is removed. Command options protect init/clone too;
+# repository-local settings protect subprocesses launched by the policy tests.
+FIXTURE_GIT_CONFIG = ('gc.auto=0', 'maintenance.auto=false')
+FIXTURE_GIT = ['git', *[item for setting in FIXTURE_GIT_CONFIG for item in ('-c', setting)]]
+
+
+def configure_disposable_git(root):
+    for setting in FIXTURE_GIT_CONFIG:
+        name, value = setting.split('=', 1)
+        subprocess.run([*FIXTURE_GIT, 'config', '--local', name, value],
+                       cwd=root, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+def assert_disposable_git_config(test, root):
+    # Deliberately use bare Git: child policy processes do not inherit -c options.
+    for setting in FIXTURE_GIT_CONFIG:
+        name, value = setting.split('=', 1)
+        actual = subprocess.check_output(['git', 'config', '--local', '--get', name], cwd=root)
+        test.assertEqual(actual.decode().strip(), value)
+
+
 class DeploymentGuard(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -25,6 +47,7 @@ class DeploymentGuard(unittest.TestCase):
         self.previous = Path.cwd()
         os.chdir(self.root)
         self.git('init', '-q')
+        configure_disposable_git(self.root)
         self.git('config', 'user.email', 'synthetic@example.invalid')
         self.git('config', 'user.name', 'Synthetic test')
         self.write('app/code.php', '<?php // synthetic')
@@ -33,13 +56,16 @@ class DeploymentGuard(unittest.TestCase):
         self.audit_patch = patch.object(guard, 'AUDIT_DIGEST', guard.audit_digest(self.base))
         self.audit_patch.start()
 
+    def test_disposable_repository_disables_background_maintenance(self):
+        assert_disposable_git_config(self, self.root)
+
     def tearDown(self):
         self.audit_patch.stop()
         os.chdir(self.previous)
         self.temp.cleanup()
 
     def git(self, *args):
-        return subprocess.check_output(['git', *args], stderr=subprocess.PIPE).decode().strip()
+        return subprocess.check_output([*FIXTURE_GIT, *args], stderr=subprocess.PIPE).decode().strip()
 
     def write(self, path, text='# Synthetic'):
         target = self.root / path
@@ -229,9 +255,12 @@ class AdoptionLifecycle(unittest.TestCase):
         self.root = Path(self.temp.name) / 'repo'
         self.previous = Path.cwd()
         self.fixture_tree = subprocess.check_output(['git', 'write-tree'], cwd=ROOT).decode().strip()
-        subprocess.run(['git', 'clone', '--shared', '--no-checkout', str(ROOT), str(self.root)],
+        subprocess.run([*FIXTURE_GIT, 'clone', '--shared', '--no-checkout',
+                        *[item for setting in FIXTURE_GIT_CONFIG for item in ('-c', setting)],
+                        str(ROOT), str(self.root)],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         os.chdir(self.root)
+        configure_disposable_git(self.root)
         self.git('config', 'user.email', 'synthetic@example.invalid')
         self.git('config', 'user.name', 'Synthetic adoption test')
         # Unit policy only: explicitly audit this temporary fixture. Never rewrite
@@ -242,12 +271,15 @@ class AdoptionLifecycle(unittest.TestCase):
         self.live_pin = self.policy.AUDIT_DIGEST
         self.policy.AUDIT_DIGEST = self.policy.audit_digest(self.fixture_tree)
 
+    def test_disposable_repository_disables_background_maintenance(self):
+        assert_disposable_git_config(self, self.root)
+
     def tearDown(self):
         os.chdir(self.previous)
         self.temp.cleanup()
 
     def git(self, *args):
-        return subprocess.check_output(['git', *args], stderr=subprocess.PIPE).decode().strip()
+        return subprocess.check_output([*FIXTURE_GIT, *args], stderr=subprocess.PIPE).decode().strip()
 
     def change(self, path, text):
         target = self.root / path
