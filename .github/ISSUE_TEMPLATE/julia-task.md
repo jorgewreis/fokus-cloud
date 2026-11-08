@@ -27,7 +27,7 @@ Use somente recursos nativos da assinatura, sem chamadas pagas de API de modelos
 
 ## Retomada
 
-Estado: pendente | em_execucao | bloqueada | pronta_para_revisao | integrada
+Estado e próxima ação: consultar a tarefa Linear vinculada.
 Branch/PR e commit-base:
 Critérios atendidos e pendentes:
 Comandos/resultados reais:
