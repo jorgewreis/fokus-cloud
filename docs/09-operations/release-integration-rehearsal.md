@@ -15,8 +15,8 @@ Componentes fixados nesta composição:
 | [#55](https://github.com/jorgewreis/fokus-cloud/pull/55) | Classificação conservadora de conhecimento | `71e31abb1ace466f9d3ee411580d1d3a8bcc583c` |
 | [#56](https://github.com/jorgewreis/fokus-cloud/pull/56) | Schema fail-closed | `8de6de496832684987302271af5112b82a5570ba` |
 | [#57](https://github.com/jorgewreis/fokus-cloud/pull/57) | Confiabilidade operacional | `a8cc9729181471c9f46ccb15d51383e1aceb61ab` |
-| [#58](https://github.com/jorgewreis/fokus-cloud/pull/58) | Contrato de workflow estrito | `ba305af40f3c67e6e2a73ecb6c326b40c0fb1517` |
-| [#59](https://github.com/jorgewreis/fokus-cloud/pull/59) | Identidade dinâmica Laravel | `ec058f77015ea67c6379af586b55a2fb2559550f` |
+| [#58](https://github.com/jorgewreis/fokus-cloud/pull/58) | Contrato de workflow estrito | `485fe638b5fd5ac97fd28675fc00f54882e002e4` |
+| [#59](https://github.com/jorgewreis/fokus-cloud/pull/59) | Identidade dinâmica Laravel | `f7523c36809665c4c375128473284cc10d5dacfa` |
 
 ## Resultados locais e validação real
 
@@ -46,8 +46,21 @@ O [schema composto](https://github.com/jorgewreis/fokus-cloud/actions/runs/42536
 concluiu 16 cenários em PHP/MySQL descartáveis: dois positivos com exit 0 e
 14 negativos com exit 1, marcadores completos de supervisor e harness presentes.
 Não repetiu o falso verde herdado. [Application quality](https://github.com/jorgewreis/fokus-cloud/actions/runs/42536012861)
-também concluiu success. O delta final após esse ensaio é apenas documental;
-os checks automáticos do SHA final são registrados no PR, sem presumir resultado.
+também concluiu success. Os checks automáticos do SHA final são registrados no PR,
+sem presumir resultado de uma árvore anterior.
+
+O CI também revelou corrida no descarte de uma fixture Git: as asserções funcionais
+passaram, mas manutenção assíncrona de commit-graphs escreveu durante o cleanup.
+O #58 desabilita manutenção automática somente nos repositórios descartáveis,
+desde init/clone, mantendo cleanup obrigatório e todas as asserções. Duas regressões
+adicionais verificam a configuração real. Três repetições locais passaram: 31/31
+no #55 e 78/78 na composição. A corrida específica do runner não foi reproduzida
+localmente; o CI final verifica novamente em Git/Python do runner.
+
+Revisão adicional alinhou o reconhecimento de REQUEST_URI no entrypoint e middleware
+do #59, incluindo barras externas. Isso impede que uma variante alcance o endpoint
+sem passar pela sanitização pré-bootstrap. Aliases implícitos de base URL não são
+parte do endpoint. A integração inclui falha de bootstrap com canário nessas variantes.
 
 O primeiro CI do endpoint detectou preparação incompleta do SQLite sintético e
 estilo Pint de `bootstrap/app.php`. Essas falhas foram corrigidas, não contornadas.

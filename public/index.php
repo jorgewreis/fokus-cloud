@@ -6,7 +6,10 @@ use Illuminate\Http\Request;
 
 define('LARAVEL_START', microtime(true));
 
-$isReleaseProbe = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) === '/_deployment/release';
+// Keep this origin-form request-target rule identical to DeploymentIdentity.
+// parse_url would interpret a leading // as an authority rather than a path.
+$requestPath = explode('?', $_SERVER['REQUEST_URI'] ?? '', 2)[0];
+$isReleaseProbe = trim($requestPath, '/') === '_deployment/release';
 if ($isReleaseProbe) {
     // Even pre-bootstrap failures must never expose debug HTML, paths or secrets.
     ini_set('display_errors', '0');

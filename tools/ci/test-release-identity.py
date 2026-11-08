@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[2]
 VERIFIER_COMMIT = 'a8cc9729181471c9f46ccb15d51383e1aceb61ab'
 VERIFIER_BLOB = '1a3275aa5619b1651a2d77d3e51c3d1d8b9c778d'
 NONCE = 'a' * 48
+PROBE_PATHS = ('/_deployment/release', '/_deployment/release/', '//_deployment/release', '///_deployment/release///')
 
 
 def verifier():
@@ -71,13 +72,14 @@ def server(root, env, opcache=False):
             process.wait(timeout=10)
 
 
-def response(base, query='?deploy_probe=' + NONCE):
+def response(base, query='?deploy_probe=' + NONCE, path='/_deployment/release'):
     try:
-        result = urllib.request.urlopen(base + '/_deployment/release' + query, timeout=6)
+        result = urllib.request.urlopen(base + path + query, timeout=6)
     except urllib.error.HTTPError as error:
         result = error
     with result:
         body = result.read()
+        assert b'DO_NOT_LEAK_SECRET' not in body
         assert 'no-store' in result.headers.get('Cache-Control', '')
         assert result.headers.get_content_type() == 'application/json'
         payload = json.loads(body)
@@ -85,8 +87,8 @@ def response(base, query='?deploy_probe=' + NONCE):
         return result.status, payload
 
 
-def unavailable(base):
-    status, body = response(base)
+def unavailable(base, path='/_deployment/release'):
+    status, body = response(base, path=path)
     assert status == 503, (status, body)
     assert body == dict(status='unavailable', release=None, probe=None)
 
@@ -161,7 +163,8 @@ def main():
                 module.verify(config, sleeper=lambda _: None, report=lambda _: None)
                 print('real_laravel_samples=3 cached=' + str(cached).lower() + ' elapsed_seconds=%.3f' % (time.monotonic() - started))
                 adversarial_samples(module, config)
-                assert response(base)[1] == dict(status='ok', release=sha, probe=NONCE)
+                for path in PROBE_PATHS:
+                    assert response(base, path=path)[1] == dict(status='ok', release=sha, probe=NONCE)
                 for query in ('', '?deploy_probe=secret', '?deploy_probe[]=secret', '?deploy_probe=' + 'A' * 48):
                     assert response(base, query) == (400, dict(status='invalid_probe', release=None, probe=None))
                 wrong = module.Configuration(base, config.release_url, 'f' * 40 if sha != 'f' * 40 else 'a' * 40, 'verify-only', '')
@@ -180,7 +183,10 @@ def main():
                             path.unlink()
                         else:
                             path.write_bytes(replacement)
-                        unavailable(base)
+                        # Every accepted path variant must share the pre-bootstrap
+                        # boundary, including APP_DEBUG exceptions containing a canary.
+                        for probe_path in PROBE_PATHS:
+                            unavailable(base, path=probe_path)
                     finally:
                         path.write_bytes(original)
                 path = root / '.release/identity.php'

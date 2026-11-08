@@ -12,7 +12,10 @@ final class DeploymentIdentity
 {
     public function handle(Request $request, Closure $next)
     {
-        if ($request->path() !== '_deployment/release') {
+        // Match the pre-bootstrap boundary in public/index.php exactly, including
+        // outer slashes, without Symfony base-URL or URL-parser reinterpretation.
+        $requestPath = explode('?', $request->server('REQUEST_URI', ''), 2)[0];
+        if (trim($requestPath, '/') !== '_deployment/release') {
             return $next($request);
         }
 
