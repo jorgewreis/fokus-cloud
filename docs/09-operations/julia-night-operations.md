@@ -20,8 +20,12 @@ continuar somente o trabalho independente acessível. Não simular testes ou dep
 | Julia — manutenção de madrugada | Diária, referência 03h em janela flexível | Inspecionar, corrigir, validar e conciliar documentação |
 | Julia — concluir pendências | A cada hora, no minuto 20 | Retomar entregas incompletas e acompanhar CI |
 
-Criação e habilitação confirmadas em 08/11/2026. A execução agendada ainda não foi
-validada; o retorno do agendador não informa detalhes do ambiente herdado.
+Criação e habilitação confirmadas em 08/11/2026. As primeiras tentativas das duas
+rotinas falharam com erro genérico do agendador. A rotina horária concluiu uma rodada
+em 08/11/2026, das 15h37 às 15h39 (America/Bahia), com acesso efetivo ao Linear e ao
+GitHub e checkpoints publicados. Essa evidência valida a execução horária, mas não
+substitui a validação independente da manutenção de madrugada nem comprova detalhes
+do ambiente herdado que o agendador não informa.
 O estado oficial das tarefas fica no [Linear — Fokus Cloud](https://linear.app/reis-developer/project/fokus-cloud-f279b0530261).
 A [issue GitHub #45](https://github.com/jorgewreis/fokus-cloud/issues/45) guarda links e evidências da configuração.
 A rotina de memória do Notion permanece independente e não foi alterada.

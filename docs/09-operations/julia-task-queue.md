@@ -40,5 +40,6 @@ e documentação. Se já houver execução ativa, acompanhar em vez de duplicar 
 - Publicar checkpoints no Linear, com links para commits/PRs/checks do GitHub.
 - Não atribuir a um usuário ou agente inexistente chamado Julia; o nome no título
   identifica o fluxo, não comprova delegação automática no Linear.
-- Os agendamentos são do ChatGPT e sua primeira execução ainda precisa ser comprovada.
+- Os agendamentos são do ChatGPT. A execução horária foi comprovada em 08/11/2026;
+  consultar a REI-9 para a evidência atual de cada rotina e das credenciais antigas.
 - Preservar a rotina independente de memória do Notion, que não foi alterada.
