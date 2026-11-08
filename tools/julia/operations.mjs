@@ -41,6 +41,16 @@ export function checkChanges(paths, task) {
     }
   }
 }
+export function requestedIssue(eventName, event, actor, owner, ref, manualIssue = '') {
+  if (actor !== owner || ref !== 'refs/heads/main') throw new Error('Execução restrita ao proprietário na main.');
+  if (eventName === 'workflow_dispatch') return manualIssue;
+  if (eventName !== 'issue_comment' || event.action !== 'created'
+    || event.comment?.body !== '/julia run' || event.issue?.pull_request
+    || !Number.isSafeInteger(event.issue?.number) || event.issue.number < 1) {
+    throw new Error('Comando de execução inválido.');
+  }
+  return String(event.issue.number);
+}
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 async function api(path, options = {}) {
   const token = process.env.GH_TOKEN;
@@ -71,10 +81,9 @@ async function authorized(issue) {
 }
 async function prepare() {
   const owner = process.env.GITHUB_REPOSITORY.split('/')[0];
-  if (process.env.GITHUB_ACTOR !== owner || process.env.GITHUB_REF !== 'refs/heads/main') {
-    throw new Error('Piloto manual: somente o proprietário, a partir da main.');
-  }
-  const requested = process.env.JULIA_ISSUE;
+  const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+  const requested = requestedIssue(process.env.GITHUB_EVENT_NAME, event, process.env.GITHUB_ACTOR,
+    owner, process.env.GITHUB_REF, process.env.JULIA_ISSUE);
   if (requested && !/^\d+$/.test(requested)) throw new Error('Número de issue inválido.');
   const issues = requested ? [await api(`issues/${requested}`)] : await pages('issues?state=open&sort=created&direction=asc');
   for (const issue of issues) {

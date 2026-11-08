@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { digest, contract, approved, safePath, checkChanges, bundle, publish } from '../../tools/julia/operations.mjs';
+import { digest, contract, approved, safePath, checkChanges, bundle, publish, requestedIssue } from '../../tools/julia/operations.mjs';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +9,18 @@ import { execFileSync } from 'node:child_process';
 const task = { product: 'cloud', allowedPaths: ['app/Services/', 'tests/Feature/'], acceptance: ['Isolar consultas por empresa'], dependencies: [] };
 const body = `Objetivo\n\n\`\`\`json\n${JSON.stringify(task)}\n\`\`\``;
 const comment = (id, text, login = 'jorgewreis') => ({ id, body: text, user: { login } });
+test('comando do proprietário seleciona somente a própria issue e recusa PR, terceiros e outros eventos', () => {
+  const event = { action: 'created', comment: { body: '/julia run' }, issue: { number: 39 } };
+  const call = (e = event, actor = 'jorgewreis', ref = 'refs/heads/main', type = 'issue_comment') => requestedIssue(type, e, actor, 'jorgewreis', ref, '7');
+  assert.equal(call(), '39');
+  assert.equal(call({}, 'jorgewreis', 'refs/heads/main', 'workflow_dispatch'), '7');
+  assert.throws(() => call(event, 'outsider'));
+  assert.throws(() => call(event, 'jorgewreis', 'refs/heads/other'));
+  assert.throws(() => call({ ...event, action: 'edited' }));
+  assert.throws(() => call({ ...event, issue: { number: 39, pull_request: {} } }));
+  assert.throws(() => call({ ...event, comment: { body: '/julia run 25' } }));
+  assert.throws(() => call(event, 'jorgewreis', 'refs/heads/main', 'push'));
+});
 test('autorizar somente o hash atual e a identidade do proprietário', () => {
   assert.equal(approved(body, [comment(1, `/julia approve ${digest(body)}`)], 'jorgewreis'), true);
   assert.equal(approved(body + ' editado', [comment(1, `/julia approve ${digest(body)}`)], 'jorgewreis'), false);
