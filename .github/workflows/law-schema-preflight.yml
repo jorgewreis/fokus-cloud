@@ -68,4 +68,10 @@ jobs:
           stage="$RUNNER_TEMP/law-schema-test"
           mkdir -p "$stage"
           cp proposed/deploy/prepublish-law-schema.php proposed/database/migrations/2026_10_30_160000_add_encrypted_details_to_law_contacts.php "$stage/"
-          php proposed/tests/Deployment/law-schema-preflight-test.php "$GITHUB_WORKSPACE/old-release" "$stage/prepublish-law-schema.php"
+          set -euo pipefail
+          status=0
+          php proposed/tests/Deployment/law-schema-preflight-test.php "$GITHUB_WORKSPACE/old-release" "$stage/prepublish-law-schema.php" > "$stage/result.log" 2>&1 || status=$?
+          cat "$stage/result.log"
+          echo "Harness exit status: $status"
+          test "$status" -eq 0
+          grep -Fxq 'Old-runtime upgrade, repeated run and both divergence guards passed.' "$stage/result.log"

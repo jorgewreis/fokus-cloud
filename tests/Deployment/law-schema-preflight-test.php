@@ -16,9 +16,12 @@ if (config('database.default') !== 'mysql' || config('database.connections.mysql
 $name = '2026_10_30_160000_add_encrypted_details_to_law_contacts';
 $schema = Illuminate\Support\Facades\Schema::getFacadeRoot();
 $db = Illuminate\Support\Facades\DB::getFacadeRoot();
-$run = static function (int $expected) use ($root, $script): void {
+$run = static function (string $case, int $expected) use ($root, $script): void {
     $process = new Symfony\Component\Process\Process([PHP_BINARY, $script, $root]);
     $process->run();
+    echo sprintf("Case %s: exit=%s expected=%d\n", $case, var_export($process->getExitCode(), true), $expected);
+    echo "stdout: " . $process->getOutput() . "\n";
+    echo "stderr: " . $process->getErrorOutput() . "\n";
     $ok = $process->getExitCode() === 0;
     if (!$ok && $expected !== 0 && !str_contains($process->getErrorOutput() . $process->getOutput(), 'Schema and migration ledger disagree')) {
         throw new RuntimeException('Failure was not the expected schema divergence guard.');
@@ -30,14 +33,14 @@ $run = static function (int $expected) use ($root, $script): void {
 if ($schema->hasColumn('law_contacts', 'sensitive_details_encrypted')) {
     throw new RuntimeException('The old release unexpectedly already contains the new column.');
 }
-$run(0); // Upgrade using the OLD release runtime.
+$run('old-runtime upgrade', 0); // Upgrade using the OLD release runtime.
 if (!$schema->hasColumn('law_contacts', 'sensitive_details_encrypted') || !$db->table('migrations')->where('migration', $name)->exists()) {
     throw new RuntimeException('Migration result missing.');
 }
-$run(0); // Repeat is harmless.
+$run('idempotent repeat', 0); // Repeat is harmless.
 $db->table('migrations')->where('migration', $name)->delete();
-$run(1); // Column exists, ledger missing: refuse.
+$run('column without ledger', 1); // Column exists, ledger missing: refuse.
 $db->table('migrations')->insert(['migration' => $name, 'batch' => 999]);
 $schema->table('law_contacts', static fn (Illuminate\Database\Schema\Blueprint $table) => $table->dropColumn('sensitive_details_encrypted'));
-$run(1); // Ledger exists, column missing: refuse.
+$run('ledger without column', 1); // Ledger exists, column missing: refuse.
 echo "Old-runtime upgrade, repeated run and both divergence guards passed.\n";
