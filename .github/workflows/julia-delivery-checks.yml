@@ -50,8 +50,7 @@ jobs:
           fi
           codex_bin="$(command -v codex)"
           sudo -u julia env HOME=/home/julia XDG_CONFIG_HOME=/home/julia/.config TMPDIR=/tmp \
-            "$codex_bin" sandbox linux --permission-profile :workspace --cd /home/julia/work \
-            -- node --test tests/Operations/julia-operations.test.mjs
+            /bin/bash -c 'cd /home/julia/work && exec "$1" sandbox linux --permission-profile :workspace -- node --test tests/Operations/julia-operations.test.mjs' _ "$codex_bin"
 
   operations:
     runs-on: ubuntu-latest
