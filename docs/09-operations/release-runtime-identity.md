@@ -26,7 +26,8 @@ minúsculo, nunca `.env`, header, parâmetro de request, ref ou arquivo SHA mut�
 O nonce é ecoado, não persistido. Entry point e middleware usam a mesma regra
 para o request-target: separam a query e removem somente barras externas. Assim,
 variantes com barras iniciais/finais repetidas recebem a mesma proteção pré-bootstrap.
-Não se usa `parse_url` para reinterpretar `//` como autoridade. `Cache-Control: no-store, private, max-age=0`, JSON,
+Não se usa `parse_url` para reinterpretar `//` como autoridade. O endpoint aceita
+somente request-target origin-form na raiz, sem aliases `index.php` ou subdiretório. `Cache-Control: no-store, private, max-age=0`, JSON,
 `Pragma: no-cache` e `X-Robots-Tag` são enviados também nas falhas. Nonce ausente,
 array, maiúsculo, inválido, parâmetros extras ou método diferente retornam 400 com
 `{"status":"invalid_probe","release":null,"probe":null}`. Identidade não confiável
@@ -59,7 +60,10 @@ o verificador rejeita respostas fora do contrato e nunca as registra.
    de arquivos, sem cache de resultado entre requests. SHA novo em diretório antigo,
    manifesto novo com captura antiga, arquivo alterado, cache adicionado ou arquivo
    removido falham fechados. Identificador isolado não basta.
-5. O endpoint **recusa OPcache ativo**. Não inferimos conteúdo de opcodes pela data
+5. O endpoint **recusa OPcache ativo e qualquer preload configurado/detectado**.
+   A recusa de preload ocorre também no entrypoint, antes de autoload e do guard:
+   classes já preloaded sobrevivem a `ini_set('opcache.enable', '0')`. Flags atuais
+   desabilitadas não tornam confiável um processo com preload. Não inferimos conteúdo de opcodes pela data
    ou hash no disco. FPM/apache convencionais sem OPcache e PHP built-in server de
    teste são os únicos HTTP SAPIs considerados. CLI HTTP persistente é recusado;
    Octane/RoadRunner/Swoole/preload/workers persistentes não são suportados. Não há
@@ -123,6 +127,7 @@ Não executar esses exemplos sobre releases ativos. Não há comando de ativaç�
 
 ```sh
 python3 tools/ci/test-prepare-release.py
+python3 tools/ci/test-preloaded-release.py
 php artisan test tests/Feature/Deployment tests/Unit/Deployment
 python3 tools/ci/test-release-identity.py
 ```
@@ -143,7 +148,9 @@ de Configuration; a CLI produtiva do verificador mantém HTTPS obrigatório.
 Casos: release correto/stale/ausente/inválido, nonce inválido, corrupção/remoção,
 alteração isolada do identificador, APP_DEBUG com tentativas de vazamento antes do
 bootstrap, arquivos/caches extras, caches config/routes reais, OPcache realmente
-habilitado recusado, conexão indisponível. Fault injection sobre respostas HTTP reais
+habilitado recusado, preload real em subprocesso PHP seguido de desativação
+em runtime (a classe continua carregada e deve ser recusada), recusa antes de
+carregar identidade/autoload nessa condição, conexão indisponível. Fault injection sobre respostas HTTP reais
 exercita replay de cache, instâncias inconsistentes, HTTP não 200, cache header e
 campos extras. São amostras sintéticas locais, não testes FPM reais nem evidência de
 produção/frota. O executor local usado na implementação não possui PHP/Composer;
