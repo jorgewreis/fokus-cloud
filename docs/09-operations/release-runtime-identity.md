@@ -109,7 +109,9 @@ Em checkout limpo com dependências já preparadas, e caminho de destino ainda i
 SHA=$(git rev-parse HEAD)
 ROOT=/caminho/offline/releases/$SHA
 python3 tools/ci/prepare-release.py prepare --source "$PWD" --root "$ROOT"
-# Opcional, com ambiente sintético/local correto, sem produzir writes em serviços:
+# Aquecer descoberta offline antes do selo (sem writes em serviços):
+(cd "$ROOT" && php artisan package:discover)
+# Opcional, com ambiente sintético/local correto:
 (cd "$ROOT" && php artisan config:cache && php artisan route:cache)
 python3 tools/ci/prepare-release.py seal --source "$PWD" --root "$ROOT"
 ```

@@ -53,6 +53,12 @@ class PreparationTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             MODULE.seal(self.source, self.root)
 
+    def test_untracked_application_code_cannot_claim_source_sha(self):
+        MODULE.prepare(self.source, self.root)
+        (self.root / 'app/injected.php').write_text('<?php // not in Git')
+        with self.assertRaises(ValueError):
+            MODULE.seal(self.source, self.root)
+
     def test_dirty_checkout_and_wrong_root_rejected(self):
         with self.assertRaises(ValueError):
             MODULE.prepare(self.source, Path(self.temp.name) / ('f' * 40))

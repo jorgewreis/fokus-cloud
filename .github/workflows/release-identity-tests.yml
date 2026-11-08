@@ -27,7 +27,10 @@ jobs:
       - name: Prepare test dependencies only
         run: |
           mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs
+          touch database/database.sqlite
+          cp .env.example .env
           composer install --no-interaction --prefer-dist
+          php artisan key:generate --force
       - name: Load pinned PR 57 verifier dependency
         run: git fetch --no-tags origin a8cc9729181471c9f46ccb15d51383e1aceb61ab
       - name: Offline preparation regression tests

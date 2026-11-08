@@ -143,12 +143,14 @@ def main():
     command('php', '-d', 'opcache.enable=1', '-d', 'opcache.enable_cli=1', '-r',
             'exit(function_exists("opcache_get_status") && opcache_get_status(false) !== false ? 0 : 1);')
     with tempfile.TemporaryDirectory(prefix='release-integration-') as temp:
-        root = Path(temp) / sha
-        command(sys.executable, 'tools/ci/prepare-release.py', 'prepare', '--source', str(ROOT), '--root', str(root))
-        with server(root, env) as base:
-            unavailable(base)
-        # Both cache modes are exercised by rebuilding a separate artifact each time.
+        # Both cache modes use a fresh artifact, never reseal an existing root.
         for cached in (False, True):
+            parent = Path(temp) / ('cached' if cached else 'uncached')
+            parent.mkdir()
+            root = parent / sha
+            command(sys.executable, 'tools/ci/prepare-release.py', 'prepare', '--source', str(ROOT), '--root', str(root))
+            with server(root, env) as base:
+                unavailable(base)
             if cached:
                 command('php', 'artisan', 'config:cache', cwd=root, env=env)
                 command('php', 'artisan', 'route:cache', cwd=root, env=env)
@@ -197,10 +199,6 @@ def main():
                     extra.unlink()
             with server(root, env, opcache=True) as base:
                 unavailable(base)
-            if not cached:
-                # Test teardown only; the production preparer never reseals artifacts.
-                import shutil
-                shutil.rmtree(root / '.release')
         # Real transport unavailability after the local server is stopped.
         rejected(module, config, 'transport_or_tls_error')
     print('release_identity_integration=passed')

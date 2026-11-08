@@ -1,5 +1,11 @@
 <?php
 
+use App\Http\Middleware\DeploymentIdentity;
+use App\Http\Middleware\EnsureLawPermission;
+use App\Http\Middleware\EnsureSupportSession;
+use App\Http\Middleware\ExpireIdleDatabaseSession;
+use App\Http\Middleware\SearchVisibility;
+use App\Http\Middleware\SecurityResponseHeaders;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -13,21 +19,20 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->prepend([\App\Http\Middleware\DeploymentIdentity::class, \App\Http\Middleware\SearchVisibility::class]);
-        $middleware->append(\App\Http\Middleware\SecurityResponseHeaders::class);
+        $middleware->prepend([DeploymentIdentity::class, SearchVisibility::class]);
+        $middleware->append(SecurityResponseHeaders::class);
         $middleware->web(append: [
-            \App\Http\Middleware\ExpireIdleDatabaseSession::class,
-            \App\Http\Middleware\EnsureSupportSession::class,
+            ExpireIdleDatabaseSession::class,
+            EnsureSupportSession::class,
         ]);
         $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : '/?acesso=cliente');
-        $middleware->alias(['law.permission' => \App\Http\Middleware\EnsureLawPermission::class]);
+        $middleware->alias(['law.permission' => EnsureLawPermission::class]);
         // The API shares Laravel's encrypted, HttpOnly session cookie. Webhooks
         // are authenticated by their provider signature, not by a browser CSRF token.
         $middleware->validateCsrfTokens(except: ['api/webhooks/mercado-pago', 'api/integrations/usage']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->render(fn (AuthenticationException $exception, Request $request) =>
-            $request->is('api/*') ? response()->json(['message' => 'Unauthenticated.'], 401) : null
+        $exceptions->render(fn (AuthenticationException $exception, Request $request) => $request->is('api/*') ? response()->json(['message' => 'Unauthenticated.'], 401) : null
         );
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
