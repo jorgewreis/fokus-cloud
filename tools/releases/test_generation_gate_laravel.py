@@ -116,7 +116,7 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
         logpath=temp/'php-http.log'
         offset=logpath.stat().st_size if logpath.exists() else 0
         with logpath.open('ab') as log:
-            server=subprocess.Popen([php,'-d','opcache.enable=0','-d','opcache.enable_cli=0','-S',f'127.0.0.1:{port}','-t',str(served/'public')],cwd=served,env={**env,'APP_DEBUG':'true'},stdout=log,stderr=log)
+            server=subprocess.Popen([php,'-d','opcache.enable=0','-d','opcache.enable_cli=0','-S',f'127.0.0.1:{port}','-t',str(served/'public')],cwd=served,env={**env,'APP_DEBUG':'false'},stdout=log,stderr=log)
             try:
                 time.sleep(.5)
                 def fetch(url,timeout):

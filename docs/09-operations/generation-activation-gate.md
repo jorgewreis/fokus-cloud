@@ -117,3 +117,21 @@ record after the completed schedule's full traversal. Missing or duplicated
 lifecycle evidence blocks handoff, even with successful local tasks. The real
 fixture also runs a negative `APP_ENV=testing` case: suppressed lifecycle must
 fail with `scheduler_lifecycle_unproven`, never produce a ready proof.
+
+### HTTP transport parity
+
+The loopback adapter sends the exact verifier's `Accept: application/json`,
+`Cache-Control: no-cache, no-store` and user-agent headers. Earlier adapter requests
+omitted them and reached Laravel's HTML health-response branch, failing with HTTP
+500. The internal HTML exception was not established and is not claimed here.
+Laravel's versioned
+[ApplicationBuilder](https://github.com/laravel/framework/blob/v13.24.0/src/Illuminate/Foundation/Configuration/ApplicationBuilder.php)
+selects JSON via `expectsJson()` and otherwise renders a Blade health page.
+
+[Run 42632145544](https://github.com/jorgewreis/fokus-cloud/actions/runs/42632145544)
+passed the full composition at head `9c5ee887197591b640b13dd523e71c91c82b7177`,
+including exact `active_release_mismatch`, persistent recovery state, healthy
+manual acknowledgement and explicit code-only rollback. That diagnostic run used
+`APP_DEBUG=true`; the final fixture explicitly uses `APP_DEBUG=false` and must be
+revalidated at its final head. Health failures remain fatal. No result is inferred
+for production or the untested HTML health branch.
