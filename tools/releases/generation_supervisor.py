@@ -83,7 +83,7 @@ def event_result(path, run_id, release, identity=None):
     require(all(code==0 for code in ends.values()),'scheduled_event_failed')
     return len(starts)
 
-def supervise(base,root,command,events,timeout=120,env=None,uid=None,gid=None,slot=None,validate=None):
+def supervise(base,root,command,events,timeout=120,env=None,uid=None,gid=None,slot=None,validate=None,complete=None):
     """Core used by tests and authorized adapter; caller must bind receipt/policy first.
     Never use this function alone as a production authorization or artifact verifier.
     """
@@ -97,6 +97,9 @@ def supervise(base,root,command,events,timeout=120,env=None,uid=None,gid=None,sl
     subreaper()
     with lock(base/'scheduler.lock'):
         latch=base/'activation-blocked.json'
+        ready=base/'scheduler-ready.json'
+        if ready.exists():
+            control(ready);os.rename(ready,base/('invalidated-handoff-'+uuid.uuid4().hex+'.json'));sync(base)
         require(not latch.exists(),'manual_recovery_required')
         if validate is not None:validate()
         require((base/'current').resolve()==root,'generation_changed')
@@ -134,7 +137,8 @@ def supervise(base,root,command,events,timeout=120,env=None,uid=None,gid=None,sl
             count=event_result(events,run_id,root.name,identity)
             if validate is not None:validate()
             require((base/'current').resolve()==root,'generation_changed')
-            state.update(state='drained_verified',events=count);record(journal,state)
+            state.update(state='drained_verified',events=count,event_identity=list(identity));record(journal,state)
+            if complete is not None:complete(state, journal, events)
             latch.unlink();sync(base)
             return state
         except BaseException:
@@ -161,6 +165,7 @@ def cli():
     parser.add_argument('--base',required=True);parser.add_argument('--root',required=True)
     parser.add_argument('--events',required=True);parser.add_argument('--policy',required=True)
     parser.add_argument('--receipt',required=True);parser.add_argument('--immutable-contract',required=True)
+    parser.add_argument('--handoff-boundary')
     args=parser.parse_args()
     # Production adapter requires reviewed #61 code and all its evidence gates.
     contract_path=Path(args.immutable_contract);code=contract_path.read_bytes()
@@ -183,7 +188,11 @@ def cli():
             require(stat.S_ISDIR(st.st_mode) and st.st_uid in (0,os.geteuid()) and (not st.st_mode & 0o022 or (st.st_uid==0 and st.st_mode & stat.S_ISVTX)), 'events_parent_mutable')
         require(events.stat().st_uid==p['runtime_uid'] and events.stat().st_mode & 0o777==0o600,'event_log_owner')
     php=Path(p['php_binary']).resolve();events=Path(args.events).absolute()
-    supervise(base,root,[str(php),str(root/'artisan'),'schedule:run'],events,p.get('timeout_seconds',120),{'PATH':'/usr/bin:/bin','LC_ALL':'C'},p['runtime_uid'],p['runtime_gid'],validate=validate)
+    complete=None
+    if args.handoff_boundary:
+        import generation_activation as gate
+        complete=gate.completion(c,base,root,receipt,args.handoff_boundary)
+    supervise(base,root,[str(php),str(root/'artisan'),'schedule:run'],events,p.get('timeout_seconds',120),{'PATH':'/usr/bin:/bin','LC_ALL':'C'},p['runtime_uid'],p['runtime_gid'],validate=validate,complete=complete)
 
 CONTRACT_DIGEST='0d1a6c1d833d1aa262763c784e17d32464ac7a83c8a6f3fb64a63c4d14489c52'
 if __name__=='__main__':
