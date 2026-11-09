@@ -1,5 +1,10 @@
 name: Temporary production approval negative test
-on: workflow_dispatch
+on:
+  push:
+    branches:
+      - codex/rei20-environment-negative-test-20261109
+    paths:
+      - .github/workflows/rei20-environment-negative-test.yml
 permissions:
   contents: read
 jobs:
