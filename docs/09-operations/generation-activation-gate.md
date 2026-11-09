@@ -68,7 +68,7 @@ needed for any later activation.
 
 ## Tests and evidence boundaries
 
-- 23 local process/state-machine gate regressions plus 20 original supervisor tests.
+- 26 local process/state-machine gate regressions plus 21 supervisor tests.
   Local gate fixtures stub artifact/runtime HTTP contracts and are not real runtime
   evidence. Cases include active descendants, double-fork, expiry, node/receipt/code
   mismatch, slots, overlap, failed later run, external unknown, concurrent locks,

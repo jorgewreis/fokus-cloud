@@ -116,12 +116,35 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
         logpath=temp/'php-http.log'
         offset=logpath.stat().st_size if logpath.exists() else 0
         with logpath.open('ab') as log:
-            server=subprocess.Popen([php,'-d','opcache.enable=0','-d','opcache.enable_cli=0','-S',f'127.0.0.1:{port}','-t',str(served/'public')],cwd=served,env=env,stdout=log,stderr=log)
+            server=subprocess.Popen([php,'-d','opcache.enable=0','-d','opcache.enable_cli=0','-S',f'127.0.0.1:{port}','-t',str(served/'public')],cwd=served,env={**env,'APP_DEBUG':'true'},stdout=log,stderr=log)
             try:
                 time.sleep(.5)
                 def fetch(url,timeout):
                     parsed=urllib.parse.urlsplit(url);url=f'http://127.0.0.1:{port}'+parsed.path+('?' + parsed.query if parsed.query else '')
-                    with urllib.request.urlopen(url,timeout=timeout) as response:return response.status,{k.lower():v for k,v in response.headers.items()},response.read(4097)
+                    request=urllib.request.Request(url,headers={'Accept':'application/json','Cache-Control':'no-cache, no-store','User-Agent':'Fokus-Deployment-Verification/1'})
+                    try:
+                        with urllib.request.urlopen(request,timeout=timeout) as response:return response.status,{k.lower():v for k,v in response.headers.items()},response.read(4097)
+                    except urllib.error.HTTPError as error:
+                        body=error.read(1024*1024)
+                        try:failure=json.loads(body)
+                        except (ValueError,UnicodeError):
+                            # Laravel puts these scalar fields before trace; truncated trace
+                            # must not hide the cause, and is never printed or parsed as evidence.
+                            failure={};prefix=body.decode('utf-8','replace')
+                            for field in ('message','exception'):
+                                match=re.search(r'(?:^\s*\{|,)\s*"'+field+r'"\s*:',prefix)
+                                if match:
+                                    try:value,_=json.JSONDecoder().raw_decode(prefix[match.end():].lstrip())
+                                    except ValueError:continue
+                                    if isinstance(value,str):failure[field]=value
+                        kind=failure.get('exception','') if isinstance(failure,dict) else ''
+                        message=failure.get('message','') if isinstance(failure,dict) else ''
+                        kind=kind if isinstance(kind,str) and re.fullmatch(r'[A-Za-z_\\][A-Za-z_0-9\\]{0,200}',kind) else 'unclassified'
+                        safe=re.sub(r"[\"'][^\"']*[\"']", '<quoted>',str(message))
+                        safe=re.sub(r'(?:https?://|/)[^\s)]+','<location>',safe)
+                        safe=re.sub(r'\b[0-9a-f]{24,}\b','<identifier>',safe)
+                        print(json.dumps({'synthetic_http_status':error.code,'exception_class':kind,'message':safe[:500]}),flush=True)
+                        raise
                 cfg=vp['configuration'](c.verifier_environment(p,target.name));vp['verify'](cfg,fetcher=fetch)
             except BaseException:
                 log.flush()
