@@ -90,3 +90,17 @@ isolada verificável e parcial para revisão; produção e a integração FEKS c
 pendentes de requisitos reais e autorizações próprias.
 
 A separação do scheduler exige UID/GID de runtime diferente do controlador e troca explícita de principal, sem fallback. O teste de sucesso injeta um lançador sintético; troca real de UID e acesso Laravel continuam não comprovados neste executor.
+
+## Revisão da falha remota e recuperação (09/11/2026)
+
+A execução [42602762301](https://github.com/jorgewreis/fokus-cloud/actions/runs/42602762301/job/129111004118), head 16efd7d5, reprovou 1/46 testes. Os logs completos confirmam a linha `next(glob('activation-*.json'))`: o padrão inclui o latch `activation-blocked.json`, cujo estado conservador é `switch_intent`, e o journal UUID com `activation_unverified_manual_recovery_required`. Ordem de diretório não é contrato. A reprodução força o latch como primeiro resultado e demonstra a antiga asserção incorreta; nenhuma transição de sucesso ou rollback automático ocorreu.
+
+Correção: selecionar exatamente o journal com 32 dígitos hexadecimais, conferir seu estado e o latch separadamente. Preservados release anterior e bloqueio de scheduler/novas ativações. Adicionado fsync do diretório após troca de current e remoção de latch para explicitar durabilidade desses pontos.
+
+A revisão executou **54 testes**, incluindo subprocesso real com timeout e quatro filhos que encerram abruptamente com os._exit após latch, journal, troca ou journal verificado. Journal truncado mantém bloqueio; retomada exige política explícita compatível. São testes de interrupção de processo/filesystem, não simulação de queda elétrica nem ensaio PHP/FPM.
+
+Build real repetido: 393 arquivos public/config idênticos; empacotador recusa a árvore suja. A causa é cache-busting que reescreve cinco HTML canônicos, não aleatoriedade observada. Manifesto Law e 14 assets validados; rsync ausente, essa parte não executada. Solução afeta contrato de build/identidade e fica separada na [proposta REI-25](immutable-release-build-dependency.md), sem ampliar allowlist.
+
+O background Law permanece intacto e bloqueado. A [proposta REI-26](immutable-release-scheduler-dependency.md) define supervisão por geração e resultados individuais; não confunde saída do pai com drenagem/sucesso de filhos. Nenhum suporte cgroup na VPS é alegado.
+
+Resultado de CI remoto do novo head deve ser consultado no PR/Linear, não inferido pelos testes locais.

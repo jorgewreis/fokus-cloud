@@ -336,17 +336,21 @@ def run_verifier(p, root):
     require(result.returncode == 0, 'post_activation_verification_failed')
 
 
+def sync_directory(directory):
+    fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
 def durable_json(path, value):
     temporary = path.with_name('.record-' + uuid.uuid4().hex)
     fd = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, 'wb') as out:
         out.write(encoded(value)); out.flush(); os.fsync(out.fileno())
     os.replace(temporary, path)
-    fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
-    try:
-        os.fsync(fd)
-    finally:
-        os.close(fd)
+    sync_directory(path.parent)
 
 
 def activate(base, candidate, receipt, policy_file, expected_previous, rollback=False):
@@ -371,6 +375,7 @@ def activate(base, candidate, receipt, policy_file, expected_previous, rollback=
             temporary.symlink_to(candidate)
             require(p['expires_at_epoch'] >= __import__('time').time(), 'evidence_expired')
             os.replace(temporary, base / 'current')
+            sync_directory(base)  # Persist the pointer before observing the new release.
             try:
                 run_verifier(p, candidate)
                 verify(candidate, receipt)
@@ -381,6 +386,7 @@ def activate(base, candidate, receipt, policy_file, expected_previous, rollback=
                 raise
             durable_json(journal, {'state': 'verified', 'candidate': str(candidate), 'previous': str(expected_previous)})
             latch.unlink()
+            sync_directory(base)
     return {'state': 'verified', 'release': candidate.name, 'code_rollback': rollback}
 
 
@@ -437,6 +443,7 @@ def schedule(base, php, receipt_directory, evidence_directory, timeout=3600):
             require(result.returncode == 0, 'scheduler_failed')
             durable_json(base / 'scheduler-last-result.json', {'state': 'finished', 'root': str(root)})
             latch.unlink()
+            sync_directory(base)
         except Exception:
             durable_json(base / 'activation-blocked.json', {'state': 'scheduler_failure_runtime_review_required', 'root': str(root)})
             raise

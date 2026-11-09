@@ -6,6 +6,7 @@ import io
 import json
 import os
 import pwd
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -198,8 +199,89 @@ class ImmutableTests(unittest.TestCase):
         receipt, old, policy = self.activation_fixture(7)
         with self.assertRaisesRegex(m.Refusal, 'post_activation_verification_failed'): m.activate(self.base, self.root, receipt, policy, old)
         self.assertEqual((self.base / 'current').resolve(), self.root)
-        self.assertIn('manual_recovery_required', next(self.base.glob('activation-*.json')).read_text())
+        journals = self.activation_journals()
+        self.assertEqual(len(journals), 1)
+        self.assertEqual(json.loads(journals[0].read_text())['state'], 'activation_unverified_manual_recovery_required')
+        self.assertEqual(json.loads((self.base / 'activation-blocked.json').read_text())['state'], 'switch_intent')
         self.assertTrue(old.exists())
+
+    def activation_journals(self):
+        # The blocker is deliberately NOT an operation journal. Never depend on readdir order.
+        return [p for p in self.base.iterdir() if re.fullmatch(r'activation-[0-9a-f]{32}\.json', p.name)]
+
+    def test_old_glob_can_select_blocker_before_failure_journal(self):
+        receipt, old, policy = self.activation_fixture(7)
+        with self.assertRaises(m.Refusal): m.activate(self.base, self.root, receipt, policy, old)
+        entries = sorted(self.base.glob('activation-*.json'), key=lambda p: p.name != 'activation-blocked.json')
+        self.assertEqual(entries[0].name, 'activation-blocked.json')
+        self.assertNotIn('manual_recovery_required', entries[0].read_text())
+        self.assertIn('manual_recovery_required', self.activation_journals()[0].read_text())
+
+    def interrupted_activation(self, stage):
+        receipt, old, policy = self.activation_fixture()
+        child = os.fork()
+        if child == 0:
+            original_write, original_replace = m.durable_json, m.os.replace
+            def write(path, value):
+                original_write(path, value)
+                if ((stage == 'latch' and path.name == 'activation-blocked.json')
+                    or (stage == 'journal' and re.fullmatch(r'activation-[0-9a-f]{32}\.json', path.name))
+                    or (stage == 'verified' and value['state'] == 'verified')):
+                    os._exit(87)  # Real abrupt process exit: no exception cleanup/finally.
+            def replace(src, dst):
+                original_replace(src, dst)
+                if stage == 'switched' and Path(dst).name == 'current': os._exit(87)
+            m.durable_json, m.os.replace = write, replace
+            try: m.activate(self.base, self.root, receipt, policy, old)
+            except BaseException: os._exit(88)
+            os._exit(89)
+        _, status = os.waitpid(child, 0)
+        self.assertEqual(os.waitstatus_to_exitcode(status), 87)
+        self.assertTrue(old.exists())
+        self.assertTrue((self.base / 'activation-blocked.json').exists())
+        self.assertEqual((self.base / 'current').resolve(), self.root if stage in ('switched', 'verified') else old)
+        with self.assertRaisesRegex(m.Refusal, 'activation_recovery_required'):
+            m.activate(self.base, self.root, receipt, policy, old)
+        return receipt, old, policy
+
+    def test_interruption_after_latch_before_journal(self):
+        self.interrupted_activation('latch')
+        self.assertEqual(self.activation_journals(), [])
+
+    def test_interruption_after_journal_before_switch(self):
+        self.interrupted_activation('journal')
+        self.assertEqual(json.loads(self.activation_journals()[0].read_text())['state'], 'switch_intent')
+
+    def test_interruption_after_switch_before_verification(self):
+        self.interrupted_activation('switched')
+        self.assertEqual(json.loads(self.activation_journals()[0].read_text())['state'], 'switch_intent')
+
+    def test_interruption_after_verified_journal_still_requires_recovery(self):
+        self.interrupted_activation('verified')
+        self.assertEqual(json.loads(self.activation_journals()[0].read_text())['state'], 'verified')
+
+    def test_incomplete_journal_does_not_clear_blocker(self):
+        receipt, old, policy = self.interrupted_activation('journal')
+        self.activation_journals()[0].write_text('{')
+        with self.assertRaisesRegex(m.Refusal, 'activation_recovery_required'):
+            m.activate(self.base, self.root, receipt, policy, old)
+        self.assertTrue(old.exists())
+
+    def test_manual_guarded_resumption_after_pre_switch_interruption(self):
+        receipt, old, policy = self.interrupted_activation('journal')
+        data = json.loads(policy.read_text()); data.update(rollback_code_compatible=True, data_restore_required=False)
+        policy.write_bytes(m.encoded(data))
+        self.assertTrue(m.activate(self.base, self.root, receipt, policy, old, rollback=True)['code_rollback'])
+        self.assertFalse((self.base / 'activation-blocked.json').exists())
+        self.assertTrue(old.exists())
+
+    def test_scheduler_actual_timeout_is_not_success(self):
+        self.prepared(); self.fixture_receipt(self.root); (self.base / 'current').symlink_to(self.root)
+        exe = self.base / 'fake-php'; exe.write_text('#!/bin/sh\nexec sleep 3\n'); exe.chmod(0o755)
+        with self.assertRaises(subprocess.TimeoutExpired):
+            m.schedule(self.base, exe, self.base / 'receipts', self.scheduler_evidence(exe), timeout=0.03)
+        self.assertEqual(json.loads((self.base / 'activation-blocked.json').read_text())['state'], 'scheduler_failure_runtime_review_required')
+        self.assertFalse((self.base / 'scheduler-last-result.json').exists())
 
     def test_null_runtime_blocks_before_switch(self):
         receipt, old, policy = self.activation_fixture()

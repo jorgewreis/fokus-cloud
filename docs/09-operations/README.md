@@ -26,3 +26,6 @@ Atualize esta pasta quando mudar ambiente, servidor, pipeline, deploy, comandos 
 
 - [Primitivas de releases imutáveis](immutable-release-tooling.md)
 - [Evidências e bloqueios da validação isolada](immutable-release-validation.md)
+
+- [Dependência de build e proveniência B+C](immutable-release-build-dependency.md)
+- [Dependência de scheduler por geração](immutable-release-scheduler-dependency.md)
