@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """REI-25 offline build/provenance. Never deploys or modifies the source checkout."""
-import argparse, hashlib, importlib.util, io, json, os, re, shutil, subprocess, sys, tarfile, tempfile
+import argparse, hashlib, importlib.util, io, json, os, re, shutil, stat, subprocess, sys, tarfile, tempfile
 from pathlib import Path
 
 CONTRACT61 = 'a4fab9f4a4bca022acaf60809f28c7af7a164f5d'
@@ -54,6 +54,8 @@ def inventory(root):
     result = {}
     for p in sorted(root.rglob('*')):
         require(not p.is_symlink(), 'artifact_symlink')
+        require(p.is_dir() or stat.S_ISREG(p.lstat().st_mode), 'artifact_special_file')
+        require(not p.stat().st_mode & 0o7000, 'artifact_special_mode')
         if p.is_file():
             require(p.stat().st_nlink == 1, 'artifact_hardlink')
             result[p.relative_to(root).as_posix()] = {'sha256': sha(p.read_bytes()), 'size': p.stat().st_size, 'executable': bool(p.stat().st_mode & 0o111)}
@@ -187,10 +189,12 @@ def seal(source, candidate, evidence, root, receipt, transport):
     identity={'release':root.name,'root':str(root),'manifest':sha(manifest)}
     staging=root/'.release-pending';staging.mkdir();(staging/'verify.lock').touch();(staging/'manifest.json').write_bytes(manifest)
     literals=', '.join("'%s' => '%s'"%(k,v.replace('\\','\\\\').replace("'","\\'")) for k,v in identity.items())
-    (staging/'identity.php').write_text('<?php\n\nreturn ['+literals+'];\n');staging.rename(root/'.release')
+    identity_bytes=('<?php\n\nreturn ['+literals+'];\n').encode()
+    (staging/'identity.php').write_bytes(identity_bytes);staging.rename(root/'.release')
     c.protect(root)
     final=c.files(root)
-    require({n:e for n,e in final.items() if not n.startswith('.release/')}==expected,'release_changed_during_seal')
+    expected_final={**expected,**{'.release/'+n:{'sha256':sha(b),'size':len(b),'executable':False} for n,b in {'verify.lock':b'','manifest.json':manifest,'identity.php':identity_bytes}.items()}}
+    require(final==expected_final,'release_changed_during_seal')
     require(source_snapshot(source)[0]==proof['source_sha'],'source_changed_during_seal')
     receipt.write_bytes(encoded({'schema':c.SCHEMA,'root':str(root),'source_sha':root.name,'artifact_sha256':transport['artifact_sha256'],'files':final,'links':{}}));receipt.chmod(0o400)
     c.verify(root,receipt)

@@ -59,6 +59,12 @@ class RealBuildTests(unittest.TestCase):
         clone=Path(self.tmp.name)/'source';subprocess.run(['git','clone','--quiet','--no-hardlinks',str(SOURCE),str(clone)],check=True)
         (clone/'package.json').write_text('{}')
         with self.assertRaisesRegex(ValueError,'dirty_source'):d.source_snapshot(clone)
+    def test_tracked_private_content_rejected(self):
+        clone=Path(self.tmp.name)/'source';subprocess.run(['git','clone','--quiet','--no-hardlinks',str(SOURCE),str(clone)],check=True)
+        (clone/'.env').write_text('SYNTHETIC_SECRET=not-real')
+        subprocess.run(['git','-C',str(clone),'add','-f','.env'],check=True)
+        subprocess.run(['git','-C',str(clone),'-c','user.name=Test','-c','user.email=test@example.invalid','commit','-qm','synthetic private fixture'],check=True)
+        with self.assertRaisesRegex(ValueError,'private_or_mutable_source'):d.source_snapshot(clone)
     def test_incomplete_package_rejected(self):
         (self.candidate/'public/build/manifest.json').unlink()
         # Exercise the pre-packaging integrity gate with real-build authority; CLI also independently rebuilds.
