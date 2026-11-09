@@ -10,7 +10,7 @@ BOUNDARIES=('all_scheduler_entrypoints_controlled','external_workers_absent_veri
 def digest(path): return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 def source_binding(): return digest(Path(g.__file__)) + ':' + digest(Path(__file__))
 def strict_events(path):
-    g.require(all(json.loads(line).get('state')!='skipped' for line in Path(path).read_bytes().splitlines()),'overlap_work_unproven')
+    g.require(all(json.loads(line).get('state') not in ('skipped','scope_unverified') for line in Path(path).read_bytes().splitlines()),'overlap_work_unproven')
 def boot(): return Path('/proc/sys/kernel/random/boot_id').read_text().strip()
 def protected(path,directory=False):
     path=Path(path).absolute();g.require(path==path.resolve(),'control_symlink')

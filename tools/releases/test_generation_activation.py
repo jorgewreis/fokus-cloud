@@ -42,6 +42,11 @@ class Gate(unittest.TestCase):
         self.assertEqual((self.base/'current').resolve(),self.root)
     def alter(self,path,**fields):
         p=json.loads(path.read_text());p.update(fields);path.write_text(json.dumps(p))
+    def test_distributed_scope_after_local_completion_blocks_handoff(self):
+        code=os.waitstatus_to_exitcode(os.waitpid(self.runjob("emit('start');emit('finish');emit('scope_unverified')"),0)[1])
+        self.assertEqual(code,1)
+        self.assertFalse((self.base/'scheduler-ready.json').exists())
+        self.assertEqual((self.base/'current').resolve(),self.root)
     def test_success_and_duplicate(self):
         self.ready();self.assertEqual(self.activate()['state'],'verified')
         with self.assertRaises(Exception):self.activate()

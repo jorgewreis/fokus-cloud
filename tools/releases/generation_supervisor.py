@@ -70,6 +70,7 @@ def event_result(path, run_id, release, identity=None):
         require(state!='queue_failure','queue_job_failed')
         if state=='ready':ready=True;continue
         require(isinstance(key,str) and re.fullmatch('[0-9a-f]{64}',key),'invalid_event')
+        if state=='scope_unverified':continue  # Local completion is not distributed drainage.
         if state=='skipped':
             require(key not in starts,'skip_after_start');continue
         if state=='start':

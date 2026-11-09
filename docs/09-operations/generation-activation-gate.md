@@ -21,7 +21,7 @@ It expires within 120 seconds, also measured by same-boot monotonic time. Every 
 scheduler attempt invalidates the previous proof before validation or launch.
 Laravel withoutOverlapping installs a rejection filter; its first skip dispatches
 ScheduledTaskSkipped before Starting/Finished. Both this path and the later mutex
-race are recorded. Distributed onOneServer schedules conservatively emit a skip
+race are recorded. Distributed onOneServer schedules conservatively emit a scope_unverified record at CommandFinished, after console route registration,
 because Laravel's cross-server skip has no terminal event. Any skipped task cannot qualify: its mutex does not establish that prior
 or external work terminated. Ordinary scheduler execution still permits a valid skip.
 

@@ -58,7 +58,7 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
             code=os.waitstatus_to_exitcode(os.waitpid(pid,0)[1])
         if mode in ('overlap-skip','filter-skip','distributed'):
             rows=[json.loads(line) for line in events.read_text().splitlines()]
-            skipped=[row['event'] for row in rows if row['state']=='skipped']
+            skipped=[row['event'] for row in rows if row['state']==('scope_unverified' if mode=='distributed' else 'skipped')]
             assert skipped, 'real Laravel overlap skip event was not observed'
             if mode!='distributed':assert not any(row.get('event') in skipped and row['state'] in ('start','finish') for row in rows), 'filtered task unexpectedly executed'
             assert not (base/'scheduler-ready.json').exists(), 'skip qualified for activation'

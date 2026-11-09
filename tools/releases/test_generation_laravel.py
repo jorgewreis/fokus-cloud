@@ -53,7 +53,7 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
             code=os.waitstatus_to_exitcode(os.waitpid(pid,0)[1])
         if mode in ('overlap-skip','filter-skip','distributed'):
             rows=[json.loads(line) for line in events.read_text().splitlines()]
-            assert any(row['state']=='skipped' for row in rows), 'real Laravel skip missing'
+            assert any(row['state']==('scope_unverified' if mode=='distributed' else 'skipped') for row in rows), 'real Laravel skip missing'
         assert code==expect,(mode,code,(temp/('error-'+mode)).read_text() if code else '')
         assert (base/'current').resolve()==root
         assert not [path for path in base.glob('activation-*.json') if path.name!='activation-blocked.json']

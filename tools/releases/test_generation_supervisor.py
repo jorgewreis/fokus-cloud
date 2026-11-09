@@ -20,6 +20,8 @@ class Processes(unittest.TestCase):
             os._exit(0)
         return pid
     def wait(self,pid): return os.waitstatus_to_exitcode(os.waitpid(pid,0)[1])
+    def test_distributed_scope_is_not_a_local_failure(self):
+        self.assertEqual(self.wait(self.child("emit('start');emit('finish');emit('scope_unverified')")),0)
     def test_normal(self):self.assertEqual(self.wait(self.child("emit('start');emit('finish')")),0)
     def test_background_drain_and_activation_lock(self):
         pid=self.child("emit('start')\nif os.fork()==0:\n time.sleep(.2);emit('finish');os._exit(0)\nos._exit(0)")

@@ -2,7 +2,7 @@
 
 namespace App\Providers;
 
-use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Console\Events\ScheduledBackgroundTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
@@ -68,12 +68,13 @@ class GenerationScheduleProvider extends ServiceProvider
         $write('ready');
         // withoutOverlapping's filter skips before Starting/Finished are emitted.
         Event::listen(ScheduledTaskSkipped::class, static fn ($event) => $write('skipped', $event->task));
-        Event::listen(CommandStarting::class, static function ($event) use ($write): void {
+        Event::listen(CommandFinished::class, static function ($event) use ($write): void {
             if ($event->command === 'schedule:run') {
                 foreach (app(Schedule::class)->events() as $task) {
-                    // Cross-server skips have no terminal event in Laravel.
+                    // The completed command sees the final schedule after console routes load.
+                    // Cross-server skips have no task terminal event in Laravel.
                     if ($task->onOneServer) {
-                        $write('skipped', $task);
+                        $write('scope_unverified', $task);
                     }
                 }
             }
