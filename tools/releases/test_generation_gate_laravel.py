@@ -123,7 +123,7 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
                     parsed=urllib.parse.urlsplit(url);url=f'http://127.0.0.1:{port}'+parsed.path+('?' + parsed.query if parsed.query else '')
                     request=urllib.request.Request(url,headers={'Accept':'application/json','Cache-Control':'no-cache, no-store','User-Agent':'Fokus-Deployment-Verification/1'})
                     try:
-                        with urllib.request.urlopen(request,timeout=timeout) as response:return response.status,{k.lower():v for k,v in response.headers.items()},response.read(4097)
+                        with urllib.request.build_opener(vp['NoRedirect']()).open(request,timeout=timeout) as response:return response.status,{k.lower():v for k,v in response.headers.items()},response.read(4097)
                     except urllib.error.HTTPError as error:
                         body=error.read(1024*1024)
                         try:failure=json.loads(body)
