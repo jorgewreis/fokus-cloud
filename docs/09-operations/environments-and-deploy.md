@@ -22,3 +22,6 @@
 - Rotina de backup.
 
 O procedimento de rotação de segredos, backup e restauração está em [Operação de segurança em produção](production-security-runbook.md). A rotina só estará comprovada após um exercício de restauração isolada com evidência registrada.
+
+O protocolo restrito de identidade dinâmica e seus bloqueios operacionais estão em
+[Identidade dinâmica de release](release-runtime-identity.md). Ele não habilita deploy in-place.
