@@ -24,7 +24,9 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
         with c.lock(base/name):pass
     c.unpack(artifact,pack['artifact_sha256'],root,transport);receipt=temp/'receipt.json';d.seal(clone,candidate,evidence,root,receipt,transport)
     (base/'current').symlink_to(root);db=temp/'database.sqlite';db.touch();marker=temp/'marker'
-    env={'PATH':os.environ['PATH'],'HOME':str(temp),'APP_ENV':'testing','APP_KEY':'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=','DB_CONNECTION':'sqlite','DB_DATABASE':str(db),'CACHE_STORE':'database','SESSION_DRIVER':'array','LOG_CHANNEL':'stderr','FOKUS_SYNTHETIC_MARKER':str(marker)}
+    # Exercise normal Artisan lifecycle: APP_ENV=testing disables CommandFinished in Laravel.
+    # Isolation is supplied by this disposable tree/SQLite/queue, not the environment name.
+    env={'PATH':os.environ['PATH'],'HOME':str(temp),'APP_ENV':'fokus-synthetic','APP_KEY':'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=','DB_CONNECTION':'sqlite','DB_DATABASE':str(db),'CACHE_STORE':'database','SESSION_DRIVER':'array','LOG_CHANNEL':'stderr','FOKUS_SYNTHETIC_MARKER':str(marker)}
     php=shutil.which('php')
     for migration in ('0001_01_01_000001_create_cache_table.php','0001_01_01_000002_create_jobs_table.php'):
         subprocess.run([php,'artisan','migrate','--force','--path=database/migrations/'+migration],cwd=root,env=env,check=True)

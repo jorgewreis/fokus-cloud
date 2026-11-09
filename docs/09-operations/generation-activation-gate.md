@@ -99,3 +99,21 @@ needed for any later activation.
 
 No server changes, merge, deploy, service restart, production migration, permission
 change, paid API or external paid infrastructure is performed by this delivery.
+
+### Console lifecycle evidence
+
+The real-process fixtures use `APP_ENV=fokus-synthetic`, not `testing`. In the
+locked Laravel 13.24.0 sources, `Application::runningUnitTests()` is exactly the
+`env === testing` check, and `Console\Kernel` suppresses Symfony command-event
+rerouting in that mode. Thus the earlier fixture failure did not prove that the
+schedule collection was incomplete: both command hooks were disabled. Sources:
+[Application](https://github.com/laravel/framework/blob/v13.24.0/src/Illuminate/Foundation/Application.php)
+and [Kernel](https://github.com/laravel/framework/blob/v13.24.0/src/Illuminate/Foundation/Console/Kernel.php).
+
+No production environment is used. The sealed temporary release, synthetic queue
+job and disposable SQLite database still provide isolation; no Datajud calls or
+customer data are introduced. The gate requires exactly one `scope_checked`
+record after the completed schedule's full traversal. Missing or duplicated
+lifecycle evidence blocks handoff, even with successful local tasks. The real
+fixture also runs a negative `APP_ENV=testing` case: suppressed lifecycle must
+fail with `scheduler_lifecycle_unproven`, never produce a ready proof.

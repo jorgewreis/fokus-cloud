@@ -77,6 +77,7 @@ class GenerationScheduleProvider extends ServiceProvider
                         $write('scope_unverified', $task);
                     }
                 }
+                $write('scope_checked');
             }
         });
         Event::listen(JobFailed::class, static fn () => $write('queue_failure'));

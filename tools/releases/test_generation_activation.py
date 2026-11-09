@@ -27,8 +27,8 @@ class Gate(unittest.TestCase):
         self.scope=self.base/'scope.json';self.scope.write_text(json.dumps(dict(schema=a.SCHEMA,base=str(self.base),root=str(self.root),receipt_sha256=a.digest(self.receipt),node_sha256=Contract.node_fingerprint(),boot=a.boot(),operator_uid=os.geteuid(),verified_at=time.time(),expires_at=time.time()+240,evidence_reference='synthetic isolated process namespace only',**{k:True for k in a.BOUNDARIES})))
         (self.base/'policy').write_text('{}')
         self.events=self.base/'events';self.events.touch()
-    def runjob(self,code='',slot=1):
-        script=self.base/'job.py';script.write_text("import os,json,time\nfrom pathlib import Path\np=Path(os.environ['FOKUS_GENERATION_EVENTS'])\ndef emit(state):\n with p.open('a') as f:f.write(json.dumps({'run':os.environ['FOKUS_GENERATION_RUN'],'release':os.environ['FOKUS_GENERATION_SHA'],'state':state,'event':'c'*64,'code':0})+'\\n')\nemit('ready')\n"+code)
+    def runjob(self,code='',slot=1,scope=True):
+        script=self.base/'job.py';script.write_text("import os,json,time\nfrom pathlib import Path\np=Path(os.environ['FOKUS_GENERATION_EVENTS'])\ndef emit(state):\n with p.open('a') as f:f.write(json.dumps({'run':os.environ['FOKUS_GENERATION_RUN'],'release':os.environ['FOKUS_GENERATION_SHA'],'state':state,'event':'c'*64,'code':0})+'\\n')\nemit('ready')\n"+("emit('scope_checked')\n" if scope else "")+code)
         pid=os.fork()
         if pid==0:
             try:g.supervise(self.base,self.root,[sys.executable,str(script)],self.events,2,{},slot=slot,validate=lambda:Contract.verify(self.root,self.receipt),complete=a.completion(Contract,self.base,self.root,self.receipt,self.scope))
@@ -47,6 +47,14 @@ class Gate(unittest.TestCase):
         self.assertEqual(code,1)
         self.assertFalse((self.base/'scheduler-ready.json').exists())
         self.assertEqual((self.base/'current').resolve(),self.root)
+    def test_missing_console_lifecycle_blocks_handoff(self):
+        code=os.waitstatus_to_exitcode(os.waitpid(self.runjob(scope=False),0)[1])
+        self.assertEqual(code,1)
+        self.assertFalse((self.base/'scheduler-ready.json').exists())
+    def test_duplicate_console_lifecycle_blocks_handoff(self):
+        code=os.waitstatus_to_exitcode(os.waitpid(self.runjob("emit('scope_checked')"),0)[1])
+        self.assertEqual(code,1)
+        self.assertFalse((self.base/'scheduler-ready.json').exists())
     def test_success_and_duplicate(self):
         self.ready();self.assertEqual(self.activate()['state'],'verified')
         with self.assertRaises(Exception):self.activate()
