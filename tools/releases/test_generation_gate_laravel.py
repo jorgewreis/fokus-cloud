@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Real PHP/Laravel database queue/cache and sealed #59/#61/#62 composition."""
-import importlib.util,json,os,shutil,sqlite3,subprocess,sys,tempfile,time,pwd,socket,urllib.request,urllib.parse,runpy
+import importlib.util,json,os,shutil,sqlite3,subprocess,sys,tempfile,time,pwd,socket,urllib.request,urllib.parse,runpy,re,hashlib
 import generation_activation as gate
 from pathlib import Path
 
@@ -113,7 +113,9 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
         served=old if serve_old[0] else target
         # Exact verifier protocol with HTTP loopback transport injection only. Not TLS/FPM proof.
         with socket.socket() as sock:sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
-        with (temp/'php-http.log').open('ab') as log:
+        logpath=temp/'php-http.log'
+        offset=logpath.stat().st_size if logpath.exists() else 0
+        with logpath.open('ab') as log:
             server=subprocess.Popen([php,'-d','opcache.enable=0','-d','opcache.enable_cli=0','-S',f'127.0.0.1:{port}','-t',str(served/'public')],cwd=served,env=env,stdout=log,stderr=log)
             try:
                 time.sleep(.5)
@@ -121,6 +123,23 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
                     parsed=urllib.parse.urlsplit(url);url=f'http://127.0.0.1:{port}'+parsed.path+('?' + parsed.query if parsed.query else '')
                     with urllib.request.urlopen(url,timeout=timeout) as response:return response.status,{k.lower():v for k,v in response.headers.items()},response.read(4097)
                 cfg=vp['configuration'](c.verifier_environment(p,target.name));vp['verify'](cfg,fetcher=fetch)
+            except BaseException:
+                log.flush()
+                data=logpath.read_bytes()[offset:offset+262144]
+                text=data.decode('utf-8','replace')
+                # Fixed category labels only: no raw paths, payloads, configuration or secrets.
+                signatures={
+                    'invalid_view_cache_path':'Please provide a valid cache path',
+                    'permission_denied':'Permission denied',
+                    'missing_file':'No such file or directory',
+                    'sqlite_missing_table':'no such table:',
+                    'database_driver_missing':'could not find driver',
+                    'app_key_missing':'No application encryption key',
+                    'undefined_class':'Class "',
+                    'readonly_database':'readonly database',
+                }
+                print(json.dumps({'synthetic_http_failure':True,'log_sha256':hashlib.sha256(data).hexdigest(),'bounded_log_bytes':len(data),'categories':[key for key,signature in signatures.items() if signature in text]}),flush=True)
+                raise
             finally:server.terminate();server.wait(timeout=10)
     c.run_verifier=real_http
     required=('target_binding_verified','php_cli_platform_verified','php_fpm_platform_verified','extensions_verified','fastcgi_physical_root_verified','permissions_acl_verified','runtime_cannot_write_release','workers_drained','shared_drivers_verified','schema_compatible','recovery_verified','publication_authorized','caches_finalized','laravel_boot_verified','assets_complete_verified','scheduler_descendants_absent_verified','build_provenance_verified')
