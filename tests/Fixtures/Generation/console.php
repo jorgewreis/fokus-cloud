@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\GenerationProbe;
+use Illuminate\Console\Scheduling\Schedule as ScheduleInstance;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
@@ -8,7 +9,7 @@ Artisan::command('generation:enqueue', function () {
     GenerationProbe::dispatch()->onConnection('law-datajud')->onQueue('law-datajud');
 });
 Artisan::command('generation:mutex {action}', function () {
-    $events = app(\Illuminate\Console\Scheduling\Schedule::class)->events();
+    $events = app(ScheduleInstance::class)->events();
     foreach ($events as $event) {
         if ($event->runInBackground) {
             if ($this->argument('action') === 'lock') {

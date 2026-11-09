@@ -17,6 +17,11 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     candidate=temp/'candidate';proof=d.build(clone,candidate);evidence=temp/'proof.json';evidence.write_bytes(d.encoded(proof))
     artifact=temp/'artifact.tar';pack=d.package(clone,candidate,evidence,artifact)
     base=temp/'control';base.mkdir();(base/'releases').mkdir();root=base/'releases'/proof['source_sha'];transport=temp/'transport.json'
+    # #61 requires pre-provisioned regular locks, outside immutable releases.
+    # Do not let fixture omissions masquerade as scheduler contention evidence.
+    for name in ('activation.lock','scheduler.lock'):
+        fd=os.open(base/name,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600);os.close(fd)
+        with c.lock(base/name):pass
     c.unpack(artifact,pack['artifact_sha256'],root,transport);receipt=temp/'receipt.json';d.seal(clone,candidate,evidence,root,receipt,transport)
     (base/'current').symlink_to(root);db=temp/'database.sqlite';db.touch();marker=temp/'marker'
     env={'PATH':os.environ['PATH'],'HOME':str(temp),'APP_ENV':'testing','APP_KEY':'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=','DB_CONNECTION':'sqlite','DB_DATABASE':str(db),'CACHE_STORE':'database','SESSION_DRIVER':'array','LOG_CHANNEL':'stderr','FOKUS_SYNTHETIC_MARKER':str(marker)}
@@ -33,12 +38,11 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
             except BaseException as error:
                 (temp/('error-'+mode)).write_text(str(error));os._exit(1)
             os._exit(0)
-        # Wait for the child-created lock; always reap before fixture cleanup.
+        # Observe the real supervisor holding the provisioned lock; always reap before cleanup.
         try:
             for _ in range(2000):
                 try:
                     with c.lock(base/'scheduler.lock'):pass
-                except FileNotFoundError:pass
                 except BlockingIOError:break
                 time.sleep(.002)
             else:raise AssertionError('scheduler lock not observed')
@@ -48,6 +52,8 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
         finally:
             code=os.waitstatus_to_exitcode(os.waitpid(pid,0)[1])
         assert code==expect,(mode,code,(temp/('error-'+mode)).read_text() if code else '')
+        assert (base/'current').resolve()==root
+        assert not [path for path in base.glob('activation-*.json') if path.name!='activation-blocked.json']
         c.verify(root,receipt)
         if expect:
             latch=json.loads((base/'activation-blocked.json').read_bytes());assert latch['drained'] is True
