@@ -30,6 +30,7 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     for migration in ('0001_01_01_000001_create_cache_table.php','0001_01_01_000002_create_jobs_table.php'):
         subprocess.run([php,'artisan','migrate','--force','--path=database/migrations/'+migration],cwd=root,env=env,check=True)
     def run(mode,slot,expect):
+        prior_journals={path.name:path.read_bytes() for path in base.glob('activation-*.json') if path.name!='activation-blocked.json'}
         currentenv={**env,'FOKUS_SYNTHETIC_MODE':mode}
         if mode in ('success','queue-fail'):
             subprocess.run([php,'artisan','generation:enqueue'],cwd=root,env=currentenv,check=True)
@@ -57,7 +58,7 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
             code=os.waitstatus_to_exitcode(os.waitpid(pid,0)[1])
         assert code==expect,(mode,code,(temp/('error-'+mode)).read_text() if code else '')
         assert (base/'current').resolve()==root
-        assert not [path for path in base.glob('activation-*.json') if path.name!='activation-blocked.json']
+        assert prior_journals=={path.name:path.read_bytes() for path in base.glob('activation-*.json') if path.name!='activation-blocked.json'}
         c.verify(root,receipt)
         if expect:
             latch=json.loads((base/'activation-blocked.json').read_bytes());assert latch['drained'] is True
@@ -125,11 +126,11 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     try:gate.activate(c,base,old,oldreceipt,policy,newroot,newreceipt,temp/'scope.json',rollback=True)
     except Exception:pass
     else:raise AssertionError('duplicate activation allowed')
-    print(json.dumps({'gate':'real_artifact_laravel_activation_verified','previous':old.name,'candidate':newroot.name,'http_transport':'loopback injection, no TLS/FPM claim'}))
+    print(json.dumps({'gate':'real_artifact_laravel_activation_verified','previous':old.name,'candidate':newroot.name,'candidate_artifact_sha256':nextpack['artifact_sha256'],'previous_artifact_sha256':pack['artifact_sha256'],'http_transport':'loopback injection, no TLS/FPM claim'}))
     for item in newroot.rglob('*'):
         if not item.is_symlink():item.chmod(0o700 if item.is_dir() else 0o600)
     newroot.chmod(0o700)
-    print(json.dumps({'state':'real_laravel_generation_verified','source_sha':root.name,'artifact_sha256':pack['artifact_sha256'],'queue_driver':'database','cache_driver':'database','database':'disposable SQLite','background_preserved':True,'legacy_activation_guard':'still closed'}))
+    print(json.dumps({'state':'real_laravel_generation_verified','source_sha':old.name,'artifact_sha256':pack['artifact_sha256'],'queue_driver':'database','cache_driver':'database','database':'disposable SQLite','background_preserved':True,'legacy_activation_guard':'still closed'}))
     root=old
     for p in root.rglob('*'):
         if not p.is_symlink():p.chmod(0o700 if p.is_dir() else 0o600)
