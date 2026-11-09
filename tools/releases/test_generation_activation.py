@@ -48,7 +48,7 @@ class Gate(unittest.TestCase):
         self.assertFalse((self.base/'scheduler-ready.json').exists())
         self.assertEqual((self.base/'current').resolve(),self.root)
     def test_missing_console_lifecycle_blocks_handoff(self):
-        code=os.waitstatus_to_exitcode(os.waitpid(self.runjob(scope=False),0)[1])
+        code=os.waitstatus_to_exitcode(os.waitpid(self.runjob("emit('start');emit('finish')",scope=False),0)[1])
         self.assertEqual(code,1)
         self.assertFalse((self.base/'scheduler-ready.json').exists())
     def test_duplicate_console_lifecycle_blocks_handoff(self):
