@@ -67,18 +67,32 @@ def validate_functional(root, original):
     require(set(law) == {'version','algorithm','assets'} and law['version'] == 1 and law['algorithm'] == 'sha256', 'law_schema')
     refs = re.findall(r"FokusLawAssets::url\('([^']+)'\)", original['resources/views/portal/fokus-law.blade.php'].decode())
     require(len(refs) == 14 and len(set(refs)) == 14 and set(law['assets']) == set(refs), 'law_completeness')
+    generated={LAW,'public/build/manifest.json','public/build/fonts-manifest.json'}
     for name, item in law['assets'].items():
         require(set(item) == {'path','sha256'}, 'law_entry')
         data = (root/'public'/name).read_bytes(); digest = sha(data)
         path = Path(name); expected = (path.parent/(path.stem+'.'+digest+path.suffix)).as_posix()
         require(item == {'path':expected,'sha256':digest}, 'law_provenance')
         require((root/'public'/expected).read_bytes() == data, 'law_content')
+        generated.add('public/'+expected)
     vite = json.loads((root/'public/build/manifest.json').read_bytes())
     require({'resources/css/app.css','resources/js/app.js'}.issubset(vite), 'vite_entries')
     for entry in vite.values():
         for name in [entry['file']] + entry.get('css',[]) + entry.get('assets',[]):
+            generated.add('public/build/'+name)
             require('..' not in Path(name).parts and not Path(name).is_absolute() and (root/'public/build'/name).is_file(), 'vite_reference')
         for name in entry.get('imports',[]) + entry.get('dynamicImports',[]): require(name in vite, 'vite_import')
+    fonts=json.loads((root/'public/build/fonts-manifest.json').read_bytes())
+    require(fonts.get('version')==1,'font_manifest')
+    def font_files(value):
+        if isinstance(value,dict):
+            for k,v in value.items():
+                if k=='file':require('public/build/'+v in generated,'font_reference')
+                else:font_files(v)
+        elif isinstance(value,list):
+            for item in value:font_files(item)
+    font_files(fonts)
+    return generated
 
 
 def build(source, output, frontend_only=False):
@@ -101,11 +115,13 @@ def build(source, output, frontend_only=False):
             run(['composer','install','--no-dev','--prefer-dist','--no-interaction','--no-scripts','--optimize-autoloader'],work,home)
             run(['composer','check-platform-reqs','--no-dev'],work,home)
             run(['php','artisan','package:discover','--ansi'],work,home)
+        generated=validate_functional(work,original)
+        transformed={'public/assets/css/shared/fokus.css'} | {'public/'+x['file'] for x in json.loads(original['resources/seo/pages.json'])} | {n for n in original if n.startswith('public/styles/') and n.endswith('.html')}
         # Gather source + generated public distribution + one named derived config.
         # Every non-public tracked byte must remain unchanged; no generic config exception.
         for name, data in original.items():
             require((work/name).is_file(), 'missing_tracked_output')
-            if not name.startswith('public/'):
+            if name not in transformed:
                 require((work/name).read_bytes() == data, 'build_modified_code')
         permitted = set(original)
         for p in work.rglob('*'):
@@ -113,7 +129,7 @@ def build(source, output, frontend_only=False):
             if name == 'node_modules' or name.startswith('node_modules/'): continue
             require(not p.is_symlink(), 'build_link')
             if p.is_file():
-                require(name in original or name.startswith('public/') or name == LAW or (not frontend_only and (name.startswith('vendor/') or name in ('bootstrap/cache/packages.php','bootstrap/cache/services.php'))), 'unexpected_build_output')
+                require(name in original or name in generated or (not frontend_only and (name.startswith('vendor/') or name in ('bootstrap/cache/packages.php','bootstrap/cache/services.php'))), 'unexpected_build_output')
                 require(not (name.startswith('public/') and name not in original and (p.suffix in ('.php','.phtml') or name in ('public/hot',))), 'executable_generated_output')
                 permitted.add(name)
         output.mkdir(mode=0o700)
