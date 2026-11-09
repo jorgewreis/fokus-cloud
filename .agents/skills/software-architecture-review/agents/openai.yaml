@@ -1,0 +1,4 @@
+interface:
+  display_name: "Revisão de arquitetura"
+  short_description: "Arquitetura por contratos, fronteiras e evidência"
+  default_prompt: "Use $software-architecture-review para avaliar esta decisão arquitetural com evidências e a menor alternativa compatível."

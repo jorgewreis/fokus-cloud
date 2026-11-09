@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review e refatoração"
+  short_description: "Review de regressões e refatoração proporcional"
+  default_prompt: "Use $code-review-refactoring para revisar este diff e apontar regressões comprovadas e ajustes mínimos."
