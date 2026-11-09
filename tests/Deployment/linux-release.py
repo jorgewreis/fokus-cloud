@@ -89,7 +89,7 @@ try:
     create(test,args.image,'container:'+mysql,extra)
     run('namespace-isolation',docker('exec',test,'python3','-c',"import socket; s=socket.socket(); s.settimeout(2); assert s.connect_ex(('1.1.1.1',443)) != 0; print('Outbound connection blocked; loopback services only')"))
     gates=[]
-    for label,script,options in [('static','linux-static.py',['--backend-only'] if args.backend_only else []),('rsync','linux-rsync.py',[]),('suite-sqlite','linux-release-suite.py',['--driver','sqlite']),('suite-mysql','linux-release-suite.py',['--driver','mysql']),('upgrade-sqlite','linux-upgrade.py',['--driver','sqlite']),('upgrade-mysql','linux-upgrade.py',['--driver','mysql'])]:
+    for label,script,options in [('deploy-guard','test_fpm_guard.py',[]),('deploy-integration','test_deploy_candidate.py',[]),('static','linux-static.py',['--backend-only'] if args.backend_only else []),('rsync','linux-rsync.py',[]),('suite-sqlite','linux-release-suite.py',['--driver','sqlite']),('suite-mysql','linux-release-suite.py',['--driver','mysql']),('upgrade-sqlite','linux-upgrade.py',['--driver','sqlite']),('upgrade-mysql','linux-upgrade.py',['--driver','mysql'])]:
         gates.append(run(label,docker('exec',test,'python3','tests/Deployment/'+script,*options),check=False))
     if (ROOT/'tests/Deployment/linux-http/run-all.py').is_file():
         gates.append(run('http',docker('exec','-e','RELEASE_REPORT_DIR=/work/reports/http',test,'python3','tests/Deployment/linux-http/run-all.py',*(['--concurrency-only'] if args.backend_only else [])),check=False))
