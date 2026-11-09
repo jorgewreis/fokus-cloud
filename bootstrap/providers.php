@@ -1,8 +1,9 @@
 <?php
 
 use App\Providers\AppServiceProvider;
+use App\Providers\GenerationScheduleProvider;
 
 return [
     AppServiceProvider::class,
-    App\Providers\GenerationScheduleProvider::class,
+    GenerationScheduleProvider::class,
 ];

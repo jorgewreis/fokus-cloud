@@ -33,17 +33,21 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
             except BaseException as error:
                 (temp/('error-'+mode)).write_text(str(error));os._exit(1)
             os._exit(0)
-        # Exercise actual #61 activate entry: it must fail at scheduler lock, before policy.
-        for _ in range(500):
-            try:
-                with c.lock(base/'scheduler.lock'):pass
-            except BlockingIOError:break
-            time.sleep(.002)
-        else:raise AssertionError('scheduler lock not observed')
-        try:c.activate(base,base/'releases'/('b'*40),receipt,temp/'nonexistent-policy',root)
-        except BlockingIOError:pass
-        else:raise AssertionError('activation entered while scheduler active')
-        code=os.waitstatus_to_exitcode(os.waitpid(pid,0)[1]);assert code==expect,(mode,code,(temp/('error-'+mode)).read_text() if code else '')
+        # Wait for the child-created lock; always reap before fixture cleanup.
+        try:
+            for _ in range(2000):
+                try:
+                    with c.lock(base/'scheduler.lock'):pass
+                except FileNotFoundError:pass
+                except BlockingIOError:break
+                time.sleep(.002)
+            else:raise AssertionError('scheduler lock not observed')
+            try:c.activate(base,base/'releases'/('b'*40),receipt,temp/'nonexistent-policy',root)
+            except BlockingIOError:pass
+            else:raise AssertionError('activation entered while scheduler active')
+        finally:
+            code=os.waitstatus_to_exitcode(os.waitpid(pid,0)[1])
+        assert code==expect,(mode,code,(temp/('error-'+mode)).read_text() if code else '')
         c.verify(root,receipt)
         if expect:
             latch=json.loads((base/'activation-blocked.json').read_bytes());assert latch['drained'] is True

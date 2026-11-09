@@ -47,10 +47,23 @@ def subreaper():
     except ChildProcessError: return
     raise Blocked('preexisting_children')
 
-def event_result(path, run_id, release):
+def event_identity(path):
+    st=path.lstat()
+    require(stat.S_ISREG(st.st_mode) and st.st_nlink==1,"events_rebound")
+    return (st.st_dev,st.st_ino)
+
+def event_result(path, run_id, release, identity=None):
     require(path.is_file() and not path.is_symlink() and path.stat().st_size<=1024*1024,'events_unreadable')
+    if identity is not None:require(event_identity(path)==identity,'events_rebound')
     starts={};ends={};ready=False
-    for line in path.read_bytes().splitlines():
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+    with os.fdopen(fd,'rb') as stream:
+        st=os.fstat(stream.fileno())
+        require(stat.S_ISREG(st.st_mode) and st.st_nlink==1 and st.st_size<=1024*1024,'events_unreadable')
+        if identity is not None:require((st.st_dev,st.st_ino)==identity,'events_rebound')
+        data=stream.read(1024*1024+1)
+    require(len(data)<=1024*1024,'events_unreadable')
+    for line in data.splitlines():
         row=json.loads(line)
         require(row.get('run')==run_id and row.get('release')==release,'event_generation_mismatch')
         state=row.get('state');key=row.get('event')
@@ -80,6 +93,7 @@ def supervise(base,root,command,events,timeout=120,env=None,uid=None,gid=None,sl
     require(re.fullmatch('[0-9a-f]{40}',root.name),'full_release_sha')
     require(timeout>0 and timeout<=3600,'bounded_execution_required')
     require(events.is_file() and not events.is_symlink() and events.stat().st_size==0,'new_event_log_required')
+    identity=event_identity(events)
     subreaper()
     with lock(base/'scheduler.lock'):
         latch=base/'activation-blocked.json'
@@ -95,7 +109,7 @@ def supervise(base,root,command,events,timeout=120,env=None,uid=None,gid=None,sl
         state['slot']=slot
         record(latch,state);record(journal,state);record(slot_path,{'run':run_id,'release':root.name,'slot':slot})
         environment=dict(env or {})
-        environment.update(FOKUS_GENERATION_RUN=run_id,FOKUS_GENERATION_SHA=root.name,FOKUS_GENERATION_ROOT=str(root),FOKUS_GENERATION_EVENTS=str(events))
+        environment.update(FOKUS_GENERATION_RUN=run_id,FOKUS_GENERATION_SHA=root.name,FOKUS_GENERATION_ROOT=str(root),FOKUS_GENERATION_EVENTS=str(events),FOKUS_GENERATION_EVENT_DEV=str(identity[0]),FOKUS_GENERATION_EVENT_INO=str(identity[1]))
         options={}
         if uid is not None: options.update(user=uid,group=gid,extra_groups=[],umask=0o077)
         proc=None;statuses=[];timed_out=False;deadline=time.monotonic()+timeout
@@ -117,7 +131,7 @@ def supervise(base,root,command,events,timeout=120,env=None,uid=None,gid=None,sl
             state.update(drained=True,exits=statuses)
             require(not timed_out,'execution_timeout')
             require(proc.returncode==0 and all(x['code']==0 for x in statuses),'descendant_failed')
-            count=event_result(events,run_id,root.name)
+            count=event_result(events,run_id,root.name,identity)
             if validate is not None:validate()
             require((base/'current').resolve()==root,'generation_changed')
             state.update(state='drained_verified',events=count);record(journal,state)
@@ -164,6 +178,9 @@ def cli():
         require(p.get('expires_at_epoch',0)>time.time() and p.get('platform_verified') is True and p.get('all_scheduler_entrypoints_controlled') is True and p.get('external_workers_absent_verified') is True and p.get('no_external_process_delegation_verified') is True,'runtime_evidence_incomplete')
         require(c.digest(php.read_bytes())==p.get('php_binary_sha256'),'php_mismatch')
         require(events==events.resolve() and not events.is_relative_to(root),'external_events_required')
+        for parent in events.parents:
+            st=parent.lstat()
+            require(stat.S_ISDIR(st.st_mode) and st.st_uid in (0,os.geteuid()) and (not st.st_mode & 0o022 or (st.st_uid==0 and st.st_mode & stat.S_ISVTX)), 'events_parent_mutable')
         require(events.stat().st_uid==p['runtime_uid'] and events.stat().st_mode & 0o777==0o600,'event_log_owner')
     php=Path(p['php_binary']).resolve();events=Path(args.events).absolute()
     supervise(base,root,[str(php),str(root/'artisan'),'schedule:run'],events,p.get('timeout_seconds',120),{'PATH':'/usr/bin:/bin','LC_ALL':'C'},p['runtime_uid'],p['runtime_gid'],validate=validate)

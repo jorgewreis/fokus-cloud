@@ -30,17 +30,29 @@ class GenerationScheduleProvider extends ServiceProvider
             || ! is_string($path) || is_link($path) || realpath($path) !== $path || ! is_file($path)) {
             throw new RuntimeException('generation_observer_unavailable');
         }
-        $write = static function (string $state, ?object $task = null, ?int $code = null) use ($path, $run, $release): void {
+        $device = getenv('FOKUS_GENERATION_EVENT_DEV');
+        $inode = getenv('FOKUS_GENERATION_EVENT_INO');
+        $write = static function (string $state, ?object $task = null, ?int $code = null) use ($path, $run, $release, $device, $inode): void {
             $record = ['run' => $run, 'release' => $release, 'state' => $state];
             if ($task !== null) {
                 $record['event'] = hash('sha256', $task->mutexName());
                 $record['code'] = $code;
             }
-            $stream = fopen($path, 'ab');
+            $stream = fopen($path, 'r+b');
             if ($stream === false || ! flock($stream, LOCK_EX)) {
                 throw new RuntimeException('generation_observer_unavailable');
             }
             try {
+                $identity = fstat($stream);
+                clearstatcache(true, $path);
+                if ($identity === false || is_link($path) || realpath($path) !== $path
+                    || (string) $identity['dev'] !== $device || (string) $identity['ino'] !== $inode
+                    || $identity['nlink'] !== 1 || ($identity['mode'] & 0170000) !== 0100000) {
+                    throw new RuntimeException('generation_observer_rebound');
+                }
+                if (fseek($stream, 0, SEEK_END) !== 0) {
+                    throw new RuntimeException('generation_observer_unavailable');
+                }
                 $line = json_encode($record, JSON_THROW_ON_ERROR)."\n";
                 if (fwrite($stream, $line) !== strlen($line) || ! fflush($stream) || ! fsync($stream)) {
                     throw new RuntimeException('generation_observer_unavailable');
