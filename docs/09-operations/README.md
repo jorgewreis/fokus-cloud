@@ -21,3 +21,8 @@ Esta pasta documenta ambientes, deploy, testes, qualidade, releases, monitoramen
 ## Quando atualizar
 
 Atualize esta pasta quando mudar ambiente, servidor, pipeline, deploy, comandos de teste, processo de release ou rotina operacional.
+
+## Preparação B+C (não implantada)
+
+- [Primitivas de releases imutáveis](immutable-release-tooling.md)
+- [Evidências e bloqueios da validação isolada](immutable-release-validation.md)
