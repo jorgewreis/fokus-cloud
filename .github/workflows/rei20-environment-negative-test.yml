@@ -1,0 +1,12 @@
+name: Temporary production approval negative test
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  approval-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    steps:
+      - name: No-op after approval
+        run: echo 'Isolated approval test; no deployment'
