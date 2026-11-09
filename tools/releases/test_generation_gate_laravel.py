@@ -125,7 +125,8 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
                 cfg=vp['configuration'](c.verifier_environment(p,target.name));vp['verify'](cfg,fetcher=fetch)
             except BaseException:
                 log.flush()
-                data=logpath.read_bytes()[offset:offset+262144]
+                with logpath.open('rb') as captured:
+                    captured.seek(offset);data=captured.read(262144)
                 text=data.decode('utf-8','replace')
                 # Fixed category labels only: no raw paths, payloads, configuration or secrets.
                 signatures={
@@ -138,6 +139,14 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
                     'undefined_class':'Class "',
                     'readonly_database':'readonly database',
                 }
+                diagnostics=[]
+                for line in text.splitlines():
+                    if not re.search(r'PHP (?:Fatal error|Warning|Parse error)|Uncaught ',line):continue
+                    line=re.sub(r"[\"'][^\"']*[\"']", '<quoted>', line)
+                    line=re.sub(r'(?:https?://|/)[^\s)]+', '<location>', line)
+                    line=re.sub(r'\b[0-9a-f]{24,}\b', '<identifier>', line)
+                    diagnostics.append(line[:500])
+                print(json.dumps({'php_diagnostics':diagnostics[:4]}),flush=True)
                 print(json.dumps({'synthetic_http_failure':True,'log_sha256':hashlib.sha256(data).hexdigest(),'bounded_log_bytes':len(data),'categories':[key for key,signature in signatures.items() if signature in text]}),flush=True)
                 raise
             finally:server.terminate();server.wait(timeout=10)
