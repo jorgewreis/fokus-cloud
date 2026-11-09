@@ -3,7 +3,7 @@
 ## Estado e decisão
 
 Implementação proposta na REI-20, baseada na main
-`8dd9835053b7dc986343e8cfc44b5c35bdde920a`. Não está operacional na main
+`a9ad848e814ce8ee2321e87f16239d33235ad95b`, após a correção do schema no PR #56. Não está operacional na main
 até aprovação, integração e verificação dos checks reais.
 
 A própria proteção altera workflow e scripts. Seu merge segue o caminho normal
@@ -164,3 +164,60 @@ não recebe exceção, mesmo com o workflow novo na árvore resultante. Execuç�
 antigas já iniciadas também não são alteradas pelo PR. Manter o PR sem merge,
 verificar os checks do head e obter decisão explícita sobre a publicação inicial
 é a ativação segura; nunca desligar checks, forçar pin ou criar bypass temporário.
+
+## Reauditoria após integração do schema (09/11/2026)
+
+Base real: `a9ad848e814ce8ee2321e87f16239d33235ad95b`.
+Head anterior do PR #55: `71e31abb1ace466f9d3ee411580d1d3a8bcc583c`.
+A composição preserva os dois históricos e os seis arquivos introduzidos pelo
+PR #56, sem conflitos. O workflow de schema, helper e ambos os harnesses são
+byte a byte idênticos à nova main. Não há novas migrations ou dependências.
+
+Registro auditado anterior:
+`1daf0709912eafccb811731f900a0f5906bf98ebf660d5f653070a0cbf453c34`.
+Registro auditado da composição aprovada nesta revisão:
+`1404b419c72aea880408fbd81fd9c2fb878453ee2d7941ee2d848beb7fc4ef47`.
+A main sem o mecanismo possui digest
+`f124672b9156c69ba9ee76e76f7525b433f5964b7d6df04f9916a4e8b361c5ad`:
+o primeiro merge da proteção continua **sem dispensa**.
+
+O novo registro cobre 1.030 entradas operacionais dos 1.031 arquivos rastreados;
+somente este documento de conhecimento fica fora nessa composição. Caminhos,
+modos e objetos dos consumidores são cobertos, incluindo os scripts e testes de
+schema corrigidos. A única normalização é o literal do registro no classificador.
+Não se alterou a política, o algoritmo, os consumidores ou os testes existentes.
+
+Reinspecionados: scripts do `package.json`, configuração Vite/Tailwind, fonte CSS,
+geração SEO, sincronização Styles, atualização das referências de assets,
+gerador Law e rotas Laravel. A descoberta automática do Tailwind continua sendo
+um consumidor de Markdown. Templates fora de engineering e documentação pública
+Styles não são elegíveis. Os cinco nomes FEKS são reconhecidos exclusivamente
+nos tipos de arquivo já definidos; scripts de Skills não recebem dispensa.
+
+### Builds reais e limites
+
+Quatro clones isolados da composição executaram `npm ci` e `npm run build`,
+sem mocks, com Node 24.22.1, npm 11.9.0 e Vite 8.2.4. Lock npm SHA-256:
+`968f24dfd9ae39a959f82a075b1bf60d4a0e63a653a8bf3bba7daf88a7b49584`.
+O snapshot completo usa o mesmo algoritmo da proteção, incluindo arquivos
+ignorados, manifesto Vite, fontes, assets Law, manifesto Law e arquivos Styles
+reescritos pelo build; não normaliza divergências.
+
+- Base: 1.342 entradas no snapshot não documental.
+- Markdown sintético sem efeito operacional: nenhuma diferença.
+- Cinco Skills sintéticas, uma por nome permitido: nenhuma diferença.
+- Markdown sintético contendo classe Tailwind inédita: diferença real no CSS
+  gerado e manifesto Vite; a dispensa é recusada apesar do caminho documental.
+
+As 26 regressões Git/CLI passaram na nova composição, incluindo adoção,
+classificador alterado, consumidores alterados, alterações mistas, erros e
+preservação dos jobs. Testes sintéticos não significam seleção automática das
+Skills ou homologação da VPS. O build comprova os cenários exercitados; cada
+alteração documental futura ainda precisa de sua própria prova de equivalência.
+Falha de download, build ou classificação nunca concede dispensa.
+
+A integração futura exige checks verdes do head final e nova autorização de
+merge. O run de produção iniciado pelo PR #56 permanece separado e retido em
+aprovação manual; não é liberado, rejeitado ou cancelado por esta revisão. O
+primeiro merge do #55 pode gerar publicação, que deve continuar sujeita à
+barreira administrativa. Não tratar o resultado do PR como deploy concluído.

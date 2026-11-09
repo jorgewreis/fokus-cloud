@@ -8,7 +8,7 @@ import stat
 import subprocess
 import tempfile
 
-AUDIT_DIGEST = '1daf0709912eafccb811731f900a0f5906bf98ebf660d5f653070a0cbf453c34'
+AUDIT_DIGEST = '1404b419c72aea880408fbd81fd9c2fb878453ee2d7941ee2d848beb7fc4ef47'
 
 SKILLS = frozenset(('engineering-research', 'secure-code-audit',
                     'software-architecture-review', 'testing-quality-engineering',
