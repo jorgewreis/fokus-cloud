@@ -27,7 +27,9 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     # Exercise normal Artisan lifecycle: APP_ENV=testing disables CommandFinished in Laravel.
     # Isolation is supplied by this disposable tree/SQLite/queue, not the environment name.
     env={'PATH':os.environ['PATH'],'HOME':str(temp),'APP_ENV':'fokus-synthetic','APP_KEY':'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=','DB_CONNECTION':'sqlite','DB_DATABASE':str(db),'CACHE_STORE':'database','SESSION_DRIVER':'array','LOG_CHANNEL':'stderr','FOKUS_SYNTHETIC_MARKER':str(marker)}
-    php=shutil.which('php')
+    php_path=shutil.which('php')
+    assert php_path, 'PHP executable unavailable'
+    php=str(Path(php_path).resolve(strict=True))
     for migration in ('0001_01_01_000001_create_cache_table.php','0001_01_01_000002_create_jobs_table.php'):
         subprocess.run([php,'artisan','migrate','--force','--path=database/migrations/'+migration],cwd=root,env=env,check=True)
     def run(mode,slot,expect):

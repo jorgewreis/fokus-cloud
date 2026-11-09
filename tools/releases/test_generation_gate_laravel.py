@@ -28,7 +28,9 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     # Exercise normal Artisan lifecycle: APP_ENV=testing disables CommandFinished in Laravel.
     # Isolation is supplied by this disposable tree/SQLite/queue, not the environment name.
     env={'PATH':os.environ['PATH'],'HOME':str(temp),'APP_ENV':'fokus-synthetic','APP_KEY':'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=','DB_CONNECTION':'sqlite','DB_DATABASE':str(db),'CACHE_STORE':'database','SESSION_DRIVER':'array','LOG_CHANNEL':'stderr','FOKUS_SYNTHETIC_MARKER':str(marker)}
-    php=shutil.which('php')
+    php_path=shutil.which('php')
+    assert php_path, 'PHP executable unavailable'
+    php=str(Path(php_path).resolve(strict=True))
     for migration in ('0001_01_01_000001_create_cache_table.php','0001_01_01_000002_create_jobs_table.php'):
         subprocess.run([php,'artisan','migrate','--force','--path=database/migrations/'+migration],cwd=root,env=env,check=True)
     def run(mode,slot,expect):
@@ -125,9 +127,13 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     p={k:True for k in required}
     p.update(schema=c.SCHEMA,release=newroot.name,base=str(base),root=str(newroot),receipt_sha256=c.digest(newreceipt.read_bytes()),node_sha256=c.node_fingerprint(),operator_uid=os.geteuid(),runtime_uid=pwd.getpwnam('nobody').pw_uid,php_binary=php,expires_at_epoch=time.time()+120,evidence_reference='Synthetic policy only, not VPS runtime',fpm_opcache_enabled=False,preload_configured_or_loaded=False,fpm_reload_mode='verify-only',fpm_service='',verifier_script=str(verifier),public_base_url='https://fixture.invalid',release_url='https://fixture.invalid/_deployment/release')
     policy=temp/'activation-policy.json';policy.write_text(json.dumps(p))
+    # Validate exact #61 policy before asserting any post-switch failure scenario.
+    c.policy(policy,newroot,base,newreceipt)
     run('success',8,0)
     try:gate.activate(c,base,newroot,newreceipt,policy,old,oldreceipt,temp/'scope.json')
-    except Exception:pass
+    except vp['VerificationError'] as error:
+        assert str(error)=='active_release_mismatch', ('unexpected verifier reason',str(error))
+        print('post_switch_failure=active_release_mismatch')
     else:raise AssertionError('real stale endpoint accepted')
     assert (base/'current').resolve()==newroot
     blocked=json.loads((base/'activation-blocked.json').read_text());assert blocked['state']=='activation_unverified_manual_recovery_required'
