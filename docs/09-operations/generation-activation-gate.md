@@ -19,7 +19,10 @@ binds full physical previous/current generation SHA, node, boot, source-code has
 receipt, journal, immutable controller-owned event snapshot and boundary evidence.
 It expires within 120 seconds, also measured by same-boot monotonic time. Every later
 scheduler attempt invalidates the previous proof before validation or launch.
-An overlapping skipped task cannot qualify: its mutex does not establish that prior
+Laravel withoutOverlapping installs a rejection filter; its first skip dispatches
+ScheduledTaskSkipped before Starting/Finished. Both this path and the later mutex
+race are recorded. Distributed onOneServer schedules conservatively emit a skip
+because Laravel's cross-server skip has no terminal event. Any skipped task cannot qualify: its mutex does not establish that prior
 or external work terminated. Ordinary scheduler execution still permits a valid skip.
 
 The boundary JSON uses schema `fokus-generation-handoff-v1`, exact base/root,
@@ -86,8 +89,8 @@ needed for any later activation.
 
 | Area | State | Remaining condition |
 |---|---|---|
-| Supervisor #63 and gate adapter | Implemented; local regressions passed | Final-head remote integration/CI must pass before acceptance |
-| Identity #59, artifacts #62, primitives #61 | Reused at pinned commits | Final composition evidence; no merge performed |
+| Supervisor #63 and gate adapter | Implemented; local regressions passed | Exact-head remote outcomes are recorded in PR #64 and REI-24; acceptance requires their verified passing state |
+| Identity #59, artifacts #62, primitives #61 | Reused at pinned commits; executable composition test included | Consult PR #64 logs for the tested head; no merge performed |
 | FPM/OPcache/cron/ACL/user switch | Pending runtime homologation | Actual environment evidence and separate authorization |
 | External/legacy/permanent work and queue compatibility | Pending runtime homologation | Fresh bounded scope evidence; otherwise blocked |
 | Production bootstrap, recovery and publication | Blocked by operational decision | Explicit reviewed activation plan and authorization |

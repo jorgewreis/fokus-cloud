@@ -56,6 +56,12 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
             else:raise AssertionError('activation entered while scheduler active')
         finally:
             code=os.waitstatus_to_exitcode(os.waitpid(pid,0)[1])
+        if mode in ('overlap-skip','filter-skip','distributed'):
+            rows=[json.loads(line) for line in events.read_text().splitlines()]
+            skipped=[row['event'] for row in rows if row['state']=='skipped']
+            assert skipped, 'real Laravel overlap skip event was not observed'
+            if mode!='distributed':assert not any(row.get('event') in skipped and row['state'] in ('start','finish') for row in rows), 'filtered task unexpectedly executed'
+            assert not (base/'scheduler-ready.json').exists(), 'skip qualified for activation'
         assert code==expect,(mode,code,(temp/('error-'+mode)).read_text() if code else '')
         assert (base/'current').resolve()==root
         assert prior_journals=={path.name:path.read_bytes() for path in base.glob('activation-*.json') if path.name!='activation-blocked.json'}
@@ -75,6 +81,9 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     subprocess.run([php,'artisan','generation:mutex','unlock'],cwd=root,env=env,check=True)
     run('queue-fail',3,1)
     run('foreground-fail',4,1)
+    run('filter-skip',5,1)
+    assert not Path(str(marker)+'.filtered').exists()
+    run('distributed',6,1)
     conn=sqlite3.connect(db);assert conn.execute('select count(*) from failed_jobs').fetchone()[0]==1
     assert conn.execute('select count(*) from jobs').fetchone()[0]==0
     old=root;oldreceipt=receipt
@@ -107,7 +116,7 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     p={k:True for k in required}
     p.update(schema=c.SCHEMA,release=newroot.name,base=str(base),root=str(newroot),receipt_sha256=c.digest(newreceipt.read_bytes()),node_sha256=c.node_fingerprint(),operator_uid=os.geteuid(),runtime_uid=pwd.getpwnam('nobody').pw_uid,php_binary=php,expires_at_epoch=time.time()+120,evidence_reference='Synthetic policy only, not VPS runtime',fpm_opcache_enabled=False,preload_configured_or_loaded=False,fpm_reload_mode='verify-only',fpm_service='',verifier_script=str(verifier),public_base_url='https://fixture.invalid',release_url='https://fixture.invalid/_deployment/release')
     policy=temp/'activation-policy.json';policy.write_text(json.dumps(p))
-    run('success',5,0)
+    run('success',7,0)
     try:gate.activate(c,base,newroot,newreceipt,policy,old,oldreceipt,temp/'scope.json')
     except Exception:pass
     else:raise AssertionError('real stale endpoint accepted')
@@ -117,7 +126,7 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     gate.acknowledge_current(c,base,base/('activation-'+blocked['run']+'.json'),blocked['run'],newreceipt,policy)
     assert not (base/'activation-blocked.json').exists()
     # Explicit synthetic code-only rollback, never automatic data rollback.
-    root=newroot;receipt=newreceipt;run('success',6,0)
+    root=newroot;receipt=newreceipt;run('success',8,0)
     p.update(release=old.name,root=str(old),receipt_sha256=c.digest(oldreceipt.read_bytes()),rollback_code_compatible=True,data_restore_required=False,expires_at_epoch=time.time()+120)
     policy.write_text(json.dumps(p))
     result=gate.activate(c,base,old,oldreceipt,policy,newroot,newreceipt,temp/'scope.json',rollback=True)
