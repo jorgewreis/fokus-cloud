@@ -7,6 +7,18 @@ use Illuminate\Support\Facades\Schedule;
 Artisan::command('generation:enqueue', function () {
     GenerationProbe::dispatch()->onConnection('law-datajud')->onQueue('law-datajud');
 });
+Artisan::command('generation:mutex {action}', function () {
+    $events = app(\Illuminate\Console\Scheduling\Schedule::class)->events();
+    foreach ($events as $event) {
+        if ($event->runInBackground) {
+            if ($this->argument('action') === 'lock') {
+                $event->mutex->create($event);
+            } else {
+                $event->mutex->forget($event);
+            }
+        }
+    }
+});
 Artisan::command('generation:foreground', function () {
     return getenv('FOKUS_SYNTHETIC_MODE') === 'foreground-fail' ? 7 : 0;
 });

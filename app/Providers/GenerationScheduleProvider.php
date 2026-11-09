@@ -53,9 +53,14 @@ class GenerationScheduleProvider extends ServiceProvider
         $write('ready');
         Event::listen(JobFailed::class, static fn () => $write('queue_failure'));
         Event::listen(JobExceptionOccurred::class, static fn () => $write('queue_failure'));
-        Event::listen(ScheduledTaskStarting::class, static fn ($event) => $write('start', $event->task));
+        Event::listen(ScheduledTaskStarting::class, static function ($event) use ($write): void {
+            // Laravel acquires its overlap mutex before invoking before callbacks.
+            $event->task->before(static fn () => $write('start', $event->task));
+        });
         Event::listen(ScheduledTaskFinished::class, static function ($event) use ($write): void {
-            if (! $event->task->runInBackground) {
+            if ($event->task->skippedBecauseOverlapping) {
+                $write('skipped', $event->task);
+            } elseif (! $event->task->runInBackground) {
                 $write('finish', $event->task, $event->task->exitCode);
             }
         });

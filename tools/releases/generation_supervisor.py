@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Linux descendant supervisor. One dedicated process, one generation, no deploy."""
-import argparse, ctypes, errno, fcntl, hashlib, json, os, re, signal, subprocess, sys, time, uuid
+import argparse, ctypes, errno, stat, fcntl, hashlib, json, os, re, signal, subprocess, sys, time, uuid
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -10,6 +10,11 @@ def require(condition, reason):
     if not condition: raise Blocked(reason)
 
 def encode(value): return json.dumps(value,sort_keys=True,separators=(',',':')).encode()
+
+def control(path, directory=False):
+    s=Path(path).lstat()
+    require((stat.S_ISDIR(s.st_mode) if directory else stat.S_ISREG(s.st_mode)) and s.st_uid==os.geteuid() and not s.st_mode & 0o022,'unsafe_control_path')
+    if not directory:require(s.st_nlink==1,'linked_control_file')
 
 def sync(directory):
     fd=os.open(directory,os.O_RDONLY|os.O_DIRECTORY)
@@ -26,6 +31,7 @@ def record(path,value):
 def lock(path):
     fd=os.open(path,os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
     try:
+        control(path)
         fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB);yield
     finally: os.close(fd)
 
@@ -51,6 +57,8 @@ def event_result(path, run_id, release):
         require(state!='queue_failure','queue_job_failed')
         if state=='ready':ready=True;continue
         require(isinstance(key,str) and re.fullmatch('[0-9a-f]{64}',key),'invalid_event')
+        if state=='skipped':
+            require(key not in starts,'skip_after_start');continue
         if state=='start':
             require(key not in starts,'repeated_event_unsupported');starts[key]=True
         elif state=='finish':
@@ -68,6 +76,7 @@ def supervise(base,root,command,events,timeout=120,env=None,uid=None,gid=None,sl
     """
     base,root,events=map(lambda p:Path(p).absolute(),(base,root,events))
     require(base==base.resolve() and root==root.resolve(),'canonical_paths_required')
+    control(base,True)
     require(re.fullmatch('[0-9a-f]{40}',root.name),'full_release_sha')
     require(timeout>0 and timeout<=3600,'bounded_execution_required')
     require(events.is_file() and not events.is_symlink() and events.stat().st_size==0,'new_event_log_required')
@@ -123,9 +132,10 @@ def recover_drained(base,journal,expected_run):
     """Only a terminal, proven drained failure may be acknowledged. Never PID guessing."""
     base,journal=Path(base).resolve(),Path(journal).resolve()
     require(journal.parent==base,'journal_location')
+    control(base,True);control(journal)
     with lock(base/'scheduler.lock'):
         latch=base/'activation-blocked.json'
-        a=json.loads(latch.read_bytes());b=json.loads(journal.read_bytes())
+        control(latch);a=json.loads(latch.read_bytes());b=json.loads(journal.read_bytes())
         require(a==b and a.get('schema')=='fokus-generation-v1' and a.get('run')==expected_run,'recovery_binding')
         require(a.get('state')=='manual_recovery_required' and a.get('drained') is True,'drainage_unproven')
         require(a.get('boot')==Path('/proc/sys/kernel/random/boot_id').read_text().strip(),'reboot_requires_review')
@@ -143,8 +153,12 @@ def cli():
     require(hashlib.sha256(code).hexdigest()==CONTRACT_DIGEST,'contract_mismatch')
     ns={'__name__':'immutable_contract','__file__':str(contract_path)};exec(compile(code,str(contract_path),'exec'),ns)
     c=type('Contract',(),ns);base,root=Path(args.base).resolve(),Path(args.root).resolve()
-    p=c.read_json(c.canonical(args.policy));receipt=Path(args.receipt).resolve()
+    policy_file=c.canonical(args.policy);control(policy_file)
+    policy_digest=c.digest(policy_file.read_bytes());p=c.read_json(policy_file);receipt=c.canonical(args.receipt);control(receipt)
     def validate():
+        control(base,True);control(policy_file);control(receipt)
+        require(c.digest(policy_file.read_bytes())==policy_digest,'policy_changed')
+        require(events not in (policy_file,receipt,base/'scheduler.lock',base/'activation.lock',base/'activation-blocked.json'),'events_control_collision')
         c.verify(root,receipt);c.scheduler_identity(p,base,root)
         require(p.get('base')==str(base) and p.get('root')==str(root) and p.get('receipt_sha256')==c.digest(receipt.read_bytes()) and p.get('node_sha256')==c.node_fingerprint() and p.get('operator_uid')==os.geteuid(),'policy_binding')
         require(p.get('expires_at_epoch',0)>time.time() and p.get('platform_verified') is True and p.get('all_scheduler_entrypoints_controlled') is True and p.get('external_workers_absent_verified') is True and p.get('no_external_process_delegation_verified') is True,'runtime_evidence_incomplete')

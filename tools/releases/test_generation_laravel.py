@@ -55,8 +55,11 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     try:c.scheduler_contract(root)
     except c.Refusal:pass
     else:raise AssertionError('legacy guard unexpectedly removed')
-    run('queue-fail',2,1)
-    run('foreground-fail',3,1)
+    subprocess.run([php,'artisan','generation:mutex','lock'],cwd=root,env=env,check=True)
+    run('overlap-skip',2,0)
+    subprocess.run([php,'artisan','generation:mutex','unlock'],cwd=root,env=env,check=True)
+    run('queue-fail',3,1)
+    run('foreground-fail',4,1)
     conn=sqlite3.connect(db);assert conn.execute('select count(*) from failed_jobs').fetchone()[0]==1
     assert conn.execute('select count(*) from jobs').fetchone()[0]==0
     print(json.dumps({'state':'real_laravel_generation_verified','source_sha':root.name,'artifact_sha256':pack['artifact_sha256'],'queue_driver':'database','cache_driver':'database','database':'disposable SQLite','background_preserved':True,'legacy_activation_guard':'still closed'}))
