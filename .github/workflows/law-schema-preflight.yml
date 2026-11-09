@@ -4,7 +4,7 @@ name: Law additive schema prepublication tests
   pull_request:
     paths:
       - 'deploy/prepublish-law-schema.php'
-      - 'tests/Deployment/law-schema-preflight-test.php'
+      - 'tests/Deployment/law-schema-*'
       - '.github/workflows/law-schema-preflight.yml'
       - '.github/workflows/deploy.yml'
       - 'database/migrations/2026_10_30_160000_add_encrypted_details_to_law_contacts.php'
@@ -63,9 +63,18 @@ jobs:
           cp .env.example .env
           composer install --no-interaction --prefer-dist --optimize-autoloader
           php artisan migrate:fresh --force --no-interaction
+      - name: Check schema PHP formatting
+        run: old-release/vendor/bin/pint --test -v proposed/deploy/prepublish-law-schema.php proposed/tests/Deployment/law-schema-preflight-test.php
       - name: Verify additive upgrade and fail-closed guards
         run: |
           stage="$RUNNER_TEMP/law-schema-test"
           mkdir -p "$stage"
           cp proposed/deploy/prepublish-law-schema.php proposed/database/migrations/2026_10_30_160000_add_encrypted_details_to_law_contacts.php "$stage/"
-          php proposed/tests/Deployment/law-schema-preflight-test.php "$GITHUB_WORKSPACE/old-release" "$stage/prepublish-law-schema.php"
+          set -euo pipefail
+          python3 proposed/tests/Deployment/law-schema-process-test.py "$GITHUB_WORKSPACE/old-release" "$stage/prepublish-law-schema.php"
+          status=0
+          php proposed/tests/Deployment/law-schema-preflight-test.php "$GITHUB_WORKSPACE/old-release" "$stage/prepublish-law-schema.php" > "$stage/result.log" 2>&1 || status=$?
+          cat "$stage/result.log"
+          echo "Harness exit status: $status"
+          test "$status" -eq 0
+          grep -Fxq 'Old-runtime upgrade, repeated run and both divergence guards passed.' "$stage/result.log"
