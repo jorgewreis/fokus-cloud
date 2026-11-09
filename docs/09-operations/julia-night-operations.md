@@ -23,9 +23,12 @@ continuar somente o trabalho independente acessível. Não simular testes ou dep
 Criação e habilitação confirmadas em 08/11/2026. As primeiras tentativas das duas
 rotinas falharam com erro genérico do agendador. A rotina horária concluiu uma rodada
 em 08/11/2026, das 15h37 às 15h39 (America/Bahia), com acesso efetivo ao Linear e ao
-GitHub e checkpoints publicados. Essa evidência valida a execução horária, mas não
-substitui a validação independente da manutenção de madrugada nem comprova detalhes
-do ambiente herdado que o agendador não informa.
+GitHub e checkpoints publicados. A manutenção de madrugada concluiu sua primeira
+rodada nativa no mesmo dia, das 15h51 às 16h21, com checkout e shell disponíveis,
+atualizações no Linear, PRs, checks, merges e deploys observados no GitHub. As duas
+rotinas estão, portanto, validadas por execuções independentes. O agendador ainda não
+informa os detalhes do ambiente herdado, e cada rodada futura deve registrar suas
+próprias evidências em vez de presumir disponibilidade contínua.
 O estado oficial das tarefas fica no [Linear — Fokus Cloud](https://linear.app/reis-developer/project/fokus-cloud-f279b0530261).
 A [issue GitHub #45](https://github.com/jorgewreis/fokus-cloud/issues/45) guarda links e evidências da configuração.
 A rotina de memória do Notion permanece independente e não foi alterada.
