@@ -1,19 +1,34 @@
 <?php
 
+use App\Http\Controllers\Api\LawSubscriptionController;
+use App\Services\AuditRecorder;
+use App\Services\AuditSanitizer;
+use App\Services\CatalogManager;
+use App\Services\LawUsageMeter;
+use App\Services\MercadoPagoClient;
+use App\Services\PrefixedUlid as ID;
+use App\Services\SubscriptionBillingManager;
+use App\Services\SubscriptionChangeManager;
+use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Database\QueryException;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+
 // Synthetic metadata-shaped rehearsal. Never reads business data or connects to production.
 $root = $argv[1];
 $mode = $argv[2];
 require $root.'/vendor/autoload.php';
 $app = require $root.'/bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app->make(Kernel::class)->bootstrap();
 require __DIR__.'/origin-schema-contract.php';
-set_exception_handler(function (Throwable $error): void { fwrite(STDERR, get_class($error).': '.$error->getMessage().PHP_EOL); exit(1); });
-
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Http;
-use App\Services\PrefixedUlid as ID;
+set_exception_handler(function (Throwable $error): void {
+    fwrite(STDERR, get_class($error).': '.$error->getMessage().PHP_EOL);
+    exit(1);
+});
 
 $sandbox = getenv('UPGRADE_SANDBOX');
 $driver = DB::getDriverName();
@@ -22,7 +37,9 @@ originRequire(($driver === 'sqlite' && config('database.connections.sqlite.datab
     || ($driver === 'mysql' && config('database.connections.mysql.host') === '127.0.0.1' && config('database.connections.mysql.port') == 3306 && preg_match('/^fokus_upgrade_[a-f0-9]{16}$/D', config('database.connections.mysql.database'))), 'disposable target guard');
 $migrationPath = $root.'/database/migrations/2026_11_07_000100_repair_payments_provider_checkout_url.php';
 $report = ['mode' => $mode, 'driver' => $driver, 'scope' => 'Synthetic rows only, metadata-shaped origin, no production approval', 'external_payment_requests' => 0];
-$save = function (string $name, array $data) use ($sandbox): void { file_put_contents($sandbox.'/'.$name.'.json', json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)); };
+$save = function (string $name, array $data) use ($sandbox): void {
+    file_put_contents($sandbox.'/'.$name.'.json', json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+};
 $read = fn (string $name): array => json_decode(file_get_contents($sandbox.'/'.$name.'.json'), true, flags: JSON_THROW_ON_ERROR);
 $f = $read('upgrade-fixture');
 
@@ -31,7 +48,9 @@ if ($mode === 'fresh-noop') {
     $before = originMetadata();
     $ledger = DB::table('migrations')->orderBy('migration')->get()->toJson();
     $migration = require $migrationPath;
-    $migration->up(); $migration->up(); $migration->down();
+    $migration->up();
+    $migration->up();
+    $migration->down();
     originRequire(originMetadata() === $before, 'fresh repair up/up/down leaves all metadata unchanged');
     originRequire(DB::table('migrations')->orderBy('migration')->get()->toJson() === $ledger, 'direct fresh no-op leaves ledger unchanged');
     if ($driver === 'mysql') {
@@ -49,7 +68,9 @@ if ($mode === 'fresh-noop') {
     Schema::table('payments', fn ($table) => $table->dropColumn('provider_checkout_url'));
     if ($driver === 'mysql') {
         foreach (['audit_events' => ['created_at'], 'support_accesses' => ['starts_at', 'ends_at']] as $table => $columns) {
-            foreach ($columns as $column) DB::statement('ALTER TABLE `'.$table.'` MODIFY `'.$column.'` TIMESTAMP NOT NULL');
+            foreach ($columns as $column) {
+                DB::statement('ALTER TABLE `'.$table.'` MODIFY `'.$column.'` TIMESTAMP NOT NULL');
+            }
         }
         $metadata = originMetadata();
         $columns = array_map(fn ($r) => array_slice($r, 0, 4), $metadata['columns']);
@@ -57,8 +78,8 @@ if ($mode === 'fresh-noop') {
         originRequire(count($columns) === 1110 && $digest === '323ce5b8442395943f1cfdff9e49f9cfd7710eac6643a42653f279e172798d7f', 'exact origin column count and global metadata digest');
         $report['schema_column_count'] = count($columns);
         $report['schema_metadata_sha256'] = $digest;
-        Illuminate\Support\Carbon::setTestNow('2026-11-07 12:34:56 UTC');
-        (new App\Services\AuditRecorder(new App\Services\AuditSanitizer))->company($f['cid'], null, 'fixture', ID::make('FIX'), 'create', reason: 'Synthetic temporal fixture only.', actorType: 'system', channel: 'cli', originContext: 'origin-upgrade-fixture');
+        Carbon::setTestNow('2026-11-07 12:34:56 UTC');
+        (new AuditRecorder(new AuditSanitizer))->company($f['cid'], null, 'fixture', ID::make('FIX'), 'create', reason: 'Synthetic temporal fixture only.', actorType: 'system', channel: 'cli', originContext: 'origin-upgrade-fixture');
         $support = ID::make('SUP');
         DB::table('support_accesses')->insert(['id' => $support, 'company_id' => $f['cid'], 'support_user_id' => $f['uid'], 'reason' => 'Synthetic fixture only', 'starts_at' => '2026-11-07 12:34:56', 'ends_at' => '2026-11-07 12:34:56']);
         $save('origin-temporal-ids', ['audit' => DB::table('audit_events')->sole()->id, 'support' => $support]);
@@ -76,20 +97,60 @@ if ($mode === 'fresh-noop') {
     originRequire(Schema::hasColumn('payments', 'provider_checkout_url') !== $beforeRepair, 'expected missing/present checkout column');
     Http::preventStrayRequests();
     Http::fake();
-    $client = new class extends App\Services\MercadoPagoClient {
+    $client = new class extends MercadoPagoClient
+    {
         public int $preferences = 0;
-        public function payerEmail(string $email): string { return 'fixture@example.invalid'; }
-        public function createPreference(array $payload, ?string $key = null): array { $this->preferences++; return ['id' => 'fixture-preference-'.$this->preferences, 'init_point' => 'https://checkout.example.invalid/synthetic']; }
-        public function sanitizePayload(mixed $payload): mixed { return $payload; }
+
+        public function payerEmail(string $email): string
+        {
+            return 'fixture@example.invalid';
+        }
+
+        public function createPreference(array $payload, ?string $key = null): array
+        {
+            $this->preferences++;
+
+            return ['id' => 'fixture-preference-'.$this->preferences, 'init_point' => 'https://checkout.example.invalid/synthetic'];
+        }
+
+        public function sanitizePayload(mixed $payload): mixed
+        {
+            return $payload;
+        }
     };
-    app()->instance(App\Services\MercadoPagoClient::class, $client);
-    $catalog = new class extends App\Services\CatalogManager { public function publicCatalog(string $code, bool $allow = false): array { return ['plans' => [], 'modules' => []]; } };
-    $changes = new class extends App\Services\SubscriptionChangeManager {
+    app()->instance(MercadoPagoClient::class, $client);
+    $catalog = new class extends CatalogManager
+    {
+        public function publicCatalog(string $code, bool $allow = false): array
+        {
+            return ['plans' => [], 'modules' => []];
+        }
+    };
+    $changes = new class extends SubscriptionChangeManager
+    {
         public function __construct() {}
-        public function snapshot(object $subscription): array { return ['items' => [], 'amount' => 10]; }
+
+        public function snapshot(object $subscription): array
+        {
+            return ['items' => [], 'amount' => 10];
+        }
     };
-    $usage = new class extends App\Services\LawUsageMeter { public function contacts(string $companyId): array { return ['used' => 0, 'limit' => 100]; } };
-    $log = new class { public array $warnings = []; public function warning($message, $context = []): void { $this->warnings[] = $message; } };
+    $usage = new class extends LawUsageMeter
+    {
+        public function contacts(string $companyId): array
+        {
+            return ['used' => 0, 'limit' => 100];
+        }
+    };
+    $log = new class
+    {
+        public array $warnings = [];
+
+        public function warning($message, $context = []): void
+        {
+            $this->warnings[] = $message;
+        }
+    };
     Log::swap($log);
     if ($beforeRepair) {
         $subscription = ID::make('SUB');
@@ -108,14 +169,17 @@ if ($mode === 'fresh-noop') {
     $change = ID::make('CHG');
     DB::table('subscription_changes')->insert(['id' => $change, 'company_id' => $f['cid'], 'subscription_id' => $subscription, 'type' => 'upgrade', 'status' => 'aguardando_pagamento', 'effective_at' => now(), 'proration_amount' => 10, 'created_at' => now(), 'updated_at' => now()]);
     $error = null;
-    try { $result = (new App\Services\SubscriptionBillingManager)->checkoutChange($subscription, ['id' => $change, 'status' => 'aguardando_pagamento', 'proration_amount' => 10, 'after' => []], 'fixture@example.invalid', '/fixture-return'); }
-    catch (Illuminate\Database\QueryException $exception) { $error = ['sqlstate' => $exception->errorInfo[0] ?? null, 'driver_code' => $exception->errorInfo[1] ?? null, 'mentions_checkout_column' => str_contains($exception->getMessage(), 'provider_checkout_url')]; }
+    try {
+        $result = (new SubscriptionBillingManager)->checkoutChange($subscription, ['id' => $change, 'status' => 'aguardando_pagamento', 'proration_amount' => 10, 'after' => []], 'fixture@example.invalid', '/fixture-return');
+    } catch (QueryException $exception) {
+        $error = ['sqlstate' => $exception->errorInfo[0] ?? null, 'driver_code' => $exception->errorInfo[1] ?? null, 'mentions_checkout_column' => str_contains($exception->getMessage(), 'provider_checkout_url')];
+    }
     $payment = (array) DB::table('payments')->where('subscription_change_id', $change)->sole();
     $changeRow = (array) DB::table('subscription_changes')->where('id', $change)->sole();
-    $request = Illuminate\Http\Request::create('/api/law/subscription');
+    $request = Request::create('/api/law/subscription');
     $request->attributes->set('active_company_id', $f['cid']);
     $request->attributes->set('active_membership', (object) ['role' => 'admin']);
-    $response = (new App\Http\Controllers\Api\LawSubscriptionController)->show($request, $catalog, $changes, $usage);
+    $response = (new LawSubscriptionController)->show($request, $catalog, $changes, $usage);
     $json = $response->getData(true);
     originRequire($client->preferences === 1 && $response->getStatusCode() === 200, 'one fake preference and actual controller response');
     if ($beforeRepair) {
@@ -137,7 +201,7 @@ if ($mode === 'fresh-noop') {
         originRequire(count($json['payments']) === 2 && $log->warnings === [], 'old and new actual history restored');
         $save('origin-payments-after', DB::table('payments')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all());
     }
-    $noop = (new App\Services\SubscriptionBillingManager)->checkoutChange($subscription, ['status' => 'aplicada'], 'fixture@example.invalid', '/fixture-return');
+    $noop = (new SubscriptionBillingManager)->checkoutChange($subscription, ['status' => 'aplicada'], 'fixture@example.invalid', '/fixture-return');
     originRequire($noop['checkout_url'] === null && $client->preferences === 1 && Http::recorded()->count() === 0, 'already-applied path bypasses fake, no HTTP sent');
     $report += ['query_error' => $error, 'fake_preferences_created' => 1, 'charges_created' => 0, 'payment_status' => $payment['status'], 'change_status' => $changeRow['status'], 'history_payments' => count($json['payments']), 'history_warnings' => $log->warnings];
 } elseif ($mode === 'verify-up' || $mode === 'verify-idempotent') {
@@ -147,8 +211,12 @@ if ($mode === 'fresh-noop') {
     originRequire(DB::table('migrations')->whereIn('migration', array_column($oldLedger, 'migration'))->orderBy('migration')->get()->map(fn ($row) => (array) $row)->all() === $oldLedger, 'original ledger rows unchanged');
     originRequire(DB::table('migrations')->count() === 84, 'exact 79 plus five ledger entries');
     $snapshot = ['metadata' => originMetadata(), 'ledger' => DB::table('migrations')->orderBy('id')->get()->toJson(), 'payments' => DB::table('payments')->orderBy('id')->get()->toJson(), 'changes' => DB::table('subscription_changes')->orderBy('id')->get()->toJson()];
-    if ($mode === 'verify-up') { $save('origin-upgraded', $snapshot); $save('origin-schema-after', $snapshot['metadata']); }
-    else originRequire($read('origin-upgraded') === $snapshot, 'repeated migrate retains all schema, payments, changes and ledger');
+    if ($mode === 'verify-up') {
+        $save('origin-upgraded', $snapshot);
+        $save('origin-schema-after', $snapshot['metadata']);
+    } else {
+        originRequire($read('origin-upgraded') === $snapshot, 'repeated migrate retains all schema, payments, changes and ledger');
+    }
 } else {
     throw new RuntimeException('Unknown origin fixture mode');
 }

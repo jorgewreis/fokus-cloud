@@ -12,7 +12,10 @@ class LawCnjConfidentiality
 
     public static function codeForLevel(int $level): ?string
     {
-        if ($level < 0 || $level > 5) return null;
+        if ($level < 0 || $level > 5) {
+            return null;
+        }
+
         return $level === 0 ? 'public' : 'cnj_'.$level;
     }
 

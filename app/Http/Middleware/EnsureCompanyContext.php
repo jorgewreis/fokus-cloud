@@ -31,6 +31,7 @@ class EnsureCompanyContext
 
         if (! $membership) {
             $request->session()->forget('active_company_id');
+
             return response()->json(['message' => 'Seu vínculo com a empresa não está ativo.'], 403);
         }
 

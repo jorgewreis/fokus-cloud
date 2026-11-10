@@ -109,7 +109,11 @@ class VoucherRedemptionTest extends TestCase
         $publication = DB::table('catalog_publications')->where('product_id', DB::table('products')->where('code', 'law')->value('id'))->latest('version')->first();
         $catalog = json_decode($publication->snapshot, true);
         // Synthetic plan includes two modules; Tarefas exercises the published extra.
-        foreach ($catalog['plans'] as &$plan) if ($plan['code'] === 'law-advocacia') $plan['module_codes'] = ['processos-advocacia', 'contatos-advocacia'];
+        foreach ($catalog['plans'] as &$plan) {
+            if ($plan['code'] === 'law-advocacia') {
+                $plan['module_codes'] = ['processos-advocacia', 'contatos-advocacia'];
+            }
+        }
         unset($plan);
         DB::table('catalog_publications')->where('id', $publication->id)->update(['snapshot' => json_encode($catalog)]);
         $items = [
@@ -334,7 +338,7 @@ class VoucherRedemptionTest extends TestCase
 
     public function test_all_voucher_discount_types_are_supported_and_capped(): void
     {
-        $manager = new VoucherManager();
+        $manager = new VoucherManager;
         $this->assertSame(100.0, $manager->discount((object) ['discount_type' => 'trial_free', 'discount_value' => 100], 100));
         $this->assertSame(25.0, $manager->discount((object) ['discount_type' => 'percentage', 'discount_value' => 25], 100));
         $this->assertSame(40.0, $manager->discount((object) ['discount_type' => 'fixed', 'discount_value' => 40], 100));

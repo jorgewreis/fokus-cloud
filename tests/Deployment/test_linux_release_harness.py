@@ -311,15 +311,31 @@ class HarnessContracts(unittest.TestCase):
         for anchor in ("getenv('RELEASE_DISPOSABLE_TESTS') === '1'", "getenv('APP_ENV') === 'testing'",
                        "is_file($sandbox.'/.disposable-upgrade')", '/^fokus_upgrade_[a-f0-9]{16}$/D',
                        'Http::preventStrayRequests()', 'Http::recorded()->count() === 0',
-                       'new App\\Services\\SubscriptionBillingManager', 'new App\\Http\\Controllers\\Api\\LawSubscriptionController',
                        "'charges_created' => 0"):
             self.assertIn(anchor, source)
+        for qualified, alias in (('App\\Services\\SubscriptionBillingManager', 'SubscriptionBillingManager'),
+                                 ('App\\Http\\Controllers\\Api\\LawSubscriptionController', 'LawSubscriptionController')):
+            imported = 'use ' + qualified + ';'
+            constructed = 'new ' + alias
+            self.assertIn(imported, source)
+            self.assertRegex(source, r'\bnew\s+' + alias + r'\b')
+            self.assertLess(source.index(imported), source.index(constructed))
         self.assertLess(source.index('explicit disposable guard'), source.index("$mode === 'prepare-origin'"))
+
+    def test_fixture_kernel_imports_precede_bootstrap(self):
+        for name in ('origin-shaped-fixture.php', 'reversal-harness.php', 'upgrade-fixture.php'):
+            with self.subTest(name=name):
+                source = (common.ROOT / 'tests/Deployment' / name).read_text(encoding='utf-8')
+                imported = 'use Illuminate\\Contracts\\Console\\Kernel;'
+                bootstrap = '->make(Kernel::class)->bootstrap()'
+                self.assertIn(imported, source)
+                self.assertIn(bootstrap, source)
+                self.assertLess(source.index(imported), source.index(bootstrap))
 
     def test_origin_reversal_records_retained_column_instead_of_baseline_equality(self):
         source = (common.ROOT / 'tests/Deployment/reversal-harness.php').read_text(encoding='utf-8')
-        self.assertIn("['--step'=>5, '--force'=>true]", source)
-        self.assertIn("Schema::hasColumn('payments','provider_checkout_url')", source)
+        self.assertRegex(source, r"\['--step'\s*=>\s*5,\s*'--force'\s*=>\s*true\]")
+        self.assertRegex(source, r"Schema::hasColumn\('payments',\s*'provider_checkout_url'\)")
         self.assertIn("$delta['repair_ledger_absent'] = true", source)
         self.assertIn("$delta['payments_and_urls_unchanged'] = true", source)
         self.assertIn('EXPLICIT AUTHORIZED ROLLBACK DELTA', source)
@@ -327,7 +343,7 @@ class HarnessContracts(unittest.TestCase):
         contract = (common.ROOT / 'tests/Deployment/origin-schema-contract.php').read_text(encoding='utf-8')
         self.assertIn("$reversed ? [['payments', 'provider_checkout_url', 'varchar(512)', 'YES']]", contract)
         self.assertIn("$retained === $before[$kind]", contract)
-        self.assertIn("finally { DB::statement(\"SET SESSION time_zone='+00:00'\"); }", contract)
+        self.assertRegex(contract, r"finally\s*\{\s*DB::statement\(\"SET SESSION time_zone='\+00:00'\"\);\s*\}")
 
     def dependency_fixture(self, root, version):
         root.mkdir(parents=True)
@@ -387,7 +403,13 @@ class HarnessContracts(unittest.TestCase):
         for name in ('linux-upgrade.py', 'baseline-target-metadata.php'):
             with self.subTest(name=name):
                 source = (common.ROOT / 'tests/Deployment' / name).read_text(encoding='utf-8')
-                self.assertIn('Pdo\\Mysql::ATTR_MULTI_STATEMENTS=>false', source)
+                if name.endswith('.php'):
+                    imported = 'use Pdo\\Mysql;'
+                    self.assertIn(imported, source)
+                    self.assertRegex(source, r'(?<![\w\\])Mysql::ATTR_MULTI_STATEMENTS\s*=>\s*false\b')
+                    self.assertLess(source.index(imported), source.index('Mysql::ATTR_MULTI_STATEMENTS'))
+                else:
+                    self.assertIn('Pdo\\Mysql::ATTR_MULTI_STATEMENTS=>false', source)
                 self.assertNotIn('PDO::MYSQL_ATTR_MULTI_STATEMENTS', source)
                 self.assertNotIn('@json_encode', source)
                 self.assertNotIn('error_reporting(0)', source)

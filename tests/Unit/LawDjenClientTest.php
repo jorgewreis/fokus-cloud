@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Services\LawCaseWorkflow;
 use App\Services\LawDjenClient;
 use App\Support\LawDjenClassName;
 use Illuminate\Http\Client\Request;
@@ -44,6 +45,7 @@ class LawDjenClientTest extends TestCase
         Http::fake(function (Request $request) use ($pages) {
             parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
             $page = (int) ($query['pagina'] ?? 1);
+
             return Http::response(['count' => 51, 'items' => $pages[$page] ?? []]);
         });
 
@@ -93,6 +95,7 @@ class LawDjenClientTest extends TestCase
         $first = array_map(fn ($i) => ['id' => $i, 'numeroProcesso' => '10016228320244013301'], range(1, 50));
         Http::fake(function (Request $request) use ($first) {
             parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
             return (int) ($query['pagina'] ?? 1) === 1 ? Http::response(['count' => 51, 'items' => $first]) : Http::response([], 503);
         });
         $result = app(LawDjenClient::class)->lookup('10016228320244013301');
@@ -114,7 +117,7 @@ class LawDjenClientTest extends TestCase
             $this->assertSame($rows[0]['excerpt'], $rows[1]['excerpt']);
             $this->assertSame(1000, mb_strlen($rows[0]['excerpt']));
             $this->assertNotSame($rows[0]['content_fingerprint'], $rows[1]['content_fingerprint']);
-            $this->assertNotSame(\App\Services\LawCaseWorkflow::publicationKey($rows[0]), \App\Services\LawCaseWorkflow::publicationKey($rows[1]));
+            $this->assertNotSame(LawCaseWorkflow::publicationKey($rows[0]), LawCaseWorkflow::publicationKey($rows[1]));
             $this->assertSame(1, $rows[0]['content_fingerprint_version']);
             $this->assertArrayNotHasKey('texto', $rows[0]);
             $this->assertStringNotContainsString('versão original', json_encode($rows));
@@ -127,7 +130,7 @@ class LawDjenClientTest extends TestCase
         Http::fake(['djen.test/*' => Http::response(['count' => 3, 'items' => [
             $base + ['texto' => '<p>Intimação&nbsp; <b>ação</b></p><p>A &amp; B</p>'],
             $base + ['texto' => " Intimação ação\n A & B "],
-            $base + ['texto' => "Intimação ação A & B"],
+            $base + ['texto' => 'Intimação ação A & B'],
         ]])]);
         $rows = app(LawDjenClient::class)->lookup('10016228320244013301')['metadata']['publications'];
         $this->assertCount(1, $rows);
@@ -141,7 +144,7 @@ class LawDjenClientTest extends TestCase
             $row = $normalize->invoke(new LawDjenClient, ['id' => 'item', 'texto' => $text, 'hash' => 'provider']);
             $this->assertNull($row['content_fingerprint']);
             $this->assertNull($row['excerpt']);
-            $this->assertFalse(\App\Services\LawCaseWorkflow::hasContentFingerprint($row));
+            $this->assertFalse(LawCaseWorkflow::hasContentFingerprint($row));
         }
     }
 

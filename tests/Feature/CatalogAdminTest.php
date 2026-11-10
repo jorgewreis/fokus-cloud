@@ -234,9 +234,17 @@ class CatalogAdminTest extends TestCase
     {
         $publication = DB::table('catalog_publications')->where('product_id', DB::table('products')->where('code', 'law')->value('id'))->latest('version')->first();
         $snapshot = json_decode($publication->snapshot, true);
-        foreach ($snapshot['modules'] as &$module) if ($module['code'] === 'processos-advocacia') $module['available_standalone'] = false;
+        foreach ($snapshot['modules'] as &$module) {
+            if ($module['code'] === 'processos-advocacia') {
+                $module['available_standalone'] = false;
+            }
+        }
         // Keep the extra-module contract test independent of unsupported offers.
-        foreach ($snapshot['plans'] as &$plan) if ($plan['code'] === 'law-advocacia') $plan['module_codes'] = ['processos-advocacia', 'contatos-advocacia'];
+        foreach ($snapshot['plans'] as &$plan) {
+            if ($plan['code'] === 'law-advocacia') {
+                $plan['module_codes'] = ['processos-advocacia', 'contatos-advocacia'];
+            }
+        }
         unset($plan);
         unset($module);
         DB::table('catalog_publications')->where('id', $publication->id)->update(['snapshot' => json_encode($snapshot)]);

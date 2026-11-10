@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Services\PrefixedUlid;
 use App\Services\CatalogManager;
+use App\Services\PrefixedUlid;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -171,7 +171,9 @@ class DatabaseSeeder extends Seeder
             $productId = DB::table('products')->where('code', $productCode)->value('id');
             $retainedCodes = array_keys($items);
             // Removing an unsupported offer must not delete existing contracts or history.
-            if ($productCode === 'law') $retainedCodes[] = 'audiencias-advocacia';
+            if ($productCode === 'law') {
+                $retainedCodes[] = 'audiencias-advocacia';
+            }
             DB::table('modules')->where('product_id', $productId)->whereNotIn('code', $retainedCodes)->delete();
         }
 

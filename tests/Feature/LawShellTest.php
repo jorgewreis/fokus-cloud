@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use App\Services\PrefixedUlid;
 use App\Services\LawUsageMeter;
+use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -15,6 +15,7 @@ class LawShellTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private string $companyId;
 
     protected function setUp(): void
@@ -189,7 +190,8 @@ class LawShellTest extends TestCase
 
         $contactIds = [];
         for ($index = 0; $index < 8; $index++) {
-            $id = PrefixedUlid::make('LCO'); $contactIds[] = $id;
+            $id = PrefixedUlid::make('LCO');
+            $contactIds[] = $id;
             DB::table('law_contacts')->insert([
                 'id' => $id, 'company_id' => $this->companyId, 'display_name' => 'Contato '.$index,
                 'contact_type' => 'person', 'status' => $index === 0 ? 'inativo' : 'ativo',
