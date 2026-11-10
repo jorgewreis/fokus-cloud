@@ -104,3 +104,15 @@ Após correção, 40 repetições concorrentes (20 do caso original e 20 do caso
 passaram com retries=0. Nenhuma dependência, timeout de teste ou asserção foi
 relaxada. CI e homologação Linux do novo SHA continuam necessários; os resultados
 do SHA anterior não comprovam a correção nova.
+
+### Inventário exato da suíte Linux
+
+A execução Linux 42828934463 comprovou PHPUnit 351/2.834, sem falhas, erros ou
+skips, tanto em SQLite quanto em MySQL. O gate de cobertura, ainda fixado em
+337/2.776 da composição Law, rejeitou esses resultados completos. A correção
+mantém igualdade exata em 351/2.834 e exige nominalmente os 14 novos casos Lead
+(58 asserções), além dos dez casos de identidade já protegidos. Omissões,
+substituições e asserções enfraquecidas continuam recusadas. Os 40 testes do
+harness, incluindo negativas por cada caso Lead, passaram; os dois JUnit reais
+foram aceitos pelo parser corrigido. Isso não substitui uma nova execução Linux
+do commit final, incluindo a correção de foco.
