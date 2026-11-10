@@ -16,6 +16,28 @@ guard = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(guard)
 
 
+# Prevent Git from leaving asynchronous maintenance writers behind when a
+# disposable repository is removed. Command options protect init/clone too;
+# repository-local settings protect subprocesses launched by the policy tests.
+FIXTURE_GIT_CONFIG = ('gc.auto=0', 'maintenance.auto=false')
+FIXTURE_GIT = ['git', *[item for setting in FIXTURE_GIT_CONFIG for item in ('-c', setting)]]
+
+
+def configure_disposable_git(root):
+    for setting in FIXTURE_GIT_CONFIG:
+        name, value = setting.split('=', 1)
+        subprocess.run([*FIXTURE_GIT, 'config', '--local', name, value],
+                       cwd=root, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+def assert_disposable_git_config(test, root):
+    # Deliberately use bare Git: child policy processes do not inherit -c options.
+    for setting in FIXTURE_GIT_CONFIG:
+        name, value = setting.split('=', 1)
+        actual = subprocess.check_output(['git', 'config', '--local', '--get', name], cwd=root)
+        test.assertEqual(actual.decode().strip(), value)
+
+
 class DeploymentGuard(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -23,6 +45,7 @@ class DeploymentGuard(unittest.TestCase):
         self.previous = Path.cwd()
         os.chdir(self.root)
         self.git('init', '-q')
+        configure_disposable_git(self.root)
         self.git('config', 'user.email', 'synthetic@example.invalid')
         self.git('config', 'user.name', 'Synthetic test')
         self.write('app/code.php', '<?php // synthetic')
@@ -31,13 +54,16 @@ class DeploymentGuard(unittest.TestCase):
         self.audit_patch = patch.object(guard, 'AUDIT_DIGEST', guard.audit_digest(self.base))
         self.audit_patch.start()
 
+    def test_disposable_repository_disables_background_maintenance(self):
+        assert_disposable_git_config(self, self.root)
+
     def tearDown(self):
         self.audit_patch.stop()
         os.chdir(self.previous)
         self.temp.cleanup()
 
     def git(self, *args):
-        return subprocess.check_output(['git', *args], stderr=subprocess.PIPE).decode().strip()
+        return subprocess.check_output([*FIXTURE_GIT, *args], stderr=subprocess.PIPE).decode().strip()
 
     def write(self, path, text='# Synthetic'):
         target = self.root / path
@@ -227,9 +253,12 @@ class AdoptionLifecycle(unittest.TestCase):
         self.root = Path(self.temp.name) / 'repo'
         self.previous = Path.cwd()
         self.fixture_tree = subprocess.check_output(['git', 'write-tree'], cwd=ROOT).decode().strip()
-        subprocess.run(['git', 'clone', '--shared', '--no-checkout', str(ROOT), str(self.root)],
+        subprocess.run([*FIXTURE_GIT, 'clone', '--shared', '--no-checkout',
+                        *[item for setting in FIXTURE_GIT_CONFIG for item in ('-c', setting)],
+                        str(ROOT), str(self.root)],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         os.chdir(self.root)
+        configure_disposable_git(self.root)
         self.git('config', 'user.email', 'synthetic@example.invalid')
         self.git('config', 'user.name', 'Synthetic adoption test')
         # Unit policy only: explicitly audit this temporary fixture. Never rewrite
@@ -240,12 +269,15 @@ class AdoptionLifecycle(unittest.TestCase):
         self.live_pin = self.policy.AUDIT_DIGEST
         self.policy.AUDIT_DIGEST = self.policy.audit_digest(self.fixture_tree)
 
+    def test_disposable_repository_disables_background_maintenance(self):
+        assert_disposable_git_config(self, self.root)
+
     def tearDown(self):
         os.chdir(self.previous)
         self.temp.cleanup()
 
     def git(self, *args):
-        return subprocess.check_output(['git', *args], stderr=subprocess.PIPE).decode().strip()
+        return subprocess.check_output([*FIXTURE_GIT, *args], stderr=subprocess.PIPE).decode().strip()
 
     def change(self, path, text):
         target = self.root / path
@@ -359,20 +391,113 @@ class AdoptionLifecycle(unittest.TestCase):
 
 
 class WorkflowContract(unittest.TestCase):
+    def expected_workflow(self):
+        import hashlib
+        import json
+        fixtures = ROOT / 'tests/Deployment/fixtures'
+        baseline = fixtures / 'deploy-main-operational.yml'
+        delta_file = fixtures / 'deploy-law-operational-deltas.json'
+        self.assertEqual(hashlib.sha256(baseline.read_bytes()).hexdigest(), '213854b5d6838bdd291dd077d3711cfd442772be9b14745a3dd31220d4e70d67')
+        self.assertEqual(hashlib.sha256(delta_file.read_bytes()).hexdigest(), '891ef7a4d2746c63370f667d74e037aa7c2091af8efd5ca20f408824d54a7605')
+        composed = baseline.read_text()
+        for delta in json.loads(delta_file.read_text())['deltas']:
+            self.assertEqual(composed.count(delta['before']), 1)
+            self.assertNotEqual(delta['before'], delta['after'])
+            composed = composed.replace(delta['before'], delta['after'], 1)
+        return composed
+
+    def assert_workflow_preserved(self, current):
+        self.assertEqual(current, self.expected_workflow(),
+                         'Workflow differs from the exact reviewed main + Law operational composition')
+
+    def test_exact_authorized_composition_and_quality_preserved(self):
+        import hashlib
+        self.assert_workflow_preserved((ROOT / '.github/workflows/deploy.yml').read_text())
+        self.assertEqual(hashlib.sha256((ROOT / '.github/workflows/application-quality.yml').read_bytes()).hexdigest(), '88aeef47f81a6949a8df7dc2a66685f3934eba7742d12546491b326ccd55c9a8')
+
+    def test_every_partial_or_reverted_delta_is_rejected(self):
+        import json
+        fixtures = ROOT / 'tests/Deployment/fixtures'
+        baseline = (fixtures / 'deploy-main-operational.yml').read_text()
+        composed = self.expected_workflow()
+        with self.assertRaises(AssertionError): self.assert_workflow_preserved(baseline)
+        for index, delta in enumerate(json.loads((fixtures / 'deploy-law-operational-deltas.json').read_text())['deltas']):
+            with self.subTest(delta=index):
+                self.assertEqual(baseline.count(delta['before']), 1)
+                self.assertEqual(composed.count(delta['after']), 1)
+                with self.assertRaises(AssertionError):
+                    self.assert_workflow_preserved(baseline.replace(delta['before'], delta['after'], 1))
+                with self.assertRaises(AssertionError):
+                    self.assert_workflow_preserved(composed.replace(delta['after'], delta['before'], 1))
+
+    def test_rejects_every_step_removed_skipped_weakened_or_extended(self):
+        import re
+        candidate = self.expected_workflow()
+        for match in re.finditer(r'^      - (?:name|uses):.*(?:\n|$)', candidate, re.M):
+            tail = candidate[match.end():]
+            boundary = re.search(r'^(?:      - |  [a-z]+:)', tail, re.M)
+            end = match.end() + (boundary.start() if boundary else len(tail))
+            block = candidate[match.start():end]
+            variants = ['', block.replace('\n', '\n        continue-on-error: true\n', 1),
+                        block.replace('\n', '\n        if: false\n', 1), block + '        # unreviewed extension\n']
+            if 'run:' in block:
+                run_start = block.index('        run:')
+                run = re.search(r'^(        run: (?![|>])[^\n]+|          [^#\n][^\n]*)$', block[run_start:], re.M)
+                self.assertIsNotNone(run)
+                command_end = run_start + run.end()
+                variants.append(block[:command_end] + ' || true' + block[command_end:])
+            for index, replacement in enumerate(variants):
+                with self.subTest(step=match.group().strip(), mutation=index):
+                    with self.assertRaises(AssertionError):
+                        self.assert_workflow_preserved(candidate[:match.start()] + replacement + candidate[end:])
+
+    def test_rejects_gate_credentials_environment_and_queue_changes(self):
+        candidate = self.expected_workflow()
+        mutations = [
+            ("github.event_name == 'workflow_dispatch' && ", ''),
+            ("github.ref == 'refs/heads/main'", 'true'),
+            ("needs.validate.result == 'success'", 'true'),
+            ("needs.classify.result == 'success'", 'true'),
+            ("needs.classify.outputs.docs_only == 'false'", 'true'),
+            ('needs: [validate, classify]', 'needs: [validate]'),
+            ('environment: production', 'environment: staging'),
+            ('persist-credentials: false', 'persist-credentials: true'),
+            ('fetch-depth: 0', 'fetch-depth: 1'),
+            ('contents: read', 'contents: write'),
+            ('actions: read', 'actions: write'),
+            ('cancel-in-progress: false', 'cancel-in-progress: true'),
+            ("format('law-validation-dispatch-{0}', github.run_id)", "'production-deploy'"),
+            ('jobs:\n', 'jobs:\n  bypass:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo deploy\n'),
+        ]
+        for before, after in mutations:
+            with self.subTest(mutation=before):
+                self.assertIn(before, candidate)
+                with self.assertRaises(AssertionError):
+                    self.assert_workflow_preserved(candidate.replace(before, after, 1))
+
+    def test_derived_law_contract_is_required_in_ci(self):
+        workflow = (ROOT / '.github/workflows/immutable-release-tests.yml').read_text()
+        self.assertIn('python3 tools/releases/test_immutable.py -v', workflow)
+        self.assertIn('python3 tools/releases/test_derived_law_contract.py -v', workflow)
+        self.assertNotIn('continue-on-error', workflow)
+        self.assertNotIn('if:', workflow)
+        self.assertNotIn('||', workflow)
+
+    def test_fixture_contract_has_no_git_object_or_checkout_depth_dependency(self):
+        with patch.object(subprocess, 'check_output', side_effect=AssertionError('No historical Git reads')):
+            self.assert_workflow_preserved((ROOT / '.github/workflows/deploy.yml').read_text())
+
     def test_production_gate_truth_table(self):
-        # Contract for the exact expression asserted below; GitHub service execution
-        # is still required before adoption, and is never simulated with real secrets.
-        for ref in ('refs/heads/main', 'refs/pull/55/merge'):
-            for validation in ('success', 'failure', 'cancelled', 'skipped'):
-                for classification in ('success', 'failure', 'cancelled', 'skipped'):
-                    for output in ('true', 'false', ''):
-                        publish = (ref == 'refs/heads/main' and validation == 'success'
-                                   and classification == 'success' and output == 'false')
-                        if publish:
-                            self.assertEqual((ref, validation, classification, output),
-                                             ('refs/heads/main', 'success', 'success', 'false'))
-                        if output == 'true' or validation != 'success' or classification != 'success':
-                            self.assertFalse(publish)
+        import itertools
+        for event, ref, validation, classification, output in itertools.product(
+                ('push', 'pull_request', 'workflow_dispatch'),
+                ('refs/heads/main', 'refs/heads/candidate', 'refs/pull/55/merge'),
+                ('success', 'failure', 'cancelled', 'skipped'),
+                ('success', 'failure', 'cancelled', 'skipped'), ('true', 'false', '')):
+            publish = (event == 'workflow_dispatch' and ref == 'refs/heads/main'
+                       and validation == classification == 'success' and output == 'false')
+            self.assertEqual(publish, (event, ref, validation, classification, output) ==
+                             ('workflow_dispatch', 'refs/heads/main', 'success', 'success', 'false'))
 
     def test_existing_job_bodies_preserved(self):
         # Checkout on a pull request can be shallow. Test the current workflow
@@ -451,7 +576,7 @@ class WorkflowContract(unittest.TestCase):
         self.assertIn('Apply explicitly selected PHP-FPM reload policy', deploy)
         self.assertIn('Verify application health and expected active release', deploy)
         self.assertIn('Report each publication phase', deploy)
-        self.assertIn('deploy/reload-runtime.sh', deploy)
+        self.assertIn('python3 deploy/fpm_guard_cli.py activate', deploy)
         self.assertNotIn('continuing deployment.', deploy)
 
         # The independent application quality workflow must retain its core

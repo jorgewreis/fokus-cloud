@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\LawAuthorizationService;
+use App\Services\SubscriptionAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Services\LawAuthorizationService;
 
 class LawShellController extends Controller
 {
@@ -24,7 +25,7 @@ class LawShellController extends Controller
         $subscriptions = DB::table('subscriptions as subscription')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->where('subscription.company_id', $companyId)
-            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
+            ->where(fn ($query) => SubscriptionAccess::usable($query))
             ->whereIn('product.code', ['law', 'fokus-law'])
             ->orderByDesc('subscription.created_at')
             ->get([
@@ -54,6 +55,11 @@ class LawShellController extends Controller
                 ->orderBy('module.display_order')
                 ->orderBy('module.name')
                 ->get(['module.id', 'module.code', 'module.module_code', 'module.name', 'module.context_code', 'module.display_order'])
+                // This unsupported legacy offer is not a navigation module. Keep
+                // judicial variants and their API/entitlements unchanged.
+                ->reject(fn (object $module): bool => str_starts_with((string) $module->module_code, 'audiencias')
+                    && ($module->code === 'audiencias-advocacia' || $module->context_code === 'escritorio'))
+                ->reject(fn (object $module): bool => str_starts_with((string) $module->module_code, 'expedicoes') && $module->context_code === 'escritorio')
                 ->unique(fn (object $module): string => (string) $module->module_code)
                 ->values();
         }
@@ -76,7 +82,7 @@ class LawShellController extends Controller
 
         $lawNames = DB::table('subscriptions as subscription')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
-            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
+            ->where(fn ($query) => SubscriptionAccess::usable($query))
             ->whereIn('product.code', ['law', 'fokus-law'])
             ->whereNotNull('subscription.public_name')
             ->where('subscription.public_name', '!=', '')
@@ -172,6 +178,7 @@ class LawShellController extends Controller
                 ->where('lum.company_membership_id', $membership->id)->where('lum.status', 'ativo')->whereNull('lum.deleted_at')
                 ->value('role.code') : null,
             'support_mode' => $supportMode,
+            'features' => ['tasks_enabled' => (bool) config('law-features.tasks_enabled', false)],
             'modules' => $modules->map(fn (object $module): array => [
                 'id' => (string) $module->id,
                 'code' => (string) $module->code,

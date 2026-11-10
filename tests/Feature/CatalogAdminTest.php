@@ -195,11 +195,57 @@ class CatalogAdminTest extends TestCase
         $this->get('/contratar/fokus-law')->assertOk();
     }
 
+    public function test_historical_advocacy_hearing_offers_are_hidden_without_rewriting_catalog_history(): void
+    {
+        $publication = DB::table('catalog_publications')->where('product_id', DB::table('products')->where('code', 'law')->value('id'))->latest('version')->first();
+        $snapshot = json_decode($publication->snapshot, true);
+        $legacy = collect($snapshot['modules'])->firstWhere('code', 'audiencias-vara-criminal');
+        $legacy['code'] = 'audiencias-advocacia';
+        $legacy['context_code'] = 'escritorio';
+        $snapshot['modules'][] = $legacy;
+        $legacyPlan = $snapshot['plans'][0];
+        $legacyPlan['code'] = 'law-audiencias-advocacia';
+        $legacyPlan['module_codes'] = ['audiencias-advocacia'];
+        $snapshot['plans'][] = $legacyPlan;
+        $dependent = $legacyPlan;
+        $dependent['code'] = 'plano-legado-sintetico';
+        $snapshot['plans'][] = $dependent;
+        $stored = json_encode($snapshot);
+        DB::table('catalog_publications')->where('id', $publication->id)->update(['snapshot' => $stored]);
+
+        $catalog = $this->getJson('/api/catalog/law')->assertOk()->json();
+        $this->assertNotContains('audiencias-advocacia', array_column($catalog['modules'], 'code'));
+        $this->assertNotContains('law-audiencias-advocacia', array_column($catalog['plans'], 'code'));
+        $this->assertNotContains('plano-legado-sintetico', array_column($catalog['plans'], 'code'));
+        $this->assertContains('audiencias-vara-criminal', array_column($catalog['modules'], 'code'));
+        $this->assertContains('law-audiencias-setor-publico', array_column($catalog['plans'], 'code'));
+        $this->postJson('/api/catalog/law/quote', [
+            'product_code' => 'law', 'selection_mode' => 'modules', 'cycle' => 'monthly',
+            'items' => [['module_code' => 'audiencias-advocacia', 'quantity' => 1]],
+        ])->assertUnprocessable();
+        $this->postJson('/api/catalog/law/quote', [
+            'product_code' => 'law', 'selection_mode' => 'plan', 'plan_code' => 'law-audiencias-advocacia', 'cycle' => 'monthly',
+            'items' => [['module_code' => 'audiencias-advocacia', 'quantity' => 1]],
+        ])->assertUnprocessable();
+        $this->assertSame($stored, DB::table('catalog_publications')->where('id', $publication->id)->value('snapshot'));
+    }
+
     public function test_plan_quote_allows_only_published_standalone_extra_and_keeps_included_modules(): void
     {
         $publication = DB::table('catalog_publications')->where('product_id', DB::table('products')->where('code', 'law')->value('id'))->latest('version')->first();
         $snapshot = json_decode($publication->snapshot, true);
-        foreach ($snapshot['modules'] as &$module) if ($module['code'] === 'processos-advocacia') $module['available_standalone'] = false;
+        foreach ($snapshot['modules'] as &$module) {
+            if ($module['code'] === 'processos-advocacia') {
+                $module['available_standalone'] = false;
+            }
+        }
+        // Keep the extra-module contract test independent of unsupported offers.
+        foreach ($snapshot['plans'] as &$plan) {
+            if ($plan['code'] === 'law-advocacia') {
+                $plan['module_codes'] = ['processos-advocacia', 'contatos-advocacia'];
+            }
+        }
+        unset($plan);
         unset($module);
         DB::table('catalog_publications')->where('id', $publication->id)->update(['snapshot' => json_encode($snapshot)]);
         $planQuote = $this->postJson('/api/catalog/law/quote', [
@@ -208,7 +254,6 @@ class CatalogAdminTest extends TestCase
                 ['module_code' => 'processos-advocacia', 'quantity' => 1],
                 ['module_code' => 'contatos-advocacia', 'quantity' => 1],
                 ['module_code' => 'tarefas-advocacia', 'quantity' => 1],
-                ['module_code' => 'audiencias-advocacia', 'quantity' => 1],
             ],
         ])->assertOk()->json();
         $this->assertGreaterThan(0, (float) $planQuote['breakdown']['plan_base']);

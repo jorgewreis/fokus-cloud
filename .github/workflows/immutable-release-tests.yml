@@ -21,4 +21,6 @@ jobs:
       - name: Test isolated B+C primitives and fail-closed contracts
         env:
           PYTHONDONTWRITEBYTECODE: '1'
-        run: python3 tools/releases/test_immutable.py -v
+        run: |
+          python3 tools/releases/test_immutable.py -v
+          python3 tools/releases/test_derived_law_contract.py -v

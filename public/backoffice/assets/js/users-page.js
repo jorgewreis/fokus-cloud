@@ -176,6 +176,7 @@ export async function mount(root, context = {}) {
     if (!canManage) $("#user-invite").hidden = true;
     $("#users-filter-form").addEventListener("submit", (event) => { event.preventDefault(); state.query = $("#users-query").value.trim(); state.page = 1; load(); });
     $("#user-invite").addEventListener("click", () => openForm("invite"));
+    $("#user-invite").disabled = !canManage;
     $("#user-drawer-close").addEventListener("click", () => drawerController.close());
     $("#user-form-cancel").addEventListener("click", () => drawerController.close());
     form.addEventListener("submit", submitForm);

@@ -31,7 +31,7 @@ the entire distribution from a clean export and compare exact evidence and inven
 A changed file with an updated caller hash is still rejected. Missing, extra,
 misplaced, linked or altered files cannot be made valid by editing a JSON receipt.
 
-The 14 Law entries are recomputed against the explicit Blade references, exact
+The 15 Law entries are recomputed against the explicit Blade references, exact
 schema, source asset bytes, content-addressed filenames and output bytes. Only the
 single named `config/fokus-law-assets.json` is a permitted generated config. There
 is no `config/**` exception. Vite entrypoints, referenced files and manifest imports

@@ -154,7 +154,10 @@ class CatalogManager
             $personalizationDefaults = $this->planPersonalizationDefaults($plan->id);
             $linkedSubscriptions = $subscriptionRows->filter(function (object $subscription) use ($plan): bool {
                 $snapshot = json_decode((string) $subscription->commercial_snapshot, true) ?: [];
-                if ((string) ($snapshot['plan_id'] ?? '') === (string) $plan->id) return true;
+                if ((string) ($snapshot['plan_id'] ?? '') === (string) $plan->id) {
+                    return true;
+                }
+
                 return empty($snapshot['plan_id'])
                     && (string) ($snapshot['product_id'] ?? '') === (string) $plan->product_id
                     && (string) ($snapshot['plan_code'] ?? '') === (string) $plan->code;
@@ -375,6 +378,7 @@ class CatalogManager
             }
             DB::table('products')->where('id', $product->id)->update(['publication_pending' => true, 'updated_at' => now()]);
         });
+
         return [(array) $current, (array) DB::table('modules')->where('id', $moduleId)->first()];
     }
 
@@ -472,6 +476,7 @@ class CatalogManager
                 'updated_at' => now(),
             ]);
             DB::table('products')->where('id', $productId)->update(['published_catalog_version' => $version, 'release_version' => $releaseVersion, 'publication_pending' => false, 'updated_at' => now()]);
+
             return ['version' => $version, 'release_version' => $releaseVersion, 'snapshot' => $snapshot];
         });
 
@@ -492,6 +497,21 @@ class CatalogManager
         abort_unless($publication, 503, 'Catálogo indisponível.');
 
         $snapshot = json_decode($publication->snapshot, true) ?: [];
+
+        if (in_array($product->code, ['law', 'fokus-law'], true)) {
+            // Retire only the unsupported advocacy hearing offer for new sales.
+            // Published snapshots and existing subscriptions remain unchanged.
+            $retired = collect($snapshot['modules'] ?? [])->filter(fn (array $module): bool => ($module['code'] ?? '') === 'audiencias-advocacia'
+                || (str_starts_with((string) ($module['module_code'] ?? ''), 'audiencias')
+                    && ($module['context_code'] ?? '') === 'escritorio'))
+                ->pluck('code')->push('audiencias-advocacia')->unique()->all();
+            $snapshot['modules'] = array_values(array_filter($snapshot['modules'] ?? [],
+                fn (array $module): bool => ! in_array($module['code'] ?? '', $retired, true)));
+            // Hide a dependent offer rather than silently changing its price/composition.
+            $snapshot['plans'] = array_values(array_filter($snapshot['plans'] ?? [],
+                fn (array $plan): bool => ($plan['code'] ?? '') !== 'law-audiencias-advocacia'
+                    && array_intersect($plan['module_codes'] ?? [], $retired) === []));
+        }
 
         return [
             ...$snapshot,
@@ -566,6 +586,7 @@ class CatalogManager
                 'updated_at' => now(),
             ]);
             DB::table('products')->where('id', $current->product_id)->update(['publication_pending' => true, 'updated_at' => now()]);
+
             return [$current, DB::table('plans')->where('id', $id)->first()];
         });
 
@@ -585,6 +606,7 @@ class CatalogManager
                 'updated_at' => now(),
             ]);
             DB::table('products')->where('id', $current->product_id)->update(['publication_pending' => true, 'updated_at' => now()]);
+
             return [$current, DB::table('modules')->where('id', $id)->first()];
         });
 
@@ -600,7 +622,9 @@ class CatalogManager
         };
         $current = DB::table($table)->where('id', $id)->first();
         abort_unless($current, 404, 'Item de catálogo não encontrado.');
-        if ($type === 'plan') abort_unless($current->publication_state === 'arquivado', 422, 'Arquive o plano antes de excluí-lo.');
+        if ($type === 'plan') {
+            abort_unless($current->publication_state === 'arquivado', 422, 'Arquive o plano antes de excluí-lo.');
+        }
 
         $dependencies = $type === 'module'
             ? $this->moduleDeletionDependencies($id)
@@ -609,7 +633,9 @@ class CatalogManager
 
         DB::transaction(function () use ($table, $id, $current): void {
             DB::table($table)->where('id', $id)->delete();
-            if ($table === 'plans') DB::table('products')->where('id', $current->product_id)->update(['publication_pending' => true, 'updated_at' => now()]);
+            if ($table === 'plans') {
+                DB::table('products')->where('id', $current->product_id)->update(['publication_pending' => true, 'updated_at' => now()]);
+            }
         });
 
         return (array) $current;
@@ -650,9 +676,15 @@ class CatalogManager
     private function moduleDeletionDependencies(string $moduleId): array
     {
         $dependencies = [];
-        if (DB::table('plan_modules')->where('module_id', $moduleId)->exists()) $dependencies[] = 'composição de plano';
-        if (DB::table('subscription_items')->where('module_id', $moduleId)->exists()) $dependencies[] = 'itens de assinatura';
-        if ($this->catalogSnapshotsContain($moduleId)) $dependencies[] = 'publicações do catálogo';
+        if (DB::table('plan_modules')->where('module_id', $moduleId)->exists()) {
+            $dependencies[] = 'composição de plano';
+        }
+        if (DB::table('subscription_items')->where('module_id', $moduleId)->exists()) {
+            $dependencies[] = 'itens de assinatura';
+        }
+        if ($this->catalogSnapshotsContain($moduleId)) {
+            $dependencies[] = 'publicações do catálogo';
+        }
 
         return $dependencies;
     }
@@ -660,9 +692,15 @@ class CatalogManager
     private function planDeletionDependencies(string $planId, string $planCode): array
     {
         $dependencies = [];
-        if (DB::table('vouchers')->where('plan_id', $planId)->exists()) $dependencies[] = 'vouchers';
-        if (DB::table('voucher_redemptions')->where('snapshot', 'like', '%'.$planId.'%')->orWhere('snapshot', 'like', '%'.$planCode.'%')->exists()) $dependencies[] = 'resgates de voucher';
-        if (DB::table('subscription_items')->where('conditions_snapshot', 'like', '%'.$planCode.'%')->exists()) $dependencies[] = 'itens de assinatura';
+        if (DB::table('vouchers')->where('plan_id', $planId)->exists()) {
+            $dependencies[] = 'vouchers';
+        }
+        if (DB::table('voucher_redemptions')->where('snapshot', 'like', '%'.$planId.'%')->orWhere('snapshot', 'like', '%'.$planCode.'%')->exists()) {
+            $dependencies[] = 'resgates de voucher';
+        }
+        if (DB::table('subscription_items')->where('conditions_snapshot', 'like', '%'.$planCode.'%')->exists()) {
+            $dependencies[] = 'itens de assinatura';
+        }
         // Catalog publications are immutable snapshots; they remain readable
         // after removing the live plan row and do not require it to exist.
 
@@ -816,6 +854,7 @@ class CatalogManager
         $incompatibilities = DB::table('module_incompatibilities as relation')->join('modules as incompatible', 'incompatible.id', '=', 'relation.incompatible_module_id')->where('relation.module_id', $moduleId)->orderBy('incompatible.name')->get(['incompatible.id', 'incompatible.code', 'incompatible.name'])->map(fn (object $item): array => (array) $item)->values()->all();
         $personalizations = DB::table('module_personalizations')->where('module_id', $moduleId)->orderBy('display_order')->orderBy('type_code')->get()->map(function (object $personalization): array {
             $type = collect(config('catalog.personalization_types', []))->firstWhere('code', $personalization->type_code) ?: [];
+
             return [
                 'id' => $personalization->id,
                 'type_code' => $personalization->type_code,
@@ -980,6 +1019,7 @@ class CatalogManager
         $allowed = collect(config('catalog.families.'.$this->catalogProductCode($product->code), []))->pluck('code')->all();
         $allowed = [...$allowed, ...DB::table('catalog_custom_module_families')->where('product_id', $product->id)->pluck('code')->all()];
         abort_unless(in_array($requested, $allowed, true), 422, 'Família técnica inválida para este produto.');
+
         return $requested;
     }
 
@@ -992,6 +1032,7 @@ class CatalogManager
                 $code = $base.'-'.Str::lower(Str::random(6));
             } while (DB::table('modules')->where('code', $code)->exists());
         }
+
         return $code;
     }
 
@@ -1015,7 +1056,9 @@ class CatalogManager
         $allowedCapabilities = collect(config('catalog.capabilities.'.$family, []))->keyBy('code');
         $customCapabilities = DB::table('catalog_custom_capabilities')->where('product_id', $product->id)->where('module_code', $family)->get(['code', 'name'])->keyBy('code');
         foreach ($capabilityCodes as $customCode) {
-            if (! Str::startsWith($customCode, 'custom_')) continue;
+            if (! Str::startsWith($customCode, 'custom_')) {
+                continue;
+            }
             if (! $customCapabilities->has($customCode)) {
                 $customName = Str::headline(Str::after($customCode, 'custom_'));
                 DB::table('catalog_custom_capabilities')->insert(['id' => PrefixedUlid::make('CAP'), 'product_id' => $product->id, 'module_code' => $family, 'code' => $customCode, 'name' => $customName, 'created_at' => now(), 'updated_at' => now()]);
@@ -1024,7 +1067,9 @@ class CatalogManager
         }
         foreach (($data['capability_custom_names'] ?? []) as $customName) {
             $customName = trim((string) $customName);
-            if ($customName === '') continue;
+            if ($customName === '') {
+                continue;
+            }
             $customCode = Str::slug($customName);
             if (! $customCapabilities->has($customCode)) {
                 DB::table('catalog_custom_capabilities')->insert(['id' => PrefixedUlid::make('CAP'), 'product_id' => $product->id, 'module_code' => $family, 'code' => $customCode, 'name' => $customName, 'created_at' => now(), 'updated_at' => now()]);
@@ -1032,7 +1077,9 @@ class CatalogManager
             $capabilityCodes[] = $customCode;
         }
         $capabilityCodes = array_values(array_unique($capabilityCodes));
-        foreach ($capabilityCodes as $code) abort_if(! $allowedCapabilities->has($code) && ! $customCapabilities->has($code) && ! DB::table('catalog_custom_capabilities')->where('product_id', $product->id)->where('module_code', $family)->where('code', $code)->exists(), 422, 'Funcionalidade inválida para a família técnica.');
+        foreach ($capabilityCodes as $code) {
+            abort_if(! $allowedCapabilities->has($code) && ! $customCapabilities->has($code) && ! DB::table('catalog_custom_capabilities')->where('product_id', $product->id)->where('module_code', $family)->where('code', $code)->exists(), 422, 'Funcionalidade inválida para a família técnica.');
+        }
 
         $existingDependencies = DB::table('module_dependencies')->where('module_id', $moduleId)->pluck('dependency_module_id')->all();
         $existingIncompatibilities = DB::table('module_incompatibilities')->where('module_id', $moduleId)->pluck('incompatible_module_id')->all();
@@ -1049,15 +1096,23 @@ class CatalogManager
         DB::table('module_capabilities')->where('module_id', $moduleId)->delete();
         DB::table('module_dependencies')->where('module_id', $moduleId)->delete();
         DB::table('module_incompatibilities')->where('module_id', $moduleId)->delete();
-        foreach ($segments as $segment) DB::table('module_segments')->insert(['module_id' => $moduleId, 'segment_code' => $segment, 'created_at' => now(), 'updated_at' => now()]);
+        foreach ($segments as $segment) {
+            DB::table('module_segments')->insert(['module_id' => $moduleId, 'segment_code' => $segment, 'created_at' => now(), 'updated_at' => now()]);
+        }
         foreach ($capabilityCodes as $index => $code) {
             $configured = $allowedCapabilities->get($code);
             $custom = $customCapabilities->get($code) ?: DB::table('catalog_custom_capabilities')->where('product_id', $product->id)->where('module_code', $family)->where('code', $code)->first();
             DB::table('module_capabilities')->insert(['id' => PrefixedUlid::make('MCF'), 'module_id' => $moduleId, 'code' => $code, 'name' => $configured['label'] ?? ($custom->name ?? $code), 'optional' => (bool) ($configured['optional'] ?? false), 'created_at' => now(), 'updated_at' => now()]);
         }
-        foreach ($dependencyIds as $dependencyId) DB::table('module_dependencies')->insert(['module_id' => $moduleId, 'dependency_module_id' => $dependencyId, 'created_at' => now(), 'updated_at' => now()]);
-        foreach ($incompatibilityIds as $incompatibilityId) DB::table('module_incompatibilities')->insert(['module_id' => $moduleId, 'incompatible_module_id' => $incompatibilityId, 'created_at' => now(), 'updated_at' => now()]);
-        if (array_key_exists('personalizations', $data)) $this->syncPersonalizations($moduleId, $data['personalizations'] ?? []);
+        foreach ($dependencyIds as $dependencyId) {
+            DB::table('module_dependencies')->insert(['module_id' => $moduleId, 'dependency_module_id' => $dependencyId, 'created_at' => now(), 'updated_at' => now()]);
+        }
+        foreach ($incompatibilityIds as $incompatibilityId) {
+            DB::table('module_incompatibilities')->insert(['module_id' => $moduleId, 'incompatible_module_id' => $incompatibilityId, 'created_at' => now(), 'updated_at' => now()]);
+        }
+        if (array_key_exists('personalizations', $data)) {
+            $this->syncPersonalizations($moduleId, $data['personalizations'] ?? []);
+        }
     }
 
     private function syncPersonalizations(string $moduleId, array $personalizations): void
@@ -1091,9 +1146,13 @@ class CatalogManager
         $edges[$moduleId] = $newDependencies;
         $visit = function (string $node, array $path) use (&$visit, $edges): void {
             abort_if(in_array($node, $path, true), 422, 'As dependências formam um ciclo.');
-            foreach ($edges[$node] ?? [] as $next) $visit($next, [...$path, $node]);
+            foreach ($edges[$node] ?? [] as $next) {
+                $visit($next, [...$path, $node]);
+            }
         };
-        foreach (array_keys($edges) as $node) $visit($node, []);
+        foreach (array_keys($edges) as $node) {
+            $visit($node, []);
+        }
     }
 
     private function validatedPlanPersonalizationDefaults(object $plan, Collection $modules, array $defaults): array
@@ -1111,7 +1170,10 @@ class CatalogManager
             abort_unless($tier, 422, 'Faixa padrão inválida para a personalização.');
             $rows[] = ['plan_id' => $plan->id, 'personalization_id' => $personalizationId, 'tier_id' => $tierId];
         }
-        foreach ($personalizations->where('required', true) as $personalization) abort_if(! collect($rows)->contains('personalization_id', $personalization->id), 422, 'Personalização obrigatória precisa de uma faixa-padrão no plano.');
+        foreach ($personalizations->where('required', true) as $personalization) {
+            abort_if(! collect($rows)->contains('personalization_id', $personalization->id), 422, 'Personalização obrigatória precisa de uma faixa-padrão no plano.');
+        }
+
         return $rows;
     }
 
@@ -1145,6 +1207,7 @@ class CatalogManager
         $base = $plan->configured_monthly_amount === null
             ? CatalogPricing::suggestedMonthly((float) $plan->module_monthly_amount)
             : max(0, (float) $plan->configured_monthly_amount);
+
         return max(0, round($base + collect($this->planPersonalizationDefaults($plan->id))->sum(fn (array $default): float => max(0, (float) ($default['additional_monthly_amount'] ?? 0))), 2));
     }
 
@@ -1170,9 +1233,9 @@ class CatalogManager
 
         $major = (int) $matches[1];
         $minor = (int) $matches[2];
+
         return $releaseType === 'major'
             ? ($major + 1).'.0'
             : $major.'.'.str_pad((string) ($minor + 1), 2, '0', STR_PAD_LEFT);
     }
-
 }

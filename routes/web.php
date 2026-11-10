@@ -1,9 +1,11 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\SearchDiscoveryController;
+use App\Http\Middleware\RequireApiCsrfToken;
+use App\Services\SubscriptionAccess;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use App\Http\Controllers\SearchDiscoveryController;
+use Illuminate\Support\Facades\Route;
 
 // These resources must reach Laravel: both sites share the same public directory.
 Route::withoutMiddleware('web')->group(function () {
@@ -48,7 +50,7 @@ Route::get('/', function () {
 
 // These endpoints intentionally inherit the web group: session cookies and
 // CSRF protection are required for every browser-originated request.
-Route::prefix('api')->middleware(\App\Http\Middleware\RequireApiCsrfToken::class)->group(base_path('routes/api.php'));
+Route::prefix('api')->middleware(RequireApiCsrfToken::class)->group(base_path('routes/api.php'));
 
 Route::get('/api/csrf-token', fn () => response()->json(['token' => csrf_token()]));
 
@@ -82,6 +84,7 @@ $serveFokusLawShell = function (string $page = 'overview', bool $redirectProfile
 
     if (! $membership) {
         request()->session()->forget('active_company_id');
+
         return redirect('/portal/empresas');
     }
 
@@ -121,7 +124,7 @@ Route::get('/portal/fokus-lead', function () {
     $hasLeadSubscription = DB::table('subscriptions as subscription')
         ->join('products as product', 'product.id', '=', 'subscription.product_id')
         ->where('subscription.company_id', $companyId)
-        ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
+        ->where(fn ($query) => SubscriptionAccess::usable($query))
         ->whereIn('product.code', ['lead', 'fokus-lead'])->exists();
 
     abort_unless($membership && $hasLeadSubscription, 403, 'Esta conta não tem um vínculo ativo com o Fokus Lead.');
@@ -130,19 +133,27 @@ Route::get('/portal/fokus-lead', function () {
 });
 Route::get('/portal/fokus-lead/perfil', function () {
     $user = Auth::guard('web')->user();
-    if (! $user || $user->status !== 'ativa') return redirect('/?acesso=cliente');
-    if (! $user->email_verified_at) return redirect('/verificar-email?return_to='.rawurlencode('/portal/fokus-lead/perfil'));
+    if (! $user || $user->status !== 'ativa') {
+        return redirect('/?acesso=cliente');
+    }
+    if (! $user->email_verified_at) {
+        return redirect('/verificar-email?return_to='.rawurlencode('/portal/fokus-lead/perfil'));
+    }
     $companyId = request()->session()->get('active_company_id');
-    if (! $companyId) return redirect('/portal/empresas');
+    if (! $companyId) {
+        return redirect('/portal/empresas');
+    }
     $hasMembership = DB::table('company_memberships as membership')->join('companies as company', 'company.id', '=', 'membership.company_id')
         ->where('membership.company_id', $companyId)->where('membership.user_id', $user->id)->where('membership.status', 'ativo')->whereNull('membership.deleted_at')
         ->where('company.status', 'ativa')->whereNull('company.deleted_at')->exists();
     $hasLeadSubscription = DB::table('subscriptions as subscription')->join('products as product', 'product.id', '=', 'subscription.product_id')
-        ->where('subscription.company_id', $companyId)->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
+        ->where('subscription.company_id', $companyId)->where(fn ($query) => SubscriptionAccess::usable($query))
         ->whereIn('product.code', ['lead', 'fokus-lead'])->exists();
     abort_unless($hasMembership && $hasLeadSubscription, 403, 'Esta conta não tem um vínculo ativo com o Fokus Lead.');
+
     return response()->view('portal.fokus-lead', ['initialPage' => 'profile']);
 });
+Route::get('/portal/fokus-law/tarefas', fn () => $serveFokusLawShell('tasks'));
 Route::get('/portal/fokus-law/processos', fn () => $serveFokusLawShell('processes'));
 Route::get('/portal/fokus-law/processos/configuracoes', fn () => $serveFokusLawShell('processes-settings'));
 Route::get('/portal/fokus-law/processos/autorizacoes', fn () => $serveFokusLawShell('processes-access'));

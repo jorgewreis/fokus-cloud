@@ -254,7 +254,7 @@ class RuntimeReloadTests(unittest.TestCase):
     def test_reload_exact_command_without_restart(self):
         result, calls = self.run_reload('reload', 'php8.4-fpm.service')
         self.assertEqual(0, result.returncode)
-        self.assertEqual('-n\nsystemctl\nreload\n--\nphp8.4-fpm.service\n', calls)
+        self.assertEqual('-n\n--\n/usr/bin/systemctl\nreload\n--\nphp8.4-fpm.service\n', calls)
 
     def test_denied_reload_preserves_failure_without_fallback(self):
         for status in (1, 5, 126, 127, 255):

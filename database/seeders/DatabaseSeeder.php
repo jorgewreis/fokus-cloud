@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Services\PrefixedUlid;
 use App\Services\CatalogManager;
+use App\Services\PrefixedUlid;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -47,7 +47,6 @@ class DatabaseSeeder extends Seeder
                 'tarefas-vara' => ['Gestão de Tarefas para Unidades Judiciais', 'tarefas', 19.90, 'setor_publico', 'vara', 'setor-publico-vara', false],
                 'tarefas-juizado' => ['Gestão de Tarefas para Juizados', 'tarefas', 19.90, 'setor_publico', 'juizado', 'setor-publico-juizado', false],
                 'tarefas-orgao-publico' => ['Gestão de Tarefas para Órgãos Públicos', 'tarefas', 19.90, 'setor_publico', 'orgao_publico', 'setor-publico-orgao-publico', false],
-                'audiencias-advocacia' => ['Gestão de Audiências para Advogados', 'audiencias', 24.90, 'advocacia', 'escritorio', 'advocacia-escritorio', false],
                 'audiencias-vara-criminal' => ['Gestão de Audiências para Varas Criminais', 'audiencias', 29.90, 'setor_publico', 'vara_criminal', 'setor-publico-vara-criminal', false],
                 'audiencias-vara-civel' => ['Gestão de Audiências para Varas Cíveis', 'audiencias', 29.90, 'setor_publico', 'vara_civel', 'setor-publico-vara-civel', false],
                 'audiencias-juizado' => ['Gestão de Audiências para Juizados', 'audiencias', 27.90, 'setor_publico', 'juizado', 'setor-publico-juizado', false],
@@ -118,7 +117,6 @@ class DatabaseSeeder extends Seeder
                 'law-cartorio-civel' => ['Cartório Cível', 'setor_publico', ['processos-vara-civel', 'contatos-vara', 'expedicoes-cartorio', 'tarefas-vara']],
                 'law-gestao-audiencias' => ['Gestão de Audiências', 'setor_publico', ['processos-juizado', 'contatos-vara', 'tarefas-juizado', 'audiencias-juizado']],
                 'law-gestao-expedientes' => ['Gestão de Expedientes', 'setor_publico', ['processos-orgao-publico', 'contatos-setor-publico', 'expedicoes-orgao-publico', 'tarefas-orgao-publico']],
-                'law-audiencias-advocacia' => ['Audiências para Advocacia', 'advocacia', ['processos-advocacia', 'contatos-advocacia', 'tarefas-advocacia', 'audiencias-advocacia']],
                 'law-audiencias-setor-publico' => ['Audiências para Setor Público', 'setor_publico', ['processos-vara-criminal', 'contatos-vara', 'tarefas-vara', 'audiencias-vara-criminal']],
             ],
             'lead' => [
@@ -171,7 +169,12 @@ class DatabaseSeeder extends Seeder
 
         foreach ($modules as $productCode => $items) {
             $productId = DB::table('products')->where('code', $productCode)->value('id');
-            DB::table('modules')->where('product_id', $productId)->whereNotIn('code', array_keys($items))->delete();
+            $retainedCodes = array_keys($items);
+            // Removing an unsupported offer must not delete existing contracts or history.
+            if ($productCode === 'law') {
+                $retainedCodes[] = 'audiencias-advocacia';
+            }
+            DB::table('modules')->where('product_id', $productId)->whereNotIn('code', $retainedCodes)->delete();
         }
 
         foreach (['law', 'lead'] as $productCode) {
