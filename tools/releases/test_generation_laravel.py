@@ -24,8 +24,12 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
         with c.lock(base/name):pass
     c.unpack(artifact,pack['artifact_sha256'],root,transport);receipt=temp/'receipt.json';d.seal(clone,candidate,evidence,root,receipt,transport)
     (base/'current').symlink_to(root);db=temp/'database.sqlite';db.touch();marker=temp/'marker'
-    env={'PATH':os.environ['PATH'],'HOME':str(temp),'APP_ENV':'testing','APP_KEY':'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=','DB_CONNECTION':'sqlite','DB_DATABASE':str(db),'CACHE_STORE':'database','SESSION_DRIVER':'array','LOG_CHANNEL':'stderr','FOKUS_SYNTHETIC_MARKER':str(marker)}
-    php=shutil.which('php')
+    # Exercise normal Artisan lifecycle: APP_ENV=testing disables CommandFinished in Laravel.
+    # Isolation is supplied by this disposable tree/SQLite/queue, not the environment name.
+    env={'PATH':os.environ['PATH'],'HOME':str(temp),'APP_ENV':'fokus-synthetic','APP_KEY':'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=','DB_CONNECTION':'sqlite','DB_DATABASE':str(db),'CACHE_STORE':'database','SESSION_DRIVER':'array','LOG_CHANNEL':'stderr','FOKUS_SYNTHETIC_MARKER':str(marker)}
+    php_path=shutil.which('php')
+    assert php_path, 'PHP executable unavailable'
+    php=str(Path(php_path).resolve(strict=True))
     for migration in ('0001_01_01_000001_create_cache_table.php','0001_01_01_000002_create_jobs_table.php'):
         subprocess.run([php,'artisan','migrate','--force','--path=database/migrations/'+migration],cwd=root,env=env,check=True)
     def run(mode,slot,expect):
@@ -51,6 +55,9 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
             else:raise AssertionError('activation entered while scheduler active')
         finally:
             code=os.waitstatus_to_exitcode(os.waitpid(pid,0)[1])
+        if mode in ('overlap-skip','filter-skip','distributed'):
+            rows=[json.loads(line) for line in events.read_text().splitlines()]
+            assert any(row['state']==('scope_unverified' if mode=='distributed' else 'skipped') for row in rows), 'real Laravel skip missing'
         assert code==expect,(mode,code,(temp/('error-'+mode)).read_text() if code else '')
         assert (base/'current').resolve()==root
         assert not [path for path in base.glob('activation-*.json') if path.name!='activation-blocked.json']
@@ -70,6 +77,9 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     subprocess.run([php,'artisan','generation:mutex','unlock'],cwd=root,env=env,check=True)
     run('queue-fail',3,1)
     run('foreground-fail',4,1)
+    run('filter-skip',5,0)
+    assert not Path(str(marker)+'.filtered').exists()
+    run('distributed',6,0)
     conn=sqlite3.connect(db);assert conn.execute('select count(*) from failed_jobs').fetchone()[0]==1
     assert conn.execute('select count(*) from jobs').fetchone()[0]==0
     print(json.dumps({'state':'real_laravel_generation_verified','source_sha':root.name,'artifact_sha256':pack['artifact_sha256'],'queue_driver':'database','cache_driver':'database','database':'disposable SQLite','background_preserved':True,'legacy_activation_guard':'still closed'}))
