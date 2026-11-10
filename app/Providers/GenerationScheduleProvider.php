@@ -2,10 +2,13 @@
 
 namespace App\Providers;
 
+use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Console\Events\ScheduledBackgroundTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
+use Illuminate\Console\Events\ScheduledTaskSkipped;
 use Illuminate\Console\Events\ScheduledTaskStarting;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Queue\Events\JobExceptionOccurred;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Support\Facades\Event;
@@ -63,6 +66,20 @@ class GenerationScheduleProvider extends ServiceProvider
             }
         };
         $write('ready');
+        // withoutOverlapping's filter skips before Starting/Finished are emitted.
+        Event::listen(ScheduledTaskSkipped::class, static fn ($event) => $write('skipped', $event->task));
+        Event::listen(CommandFinished::class, static function ($event) use ($write): void {
+            if ($event->command === 'schedule:run') {
+                foreach (app(Schedule::class)->events() as $task) {
+                    // The completed command sees the final schedule after console routes load.
+                    // Cross-server skips have no task terminal event in Laravel.
+                    if ($task->onOneServer) {
+                        $write('scope_unverified', $task);
+                    }
+                }
+                $write('scope_checked');
+            }
+        });
         Event::listen(JobFailed::class, static fn () => $write('queue_failure'));
         Event::listen(JobExceptionOccurred::class, static fn () => $write('queue_failure'));
         Event::listen(ScheduledTaskStarting::class, static function ($event) use ($write): void {
