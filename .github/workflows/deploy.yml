@@ -6,9 +6,14 @@ name: Deploy Fokus Cloud Laravel
       - main
   pull_request:
   workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact main commit with successful isolated Linux validation
+        required: true
+        type: string
 
 concurrency:
-  group: ${{ github.event_name == 'pull_request' && format('law-validation-pr-{0}', github.event.pull_request.number) || 'production-deploy' }}
+  group: ${{ github.event_name == 'pull_request' && format('law-validation-pr-{0}', github.event.pull_request.number) || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && format('law-validation-dispatch-{0}', github.run_id) || 'production-deploy') }}
   cancel-in-progress: false
 
 jobs:
@@ -54,6 +59,12 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '24'
+
+      - name: Test fail-closed FPM workflow integration without network
+        run: python3 -m unittest discover -s tests/Deployment -p 'test_fpm*.py' -v
+
+      - name: Test manual publication gate without GitHub or server access
+        run: python3 -m unittest discover -s tests/Deployment -p 'test_publication_gate.py' -v
 
       - name: Generate content-addressed Fokus Law assets for tests
         run: npm run law:assets:prepare
@@ -117,14 +128,12 @@ jobs:
         run: npm run seo:check
 
   deploy:
-    if: github.ref == 'refs/heads/main' && needs.validate.result == 'success' && needs.classify.result == 'success' && needs.classify.outputs.docs_only == 'false'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.validate.result == 'success' && needs.classify.result == 'success' && needs.classify.outputs.docs_only == 'false'
     name: Publish Laravel application
     needs: [validate, classify]
     runs-on: ubuntu-latest
     environment: production
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
       DEPLOY_PUBLIC_BASE_URL: ${{ vars.DEPLOY_PUBLIC_BASE_URL }}
       DEPLOY_RELEASE_URL: ${{ vars.DEPLOY_RELEASE_URL }}
       FPM_RELOAD_MODE: ${{ vars.FPM_RELOAD_MODE }}
@@ -132,10 +141,28 @@ jobs:
       EXPECTED_RELEASE: ${{ github.sha }}
     permissions:
       contents: read
+      actions: read
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Setup Node for immutable Fokus Law assets
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: Generate immutable assets and one-shot deploy payload
+        run: node tools/generate-fokus-law-assets.mjs --output-root "$GITHUB_WORKSPACE" --staging-dir "$RUNNER_TEMP/fokus-law-assets"
+
+      - name: Require exact main revision and latest successful Linux validation
+        id: publication
+        env:
+          EXPECTED_CANDIDATE: ${{ inputs.candidate_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 deploy/publication_gate.py
 
       # Intentionally fail before SSH or schema mutations until an independently
       # reviewed, dynamic release endpoint and runtime policy are configured.
@@ -145,14 +172,6 @@ jobs:
         run: |
           python3 tools/ci/verify-deployment.py preflight
           python3 tools/ci/verify-deployment.py probe-current
-
-      - name: Setup Node for immutable Fokus Law assets
-        uses: actions/setup-node@v5
-        with:
-          node-version: '24'
-
-      - name: Generate immutable assets and one-shot deploy payload
-        run: node tools/generate-fokus-law-assets.mjs --output-root "$GITHUB_WORKSPACE" --staging-dir "$RUNNER_TEMP/fokus-law-assets"
 
       - name: Configure SSH
         id: ssh
@@ -175,6 +194,15 @@ jobs:
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" exit
+
+      - name: Preflight selected FPM policy before any remote mutation
+        id: fpm_preflight
+        timeout-minutes: 2
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: python3 deploy/fpm_guard_cli.py preflight
 
       - name: Verify Law schema before publishing application code
         id: schema
@@ -340,17 +368,19 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-        run: |
-          set -euo pipefail
-          # Preflight validates these exact, bounded arguments before any mutation.
-          # No restart fallback, privilege change, or swallowed SSH exit status.
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "bash -s -- '$FPM_RELOAD_MODE' '$FPM_SERVICE'" < deploy/reload-runtime.sh
+        run: python3 deploy/fpm_guard_cli.py activate
 
       - name: Purge Cloudflare cache
         id: cdn
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ZONE_ID != '' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
         run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ZONE_ID" ]; then
+            echo "Cloudflare purge not configured; skipping."
+            echo "result=skipped" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           curl --fail-with-body --request POST \
             "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
             --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
@@ -365,6 +395,8 @@ jobs:
       - name: Report each publication phase
         if: ${{ always() }}
         env:
+          PHASE_PUBLICATION: ${{ steps.publication.outcome }}
+          PHASE_FPM_PREFLIGHT: ${{ steps.fpm_preflight.outcome }}
           PHASE_PREFLIGHT: ${{ steps.preflight.outcome }}
           PHASE_SSH: ${{ steps.ssh.outcome }}
           PHASE_SCHEMA: ${{ steps.schema.outcome }}
@@ -379,6 +411,6 @@ jobs:
           PHASE_DATAJUD: ${{ steps.datajud.outcome }}
           PHASE_SCHEDULER: ${{ steps.scheduler.outcome }}
           PHASE_SERVICES: ${{ steps.services.outcome }}
-          PHASE_CDN: ${{ steps.cdn.outcome }}
+          PHASE_CDN: ${{ steps.cdn.outputs.result || steps.cdn.outcome }}
           PHASE_RELEASE: ${{ steps.release.outcome }}
         run: python3 tools/ci/summarize-deployment.py

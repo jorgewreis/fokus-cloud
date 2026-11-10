@@ -10,14 +10,13 @@
   Object.assign(labels, { cnj_1: 'Segredo de Justiça', cnj_2: 'Sigilo mínimo', cnj_3: 'Sigilo médio', cnj_4: 'Sigilo intenso', cnj_5: 'Sigilo absoluto' });
   const confidentialityAlert = 'Este processo tem prioridade para criança ou adolescente ou violência doméstica. Revise seu nível de sigilo.';
   const needsConfidentialityAlert = (priorities, level) => (priorities || []).some((code) => ['child_adolescent', 'domestic_violence'].includes(code)) && level === 'public';
-  let apiRoot = '/law/cases';
-  const request = (path = '', options) => window.FokusApi.request(`${apiRoot}${path}`, options);
   let generation = 0;
 
   async function render(root, context, initialCaseId = null, pageView = 'module', processModule = null) {
     const advocacyVariant = processModule?.context_code === 'escritorio' || (context.modules || []).some((module) => String(module.family || '').startsWith('processos') && module.context_code === 'escritorio');
     const adminVariant = processModule?.context_code === 'orgao_publico' || ((context.modules || []).some((module) => String(module.family || '').startsWith('processos') && module.context_code === 'orgao_publico') && !(context.modules || []).some((module) => String(module.family || '').startsWith('processos') && ['judiciario', 'vara_criminal', 'escritorio'].includes(module.context_code)));
-    apiRoot = adminVariant ? '/law/admin-cases' : '/law/cases';
+    const apiRoot = adminVariant ? '/law/admin-cases' : '/law/cases';
+    const request = (path = '', options) => window.FokusApi.request(`${apiRoot}${path}`, options);
     const pageTitles = { module: adminVariant ? 'Processos administrativos' : 'Processos', 'processes-settings': adminVariant ? 'Configurações do órgão' : advocacyVariant ? 'Configurações do escritório' : 'Configurações da unidade', 'processes-access': 'Autorizações' };
     document.title = `${pageTitles[pageView] || pageTitles.module} | Fokus Law`;
     const session = ++generation;
@@ -220,6 +219,7 @@
         if (!active() || token !== viewToken) return;
         body.replaceChildren(); body.className = ''; headingActions.replaceChildren();
         if (can('create')) headingActions.append(button('Novo processo', action(create), true));
+        if (can('create') && advocacyVariant) headingActions.append(button('Importar carteira', action(importPortfolio)));
         const total = Number(result.pagination.total); const classes = result.summary_by_class || []; const summary = result.summary || {};
         const overview = $('section', 'law-record-overview-banner fs-card'); overview.setAttribute('aria-label', 'Resumo dos processos acessíveis');
         const copy = $('div', 'law-record-overview-copy'); copy.append($('span', 'law-record-overview-kicker', 'PAINEL PROCESSUAL'), $('h3', '', 'Seus processos, em uma visão.'), $('p', '', 'Classes judiciais, organização interna e histórico dos processos em um só lugar.'));
@@ -266,7 +266,44 @@
         paginate(body, result.pagination.total, result.pagination.per_page, page, async (value) => { page = value; await list(); });
       } catch (error) { report(error); } finally { body.removeAttribute('aria-busy'); }
     }
+    async function importPortfolio(event) {
+      const token = viewToken;
+      const local = await getRefs(context.active_unit_id);
+      if (!active() || token !== viewToken) return;
+      const modal = dialog('Importar carteira', event?.currentTarget);
+      const form = $('form', 'law-record-editor'); const error = message(); const preview = $('div');
+      const numbers = $('textarea', 'fs-form-control'); numbers.rows = 8; numbers.required = true;
+      const unit = select(local.units.map(item => [item.id, item.name]), context.active_unit_id);
+      const privacy = select(local.confidentiality_levels.map(item => [item.code, item.label]), 'public');
+      const submit = button('Conferir carteira', null, true); submit.type = 'submit';
+      form.id = `law-portfolio-${session}`; submit.setAttribute('form', form.id);
+      let snapshot = null; let completed = false;
+      const payload = () => ({ numbers: numbers.value.split(/[\n;,]+/).map(value => value.trim()).filter(Boolean), law_unit_id: unit.value, internal_confidentiality_level: privacy.value });
+      const invalidate = () => { snapshot = null; preview.replaceChildren(); submit.textContent = 'Conferir carteira'; };
+      [numbers, unit, privacy].forEach(control => { control.addEventListener('input', invalidate); control.addEventListener('change', invalidate); });
+      form.append(field('Números CNJ (um por linha, até 200)', numbers, 'numbers'), field('Unidade', unit, 'law_unit_id'), field('Sigilo interno dos novos processos', privacy, 'internal_confidentiality_level'), preview, error);
+      modal.body.append(form); modal.footer.append(button('Cancelar', () => modal.close()), submit);
+      bindForm(form, submit, error, async () => {
+        if (completed) return;
+        const sent = payload(); const identity = JSON.stringify(sent); const confirmed = snapshot === identity;
+        const result = await request('/portfolio/import', { method: 'POST', body: { ...sent, confirmed } });
+        if (!modal.element.isConnected || !active() || token !== viewToken) return;
+        if (identity !== JSON.stringify(payload())) { invalidate(); return; }
+        preview.replaceChildren();
+        if (confirmed) {
+          completed = true; snapshot = null; submit.disabled = true; submit.hidden = true;
+          preview.append($('p', 'fs-alert fs-alert-success', `${result.created_count || 0} processos cadastrados. Registros existentes foram preservados.`));
+          modal.footer.append(button('Concluir', () => { modal.close(); if (active() && token === viewToken) list(); }));
+          return;
+        }
+        snapshot = identity;
+        (result.rows || []).forEach(row => preview.append($('p', '', `${row.number || row.case_number}: ${row.status}${row.message ? ` - ${row.message}` : ''}`)));
+        preview.append($('p', '', 'Confira os números, a unidade e o sigilo antes de confirmar. Não serão concedidas autorizações nominais automaticamente.'));
+        submit.textContent = 'Confirmar importação';
+      });
+    }
     async function create(event) {
+      const createToken = viewToken;
       if (!refs) throw new Error('Selecione uma unidade ativa no menu para cadastrar um processo.');
       const number = input('', 'text', 25); number.required = true; number.placeholder = '0000000-00.0000.0.00.0000'; number.inputMode = 'numeric';
       const unit = select(refs.units.map((item) => [item.id, item.name]), context.active_unit_id); unit.required = true;
@@ -279,12 +316,13 @@
       form.append(main, error); form.id = `law-case-form-${Date.now()}`; const save = button('Cadastrar processo', null, true); save.type = 'submit'; save.setAttribute('form', form.id); modal.body.append(form); modal.footer.append(button('Cancelar', () => modal.close()), save);
       bindForm(form, save, error, async () => {
         const result = await request('', { method: 'POST', body: { case_number: number.value, law_unit_id: unit.value, filing_date: filing.value || null, distribution_date: distribution.value || null } });
+        const valid = modal.element.isConnected && active() && viewToken === createToken;
         modal.close();
-        await detail(result.case.id);
+        if (valid) await detail(result.case.id);
       });
     }
     async function edit(event) {
-      const c = detailData.case; const local = await getRefs(c.law_unit_id); const modal = dialog('Editar processo', event?.currentTarget, 'fs-modal-xl');
+      const c = detailData.case; const internalLevel = c.internal_confidentiality_level ?? c.confidentiality_level; const editToken = viewToken; const local = await getRefs(c.law_unit_id); if (!active() || currentId !== c.id || viewToken !== editToken) return; const modal = dialog('Editar processo', event?.currentTarget, 'fs-modal-xl');
       const form = $('form', 'law-record-editor'); form.id = `law-case-edit-${c.id}`; const controls = {};
       const add = (box, label, name, control, help = '') => { controls[name] = control; box.body.append(field(label, control, name, help)); };
       const operational = section('Organização interna', 'ORG');
@@ -294,7 +332,7 @@
       add(operational, 'Estado operacional', 'operational_status', state, 'O Datajud não altera este estado. Para arquivar ou reabrir, use a ação específica.');
       add(operational, 'Prioridade operacional', 'operational_priority', select(['normal', 'high', 'urgent'].map((v) => [v, text(v)]), c.operational_priority));
       add(operational, 'Responsável principal', 'responsible_membership_id', select([['', 'Sem responsável'], ...local.members.map((v) => [v.id, v.name])], c.responsible_membership_id));
-      if (detailData.can_manage_access) add(operational, 'Sigilo', 'confidentiality_level', select([...local.confidentiality_levels.map((v) => [v.code, v.label]), ...(c.confidentiality_level === 'confidential' ? [['confidential', 'Sigiloso (legado)']] : []), ...(c.confidentiality_level === 'secret' ? [['secret', 'Secreto (legado)']] : [])], c.confidentiality_level), 'No Fokus Law, somente Sigilo absoluto (nível 5) exige autorização nominal. Registros legados mantêm a restrição já aplicada.');
+      if (detailData.can_manage_access) add(operational, 'Sigilo interno', 'internal_confidentiality_level', select([...local.confidentiality_levels.map((v) => [v.code, v.label]), ...(internalLevel === 'confidential' ? [['confidential', 'Sigiloso (legado)']] : []), ...(internalLevel === 'secret' ? [['secret', 'Secreto (legado)']] : [])], internalLevel), 'No Fokus Law, somente Sigilo absoluto (nível 5) exige autorização nominal. Registros legados mantêm a restrição já aplicada.');
       const metadata = section('Dados processuais', 'CNJ');
       const legal = section('Prioridade processual', 'PRIO', 'Fundamentos legais de tramitação prioritária; podem ser cumulativos.');
       const legalPriorities = $('fieldset', 'fs-stack fs-stack-gap-2'); legalPriorities.append($('legend', 'fs-form-label', 'Fundamentos legais'));
@@ -307,10 +345,10 @@
       const confidentialityAlertNotice = $('p', 'fs-alert fs-alert-warning', confidentialityAlert); confidentialityAlertNotice.setAttribute('role', 'alert');
       const updateConfidentialityAlert = () => {
         const priorities = [...legalPriorities.querySelectorAll('input:checked')].map((checkbox) => checkbox.value);
-        confidentialityAlertNotice.hidden = !needsConfidentialityAlert(priorities, controls.confidentiality_level?.value || c.confidentiality_level);
+        confidentialityAlertNotice.hidden = !needsConfidentialityAlert(priorities, controls.internal_confidentiality_level?.value || internalLevel);
       };
       legalPriorities.addEventListener('change', updateConfidentialityAlert);
-      controls.confidentiality_level?.addEventListener('change', updateConfidentialityAlert);
+      controls.internal_confidentiality_level?.addEventListener('change', updateConfidentialityAlert);
       updateConfidentialityAlert(); operational.body.append(confidentialityAlertNotice);
       const classIsOfficial = (c.official_fields || []).includes('case_class'); const subjectsAreOfficial = (c.official_fields || []).includes('subjects');
       const editor = metadataEditor(local, { code: c.case_class_code, name: c.case_class }, c.subjects || []);
@@ -349,7 +387,9 @@
           }
           else data[name] = control.value || null;
         });
-        await request(apiPath(c.id), { method: 'PATCH', body: data }); modal.close(); await detail(c.id);
+        await request(apiPath(c.id), { method: 'PATCH', body: data });
+        const stillEditing = modal.element.isConnected && active() && currentId === c.id && viewToken === editToken;
+        modal.close(); if (stillEditing) await detail(c.id);
       });
     }
     async function detail(id, historyPage = 1) {
@@ -492,8 +532,35 @@
         });
         movementHistory.body.append(eventList);
         if (c.djen_sync_status !== 'not_requested') movementHistory.body.append($('p', 'law-record-detail-empty', 'As publicações do DJEN são complementares; não alteram a situação oficial nem calculam prazos.'));
+        main.body.append(keyValues([['Sigilo interno', text(c.internal_confidentiality_level ?? c.confidentiality_level)], ['Sigilo informado pela fonte', text(c.source_confidentiality_level)]]));
         const operational = section('Organização interna', 'ORG', 'Acompanhamento do trabalho da unidade'); operational.classList.add('law-record-detail-organization'); operational.body.append(keyValues([['Unidade', c.unit_name], ['Estado operacional', c.operational_status_label], ['Prioridade operacional', text(c.operational_priority)], ['Prioridades processuais', (c.procedural_priorities || []).map((code) => local.procedural_priorities?.find((item) => item.code === code)?.label || code).join('; ') || 'Nenhuma'], ['Responsável principal', local.members.find((item) => item.id === c.responsible_membership_id)?.name || 'Sem responsável'], ['Sigilo', labels[c.confidentiality_level] || 'Nível não informado']]));
         if (c.operational_status === 'archived') operational.body.append(keyValues([['Justificativa do arquivamento', c.archive_reason]])); operational.body.append($('p', 'law-record-detail-empty', 'A situação oficial do Datajud e o estado operacional são independentes.')); leftColumn.append(main, movementHistory); rightColumn.append(operational);
+        if (!adminVariant && result.workflow?.publications?.length) {
+          const reviews = section('Triagem de publicações', 'DJEN', 'Registro manual, sem cálculo automático de prazos');
+          result.workflow.publications.forEach(item => {
+            const row = $('article', 'law-record-history-entry');
+            row.append($('h4', '', `${item.status === 'reviewed' ? 'Revisada' : 'Pendente de revisão'}: ${dateOnly(item.publication.availability_date || item.publication.publication_date)}`));
+            if (item.publication.excerpt) row.append($('p', '', item.publication.excerpt));
+            if (item.content_identity_unverified) row.append($('p', '', 'Identidade do conteúdo integral não verificada. O resumo ou hash do provedor não confirma que o texto permaneceu inalterado.'));
+            if (item.previous_publication_keys?.length) row.append($('p', '', 'Há triagem histórica associada a este resumo. Ela foi preservada separadamente e não confirma a revisão desta versão integral.'));
+            if (item.missing_from_current_source) row.append($('p', '', 'Registro histórico ausente da consulta atual.'));
+            if (item.next_action) row.append($('p', '', `Próxima providência: ${item.next_action}`));
+            if (can('update') && !item.missing_from_current_source) row.append(button('Registrar triagem', action(event => {
+              const modal = dialog('Registrar triagem', event?.currentTarget); const form = $('form'); const error = message();
+              const status = select([['pending', 'Pendente'], ['reviewed', 'Revisada']], item.status);
+              const next = $('textarea', 'fs-form-control'); next.value = item.next_action || ''; next.maxLength = 2000;
+              form.id = `law-publication-${session}`; const save = button('Salvar triagem', null, true); save.type = 'submit'; save.setAttribute('form', form.id);
+              form.append(field('Estado', status, 'status'), field('Próxima providência', next, 'next_action'), error); modal.body.append(form); modal.footer.append(button('Cancelar', () => modal.close()), save);
+              bindForm(form, save, error, async () => {
+                await request(`${apiPath(id)}/publications/${encodeURIComponent(item.key)}`, { method: 'PATCH', body: { status: status.value, next_action: next.value || null, version: item.version } });
+                const valid = modal.element.isConnected && active() && currentId === id && viewToken === token;
+                modal.close(); if (valid) await detail(id, historyPage);
+              });
+            })));
+            reviews.body.append(row);
+          });
+          leftColumn.append(reviews);
+        }
         let conflictsCard = null;
         if (c.metadata_conflicts?.length) {
           const conflicts = section('Divergências com o Datajud'); conflicts.body.append($('p', '', 'O preenchimento manual foi preservado. Escolha o valor que deve permanecer em cada campo.'));

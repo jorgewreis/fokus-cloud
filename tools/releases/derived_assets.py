@@ -66,7 +66,7 @@ def validate_functional(root, original):
     law = json.loads((root/LAW).read_bytes())
     require(set(law) == {'version','algorithm','assets'} and law['version'] == 1 and law['algorithm'] == 'sha256', 'law_schema')
     refs = re.findall(r"FokusLawAssets::url\('([^']+)'\)", original['resources/views/portal/fokus-law.blade.php'].decode())
-    require(len(refs) == 14 and len(set(refs)) == 14 and set(law['assets']) == set(refs), 'law_completeness')
+    require(len(refs) == 15 and len(set(refs)) == 15 and set(law['assets']) == set(refs), 'law_completeness')
     generated={LAW,'public/build/manifest.json','public/build/fonts-manifest.json'}
     for name, item in law['assets'].items():
         require(set(item) == {'path','sha256'}, 'law_entry')

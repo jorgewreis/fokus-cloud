@@ -25,11 +25,13 @@ class EnsureCompanyContext
             ->where('membership.company_id', $companyId)
             ->where('membership.user_id', $request->user()->id)
             ->where('membership.status', 'ativo')
+            ->whereNull('membership.deleted_at')
             ->select('membership.*', 'roles.code as role')
             ->first();
 
         if (! $membership) {
             $request->session()->forget('active_company_id');
+
             return response()->json(['message' => 'Seu vínculo com a empresa não está ativo.'], 403);
         }
 

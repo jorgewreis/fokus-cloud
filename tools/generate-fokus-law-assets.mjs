@@ -16,6 +16,7 @@ export const FOKUS_LAW_ASSETS = Object.freeze([
     'portal/assets/fokus-law-contacts.js',
     'portal/assets/law-record-ui.js',
     'portal/assets/fokus-law-processes.js',
+        'portal/assets/fokus-law-tasks.js',
     'portal/assets/fokus-law-shell.js',
     'assets/js/portal-profile.js',
 ]);

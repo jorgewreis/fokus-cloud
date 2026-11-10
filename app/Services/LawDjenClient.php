@@ -2,13 +2,18 @@
 
 namespace App\Services;
 
+use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class LawDjenClient
 {
     private const PAGE_SIZE = 50;
+
     private const MAX_PAGES = 200;
+
     public function lookup(string $caseNumber): array
     {
         $digits = preg_replace('/\D+/', '', $caseNumber) ?: '';
@@ -24,14 +29,21 @@ class LawDjenClient
             $fetchedCount = 0;
             for ($page = 1; $page <= self::MAX_PAGES; $page++) {
                 $response = $http->get($endpoint, ['numeroProcesso' => $digits, 'pagina' => $page, 'itensPorPagina' => self::PAGE_SIZE]);
-                if (! $response->successful()) return $this->httpFailure($response);
+                if (! $response->successful()) {
+                    return $this->httpFailure($response);
+                }
                 $payload = $response->json();
                 if (! is_array($payload) || ! array_key_exists('count', $payload) || ! is_numeric($payload['count']) || (int) $payload['count'] < 0 || ! array_key_exists('items', $payload) || ! is_array($payload['items']) || ! array_is_list($payload['items'])) {
                     return $this->failure('invalid_response', 'O DJEN retornou uma resposta sem total ou lista de resultados válidos. Os dados anteriores foram preservados.');
                 }
-                if ($expectedCount === null) $expectedCount = (int) $payload['count'];
-                elseif ((int) $payload['count'] !== $expectedCount) return $this->failure('inconsistent_response', 'O total de resultados do DJEN mudou durante a paginação. A consulta será repetida e os dados anteriores foram preservados.');
-                if ($expectedCount >= self::PAGE_SIZE * self::MAX_PAGES) return $this->failure('result_limit', 'O resultado alcançou o limite seguro de páginas e sua completude não pode ser confirmada. Nenhuma lista parcial substituiu as publicações anteriores.');
+                if ($expectedCount === null) {
+                    $expectedCount = (int) $payload['count'];
+                } elseif ((int) $payload['count'] !== $expectedCount) {
+                    return $this->failure('inconsistent_response', 'O total de resultados do DJEN mudou durante a paginação. A consulta será repetida e os dados anteriores foram preservados.');
+                }
+                if ($expectedCount >= self::PAGE_SIZE * self::MAX_PAGES) {
+                    return $this->failure('result_limit', 'O resultado alcançou o limite seguro de páginas e sua completude não pode ser confirmada. Nenhuma lista parcial substituiu as publicações anteriores.');
+                }
                 foreach ($payload['items'] as $item) {
                     if (! is_array($item) || preg_replace('/\D+/', '', (string) ($item['numeroProcesso'] ?? $item['numero_processo'] ?? '')) !== $digits) {
                         return $this->failure('invalid_result', 'O DJEN retornou um item sem correspondência verificável com o número CNJ consultado. Os dados anteriores foram preservados.');
@@ -39,21 +51,38 @@ class LawDjenClient
                 }
                 $items = [...$items, ...$payload['items']];
                 $fetchedCount += count($payload['items']);
-                if ($fetchedCount >= $expectedCount) break;
-                if ($payload['items'] === []) return $this->failure('incomplete_response', 'O DJEN retornou uma página vazia antes de completar o total informado. Os dados anteriores foram preservados.');
+                if ($fetchedCount >= $expectedCount) {
+                    break;
+                }
+                if ($payload['items'] === []) {
+                    return $this->failure('incomplete_response', 'O DJEN retornou uma página vazia antes de completar o total informado. Os dados anteriores foram preservados.');
+                }
             }
-            if ($expectedCount === null || $fetchedCount < $expectedCount) return $this->failure('incomplete_response', 'A consulta ao DJEN atingiu o limite de páginas sem recuperar todos os resultados. Os dados anteriores foram preservados.');
-            if ($fetchedCount !== $expectedCount) return $this->failure('inconsistent_response', 'O número de itens recebidos não corresponde ao total informado pelo DJEN. Os dados anteriores foram preservados.');
+            if ($expectedCount === null || $fetchedCount < $expectedCount) {
+                return $this->failure('incomplete_response', 'A consulta ao DJEN atingiu o limite de páginas sem recuperar todos os resultados. Os dados anteriores foram preservados.');
+            }
+            if ($fetchedCount !== $expectedCount) {
+                return $this->failure('inconsistent_response', 'O número de itens recebidos não corresponde ao total informado pelo DJEN. Os dados anteriores foram preservados.');
+            }
 
             $normalizedItems = collect($items)->map(fn (array $item): array => $this->normalizePublication($item));
             if ($normalizedItems->contains(fn (array $item): bool => ! ($item['id'] || $item['hash'] || $item['availability_date'] || $item['publication_date'] || $item['type'] || $item['court_name'] || $item['tribunal'] || $item['link']))) {
                 return $this->failure('invalid_result', 'Uma publicação do DJEN não contém dados reconhecíveis. As publicações anteriores foram preservadas.');
             }
+            // Dates and descriptive labels alone cannot distinguish publications.
+            // Reject the entire response rather than silently merging uncertain items.
+            if ($normalizedItems->contains(fn (array $item): bool => ! (
+                $item['id'] || $item['hash'] || $item['link'] || LawCaseWorkflow::hasContentFingerprint($item)
+            ))) {
+                return $this->failure('invalid_result', 'Uma publicação do DJEN não contém identidade suficiente para comparação segura. As publicações anteriores foram preservadas.');
+            }
             $publications = $normalizedItems
-                ->unique(fn (array $item): string => (string) ($item['id'] ?: ($item['hash'] ?: implode('|', [$item['availability_date'], $item['type'], $item['court_name']]))) )
+                ->unique(fn (array $item): string => LawCaseWorkflow::publicationKey($item))
                 ->sortByDesc('availability_date')->values()->all();
 
-            if ($expectedCount > 0 && $publications === []) return $this->failure('invalid_result', 'O DJEN informou resultados, mas nenhum item tinha dados reconhecíveis. As publicações anteriores foram preservadas.');
+            if ($expectedCount > 0 && $publications === []) {
+                return $this->failure('invalid_result', 'O DJEN informou resultados, mas nenhum item tinha dados reconhecíveis. As publicações anteriores foram preservadas.');
+            }
 
             if ($publications === []) {
                 return [
@@ -67,6 +96,7 @@ class LawDjenClient
                 ->unique(fn (array $item): string => mb_strtolower($item['name'].'|'.($item['pole'] ?? '')))->values()->all();
             $recipientAttorneys = collect($publications)->flatMap(fn (array $item): array => $item['recipient_attorneys'])
                 ->unique(fn (array $item): string => mb_strtolower($item['name']))->values()->all();
+
             return [
                 'status' => 'synced', 'code' => 'synced',
                 'metadata' => [
@@ -89,11 +119,13 @@ class LawDjenClient
             ];
         } catch (ConnectionException $exception) {
             $timedOut = preg_match('/cURL error 28|timed?\s*out|timeout/i', $exception->getMessage()) === 1;
+
             return $this->failure($timedOut ? 'timeout' : 'connection_failed', $timedOut
                 ? 'A consulta ao DJEN excedeu o tempo de espera.'
                 : 'Não foi possível estabelecer conexão com o serviço do DJEN.');
         } catch (\Throwable $exception) {
-            \Illuminate\Support\Facades\Log::error('Falha interna na consulta DJEN.', ['exception_class' => $exception::class]);
+            Log::error('Falha interna na consulta DJEN.', ['exception_class' => $exception::class]);
+
             return $this->failure('internal_error', 'O sistema não conseguiu interpretar a resposta do DJEN.');
         }
     }
@@ -101,9 +133,15 @@ class LawDjenClient
     private function normalizePublication(array $item): array
     {
         $link = trim((string) ($item['link'] ?? $item['linkDocumento'] ?? $item['url'] ?? ''));
-        if ($link !== '' && (! filter_var($link, FILTER_VALIDATE_URL) || strtolower((string) parse_url($link, PHP_URL_SCHEME)) !== 'https')) $link = '';
+        if ($link !== '' && (! filter_var($link, FILTER_VALIDATE_URL) || strtolower((string) parse_url($link, PHP_URL_SCHEME)) !== 'https')) {
+            $link = '';
+        }
+
+        $text = $this->publicationText($item['texto'] ?? null);
 
         return [
+            'content_fingerprint_version' => 1,
+            'content_fingerprint' => $text === null ? null : hash('sha256', $text),
             'hash' => isset($item['hash']) ? substr(trim((string) $item['hash']), 0, 120) : null,
             'id' => isset($item['id']) ? (string) $item['id'] : null,
             'availability_date' => $this->normalizeDate($item['dataDisponibilizacao'] ?? $item['data_disponibilizacao'] ?? null),
@@ -113,60 +151,90 @@ class LawDjenClient
             'case_class' => $this->shortText($item['nomeClasse'] ?? $item['classeProcessual'] ?? $item['classe'] ?? null, 180),
             'type' => $this->shortText($item['tipoComunicacao'] ?? null, 120),
             'document_type' => $this->shortText($item['tipoDocumento'] ?? null, 120),
-            'excerpt' => $this->publicationExcerpt($item['texto'] ?? null),
+            'excerpt' => $text === null ? null : (mb_strlen($text) > 1000 ? rtrim(mb_substr($text, 0, 999)).'…' : $text),
             'link' => $link !== '' ? $link : null,
             'recipients' => $this->normalizeRecipients($item['destinatarios'] ?? []),
             'recipient_attorneys' => $this->normalizeAttorneys($item['destinatarioadvogados'] ?? []),
         ];
     }
 
-    private function publicationExcerpt(mixed $value): ?string
+    private function publicationText(mixed $value): ?string
     {
-        if (! is_string($value) || trim($value) === '') return null;
+        if (! is_string($value) || ! mb_check_encoding($value, 'UTF-8') || trim($value) === '') {
+            return null;
+        }
         $text = preg_replace('/<\s*(?:br|\/p|\/div|\/li|\/tr)\b[^>]*>/iu', ' ', $value) ?? $value;
         $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $text = trim(preg_replace('/[\s\p{Z}]+/u', ' ', $text) ?? '');
-        if ($text === '') return null;
-        return mb_strlen($text) > 1000 ? rtrim(mb_substr($text, 0, 999)).'…' : $text;
+        if ($text === '') {
+            return null;
+        }
+        // NFC makes canonically equivalent Unicode independent of provider encoding.
+        $normalized = \Normalizer::normalize($text, \Normalizer::FORM_C);
+
+        return $normalized === false ? null : $normalized;
     }
 
     private function normalizeRecipients(mixed $items): array
     {
-        if (! is_array($items)) return [];
+        if (! is_array($items)) {
+            return [];
+        }
+
         return collect($items)->map(function ($item): ?array {
-            if (is_scalar($item)) $item = ['nome' => $item];
-            if (! is_array($item)) return null;
+            if (is_scalar($item)) {
+                $item = ['nome' => $item];
+            }
+            if (! is_array($item)) {
+                return null;
+            }
             $name = $this->shortText($item['nome'] ?? $item['name'] ?? null, 180);
-            if ($name === null) return null;
+            if ($name === null) {
+                return null;
+            }
+
             return array_filter(['name' => $name, 'pole' => $this->shortText($item['polo'] ?? null, 40)], static fn ($value) => $value !== null);
         })->filter()->unique(fn (array $item): string => mb_strtolower($item['name'].'|'.($item['pole'] ?? '')))->take(100)->values()->all();
     }
 
     private function normalizeAttorneys(mixed $items): array
     {
-        if (! is_array($items)) return [];
+        if (! is_array($items)) {
+            return [];
+        }
+
         return collect($items)->map(function ($item): ?array {
-            if (! is_array($item)) return null;
+            if (! is_array($item)) {
+                return null;
+            }
             $attorney = is_array($item['advogado'] ?? null) ? $item['advogado'] : $item;
             $name = $this->shortText($attorney['nome'] ?? $item['nome'] ?? null, 180);
+
             return $name === null ? null : ['name' => $name];
         })->filter()->unique(fn (array $item): string => mb_strtolower($item['name']))->take(100)->values()->all();
     }
 
     private function shortText(mixed $value, int $limit): ?string
     {
-        if (! is_scalar($value)) return null;
+        if (! is_scalar($value)) {
+            return null;
+        }
         $value = trim((string) $value);
+
         return $value === '' ? null : mb_substr($value, 0, $limit);
     }
 
     private function normalizeDate(mixed $value): ?string
     {
-        if (! is_scalar($value)) return null;
+        if (! is_scalar($value)) {
+            return null;
+        }
         $value = trim((string) $value);
-        if ($value === '') return null;
+        if ($value === '') {
+            return null;
+        }
         try {
-            return \Carbon\Carbon::parse($value)->toDateString();
+            return Carbon::parse($value)->toDateString();
         } catch (\Throwable) {
             return null;
         }
@@ -177,7 +245,7 @@ class LawDjenClient
         return ['status' => 'error', 'code' => $code, 'metadata' => [], 'message' => $message];
     }
 
-    private function httpFailure(\Illuminate\Http\Client\Response $response): array
+    private function httpFailure(Response $response): array
     {
         return match ($response->status()) {
             401, 403 => $this->failure('access_denied', 'O serviço público do DJEN recusou a consulta a partir deste ambiente.'),

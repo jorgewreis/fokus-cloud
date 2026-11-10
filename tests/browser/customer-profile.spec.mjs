@@ -29,7 +29,7 @@ const shellView = shellTemplate.replace(/{{\s*\\App\\Support\\FokusLawAssets::ur
     resolvedAssets += 1;
     return assetUrls.get(source);
 });
-assert.equal(resolvedAssets, 14, 'Resolve every real Blade asset reference for the static browser fixture.');
+assert.equal(resolvedAssets, 15, 'Resolve every real Blade asset reference for the static browser fixture.');
 assert.ok(!shellView.includes('FokusLawAssets::url'), 'Do not serve unresolved Blade asset helpers.');
 const profileView = await readFile(new URL('../../resources/views/portal/partials/fokus-law-profile.blade.php', import.meta.url), 'utf8');
 const renderedShell = shellView

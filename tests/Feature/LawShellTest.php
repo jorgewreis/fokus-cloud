@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use App\Services\PrefixedUlid;
 use App\Services\LawUsageMeter;
+use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -15,6 +15,7 @@ class LawShellTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private string $companyId;
 
     protected function setUp(): void
@@ -189,7 +190,8 @@ class LawShellTest extends TestCase
 
         $contactIds = [];
         for ($index = 0; $index < 8; $index++) {
-            $id = PrefixedUlid::make('LCO'); $contactIds[] = $id;
+            $id = PrefixedUlid::make('LCO');
+            $contactIds[] = $id;
             DB::table('law_contacts')->insert([
                 'id' => $id, 'company_id' => $this->companyId, 'display_name' => 'Contato '.$index,
                 'contact_type' => 'person', 'status' => $index === 0 ? 'inativo' : 'ativo',
@@ -255,6 +257,53 @@ class LawShellTest extends TestCase
             ->assertJsonPath('permissions.manage_company_users', true)
             ->assertJsonPath('subscription', null)
             ->assertJsonCount(0, 'modules');
+    }
+
+    public function test_seed_has_no_advocacy_hearing_offer_and_preserves_judicial_variants(): void
+    {
+        $this->assertDatabaseMissing('modules', ['code' => 'audiencias-advocacia']);
+        $this->assertDatabaseMissing('plans', ['code' => 'law-audiencias-advocacia']);
+        foreach (['vara-criminal', 'vara-civel', 'juizado', 'orgao-publico', 'externo'] as $variant) {
+            $this->assertDatabaseHas('modules', ['code' => 'audiencias-'.$variant]);
+        }
+        $this->assertDatabaseHas('plans', ['code' => 'law-audiencias-setor-publico']);
+    }
+
+    public function test_legacy_advocacy_hearing_menu_is_hidden_without_deleting_it_or_judicial_module(): void
+    {
+        $judicial = DB::table('modules')->where('code', 'audiencias-vara-criminal')->firstOrFail();
+        $legacy = (array) $judicial;
+        $legacy['id'] = PrefixedUlid::make('MOD');
+        $legacy['code'] = 'audiencias-advocacia';
+        $legacy['name'] = 'Oferta legada sintética';
+        $legacy['context_code'] = 'escritorio';
+        $legacy['display_order'] = 0;
+        DB::table('modules')->insert($legacy);
+        // Repeating a non-production seed must not erase pre-existing contracts.
+        $this->seed();
+        $this->assertDatabaseHas('modules', ['id' => $legacy['id']]);
+        DB::table('modules')->whereIn('id', [$judicial->id, $legacy['id']])->update(['status' => 'ativo', 'publication_state' => 'publicado']);
+
+        $subscriptionId = PrefixedUlid::make('ASS');
+        DB::table('subscriptions')->insert([
+            'id' => $subscriptionId, 'company_id' => $this->companyId, 'product_id' => $judicial->product_id,
+            'status' => 'ativa', 'open_company_product' => $this->companyId.'-'.$judicial->product_id,
+            'commercial_snapshot' => json_encode(['segment' => 'setor_publico']), 'version' => 1,
+            'created_by' => $this->user->id, 'updated_by' => $this->user->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        foreach ([$legacy, (array) $judicial] as $module) {
+            DB::table('subscription_items')->insert([
+                'id' => PrefixedUlid::make('ITM'), 'company_id' => $this->companyId, 'subscription_id' => $subscriptionId,
+                'module_id' => $module['id'], 'name_snapshot' => $module['name'], 'quantity' => 1,
+                'unit_price_snapshot' => $module['monthly_price'], 'version' => 1,
+                'created_by' => $this->user->id, 'updated_by' => $this->user->id, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        $this->actingAs($this->user)->withSession(['active_company_id' => $this->companyId])
+            ->getJson('/api/law/shell-context')->assertOk()->assertJsonCount(1, 'modules')
+            ->assertJsonPath('modules.0.code', 'audiencias-vara-criminal');
+        $this->assertDatabaseHas('subscription_items', ['module_id' => $legacy['id']]);
+        $this->assertDatabaseHas('modules', ['id' => $legacy['id']]);
     }
 
     public function test_shell_context_lists_only_contracted_published_modules(): void

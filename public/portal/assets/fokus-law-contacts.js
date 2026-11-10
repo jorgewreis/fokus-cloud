@@ -101,6 +101,73 @@
     } catch (error) { feedback.dataset.state = 'error'; feedback.textContent = error.message || 'Não foi possível carregar os contextos disponíveis.'; root.append(feedback); }
   }
 
+  function openImport(root, onSaved, opener) {
+    const modal = createModal(root, 'Importar contatos', 'fs-modal-lg', opener);
+    const help = $('p', '', 'CSV UTF-8 (vírgula ou ponto e vírgula) ou PDF exportado pelo Fokus v1. Até 2 MiB e 500 linhas. Prévia válida por 30 minutos. Colunas: display_name, legal_nature, legal_name, cpf, cnpj, email, phone. Apenas linhas prontas serão selecionáveis.');
+    const file = input('', '', 0); file.type = 'file'; file.accept = '.csv,.pdf'; file.setAttribute('aria-label', 'Arquivo de contatos');
+    const message = $('p', 'law-contact-feedback'); message.setAttribute('role', 'status');
+    const rows = $('div', 'law-contact-import-preview');
+    const confirmed = input('', '', 0); confirmed.type = 'checkbox';
+    const confirmation = field('Revisei as linhas selecionadas e confirmo a importação.', confirmed);
+    let batch = null; let generation = 0; let closed = false; let busy = false; let selections = [];
+    modal.onHidden(() => { closed = true; generation++; batch = null; });
+    const originalClose = modal.close;
+    modal.close = () => { if (busy) return; closed = true; generation++; batch = null; originalClose(); };
+    const commit = button('Confirmar importação', 'fs-btn fs-btn-primary', async () => {
+      const selected = selections.filter((item) => item.control.checked).map((item) => item.index);
+      if (busy || !batch || !confirmed.checked || !selected.length) return;
+      busy = true; commit.disabled = true; file.disabled = true; cancel.disabled = true;
+      try {
+        const result = await window.FokusApi.request('/law/contacts/import/commit', { method: 'POST', body: { batch_id: batch, rows: selected, confirmed: true } });
+        batch = null; message.textContent = `${result.imported_count} contato(s) importado(s).`;
+        busy = false;
+        if (!closed) { modal.close(); await onSaved(); }
+      } catch (error) {
+        batch = null; message.textContent = `${error.message || 'Não foi possível confirmar.'} Gere uma nova prévia antes de tentar novamente.`;
+      } finally { busy = false; file.disabled = false; cancel.disabled = false; update(); }
+    });
+    const update = () => { commit.disabled = closed || busy || !batch || !confirmed.checked || !selections.some((item) => item.control.checked); };
+    const cancel = button('Cancelar', 'fs-btn fs-btn-outline-primary', () => modal.close());
+    confirmed.addEventListener('change', update);
+    file.addEventListener('change', async () => {
+      const serial = ++generation; batch = null; selections = []; confirmed.checked = false; rows.replaceChildren(); update();
+      const selected = file.files?.[0]; if (!selected) return;
+      const format = selected.name.toLowerCase().endsWith('.pdf') ? 'pdf' : selected.name.toLowerCase().endsWith('.csv') ? 'csv' : null;
+      if (!format || selected.size > 2097152 || !selected.size) { message.textContent = 'Selecione CSV ou PDF Fokus de até 2 MiB.'; return; }
+      message.textContent = 'Preparando prévia...';
+      try {
+        const bytes = new Uint8Array(await selected.arrayBuffer());
+        let binary = ''; for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+        if (closed || serial !== generation) return;
+        const result = await window.FokusApi.request('/law/contacts/import/preview', { method: 'POST', body: { format, content_base64: btoa(binary) } });
+        if (closed || serial !== generation) return;
+        batch = result.batch_id;
+        for (const item of result.rows) {
+          const choice = input('', '', 0); choice.type = 'checkbox'; choice.disabled = item.status !== 'ready'; choice.checked = item.status === 'ready';
+          choice.addEventListener('change', update); selections.push({ index: item.index, control: choice });
+          const status = { ready: 'Pronto', duplicate: 'Duplicado', invalid: 'Inválido ou sem permissão para os documentos' }[item.status] || 'Inválido';
+          rows.append(field(`Linha ${item.index + 1}: ${item.display_name} (${status})`, choice));
+        }
+        message.textContent = 'Revise a seleção. Duplicados e inválidos não serão importados.'; update();
+      } catch (error) { if (!closed && serial === generation) message.textContent = error.message || 'Não foi possível gerar a prévia.'; }
+    });
+    modal.body.append(help, file, message, rows, confirmation); modal.footer.append(cancel, commit); update();
+    return { modal, file, confirmed, commit, rows, cancel };
+  }
+
+  async function exportContacts(format, feedback, trigger) {
+    trigger.disabled = true;
+    try {
+      const result = await window.FokusApi.request(`/law/contacts/export?format=${format}`);
+      const bytes = Uint8Array.from(atob(result.content_base64), (char) => char.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: result.mime_type }));
+      const link = document.createElement('a'); link.href = url; link.download = result.filename; document.body.append(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      feedback.textContent = `${result.exported_count} contato(s) próprio(s) exportado(s).`;
+    } catch (error) { feedback.textContent = error.message || 'Não foi possível exportar.'; }
+    finally { trigger.disabled = false; }
+  }
+
   function render(root, context) {
     const permissions = new Set(context.law_permissions || []);
     if (context.company?.role === 'admin') ['law.contacts.view', 'law.contacts.create', 'law.contacts.update', 'law.contacts.delete', 'law.contacts.merge', 'law.contacts.sensitive.view', 'law.contacts.shared.view', 'law.contacts.share.manage'].forEach((p) => permissions.add(p));
@@ -120,6 +187,10 @@
     const heading = $('div', 'law-page-heading law-record-page-heading');
     heading.append($('p', 'law-page-eyebrow', 'GESTÃO DE CONTATOS'), $('h2', '', 'Contatos'), $('p', 'law-page-lede', 'Organize pessoas, organizações e unidades em uma base compartilhada pelos setores autorizados.'));
     const headingActions = $('div', 'law-record-heading-actions');
+    const transferFeedback = $('p', 'law-contact-feedback'); transferFeedback.setAttribute('role', 'status');
+    if (can('law.contacts.create')) headingActions.append(button('Importar contatos', 'fs-btn fs-btn-outline-primary', (event) => openImport(root, refresh, event.currentTarget)));
+    if (can('law.contacts.view')) ['csv', 'pdf'].forEach((format) => headingActions.append(button(`Exportar ${format.toUpperCase()}`, 'fs-btn fs-btn-outline-primary', (event) => exportContacts(format, transferFeedback, event.currentTarget))));
+    heading.append($('p', '', 'Exportação: todos os contatos próprios PF/PJ, até 500. Não inclui registros compartilhados, unidades, dados bancários ou Pix.'), transferFeedback);
     if (can('law.contacts.create')) {
       headingActions.append(button('Novo contato', 'fs-btn fs-btn-primary', (event) => openEditor(root, null, refresh, event.currentTarget, relationshipOptions, designationOptions, competencyOptions)));
       headingActions.append(button('Cadastrar unidade', 'fs-btn fs-btn-outline-primary', (event) => openEditor(root, null, refresh, event.currentTarget, relationshipOptions, designationOptions, competencyOptions, 'unit')));

@@ -6,6 +6,8 @@ from pathlib import Path
 
 
 PHASES = (
+    ("PUBLICATION", "Exact main revision and successful Linux validation"),
+    ("FPM_PREFLIGHT", "Selected FPM unit and exact sudo permission"),
     ("PREFLIGHT", "Prerequisites and current dynamic release contract"),
     ("SSH", "SSH connection using configured known hosts"),
     ("SCHEMA", "Prepublication schema prerequisite"),
@@ -35,10 +37,11 @@ def render(env):
     lines = ["## Publication evidence", "", "| Phase | Outcome |", "| --- | --- |"]
     for key, label in PHASES:
         value = results[key]
-        if key == "SERVICES" and value == "success":
+        if key in {"SERVICES", "FPM_PREFLIGHT"} and value == "success":
             mode = env.get("FPM_RELOAD_MODE")
             if mode == "verify-only":
-                value = "not requested (verify-only); no OPcache claim"
+                value = ("not requested (verify-only); no unit or sudo claim" if key == "FPM_PREFLIGHT"
+                         else "not requested (verify-only); no OPcache claim")
             elif mode != "reload":
                 value = "unknown runtime policy"
                 complete = False

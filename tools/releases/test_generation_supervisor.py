@@ -4,6 +4,28 @@ import importlib.util,json,os,signal,subprocess,sys,tempfile,time,unittest
 from pathlib import Path
 spec=importlib.util.spec_from_file_location('g',Path(__file__).with_name('generation_supervisor.py'));g=importlib.util.module_from_spec(spec);spec.loader.exec_module(g)
 
+class ProbeFixture(unittest.TestCase):
+    def test_actual_laravel_setup_copies_exact_non_autoloaded_fixture(self):
+        import ast
+        import hashlib
+        import shutil
+        source = Path(__file__).resolve().parents[2]
+        fixture = source / 'tests/Fixtures/Generation/GenerationProbe.php.stub'
+        self.assertFalse(fixture.with_suffix('').exists())
+        self.assertEqual(hashlib.sha256(fixture.read_bytes()).hexdigest(), '556ee9898385d33bf8b2ccaf01fe602176b2fde814f6ae79ba7427764fd42e2c')
+        script = source / 'tools/releases/test_generation_laravel.py'
+        copies = [node for node in ast.walk(ast.parse(script.read_text()))
+                  if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+                  and ast.unparse(node.value.func) == 'shutil.copyfile'
+                  and 'GenerationProbe.php.stub' in ast.unparse(node)]
+        self.assertEqual(len(copies), 1)
+        with tempfile.TemporaryDirectory() as directory:
+            clone = Path(directory)
+            (clone / 'app/Jobs').mkdir(parents=True)
+            exec(compile(ast.Module(body=copies, type_ignores=[]), str(script), 'exec'),
+                 {'source': source, 'clone': clone, 'shutil': shutil})
+            self.assertEqual((clone / 'app/Jobs/GenerationProbe.php').read_bytes(), fixture.read_bytes())
+
 class Processes(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.base=Path(self.temp.name)
