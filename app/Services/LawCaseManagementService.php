@@ -14,6 +14,7 @@ class LawCaseManagementService
     private const ROLE_OPTIONS = [
         'advogado' => 'Advogado', 'autoridade_policial' => 'Autoridade policial',
         'defensor_publico' => 'Defensor público', 'outro' => 'Outro',
+        'cliente' => 'Cliente', 'parte_contraria' => 'Parte contrária', 'advogado_contrario' => 'Advogado da parte contrária',
         'parte_autora' => 'Parte autora', 'parte_re' => 'Parte ré',
         'promotor' => 'Promotor de Justiça', 'vitima' => 'Vítima',
         'testemunha_defesa' => 'Testemunha da Defesa', 'testemunha_denuncia' => 'Testemunha da Denúncia',
@@ -96,16 +97,63 @@ class LawCaseManagementService
                 }
             }
 
+            foreach (['tribunal', 'degree', 'system', 'format', 'confidentiality_level_cnj', 'filing_date', 'source_updated_at', 'court_municipality_code', 'recent_movements', 'records', 'movements_truncated'] as $field) {
+                if (array_key_exists($field, $result['metadata'] ?? [])) $official[$field] = $result['metadata'][$field];
+            }
+
+            $cnjLevel = $result['metadata']['confidentiality_level_cnj'] ?? null;
+            $cnjCode = is_int($cnjLevel) && $cnjLevel >= 0 && $cnjLevel <= 5 ? LawCnjConfidentiality::codeForLevel($cnjLevel) : null;
+
             $checkedAt = now();
+            $successful = in_array($result['status'], ['synced', 'not_found'], true);
+            $retryCount = (int) ($current->datajud_retry_count ?? 0);
+            if ($successful) $retryCount = 0;
+            else $retryCount = min(65535, $retryCount + 1);
+            $retryableCodes = ['timeout', 'rate_limited', 'service_busy', 'source_timeout', 'partial_response', 'service_unavailable', 'connection_failed', 'secure_connection_failed', 'internal_error', 'invalid_response', 'result_limit'];
             $updates = [
                 'datajud_metadata' => json_encode($official, JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}',
                 'manual_metadata' => json_encode($manual, JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}',
                 'datajud_sync_status' => $result['status'],
                 'last_datajud_checked_at' => $checkedAt,
+                'datajud_retry_count' => $retryCount,
+                'datajud_retryable' => $successful || in_array($result['code'] ?? '', $retryableCodes, true),
                 'version' => DB::raw('version + 1'),
                 'updated_at' => $checkedAt,
             ];
-            if ($result['status'] === 'synced') $updates['last_datajud_synced_at'] = $checkedAt;
+            // Do not reinterpret historical local values. New CNJ classifications are
+            // applied automatically when the public API explicitly supplies level 0-5.
+            if ($successful && $cnjCode !== null && in_array($current->confidentiality_level, ['public', 'cnj_1', 'cnj_2', 'cnj_3', 'cnj_4', 'cnj_5'], true)) {
+                $updates['confidentiality_level'] = $cnjCode;
+                if (LawCnjConfidentiality::requiresNamedAccess($cnjCode)) {
+                    $responsibleUserId = $current->responsible_membership_id
+                        ? DB::table('company_memberships')->where('company_id', $companyId)->where('id', $current->responsible_membership_id)->value('user_id')
+                        : null;
+                    $grantorId = $actorId ?: ($responsibleUserId ? (string) $responsibleUserId : null);
+                    $membershipIds = collect([$current->responsible_membership_id])
+                        ->merge($actorId ? DB::table('company_memberships')->where('company_id', $companyId)->where('user_id', $actorId)->where('status', 'ativo')->whereNull('deleted_at')->pluck('id') : [])
+                        ->filter()->unique()->values();
+                    foreach ($membershipIds as $membershipId) {
+                        $existingAccess = DB::table('law_confidential_case_accesses')->where('company_id', $companyId)->where('law_case_id', $caseId)->where('company_membership_id', $membershipId)->first();
+                        if ($existingAccess) {
+                            if ($existingAccess->revoked_at !== null) DB::table('law_confidential_case_accesses')->where('id', $existingAccess->id)->update(['revoked_at' => null, 'granted_by' => $grantorId, 'updated_at' => $checkedAt]);
+                        } else {
+                            DB::table('law_confidential_case_accesses')->insert([
+                                'id' => PrefixedUlid::make('LCA'), 'company_id' => $companyId, 'law_case_id' => $caseId,
+                                'company_membership_id' => $membershipId, 'granted_by' => $grantorId, 'created_at' => $checkedAt, 'updated_at' => $checkedAt,
+                            ]);
+                        }
+                    }
+                }
+            }
+            if ($successful) $updates['last_datajud_synced_at'] = $checkedAt;
+            if ($successful && ! array_key_exists('official_status_text', $result['metadata'] ?? []) && ! array_key_exists('official_status_text', $manual)) {
+                $updates['official_status_text'] = null;
+                $official['official_status_text'] = null;
+            }
+            if ($successful && ! array_key_exists('official_status_code', $result['metadata'] ?? []) && ! array_key_exists('official_status_code', $manual)) {
+                $official['official_status_code'] = null;
+            }
+            if ($successful) $updates['datajud_metadata'] = json_encode($official, JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
             DB::table('law_cases')->where('company_id', $companyId)->where('id', $caseId)->update($updates);
 
             $title = match ($result['status']) {
@@ -126,6 +174,29 @@ class LawCaseManagementService
             ]);
         });
 
+        return $result;
+    }
+
+    public function syncDjen(object $case, LawDjenClient $client): array
+    {
+        $result = $client->lookup((string) $case->case_number);
+        $checkedAt = now();
+        $updates = [
+            'djen_sync_status' => $result['status'],
+            'last_djen_checked_at' => $checkedAt,
+            'djen_sync_message' => $result['message'] ?? null,
+        ];
+        $successful = in_array($result['status'], ['synced', 'not_found'], true);
+        $retryableCodes = ['rate_limited', 'timeout', 'service_unavailable', 'connection_failed', 'internal_error', 'invalid_response', 'invalid_result', 'incomplete_response', 'inconsistent_response', 'result_limit'];
+        $retryCount = (int) ($case->djen_retry_count ?? 0);
+        $updates['djen_retry_count'] = $successful ? 0 : min(65535, $retryCount + 1);
+        $updates['djen_retryable'] = $successful || in_array($result['code'] ?? '', $retryableCodes, true);
+        if ($successful) {
+            $updates['djen_metadata'] = json_encode($result['metadata'] ?? [], JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
+        }
+        if ($successful) $updates['last_djen_synced_at'] = $checkedAt;
+
+        DB::table('law_cases')->where('company_id', $case->company_id)->where('id', $case->id)->update($updates);
         return $result;
     }
 
@@ -156,6 +227,7 @@ class LawCaseManagementService
             'subjects' => $this->presentSubjects(json_decode((string) ($case->subjects ?? ''), true) ?: [], (string) $case->company_id),
             'court_name' => $case->court_name,
             'court_code' => $case->court_code,
+            'comarca' => $case->comarca ?? null,
             'official_status_code' => $case->official_status_code,
             'official_status_text' => $case->official_status_text,
             'filing_date' => $case->filing_date,
@@ -172,7 +244,15 @@ class LawCaseManagementService
             'last_datajud_checked_at' => $this->timestamp($case->last_datajud_checked_at),
             'last_datajud_synced_at' => $this->timestamp($case->last_datajud_synced_at),
             'datajud_sync_status' => (string) $case->datajud_sync_status,
-            'official_fields' => array_keys(json_decode((string) ($case->datajud_metadata ?? ''), true) ?: []),
+            'djen_sync_status' => (string) ($case->djen_sync_status ?? 'not_requested'),
+            'last_djen_checked_at' => $this->timestamp($case->last_djen_checked_at ?? null),
+            'last_djen_synced_at' => $this->timestamp($case->last_djen_synced_at ?? null),
+            'djen_sync_message' => $case->djen_sync_message ?? null,
+            'djen_retry_count' => (int) ($case->djen_retry_count ?? 0),
+            'official_fields' => array_values(array_intersect(
+                array_keys(json_decode((string) ($case->datajud_metadata ?? ''), true) ?: []),
+                ['case_class', 'case_class_code', 'subjects', 'court_name', 'court_code', 'official_status_code', 'official_status_text'],
+            )),
             'manual_fields' => array_keys($manual),
             'metadata_conflicts' => $conflicts,
             'version' => (int) $case->version,
@@ -190,6 +270,43 @@ class LawCaseManagementService
     {
         if (strlen($digits) !== 20) return $digits;
         return substr($digits, 0, 7).'-'.substr($digits, 7, 2).'.'.substr($digits, 9, 4).'.'.substr($digits, 13, 1).'.'.substr($digits, 14, 2).'.'.substr($digits, 16, 4);
+    }
+
+    public function comarcaForCaseNumber(string $caseNumber): ?string
+    {
+        $identity = $this->originIdentity($caseNumber);
+        if ($identity === null) return null;
+        return DB::table('law_case_origin_comarcas')->where('justice_branch', $identity[0])
+            ->where('tribunal_code', $identity[1])->where('origin_code', $identity[2])->value('comarca_name');
+    }
+
+    public function saveComarcaMapping(string $caseNumber, string $comarca, string $actorId, string $companyId, ?string $excludeCaseId = null): void
+    {
+        $identity = $this->originIdentity($caseNumber);
+        if ($identity === null) return;
+        [$branch, $tribunal, $origin] = $identity;
+        $comarca = trim($comarca);
+        DB::table('law_case_origin_comarcas')->insertOrIgnore([
+            'justice_branch' => $branch, 'tribunal_code' => $tribunal, 'origin_code' => $origin,
+            'comarca_name' => $comarca, 'created_by' => $actorId, 'created_company_id' => $companyId,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $mapping = DB::table('law_case_origin_comarcas')->where('justice_branch', $branch)->where('tribunal_code', $tribunal)->where('origin_code', $origin)->lockForUpdate()->first();
+        if (! $mapping || mb_strtolower(trim((string) $mapping->comarca_name)) !== mb_strtolower($comarca)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['comarca' => 'Este código de unidade de origem já está associado a outra comarca. Revise o cadastro antes de alterar o vínculo.']);
+        }
+        DB::table('law_cases')->whereNull('comarca')->when($excludeCaseId, fn ($query) => $query->where('id', '<>', $excludeCaseId))
+            ->whereRaw('SUBSTRING(case_number, 14, 1) = ?', [$branch])
+            ->whereRaw('SUBSTRING(case_number, 15, 2) = ?', [$tribunal])
+            ->whereRaw('SUBSTRING(case_number, 17, 4) = ?', [$origin])
+            ->update(['comarca' => $mapping->comarca_name, 'version' => DB::raw('version + 1'), 'updated_at' => now()]);
+    }
+
+    private function originIdentity(string $caseNumber): ?array
+    {
+        $digits = preg_replace('/\D+/', '', $caseNumber) ?? '';
+        if (strlen($digits) !== 20) return null;
+        return [substr($digits, 13, 1), substr($digits, 14, 2), substr($digits, 16, 4)];
     }
 
     private function upsertConflict(string $companyId, string $caseId, string $field, mixed $manualValue, mixed $officialValue): void

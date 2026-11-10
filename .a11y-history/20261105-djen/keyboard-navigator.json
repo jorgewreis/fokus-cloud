@@ -1,0 +1,10 @@
+{
+  "skill": "keyboard-navigator",
+  "scope": ["public/portal/assets/fokus-law-processes.js"],
+  "findings": [],
+  "passed": [
+    "Publication dates are rendered as non-interactive text; the update does not add a keyboard access requirement.",
+    "Polling defers refresh while focus is elsewhere inside the process view, preserving the user's position.",
+    "When focus is on the DJEN action, completion refreshes the view and moves focus to the DJEN publications heading."
+  ]
+}

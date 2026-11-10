@@ -1,0 +1,56 @@
+/* ACCESSIBILITY BASE STYLES */
+
+:where(a:focus-visible) {
+    text-decoration: none;
+}
+
+:where(dialog) {
+    max-width: min(100% - 2rem, 40rem);
+    max-height: calc(100dvh - 2rem);
+    overflow: auto;
+    border: 0;
+    color: var(--color-text);
+    background: var(--color-surface-card);
+}
+
+:where(dialog)::backdrop {
+    background: var(--color-overlay-50);
+}
+
+:where(progress, meter) {
+    accent-color: var(--color-primary);
+}
+
+:where(details > summary) {
+    list-style: none;
+}
+
+:where(details > summary::-webkit-details-marker) {
+    display: none;
+}
+
+:where([id]) {
+    scroll-margin-block-start: var(--space-16);
+}
+
+@media (prefers-contrast: more) {
+    :root {
+        --color-border: var(--color-gray-700);
+        --color-border-focus: var(--color-blue-700);
+    }
+
+    :where(a, button, input, select, textarea):focus-visible {
+        outline-width: 3px;
+    }
+}
+
+@media (forced-colors: active) {
+    :where(button, input, select, textarea, a):focus-visible {
+        outline: 2px solid CanvasText;
+        outline-offset: 2px;
+    }
+
+    :where(progress, meter) {
+        accent-color: Highlight;
+    }
+}

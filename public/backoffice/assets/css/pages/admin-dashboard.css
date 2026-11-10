@@ -1498,6 +1498,36 @@ html[data-role="admin"] .fs-sidebar.single,
 html[data-role="admin"] .fs-sidebar .sidebar-button {
     border-radius: 0 !important;
 }
+
+/* Keep every sidebar entry independent from browser-native button chrome. */
+html[data-role="admin"] .fs-sidebar .sidebar-button {
+    -webkit-appearance: none;
+    appearance: none;
+    box-sizing: border-box;
+    border: 0;
+    background-color: transparent;
+    box-shadow: none;
+    color: rgba(255, 255, 255, 0.84);
+    font: inherit;
+    text-align: left;
+}
+html[data-role="admin"] .fs-sidebar .sidebar-button:hover:not(:disabled):not(.active) {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+html[data-role="admin"] .fs-sidebar .sidebar-button.active {
+    background: linear-gradient(105deg, #1a5f94, #1a4f7d);
+    color: #fff;
+}
+html[data-role="admin"] .fs-sidebar .sidebar-subnav {
+    width: calc(100% - 41px);
+    margin-left: 41px;
+}
+html[data-role="admin"] .fs-sidebar .sidebar-subnav-button {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 12px !important;
+}
 /* Dashboard content: shared Fokus Styles composition, scoped away from the shell. */
 .admin-final-dashboard {
     font-family: "Google Sans", sans-serif;

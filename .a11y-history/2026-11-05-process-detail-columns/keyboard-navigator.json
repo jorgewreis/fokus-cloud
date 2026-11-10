@@ -1,0 +1,1 @@
+{"skill":"keyboard-navigator","scope":["public/portal/assets/fokus-law-processes.js","public/portal/assets/fokus-law-shell.css"],"findings":[],"passed":["Separating cards into two normal div containers does not itself add or remove focus stops.","With cards ordered in the DOM to match their order within each column, keyboard navigation follows that order."],"notes":[]}

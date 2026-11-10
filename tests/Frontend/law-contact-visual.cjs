@@ -1,0 +1,45 @@
+const {chromium}=require('playwright'); const fs=require('fs'); const path=require('path'); const assert=require('assert/strict');
+const base=path.resolve(__dirname, '../..'); const out=path.join(base, 'test-results/law-contact-visual');fs.mkdirSync(out,{recursive:true});
+const sample={id:'synthetic-contact',display_name:'Pessoa Fictícia de Teste',legal_nature:'pf',record_kind:'contact',status:'ativo',documents:[],channels:[],addresses:[],professions:[],tags:[],linked_contacts:[],institutional_data:[],sensitive_details:{birth_date:'1990-01-01',parentage:[{name:'Ascendente Fictícia',relationship:'Mãe'}],bank_accounts:[{bank:'Banco Fictício',branch:'0001',account:'12345-6',account_type:'Corrente',holder_name:'Titular Fictício'}],pix_keys:[{type:'email',value:'pix-sintetico@example.test'}]}};
+(async()=>{const browser=await chromium.launch({headless:true,args:['--no-sandbox']});const page=await browser.newPage({viewport:{width:1440,height:1000}});let errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.route('**/*',async r=>{const u=new URL(r.request().url()); if(u.hostname!=='isolated.test')return r.abort();if(u.pathname==='/')return r.fulfill({contentType:'text/html',body:`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="stylesheet" href="/assets/css/shared/fokus.css"><link rel="stylesheet" href="/marketing/products/fokus-law.css"><link rel="stylesheet" href="/portal/assets/fokus-law-shell.css"><div id="root"></div><script src="/assets/js/fokus.min.js"></script><script src="/portal/assets/fokus-law-select.js"></script><script src="/portal/assets/law-record-ui.js"></script>`});const p=path.join(base,'public',u.pathname);if(fs.existsSync(p))return r.fulfill({path:p});return r.fulfill({status:404,body:''});});
+await page.goto('https://isolated.test/');await page.addScriptTag({content:fs.readFileSync(base+'/public/portal/assets/fokus-law-contacts.js','utf8').replace('  window.FokusLawContacts = {','  window.__lawTest = {openEditor, openDetails};\n  window.FokusLawContacts = {')});
+async function openEditor(contact=sample,can=true,kind=null){await page.evaluate(({contact,can,kind})=>{document.querySelectorAll('.fs-modal').forEach(e=>e.remove());window.lawContactsCanSensitive=can;window.lawContactContext={context_code:'judiciario',unit_label:'Unidade',organization_label:'Organização'};window.__lawTest.openEditor(document.getElementById('root'),contact,()=>{},null,[],[],[],kind);},{contact,can,kind});await page.waitForTimeout(300);}
+
+/* Exercise the actual shared CSS cascade, including its high-specificity
+   button:not(...) rule, for each labelled row reported by users. */
+await page.evaluate(() => {
+  const field = (label, control) => '<label class="law-record-field"><span>'+label+'</span>'+control+'</label>';
+  const input = '<input class="fs-form-control" value="Synthetic">';
+  const select = '<select class="fs-form-select"><option>Synthetic</option></select>';
+  document.getElementById('root').innerHTML = '<div id="alignment-fixture" class="law-record-editor" style="padding:16px;max-width:900px">' +
+    '<div class="law-contact-repeat-row law-contact-document-row">' + field('Tipo', select) + field('Número', input) + '<button class="fs-btn fs-btn-danger law-contact-remove">Remover</button></div>' +
+    '<div class="law-contact-relationship-entry law-contact-role-entry">' + field('Papel', select) + field('Complemento (Outro)', input) + '<button class="fs-btn fs-btn-danger law-contact-chip-remove">Remover papel</button></div>' +
+    '<div class="law-contact-relationship-entry law-contact-designation-entry">' + field('Cargo/posto/graduação/função', input) + '<button class="fs-btn fs-btn-danger law-contact-chip-remove">Remover designação</button></div></div>';
+});
+for (const width of [1440, 768, 390]) {
+  await page.setViewportSize({width, height:1000});
+  const geometry = await page.locator('#alignment-fixture > div').evaluateAll(rows => rows.map(row => {
+    const action=row.querySelector('button'), controls=[...row.querySelectorAll('input,select')];
+    const b=action.getBoundingClientRect(), rects=controls.map(c=>c.getBoundingClientRect());
+    return {label:action.textContent, align:getComputedStyle(action).alignSelf,
+      bottomDelta:Math.abs(b.bottom-Math.max(...rects.map(r=>r.bottom))),
+      width:row.clientWidth, scroll:row.scrollWidth};
+  }));
+  for (const row of geometry) {
+    assert.equal(row.align,'end',row.label+' must override shared button alignment');
+    if(width===1440) assert(row.bottomDelta<=1,row.label+' bottom must align with controls: '+row.bottomDelta);
+    assert(row.scroll<=row.width+2,row.label+' row must not overflow at '+width);
+  }
+  await page.screenshot({path:out+'/remove-alignment-'+width+'.png'});
+}
+await page.evaluate(()=>document.getElementById('root').replaceChildren());
+await page.setViewportSize({width:1440,height:1000});
+
+await openEditor();assert(await page.getByText('Nascimento e filiação',{exact:true}).isVisible());await page.getByText('Dados bancários e Pix — acesso restrito',{exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:out+'/pf-desktop.png'});
+await page.setViewportSize({width:390,height:844});await page.getByText('Dados bancários e Pix — acesso restrito',{exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:out+'/pf-mobile.png'});await page.locator('.law-record-modal-body').evaluate(e=>e.scrollTop=0);await page.screenshot({path:out+'/mobile-top.png'});
+const overflow=await page.evaluate(()=>[...document.querySelectorAll('.law-record-form-section:not([hidden])')].filter(e=>e.scrollWidth>e.clientWidth+2).map(e=>({title:e.querySelector('h3')?.textContent,w:e.clientWidth,scroll:e.scrollWidth})));console.log('OVERFLOW',JSON.stringify(overflow));
+await page.setViewportSize({width:1440,height:1000});await openEditor({...sample,legal_nature:'pj',sensitive_details:{bank_accounts:sample.sensitive_details.bank_accounts,pix_keys:sample.sensitive_details.pix_keys}});assert(!(await page.getByText('Nascimento e filiação',{exact:true}).isVisible()));await page.getByText('Dados bancários e Pix — acesso restrito',{exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:out+'/pj-desktop.png'});
+await openEditor({...sample,sensitive_details:undefined},false);assert.equal(await page.getByText('Dados bancários e Pix — acesso restrito',{exact:true}).count(),0);assert.equal(await page.getByText('Nascimento e filiação',{exact:true}).count(),0);
+await openEditor(null,true,'unit');assert(!(await page.getByText('Dados bancários e Pix — acesso restrito',{exact:true}).isVisible()));assert(!(await page.getByText('Nascimento e filiação',{exact:true}).isVisible()));
+await page.evaluate(sample=>{document.querySelectorAll('.fs-modal').forEach(e=>e.remove());window.FokusApi={request:async()=>({contact:sample})};return window.__lawTest.openDetails(document.getElementById('root'),sample.id,false,()=>{});},sample);await page.waitForTimeout(250);await page.getByText('Dados pessoais e bancários restritos',{exact:true}).scrollIntoViewIfNeeded();assert.equal(await page.getByText('pix-sintetico@example.test',{exact:true}).count(),0);await page.screenshot({path:out+'/detail-masked.png'});await page.getByRole('button',{name:'Exibir ou ocultar Pix — E-mail',exact:true}).click();assert(await page.getByText('pix-sintetico@example.test',{exact:true}).isVisible());await page.screenshot({path:out+'/detail-revealed.png'});console.log('ERRORS',errors);assert.equal(errors.length,0);assert.deepEqual(overflow,[], 'Protected editor must not overflow its cards');fs.writeFileSync(out+'/result.json',JSON.stringify({errors,overflow,screenshots:fs.readdirSync(out)},null,2));await browser.close();})();

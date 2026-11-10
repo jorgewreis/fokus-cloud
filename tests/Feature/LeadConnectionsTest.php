@@ -73,4 +73,31 @@ class LeadConnectionsTest extends TestCase
         $this->expectException(LeadUnavailable::class);
         $adapter->runtime('company-a', 'user-a', false, fn () => $this->fail('Configuração insegura foi aceita.'));
     }
+
+    public function test_transaction_pooler_and_missing_ca_are_rejected_before_connecting(): void
+    {
+        foreach (['port' => 6543, 'sslrootcert' => '/nonexistent/lead-ca.pem', 'driver' => 'mysql'] as $setting => $value) {
+            $connection = Mockery::mock(Connection::class);
+            $adapter = $this->adapter($connection);
+            config(["database.connections.lead.$setting" => $value]);
+            try {
+                $adapter->runtime('company-a', 'user-a', false, fn () => $this->fail('Configuração insegura foi aceita.'));
+                $this->fail('A configuração deveria ser recusada antes da conexão.');
+            } catch (LeadUnavailable $exception) {
+                $this->assertSame('unsafe_configuration', $exception->reason);
+            }
+        }
+    }
+
+    public function test_disabled_runtime_never_opens_connection(): void
+    {
+        $adapter = $this->adapter(Mockery::mock(Connection::class));
+        config(['lead.runtime_enabled' => false]);
+        try {
+            $adapter->runtime('company-a', 'user-a', false, fn () => $this->fail('Runtime desativado foi executado.'));
+            $this->fail('Runtime desativado deveria ser recusado.');
+        } catch (LeadUnavailable $exception) {
+            $this->assertSame('not_configured', $exception->reason);
+        }
+    }
 }

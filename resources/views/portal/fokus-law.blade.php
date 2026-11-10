@@ -6,9 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#1b1028" />
   <title>Fokus Law | Fokus Cloud</title>
-  <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20261009-select-menu-options-v1" />
-  <link rel="stylesheet" href="/marketing/products/fokus-law.css?v=20261008-primary-outline-buttons-v1" />
-  <link rel="stylesheet" href="/portal/assets/fokus-law-shell.css?v=20261014-square-rail-icons-v1" />
+  <link rel="stylesheet" href="{{ \App\Support\FokusLawAssets::url('assets/css/shared/fokus.css') }}" />
+  <link rel="stylesheet" href="{{ \App\Support\FokusLawAssets::url('marketing/products/fokus-law.css') }}" />
+  <link rel="stylesheet" href="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-shell.css') }}" />
 </head>
 <body class="fokus-law-shell-page">
   <a class="law-shell-skip" href="#law-workspace">Pular para o conteúdo principal</a>
@@ -20,17 +20,6 @@
   <div class="law-shell" id="law-shell" data-initial-page="{{ $initialPage ?? 'overview' }}" hidden>
     <div class="law-mobile-scrim" id="mobile-scrim" hidden></div>
     <aside class="law-sidebar" id="law-sidebar" aria-label="Navegação do Fokus Law">
-      <nav class="law-rail" aria-label="Grupos e módulos">
-        <a class="law-mark" href="/portal" aria-label="Fokus Cloud, voltar ao portal">
-          <span aria-hidden="true">F</span>
-        </a>
-        <div class="law-rail-items" id="rail-items"></div>
-        <div class="law-rail-spacer"></div>
-        <a class="law-rail-link" href="/produtos/fokus-law" aria-label="Sobre o Fokus Law" title="Sobre o Fokus Law">
-          <img src="/backoffice/assets/icons/Programming-User-Chat--Streamline-Ultimate.png" alt="" />
-        </a>
-      </nav>
-
       <div class="law-nav-panel">
         <header class="law-system-context">
           <a class="law-system-brand" href="/portal" aria-label="Fokus Cloud Law, voltar ao portal"><span>FOKUS CLOUD</span><b>LAW</b></a>
@@ -38,7 +27,7 @@
           <div class="law-company-context">
             <span class="law-context-caption">Sistema ativo</span>
             <button class="law-company-switch" id="company-switch" type="button" aria-haspopup="listbox" aria-expanded="false" hidden>
-              <span id="company-name">—</span><span aria-hidden="true">⌄</span>
+              <span id="company-name">—</span><img class="law-chevron" src="/backoffice/assets/icons/Arrow-Button-Down--Streamline-Ultimate-Bold.png" alt="" />
             </button>
             <strong class="law-company-name" id="company-name-static">—</strong>
             <div class="law-company-options" id="company-options" role="listbox" aria-label="Empresas disponíveis" hidden></div>
@@ -51,18 +40,24 @@
 
         <div class="law-nav-heading">
           <h1 id="section-title">Visão geral</h1>
-          <img class="law-nav-heading-icon" id="section-icon" src="/backoffice/assets/icons/Layout-Dashboard--Streamline-Ultimate.png" alt="" />
+          <img class="law-nav-heading-icon" id="section-icon" src="/backoffice/assets/icons/Layout-Dashboard--Streamline-Ultimate-Colors.png" alt="" />
         </div>
         <nav class="law-page-navigation" id="page-navigation" aria-label="Páginas e funcionalidades">
           <div id="page-items"></div>
         </nav>
 
         <footer class="law-user-footer">
-          <div class="law-user-avatar fs-avatar fs-avatar-sm" id="user-avatar" aria-hidden="true">—</div>
-          <div class="law-user-meta"><strong id="user-name">—</strong><span id="user-email">—</span></div>
-          <a class="law-profile-link" href="/portal/fokus-law/perfil" aria-label="Meu perfil" title="Meu perfil">
-            <img src="/backoffice/assets/icons/Settings-User--Streamline-Ultimate.png" alt="" />
-          </a>
+          <button class="law-account-toggle" id="account-toggle" type="button" aria-expanded="false" aria-controls="account-panel">
+            <span class="law-user-avatar fs-avatar fs-avatar-sm" id="user-avatar" aria-hidden="true">—</span>
+            <span class="law-user-meta"><strong id="user-name">—</strong><span id="user-email">—</span></span>
+            <img class="law-chevron law-account-chevron" src="/backoffice/assets/icons/Arrow-Button-Down--Streamline-Ultimate-Bold.png" alt="" />
+          </button>
+          <div class="law-account-panel" id="account-panel" hidden>
+            <a class="law-nav-item" href="/portal/fokus-law/perfil">Meu perfil</a>
+            <button class="law-nav-item" id="account-preferences" type="button">Preferências</button>
+            <button class="law-nav-item" id="account-settings" type="button" hidden>Configurações</button>
+            <button class="law-nav-item law-account-logout" id="logout-button" type="button">Sair</button>
+          </div>
         </footer>
       </div>
     </aside>
@@ -74,7 +69,7 @@
       </section>
       <header class="law-topbar" aria-label="Barra de ferramentas">
         <button class="law-mobile-menu fs-btn fs-btn-outline-primary fs-btn-icon" id="mobile-menu-button" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="law-sidebar">
-          <span aria-hidden="true">☰</span>
+          <img src="/backoffice/assets/icons/Navigation-Menu-3--Streamline-Ultimate-Bold.png" alt="" />
         </button>
         <div class="law-search-wrap">
           <img src="/backoffice/assets/icons/Search-Bar--Streamline-Ultimate.png" alt="" />
@@ -94,9 +89,7 @@
               <span>Os avisos dos módulos aparecerão aqui.</span>
             </section>
           </div>
-          <button class="law-exit-button fs-btn fs-btn-outline-primary" id="logout-button" type="button">
-            <img src="/backoffice/assets/icons/User-Logout--Streamline-Ultimate-Regular.png" alt="" /><span>Sair</span>
-          </button>
+
         </div>
       </header>
 
@@ -107,15 +100,16 @@
   <template id="law-profile-template">
     @include('portal.partials.fokus-law-profile')
   </template>
-  <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script>
-  <script src="/assets/js/api-client.js"></script>
-  <script src="/assets/js/brazilian-documents.js?v=20260930-document-validation-v1"></script>
-  <script src="/portal/assets/fokus-law-select.js?v=20261008-select-options-full-width-v1"></script>
-  <script src="/portal/assets/fokus-law-access.js?v=20261008-primary-outline-buttons-v2" defer></script>
-  <script src="/portal/assets/fokus-law-contacts.js?v=20261008-contact-detail-edit-permissions-v1" defer></script>
-  <script src="/portal/assets/law-record-ui.js?v=20261008-primary-outline-buttons-v2" defer></script>
-  <script src="/portal/assets/fokus-law-processes.js?v=20261008-admin-processes-v1" defer></script>
-  <script src="/portal/assets/fokus-law-shell.js?v=20261014-square-rail-icons-v1" defer></script>
-  <script src="/assets/js/portal-profile.js?v=20260925-profile-v4" defer></script>
+<script src="{{ \App\Support\FokusLawAssets::url('assets/js/fokus.min.js') }}"></script>
+<script src="{{ \App\Support\FokusLawAssets::url('assets/js/api-client.js') }}"></script>
+<script src="{{ \App\Support\FokusLawAssets::url('assets/js/brazilian-documents.js') }}"></script>
+<script src="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-select.js') }}"></script>
+<script src="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-access.js') }}" defer></script>
+<script src="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-bank-catalog.js') }}" defer></script>
+<script src="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-contacts.js') }}" defer></script>
+<script src="{{ \App\Support\FokusLawAssets::url('portal/assets/law-record-ui.js') }}" defer></script>
+<script src="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-processes.js') }}" defer></script>
+<script src="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-shell.js') }}" defer></script>
+<script src="{{ \App\Support\FokusLawAssets::url('assets/js/portal-profile.js') }}" defer></script>
 </body>
 </html>

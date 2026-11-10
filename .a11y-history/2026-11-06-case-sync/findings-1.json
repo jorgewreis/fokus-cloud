@@ -1,0 +1,13 @@
+{
+  "skill": "live-region-controller",
+  "scope": [
+    "public/portal/assets/fokus-law-processes.js"
+  ],
+  "findings": [],
+  "passed": [
+    "Uma região status persistente informa início, pendência, conclusão e falha."
+  ],
+  "notes": [
+    "Revisão estática; anúncios e foco não foram verificados com leitor de tela em execução."
+  ]
+}

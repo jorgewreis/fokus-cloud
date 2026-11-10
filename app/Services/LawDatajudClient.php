@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Http;
 
 class LawDatajudClient
 {
+    private const MAX_RESULT_PAGES = 100;
+    private const MAX_MOVEMENTS = 5000;
     private const STATE_CODES = [
         '01' => 'ac', '02' => 'al', '03' => 'ap', '04' => 'am', '05' => 'ba', '06' => 'ce',
         '07' => 'df', '08' => 'es', '09' => 'go', '10' => 'ma', '11' => 'mt', '12' => 'ms',
@@ -32,19 +34,26 @@ class LawDatajudClient
         }
 
         try {
-            $response = Http::connectTimeout(max(2, min(15, (int) config('services.datajud.connect_timeout', 10))))
+            $pageSize = max(10, min(10000, (int) config('services.datajud.page_size', 1000)));
+            $endpoint = rtrim((string) config('services.datajud.base_url'), '/').'/'.$alias.'/_search';
+            $request = Http::connectTimeout(max(2, min(15, (int) config('services.datajud.connect_timeout', 10))))
                 ->timeout(max(5, min(60, (int) config('services.datajud.timeout', 50))))->acceptJson()->withHeaders([
                 'Authorization' => 'APIKey '.$apiKey,
                 'Content-Type' => 'application/json',
-            ])->post(rtrim((string) config('services.datajud.base_url'), '/').'/'.$alias.'/_search', [
-                'size' => 1,
-                '_source' => [
-                    'numeroProcesso', 'classe.codigo', 'classe.nome', 'assuntos.codigo', 'assuntos.nome',
-                    'orgaoJulgador.codigo', 'orgaoJulgador.nome', 'tribunal', 'situacaoProcessual.codigo',
-                    'situacaoProcessual.nome', 'situacao.codigo', 'situacao.nome', 'situacaoAtual',
-                ],
-                'query' => ['match' => ['numeroProcesso' => $digits]],
             ]);
+            $requestBody = [
+                'size' => $pageSize,
+                '_source' => [
+                    'numeroProcesso', 'classe.codigo', 'classe.nome', 'assuntos',
+                    'orgaoJulgador.codigo', 'orgaoJulgador.nome', 'tribunal', 'situacaoProcessual.codigo',
+                    'orgaoJulgador.codigoMunicipioIBGE', 'situacaoProcessual.nome', 'situacao.codigo', 'situacao.nome', 'situacaoAtual',
+                    'grau', 'sistema', 'formato', 'nivelSigilo', 'dataAjuizamento', 'dataHoraUltimaAtualizacao', '@timestamp',
+                    'movimentos.codigo', 'movimentos.nome', 'movimentos.dataHora', 'movimentos.complementosTabelados',
+                ],
+                'sort' => ['@timestamp'],
+                'query' => ['match' => ['numeroProcesso' => $digits]],
+            ];
+            $response = $request->post($endpoint, $requestBody);
 
             if (! $response->successful()) {
                 $upstreamError = data_get($response->json(), 'error.type') ?? data_get($response->json(), 'error.root_cause.0.type');
@@ -72,11 +81,36 @@ class LawDatajudClient
             if (! is_array($payload) || ! is_array($hits)) {
                 return $this->failure('invalid_response', 'O Datajud retornou uma resposta que não pôde ser interpretada. Tente novamente; se a falha continuar, informe a administração do sistema.');
             }
-            if ($hits === []) return ['status' => 'not_found', 'code' => 'not_found', 'metadata' => [], 'message' => 'A consulta foi concluída, mas o Datajud não disponibilizou dados públicos para este processo. Os campos podem ser preenchidos manualmente.'];
-            $source = data_get($hits, '0._source');
-            if (! is_array($source) || (isset($source['numeroProcesso']) && preg_replace('/\D+/', '', (string) $source['numeroProcesso']) !== $digits)) {
-                return $this->failure('invalid_response', 'O Datajud retornou dados incompatíveis com o processo consultado. Nenhum metadado desta resposta foi aplicado. Solicite à administração do sistema a conferência da integração.');
+            $allHits = $hits;
+            $seenCursors = [];
+            for ($page = 1; count($hits) === $pageSize && $page < self::MAX_RESULT_PAGES; $page++) {
+                $cursor = data_get($hits, (count($hits) - 1).'.sort');
+                if (! is_array($cursor) || $cursor === []) return $this->failure('invalid_response', 'A paginação do DataJud não forneceu o cursor necessário. Nenhum resultado incompleto foi aplicado.');
+                $cursorKey = json_encode($cursor);
+                if (isset($seenCursors[$cursorKey])) return $this->failure('invalid_response', 'A paginação do DataJud repetiu um cursor. Nenhum resultado incompleto foi aplicado.');
+                $seenCursors[$cursorKey] = true;
+                $nextResponse = $request->post($endpoint, $requestBody + ['search_after' => $cursor]);
+                if (! $nextResponse->successful()) return $this->httpFailure($nextResponse);
+                $nextPayload = $nextResponse->json();
+                if (data_get($nextPayload, 'timed_out') === true) return $this->failure('source_timeout', 'O DataJud não concluiu todas as páginas da consulta. Nenhum resultado incompleto foi aplicado.');
+                if ((int) data_get($nextPayload, '_shards.failed', 0) > 0) return $this->failure('partial_response', 'Uma página do DataJud retornou falha parcial. Nenhum resultado incompleto foi aplicado.');
+                $hits = data_get($nextPayload, 'hits.hits');
+                if (! is_array($hits)) return $this->failure('invalid_response', 'Uma página do DataJud não pôde ser interpretada.');
+                $allHits = [...$allHits, ...$hits];
+                if ($page === self::MAX_RESULT_PAGES - 1 && count($hits) === $pageSize) return $this->failure('result_limit', 'A quantidade de registros excedeu o limite seguro de páginas. Nenhum resultado parcial foi aplicado.');
             }
+            $hits = $allHits;
+            if ($hits === []) return ['status' => 'not_found', 'code' => 'not_found', 'metadata' => [], 'message' => 'A consulta foi concluída, mas a API pública do DataJud não disponibilizou dados para este processo. Isso não confirma ausência em bases internas ou sigilosas.'];
+            $sources = [];
+            foreach ($hits as $hit) {
+                $candidate = $hit['_source'] ?? null;
+                if (! is_array($candidate) || preg_replace('/\D+/', '', (string) ($candidate['numeroProcesso'] ?? '')) !== $digits) {
+                    return $this->failure('invalid_response', 'O Datajud retornou dados incompatíveis com o processo consultado. Nenhum metadado desta resposta foi aplicado. Solicite à administração do sistema a conferência da integração.');
+                }
+                $sources[] = $candidate;
+            }
+            usort($sources, fn (array $a, array $b): int => (($this->normalizeDateTime($b['dataHoraUltimaAtualizacao'] ?? $b['@timestamp'] ?? null) ?? '') <=> ($this->normalizeDateTime($a['dataHoraUltimaAtualizacao'] ?? $a['@timestamp'] ?? null) ?? '')) ?: (count($b) <=> count($a)));
+            $source = $sources[0];
 
             $class = data_get($source, 'classe');
             $court = data_get($source, 'orgaoJulgador');
@@ -84,10 +118,28 @@ class LawDatajudClient
             if (! is_array($status) && is_string(data_get($source, 'situacaoAtual'))) {
                 $status = ['nome' => data_get($source, 'situacaoAtual')];
             }
-            $subjects = collect(data_get($source, 'assuntos', []))
+            $subjects = collect($sources)->flatMap(fn (array $record) => $this->flattenRecords(data_get($record, 'assuntos', [])))
                 ->filter(fn ($item): bool => is_array($item) && trim((string) ($item['nome'] ?? '')) !== '')
                 ->map(fn (array $item): array => ['code' => (string) ($item['codigo'] ?? ''), 'name' => trim((string) $item['nome'])])
                 ->values()->all();
+            $allMovements = collect($sources)->flatMap(fn (array $record) => collect(data_get($record, 'movimentos', []))->map(fn ($movement) => is_array($movement) ? $movement + ['grau' => $record['grau'] ?? null, 'orgaoJulgadorNome' => data_get($record, 'orgaoJulgador.nome')] : $movement))
+                ->filter(fn ($item): bool => is_array($item) && trim((string) ($item['nome'] ?? '')) !== '')
+                ->map(fn (array $item): array => array_filter([
+                    'code' => isset($item['codigo']) ? (string) $item['codigo'] : null,
+                    'name' => trim((string) $item['nome']),
+                    'occurred_at' => $this->normalizeDateTime($item['dataHora'] ?? null),
+                    'complements' => collect($item['complementosTabelados'] ?? [])->filter(fn ($value) => is_array($value))->map(fn (array $value) => array_filter([
+                        'description' => is_scalar($value['descricao'] ?? null) ? trim((string) $value['descricao']) : null,
+                        'name' => is_scalar($value['nome'] ?? null) ? trim((string) $value['nome']) : null,
+                    ]))->filter()->values()->all(),
+                    'degree' => $item['grau'] ?? null,
+                    'court_name' => $item['orgaoJulgadorNome'] ?? null,
+                ], static fn ($value): bool => $value !== null && $value !== ''))
+                ->sortByDesc('occurred_at')->values();
+            $movements = $allMovements->take(self::MAX_MOVEMENTS)->all();
+            $systemValue = $source['sistema'] ?? null;
+            $formatValue = $source['formato'] ?? null;
+            $confidentialityLevels = collect($sources)->map(fn (array $record) => $this->confidentialityLevel($record['nivelSigilo'] ?? null))->filter(fn ($level): bool => $level !== null);
 
             $metadata = array_filter([
                 'case_class' => is_array($class) ? trim((string) ($class['nome'] ?? '')) : null,
@@ -97,12 +149,30 @@ class LawDatajudClient
                 'court_code' => is_array($court) && isset($court['codigo']) ? (string) $court['codigo'] : null,
                 'official_status_code' => is_array($status) && isset($status['codigo']) ? (string) $status['codigo'] : null,
                 'official_status_text' => is_array($status) ? trim((string) ($status['nome'] ?? '')) : (is_string($status) ? trim($status) : null),
+                'tribunal' => isset($source['tribunal']) ? trim((string) $source['tribunal']) : null,
+                'degree' => isset($source['grau']) ? trim((string) $source['grau']) : null,
+                'system' => is_array($systemValue) ? trim((string) ($systemValue['nome'] ?? '')) : (is_scalar($systemValue) ? trim((string) $systemValue) : null),
+                'format' => is_array($formatValue) ? trim((string) ($formatValue['nome'] ?? '')) : (is_scalar($formatValue) ? trim((string) $formatValue) : null),
+                'confidentiality_level_cnj' => $confidentialityLevels->isEmpty() ? null : $confidentialityLevels->max(),
+                'filing_date' => $this->normalizeDateTime($source['dataAjuizamento'] ?? null),
+                'source_updated_at' => $this->normalizeDateTime($source['dataHoraUltimaAtualizacao'] ?? $source['@timestamp'] ?? null),
+                'court_municipality_code' => isset($court['codigoMunicipioIBGE']) ? (string) $court['codigoMunicipioIBGE'] : null,
+                'recent_movements' => $movements ?: null,
+                'movements_truncated' => $allMovements->count() > self::MAX_MOVEMENTS,
+                'records' => array_map(fn (array $record): array => array_filter([
+                    'degree' => isset($record['grau']) ? trim((string) $record['grau']) : null,
+                    'court_name' => trim((string) data_get($record, 'orgaoJulgador.nome')) ?: null,
+                    'case_class' => trim((string) data_get($record, 'classe.nome')) ?: null,
+                    'confidentiality_level_cnj' => $this->confidentialityLevel($record['nivelSigilo'] ?? null),
+                    'source_updated_at' => $this->normalizeDateTime($record['dataHoraUltimaAtualizacao'] ?? $record['@timestamp'] ?? null),
+                ], static fn ($value) => $value !== null && $value !== ''), $sources),
             ], static fn ($value): bool => $value !== null && $value !== '');
 
+            $hasMetadata = (bool) array_filter($metadata, static fn ($value, $key): bool => ! in_array($key, ['records', 'movements_truncated'], true) && $value !== null && $value !== '', ARRAY_FILTER_USE_BOTH);
             return [
-                'status' => $metadata ? 'synced' : 'not_found', 'code' => $metadata ? 'synced' : 'no_metadata', 'metadata' => $metadata,
-                'message' => $metadata
-                    ? 'Consulta concluída. Os metadados disponíveis foram recebidos; preenchimentos manuais divergentes foram preservados para sua revisão. Campos não fornecidos pelo CNJ podem continuar sem informação.'
+                'status' => $hasMetadata ? 'synced' : 'not_found', 'code' => $hasMetadata ? 'synced' : 'no_metadata', 'metadata' => $hasMetadata ? $metadata : [],
+                'message' => $hasMetadata
+                    ? 'Consulta concluída na API pública do DataJud. Os campos não fornecidos podem continuar sem informação; a base pública pode não refletir atualizações em tempo real e não inclui automaticamente processos sigilosos.'
                     : 'O Datajud encontrou o processo, mas não forneceu os metadados utilizados nesta etapa. Você pode preencher os campos ausentes manualmente.',
             ];
         } catch (ConnectionException $exception) {
@@ -124,6 +194,29 @@ class LawDatajudClient
         return ['status' => 'error', 'code' => $code, 'message' => $message];
     }
 
+    private function httpFailure(\Illuminate\Http\Client\Response $response): array
+    {
+        $upstreamError = data_get($response->json(), 'error.type') ?? data_get($response->json(), 'error.root_cause.0.type');
+        if ($response->status() === 429 && in_array($upstreamError, ['circuit_breaking_exception', 'es_rejected_execution_exception'], true)) return $this->failure('service_busy', 'O DataJud está sobrecarregado. Tente novamente mais tarde.');
+        return match (true) {
+            in_array($response->status(), [401, 403], true) => $this->failure('authentication_failed', 'O CNJ recusou a chave de acesso ao DataJud.'),
+            $response->status() === 429 => $this->failure('rate_limited', 'O DataJud está limitando as consultas. '.$this->retryAdvice($response->header('Retry-After'))),
+            in_array($response->status(), [408, 504], true) => $this->failure('timeout', 'O DataJud excedeu o tempo limite da consulta.'),
+            $response->serverError() => $this->failure('service_unavailable', 'O serviço do DataJud apresentou uma falha temporária.'),
+            $response->status() === 404 => $this->failure('endpoint_not_found', 'O endpoint deste tribunal não foi encontrado no DataJud.'),
+            default => $this->failure('request_rejected', 'O DataJud recusou a consulta (HTTP '.$response->status().').'),
+        };
+    }
+
+    private function flattenRecords(mixed $value): array
+    {
+        if (! is_array($value)) return [];
+        if (array_key_exists('nome', $value) || array_key_exists('codigo', $value)) return [$value];
+        $records = [];
+        foreach ($value as $item) $records = [...$records, ...$this->flattenRecords($item)];
+        return $records;
+    }
+
     private function retryAdvice(?string $value): string
     {
         $value = trim((string) $value);
@@ -132,6 +225,25 @@ class LawDatajudClient
         return $seconds > 0 && $seconds <= 86400
             ? 'O CNJ orienta aguardar pelo menos '.(int) ceil($seconds / 60).' minuto(s) antes de tentar novamente.'
             : 'Aguarde alguns minutos antes de tentar novamente.';
+    }
+
+    private function confidentialityLevel(mixed $value): ?int
+    {
+        if (! is_int($value) && ! (is_string($value) && preg_match('/^[0-5]$/D', $value))) return null;
+        $level = (int) $value;
+        return $level >= 0 && $level <= 5 ? $level : null;
+    }
+
+    private function normalizeDateTime(mixed $value): ?string
+    {
+        $value = trim((string) $value);
+        if ($value === '') return null;
+        try {
+            if (preg_match('/^\d{14}$/', $value)) return \Carbon\Carbon::createFromFormat('YmdHis', $value)->toIso8601String();
+            return \Carbon\Carbon::parse($value)->toIso8601String();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function aliasFor(string $digits): ?string

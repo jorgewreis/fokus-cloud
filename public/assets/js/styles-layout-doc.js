@@ -15,6 +15,32 @@
     });
   });
 
+  const componentsOutput = document.querySelector("[data-components-output]");
+  const componentsCode = document.querySelector("[data-components-code]");
+  if (componentsOutput && componentsCode) {
+    const states = {
+      success: ["Publicação concluída", "O conteúdo foi publicado com sucesso."],
+      warning: ["Revisão necessária", "Revise os campos antes de publicar."],
+      danger: ["Publicação não concluída", "Não foi possível publicar agora."],
+    };
+    const updateComponents = (state) => {
+      if (!states[state]) return;
+      componentsOutput.className = `fs-alert fs-alert-${state}`;
+      componentsOutput.querySelector(".fs-alert-heading").textContent = states[state][0];
+      componentsOutput.querySelector(".fs-alert-text").textContent = states[state][1];
+      const example = componentsOutput.cloneNode(true);
+      example.removeAttribute("data-components-output");
+      componentsCode.textContent = example.outerHTML;
+      document.querySelectorAll("[data-components-state]").forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.componentsState === state));
+      });
+    };
+    document.querySelectorAll("[data-components-state]").forEach((button) => {
+      button.addEventListener("click", () => updateComponents(button.dataset.componentsState));
+    });
+    updateComponents("success");
+  }
+
   const layoutLab = document.querySelector("[data-layout-lab]");
   if (layoutLab) {
     const stage = layoutLab.querySelector("[data-layout-stage]");
@@ -74,13 +100,18 @@
     const submit = formsLab.querySelector("[data-forms-submit]");
     const email = formsLab.querySelector("#lab-email");
     const emailError = formsLab.querySelector("#lab-email-error");
+    const emailGroup = email.closest(".fs-input-group");
     const range = formsLab.querySelector("#lab-team-size");
     const rangeOutput = formsLab.querySelector("#lab-team-output");
     const formsCode = document.querySelector("#forms-lab-code code");
+    let submissionTimer;
     const clearValidation = () => {
+      window.clearTimeout(submissionTimer);
+      submissionTimer = undefined;
       error.hidden = true;
       success.hidden = true;
       email.classList.remove("is-invalid");
+      emailGroup.classList.remove("is-invalid");
       email.removeAttribute("aria-invalid");
       emailError.hidden = true;
       status.textContent = "";
@@ -94,17 +125,19 @@
     };
     const updateFormsCode = () => {
       const emailState = email.classList.contains("is-invalid") ? ' aria-invalid="true"' : "";
-      const termsState = formsLab.querySelector("#lab-terms").checked ? " checked" : "";
+      const newsState = formsLab.querySelector("#lab-news").checked ? " checked" : "";
       formsCode.textContent = `<fieldset class="fs-form-fieldset">
     <legend>Seu espaço de trabalho</legend>
-    <div class="fs-input-group">
-        <span class="fs-input-group-text">@</span>
-        <input class="fs-form-control${emailState ? " is-invalid" : ""}" type="email"${emailState}>
-    </div>
-    <input class="fs-form-range" type="range" value="${range.value}">
+    <label class="fs-form-label" for="example-email">Email</label>
+    <div class="fs-input-group${emailState ? " is-invalid" : ""}">
+        <span class="fs-input-group-text" aria-hidden="true">@</span>
+        <input class="fs-form-control${emailState ? " is-invalid" : ""}" id="example-email" name="email" type="email" autocomplete="email" required${emailState}${emailState ? ' aria-describedby="example-email-error"' : ""}>
+    </div>${emailState ? '\n    <p class="fs-invalid-feedback" id="example-email-error">Informe um email válido.</p>' : ""}
+    <label class="fs-form-label" for="example-team-size">Tamanho da equipe</label>
+    <input class="fs-form-range" id="example-team-size" name="teamSize" type="range" min="1" max="50" value="${range.value}">
     <div class="fs-switch">
-        <input class="fs-switch-input" type="checkbox"${termsState}>
-        <label class="fs-switch-label">Receber novidades</label>
+        <input class="fs-switch-input" id="example-news" name="news" type="checkbox"${newsState}>
+        <label class="fs-switch-label" for="example-news">Receber novidades e conteúdos</label>
     </div>
 </fieldset>`;
     };
@@ -112,6 +145,7 @@
       clearValidation();
       error.hidden = false;
       email.classList.add("is-invalid");
+      emailGroup.classList.add("is-invalid");
       email.setAttribute("aria-invalid", "true");
       emailError.hidden = false;
       email.focus({ preventScroll: true });
@@ -157,7 +191,8 @@
       submit.disabled = true;
       submit.innerHTML = '<span class="fs-spinner fs-spinner-sm" aria-hidden="true"></span> Criando cadastro';
       status.textContent = "Validando informações…";
-      window.setTimeout(() => {
+      submissionTimer = window.setTimeout(() => {
+        submissionTimer = undefined;
         form.removeAttribute("aria-busy");
         success.hidden = false;
         submit.disabled = false;
@@ -167,6 +202,43 @@
     });
     updateRange();
     updateFormsCode();
+  }
+
+  const helpersStage = document.querySelector("[data-helpers-stage]");
+  const helpersButtons = [...document.querySelectorAll("[data-helpers-gap]")];
+  if (helpersStage && helpersButtons.length) {
+    helpersButtons.forEach((button) => button.addEventListener("click", () => {
+      const gap = button.dataset.helpersGap;
+      if (!["1", "4"].includes(gap)) return;
+      helpersStage.classList.remove("fs-stack-gap-1", "fs-stack-gap-3", "fs-stack-gap-4");
+      helpersStage.classList.add(`fs-stack-gap-${gap}`);
+      helpersButtons.forEach((control) => control.setAttribute("aria-pressed", String(control === button)));
+      const code = helpersStage.querySelector("code");
+      if (code) code.textContent = `<div class="fs-stack fs-stack-gap-${gap}">\n    <div class="fs-cluster fs-cluster-gap-2">...</div>\n</div>`;
+    }));
+  }
+
+  const utilitiesCard = document.querySelector("[data-utilities-card]");
+  const utilitiesButtons = [...document.querySelectorAll("[data-utilities-state]")];
+  if (utilitiesCard && utilitiesButtons.length) {
+    const states = { success: "Concluído", warning: "Em atenção", danger: "Com erro" };
+    const code = utilitiesCard.closest(".styles-lab-stage")?.querySelector("code");
+    const updateCode = () => { if (code) code.textContent = utilitiesCard.outerHTML; };
+    utilitiesButtons.forEach((button) => button.addEventListener("click", () => {
+      const state = button.dataset.utilitiesState;
+      if (!Object.hasOwn(states, state)) return;
+      for (const variant of Object.keys(states)) {
+        utilitiesCard.classList.remove(`fs-u-bg-${variant}-subtle`, `fs-u-text-${variant}-emphasis`);
+      }
+      utilitiesCard.classList.add(`fs-u-bg-${state}-subtle`, `fs-u-text-${state}-emphasis`);
+      const status = utilitiesCard.querySelector("[data-utilities-status]");
+      status.textContent = states[state];
+      status.classList.remove("fs-badge-soft-primary", ...Object.keys(states).map(variant => `fs-badge-soft-${variant}`));
+      status.classList.add(`fs-badge-soft-${state}`);
+      utilitiesButtons.forEach((control) => control.setAttribute("aria-pressed", String(control === button)));
+      updateCode();
+    }));
+    updateCode();
   }
 
   const links = [...document.querySelectorAll(".styles-sidebar a[href^='#']")];

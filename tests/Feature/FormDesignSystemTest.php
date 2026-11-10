@@ -368,11 +368,24 @@ class FormDesignSystemTest extends TestCase
     {
         $home = file_get_contents(base_path('public/styles/index.html'));
 
-        $this->assertStringContainsString('href="/layout">Layout</a>', $home);
-        $this->assertStringContainsString('href="/forms">Forms</a>', $home);
-        $this->assertStringContainsString('href="/components">Components</a>', $home);
-        $this->assertStringContainsString('href="/helpers">Helpers</a>', $home);
-        $this->assertStringContainsString('href="/utilities">Utilities</a>', $home);
+        $this->assertNotFalse($home);
+        $document = new \DOMDocument;
+        $this->assertTrue($document->loadHTML('<?xml encoding="UTF-8"?>'.$home, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING));
+        $xpath = new \DOMXPath($document);
+
+        foreach ([
+            '/layout' => 'Layout',
+            '/forms' => 'Formulários',
+            '/components' => 'Componentes',
+            '/helpers' => 'Helpers',
+            '/utilities' => 'Utilitários',
+        ] as $href => $label) {
+            $links = $xpath->query('//*[@id="documentacao"]//a[@href="'.$href.'"]');
+            $this->assertNotFalse($links);
+            $this->assertCount(1, $links, 'Documentation must contain one link to '.$href);
+            $this->assertStringContainsString($label, $links->item(0)->textContent, $href);
+        }
+
         $this->assertSame(0, substr_count($home, 'class="styles-sidebar-planned"'));
         $this->assertStringNotContainsString('href="#layout"', $home);
     }

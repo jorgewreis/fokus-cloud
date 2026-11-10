@@ -48,7 +48,7 @@ class LawHearingController extends Controller
         if (! empty($data['law_case_id'])) {
             $case = DB::table('law_cases')->where('company_id', $companyId)->where('id', $data['law_case_id'])->first(['id', 'confidentiality_level']);
             abort_unless($case, 404, 'Processo não encontrado nesta empresa.');
-            if ($case->confidentiality_level === 'secret') {
+            if (\App\Services\LawCnjConfidentiality::requiresNamedAccess($case->confidentiality_level)) {
                 $membershipId = (string) ($request->attributes->get('active_membership')?->id ?? '');
                 abort_unless(DB::table('law_confidential_case_accesses')->where('company_id', $companyId)->where('law_case_id', $case->id)->where('company_membership_id', $membershipId)->whereNull('revoked_at')->exists(), 404, 'Processo não encontrado nesta empresa.');
             }
@@ -139,7 +139,7 @@ class LawHearingController extends Controller
                 $secretCase->selectRaw('1')->from('law_cases as secret_case')
                     ->whereColumn('secret_case.company_id', 'law_hearings.company_id')
                     ->whereColumn('secret_case.id', 'law_hearings.law_case_id')
-                    ->where('secret_case.confidentiality_level', 'secret');
+                    ->whereIn('secret_case.confidentiality_level', ['cnj_5', 'secret']);
             })->orWhereExists(function ($authorizedCase) use ($membershipId): void {
                 $authorizedCase->selectRaw('1')->from('law_cases as secret_case')
                     ->join('law_confidential_case_accesses as case_access', function ($join): void {
@@ -148,7 +148,7 @@ class LawHearingController extends Controller
                     })
                     ->whereColumn('secret_case.company_id', 'law_hearings.company_id')
                     ->whereColumn('secret_case.id', 'law_hearings.law_case_id')
-                    ->where('secret_case.confidentiality_level', 'secret')
+                    ->whereIn('secret_case.confidentiality_level', ['cnj_5', 'secret'])
                     ->where('case_access.company_membership_id', $membershipId)->whereNull('case_access.revoked_at');
             });
         });

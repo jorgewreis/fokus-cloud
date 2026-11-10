@@ -1,0 +1,80 @@
+name: Law additive schema prepublication tests
+
+"on":
+  pull_request:
+    paths:
+      - 'deploy/prepublish-law-schema.php'
+      - 'tests/Deployment/law-schema-*'
+      - '.github/workflows/law-schema-preflight.yml'
+      - '.github/workflows/deploy.yml'
+      - 'database/migrations/2026_10_30_160000_add_encrypted_details_to_law_contacts.php'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-schema-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: isolated-test-only
+          MYSQL_DATABASE: fokuscloud_schema_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot --password=isolated-test-only"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+    env:
+      APP_ENV: testing
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: fokuscloud_schema_test
+      DB_USERNAME: root
+      DB_PASSWORD: isolated-test-only
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: proposed
+      - uses: actions/checkout@v5
+        with:
+          ref: b3d441ae81136f7c985b4a6e0eb96f4e5ca63026
+          path: old-release
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_mysql
+          coverage: none
+      - name: Lint prepared PHP files
+        run: |
+          php -l proposed/deploy/prepublish-law-schema.php
+          php -l proposed/tests/Deployment/law-schema-preflight-test.php
+      - name: Prepare old release with disposable database
+        working-directory: old-release
+        run: |
+          cp .env.example .env
+          composer install --no-interaction --prefer-dist --optimize-autoloader
+          php artisan migrate:fresh --force --no-interaction
+      - name: Check schema PHP formatting
+        run: old-release/vendor/bin/pint --test -v proposed/deploy/prepublish-law-schema.php proposed/tests/Deployment/law-schema-preflight-test.php
+      - name: Verify additive upgrade and fail-closed guards
+        run: |
+          stage="$RUNNER_TEMP/law-schema-test"
+          mkdir -p "$stage"
+          cp proposed/deploy/prepublish-law-schema.php proposed/database/migrations/2026_10_30_160000_add_encrypted_details_to_law_contacts.php "$stage/"
+          set -euo pipefail
+          python3 proposed/tests/Deployment/law-schema-process-test.py "$GITHUB_WORKSPACE/old-release" "$stage/prepublish-law-schema.php"
+          status=0
+          php proposed/tests/Deployment/law-schema-preflight-test.php "$GITHUB_WORKSPACE/old-release" "$stage/prepublish-law-schema.php" > "$stage/result.log" 2>&1 || status=$?
+          cat "$stage/result.log"
+          echo "Harness exit status: $status"
+          test "$status" -eq 0
+          grep -Fxq 'Old-runtime upgrade, repeated run and both divergence guards passed.' "$stage/result.log"

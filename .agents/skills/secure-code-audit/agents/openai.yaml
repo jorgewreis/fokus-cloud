@@ -1,0 +1,4 @@
+interface:
+  display_name: "Secure Code Audit"
+  short_description: "Auditoria de código com evidências e limites"
+  default_prompt: "Use $secure-code-audit para revisar este escopo autorizado e relatar controles, achados fundamentados e testes necessários."

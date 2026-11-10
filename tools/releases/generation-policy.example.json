@@ -1,0 +1,18 @@
+{
+  "base": null,
+  "root": null,
+  "receipt_sha256": null,
+  "node_sha256": null,
+  "operator_uid": null,
+  "runtime_uid": null,
+  "runtime_gid": null,
+  "runtime_permissions_verified": null,
+  "php_binary": null,
+  "php_binary_sha256": null,
+  "platform_verified": null,
+  "all_scheduler_entrypoints_controlled": null,
+  "external_workers_absent_verified": null,
+  "no_external_process_delegation_verified": null,
+  "expires_at_epoch": null,
+  "timeout_seconds": 120
+}

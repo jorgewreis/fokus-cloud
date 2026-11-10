@@ -1,0 +1,15 @@
+{
+  "skill": "keyboard-navigator",
+  "scope": [
+    "public/portal/assets/fokus-law-shell.css",
+    "public/portal/assets/fokus-law-processes.js"
+  ],
+  "findings": [],
+  "passed": [
+    "O campo, o botão e a caixa de seleção são controles nativos e seguem a ordem visual.",
+    "A alteração de alinhamento não modifica a ordem nem a operação por teclado."
+  ],
+  "notes": [
+    "Revisão estática; a tela autenticada não foi verificada em execução."
+  ]
+}

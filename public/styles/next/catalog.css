@@ -1,0 +1,22 @@
+.catalog-filters{display:flex;gap:18px;align-items:end;flex-wrap:wrap;margin:28px 0}
+.catalog-filters label{display:grid;gap:8px;flex:1;min-width:180px}
+.catalog-filters input,.catalog-filters select{font:inherit;min-height:44px;padding:10px;border:1px solid var(--showcase-border);border-radius:6px;background:var(--showcase-surface);color:var(--showcase-text);width:100%}
+/* Site controls only; framework examples remain inside isolated iframes. */
+.catalog-filters .fs-btn,#catalog-detail .fs-btn,#catalog-retry{background:var(--site-surface);color:var(--site-text);border:1px solid var(--site-border);border-radius:6px;min-height:44px}
+.catalog-filters .fs-btn:hover,#catalog-detail .fs-btn:hover,#catalog-retry:hover{color:var(--site-accent);border-color:var(--site-accent);background:var(--site-accent-soft)}
+.catalog-layout{display:grid;grid-template-columns:minmax(200px,280px) minmax(0,1fr);gap:28px;align-items:start}
+#catalog-list{display:grid;gap:8px;max-height:75vh;overflow:auto;padding:4px}
+#catalog-list a{display:block;padding:12px;border:1px solid var(--showcase-border);border-radius:8px;color:var(--showcase-text)}
+#catalog-list a[aria-current]{border-color:var(--showcase-accent);background:var(--showcase-surface)}
+#catalog-detail{min-width:0;overflow-wrap:anywhere;border:1px solid var(--showcase-border);border-radius:12px;padding:24px;background:var(--showcase-surface)}
+#catalog-detail h2{font-size:32px}#catalog-detail h3{margin-top:28px}
+#catalog-detail pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--showcase-bg);border:1px solid var(--showcase-border);padding:16px;border-radius:8px;max-height:480px;overflow:auto}
+#catalog-detail iframe{display:block;width:100%;height:380px;border:1px solid var(--showcase-border);border-radius:8px;background:white;margin:16px 0}
+#catalog-detail details{margin:16px 0}#catalog-detail summary{cursor:pointer;padding:10px 0}
+#provenance{font-size:12px;overflow-wrap:anywhere} :focus-visible{outline:3px solid var(--showcase-accent);outline-offset:3px}
+[hidden]{display:none!important}
+@media(max-width:700px){.catalog-layout{grid-template-columns:1fr}#catalog-list{max-height:250px}#catalog-detail{padding:16px}.catalog-filters{align-items:stretch}}
+/* Native disclosure triangles are directional icons too; keep textual controls. */
+#catalog-detail summary{list-style:none;border-bottom:1px solid var(--showcase-border)}
+#catalog-detail summary::marker{content:""}
+#catalog-detail summary::-webkit-details-marker{display:none}

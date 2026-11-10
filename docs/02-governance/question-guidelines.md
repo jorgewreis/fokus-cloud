@@ -4,6 +4,12 @@
 
 Quando for necessario fazer perguntas ao responsavel pelo projeto, as perguntas devem ser feitas uma de cada vez.
 
+Investigar primeiro código e documentação. Em tarefa com implementação já
+autorizada, resolver decisões técnicas reversíveis dentro do escopo sem novas
+confirmações. Na [operação autônoma](../09-operations/julia-night-operations.md),
+registrar decisões materiais sem resposta como bloqueios e concluir o trabalho
+independente possível; não interromper por perguntas opcionais.
+
 ## Formato das perguntas
 
 Cada pergunta deve apresentar ate 5 respostas sugeridas, com uma resposta marcada como recomendada.

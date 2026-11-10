@@ -1,0 +1,24 @@
+{
+  "skill": "keyboard-navigator",
+  "scope": [
+    "public/portal/assets/fokus-law-shell.css",
+    "public/portal/assets/fokus-law-processes.js"
+  ],
+  "findings": [
+    {
+      "rule": "KEYBOARD-FOCUS-ORDER-001",
+      "wcag": "2.4.3 A",
+      "severity": "moderate",
+      "confidence": "high",
+      "location": "public/portal/assets/fokus-law-shell.css:508-511",
+      "summary": "The submit button appears vertically above the search input, despite following it in keyboard focus order.",
+      "fix": "Align the submit button with the input control's vertical position so its visual placement matches the input-then-button tab sequence.",
+      "evidence": "The search field occupies the first grid row including its label; the button uses align-self: end on that same row, but the screenshot shows it aligned with the label rather than the input."
+    }
+  ],
+  "passed": [
+    "Search input, submit button, and archived checkbox are native form controls in DOM order, so each is reachable by Tab and the button can be activated with Enter or Space.",
+    "The archived checkbox is placed on a separate grid row after the input and submit button; this matches its later position in DOM focus order."
+  ],
+  "notes": []
+}

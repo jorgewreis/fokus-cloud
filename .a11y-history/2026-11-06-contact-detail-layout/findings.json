@@ -1,0 +1,15 @@
+{
+  "skill": "keyboard-navigator",
+  "scope": [
+    "public/portal/assets/fokus-law-contacts.js",
+    "public/portal/assets/fokus-law-shell.css"
+  ],
+  "findings": [],
+  "passed": [
+    "A sigla removida não era interativa e o tipo permanece na descrição.",
+    "O layout não altera a ordem de foco nem adiciona controles."
+  ],
+  "notes": [
+    "Revisão estática."
+  ]
+}

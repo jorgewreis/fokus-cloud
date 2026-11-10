@@ -1,0 +1,2013 @@
+{
+  "channel": "next",
+  "published": false,
+  "source": {
+    "baselineCommit": "218afe443936e31edd57fdca03b392ac23381d1d",
+    "digest": "97a63e72f6be58d4a39fd241edd02a39cd9b33987e5906d2f15c81d17a6fdc29",
+    "sassEvidenceCssSha256": "22f780be35e3ecfe3fcb02ab6e7537ca855bb7150f15c514f0f9eb1e7a7e1743",
+    "files": [
+      {
+        "path": "docs/catalog/components.json",
+        "sha256": "1bab1641764cb2253eaa2d5353557ce4f556911f4057855a41cbf0d0f0598a02"
+      },
+      {
+        "path": "docs/catalog/examples.json",
+        "sha256": "28cbd49b6ad7a6952c52823b0a5701c44bef3a66044576d3e9a6d384ec55e2a8"
+      },
+      {
+        "path": "docs/catalog/feedback-cases.json",
+        "sha256": "88793c8d6c58418a90b9cda0c4a04ad06dc0df7de7fa5c188e544064df606b18"
+      },
+      {
+        "path": "docs/catalog/fixture-provenance.json",
+        "sha256": "10319d56a453232fb5d27b3dbb8f778c12f40cc782e516bed954a07d606fe41c"
+      },
+      {
+        "path": "docs/catalog/fixtures/accordion/always-open.html",
+        "sha256": "ce22b61fc92e0adf522589d6826e7bb82e9bde6fabf095930579e783586ffd21"
+      },
+      {
+        "path": "docs/catalog/fixtures/accordion/always-open.js",
+        "sha256": "9510b569dc41d605aab8f7303db02db6cf87267ae01693beccb7dec536b9f4ac"
+      },
+      {
+        "path": "docs/catalog/fixtures/accordion/basic.html",
+        "sha256": "a0167e521ff3091218ad7ad8e1b9c677e072b195de796bcf25d1201955d69550"
+      },
+      {
+        "path": "docs/catalog/fixtures/accordion/basic.js",
+        "sha256": "9510b569dc41d605aab8f7303db02db6cf87267ae01693beccb7dec536b9f4ac"
+      },
+      {
+        "path": "docs/catalog/fixtures/accordion/multiple.html",
+        "sha256": "1ad861712c1068523f613ecb8defffb9bbba6747f455815c7268c4e7f822eb01"
+      },
+      {
+        "path": "docs/catalog/fixtures/accordion/multiple.js",
+        "sha256": "9510b569dc41d605aab8f7303db02db6cf87267ae01693beccb7dec536b9f4ac"
+      },
+      {
+        "path": "docs/catalog/fixtures/alert-dialog/basic.html",
+        "sha256": "5c322996b097f8100166af2f1a9782ec333dc2ae533d2f316bf118e95ee2f17a"
+      },
+      {
+        "path": "docs/catalog/fixtures/alert-dialog/basic.js",
+        "sha256": "1daf672021fc9489cd7288c86549db00e839b6e81b98bb624a0417508ed9feca"
+      },
+      {
+        "path": "docs/catalog/fixtures/alert/basic.html",
+        "sha256": "49850f4e45c86860400393757876dc88826404d71614b3939c99f03e47e7632f"
+      },
+      {
+        "path": "docs/catalog/fixtures/alert/states.html",
+        "sha256": "8e63cc8433c941effd5fc76b05bf55ff23e7345fd415db13836306e0294da38b"
+      },
+      {
+        "path": "docs/catalog/fixtures/alert/states.js",
+        "sha256": "fa57a76feaf459dcc373f6aeadaeb5802489da542afb8aa22e1a39629d5a6db7"
+      },
+      {
+        "path": "docs/catalog/fixtures/alert/tokens.css",
+        "sha256": "a345dc9b2e9649002a396621bda1a6a085889810ba43846d6c0f8173fe94bda6"
+      },
+      {
+        "path": "docs/catalog/fixtures/alert/tokens.html",
+        "sha256": "05f294ef2aa9ad777c4ee4a462ae9e5ec5f90f5f75d7545b10460c39917cf21e"
+      },
+      {
+        "path": "docs/catalog/fixtures/alert/variants.html",
+        "sha256": "81f93bf4de735da136c01817368d04ea6517e97956c23d96654ed07a6223e0c8"
+      },
+      {
+        "path": "docs/catalog/fixtures/avatar/basic.html",
+        "sha256": "cf4e31dc7cd52fdaa928d1e447eee76cef4a53f8cad96005d4d587f38d75b8f7"
+      },
+      {
+        "path": "docs/catalog/fixtures/badge/basic.html",
+        "sha256": "9138c0bea543baccd581c2bcd0f45422ccd8ba24b51b4c399b50a64be5f3778f"
+      },
+      {
+        "path": "docs/catalog/fixtures/badge/states.css",
+        "sha256": "49af3f4770f5e493961c7d2f50899528d0e4a132a2917a68bdbba9f38ed075c5"
+      },
+      {
+        "path": "docs/catalog/fixtures/badge/states.html",
+        "sha256": "729ba8e701d7a17facdbe6685b8720c699b90e2adbfe95a1dfb5e494cc59df78"
+      },
+      {
+        "path": "docs/catalog/fixtures/badge/tokens.css",
+        "sha256": "000e7b1383ec45382c4e10363cd74963983e2f3f4234250fbd179751a2623c04"
+      },
+      {
+        "path": "docs/catalog/fixtures/badge/tokens.html",
+        "sha256": "f42e9ea55216b65a82669e8782e9ab6f7e4b31685b0be28c531bcca00fee148e"
+      },
+      {
+        "path": "docs/catalog/fixtures/badge/variants.css",
+        "sha256": "49af3f4770f5e493961c7d2f50899528d0e4a132a2917a68bdbba9f38ed075c5"
+      },
+      {
+        "path": "docs/catalog/fixtures/badge/variants.html",
+        "sha256": "32cad487cbc48db98263e2cea4a8a7e25348b305a0bf5d8c4cfafbf2e7c8aa31"
+      },
+      {
+        "path": "docs/catalog/fixtures/breadcrumb/basic.html",
+        "sha256": "20ce604d5998f4edb81c7f5a8c66ae0b6db434259a0dc42a98ce51056c305532"
+      },
+      {
+        "path": "docs/catalog/fixtures/breadcrumb/responsive-collapse.html",
+        "sha256": "59422a3ca343108e27bea33a6fcf10214670e70f7d17a32b4caedc196d498353"
+      },
+      {
+        "path": "docs/catalog/fixtures/breadcrumb/responsive-collapse.js",
+        "sha256": "8b56f5c1b2f5c1ada6b14ad6749570278423a22fc7743657c5fa9e80ec6302df"
+      },
+      {
+        "path": "docs/catalog/fixtures/button-group/basic.html",
+        "sha256": "56af881d9a34842277aab0015c8c61174723e9dbb32b2486892add4e366489af"
+      },
+      {
+        "path": "docs/catalog/fixtures/button/basic.html",
+        "sha256": "ea073c48488a8f2041e6c7e987016fa829f24665bc0cc48b944304db8a5d0818"
+      },
+      {
+        "path": "docs/catalog/fixtures/button/states.css",
+        "sha256": "49af3f4770f5e493961c7d2f50899528d0e4a132a2917a68bdbba9f38ed075c5"
+      },
+      {
+        "path": "docs/catalog/fixtures/button/states.html",
+        "sha256": "ac93e7860b6dcbdca2df46e932d3d03a852a73b9bd9c4761d9dd3a817ceb19c2"
+      },
+      {
+        "path": "docs/catalog/fixtures/button/tokens.css",
+        "sha256": "ddc23d950a89cfd5fb9ce24ef3921213b5741e4e2db0da8de80cafa671d5b693"
+      },
+      {
+        "path": "docs/catalog/fixtures/button/tokens.html",
+        "sha256": "addc317b9588a87ba8426fbae11d79cda3479a3cdafdcabde950bd123dc76925"
+      },
+      {
+        "path": "docs/catalog/fixtures/button/variants.css",
+        "sha256": "49af3f4770f5e493961c7d2f50899528d0e4a132a2917a68bdbba9f38ed075c5"
+      },
+      {
+        "path": "docs/catalog/fixtures/button/variants.html",
+        "sha256": "972e7fb415c38cdfc0502ff185b22f028acdfd6b64c6ec6cc1c2c85590150410"
+      },
+      {
+        "path": "docs/catalog/fixtures/card/basic.html",
+        "sha256": "40351526bc92dcd3872f2ad8f805aeae4b25c94c8329a046f42989fa1394f194"
+      },
+      {
+        "path": "docs/catalog/fixtures/card/states.html",
+        "sha256": "859a2af7107d1b1f9d0a086648b3dc7d878202aae67403297fed59832821013a"
+      },
+      {
+        "path": "docs/catalog/fixtures/card/tokens.css",
+        "sha256": "066185133b28137c7ff29aef1bf3b3a334df20f76a30ab9c8bcddf3997b32330"
+      },
+      {
+        "path": "docs/catalog/fixtures/card/tokens.html",
+        "sha256": "51c777ca4755eabcea0afd1b582547160f764c81712055356634441eccf2af6e"
+      },
+      {
+        "path": "docs/catalog/fixtures/card/variants.css",
+        "sha256": "49af3f4770f5e493961c7d2f50899528d0e4a132a2917a68bdbba9f38ed075c5"
+      },
+      {
+        "path": "docs/catalog/fixtures/card/variants.html",
+        "sha256": "2da4cd4d3f8654a3b2d399ff91732cb1f3a2903dc89aa5ea8d69ae24717ab0c5"
+      },
+      {
+        "path": "docs/catalog/fixtures/carousel/basic.html",
+        "sha256": "557c355543e596e11d0b463e511490490d7b0a8c2137218e46501794d610e0fa"
+      },
+      {
+        "path": "docs/catalog/fixtures/carousel/basic.js",
+        "sha256": "01505ec221704347032343a078f8e78b90b04b1df5fe8a5e0fb4f649dac4fb48"
+      },
+      {
+        "path": "docs/catalog/fixtures/checkbox/basic.html",
+        "sha256": "ee50345399a28fe159d84664aeb5d3093d39cb103c8ece361c3d004526963b5c"
+      },
+      {
+        "path": "docs/catalog/fixtures/checkbox/native-states.html",
+        "sha256": "d2b248bb37447759d347fa16ef47f2c8a214e4064448b870c03c9c0bb5516306"
+      },
+      {
+        "path": "docs/catalog/fixtures/checkbox/native-tokens.css",
+        "sha256": "6e193ab893eb054e8107c1f2ecb305123e69e0698c1717796f2d49bc200b8842"
+      },
+      {
+        "path": "docs/catalog/fixtures/checkbox/native-tokens.html",
+        "sha256": "94c21a25a6494a06ff8297baaf7075a72d1f4076ad9f4358d7998ab4003fca00"
+      },
+      {
+        "path": "docs/catalog/fixtures/close-button/basic.html",
+        "sha256": "15861a77f34aa27fb582f8e3ec1df507484ab985d887bda0e0b4a44310489f38"
+      },
+      {
+        "path": "docs/catalog/fixtures/code/basic.html",
+        "sha256": "e6627413be159c5aa8a1340de0f1147f6692d2d67fbd539bf10aa080f5c10a0d"
+      },
+      {
+        "path": "docs/catalog/fixtures/code/tokens.css",
+        "sha256": "805df163236b5031d22d3a786d1ed227cbd4c1d035553bc9571be86fcf0f714b"
+      },
+      {
+        "path": "docs/catalog/fixtures/code/tokens.html",
+        "sha256": "3f9c9e45651b3aa9e4ffe80176fff090affad11e9a9d1899eef51ae225cb52ca"
+      },
+      {
+        "path": "docs/catalog/fixtures/code/variants.css",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      {
+        "path": "docs/catalog/fixtures/code/variants.html",
+        "sha256": "f18eea3951a3ec25b0bb65809dd2e6751b0777da79750f35b034d87be48b18ed"
+      },
+      {
+        "path": "docs/catalog/fixtures/collapse/basic.html",
+        "sha256": "b8f51d8bc595a386224f05f585d26feedb8c2628c584ea69084b33c22202dbc6"
+      },
+      {
+        "path": "docs/catalog/fixtures/collapse/basic.js",
+        "sha256": "62542e5d08db3770f757b2bdece95f9f725ac257b4f74734362beb324e6c16f1"
+      },
+      {
+        "path": "docs/catalog/fixtures/combobox/basic.html",
+        "sha256": "ac51fac3eb7bd8a8c73fdc973f872edea4c3e96a3135511c6c6f77bd8c57f7b8"
+      },
+      {
+        "path": "docs/catalog/fixtures/combobox/basic.js",
+        "sha256": "24b6dd74075de12dbe51a4a1149a6a094749f3dc81f40605ed91b4d31b8ed544"
+      },
+      {
+        "path": "docs/catalog/fixtures/combobox/states.html",
+        "sha256": "8c28d799717607d7607c3ef1055b8393bf1d108b455129ee060af63133e78ec9"
+      },
+      {
+        "path": "docs/catalog/fixtures/combobox/states.js",
+        "sha256": "d913d5cffbf65074466231a273ccab32bdc92384453682e3ae634ce36c1d877f"
+      },
+      {
+        "path": "docs/catalog/fixtures/command-palette/basic.html",
+        "sha256": "b703767171b758b1d5c57ff8e09f0e8102266b1a31acc0f9ee13a39950f187ab"
+      },
+      {
+        "path": "docs/catalog/fixtures/command-palette/basic.js",
+        "sha256": "2652ecea099a424e50228d9d351ca04786353a5ed3678f90eb6caa9a0061a179"
+      },
+      {
+        "path": "docs/catalog/fixtures/command-palette/shortcut-empty.html",
+        "sha256": "54cca51496cd55754ac5303f9b8944d321dcd5df7d5f015c0dea0605e765b2dc"
+      },
+      {
+        "path": "docs/catalog/fixtures/command-palette/shortcut-empty.js",
+        "sha256": "6e978f69435404cb9cda5041c64cec823ce9ad9b8e67a989959fb8150d58e0d8"
+      },
+      {
+        "path": "docs/catalog/fixtures/datatable/basic.html",
+        "sha256": "dc0de112cbe2df4a6ed975e705ffc12c54cb2e0d6decfd77fb4afe8ca4f177f9"
+      },
+      {
+        "path": "docs/catalog/fixtures/datatable/basic.js",
+        "sha256": "0aed599ebf3ab464b6a706aa314ed6197de026736ae2f04f8f45eb69174d07a6"
+      },
+      {
+        "path": "docs/catalog/fixtures/datatable/states.css",
+        "sha256": "49af3f4770f5e493961c7d2f50899528d0e4a132a2917a68bdbba9f38ed075c5"
+      },
+      {
+        "path": "docs/catalog/fixtures/datatable/states.html",
+        "sha256": "9bd6794eff378af1abae73211786f044d03dbd405debbbb7de0e243702ce6bed"
+      },
+      {
+        "path": "docs/catalog/fixtures/datatable/states.js",
+        "sha256": "d8a44f666599b5fa735396ba1cb2a542fd5280e04488a3819220ea3e66d00234"
+      },
+      {
+        "path": "docs/catalog/fixtures/datatable/tokens.css",
+        "sha256": "8661b4c019138fb703d7a4c1a9d9319e0817b167257617329c4fc9edc938971f"
+      },
+      {
+        "path": "docs/catalog/fixtures/datatable/tokens.html",
+        "sha256": "4381b2cbfadb140a4ca97e651289df45867fad58d79cb523cd438f88247e73c4"
+      },
+      {
+        "path": "docs/catalog/fixtures/datatable/tokens.js",
+        "sha256": "2f9769f34f6ad279504ba54058f52517f2c238393bb7025dc54454447bb9410c"
+      },
+      {
+        "path": "docs/catalog/fixtures/datatable/variants.html",
+        "sha256": "a2946bdb1eb3a4b8cfe3bc1343ca7d3ec35cf4133f432757abc919cadb6e7955"
+      },
+      {
+        "path": "docs/catalog/fixtures/datatable/variants.js",
+        "sha256": "2f9769f34f6ad279504ba54058f52517f2c238393bb7025dc54454447bb9410c"
+      },
+      {
+        "path": "docs/catalog/fixtures/datepicker/basic.html",
+        "sha256": "1c4022acd1ff8557f8deedc3f4866b8804325c367744109cb3949fd85d22468a"
+      },
+      {
+        "path": "docs/catalog/fixtures/datepicker/basic.js",
+        "sha256": "dc84e3dcc2f809e5935ec96269029769dc64340525e6a0979498335dd2d3c4ea"
+      },
+      {
+        "path": "docs/catalog/fixtures/datepicker/states.html",
+        "sha256": "42c810b5293c15dd202fe56d5224d1362ed2477f94633c18382b0cd5aa4f18d9"
+      },
+      {
+        "path": "docs/catalog/fixtures/datepicker/states.js",
+        "sha256": "645d501da7f3fec876df200b8369368a64ff10c5faaab73d059047741d89ec38"
+      },
+      {
+        "path": "docs/catalog/fixtures/divider/basic.html",
+        "sha256": "86c42d2168817abc637c92001430ae915f141d4518fefabfd00fc9c0c071118c"
+      },
+      {
+        "path": "docs/catalog/fixtures/divider/tokens.css",
+        "sha256": "3fedcbf24845d08b356f6b4f78717f2266f20cfde3298a4dbef2d5ca47884215"
+      },
+      {
+        "path": "docs/catalog/fixtures/divider/tokens.html",
+        "sha256": "3b4ffa21dc4df17e421849c61019d81f879a790555c2846dea1824f0c0b0f5ee"
+      },
+      {
+        "path": "docs/catalog/fixtures/divider/variants.css",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      {
+        "path": "docs/catalog/fixtures/divider/variants.html",
+        "sha256": "e53311a0819f21f19cd54d1013096356292da4e2fb7912b4d6972fe55e19b88e"
+      },
+      {
+        "path": "docs/catalog/fixtures/dropdown/basic.html",
+        "sha256": "f3c3981a43f5f87920e91f1cb77a02304134cde7b8e002df9901fbfb4e9d1c75"
+      },
+      {
+        "path": "docs/catalog/fixtures/dropdown/basic.js",
+        "sha256": "d6a313565b0de0a89db0c1fc9a27f4c3e7a953c63afebd1ec5dab2a08093ca67"
+      },
+      {
+        "path": "docs/catalog/fixtures/dropdown/options-precedence.html",
+        "sha256": "431eb7a31550b8bfcc7f3a226cc9e0f336bfcacf3fb16844e47b7331f8e40226"
+      },
+      {
+        "path": "docs/catalog/fixtures/dropdown/options-precedence.js",
+        "sha256": "716468b4a4516d5f75d0cd7744dfaefa7fe88d6944f2b65ed2e6f1c8165ecb2e"
+      },
+      {
+        "path": "docs/catalog/fixtures/dropdown/top-end-disabled.html",
+        "sha256": "431eb7a31550b8bfcc7f3a226cc9e0f336bfcacf3fb16844e47b7331f8e40226"
+      },
+      {
+        "path": "docs/catalog/fixtures/dropdown/top-end-disabled.js",
+        "sha256": "d6a313565b0de0a89db0c1fc9a27f4c3e7a953c63afebd1ec5dab2a08093ca67"
+      },
+      {
+        "path": "docs/catalog/fixtures/empty-state/basic.html",
+        "sha256": "131414ad58752193047f08411e977a6ff5eab04a6ec76ef53da3fb521447e850"
+      },
+      {
+        "path": "docs/catalog/fixtures/empty-state/recoverable.html",
+        "sha256": "e477fabd7f9694326b286aefbe5d42e553c55f07c20a16fa1b40cb62ff50b00e"
+      },
+      {
+        "path": "docs/catalog/fixtures/empty-state/recoverable.js",
+        "sha256": "87fd8db42c44a8c2b154fae21b001aeaf21eff30937df5268a0b8b99d8912f5c"
+      },
+      {
+        "path": "docs/catalog/fixtures/file-upload-advanced/basic.html",
+        "sha256": "d3cbe2b9ba47e3fb564d777fcfdf07082290f267e9cede1217675f1425ea4145"
+      },
+      {
+        "path": "docs/catalog/fixtures/file-upload-advanced/basic.js",
+        "sha256": "fd96d743236b65bdd171e40b7fd4089aedb943416fa9b61c777a7eaa0bc26858"
+      },
+      {
+        "path": "docs/catalog/fixtures/file-upload-advanced/states.html",
+        "sha256": "32e8b46b486276012d2a8c5274cf0d6fbf31d9ae5f1ff8c541a7431e6e8e76eb"
+      },
+      {
+        "path": "docs/catalog/fixtures/file-upload-advanced/states.js",
+        "sha256": "44e20b82bce51763f2bca701c9b88e25cc5e3b31c1a58caae76c06c0651b2751"
+      },
+      {
+        "path": "docs/catalog/fixtures/file-upload/basic.html",
+        "sha256": "1f147bdbcf8eb0636090eb539789d6a80195f8959fa71ba5024bc6fedb4af52f"
+      },
+      {
+        "path": "docs/catalog/fixtures/file-upload/native-sizes.html",
+        "sha256": "3b64fde74aa924e300495aefa11ec7ade42a1bfcf2691816a463c6f168b3fc41"
+      },
+      {
+        "path": "docs/catalog/fixtures/file-upload/native-states.html",
+        "sha256": "8a71464aa10b38271845d07ff63afac7b66a6042e66cc74c7087921b7b86e6f5"
+      },
+      {
+        "path": "docs/catalog/fixtures/icon-link/basic.html",
+        "sha256": "b1fc9defe2bcb7bf64c2c8ea48e2b99ca83fd1ecb81a3eff11e1620701209284"
+      },
+      {
+        "path": "docs/catalog/fixtures/input-group/basic.html",
+        "sha256": "8ec6e1bf606f93358bc5ccdbb429ce138f128b381b21e79c3ee11a746dc65534"
+      },
+      {
+        "path": "docs/catalog/fixtures/input-group/native-sizes.html",
+        "sha256": "a7e049ee4c865b8c317ea7396baf5db1ac26a673c56c659d4272b498509115ba"
+      },
+      {
+        "path": "docs/catalog/fixtures/input-group/native-states.html",
+        "sha256": "9a7f2d50730da55cd85013c7da0c286018d529d7db4c0d40010ae3dc93f5159c"
+      },
+      {
+        "path": "docs/catalog/fixtures/input/basic.html",
+        "sha256": "e7cf7c05904c209cb8113a1a5876ba85367515f575c233673865a58964397211"
+      },
+      {
+        "path": "docs/catalog/fixtures/input/native-sizes.html",
+        "sha256": "d34776883f076e538045bfd7658931e3df397fb9fd693c77ae0dc2e2f4263e41"
+      },
+      {
+        "path": "docs/catalog/fixtures/input/native-states.html",
+        "sha256": "76cbe1346375d8bf7c7611a9710f9e2f11b0913daa6f154f38675d127f7619da"
+      },
+      {
+        "path": "docs/catalog/fixtures/list-group/basic.html",
+        "sha256": "ec704cce2676115fcafaf3296ba3495cd060bf341eb38a38a5d843b964b00b22"
+      },
+      {
+        "path": "docs/catalog/fixtures/list-group/tokens.css",
+        "sha256": "e5af1cdcb3594131d67717c9e69a3df7b9805b0793bfd50d2c2da6a566147685"
+      },
+      {
+        "path": "docs/catalog/fixtures/list-group/tokens.html",
+        "sha256": "6ce538eb9d63236bd08f81e59a361c86de13b2b33b7b2cfd7cdf51c9f9db3dfc"
+      },
+      {
+        "path": "docs/catalog/fixtures/list-group/variants.css",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      {
+        "path": "docs/catalog/fixtures/list-group/variants.html",
+        "sha256": "d548d4af5968655e6f6ab69e46eb0d6a569c9e33cfd540668251e8764113610f"
+      },
+      {
+        "path": "docs/catalog/fixtures/menu/basic.html",
+        "sha256": "c2a5c756e23092b4391d89e433c2dbd803246d05e8151825ade83ab7b4d54a4c"
+      },
+      {
+        "path": "docs/catalog/fixtures/menu/compact-nested.html",
+        "sha256": "78e1a1f67450404e773ebbe587fa720224b8d0c0f33e1df7cb89c095ace1ab52"
+      },
+      {
+        "path": "docs/catalog/fixtures/menu/local-tokens.css",
+        "sha256": "7ce26624ee088a43c2352059f519e39440323ee1a07facd462531a0e94a08b05"
+      },
+      {
+        "path": "docs/catalog/fixtures/menu/local-tokens.html",
+        "sha256": "4b365ded05215493a168edf5de866020466c2b004b64bf635f8c7746a9d46f07"
+      },
+      {
+        "path": "docs/catalog/fixtures/modal/basic.html",
+        "sha256": "640c3e2ce53ab3d60663860e9768a969452a8fd2a3de905947e7422857bca5ff"
+      },
+      {
+        "path": "docs/catalog/fixtures/modal/basic.js",
+        "sha256": "9fcf2831fad4ed628bb2b5a547fd2b00063ab61e2b6a3a5176951eeb5c8f60b5"
+      },
+      {
+        "path": "docs/catalog/fixtures/modal/false-option.html",
+        "sha256": "cc4a354f50c803dda85314d4e215b8aa9214b54b028633b31c32524f5c292eb3"
+      },
+      {
+        "path": "docs/catalog/fixtures/modal/false-option.js",
+        "sha256": "3155bdf37e20c541072b4676525b485476625cf0b144ea98480236123f23439b"
+      },
+      {
+        "path": "docs/catalog/fixtures/modal/static-backdrop.html",
+        "sha256": "a110d4b386a8ec24e8b701183b37b83f29953115be64b8c902daefe00385a22f"
+      },
+      {
+        "path": "docs/catalog/fixtures/modal/static-backdrop.js",
+        "sha256": "9fcf2831fad4ed628bb2b5a547fd2b00063ab61e2b6a3a5176951eeb5c8f60b5"
+      },
+      {
+        "path": "docs/catalog/fixtures/navbar/basic.html",
+        "sha256": "63b6f552bed01a65e5c09f604b28371ce59c4dcc24df5eef851ffb5ef7834d1b"
+      },
+      {
+        "path": "docs/catalog/fixtures/navbar/basic.js",
+        "sha256": "6074e84cbdb3d1a414994b1e3007ff617554afc8b3710d9bf1cc0f339782bace"
+      },
+      {
+        "path": "docs/catalog/fixtures/navbar/responsive-states.html",
+        "sha256": "63b6f552bed01a65e5c09f604b28371ce59c4dcc24df5eef851ffb5ef7834d1b"
+      },
+      {
+        "path": "docs/catalog/fixtures/navbar/responsive-states.js",
+        "sha256": "a1488afef25d572a43b0166bede13b4e3ad59ea828563ca971fec5ce86c6b853"
+      },
+      {
+        "path": "docs/catalog/fixtures/navbar/static-disabled.html",
+        "sha256": "fbacd5e4dc1e3829fcd8bbe91ade213ac271e49a47f7810cdf31a94d18e5659d"
+      },
+      {
+        "path": "docs/catalog/fixtures/nested-menu/basic.html",
+        "sha256": "3fd00b6c46c56adfdeadcaf6e9dfea5a02cd312c98ac78992e561fc56d811448"
+      },
+      {
+        "path": "docs/catalog/fixtures/nested-menu/basic.js",
+        "sha256": "a0732f1a721fb29f0464bd34b5a84a784cb8874aaa3317e84e93b8578caf25f5"
+      },
+      {
+        "path": "docs/catalog/fixtures/nested-menu/recursive-end.html",
+        "sha256": "175bb4da6d0519ffab1fde83d7d7478bda5f4f26721b55afbb1722203ac41be7"
+      },
+      {
+        "path": "docs/catalog/fixtures/nested-menu/recursive-end.js",
+        "sha256": "fec83b1e864c5751b964b1d41454e12946a38641ff44cfc0ee8eaad679328486"
+      },
+      {
+        "path": "docs/catalog/fixtures/notification-center/basic.html",
+        "sha256": "d400137a9004f6b616360ee06e3bc6dd6d46feb126d7c1c9d0cca3306a0993a0"
+      },
+      {
+        "path": "docs/catalog/fixtures/notification-center/basic.js",
+        "sha256": "1821f14b67a390d66979a525340d47a8a020488bdf9ac46f6ddb607066bf8a4d"
+      },
+      {
+        "path": "docs/catalog/fixtures/notification-center/history-actions.html",
+        "sha256": "84c3e47e98154b74995c76e4c305f9418b33ee08ab86fdf17b0c865c0274074f"
+      },
+      {
+        "path": "docs/catalog/fixtures/notification-center/history-actions.js",
+        "sha256": "67d810892c584bfd4eb70ba70811d98aa305911936120a36331807e583352641"
+      },
+      {
+        "path": "docs/catalog/fixtures/offcanvas/basic.html",
+        "sha256": "580157829cc682747726eae055d1a4dd626983aa3528789263b3c3fe0eeb2525"
+      },
+      {
+        "path": "docs/catalog/fixtures/offcanvas/basic.js",
+        "sha256": "0058a761f718a6c3d6d30e0707e560851dbe57e4bc59996ce9fa59efe1ca7975"
+      },
+      {
+        "path": "docs/catalog/fixtures/pagination/basic.html",
+        "sha256": "94707ca23825f6946c6bae5990ef00370a5845eecddb68f7c8a3ca048c2476bf"
+      },
+      {
+        "path": "docs/catalog/fixtures/pagination/bordered-small.html",
+        "sha256": "c77cb3cf7437b9c940fbb58b9dfabea0dfff91cf88438ccb70b671b71fb10f22"
+      },
+      {
+        "path": "docs/catalog/fixtures/pagination/rounded-large.html",
+        "sha256": "80ae5c40f9ecfb8377f4ad98db2f9b6f6da87e9909ba39b90874cff48594916e"
+      },
+      {
+        "path": "docs/catalog/fixtures/placeholder/basic.html",
+        "sha256": "7d0ddcae303263d2d6be825a38c7e4375f59ed1886e9c516a9ba8a9f68499e14"
+      },
+      {
+        "path": "docs/catalog/fixtures/placeholder/loading-complete.html",
+        "sha256": "81ba5f741618c90de8c5add9cf4af02f54548c19aae30dff0670d497127a879d"
+      },
+      {
+        "path": "docs/catalog/fixtures/placeholder/loading-complete.js",
+        "sha256": "b1f67b7825e847d8dac7faef67392435a7fce04eb9f16e13cbdabf44e9d65c84"
+      },
+      {
+        "path": "docs/catalog/fixtures/popover/basic.html",
+        "sha256": "9a8440b0ef055aa8f2182d65777b1a1559bfbc149cb4c8b321e8faa662ed2f2f"
+      },
+      {
+        "path": "docs/catalog/fixtures/popover/basic.js",
+        "sha256": "8233d8a00e8ee01b56cd5e9b61c1e4516fcd7d31fa81cd57afedff359d610e77"
+      },
+      {
+        "path": "docs/catalog/fixtures/progress/basic.html",
+        "sha256": "c0407f433130d477f2529d8f737cf90c212ef9943173667a68f68719c29d7e13"
+      },
+      {
+        "path": "docs/catalog/fixtures/progress/determinate-states.html",
+        "sha256": "09b600e131875108505b69c9e64a594b7b62caee9690b6816c64ff1cf8648b79"
+      },
+      {
+        "path": "docs/catalog/fixtures/progress/indeterminate.html",
+        "sha256": "575706718f0c81c43dbd627e4d9d105e14d8f58546e1117b004dbdfd03630bc2"
+      },
+      {
+        "path": "docs/catalog/fixtures/radio/basic.html",
+        "sha256": "537ebf8fe682524ea7944f74c9f2b3cd6a03d45ea476be4410364a2d1afb6da3"
+      },
+      {
+        "path": "docs/catalog/fixtures/radio/native-states.html",
+        "sha256": "c2ba87a1b576f6ee7ac8bfb4e63d8f918d8a48b6c5281f770baa39c665dd932a"
+      },
+      {
+        "path": "docs/catalog/fixtures/radio/native-tokens.css",
+        "sha256": "2399de1ccc897261f06aff38627abe9d02382c67e42aa8b6a5c61ea3ab39221c"
+      },
+      {
+        "path": "docs/catalog/fixtures/radio/native-tokens.html",
+        "sha256": "d378df04cfd238bd11c9ff1090a6b9c1cc69d5d53d2ca6d5eea3703f0f47e061"
+      },
+      {
+        "path": "docs/catalog/fixtures/range/basic.html",
+        "sha256": "81062ab98d7b020ff6746d7ec41499497b4593c41803ae9177c824d4026cd6ef"
+      },
+      {
+        "path": "docs/catalog/fixtures/range/states.html",
+        "sha256": "0b20c4f6082cfd6fdce35acbb585207b24eaed6890778bcb6d0def540ce68f07"
+      },
+      {
+        "path": "docs/catalog/fixtures/range/states.js",
+        "sha256": "4e0eb8200356d961fb402fbb08d6a9a15c3f49766aea279859f7dffe64c82045"
+      },
+      {
+        "path": "docs/catalog/fixtures/rating/basic.html",
+        "sha256": "1354cbcbb4d132ba48541db88af4e237fa4ed6a619ead50e4b20c370017bf519"
+      },
+      {
+        "path": "docs/catalog/fixtures/ratio/basic.html",
+        "sha256": "dbd5232d5bf0ac90eba3cebe3d928e7c73d34c841f868ca75d6279dbfa1818bd"
+      },
+      {
+        "path": "docs/catalog/fixtures/ratio/tokens.css",
+        "sha256": "1247e0a093a3845a7bc38caa2ddd9ba9bf3c04db7fb85efb0d4712a844b886dd"
+      },
+      {
+        "path": "docs/catalog/fixtures/ratio/tokens.html",
+        "sha256": "1da01c96e52057220eb7536c1a059340d3d4994187d08ea9ff68f486a0ef6869"
+      },
+      {
+        "path": "docs/catalog/fixtures/ratio/variants.css",
+        "sha256": "725ee5428c50db64a6c2e01b2997b91e5e618d0d9e9a9ff4b243b2052557d05c"
+      },
+      {
+        "path": "docs/catalog/fixtures/ratio/variants.html",
+        "sha256": "7923ad945fdc3d77fea8a0dcffc8424832b90f42594116ff72dcc92b7636a06a"
+      },
+      {
+        "path": "docs/catalog/fixtures/responsive/basic.html",
+        "sha256": "729f4d2dcf23af7eef2de794ee38e416181ea6d7a18eec5a2f828ea120b63219"
+      },
+      {
+        "path": "docs/catalog/fixtures/responsive/tokens.css",
+        "sha256": "4649aa756b025b7c2a4cd5f3617375af9751ece106defab5ad7beb7f9824f007"
+      },
+      {
+        "path": "docs/catalog/fixtures/responsive/tokens.html",
+        "sha256": "e1391befbd4e9172b4e9fa0779ba65ab5afd969878b05884a5d01b732b4bae62"
+      },
+      {
+        "path": "docs/catalog/fixtures/responsive/variants.css",
+        "sha256": "a18416c3ccc0bdfefecf51ace95bff398672f4786558203973c29971b3deadb2"
+      },
+      {
+        "path": "docs/catalog/fixtures/responsive/variants.html",
+        "sha256": "6b07aa8bbfa8a3495dae31bacc2856350beece18ada6861ec72eb767c26c6c82"
+      },
+      {
+        "path": "docs/catalog/fixtures/scrollspy/basic.html",
+        "sha256": "254d46e5b5171a2d7aafe57c80af435c5f4f2bf7d3d5a96d039aab3ec4e3a01c"
+      },
+      {
+        "path": "docs/catalog/fixtures/scrollspy/basic.js",
+        "sha256": "537faa1590629d89831fe1de8301d97766b663a7bba16eb4fe9c747f467a4e09"
+      },
+      {
+        "path": "docs/catalog/fixtures/scrollspy/long-sections.css",
+        "sha256": "e5315d892a2438de50dc178645f2698e5cb8b86712214d178d4cd260956c4f1d"
+      },
+      {
+        "path": "docs/catalog/fixtures/scrollspy/long-sections.html",
+        "sha256": "254d46e5b5171a2d7aafe57c80af435c5f4f2bf7d3d5a96d039aab3ec4e3a01c"
+      },
+      {
+        "path": "docs/catalog/fixtures/scrollspy/long-sections.js",
+        "sha256": "537faa1590629d89831fe1de8301d97766b663a7bba16eb4fe9c747f467a4e09"
+      },
+      {
+        "path": "docs/catalog/fixtures/segmented-control/basic.html",
+        "sha256": "99e0729de1a71267e04816d57e58be9600f9af45c38dc4ec7c5d47d7794e467d"
+      },
+      {
+        "path": "docs/catalog/fixtures/select/basic.html",
+        "sha256": "05954303d7c4d75645be5da22aa6c7a8807681149fe83b8f2ffaa86ff1c4e464"
+      },
+      {
+        "path": "docs/catalog/fixtures/select/basic.js",
+        "sha256": "ab437b59b381b8bec422d59f2370c86256fddb5fcac00a99fb3e4ca6c6735719"
+      },
+      {
+        "path": "docs/catalog/fixtures/select/states.html",
+        "sha256": "55bccb136f4bdf770070ddc863aa269a6ee577f8a14ec5e9e4799fc4f39fde61"
+      },
+      {
+        "path": "docs/catalog/fixtures/select/states.js",
+        "sha256": "103c0a0fc311ced6582395bac1ae631101e8bd020ea3ab89906eb112b6f20122"
+      },
+      {
+        "path": "docs/catalog/fixtures/skeleton/basic.html",
+        "sha256": "d8d1fc7d365ecd657c2a725b17b6e689c2064d142ecd3b9a9f066c26c4a323a3"
+      },
+      {
+        "path": "docs/catalog/fixtures/skeleton/loading-complete.html",
+        "sha256": "ac14005ce3161a24a1978302c1caf4f2e3d6dd80537d32d1ad53264cd07cd239"
+      },
+      {
+        "path": "docs/catalog/fixtures/skeleton/loading-complete.js",
+        "sha256": "b1f67b7825e847d8dac7faef67392435a7fce04eb9f16e13cbdabf44e9d65c84"
+      },
+      {
+        "path": "docs/catalog/fixtures/skeleton/shapes-wave.html",
+        "sha256": "7b60c7bbe044b56674767ef7ddd5721ee51ebe0049e265d57b61a55786f449af"
+      },
+      {
+        "path": "docs/catalog/fixtures/stepper/basic.html",
+        "sha256": "cb04a74daba3800a0acf08cb70debea7b7c5035ffd8e77a9dc3a6783c22e346b"
+      },
+      {
+        "path": "docs/catalog/fixtures/stepper/basic.js",
+        "sha256": "06e91f17eca0a8b51bbeb6d4715e9b76d936bc2240cf0c6eee4e3c85372968e2"
+      },
+      {
+        "path": "docs/catalog/fixtures/stepper/nonlinear-vertical.html",
+        "sha256": "863b664042f0b67d74662fe206ed132509ce1185d2a73dcbc244e33f646d63ce"
+      },
+      {
+        "path": "docs/catalog/fixtures/stepper/nonlinear-vertical.js",
+        "sha256": "af6608cdf9c5cd86641564bef7d93867261dece0ef7fa01b812f032c9c6b8626"
+      },
+      {
+        "path": "docs/catalog/fixtures/stepper/validation-error.html",
+        "sha256": "b7f5f89be370248e445ed9702b344512458abe06d42603d9f74b2cc3babf9b0f"
+      },
+      {
+        "path": "docs/catalog/fixtures/stepper/validation-error.js",
+        "sha256": "af6608cdf9c5cd86641564bef7d93867261dece0ef7fa01b812f032c9c6b8626"
+      },
+      {
+        "path": "docs/catalog/fixtures/switch/basic.html",
+        "sha256": "b910c06625f27e7c00b76574c046f63c36f68ea909d71ba27f862d908210b752"
+      },
+      {
+        "path": "docs/catalog/fixtures/switch/native-states.html",
+        "sha256": "5e35bfafed7de745399c2bfd703d72f54d3a4a9a3c15130552e87faf5229a13a"
+      },
+      {
+        "path": "docs/catalog/fixtures/switch/native-tokens.css",
+        "sha256": "ced8ed997ae41016ce46c8f244144dab9832e9863c01c80b43baf938ed840959"
+      },
+      {
+        "path": "docs/catalog/fixtures/switch/native-tokens.html",
+        "sha256": "aa63bd2aca6ea25fefc0be43e769560bba0e27d4300c6ef5033b6dbaab54b305"
+      },
+      {
+        "path": "docs/catalog/fixtures/table/basic.html",
+        "sha256": "3501de011edf7dc3a38d3559fdb5b66d425959e5953a7487a3f07a380a3e1b3f"
+      },
+      {
+        "path": "docs/catalog/fixtures/table/states.html",
+        "sha256": "dd3bee4346bee8dd73d3e0af84be024d8cc7ac0a6f02afc4336ee7c0df6a70a6"
+      },
+      {
+        "path": "docs/catalog/fixtures/table/tokens.css",
+        "sha256": "2b23636389400fbf83cae3678720561cdf4527027b422b61bffd4ce92e90d478"
+      },
+      {
+        "path": "docs/catalog/fixtures/table/tokens.html",
+        "sha256": "cabd9d12066b57cb75909dacf662082ca26ee2063c6288b3d64701b85fbc6a7c"
+      },
+      {
+        "path": "docs/catalog/fixtures/table/variants.css",
+        "sha256": "49af3f4770f5e493961c7d2f50899528d0e4a132a2917a68bdbba9f38ed075c5"
+      },
+      {
+        "path": "docs/catalog/fixtures/table/variants.html",
+        "sha256": "df35c6a0605b60f0bca167524509aeb3151b39b6cbf05cff512ea3dcf1d1ad99"
+      },
+      {
+        "path": "docs/catalog/fixtures/tabs/basic.html",
+        "sha256": "b3d92505810a07634614a61d766cd701a2c943fc3e43eab9295b1b7550603ae6"
+      },
+      {
+        "path": "docs/catalog/fixtures/tabs/basic.js",
+        "sha256": "cdbe4b953e7b5b3635b07167c86dbe4cc40f12ac48270c6c3433ee2f7ca3978b"
+      },
+      {
+        "path": "docs/catalog/fixtures/tabs/vertical-automatic.html",
+        "sha256": "5576349fd721f5e2fce0a28ae9b0fcaf8bf748186aeb192da95a231c44d8f900"
+      },
+      {
+        "path": "docs/catalog/fixtures/tabs/vertical-automatic.js",
+        "sha256": "cdbe4b953e7b5b3635b07167c86dbe4cc40f12ac48270c6c3433ee2f7ca3978b"
+      },
+      {
+        "path": "docs/catalog/fixtures/tabs/vertical-manual.html",
+        "sha256": "f96f788077afdc37997e4130244820997b84feaa5174c076e322ab52f3057749"
+      },
+      {
+        "path": "docs/catalog/fixtures/tabs/vertical-manual.js",
+        "sha256": "cdbe4b953e7b5b3635b07167c86dbe4cc40f12ac48270c6c3433ee2f7ca3978b"
+      },
+      {
+        "path": "docs/catalog/fixtures/tag/basic.html",
+        "sha256": "49b23feb188b18e676c28fb35d07d8889610661e7f2a484a78de395362e464c2"
+      },
+      {
+        "path": "docs/catalog/fixtures/tag/basic.js",
+        "sha256": "67a33df91cecac291e9862d62b657ede3a950a2c36a3cdc9f4ec76ddb3deac08"
+      },
+      {
+        "path": "docs/catalog/fixtures/tile/basic.html",
+        "sha256": "4d0218ac209b6dd77b88c93c3675e4b8bbe1e7dc526b1a46c870f4fc706b1a3b"
+      },
+      {
+        "path": "docs/catalog/fixtures/tile/tokens.css",
+        "sha256": "b678d159bc83f14087d1b30a92938d7c80c6453d471576ad8edc8e049a75ec4a"
+      },
+      {
+        "path": "docs/catalog/fixtures/tile/tokens.html",
+        "sha256": "94f605e2816020738b4d880d4205be5e3d52041a07dc86cd55c2d6fc15b5c5a6"
+      },
+      {
+        "path": "docs/catalog/fixtures/tile/variants.css",
+        "sha256": "a18416c3ccc0bdfefecf51ace95bff398672f4786558203973c29971b3deadb2"
+      },
+      {
+        "path": "docs/catalog/fixtures/tile/variants.html",
+        "sha256": "b7d6394a5689b183fe8f89476231910d50d9c8cddc80c7b6ee7ed6a0e6c5874e"
+      },
+      {
+        "path": "docs/catalog/fixtures/timeline/basic.html",
+        "sha256": "2a0beff748cd5dbd5cc33da1e12bd9593b148dd7e44267c67dfdafd34b282fce"
+      },
+      {
+        "path": "docs/catalog/fixtures/timeline/horizontal-states.html",
+        "sha256": "04af8e7f53287ae71abfd030a37024808d968c2bc5dbdd88e7142053ea877469"
+      },
+      {
+        "path": "docs/catalog/fixtures/toast/basic.html",
+        "sha256": "9c1b7f0fe58e3f7a6e64f8329a7a147eb30b049505f6dfb1752f7ea76ebf1b1c"
+      },
+      {
+        "path": "docs/catalog/fixtures/toast/basic.js",
+        "sha256": "e7f134ce1c3a6211d2cb4aab90ee2c2b5a693042fff9fbc4c35f114a8acae1a3"
+      },
+      {
+        "path": "docs/catalog/fixtures/toast/persistent-variants.html",
+        "sha256": "32da1794e7904ad4d8893de22d50c3d42dc78640c142ea20db552257d1556aea"
+      },
+      {
+        "path": "docs/catalog/fixtures/toast/persistent-variants.js",
+        "sha256": "00d7eb0851ffcd4fd4fb68a88a2c8bb09e5fb832a3df2a2a19ddea3d60bacb3e"
+      },
+      {
+        "path": "docs/catalog/fixtures/toast/timed-progress.html",
+        "sha256": "a7a8e32ee6d0c258cd1cefa082370760c1f6caadc8be19c05dea6bdea3c28489"
+      },
+      {
+        "path": "docs/catalog/fixtures/toast/timed-progress.js",
+        "sha256": "00d7eb0851ffcd4fd4fb68a88a2c8bb09e5fb832a3df2a2a19ddea3d60bacb3e"
+      },
+      {
+        "path": "docs/catalog/fixtures/tooltip/basic.html",
+        "sha256": "12c9097a0b9c177af86ec26fb4cf26e174732c79e97c54f4e09fa166525f3892"
+      },
+      {
+        "path": "docs/catalog/fixtures/tooltip/basic.js",
+        "sha256": "89f7f39430f2ab625101cfa3e6c13dc67c54ced82112be49b34e271c5fd2ebf9"
+      },
+      {
+        "path": "docs/catalog/fixtures/tooltip/delays-description.html",
+        "sha256": "43ca411ed06eeaf30dd2571234213f672f3f192f4e953b9dab18a6382b346c2a"
+      },
+      {
+        "path": "docs/catalog/fixtures/tooltip/delays-description.js",
+        "sha256": "89f7f39430f2ab625101cfa3e6c13dc67c54ced82112be49b34e271c5fd2ebf9"
+      },
+      {
+        "path": "docs/catalog/fixtures/tooltip/fallback-values.html",
+        "sha256": "504fb32a202d44cb3ae8ee3b0b860d34cdc8c19977fed11b3f106cc5e70668c0"
+      },
+      {
+        "path": "docs/catalog/fixtures/tooltip/fallback-values.js",
+        "sha256": "89f7f39430f2ab625101cfa3e6c13dc67c54ced82112be49b34e271c5fd2ebf9"
+      },
+      {
+        "path": "docs/catalog/fixtures/tooltip/options-precedence.html",
+        "sha256": "43ca411ed06eeaf30dd2571234213f672f3f192f4e953b9dab18a6382b346c2a"
+      },
+      {
+        "path": "docs/catalog/fixtures/tooltip/options-precedence.js",
+        "sha256": "64647d37e62c2ef3b6d71723beea6996de9b770e0cfebfe7ff878f54cdeeec37"
+      },
+      {
+        "path": "docs/catalog/fixtures/tree-view/basic.html",
+        "sha256": "7bea5c95f92d8fd75d0e41f0678fb06ae7d6667abd57fcb15a003003b9ca32d4"
+      },
+      {
+        "path": "docs/catalog/fixtures/tree-view/basic.js",
+        "sha256": "69c655df1040387ce24ffff4533e8c2f63a33482c8319688a9058f5e1703f9e2"
+      },
+      {
+        "path": "docs/catalog/fixtures/tree-view/expanded-values.html",
+        "sha256": "cc2cde67ecc2c7e09b498a1eab002682ff48fc05aed365b79b878da242df0e07"
+      },
+      {
+        "path": "docs/catalog/fixtures/tree-view/expanded-values.js",
+        "sha256": "dd3d8c29c3d47ae3a148c38d21d3c2ec8703097a3ddbc3c6ebf97d49d9e52776"
+      },
+      {
+        "path": "docs/catalog/navigation-provenance.json",
+        "sha256": "856912bc89c2260d0bc51a002720bb574f217895c76067bebbe5ce93aaf9264b"
+      },
+      {
+        "path": "docs/components/accordion.md",
+        "sha256": "a1bf87910da375b285ca616dc4225f3618be710e6c4f9927d78f5aeededdc881"
+      },
+      {
+        "path": "docs/components/alert-dialog.md",
+        "sha256": "04c7b48f04799e3f182fd220c4eca2506284566222c4f56ea2f3049b11f7e179"
+      },
+      {
+        "path": "docs/components/alert.md",
+        "sha256": "9ca5dc495ec3f569625cc11d7d8e517b68e4cd32992d6460c83e7a0bd879075d"
+      },
+      {
+        "path": "docs/components/avatar.md",
+        "sha256": "1c910134a7fbbf90b46703f3d8cd7e3dad4b1b1692c664d2a54f95d2e83afdd0"
+      },
+      {
+        "path": "docs/components/badge.md",
+        "sha256": "8e5b25abb0405a0de40ee651172041dbc0521b01d6b747e0927ecab0ab4ad96e"
+      },
+      {
+        "path": "docs/components/breadcrumb.md",
+        "sha256": "73df64c0a6ab9ec26d60a9ce5b8f34cd23da61ba2430a4aff756ab7fe0a3282a"
+      },
+      {
+        "path": "docs/components/button-group.md",
+        "sha256": "a29b073b082272c0ed1334033dc77631113ecdf7a7a969ecdfcc6dbe28c758ef"
+      },
+      {
+        "path": "docs/components/button.md",
+        "sha256": "e4f3e3dcdc8d89c970f7786c3aeef28ee117107af98ef24c797f9a160af5285f"
+      },
+      {
+        "path": "docs/components/card.md",
+        "sha256": "e1351b01b4881f1ce5f587074a92fe5f961c5f535e9b6ab9c55b653d2f00c934"
+      },
+      {
+        "path": "docs/components/carousel.md",
+        "sha256": "b0698acdfb9059db3b2e63528b3f6eb80796426aac8fa606a052c2a5d8a55955"
+      },
+      {
+        "path": "docs/components/checkbox.md",
+        "sha256": "0e3439ba91db34144dca40bf10cf74ddae1fb156ce78bc2a36ff1711de5bcb49"
+      },
+      {
+        "path": "docs/components/close-button.md",
+        "sha256": "1cb683be64e38f9418647231929f55c6ed6b1b1cf9f75c5185a9909554d96546"
+      },
+      {
+        "path": "docs/components/code.md",
+        "sha256": "7d8bfbc223c03b4c0a21b1bab03fe9c63522d98ab24369ac424aba50ecfcc298"
+      },
+      {
+        "path": "docs/components/collapse.md",
+        "sha256": "24d43a7100fc1ec925098cd589632923702d0abad7484cc3c92a20cbffd6e981"
+      },
+      {
+        "path": "docs/components/combobox.md",
+        "sha256": "d5d4dd1759bffae5b9cde2f6d40f12b50bac18040aa45ee4f8c13fa4aaf36af9"
+      },
+      {
+        "path": "docs/components/command-palette.md",
+        "sha256": "3bcbd8fd1d68dfc26ab74db6ebd5d3dc0b5ea98fdfa0b1ab4666d3b1b65c37cb"
+      },
+      {
+        "path": "docs/components/datatable.md",
+        "sha256": "dc7f7e698bfb740ab30c61db66adf4d400ec098cc1b880078d7548c5a72276d6"
+      },
+      {
+        "path": "docs/components/datepicker.md",
+        "sha256": "7bce4869e90c3ccc8b548459d24c8616f4b74626a49bf3343e9443b3e623bf18"
+      },
+      {
+        "path": "docs/components/divider.md",
+        "sha256": "09cfde1bfe56be52073e51d3cfde6af9b50f919f2557a1fa8ab186d648232efb"
+      },
+      {
+        "path": "docs/components/dropdown.md",
+        "sha256": "7462d16afed359755080342de485744b7ef02bb58169bf1da8a2fb9e0c2077d7"
+      },
+      {
+        "path": "docs/components/empty-state.md",
+        "sha256": "c2d2bb719613b5bf824befbd66efaa5cf0f2c77622611d7962ae0d1a476dc9fb"
+      },
+      {
+        "path": "docs/components/file-upload-advanced.md",
+        "sha256": "c8cb7c6f32b9567a715199f0dc7a52ee665021b6a4f8d35bff6e5ffda5981231"
+      },
+      {
+        "path": "docs/components/file-upload.md",
+        "sha256": "22ce26a9022a2d4e716038e806c59432683f360a1ecc1dd401ade228817b7286"
+      },
+      {
+        "path": "docs/components/icon-link.md",
+        "sha256": "69214c6999655e3c7434690c3c106a53e09cfcc957ef3f5004cb8a78bfa69549"
+      },
+      {
+        "path": "docs/components/input-group.md",
+        "sha256": "94cfcd41a499a456b6e87f1a3de49cbe9db011215edf1a4e5986acc3129a00e4"
+      },
+      {
+        "path": "docs/components/input.md",
+        "sha256": "7791ac9db22cb8a471c178d78bb25e92907e6e82b95fbcfd5bce41d9485b437a"
+      },
+      {
+        "path": "docs/components/list-group.md",
+        "sha256": "e03c60bb243542c3f79a83edac3506996b74d2c21b4591ce550fa2f386d1e5c3"
+      },
+      {
+        "path": "docs/components/menu.md",
+        "sha256": "11d74460d125857519038008528eff99b8e7263efcf1764be9e64f873633c31a"
+      },
+      {
+        "path": "docs/components/modal.md",
+        "sha256": "2141e8adf1a6abcf05a0e7a741d3a6ca259d594b7e592d6c1e67a665220775e0"
+      },
+      {
+        "path": "docs/components/navbar.md",
+        "sha256": "6878df33044d8a19c93552592d8ff7ee109a2bcf5afbb24b741de656c56ad858"
+      },
+      {
+        "path": "docs/components/nested-menu.md",
+        "sha256": "167ab633a3143b1a4d4fd54e4aa007c05ba1999ca78565992c8d11a3f62521b8"
+      },
+      {
+        "path": "docs/components/notification-center.md",
+        "sha256": "299fbef89bc51c43b3bff91e6be045badf88be4411afad30a1a2aab8dac61704"
+      },
+      {
+        "path": "docs/components/offcanvas.md",
+        "sha256": "008fd0c0f85ba4b7dd1d0c563698f6ad768e4c5698e140970150dda531c45ca9"
+      },
+      {
+        "path": "docs/components/pagination.md",
+        "sha256": "e1fbb037d3da8b9d9a29c4bc785081db7f5528807a9f1fcd155716c5e715a4b1"
+      },
+      {
+        "path": "docs/components/placeholder.md",
+        "sha256": "6790f6646034a3777c4d6ca4fd183dd427c161ac01666ba748c2bdafc82a3800"
+      },
+      {
+        "path": "docs/components/popover.md",
+        "sha256": "975f0d416ed8f28f9ed6761e478e9909dcd4d90854fc49b7b2e05cb7a53bbd66"
+      },
+      {
+        "path": "docs/components/progress.md",
+        "sha256": "af209b4dde69575885e93b7d4335ddffeb78ace224e05e986859b6c851bf147d"
+      },
+      {
+        "path": "docs/components/radio.md",
+        "sha256": "79c794b31f48178cc0c42812b69f8595f4fae616831af13bdcd9a7486020ecac"
+      },
+      {
+        "path": "docs/components/range.md",
+        "sha256": "48fc90cd65d769b8678098c15212fd42f817b996b2c32b60d9d952dd7ce87889"
+      },
+      {
+        "path": "docs/components/rating.md",
+        "sha256": "d36a38810a1cced7508a816da7b583722c1e2d8a1c714ce6ab1f66fa8038acc8"
+      },
+      {
+        "path": "docs/components/ratio.md",
+        "sha256": "2a8daa4b6f2d03d5cd1a11732721e22f2d00daa536a34ce00d4b3022221cd098"
+      },
+      {
+        "path": "docs/components/responsive.md",
+        "sha256": "cc5f06355c74d25df2e71c1f8e8558a9b1f85fd661e258a3f018ee10fdfb19e7"
+      },
+      {
+        "path": "docs/components/scrollspy.md",
+        "sha256": "5cf7ceebb92a67ddae36080f035da4928e7155293a75f5ea6f0e5e551668b1e7"
+      },
+      {
+        "path": "docs/components/segmented-control.md",
+        "sha256": "377f6fb39d0e9c37393b1f73f239ebbe3bf672776c26c84ef263b9cc7be799ca"
+      },
+      {
+        "path": "docs/components/select.md",
+        "sha256": "431b7fa1f00d6ee73639daa3eebef48003069ff86d8892f1e4ece30312cb74e7"
+      },
+      {
+        "path": "docs/components/skeleton.md",
+        "sha256": "b6ca3b40552ad43d3e9192aaeeb1e6a4a1ecb3ea9b2ad322a4acb833e4171e8b"
+      },
+      {
+        "path": "docs/components/stepper.md",
+        "sha256": "257126dc6cbd44ce854b9ca467414e43f31b665b80c7ee3b99fbfdd5a08325c0"
+      },
+      {
+        "path": "docs/components/switch.md",
+        "sha256": "240c3f33d22891049ded4874b5fa430f49219d83c33a4daaaaf1df7f6c83be08"
+      },
+      {
+        "path": "docs/components/table.md",
+        "sha256": "28135cdc5c345307a552da8535e963a14b06fe96a6ee39558df0a01d69a7d77e"
+      },
+      {
+        "path": "docs/components/tabs.md",
+        "sha256": "314a525be1d38ea6d8b107319a5311a706d94759bd99fb32e107d54d90e2801a"
+      },
+      {
+        "path": "docs/components/tag.md",
+        "sha256": "d8ae3420f661dd16b9b993dd475cd0441526242e8b13862d7abc4848926bd40b"
+      },
+      {
+        "path": "docs/components/tile.md",
+        "sha256": "f81e56b8d35b47e942884044a91c532ea34a95682a7cc44987c8d25cac7b3390"
+      },
+      {
+        "path": "docs/components/timeline.md",
+        "sha256": "4f814ee452346997076a3db7ace1edb052735fd7779318037d487e3af8f91707"
+      },
+      {
+        "path": "docs/components/toast.md",
+        "sha256": "5bf0b89f506cef58970c2dff71e369a34f6c14cd82ad2249bb68b15bd3fad1b9"
+      },
+      {
+        "path": "docs/components/tooltip.md",
+        "sha256": "4ee28e7b11dc81c99db7ab78df8ace64f0df2ac25361bb2c1988a7a76e9635cb"
+      },
+      {
+        "path": "docs/components/tree-view.md",
+        "sha256": "2ff9b4668ef1e888c8a14b5074351252b4c5685f64a4d11379b15399a70402fb"
+      },
+      {
+        "path": "package-lock.json",
+        "sha256": "b9f60d816847a92b003335b25c19a02a08732c69effbe7153682d2984de568a9"
+      },
+      {
+        "path": "package.json",
+        "sha256": "ca7260ef9503c484fb0e2680f0d728332c1ae24ee4333f17402366ff0f63d517"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_accordion.scss",
+        "sha256": "a5545ec9846998f6f1ee68c3ee31971be9b150abc5b353073613fff4ab89e4ff"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_alert-dialog.scss",
+        "sha256": "29a2cb4db482e552083440d7c79aa5e5a32118cf202ccc6a8b75828c58aaa72c"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_alerts.scss",
+        "sha256": "15edf2932b4eeae0ce3ee942b677c7817cf82cefa4be926be546bb52db22c63c"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_avatar.scss",
+        "sha256": "2544664701872d7e8eb5d2feea930d732609f1af21ad7aed2fb96c1bc78b2595"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_badges.scss",
+        "sha256": "49bad22b3ccd749f47f9d4a22290e8716af6babd579288c9fec52c51d4536e30"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_breadcrumbs.scss",
+        "sha256": "6d2221396a21445ff5a5e0e39f4b6d7a4829d73c7abedf214f70faa346bf1cfb"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_button-group.scss",
+        "sha256": "5a0301738cca79de57823f0dd73d5faee5c7f012259559393ec9179bae7d5aa4"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_buttons.scss",
+        "sha256": "dcddbd63d9dba80e7abd5551ea78982af461f4888b0e7fe7e5bc40519e4c4256"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_cards.scss",
+        "sha256": "97dd58a6a2b4e158781dcabeede3a8f6b96000019adc61037d686901be09ba93"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_carousel.scss",
+        "sha256": "c510591fff32aa8ef763b54f7321020a91c2e0da72bcbe53edaea30d9426e737"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_close-button.scss",
+        "sha256": "5234d336ee83e08d27fa0e60c290665dcebf33695bbeeccbd10f4b7d8e7cb338"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_code.scss",
+        "sha256": "9424a4eac20a7622dc499ed5622f0fc6492c3a13d299e365710e5ed495756331"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_collapse.scss",
+        "sha256": "c468dbdfcbdf3f1564b304725ebb813960d5291dcb4e112f011882d8043b3e1b"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_combobox.scss",
+        "sha256": "26ff7aee8a55e799ed2f017577ddb428c951b5216e26f94437faa6fd0c8cf0b8"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_command-palette.scss",
+        "sha256": "59f738e7b1d872e4373dafd32fefa60c4e3593807027cf6005ea665aa10ba026"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_datatable.scss",
+        "sha256": "f5a2b04ee24b8c3ecb961a33ad515a507afa1d8b86014869c463b7f54d23a12a"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_datepicker.scss",
+        "sha256": "7fe4d91b6955e7eb38f340035d8b9feb0aba602e6283ae75441639a0d02b6012"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_divider.scss",
+        "sha256": "9f5cceea735dbd1a3f83994b3992e45bad3241ddff402fc70bd8e7db16c269d3"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_dropdown.scss",
+        "sha256": "4aa72d9d9d17d40af1c0f4e5c3bb7b2db25edab0dbce215caad81031aee8701d"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_empty-state.scss",
+        "sha256": "16f70abc362a747d943e89f24403505a7939062455b455e6a827303de3d335e7"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_icon-link.scss",
+        "sha256": "81b2b2b095461a7ce58349bf7674ff602adb409875cba6d2e8c10556007f5fc8"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_index.scss",
+        "sha256": "a392b03dffb979b7f0b4c1f99f3c3e39ea3a1ac335f0978a0e147711a66d9dea"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_list-group.scss",
+        "sha256": "800a1d51b2c6347c18054b00f26ecd9c7cbfac7c52a34e9fbdcafc9e254dd58e"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_menu.scss",
+        "sha256": "9e1a5f43c3f4b5106057ec2583dde94cc4993183f6a9c23aa376cdf9320e0549"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_modal.scss",
+        "sha256": "9dd0bf109879991726b3164452c692f8b1a213f42043c58ee302cf09af4b2a24"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_navbar.scss",
+        "sha256": "2250b8befbd84dd37f65ee1661bdbc1fea5a825a282ef483d92df5670f2b2035"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_nested-menu.scss",
+        "sha256": "d8d1e7b199be29ece3e0ea3b74b6ff9c133a28f406364ab82d5a38332380a950"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_notification-center.scss",
+        "sha256": "5d3f05649396033053f4b48fa68e54753a93a45a7756fe472dfa4e6ef55767f9"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_offcanvas.scss",
+        "sha256": "f93fe12cbc6ea40e918c53e2182fdc110b0667ee33cb14712671805991a0dbe1"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_pagination.scss",
+        "sha256": "c6d2079fefcd178a698567a5713ef1752467ebbcc086e61fee395cbfea417577"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_placeholder.scss",
+        "sha256": "48e09785f7e251bdbf2478bace67b6ca528cdc799bd04bb14a694c7e68425b36"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_popover.scss",
+        "sha256": "8cb77fe15196b1436a2c832334a3d8c11a73b52eed6820fc59b9d6e9892915c8"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_progress.scss",
+        "sha256": "ce3b984af79caa1e076d54dfaff7ac9d1793733413d37a2fdece50b938d856e2"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_rating.scss",
+        "sha256": "0dad6ed44db5903d5587e6ee3e6a68f9961e2fe928a831374607854d3739fd9b"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_ratio.scss",
+        "sha256": "acb81b12ae0ac9ba95a8bfeb499d0fabcdd5a720444612c01ba1492f61728b87"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_responsive.scss",
+        "sha256": "8da4868322cb3733ecbb7f595c57b0b4c5ccb2bc40d647123f0582da388db524"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_scrollspy.scss",
+        "sha256": "ea330eda39160f2a056eb9d93d41cd200761b50e04c3fe8c9d104f1b4ab9bf9a"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_segmented-control.scss",
+        "sha256": "7eebc17f837eb8eb227f160a10bc0ac7d5229ada01e905dd7b29efcff8703084"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_skeleton.scss",
+        "sha256": "4edfcd145116756604f49e822cd0c83d9eb7cfa9c80829d8b16c8e3b52ce1db6"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_spinner.scss",
+        "sha256": "baf65aa5811ba79614e99bbb4dd8c8166c2a3ca5647586ad5d735f351527eb20"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_stepper.scss",
+        "sha256": "6abb0a128f02c4651c9f9c83a124c3afd2982061fb97144dd5398270f44c753a"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_tables.scss",
+        "sha256": "492ed003c1c711f34c0235fd7241903f9d31f963e3896a5dac039c821c5f537e"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_tabs.scss",
+        "sha256": "e6e2ee07c03e8e4d5c640328e368dd293fdbf208a34b560c529c7f3d4ae42fd3"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_tag.scss",
+        "sha256": "a96d0b889b37d05512f25d4d85d948876fa45476987c1cd816c0584f9eaff001"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_tile.scss",
+        "sha256": "5b1d9eac0f2b027f79cdb452c390480cf631a6bd8d14f1ab41356501d83b9a49"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_timeline.scss",
+        "sha256": "ae0d879195d5632f190f064de3e8cae8158f26b041f2013c68d127d43a0166ff"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_toasts.scss",
+        "sha256": "7a116e15855bebf5cd90e9d4a14fc483798198a065986dcafa9092ba15a47ebe"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_tooltips.scss",
+        "sha256": "5ed8dfccee24b1bd2fb0d761b7bd4bc0762a039ac02b64e8221c283f622bc5ec"
+      },
+      {
+        "path": "packages/fokus-components/scss/components/_tree-view.scss",
+        "sha256": "6b43841396a2f4ad7a70f92280c7bb611c75b34538f7c80def4abdf3023d36c9"
+      },
+      {
+        "path": "packages/fokus-components/scss/forms/_check-radio-switch.scss",
+        "sha256": "ddcfdb8c5f2cbd937c9da33ba5a10a9f6bede504c02761b9dcc16b93e2d2569c"
+      },
+      {
+        "path": "packages/fokus-components/scss/forms/_file-upload-advanced.scss",
+        "sha256": "ae9f35f4f8a83b409778725c945955a934b22edb0773fe6e96601337bbe680dd"
+      },
+      {
+        "path": "packages/fokus-components/scss/forms/_forms.scss",
+        "sha256": "9a1e4a1f111ea8b5049e2b619ea985bf3f10fb19d614f83a610c239a5d382687"
+      },
+      {
+        "path": "packages/fokus-components/scss/forms/_index.scss",
+        "sha256": "797adc5ecd0a532a7210fa190499ef0f11a51b5b8649f0717bd389a5ba38a68a"
+      },
+      {
+        "path": "packages/fokus-components/scss/forms/_range.scss",
+        "sha256": "a5ca80765059fb29276bdc929b35b4bf7ffa4a2b0b32a707b79617102068c573"
+      },
+      {
+        "path": "packages/fokus-core/scss/base/_accessibility.scss",
+        "sha256": "45d72311a1f25b94610e2d5f4905e1b640654474cc9ad5c8f90cc7850c974fc5"
+      },
+      {
+        "path": "packages/fokus-core/scss/base/_index.scss",
+        "sha256": "06109f32849e3ff2d584bb0a1cd7c2f8d255caf96aa7ab4daf75aaba8c2b1e8a"
+      },
+      {
+        "path": "packages/fokus-core/scss/base/_motion.scss",
+        "sha256": "4fb0f926560bbc5e2431803c9f29de8b5d0df4e21b95cad5f4d038867004661b"
+      },
+      {
+        "path": "packages/fokus-core/scss/base/_reset.scss",
+        "sha256": "2dc04e66735814311b2f1c923c020bea815ddb3c36e61b8b93d3a2cc7ad67072"
+      },
+      {
+        "path": "packages/fokus-core/scss/base/_typography.scss",
+        "sha256": "61504f993dc2afa1fb83bf813db215cc16992f30e021d04f78bc65ab944e4d5b"
+      },
+      {
+        "path": "packages/fokus-core/scss/layout/_cluster.scss",
+        "sha256": "5cc85368e7a966daac0bc677b40463a0c4f431cd4dbfe70eadccc69c4a1c86e5"
+      },
+      {
+        "path": "packages/fokus-core/scss/layout/_containers.scss",
+        "sha256": "82a378da29edc7d6c72a6c798c12b739d916e093b990dcb2c2cb0b9ae86f42a3"
+      },
+      {
+        "path": "packages/fokus-core/scss/layout/_grid.scss",
+        "sha256": "9a63f8377a7a2b2f4c467faab40bc63cec3cacea492b75f226d140eeffb8becb"
+      },
+      {
+        "path": "packages/fokus-core/scss/layout/_index.scss",
+        "sha256": "1916bb74a81a762623ce4f088fcf95c1af02ebb118e3c6e91c28ce0702f7e0a0"
+      },
+      {
+        "path": "packages/fokus-core/scss/layout/_sidebar.scss",
+        "sha256": "1c95db02dac0584d7fcb65976bdfd42dea3b1c1c3c9163f0d97002f22695d13a"
+      },
+      {
+        "path": "packages/fokus-core/scss/layout/_stack.scss",
+        "sha256": "485065794789520124537d38b991fc9ddc3c00d73244cf9b5dfbaafc0cbc304e"
+      },
+      {
+        "path": "packages/fokus-core/scss/settings/_breakpoints.scss",
+        "sha256": "f627861d5762aa6feaef7c5819fb7b9baf1b031058d99eaf91e91a291adcb6cd"
+      },
+      {
+        "path": "packages/fokus-core/scss/settings/_button-states.scss",
+        "sha256": "59d186cea5ec861a6807984940b982396d8b1f4f92386ca1116de2190ecb5d08"
+      },
+      {
+        "path": "packages/fokus-core/scss/settings/_colors.scss",
+        "sha256": "5b8e4c346460297c8c00af721faae8990687780d1aa94a9f66a139696eba6df2"
+      },
+      {
+        "path": "packages/fokus-core/scss/settings/_config.scss",
+        "sha256": "25685a6df539987b462fe1e172dbe1cb6aaba251a4b41885c2979c032193f5e7"
+      },
+      {
+        "path": "packages/fokus-core/scss/settings/_container-queries.scss",
+        "sha256": "42d6e95bc690d847cb3848ff3311787ef80edc2309b550680dee042152044bfe"
+      },
+      {
+        "path": "packages/fokus-core/scss/settings/_index.scss",
+        "sha256": "260fe608a27eea88026c1b04f03ad9f13aea4e95289e9822924d710f875bb145"
+      },
+      {
+        "path": "packages/fokus-core/scss/settings/_spacing.scss",
+        "sha256": "5d7e4ac4d56fa7f816737c36ba73d98e802c2dd8bb1efbdcb9906182adb5cbae"
+      },
+      {
+        "path": "packages/fokus-core/scss/settings/_typography.scss",
+        "sha256": "ec85441438d641c0e7a0aa9bf2ab88c1ddfba6a7f3eed9b59623ea394316357e"
+      },
+      {
+        "path": "packages/fokus-core/scss/settings/_utilities.scss",
+        "sha256": "d2ee633c774748f097af1932a109fa136980b6eb9f5e1aa68c1616e20b5d0710"
+      },
+      {
+        "path": "packages/fokus-core/scss/themes/_brands.scss",
+        "sha256": "c816815ad20eef962b520be4067bdea78a82223f4677eefb0d6146f40ea1a077"
+      },
+      {
+        "path": "packages/fokus-core/scss/themes/_dark.scss",
+        "sha256": "44da364e49e47353bff0a81934a73ca575bc8a7a8741aa3760dd03705111c4bc"
+      },
+      {
+        "path": "packages/fokus-core/scss/themes/_index.scss",
+        "sha256": "19e60e9d018c9c8133dea475f6d249eeb3b66ce4a3d7b0094d7ff37790b4f287"
+      },
+      {
+        "path": "packages/fokus-core/scss/tokens/_charts.scss",
+        "sha256": "485731a5a94cf9b642ce3362fbd66dad10ba12c18bd9d857bbb1cf2f3c503a0b"
+      },
+      {
+        "path": "packages/fokus-core/scss/tokens/_index.scss",
+        "sha256": "3a83e7f69c9a1526f1e2a07f09f047ac3109b47dcedd73c96ac830c243add6aa"
+      },
+      {
+        "path": "packages/fokus-core/scss/tokens/_root.scss",
+        "sha256": "683fc13722a2ec719aab2fd50a9ccd7bf24d0eabc648c57ca05a07a3476982c9"
+      },
+      {
+        "path": "packages/fokus-core/scss/tokens/_semantic.scss",
+        "sha256": "f686c694e51a31b07a7fe78c141f032bad36fe6edc36ce1b5a9d105eae9a8cd2"
+      },
+      {
+        "path": "packages/fokus-core/scss/tools/_index.scss",
+        "sha256": "aa08f463f24d49f7aeefc3b22df70058faa650345d1b53c9aa99a4ff127bed8b"
+      },
+      {
+        "path": "packages/fokus-core/scss/tools/_mixins.scss",
+        "sha256": "5fde61dc855a42e1e26ced0ef9f386bfecd072b4d4ac8e3cd04c301e57afaf50"
+      },
+      {
+        "path": "packages/fokus-fonts/scss/_fonts.scss",
+        "sha256": "664fde2c9bf57a2a5b8c8bdda094511c742bcdf7279fb5a348c7bcf8f5833a47"
+      },
+      {
+        "path": "packages/fokus-icons/index.js",
+        "sha256": "464f36828f9f1f7ceee1cdf1e889efc06fecfeea9d224772ddc7d09a14ad6de4"
+      },
+      {
+        "path": "packages/fokus-js/js/accordion.d.ts",
+        "sha256": "748bfd9651b20e2003055d9357175feda16b3084085104ebfaf4a59597263c1c"
+      },
+      {
+        "path": "packages/fokus-js/js/accordion.js",
+        "sha256": "6f7a5a1ff665410f58df70b7250b4121ff6991606b37f8320b610b5bcb7a1ed1"
+      },
+      {
+        "path": "packages/fokus-js/js/breadcrumb.d.ts",
+        "sha256": "1673d4a5ca68b715e79e0cd2ff01d308359fd919d25fdf311d94793b1638fd77"
+      },
+      {
+        "path": "packages/fokus-js/js/breadcrumb.js",
+        "sha256": "cd41d74aaf1df318ee61d18d23017bf8c50217900246d1b4a387ed20f7718395"
+      },
+      {
+        "path": "packages/fokus-js/js/carousel.d.ts",
+        "sha256": "30a49eaaec6dbf200a523653b007629d310725b6b3569705e941bf66dcdd8fb3"
+      },
+      {
+        "path": "packages/fokus-js/js/carousel.js",
+        "sha256": "947ae74d5a4ab8fcc79ad5a600d022b064d9fbced72d2a38eaec6b1a9385ac40"
+      },
+      {
+        "path": "packages/fokus-js/js/collapse.d.ts",
+        "sha256": "fef4e9ad1103917125b7c39d2fb9718ba44dba6f7c423c467875c42f024e2021"
+      },
+      {
+        "path": "packages/fokus-js/js/collapse.js",
+        "sha256": "695e4de074854dc0ae40910dcb356628c4dc23361f228dd642d9b3ff48d8bf13"
+      },
+      {
+        "path": "packages/fokus-js/js/combobox.d.ts",
+        "sha256": "ac95357976b59a30ec73a915e719c674ed091fcbfd7a74f13d234e54b7d99dc9"
+      },
+      {
+        "path": "packages/fokus-js/js/combobox.js",
+        "sha256": "9cafa6d72f5418fd49569c9698b40258a18c5a333cddf4e0436173e10bfb83f1"
+      },
+      {
+        "path": "packages/fokus-js/js/command-palette.d.ts",
+        "sha256": "5c2cd9efc60a014e593c4cf89aa71506595cae448675ca51977164cbe9bcf3c7"
+      },
+      {
+        "path": "packages/fokus-js/js/command-palette.js",
+        "sha256": "660e005c6296e1d9ef56f521b10a72572f2dcffcc0819adc637a149aec5c786b"
+      },
+      {
+        "path": "packages/fokus-js/js/confirm.d.ts",
+        "sha256": "f2d4809ad598f89c0623e6252c24d24d5de138841dc063a0956dc6f8d9c50428"
+      },
+      {
+        "path": "packages/fokus-js/js/confirm.js",
+        "sha256": "f5f57eac2bd95bfb84c6d496e977b434e053fad4b3609db3fe69abca6350758a"
+      },
+      {
+        "path": "packages/fokus-js/js/core/focus.d.ts",
+        "sha256": "7854e916da8fd50674cd8b0dbfafdf7268073cf41b0fdc54fc1e0d1b726d59a7"
+      },
+      {
+        "path": "packages/fokus-js/js/core/focus.js",
+        "sha256": "3307db7dfdbddd9843ba8564f8779ad96b1a119747431dbce7f41734ad053423"
+      },
+      {
+        "path": "packages/fokus-js/js/core/html.js",
+        "sha256": "6357e8f7bf2281795be3fe175a7439ee338d42f724b646912c1b70f7edd764a2"
+      },
+      {
+        "path": "packages/fokus-js/js/core/index.d.ts",
+        "sha256": "1e7e040d61e68bbcaa996cef8a7427fde730e516c6ba5ec8383dd298f6d2ebf3"
+      },
+      {
+        "path": "packages/fokus-js/js/core/index.js",
+        "sha256": "1e7e040d61e68bbcaa996cef8a7427fde730e516c6ba5ec8383dd298f6d2ebf3"
+      },
+      {
+        "path": "packages/fokus-js/js/core/overlay.d.ts",
+        "sha256": "eb94a48fdc6e970a6ea16828a128af63decc10359ce733d406324d56d4c783ab"
+      },
+      {
+        "path": "packages/fokus-js/js/core/overlay.js",
+        "sha256": "08b0fa26717c8821c62fde5a22b802956d1a5b87006a65348961bdc6df3b654e"
+      },
+      {
+        "path": "packages/fokus-js/js/core/portal.js",
+        "sha256": "d58b2c9befd08bc293d83f3e473c25ea089fc41721bbfc084b5ca11fc648390f"
+      },
+      {
+        "path": "packages/fokus-js/js/core/positioning.d.ts",
+        "sha256": "70ea22bbd2a96dd9205a36cd48195775c404e76f6e0c0344c6ae62f28aec9519"
+      },
+      {
+        "path": "packages/fokus-js/js/core/positioning.js",
+        "sha256": "c4a960fcc07067703706f8c807e0eaefc138466262386e9f2b9f1a69dd2cda72"
+      },
+      {
+        "path": "packages/fokus-js/js/core/register.d.ts",
+        "sha256": "fc09f3d2b8162a2baa1dd6e3c16d3244410a29ecf7fa543e4cd86f00546f488a"
+      },
+      {
+        "path": "packages/fokus-js/js/core/register.js",
+        "sha256": "aa5dec5a285682a0ca41f4f218989d156b20bf5ab0e65f8db70c8956c7d0d61d"
+      },
+      {
+        "path": "packages/fokus-js/js/core/theme.js",
+        "sha256": "e7cb639f325d6a686a796db8960d891e8a438c880d1aab8362b28dc58ffa3e0f"
+      },
+      {
+        "path": "packages/fokus-js/js/core/transition.d.ts",
+        "sha256": "8bf4440d79909dc8d2f8279b51d405745bfeb6ddcde936a75bfdd3d15ece5199"
+      },
+      {
+        "path": "packages/fokus-js/js/core/transition.js",
+        "sha256": "63fe37c134fbdf62f12bc663421b9243aff17f913b3a8b32020fb5270b2e71c2"
+      },
+      {
+        "path": "packages/fokus-js/js/core/variant.js",
+        "sha256": "856f46e4128c0cc720cb2fe2a48da8296dabeb1ec25480422cd42fcccf81ff74"
+      },
+      {
+        "path": "packages/fokus-js/js/datatable.d.ts",
+        "sha256": "5cbd13cddf4e57d07838acc1268fb114202d077da92963943c6d83db7d6382bc"
+      },
+      {
+        "path": "packages/fokus-js/js/datatable.js",
+        "sha256": "e78ce83a90d253cc4efc6fd04f8b57cfebdf44a19062bcecf37531e19924c9aa"
+      },
+      {
+        "path": "packages/fokus-js/js/datepicker.d.ts",
+        "sha256": "9a8d702e7067308d7689be8877de888a8bd52bdc5de4ba54634a0002920ef4c3"
+      },
+      {
+        "path": "packages/fokus-js/js/datepicker.js",
+        "sha256": "59ff44cd601f042e7c262a2fe149eda16ed7667934fd6353329fecd4e616254a"
+      },
+      {
+        "path": "packages/fokus-js/js/dropdown.d.ts",
+        "sha256": "4ecd85ca2de3f4e1ab601f9ebc9dafd95888956de73731b9884cbdcd89653353"
+      },
+      {
+        "path": "packages/fokus-js/js/dropdown.js",
+        "sha256": "5b431b36d7626c31a6cdbd83d149899217ae5527c7c385449905601a9a218209"
+      },
+      {
+        "path": "packages/fokus-js/js/file-drop.d.ts",
+        "sha256": "eba01832b4d6853ad7ba192b96059799e5aba623edead9e1369eb6e7925cedbf"
+      },
+      {
+        "path": "packages/fokus-js/js/file-drop.js",
+        "sha256": "72ff2f318b5a84555826aad39623af62f9572e0c8d1d872d9a01f9d3be7af136"
+      },
+      {
+        "path": "packages/fokus-js/js/file-upload-advanced.d.ts",
+        "sha256": "cffefe2d342e3b32271c50b97b42a36c411e3fa0254831bde517d09889cb145d"
+      },
+      {
+        "path": "packages/fokus-js/js/file-upload-advanced.js",
+        "sha256": "b47f5de89754252cb41e7e44485a8efcb06fed4d867b565ca292583069c03789"
+      },
+      {
+        "path": "packages/fokus-js/js/focus-trap.d.ts",
+        "sha256": "428b03dcd5e9a158613f36e2dd990c9f915c3fbbbe5245ffb5b6b5442dd0ecfe"
+      },
+      {
+        "path": "packages/fokus-js/js/focus-trap.js",
+        "sha256": "2f46e7e0f3e54a46d42a3ac83cc0723f3a0dcfd33b126b8d70d79ec78c727434"
+      },
+      {
+        "path": "packages/fokus-js/js/fokus.d.ts",
+        "sha256": "a15ac1ec2fb3f360a09e4a1e0b2bcc928704a1eeb5707cb5c03f8872d6389405"
+      },
+      {
+        "path": "packages/fokus-js/js/fokus.js",
+        "sha256": "802c4ca32bbf35a88e6f322dc80900a83f3daae47b2b1f511e0cb7c553916e2c"
+      },
+      {
+        "path": "packages/fokus-js/js/form-validation.d.ts",
+        "sha256": "adb3af11b190ebf4f99e9453b94a29129c4da31c8ca2b2d9b1e073e214d0f407"
+      },
+      {
+        "path": "packages/fokus-js/js/form-validation.js",
+        "sha256": "016b4139dbf41cc44d1f2e16f4ebebd207ab130a88b213f2586d6d8631a7aa06"
+      },
+      {
+        "path": "packages/fokus-js/js/global.d.ts",
+        "sha256": "9c5c0d76062672c7b9f1a9a810247f70eb62a0f1da55205bfe84aafbfc532ab6"
+      },
+      {
+        "path": "packages/fokus-js/js/modal.d.ts",
+        "sha256": "3c976f8a9229b2f9a5beeb25a9f11f7bcdacad624841f4b3c0b629a3531cc8e4"
+      },
+      {
+        "path": "packages/fokus-js/js/modal.js",
+        "sha256": "7ce9944a4d0d43587bf655ea650c2bf63f6c2aa5740ad4a0a874a29eed131066"
+      },
+      {
+        "path": "packages/fokus-js/js/navbar.d.ts",
+        "sha256": "cb4f05157853623e4ba479015b68913ef6c1ca763413f11cee3d78fba618d0e6"
+      },
+      {
+        "path": "packages/fokus-js/js/navbar.js",
+        "sha256": "7d60228e5fee7556a23ab16853bb2bab4a3fe919a660538290f023b49fa4b99f"
+      },
+      {
+        "path": "packages/fokus-js/js/nested-menu.d.ts",
+        "sha256": "374a1ad6a9c8736da62f57166ce60938c02c8ca95fdc7262e7227c16284497d2"
+      },
+      {
+        "path": "packages/fokus-js/js/nested-menu.js",
+        "sha256": "8b69b9598d9cd9092e04a1effdf20c9943ab2119384cbaa891ff905bc9321cb6"
+      },
+      {
+        "path": "packages/fokus-js/js/notification-center.d.ts",
+        "sha256": "732e6ac5278d8320d9eba918420bd9fa7fb8d0571f0a9e2b22d52dfc95edbfcf"
+      },
+      {
+        "path": "packages/fokus-js/js/notification-center.js",
+        "sha256": "328d3eee486c7008141320b69e2e9a509711602a8301ce89471e8bea67889566"
+      },
+      {
+        "path": "packages/fokus-js/js/offcanvas.d.ts",
+        "sha256": "96e0feee9e7084c95f260479fa1d564f5cbbd8fce286382b324cfc5290875bdf"
+      },
+      {
+        "path": "packages/fokus-js/js/offcanvas.js",
+        "sha256": "1c2a8f17502ac1e6f01a98d67d0a4715360efe3c28bd5fb1aaea238cd2e03a0a"
+      },
+      {
+        "path": "packages/fokus-js/js/pagination.d.ts",
+        "sha256": "e7675004f8ea2b0880a789882444682ed3177f62a8c3b562d6d4aa2aea1d7542"
+      },
+      {
+        "path": "packages/fokus-js/js/pagination.js",
+        "sha256": "98bcb367759e942d0f27a8eb4ffcca5bd84ced174d1c734358edd66e43036786"
+      },
+      {
+        "path": "packages/fokus-js/js/popover.d.ts",
+        "sha256": "eb04f9b7bc90a54666286af35519d5b237d1b082e606013387c46a722696dba5"
+      },
+      {
+        "path": "packages/fokus-js/js/popover.js",
+        "sha256": "7f64622b84891c39e81c9244219a89a897964e6e6b83660a836bf683c0170f47"
+      },
+      {
+        "path": "packages/fokus-js/js/range.d.ts",
+        "sha256": "f5e9ed3c2074e3f97a4ee70feb2888ead15f471c5747873b330dfafc9f71d3a9"
+      },
+      {
+        "path": "packages/fokus-js/js/range.js",
+        "sha256": "bb378199d022e1f816c4192d5c046a47bbd5ced333b76e7c0fd2334db9b4ccf9"
+      },
+      {
+        "path": "packages/fokus-js/js/scrollspy.d.ts",
+        "sha256": "69b3f1017ec656b6fa794e752d64796a7e8474db28fb56ceb579e2e512696225"
+      },
+      {
+        "path": "packages/fokus-js/js/scrollspy.js",
+        "sha256": "14f6f8fe57f93cadc527361385fc35806ae2b4d7ed5a9d38df6dd811e899e0c9"
+      },
+      {
+        "path": "packages/fokus-js/js/select.d.ts",
+        "sha256": "dd6d838d0808165eaff8f456e6f955ec7a7611291749abfdfe59afdefc121538"
+      },
+      {
+        "path": "packages/fokus-js/js/select.js",
+        "sha256": "ba6a3292be4d44eb361dcf525668f923799a8ee5da73e681f96641feb0530f7e"
+      },
+      {
+        "path": "packages/fokus-js/js/spinner.d.ts",
+        "sha256": "1cd770d4f17b6ba8b626e5421fc767b5a401d6501944526273febd51fb80c40d"
+      },
+      {
+        "path": "packages/fokus-js/js/spinner.js",
+        "sha256": "8843c101636bb33eadfddb4b4a9fb733a53c04f4eaf9ec7922f36cbfc4d20c23"
+      },
+      {
+        "path": "packages/fokus-js/js/stepper.d.ts",
+        "sha256": "11402d03e8166560b6237203f65a923da678e3937c597813a1990c0b94594137"
+      },
+      {
+        "path": "packages/fokus-js/js/stepper.js",
+        "sha256": "4041228203efe1aa709c90688e3e9c046b5a7169866424693fe9da16878545f3"
+      },
+      {
+        "path": "packages/fokus-js/js/tabs.d.ts",
+        "sha256": "bdd739675938bd43366f96492620ffc4d037741a4a5671c563f88ec435889bb9"
+      },
+      {
+        "path": "packages/fokus-js/js/tabs.js",
+        "sha256": "4a1b4ec36677d64146bdfdbcf61c2fc626bb324548641de6bb62bb70ee3c63e9"
+      },
+      {
+        "path": "packages/fokus-js/js/tag.d.ts",
+        "sha256": "44507ca10eb461747514a71b2c38c176c9c553d3fe530bf02f3626ad457d0309"
+      },
+      {
+        "path": "packages/fokus-js/js/tag.js",
+        "sha256": "451f8c7ef77dca1e6297b9b94e4d15d0210dfccfef21cfe6d176434d4a191e22"
+      },
+      {
+        "path": "packages/fokus-js/js/theme.d.ts",
+        "sha256": "724ed4a987b32d60e58297d7d3f7adf1fc38c911c0829dbe33e8f4576a6bcfb1"
+      },
+      {
+        "path": "packages/fokus-js/js/theme.js",
+        "sha256": "dbfef984fc4a7f7b9df1c452c2cf312d94dd2b3f48f1775e759511155ee2cd0c"
+      },
+      {
+        "path": "packages/fokus-js/js/toast.d.ts",
+        "sha256": "a0ae33e05c6476512138b33e11eb736098dadcf2c387e1c68abac1d6982d6611"
+      },
+      {
+        "path": "packages/fokus-js/js/toast.js",
+        "sha256": "4624504bbc238217d937d7296c182cade3fcbb91e70919a3aa8fd9331ed6f8a7"
+      },
+      {
+        "path": "packages/fokus-js/js/tooltip.d.ts",
+        "sha256": "112c22fbe32774a8cd7eb293d33b71dd48d330bed4cc553f19a2014f7739b058"
+      },
+      {
+        "path": "packages/fokus-js/js/tooltip.js",
+        "sha256": "220b59f63a2285fef4bba04d5e1edbdfe7fd42c3df187dfd59780ceff10c0b3f"
+      },
+      {
+        "path": "packages/fokus-js/js/tree-view.d.ts",
+        "sha256": "86c00b7689d3abc8417bb47a80badadf18875f57680e1ccdfeae19d8e8b1b9e2"
+      },
+      {
+        "path": "packages/fokus-js/js/tree-view.js",
+        "sha256": "d0763209defa54e1444b9f7cec5655ed722b7f87dddf881aecf2242c33e92f49"
+      },
+      {
+        "path": "packages/fokus-react/src/Dropdown.js",
+        "sha256": "9c45ec05e425699a8cb28283297b38450488e49bbcc17f87851e07c8126e060c"
+      },
+      {
+        "path": "packages/fokus-react/src/Modal.js",
+        "sha256": "1d6d81a19eafba362f1fc71208a8be1ffe9fba111b0d226cf42556dd699f109a"
+      },
+      {
+        "path": "packages/fokus-react/src/Tabs.js",
+        "sha256": "e0e1efc74c106bbdbe50a838231bdd5cba5b186780e8e2a8abeb0773d2f918bf"
+      },
+      {
+        "path": "packages/fokus-react/src/index.d.ts",
+        "sha256": "9f91db9ef04ba2a04b63bc79c6e384989550a00d2070e3ff5cfd31bbed32916e"
+      },
+      {
+        "path": "packages/fokus-react/src/index.js",
+        "sha256": "b0e9e5ac2345765681ef8726c3409cf606ce8ac9b12191560ed8e8f830b4be1d"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_api.scss",
+        "sha256": "267a2e572b15d42ba31c428bb6cee3701468af109b360e1a784ad280c0ce8a29"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_borders.scss",
+        "sha256": "51e111e671f91ac6629c30a5cc827b2b62bb1e4861019c32d2675828074d3575"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_colors.scss",
+        "sha256": "938ff02127a6646666a042536535e53624216d6ce068c4c464c76c7cb70123e0"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_container-queries.scss",
+        "sha256": "517861d6649f4939e2621a4464876d64fc96aed34a01749f990aefd7d594b67a"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_display.scss",
+        "sha256": "5b12a4ca50dc0379079cdc3652233f6d1c4b8acea7b084a2ac0aefc560efd1c4"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_effects.scss",
+        "sha256": "f5d08f6885f3449d8b9b0916797cacb33b65acefce02f399415de21e9a25e2b2"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_flex.scss",
+        "sha256": "cc8537f57fb6d5c26bfe8499525ed2b32816db88ae1db1b8e6f604cdfdbff5a6"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_generated.scss",
+        "sha256": "705208f9d9fb8942cc08a73b5a2762cceee805b670661d4c57774ece580d441f"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_grid.scss",
+        "sha256": "2c2b685ba8c0f3c51a9e25073a77d8bfb7f0c81c77263fb81725c86010dc7176"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_helpers.scss",
+        "sha256": "b8c0ef31e1bb1409cff8a07c1be08a4d959dbbc3de3df00a87174ec415a2b0a9"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_icon.scss",
+        "sha256": "d7a556abc1b88bc3ea510f3d00033567bbbd7066307c39256bae1018062141f4"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_index.scss",
+        "sha256": "55ce295276297435024da0b332549fbd0808e6217310dbd3405845ca8a2db413"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_interactivity.scss",
+        "sha256": "6251e36fb1bf85cb782ef71c0a0d17618b12ca39b6c8a304e848c4178126db8b"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_layout.scss",
+        "sha256": "39a3d8eb952bff061af82588e1e524bc01efbe7b358dc779de5f5970c76a57dc"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_motion.scss",
+        "sha256": "15f9c001d545b58f9369bcb4fdfdfcb32916a2e65077a790b231320e1a330be0"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_position.scss",
+        "sha256": "a4834aa16e3920b05edd09f54341e06ac3627850826245fdba020f4d9fc43fd2"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_print.scss",
+        "sha256": "d8f46a96e07d4bce70481def812028d785273dcbc19d03fb81ccbf7095bbb657"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_shadow.scss",
+        "sha256": "fea4d9f40ee2914ec6fe71620d858dc1c8125fac98e722af77af3a9e3a87fd1a"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_sizing.scss",
+        "sha256": "dd2451378d91c8e17976562d8c2e4738075eb562e56d137c4704be9f426bc295"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_spacing.scss",
+        "sha256": "c0ab7b1e7ed5ada2abdee254a41d87a83e112b8e8ad95d0eeea4c07a0c5e0fc1"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_states.scss",
+        "sha256": "f896821920124c11cc4ce3ed6010e3cbbb5797f932f4466a33f50565102df055"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_transforms.scss",
+        "sha256": "fa1332a02c1fc8a4bc4d5f7057196d9a297cbc1c96e2237ddd454c8c713e4a45"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_typography.scss",
+        "sha256": "181097dc25aefe8f2dc9ae24a101074b1c3ee73c550853bc7b6aba9512c3d0cd"
+      },
+      {
+        "path": "packages/fokus-utilities/scss/utilities/_visibility.scss",
+        "sha256": "5ac69d80477001ade71d4d3d272cb4da86046300984f1313e9131880f79a702f"
+      },
+      {
+        "path": "scripts/catalog.mjs",
+        "sha256": "05fa8071415c108be49d6357740308a794aa448e7c186d297f28eea6470c4f94"
+      },
+      {
+        "path": "scss/_index.scss",
+        "sha256": "529aab870afd010b951405d34add982ff325c728d5e4163a5a6f69e4d77fbab6"
+      },
+      {
+        "path": "scss/entries/components-entry.scss",
+        "sha256": "f0b5cde2aa00597439fac1dc7fbc6c8c2f673a8eb577f1e27398f6515b95d8a8"
+      },
+      {
+        "path": "scss/entries/core-entry.scss",
+        "sha256": "3f95fea9c1d5bf2a6b84415fbe11b277d0112e3c16096ac6df051855c9726b02"
+      },
+      {
+        "path": "scss/entries/dark-entry.scss",
+        "sha256": "c24e62d75379464d8b78c193ebe724ba42c9493e3ff0ae3241b19dff599013e1"
+      },
+      {
+        "path": "scss/entries/fonts-entry.scss",
+        "sha256": "e3d795c91b8d297b411436b5b42a91971b231691c3eeef7319bd9569e30d14a7"
+      },
+      {
+        "path": "scss/entries/forms-entry.scss",
+        "sha256": "283d222013626181beefa51bc75486eb757fe6b2e37f31b9c0848f33c69135bc"
+      },
+      {
+        "path": "scss/entries/helpers-entry.scss",
+        "sha256": "3671b942a1cff5226ab98a38b0a635191636e0527247a069be0818ff1c17af37"
+      },
+      {
+        "path": "scss/entries/layout-entry.scss",
+        "sha256": "3f95fea9c1d5bf2a6b84415fbe11b277d0112e3c16096ac6df051855c9726b02"
+      },
+      {
+        "path": "scss/entries/rtl-entry.scss",
+        "sha256": "5a736a7aebdcb3ff2e227270371ee44224b12d6a13e513eeda0efbff5d6bf1e9"
+      },
+      {
+        "path": "scss/entries/utilities-entry.scss",
+        "sha256": "d93d83cafded2e13d420a0069ee157a0917e48801c0d3bdef46df1dd3e10c154"
+      },
+      {
+        "path": "scss/fokus.scss",
+        "sha256": "bb0c237ca1dabfdf7fc2a5f2b3ea2cd8b0e6ce4c1b558dd7af7cff381690fedc"
+      }
+    ]
+  },
+  "files": {
+    "catalog.json": {
+      "source": "docs/generated/next/catalog.json",
+      "sha256": "b915eff313639227de3774b4e2ceda8c0d8b0331989a80bd061186a5d13f0c79"
+    },
+    "fokus.css": {
+      "source": "dist/css/fokus.css",
+      "sha256": "4e9196ef7365955630452e6769787cbeb7234479960f854239c4312af0afdef0"
+    },
+    "fokus.js": {
+      "source": "dist/js/fokus.js",
+      "sha256": "8efb1be3c6d9d20124df04a9061ae08352c6b95f2f749c53f4edd96b570bd469"
+    }
+  }
+}

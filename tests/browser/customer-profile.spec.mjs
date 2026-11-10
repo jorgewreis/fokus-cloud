@@ -1,12 +1,36 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import assert from 'node:assert/strict';
 
 const selectFokusOption = async (page, label, option) => {
     await page.getByRole('button', { name: label, exact: true }).click();
     await page.getByRole('option', { name: option, exact: true }).click();
 };
 
-const shellView = await readFile(new URL('../../resources/views/portal/fokus-law.blade.php', import.meta.url), 'utf8');
+const shellTemplate = await readFile(new URL('../../resources/views/portal/fokus-law.blade.php', import.meta.url), 'utf8');
+const assetManifest = JSON.parse(await readFile(new URL('../../config/fokus-law-assets.json', import.meta.url), 'utf8'));
+const assetUrls = new Map();
+assert.equal(assetManifest.version, 1);
+assert.equal(assetManifest.algorithm, 'sha256');
+for (const [source, entry] of Object.entries(assetManifest.assets)) {
+    assert.match(entry.sha256, /^[a-f0-9]{64}$/);
+    const dot = source.lastIndexOf('.');
+    const expectedPath = source.slice(0, dot) + '.' + entry.sha256 + source.slice(dot);
+    assert.equal(entry.path, expectedPath);
+    assert.ok(!source.includes('..') && !source.startsWith('/'));
+    const bytes = await readFile(new URL('../../public/' + entry.path, import.meta.url));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), entry.sha256);
+    assetUrls.set(source, '/' + entry.path);
+}
+let resolvedAssets = 0;
+const shellView = shellTemplate.replace(/{{\s*\\App\\Support\\FokusLawAssets::url\('([^']+)'\)\s*}}/g, (_, source) => {
+    assert.ok(assetUrls.has(source), 'Missing generated asset: ' + source);
+    resolvedAssets += 1;
+    return assetUrls.get(source);
+});
+assert.equal(resolvedAssets, 14, 'Resolve every real Blade asset reference for the static browser fixture.');
+assert.ok(!shellView.includes('FokusLawAssets::url'), 'Do not serve unresolved Blade asset helpers.');
 const profileView = await readFile(new URL('../../resources/views/portal/partials/fokus-law-profile.blade.php', import.meta.url), 'utf8');
 const renderedShell = shellView
     .replace("{{ $initialPage ?? 'overview' }}", 'profile')
@@ -26,7 +50,7 @@ async function openProfile(page, supportMode = null) {
         company: { id: 'CMP_VISUAL', name: 'Menezes Advocacia', role: 'admin' },
         active_company_id: 'CMP_VISUAL', companies: profile.companies,
         subscription: null, permissions: { manage_company_users: true, manage_settings: true },
-        modules: [], support_mode: supportMode,
+        modules: [{ id: 'C1', family: 'contatos' }, { id: 'P1', family: 'processos' }], support_mode: supportMode,
     } }));
     await page.route('**/api/auth/me', (route) => route.fulfill({ json: { ...profile, support_mode: supportMode } }));
     await page.route('**/api/csrf-token', (route) => route.fulfill({ json: { token: 'profile-test-token' } }));
@@ -49,25 +73,48 @@ test('perfil do cliente adapta as três seções a desktop, tablet e celular', a
         await expect(page.getByRole('heading', { name: 'Segurança' })).toBeVisible();
         await expect(page.locator('#law-sidebar')).toBeVisible();
         await expect(page.locator('.law-topbar')).toBeVisible();
-        await expect(page.locator('.law-rail')).toBeVisible();
-        const railItemSizes = await page.locator('.law-rail-button, .law-rail-link').evaluateAll((items) => items.map((item) => {
-            const { width, height } = item.getBoundingClientRect();
-            return [width, height];
-        }));
-        expect(railItemSizes.length).toBeGreaterThan(0);
-        for (const [width, height] of railItemSizes) {
-            expect(width).toBe(44);
-            expect(height).toBe(44);
+        await expect(page.locator('.law-rail')).toHaveCount(0);
+        await expect(page.getByLabel('Sobre o Fokus Law')).toHaveCount(0);
+        if (viewport.width <= 720) await page.getByRole('button', { name: 'Abrir menu' }).click();
+        const dashboard = page.getByRole('link', { name: 'Dashboard', exact: true });
+        const contacts = page.getByRole('button', { name: 'Contatos', exact: true });
+        const processes = page.getByRole('button', { name: 'Processos', exact: true });
+        const dimensions = await Promise.all([dashboard, contacts, processes].map((item) => item.evaluate((node) => {
+            const bounds = node.getBoundingClientRect();
+            const style = getComputedStyle(node);
+            return [bounds.width, bounds.height, style.fontSize];
+        })));
+        expect(dimensions[1]).toEqual(dimensions[0]);
+        expect(dimensions[2]).toEqual(dimensions[0]);
+        await expect(contacts.locator('img.law-module-chevron')).toHaveAttribute('src', /Arrow-Button-Down--Streamline-Ultimate-Bold\.png$/);
+        await expect(contacts.locator('img.law-module-chevron')).toHaveCSS('width', '8px');
+        await expect(contacts.locator('img.law-module-chevron')).toHaveCSS('height', '8px');
+        await contacts.click();
+        await expect(contacts).toHaveAttribute('aria-expanded', 'true');
+        await processes.click();
+        await expect(processes).toHaveAttribute('aria-expanded', 'true');
+        await expect(contacts.locator('img.law-module-icon')).toHaveAttribute('src', /Single-Man-Phone-Book--Streamline-Ultimate-Colors\.png$/);
+        await expect(processes.locator('img.law-module-icon')).toHaveAttribute('src', /Archive-Books--Streamline-Ultimate-Colors\.png$/);
+        for (const toggle of [contacts, processes]) {
+            const panelId = await toggle.getAttribute('aria-controls');
+            const panel = page.locator(`#${panelId}`);
+            await expect(panel.locator('.law-nav-item > img')).toHaveCount(0);
+            await expect(panel.locator('.law-nav-item').first()).toHaveCSS('font-size', '12px');
         }
-        const railIconSizes = await page.locator('.law-rail-button img, .law-rail-link img').evaluateAll((icons) => icons.map((icon) => {
-            const { width, height } = icon.getBoundingClientRect();
-            return [width, height];
-        }));
-        for (const [width, height] of railIconSizes) {
-            expect(width).toBe(20);
-            expect(height).toBe(20);
-        }
-        await expect(page.locator('#page-items a[aria-current="page"]')).toHaveAttribute('href', '/portal/fokus-law/perfil');
+        await expect(page.locator('#account-toggle img.law-account-chevron')).toHaveCSS('transform', 'matrix(-1, 0, 0, -1, 0, 0)');
+        await page.locator('#account-toggle').click();
+        await expect(page.locator('#account-toggle img.law-account-chevron')).toHaveCSS('transform', 'none');
+        const accountWidths = await page.locator('#account-panel .law-nav-item').evaluateAll((items) => items.map((item) => item.getBoundingClientRect().width));
+        expect(accountWidths).toHaveLength(4);
+        expect(new Set(accountWidths).size).toBe(1);
+        await expect(page.locator('#account-toggle img.law-account-chevron')).toHaveAttribute('src', /Arrow-Button-Down--Streamline-Ultimate-Bold\.png$/);
+        await expect(page.locator('#account-panel').getByRole('link', { name: 'Meu perfil' })).toHaveAttribute('href', '/portal/fokus-law/perfil');
+        await expect(page.locator('#account-panel').getByRole('button', { name: 'Preferências' })).toBeVisible();
+        await expect(page.locator('#account-panel').getByRole('button', { name: 'Configurações' })).toBeVisible();
+        await expect(page.locator('#account-panel').getByRole('button', { name: 'Sair' })).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(page.locator('#account-toggle')).toBeFocused();
+        if (viewport.width <= 720) await page.keyboard.press('Escape');
         expect(await page.locator('.law-shell').evaluate((element) => getComputedStyle(element).display)).toBe(viewport.width <= 720 ? 'block' : 'grid');
         expect(await page.locator('body').evaluate((element) => getComputedStyle(element).fontFamily)).toContain('Google Sans');
         const personalFieldWidths = await page.locator('#profile-name').evaluate((element) => [element.getBoundingClientRect().width, element.parentElement.getBoundingClientRect().width]);
@@ -75,10 +122,32 @@ test('perfil do cliente adapta as três seções a desktop, tablet e celular', a
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
         expect(overflow).toBe(false);
         if (viewport.width <= 720) await page.getByRole('button', { name: 'Abrir menu' }).click();
-        await page.locator('#rail-items [data-group="settings"]').click();
+        await page.locator('#account-toggle').click();
+        await page.locator('#account-settings').click();
         await expect(page.locator('#content-region h2')).toHaveText('Configurações');
         await expect(page.locator('#content-region .law-settings-link[href="/portal/fokus-law/perfil"]')).toHaveCount(0);
     }
+});
+
+test('dashboard exibe módulos com ícones coloridos de 32px e sem botão de abertura', async ({ page }) => {
+    await openProfile(page);
+    const dashboardShell = shellView.replace("{{ $initialPage ?? 'overview' }}", 'overview').replace("@include('portal.partials.fokus-law-profile')", profileView);
+    await page.route('**/portal/fokus-law', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: dashboardShell }));
+    await page.goto('/portal/fokus-law');
+    await expect(page.locator('.law-dashboard-widget-mark img')).toHaveCount(2);
+    await expect(page.locator('.law-dashboard-contacts .law-dashboard-widget-mark img')).toHaveAttribute('src', /Single-Man-Phone-Book--Streamline-Ultimate-Colors\.png$/);
+    await expect(page.locator('.law-dashboard-module-wide .law-dashboard-widget-mark img')).toHaveAttribute('src', /Archive-Books--Streamline-Ultimate-Colors\.png$/);
+    await expect(page.getByRole('button', { name: 'Abrir módulo' })).toHaveCount(0);
+    await expect(page.locator('.law-dashboard-contacts header')).toHaveText('Gestão de Contatos');
+    await expect(page.locator('.law-dashboard-module-wide header')).toHaveText('Gestão de Processos');
+    await expect(page.locator('.law-dashboard-widget-header h3.law-dashboard-widget-kicker')).toHaveCount(2);
+    for (const image of await page.locator('.law-dashboard-widget-mark img').all()) {
+        const styles = await image.evaluate((node) => ({ width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height, filter: getComputedStyle(node).filter, background: getComputedStyle(node.parentElement).backgroundColor, border: getComputedStyle(node.parentElement).borderWidth, src: node.currentSrc, loaded: node.complete && node.naturalWidth > 0 }));
+        expect(styles).toMatchObject({ width: 32, height: 32, filter: 'none', background: 'rgba(0, 0, 0, 0)', border: '0px', loaded: true });
+        expect(styles.src).toContain('Streamline-Ultimate-Colors.png');
+    }
+    await page.getByRole('button', { name: 'Contatos', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Contatos', exact: true })).toHaveAttribute('aria-expanded', 'true');
 });
 
 test('perfil em acesso de suporte fica somente para leitura', async ({ page }) => {
@@ -180,11 +249,11 @@ async function openUsers(page, viewport) {
 test('gestão de usuários integrada ao shell funciona em desktop, tablet e celular', async ({ page }) => {
     for (const viewport of [{ width: 1365, height: 900 }, { width: 768, height: 1024 }, { width: 375, height: 812 }]) {
         const { mutations } = await openUsers(page, viewport);
-        await expect(page.locator('#page-items a[aria-current="page"]')).toHaveAttribute('href', '/portal/usuarios');
+        await expect(page.locator('.law-settings-navigation a[aria-current="page"]')).toHaveAttribute('href', '/portal/usuarios');
         await expect(page.getByRole('heading', { name: 'Perfis de Setor Central' })).toBeVisible();
         await expect(page.getByText('Ana Operadora')).toBeVisible();
         await expect(page.getByText('111.***.***-35')).toHaveCount(0);
-        await expect(page.locator('#content-region').getByRole('link', { name: 'Transferir administração' })).toBeVisible();
+        await expect(page.locator('#content-region .law-users-transfer')).toBeVisible();
 
         await page.getByLabel('Nome completo').fill('Pessoa Nova');
         await page.getByLabel('CPF').fill('11111111111');
@@ -238,7 +307,7 @@ test('perfis personalizados e transferir administração funcionam dentro do she
 
     await page.goto('/portal/transferir-administracao');
     await expect(page.getByRole('heading', { name: 'Transferir administração' })).toBeVisible();
-    await expect(page.locator('#page-items a[aria-current="page"]')).toHaveAttribute('href', '/portal/transferir-administracao');
+    await expect(page.locator('.law-settings-navigation a[aria-current="page"]')).toHaveAttribute('href', '/portal/transferir-administracao');
     await expect(page.getByRole('heading', { name: 'Histórico de administração' })).toBeVisible();
 });
 

@@ -54,6 +54,8 @@ Sobre essa base, produtos derivados podem evoluir por modulos independentes:
 - [Seguranca e dados](07-security/security-and-data.md)
 - [Catalogo comercial](08-commercial/catalog.md)
 - [Ambientes e deploy](09-operations/environments-and-deploy.md)
+- [Operação autônoma de Julia](09-operations/julia-night-operations.md)
+- [Fila de tarefas de Julia](09-operations/julia-task-queue.md)
 - [Release 0.1 - Backoffice Admin](10-releases/v0.1-admin-backoffice/README.md)
 
 ## Principios centrais

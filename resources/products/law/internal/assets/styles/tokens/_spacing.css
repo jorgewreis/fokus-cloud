@@ -1,0 +1,54 @@
+/* SPACE TOKENS */
+:root {
+    --space-unit: 0.25rem; /* 4px */
+}
+
+/* -- ESCALA NUMÉRICA */
+:root {
+  --space-0: 0;
+  --space-1: calc(var(--space-unit) * 1);   /* 4px */
+  --space-2: calc(var(--space-unit) * 2);   /* 8px */
+  --space-3: calc(var(--space-unit) * 3);   /* 12px */
+  --space-4: calc(var(--space-unit) * 4);   /* 16px */
+  --space-5: calc(var(--space-unit) * 5);   /* 20px */
+  --space-6: calc(var(--space-unit) * 6);   /* 24px */
+  --space-8: calc(var(--space-unit) * 8);   /* 32px */
+  --space-10: calc(var(--space-unit) * 10); /* 40px */
+  --space-12: calc(var(--space-unit) * 12); /* 48px */
+  --space-16: calc(var(--space-unit) * 16); /* 64px */
+  --space-20: calc(var(--space-unit) * 20); /* 80px */
+  --space-24: calc(var(--space-unit) * 24); /* 96px */
+  --space-32: calc(var(--space-unit) * 32); /* 128px */
+}
+
+/* -- ESPAÇAMENTOS SEMÂNTICOS */
+:root {
+    /* -- -- LAYOUT */
+    --space-page-padding: var(--space-4);
+    --space-section-padding: var(--space-3);
+    --space-section-gap: var(--space-2);
+    --space-container-padding: var(--space-2);
+    --space-grid-gap: var(--space-4);
+    --space-list-gap: var(--space-2);
+    --space-stack-gap: var(--space-3);
+    --space-icon-gap: var(--space-2);
+    --space-inline-gap: var(--space-2);
+    --space-navigation-gap: var(--space-1);
+    --space-header-gap: var(--space-3);
+    --space-touch-target-min: 2.75rem;
+
+    /* -- -- COMPONENTES */
+    --space-card-padding: var(--space-4);
+    --space-card-gap: var(--space-2);
+    --space-form-gap: var(--space-2);
+    --space-input-padding-x: var(--space-4);
+    --space-input-padding-y: var(--space-2);
+    --space-button-padding-x: var(--space-4);
+    --space-button-padding-y: var(--space-2);
+}
+
+/* -- ESPAÇAMENTOS RESPONSIVOS */
+:root {
+    --space-page-padding-responsive: clamp(var(--space-4), 4vw, var(--space-8));
+    --space-container-padding-responsive: clamp(var(--space-2), 2vw, var(--space-6));
+}
