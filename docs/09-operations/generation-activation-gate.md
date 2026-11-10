@@ -54,23 +54,31 @@ activation then scheduler, verifies both releases and all original policy gates,
 rejects any latch or unfinished/inconsistent journal, verifies the exact latest
 successful run and slot record, and consumes its proof once. A durable intent latch
 and journal are written before consumption; consumption precedes pointer mutation.
-All records remain for recovery. The pointer switch does not imply FPM or workers
-updated: the original verifier and runtime prerequisites remain mandatory.
+Both journal and latch are written with the terminal verified state before the latch
+is removed. Recovery can reconcile a matching intent-bound terminal journal with a
+pending latch after interruption, but only after fresh identity verification; a removal
+failure remains safely retryable. All records remain for recovery. The pointer switch
+does not imply FPM or workers updated: the original verifier and runtime prerequisites
+remain mandatory.
 
 `--code-rollback` retains schema/data compatibility gates and **cannot bypass a
 pending latch**. No automatic database, storage or migration rollback exists.
 
-`recover` is explicit manual acknowledgement, not a retry: exact journal/latch/run,
-same boot/node, consumed proof, known previous/candidate current root, fresh original
-policy, receipt and successful actual verifier are required before clearing a latch.
-It does not recreate consumed proof. Interrupted unknown states, missing consumption,
-other current roots or unresolved work remain blocked. A new supervised cycle is
+`recover` is explicit manual acknowledgement, not a retry: the journal and latch must
+match exactly, or the pending latch must match a terminal journal in every intent field
+except its terminal state. The exact run, same boot/node, consumed proof, known
+previous/candidate current root, fresh original policy, receipt and successful actual
+verifier are required before clearing a latch. It does not recreate consumed proof.
+Interrupted unknown states, missing consumption, other current roots or unresolved
+work remain blocked. A new supervised cycle is
 needed for any later activation.
 
 ## Tests and evidence boundaries
 
-- 26 local process/state-machine gate regressions plus 22 supervisor tests
-  (22 passed locally on this consolidation branch).
+- 30 local process/state-machine gate regressions plus 22 supervisor tests
+  (30 and 22 passed locally on this consolidation branch). The gate regressions
+  inject journal-before-latch interruptions and latch unlink failures in both activation
+  and acknowledgement, including safe retry.
   Local gate fixtures stub artifact/runtime HTTP contracts and are not real runtime
   evidence. Cases include active descendants, double-fork, expiry, node/receipt/code
   mismatch, slots, overlap, failed later run, external unknown, concurrent locks,

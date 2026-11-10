@@ -122,7 +122,7 @@ def activate(c,base,candidate,receipt,policy_file,expected_previous,previous_rec
             g.require(c.current_target(base)==candidate,'current_changed_during_verification')
         except BaseException:
             state['state']='activation_unverified_manual_recovery_required';g.record(journal,state);g.record(latch,state);raise
-        state['state']='verified';g.record(journal,state);latch.unlink();g.sync(base)
+        state['state']='verified';g.record(journal,state);g.record(latch,state);latch.unlink();g.sync(base)
         return {'state':'verified','release':candidate.name,'handoff_run':proof['run'],'code_rollback':rollback}
 
 def acknowledge_current(c,base,journal,expected_run,receipt,policy_file):
@@ -135,14 +135,20 @@ def acknowledge_current(c,base,journal,expected_run,receipt,policy_file):
     with c.lock(base/'activation.lock'):
       with c.lock(base/'scheduler.lock'):
         a=read(base/'activation-blocked.json');j=read(journal)
-        g.require(a==j and a.get('schema')==SCHEMA and a.get('run')==expected_run and journal==base/('activation-'+expected_run+'.json'),'recovery_binding')
-        g.require(a.get('state') in ('switch_intent','activation_unverified_manual_recovery_required') and a.get('boot')==boot() and a.get('node_sha256')==c.node_fingerprint(),'unknown_recovery')
+        g.require(a.get('schema')==SCHEMA and a.get('run')==expected_run and journal==base/('activation-'+expected_run+'.json'),'recovery_binding')
+        pending=('switch_intent','activation_unverified_manual_recovery_required')
+        terminal=('verified','manually_verified_current')
+        same_intent={k:v for k,v in a.items() if k!='state'}=={k:v for k,v in j.items() if k not in ('state','verified_current')}
+        reconciled_terminal=a.get('state') in pending and j.get('state') in terminal and same_intent
+        g.require((a==j and a.get('state') in pending+terminal) or reconciled_terminal,'recovery_binding')
+        g.require(a.get('boot')==boot() and a.get('node_sha256')==c.node_fingerprint(),'unknown_recovery')
         consumed=base/('consumed-'+a['handoff_run']+'.json')
         g.control(consumed);g.require(digest(consumed)==a['handoff_sha256'],'consumption_unproven')
         root=c.current_target(base);g.require(str(root) in (a['candidate'],a['previous']),'unexpected_current')
+        if j.get('state')=='manually_verified_current':g.require(j.get('verified_current')==str(root),'recovery_state_changed')
         p=c.policy(policy_file,root,base,receipt);c.verify(root,receipt);c.run_verifier(p,root);c.verify(root,receipt)
         g.require(c.current_target(base)==root and p['expires_at_epoch']>=time.time(),'recovery_changed')
-        a.update(state='manually_verified_current',verified_current=str(root));g.record(journal,a)
+        a.update(state='manually_verified_current',verified_current=str(root));g.record(journal,a);g.record(base/'activation-blocked.json',a)
         (base/'activation-blocked.json').unlink();g.sync(base)
 
 def cli():

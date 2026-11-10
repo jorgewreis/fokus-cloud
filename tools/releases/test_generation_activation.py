@@ -96,6 +96,64 @@ class Gate(unittest.TestCase):
         latch=json.loads((self.base/'activation-blocked.json').read_text());journal=self.base/('activation-'+latch['run']+'.json')
         a.acknowledge_current(Contract,self.base,journal,latch['run'],self.newreceipt,self.base/'policy')
         self.assertFalse((self.base/'activation-blocked.json').exists());self.assertFalse((self.base/'scheduler-ready.json').exists())
+    def pending_recovery(self):
+        self.ready()
+        with patch.object(Contract,'run_verifier',side_effect=RuntimeError('synthetic failure')):
+            with self.assertRaises(RuntimeError):self.activate()
+        latch=self.base/'activation-blocked.json';state=json.loads(latch.read_text())
+        return latch,self.base/('activation-'+state['run']+'.json'),state['run']
+    def test_verified_journal_before_latch_update_is_recoverable(self):
+        self.ready();latch=self.base/'activation-blocked.json';original=g.record
+        def interrupt_latch(path,value):
+            if path==latch and value.get('state')=='verified':raise OSError('synthetic interruption before terminal latch')
+            return original(path,value)
+        with patch.object(g,'record',side_effect=interrupt_latch):
+            with self.assertRaisesRegex(OSError,'terminal latch'):self.activate()
+        state=json.loads(latch.read_text());journal=self.base/('activation-'+state['run']+'.json')
+        self.assertEqual(state['state'],'switch_intent')
+        self.assertEqual(json.loads(journal.read_text())['state'],'verified')
+        a.acknowledge_current(Contract,self.base,journal,state['run'],self.newreceipt,self.base/'policy')
+        self.assertFalse(latch.exists())
+        self.assertEqual(json.loads(journal.read_text())['state'],'manually_verified_current')
+    def test_activation_latch_unlink_failure_is_recoverable(self):
+        self.ready();latch=self.base/'activation-blocked.json';original=Path.unlink
+        def fail_latch(path,*args,**kwargs):
+            if path==latch:raise OSError('synthetic activation latch unlink failure')
+            return original(path,*args,**kwargs)
+        with patch.object(Path,'unlink',fail_latch):
+            with self.assertRaisesRegex(OSError,'activation latch unlink failure'):self.activate()
+        state=json.loads(latch.read_text());journal=self.base/('activation-'+state['run']+'.json')
+        self.assertEqual((self.base/'current').resolve(),self.new)
+        self.assertEqual(state['state'],'verified')
+        self.assertEqual(json.loads(journal.read_text())['state'],'verified')
+        a.acknowledge_current(Contract,self.base,journal,state['run'],self.newreceipt,self.base/'policy')
+        self.assertFalse(latch.exists())
+    def test_manual_journal_before_latch_update_is_recoverable(self):
+        latch,journal,run=self.pending_recovery();original=g.record
+        def interrupt_journal(path,value):
+            result=original(path,value)
+            if path==journal and value.get('state')=='manually_verified_current':raise OSError('synthetic recovery interruption')
+            return result
+        with patch.object(g,'record',side_effect=interrupt_journal):
+            with self.assertRaisesRegex(OSError,'recovery interruption'):
+                a.acknowledge_current(Contract,self.base,journal,run,self.newreceipt,self.base/'policy')
+        self.assertEqual(json.loads(latch.read_text())['state'],'activation_unverified_manual_recovery_required')
+        self.assertEqual(json.loads(journal.read_text())['state'],'manually_verified_current')
+        a.acknowledge_current(Contract,self.base,journal,run,self.newreceipt,self.base/'policy')
+        self.assertFalse(latch.exists())
+        self.assertEqual(json.loads(journal.read_text())['state'],'manually_verified_current')
+    def test_latch_unlink_failure_is_retryable(self):
+        latch,journal,run=self.pending_recovery();original=Path.unlink
+        def fail_latch(path,*args,**kwargs):
+            if path==latch:raise OSError('synthetic latch unlink failure')
+            return original(path,*args,**kwargs)
+        with patch.object(Path,'unlink',fail_latch):
+            with self.assertRaisesRegex(OSError,'latch unlink failure'):
+                a.acknowledge_current(Contract,self.base,journal,run,self.newreceipt,self.base/'policy')
+        self.assertEqual(json.loads(latch.read_text())['state'],'manually_verified_current')
+        self.assertEqual(json.loads(journal.read_text())['state'],'manually_verified_current')
+        a.acknowledge_current(Contract,self.base,journal,run,self.newreceipt,self.base/'policy')
+        self.assertFalse(latch.exists())
     def test_interruption_before_pointer(self):
         self.ready();original=a.os.replace
         def replace(src,dst):
