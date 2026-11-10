@@ -11,7 +11,7 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     temp=Path(temp);clone=temp/'source'
     subprocess.run(['git','clone','--quiet','--no-hardlinks',str(source),str(clone)],check=True)
     shutil.copyfile(source/'tests/Fixtures/Generation/console.php',clone/'routes/console.php')
-    shutil.copyfile(source/'tests/Fixtures/Generation/GenerationProbe.php',clone/'app/Jobs/GenerationProbe.php')
+    shutil.copyfile(source/'tests/Fixtures/Generation/GenerationProbe.php.stub',clone/'app/Jobs/GenerationProbe.php')
     subprocess.run(['git','-C',str(clone),'add','.'],check=True)
     subprocess.run(['git','-C',str(clone),'-c','user.name=Synthetic','-c','user.email=synthetic@example.invalid','commit','-qm','Synthetic scheduler fixtures only'],check=True)
     d=module('d',clone/'tools/releases/derived_assets.py');c=d.contract(clone)

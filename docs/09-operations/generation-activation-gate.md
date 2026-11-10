@@ -77,7 +77,9 @@ needed for any later activation.
   abrupt os._exit before/after pointer, verifier failure and explicit recovery.
 - Remote test workflow composes the pinned #59/#61/#62 with this #63-based branch.
   It builds two actual artifacts with locked npm/Composer dependencies, seals and
-  verifies receipts, runs PHP/Laravel foreground/background and disposable database
+  verifies receipts, copies `GenerationProbe.php.stub` to the generated Laravel job
+  class (preserving the current main fixture convention), and runs PHP/Laravel
+  foreground/background and disposable database
   queue/cache, and exercises the new gate under a real scheduler lock.
 - Integrated HTTP verification uses the exact #57 verifier protocol with an explicit
   loopback HTTP transport injection against the real #59 PHP endpoint. It tests a
