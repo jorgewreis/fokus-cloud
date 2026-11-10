@@ -1,13 +1,12 @@
 # Gestao de Audiencias do Fokus Law
 
 O modulo comercial Gestao de Audiencias aparece no menu como `Audiencias`.
-Ele possui variantes para Advocacia e Setor Publico, com agenda, participantes,
+Ele possui variantes para o Setor Publico, com agenda, participantes,
 alertas, notificacoes, status e vinculos com processos, contatos, expedicoes e
 tarefas.
 
 ## Variantes
 
-- `audiencias-advocacia`: agenda de audiencias, alertas, anotacoes internas e controle de prazos do escritorio.
 - `audiencias-vara-criminal`: pauta e fluxo de audiencias criminais.
 - `audiencias-vara-civel`: pauta e fluxo de audiencias civeis.
 - `audiencias-juizado`: audiencias, conciliacao e procedimentos simplificados.

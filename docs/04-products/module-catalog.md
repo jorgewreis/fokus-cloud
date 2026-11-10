@@ -11,7 +11,7 @@ Este arquivo lista os modulos previstos, em planejamento ou implementados.
 | Fokus Law - Gestao de Contatos | Fokus Law | Nucleo funcional | Cadastro operacional disponível para Jurídico, Setor Público e Advocacia; integrações com módulos futuros e melhorias de evolução posterior. Menu: Contatos. |
 | Fokus Law - Gestao de Expedicoes | Fokus Law | V1 definida | Nucleo tecnico `expedicoes`, com variantes para cartorios, varas e orgaos publicos. Menu: Expedicoes. |
 | Fokus Law - Gestao de Tarefas | Fokus Law | V1 definida | Nucleo tecnico `tarefas`, com variantes para escritorios, unidades judiciais e orgaos publicos. Menu: Tarefas. |
-| Fokus Law - Gestao de Audiencias | Fokus Law | V1 definida | Nucleo tecnico `audiencias`, com variantes para advogados, varas, juizados e orgaos publicos. Menu: Audiencias. |
+| Fokus Law - Gestao de Audiencias | Fokus Law | V1 definida | Nucleo tecnico `audiencias`, com variantes para varas, juizados e orgaos publicos. Menu: Audiencias. |
 | CRM imobiliario | Fokus Lead | A definir | Modulos especificos do dominio imobiliario. |
 
 ## A complementar

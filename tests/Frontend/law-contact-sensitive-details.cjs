@@ -176,7 +176,34 @@ assert(!catalogContext.window.FokusLawBankCatalog.banks.some((bank) => bank.code
 assert(!catalogContext.window.FokusLawBankCatalog.banks.some((bank) => bank.code === '0'));
 assert(source.includes("Object.prototype.hasOwnProperty.call(contact, 'sensitive_details')"));
 assert(source.includes('if (protectedEditor && recordKind.value !== \'unit\') body.sensitive_details'));
-assert(source.includes('documentRows.children.length < 20'));
+assert(source.includes('documentRows.children.length < 10'));
+// Exercise the actual editor block and click handler, rather than only its source text.
+// The base server and UI both enforce ten documents; the former assertion of twenty was inconsistent.
+const documentContext = {
+  ...context,
+  window: { lawContactsCanSensitive: true },
+  contact: { documents: Array.from({ length: 9 }, (_, index) => ({ type: 'other', number: `SYNTHETIC-${index}` })) },
+  nature: { value: 'pf' },
+  DOCUMENT_TYPES_BY_NATURE: { pf: ['other'] },
+  documentRow: () => new Node(),
+};
+vm.createContext(documentContext);
+const documentsStart = source.indexOf('    let documentRows;');
+const documentsEnd = source.indexOf('    const protectedEditor', documentsStart);
+assert(documentsStart >= 0 && documentsEnd > documentsStart, 'the actual document editor block must exist');
+vm.runInContext(source.slice(documentsStart, documentsEnd) + '\nglobalThis.documentControls = { rows: documentRows, add: documentSection.content.children[1] };', documentContext);
+const documentControls = documentContext.documentControls;
+assert.equal(documentControls.rows.children.length, 9);
+documentControls.add.click();
+assert.equal(documentControls.rows.children.length, 10, 'the tenth document must be accepted');
+documentControls.add.click();
+assert.equal(documentControls.rows.children.length, 10, 'the eleventh document must be blocked');
+documentControls.add.click();
+assert.equal(documentControls.rows.children.length, 10, 'repeated clicks must not bypass the limit');
+documentControls.rows.children[0].remove();
+assert.equal(documentControls.rows.children.length, 9);
+documentControls.add.click();
+assert.equal(documentControls.rows.children.length, 10, 'removing a document must allow replacement up to ten');
 assert(source.includes('emailCount > 10'));
 assert(!source.includes('Não cadastre senhas, tokens ou credenciais bancárias.'));
 assert(/\.law-contact-repeat-row\s*>\s*\.law-contact-remove\s*\{[^}]*align-self:\s*end/s.test(styles), 'repeat-row remove buttons must align with the bottom of the controls');

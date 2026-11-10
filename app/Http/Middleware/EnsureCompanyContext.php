@@ -25,6 +25,7 @@ class EnsureCompanyContext
             ->where('membership.company_id', $companyId)
             ->where('membership.user_id', $request->user()->id)
             ->where('membership.status', 'ativo')
+            ->whereNull('membership.deleted_at')
             ->select('membership.*', 'roles.code as role')
             ->first();
 

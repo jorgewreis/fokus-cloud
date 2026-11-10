@@ -106,11 +106,16 @@ class VoucherRedemptionTest extends TestCase
     {
         [$user, $companyId] = $this->customerContext();
         Http::fake(['https://api.mercadopago.com/preapproval' => Http::response(['id' => 'preapproval-plan-extra', 'init_point' => 'https://mercadopago.test/checkout'], 201)]);
+        $publication = DB::table('catalog_publications')->where('product_id', DB::table('products')->where('code', 'law')->value('id'))->latest('version')->first();
+        $catalog = json_decode($publication->snapshot, true);
+        // Synthetic plan includes two modules; Tarefas exercises the published extra.
+        foreach ($catalog['plans'] as &$plan) if ($plan['code'] === 'law-advocacia') $plan['module_codes'] = ['processos-advocacia', 'contatos-advocacia'];
+        unset($plan);
+        DB::table('catalog_publications')->where('id', $publication->id)->update(['snapshot' => json_encode($catalog)]);
         $items = [
             ['module_code' => 'processos-advocacia', 'quantity' => 1],
             ['module_code' => 'contatos-advocacia', 'quantity' => 1],
             ['module_code' => 'tarefas-advocacia', 'quantity' => 1],
-            ['module_code' => 'audiencias-advocacia', 'quantity' => 1],
         ];
         $payload = ['product_code' => 'law', 'items' => $items, 'cycle' => 'monthly', 'selection_mode' => 'plan', 'plan_code' => 'law-advocacia'];
         $quote = $this->postJson('/api/catalog/law/quote', $payload)->assertOk()->json();
@@ -120,7 +125,7 @@ class VoucherRedemptionTest extends TestCase
         $snapshot = json_decode((string) DB::table('subscriptions')->where('id', $subscriptionId)->value('commercial_snapshot'), true);
         $this->assertEquals($quote['amount'], (float) $result->json('amount'));
         $this->assertEquals($quote['breakdown'], $snapshot['price_breakdown']);
-        $this->assertCount(4, $snapshot['items']);
+        $this->assertCount(3, $snapshot['items']);
         $this->assertEqualsWithDelta($quote['amount'], collect($snapshot['items'])->sum(fn (array $item) => $item['unit_price'] * $item['quantity']), 0.01);
         $this->assertSame('law-advocacia', $snapshot['plan_code']);
     }

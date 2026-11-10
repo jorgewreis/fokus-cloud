@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 class LawCaseManagementService
@@ -19,6 +21,47 @@ class LawCaseManagementService
         'promotor' => 'Promotor de Justiça', 'vitima' => 'Vítima',
         'testemunha_defesa' => 'Testemunha da Defesa', 'testemunha_denuncia' => 'Testemunha da Denúncia',
     ];
+
+    /** Shared ACL for process reads, including processes linked from other modules. */
+    public function visibleQuery(Request $request, Builder $query, string $alias = 'law_cases'): Builder
+    {
+        if (! preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/D', $alias)) throw new \InvalidArgumentException('Invalid table alias.');
+        $authorization = app(LawAuthorizationService::class);
+        if (! $authorization->can($request, 'law.cases.view')) return $query->whereRaw('1 = 0');
+        $judicialModule = DB::table('subscription_items as item')
+            ->join('subscriptions as subscription', 'subscription.id', '=', 'item.subscription_id')
+            ->join('products as product', 'product.id', '=', 'subscription.product_id')
+            ->join('modules as module', 'module.id', '=', 'item.module_id')
+            ->leftJoin('module_segments as segment', 'segment.module_id', '=', 'module.id')
+            ->whereNull('item.deleted_at')->where('subscription.company_id', $request->attributes->get('active_company_id'))
+            ->where(fn ($subscriptions) => SubscriptionAccess::usable($subscriptions))
+            ->whereIn('product.code', ['law', 'fokus-law'])->where('module.status', 'ativo')
+            ->where('module.publication_state', 'publicado')->where('module.module_code', 'processos')
+            ->where(function ($contexts): void {
+                $contexts->whereIn('module.context_code', ['judiciario', 'vara_criminal'])
+                    ->orWhere(fn ($advocacy) => $advocacy->where('module.context_code', 'escritorio')->where('segment.segment_code', 'advocacia'));
+            })->exists();
+        if (! $judicialModule) return $query->whereRaw('1 = 0');
+        $query->where($alias.'.company_id', $request->attributes->get('active_company_id'))
+            ->whereExists(function ($units) use ($alias): void {
+                $units->selectRaw('1')->from('law_units as visible_unit')
+                    ->whereColumn('visible_unit.company_id', $alias.'.company_id')
+                    ->whereColumn('visible_unit.id', $alias.'.law_unit_id')->where('visible_unit.status', 'ativo');
+            });
+        if (! $authorization->isCompanyAdmin($request)) {
+            $query->where($alias.'.law_unit_id', $authorization->activeUnitId($request) ?? '');
+        }
+        return $query->where(function ($visible) use ($request, $alias): void {
+            $visible->whereRaw("COALESCE($alias.internal_confidentiality_level, $alias.confidentiality_level) NOT IN (?, ?)", ['cnj_5', 'secret'])
+                ->orWhereExists(function ($access) use ($request, $alias): void {
+                    $access->selectRaw('1')->from('law_confidential_case_accesses as case_access')
+                        ->whereColumn('case_access.company_id', $alias.'.company_id')
+                        ->whereColumn('case_access.law_case_id', $alias.'.id')
+                        ->where('case_access.company_membership_id', $request->attributes->get('active_membership')?->id ?? '')
+                        ->whereNull('case_access.revoked_at');
+                });
+        });
+    }
 
     public function ensureUnitOptions(string $companyId, string $unitId, ?string $actorId = null): void
     {
@@ -120,31 +163,8 @@ class LawCaseManagementService
                 'version' => DB::raw('version + 1'),
                 'updated_at' => $checkedAt,
             ];
-            // Do not reinterpret historical local values. New CNJ classifications are
-            // applied automatically when the public API explicitly supplies level 0-5.
-            if ($successful && $cnjCode !== null && in_array($current->confidentiality_level, ['public', 'cnj_1', 'cnj_2', 'cnj_3', 'cnj_4', 'cnj_5'], true)) {
-                $updates['confidentiality_level'] = $cnjCode;
-                if (LawCnjConfidentiality::requiresNamedAccess($cnjCode)) {
-                    $responsibleUserId = $current->responsible_membership_id
-                        ? DB::table('company_memberships')->where('company_id', $companyId)->where('id', $current->responsible_membership_id)->value('user_id')
-                        : null;
-                    $grantorId = $actorId ?: ($responsibleUserId ? (string) $responsibleUserId : null);
-                    $membershipIds = collect([$current->responsible_membership_id])
-                        ->merge($actorId ? DB::table('company_memberships')->where('company_id', $companyId)->where('user_id', $actorId)->where('status', 'ativo')->whereNull('deleted_at')->pluck('id') : [])
-                        ->filter()->unique()->values();
-                    foreach ($membershipIds as $membershipId) {
-                        $existingAccess = DB::table('law_confidential_case_accesses')->where('company_id', $companyId)->where('law_case_id', $caseId)->where('company_membership_id', $membershipId)->first();
-                        if ($existingAccess) {
-                            if ($existingAccess->revoked_at !== null) DB::table('law_confidential_case_accesses')->where('id', $existingAccess->id)->update(['revoked_at' => null, 'granted_by' => $grantorId, 'updated_at' => $checkedAt]);
-                        } else {
-                            DB::table('law_confidential_case_accesses')->insert([
-                                'id' => PrefixedUlid::make('LCA'), 'company_id' => $companyId, 'law_case_id' => $caseId,
-                                'company_membership_id' => $membershipId, 'granted_by' => $grantorId, 'created_at' => $checkedAt, 'updated_at' => $checkedAt,
-                            ]);
-                        }
-                    }
-                }
-            }
+            // Synchronization must not change local confidentiality or grant access.
+            if ($successful && $cnjCode !== null) $updates['source_confidentiality_level'] = $cnjCode;
             if ($successful) $updates['last_datajud_synced_at'] = $checkedAt;
             if ($successful && ! array_key_exists('official_status_text', $result['metadata'] ?? []) && ! array_key_exists('official_status_text', $manual)) {
                 $updates['official_status_text'] = null;
@@ -155,6 +175,7 @@ class LawCaseManagementService
             }
             if ($successful) $updates['datajud_metadata'] = json_encode($official, JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
             DB::table('law_cases')->where('company_id', $companyId)->where('id', $caseId)->update($updates);
+            LawCaseWorkflow::refreshProjection($companyId, $caseId);
 
             $title = match ($result['status']) {
                 'synced' => 'Metadados do Datajud atualizados',
@@ -180,23 +201,35 @@ class LawCaseManagementService
     public function syncDjen(object $case, LawDjenClient $client): array
     {
         $result = $client->lookup((string) $case->case_number);
-        $checkedAt = now();
-        $updates = [
-            'djen_sync_status' => $result['status'],
-            'last_djen_checked_at' => $checkedAt,
-            'djen_sync_message' => $result['message'] ?? null,
-        ];
         $successful = in_array($result['status'], ['synced', 'not_found'], true);
-        $retryableCodes = ['rate_limited', 'timeout', 'service_unavailable', 'connection_failed', 'internal_error', 'invalid_response', 'invalid_result', 'incomplete_response', 'inconsistent_response', 'result_limit'];
-        $retryCount = (int) ($case->djen_retry_count ?? 0);
-        $updates['djen_retry_count'] = $successful ? 0 : min(65535, $retryCount + 1);
-        $updates['djen_retryable'] = $successful || in_array($result['code'] ?? '', $retryableCodes, true);
         if ($successful) {
-            $updates['djen_metadata'] = json_encode($result['metadata'] ?? [], JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
+            try {
+                $metadata = $result['metadata'] ?? [];
+                $metadata['publications'] = LawCaseWorkflow::publications($metadata);
+                $result['metadata'] = $metadata;
+            } catch (\Illuminate\Validation\ValidationException) {
+                $result = ['status' => 'error', 'code' => 'invalid_result', 'metadata' => [], 'message' => 'Publications lack sufficient identity; previous data preserved.'];
+                $successful = false;
+            }
         }
-        if ($successful) $updates['last_djen_synced_at'] = $checkedAt;
-
-        DB::table('law_cases')->where('company_id', $case->company_id)->where('id', $case->id)->update($updates);
+        DB::transaction(function () use ($case, $result, $successful): void {
+            $current = DB::table('law_cases')->where('company_id', $case->company_id)->where('id', $case->id)->lockForUpdate()->first();
+            if (! $current) return;
+            $checkedAt = now();
+            $retryableCodes = ['rate_limited', 'timeout', 'service_unavailable', 'connection_failed', 'internal_error', 'invalid_response', 'invalid_result', 'incomplete_response', 'inconsistent_response', 'result_limit'];
+            $updates = [
+                'djen_sync_status' => $result['status'], 'last_djen_checked_at' => $checkedAt,
+                'djen_sync_message' => $result['message'] ?? null,
+                'djen_retry_count' => $successful ? 0 : min(65535, (int) ($current->djen_retry_count ?? 0) + 1),
+                'djen_retryable' => $successful || in_array($result['code'] ?? '', $retryableCodes, true),
+            ];
+            if ($successful) {
+                $updates['djen_metadata'] = json_encode($result['metadata'], JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
+                $updates['last_djen_synced_at'] = $checkedAt;
+            }
+            DB::table('law_cases')->where('company_id', $case->company_id)->where('id', $case->id)->update($updates);
+            if ($successful) LawCaseWorkflow::refreshProjection((string) $case->company_id, (string) $case->id);
+        });
         return $result;
     }
 
@@ -236,7 +269,10 @@ class LawCaseManagementService
             'operational_status_label' => DB::table('law_case_status_options')->where('company_id', $case->company_id)->where('law_unit_id', $case->law_unit_id)->where('code', $case->operational_status)->value('label') ?? $case->operational_status,
             'operational_priority' => (string) $case->operational_priority,
             'procedural_priorities' => DB::table('law_case_procedural_priorities')->where('company_id', $case->company_id)->where('law_case_id', $case->id)->orderBy('code')->pluck('code')->all(),
-            'confidentiality_level' => (string) $case->confidentiality_level,
+            'confidentiality_level' => LawCnjConfidentiality::internalCode($case),
+            'internal_confidentiality_level' => LawCnjConfidentiality::internalCode($case),
+            'source_confidentiality_level' => $case->source_confidentiality_level ?? null,
+            'last_official_movement_at' => $this->timestamp($case->last_official_movement_at ?? null),
             'responsible_membership_id' => $case->responsible_membership_id,
             'responsible_name' => $case->responsible_name ?? null,
             'archive_reason' => $case->archive_reason,

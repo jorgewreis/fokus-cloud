@@ -1,0 +1,5 @@
+{
+  "baseline_sha": "26daac7c27d246eaef64bb3f0e59499376993f8f",
+  "recovery_strategy": "forward-fix-only",
+  "down_scope": "destructive-disposable-tests-only"
+}

@@ -360,28 +360,94 @@ class AdoptionLifecycle(unittest.TestCase):
 
 class WorkflowContract(unittest.TestCase):
     def test_production_gate_truth_table(self):
-        # Contract for the exact expression asserted below; GitHub service execution
-        # is still required before adoption, and is never simulated with real secrets.
-        for ref in ('refs/heads/main', 'refs/pull/55/merge'):
-            for validation in ('success', 'failure', 'cancelled', 'skipped'):
-                for classification in ('success', 'failure', 'cancelled', 'skipped'):
-                    for output in ('true', 'false', ''):
-                        publish = (ref == 'refs/heads/main' and validation == 'success'
-                                   and classification == 'success' and output == 'false')
-                        if publish:
-                            self.assertEqual((ref, validation, classification, output),
-                                             ('refs/heads/main', 'success', 'success', 'false'))
-                        if output == 'true' or validation != 'success' or classification != 'success':
-                            self.assertFalse(publish)
+        # Exact workflow condition below; SHA and Linux evidence are separately
+        # required inside the deploy job before any destination credentials.
+        import itertools
+        states = ('success', 'failure', 'cancelled', 'skipped')
+        for event, ref, validation, classification, output in itertools.product(
+                ('push', 'pull_request', 'workflow_dispatch'),
+                ('refs/heads/main', 'refs/pull/55/merge', 'refs/heads/candidate'),
+                states, states, ('true', 'false', '')):
+            publish = (event == 'workflow_dispatch' and ref == 'refs/heads/main'
+                       and validation == classification == 'success' and output == 'false')
+            self.assertEqual(publish, (event, ref, validation, classification, output) ==
+                             ('workflow_dispatch', 'refs/heads/main', 'success', 'success', 'false'))
 
-    def test_existing_job_bodies_preserved(self):
+    def test_existing_job_bodies_preserved_except_authorized_fpm_glue(self):
         original = subprocess.check_output(['git', 'show', '8dd9835053b7dc986343e8cfc44b5c35bdde920a:.github/workflows/deploy.yml'], cwd=ROOT).decode()
         current = (ROOT / '.github/workflows/deploy.yml').read_text()
-        self.assertEqual(original.split('  validate:\n')[1].split('  deploy:\n')[0], current.split('  validate:\n')[1].split('  deploy:\n')[0])
-        self.assertEqual(original.split('    environment: production')[1], current.split('    environment: production')[1])
+        test_step = """      - name: Test fail-closed FPM workflow integration without network
+        run: python3 -m unittest discover -s tests/Deployment -p 'test_fpm*.py' -v
+
+      - name: Test manual publication gate without GitHub or server access
+        run: python3 -m unittest discover -s tests/Deployment -p 'test_publication_gate.py' -v
+
+"""
+        expected_validate = original.split('  validate:\n')[1].split('  deploy:\n')[0]
+        expected_validate = expected_validate.replace(
+            '      - name: Generate content-addressed Fokus Law assets for tests',
+            test_step + '      - name: Generate content-addressed Fokus Law assets for tests')
+        self.assertEqual(expected_validate, current.split('  validate:\n')[1].split('  deploy:\n')[0])
+        preflight = """      - name: Preflight PHP-FPM before any remote mutation
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: python3 deploy/fpm_guard_cli.py preflight
+
+"""
+        activation = """      - name: Activate PHP-FPM with fail-closed guard
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: python3 deploy/fpm_guard_cli.py activate
+
+"""
+        expected_deploy = original.split('    environment: production')[1]
+        legacy_start = expected_deploy.index('      - name: Reload PHP-FPM opcache on server')
+        legacy_end = expected_deploy.index('      - name: Purge Cloudflare cache', legacy_start)
+        expected_deploy = expected_deploy[:legacy_start] + activation + expected_deploy[legacy_end:]
+        expected_deploy = expected_deploy.replace(
+            '      - name: Verify Law schema before publishing application code',
+            preflight + '      - name: Verify Law schema before publishing application code')
+        # Authorized manual gate: only read access, after preparation, before
+        # destination credentials. Cloudflare secrets become purge-step scoped.
+        cloudflare_env = """    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+"""
+        expected_deploy = expected_deploy.replace(cloudflare_env, '')
+        expected_deploy = expected_deploy.replace('      contents: read\n', '      contents: read\n      actions: read\n', 1)
+        expected_deploy = expected_deploy.replace('        uses: actions/checkout@v5\n',
+            '        uses: actions/checkout@v5\n        with:\n          persist-credentials: false\n', 1)
+        publication_gate = """      - name: Require exact main revision and latest successful Linux validation
+        env:
+          EXPECTED_CANDIDATE: ${{ inputs.candidate_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 deploy/publication_gate.py
+
+"""
+        expected_deploy = expected_deploy.replace('      - name: Configure SSH\n', publication_gate + '      - name: Configure SSH\n')
+        expected_deploy = expected_deploy.replace("""      - name: Purge Cloudflare cache
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ZONE_ID != '' }}
+        run: |
+""", """      - name: Purge Cloudflare cache
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ZONE_ID" ]; then
+            echo "Cloudflare purge not configured; skipping."
+            exit 0
+          fi
+""")
+        # No unrelated body changes are permitted: #56 schema, immutable assets,
+        # Composer, migrations, scheduler and purge remain exactly as reviewed.
+        self.assertEqual(expected_deploy, current.split('    environment: production')[1])
         self.assertEqual(original.split('concurrency:\n')[1].split('jobs:\n')[0], current.split('concurrency:\n')[1].split('jobs:\n')[0])
         self.assertIn('needs: [validate, classify]', current)
-        self.assertIn("github.ref == 'refs/heads/main' && needs.validate.result == 'success' && needs.classify.result == 'success' && needs.classify.outputs.docs_only == 'false'", current)
+        self.assertIn("if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.validate.result == 'success' && needs.classify.result == 'success' && needs.classify.outputs.docs_only == 'false'", current)
         self.assertIn('fetch-depth: 0', current)
         self.assertIn('persist-credentials: false', current)
         self.assertNotIn('secrets.', current.split('  classify:\n')[1].split('  validate:\n')[0])

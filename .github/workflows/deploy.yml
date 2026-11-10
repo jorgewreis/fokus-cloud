@@ -6,6 +6,11 @@ name: Deploy Fokus Cloud Laravel
       - main
   pull_request:
   workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact main commit with successful isolated Linux validation
+        required: true
+        type: string
 
 concurrency:
   group: ${{ github.event_name == 'pull_request' && format('law-validation-pr-{0}', github.event.pull_request.number) || 'production-deploy' }}
@@ -51,6 +56,12 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '24'
+
+      - name: Test fail-closed FPM workflow integration without network
+        run: python3 -m unittest discover -s tests/Deployment -p 'test_fpm*.py' -v
+
+      - name: Test manual publication gate without GitHub or server access
+        run: python3 -m unittest discover -s tests/Deployment -p 'test_publication_gate.py' -v
 
       - name: Generate content-addressed Fokus Law assets for tests
         run: npm run law:assets:prepare
@@ -114,20 +125,20 @@ jobs:
         run: npm run seo:check
 
   deploy:
-    if: github.ref == 'refs/heads/main' && needs.validate.result == 'success' && needs.classify.result == 'success' && needs.classify.outputs.docs_only == 'false'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.validate.result == 'success' && needs.classify.result == 'success' && needs.classify.outputs.docs_only == 'false'
     name: Publish Laravel application
     needs: [validate, classify]
     runs-on: ubuntu-latest
     environment: production
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
     permissions:
       contents: read
+      actions: read
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Setup Node for immutable Fokus Law assets
         uses: actions/setup-node@v5
@@ -136,6 +147,12 @@ jobs:
 
       - name: Generate immutable assets and one-shot deploy payload
         run: node tools/generate-fokus-law-assets.mjs --output-root "$GITHUB_WORKSPACE" --staging-dir "$RUNNER_TEMP/fokus-law-assets"
+
+      - name: Require exact main revision and latest successful Linux validation
+        env:
+          EXPECTED_CANDIDATE: ${{ inputs.candidate_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 deploy/publication_gate.py
 
       - name: Configure SSH
         env:
@@ -157,6 +174,13 @@ jobs:
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" exit
+
+      - name: Preflight PHP-FPM before any remote mutation
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: python3 deploy/fpm_guard_cli.py preflight
 
       - name: Verify Law schema before publishing application code
         env:
@@ -304,18 +328,22 @@ jobs:
         run: |
           ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; cd '$DEPLOY_PATH'; bash deploy/install-scheduler.sh; php artisan schedule:list --no-ansi | grep law-datajud"
 
-      - name: Reload PHP-FPM opcache on server
+      - name: Activate PHP-FPM with fail-closed guard
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-        run: |
-          ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "sudo -n systemctl reload clp-php-fpm.service || sudo -n systemctl restart clp-php-fpm.service" || echo "PHP-FPM reload requires server-side sudo; continuing deployment."
+        run: python3 deploy/fpm_guard_cli.py activate
 
       - name: Purge Cloudflare cache
-        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ZONE_ID != '' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
         run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ZONE_ID" ]; then
+            echo "Cloudflare purge not configured; skipping."
+            exit 0
+          fi
           curl --fail-with-body --request POST \
             "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
             --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \

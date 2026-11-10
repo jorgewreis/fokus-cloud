@@ -12,7 +12,7 @@ final class BrazilianDocuments
     public static function cpf(string $value): bool
     {
         $cpf = self::digits($value);
-        if (strlen($cpf) !== 11 || preg_match('/^(\d)\1+$/', $cpf)) {
+        if (preg_match('/^[0-9]{11}$/D', $cpf) !== 1 || preg_match('/^(\d)\1+$/', $cpf)) {
             return false;
         }
 

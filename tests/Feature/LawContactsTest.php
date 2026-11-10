@@ -19,6 +19,124 @@ class LawContactsTest extends TestCase
 {
     use RefreshDatabase;
 
+    private function importPreviewFor(array $rows): array
+    {
+        $csv = (new \App\Services\LawContactTransfer)->csv(array_map(fn ($name) => array_replace(array_fill_keys(\App\Services\LawContactTransfer::COLUMNS, ''), ['display_name' => $name, 'legal_nature' => 'pf']), $rows));
+        return $this->actingAs($this->admin)->withSession(['active_company_id' => $this->companyId])->postJson('/api/law/contacts/import/preview', ['format' => 'csv', 'content_base64' => base64_encode($csv)])->assertOk()->json();
+    }
+
+    public function test_import_review_replay_and_encrypted_batch(): void
+    {
+        $preview = $this->importPreviewFor(['Pessoa Teste', 'Pessoa Teste']);
+        $this->assertSame(['ready', 'duplicate'], array_column($preview['rows'], 'status'));
+        $stored = DB::table('law_contact_import_batches')->where('id', $preview['batch_id'])->first();
+        $this->assertStringNotContainsString('Pessoa Teste', $stored->payload_encrypted);
+        $this->assertStringContainsString('Pessoa Teste', Crypt::decryptString($stored->payload_encrypted));
+        $payload = ['batch_id' => $preview['batch_id'], 'rows' => [0], 'confirmed' => true];
+        $this->postJson('/api/law/contacts/import/commit', array_replace($payload, ['confirmed' => false]))->assertUnprocessable();
+        $this->postJson('/api/law/contacts/import/commit', array_replace($payload, ['rows' => [1]]))->assertConflict();
+        $this->postJson('/api/law/contacts/import/commit', $payload)->assertCreated()->assertJsonPath('imported_count', 1);
+        $this->postJson('/api/law/contacts/import/commit', $payload)->assertConflict();
+        $this->assertDatabaseCount('law_contact_import_batches', 0);
+        $this->assertSame(1, DB::table('law_contacts')->where('company_id', $this->companyId)->count());
+    }
+
+    public function test_import_cnpj_validation_and_document_ciphertext(): void
+    {
+        $csv = "display_name,legal_nature,legal_name,cpf,cnpj,email,phone\nOrganização Alfanumérica,pj,,,12.ABC.345/01DE-35,,\nOrganização Inválida,pj,,,11.222.333/0001-80,,\nPessoa Incompatível,pf,,,11.222.333/0001-81,,\n";
+        $batch = $this->actingAs($this->admin)->withSession(['active_company_id' => $this->companyId])->postJson('/api/law/contacts/import/preview', ['format' => 'csv', 'content_base64' => base64_encode($csv)])->assertOk()->json();
+        $this->assertSame(['ready', 'invalid', 'invalid'], array_column($batch['rows'], 'status'));
+        $this->postJson('/api/law/contacts/import/commit', ['batch_id' => $batch['batch_id'], 'rows' => [0], 'confirmed' => true])->assertCreated();
+        $ciphertext = DB::table('law_contact_documents')->where('company_id', $this->companyId)->value('document_number_encrypted');
+        $this->assertStringNotContainsString('12ABC34501DE35', $ciphertext);
+        $this->assertSame('12ABC34501DE35', Crypt::decryptString($ciphertext));
+    }
+
+    public function test_import_rejects_alphanumeric_cpf_without_creating_contacts(): void
+    {
+        $csv = "display_name,legal_nature,legal_name,cpf,cnpj,email,phone\nPessoa CPF Invalido,pf,,AAAAAAAAA00,,,\nPessoa CPF Valido,pf,,529.982.247-25,,,\n";
+        $batch = $this->actingAs($this->admin)->withSession(['active_company_id' => $this->companyId])
+            ->postJson('/api/law/contacts/import/preview', ['format' => 'csv', 'content_base64' => base64_encode($csv)])
+            ->assertOk()->json();
+        $this->assertSame(['invalid', 'ready'], array_column($batch['rows'], 'status'));
+        $this->postJson('/api/law/contacts/import/commit', ['batch_id' => $batch['batch_id'], 'rows' => [0], 'confirmed' => true])->assertConflict();
+        $this->assertSame(0, DB::table('law_contacts')->where('company_id', $this->companyId)->count());
+        $this->assertSame(0, DB::table('law_contact_documents')->where('company_id', $this->companyId)->count());
+        $this->assertDatabaseHas('law_contact_import_batches', ['id' => $batch['batch_id']]);
+        $this->postJson('/api/law/contacts/import/commit', ['batch_id' => $batch['batch_id'], 'rows' => [1], 'confirmed' => true])
+            ->assertCreated()->assertJsonPath('imported_count', 1);
+        $this->assertDatabaseMissing('law_contacts', ['company_id' => $this->companyId, 'display_name' => 'Pessoa CPF Invalido']);
+        $this->assertDatabaseHas('law_contacts', ['company_id' => $this->companyId, 'display_name' => 'Pessoa CPF Valido']);
+        $this->assertSame(1, DB::table('law_contacts')->where('company_id', $this->companyId)->count());
+        $ciphertext = DB::table('law_contact_documents')->where('company_id', $this->companyId)->value('document_number_encrypted');
+        $this->assertSame('52998224725', Crypt::decryptString($ciphertext));
+    }
+
+    public function test_import_rechecks_duplicates_and_rolls_back_selection(): void
+    {
+        $preview = $this->importPreviewFor(['Pessoa Primeira', 'Pessoa Segunda']);
+        $this->postJson('/api/law/contacts', ['display_name' => 'Pessoa Segunda', 'legal_nature' => 'pf'])->assertCreated();
+        $this->postJson('/api/law/contacts/import/commit', ['batch_id' => $preview['batch_id'], 'rows' => [0, 1], 'confirmed' => true])->assertConflict();
+        $this->assertDatabaseMissing('law_contacts', ['company_id' => $this->companyId, 'display_name' => 'Pessoa Primeira']);
+        $this->assertDatabaseHas('law_contact_import_batches', ['id' => $preview['batch_id']]);
+    }
+
+    public function test_import_batch_binding_expiry_tampering_and_capacity(): void
+    {
+        $preview = $this->importPreviewFor(['Pessoa Um', 'Pessoa Dois', 'Pessoa Tres', 'Pessoa Quatro']);
+        $payload = ['batch_id' => $preview['batch_id'], 'rows' => [0], 'confirmed' => true];
+        $this->postJson('/api/law/contacts/import/commit', array_replace($payload, ['rows' => [0, 1, 2, 3]]))->assertUnprocessable();
+        $this->assertSame(0, DB::table('law_contacts')->where('company_id', $this->companyId)->count());
+        $this->postJson('/api/law/contacts/import/commit', array_replace($payload, ['rows' => [99]]))->assertConflict();
+        $other = User::create(['id' => PrefixedUlid::make('USR'), 'name' => 'Other synthetic', 'cpf' => '52998224725', 'email' => 'other-transfer@example.test', 'password' => Hash::make('SyntheticOnly'), 'status' => 'ativa']);
+        DB::table('law_contact_import_batches')->where('id', $preview['batch_id'])->update(['user_id' => $other->id]);
+        $this->postJson('/api/law/contacts/import/commit', $payload)->assertConflict();
+        DB::table('law_contact_import_batches')->where('id', $preview['batch_id'])->update(['user_id' => $this->admin->id, 'expires_at' => now()->subMinute()]);
+        $this->postJson('/api/law/contacts/import/commit', $payload)->assertConflict();
+        $this->assertSame(0, DB::table('law_contacts')->where('company_id', $this->companyId)->count());
+    }
+
+    public function test_export_csv_pdf_roundtrip_excludes_private_details(): void
+    {
+        $this->actingAs($this->admin)->withSession(['active_company_id' => $this->companyId])->postJson('/api/law/contacts', ['display_name' => 'Pessoa Exportada', 'legal_nature' => 'pf', 'sensitive_details' => ['bank_accounts' => [['bank' => 'Banco Teste', 'account' => 'PRIVATE-ACCOUNT']]]])->assertCreated();
+        foreach (['csv', 'pdf'] as $format) {
+            $export = $this->getJson('/api/law/contacts/export?format='.$format)->assertOk()->assertJsonPath('exported_count', 1)->json();
+            $decoded = (new \App\Services\LawContactTransfer)->decode($format, $export['content_base64']);
+            $this->assertSame('Pessoa Exportada', $decoded[0]['display_name']);
+            $this->assertStringNotContainsString('PRIVATE-ACCOUNT', json_encode($decoded));
+            $this->postJson('/api/law/contacts/import/preview', ['format' => $format, 'content_base64' => $export['content_base64']])->assertOk()->assertJsonPath('rows.0.status', 'duplicate');
+        }
+    }
+
+    public function test_pagination_exceeds_old_limit_and_export_never_silently_truncates(): void
+    {
+        $id = $this->actingAs($this->admin)->withSession(['active_company_id' => $this->companyId])->postJson('/api/law/contacts', ['display_name' => 'Contato 000', 'legal_nature' => 'pf'])->assertCreated()->json('contact.id');
+        $prototype = (array) DB::table('law_contacts')->where('id', $id)->first();
+        for ($i = 1; $i <= 500; $i++) DB::table('law_contacts')->insert(array_replace($prototype, ['id' => PrefixedUlid::make('LCO'), 'display_name' => sprintf('Contato %03d', $i)]));
+        $this->getJson('/api/law/contacts?page=34&per_page=15')->assertOk()->assertJsonPath('pagination.total', 501)->assertJsonCount(6, 'contacts');
+        $this->getJson('/api/law/contacts/export?format=csv')->assertUnprocessable();
+    }
+
+    public function test_other_tenant_batch_and_contact_are_not_exposed(): void
+    {
+        $company = (array) DB::table('companies')->where('id', $this->companyId)->first();
+        $otherId = PrefixedUlid::make('COM');
+        DB::table('companies')->insert(array_replace($company, ['id' => $otherId, 'document_number' => '52998224725']));
+        $batch = $this->importPreviewFor(['Nome Confidencial Sintético']);
+        DB::table('law_contact_import_batches')->where('id', $batch['batch_id'])->update(['company_id' => $otherId]);
+        $response = $this->postJson('/api/law/contacts/import/commit', ['batch_id' => $batch['batch_id'], 'rows' => [0], 'confirmed' => true])->assertConflict();
+        $response->assertJsonMissing(['display_name' => 'Nome Confidencial Sintético']);
+        $contactId = $this->postJson('/api/law/contacts', ['display_name' => 'Contato Restrito', 'legal_nature' => 'pf'])->assertCreated()->json('contact.id');
+        // A fully isolated synthetic contact, without any cross-tenant children.
+        $prototype = (array) DB::table('law_contacts')->where('id', $contactId)->first();
+        $foreignId = PrefixedUlid::make('LCO');
+        DB::table('law_contacts')->insert(array_replace($prototype, ['id' => $foreignId, 'company_id' => $otherId, 'display_name' => 'Nome Outra Empresa']));
+        $this->getJson('/api/law/contacts/'.$foreignId)->assertNotFound();
+        $export = $this->getJson('/api/law/contacts/export?format=csv')->assertOk()->json();
+        $this->assertStringNotContainsString('Nome Outra Empresa', base64_decode($export['content_base64']));
+        $this->assertSame('ready', $this->importPreviewFor(['Nome Outra Empresa'])['rows'][0]['status']);
+    }
+
     private User $admin;
     private string $companyId;
     private string $sessionCompanyId;
@@ -445,6 +563,14 @@ class LawContactsTest extends TestCase
         $this->assertDatabaseHas('law_contact_addresses', ['law_contact_id' => $created['id'], 'street' => 'Rua Um']);
         $this->assertDatabaseHas('law_contact_documents', ['law_contact_id' => $created['id']]);
         $this->assertDatabaseHas('law_contact_channels', ['law_contact_id' => $created['id'], 'channel_value' => '71999990000', 'is_personal' => true]);
+        $export = $this->getJson('/api/law/contacts/export?format=csv')->assertOk()->json();
+        $rows = (new \App\Services\LawContactTransfer)->decode('csv', $export['content_base64']);
+        $this->assertSame('', $rows[0]['cpf']);
+        $this->assertSame('', $rows[0]['phone']);
+        $this->assertSame('maria@example.test', $rows[0]['email']);
+        $csv = "display_name,legal_nature,legal_name,cpf,cnpj,email,phone\nPessoa Sem Documento,pf,,,,,\n";
+        $preview = $this->postJson('/api/law/contacts/import/preview', ['format' => 'csv', 'content_base64' => base64_encode($csv)])->assertOk()->assertJsonPath('rows.0.status', 'ready')->json();
+        $this->postJson('/api/law/contacts/import/commit', ['batch_id' => $preview['batch_id'], 'rows' => [0], 'confirmed' => true])->assertCreated();
     }
 
     public function test_sensitive_details_are_encrypted_and_omission_preserves_them(): void
@@ -532,7 +658,12 @@ class LawContactsTest extends TestCase
         }
         $this->actingAs($this->admin)->withSession($session)->patchJson('/api/law/contacts/'.$contact['id'], [
             'documents' => [...$documents, ['type' => 'other', 'number' => 'OVER-LIMIT']],
-        ])->assertUnprocessable();
+        ])->assertUnprocessable()->assertJsonValidationErrors('documents');
+        $this->actingAs($this->admin)->withSession($session)->postJson('/api/law/contacts', [
+            'legal_nature' => 'pf', 'display_name' => 'Onze Documentos Sintéticos',
+            'documents' => [...$documents, ['type' => 'other', 'number' => 'OVER-LIMIT']],
+        ])->assertUnprocessable()->assertJsonValidationErrors('documents');
+        $this->assertDatabaseMissing('law_contacts', ['company_id' => $this->companyId, 'display_name' => 'Onze Documentos Sintéticos']);
         $this->actingAs($this->admin)->withSession($session)->patchJson('/api/law/contacts/'.$contact['id'], [
             'channels' => [...$channels, ['type' => 'email', 'value' => 'overflow@example.test']],
         ])->assertUnprocessable();

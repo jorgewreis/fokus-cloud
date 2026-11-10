@@ -4,6 +4,12 @@ namespace App\Services;
 
 class LawCnjConfidentiality
 {
+    /** The official source classification is informational and never an access rule. */
+    public static function internalCode(object $case): string
+    {
+        return (string) ($case->internal_confidentiality_level ?? $case->confidentiality_level ?? 'public');
+    }
+
     public static function codeForLevel(int $level): ?string
     {
         if ($level < 0 || $level > 5) return null;

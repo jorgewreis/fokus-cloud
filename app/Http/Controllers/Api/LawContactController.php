@@ -8,6 +8,7 @@ use App\Services\LawAuthorizationService;
 use App\Services\LawCaseManagementService;
 use App\Services\LawCnjNumbering;
 use App\Services\LawContactAgeTagService;
+use App\Services\LawContactTransfer;
 use App\Services\LawUsageMeter;
 use App\Services\PrefixedUlid;
 use App\Support\BrazilianDocuments;
@@ -31,6 +32,130 @@ class LawContactController extends Controller
     private const DOCUMENT_TYPES = ['cpf', 'cnpj', 'state_registration', 'oab', 'rg', 'registration', 'cadastro', 'voter_title', 'passport', 'pis', 'pasep', 'nit', 'nis', 'cadunico', 'cnh', 'cin', 'other'];
 
     private const SHARE_FIELDS = ['professional_channels', 'business_addresses', 'documents'];
+
+    public function export(Request $request, LawContactTransfer $transfer, LawAuthorizationService $authorization)
+    {
+        $companyId = (string) $request->attributes->get('active_company_id');
+        $this->assertModuleEnabled($companyId);
+        $data = $request->validate(['format' => ['required', Rule::in(['csv', 'pdf'])]]);
+        // Exports deliberately contain only the seven portable fields, never private details or shared records.
+        $canSensitive = $authorization->can($request, 'law.contacts.sensitive.view', $authorization->activeUnitId($request));
+        $contacts = DB::table('law_contacts')->where('company_id', $companyId)->where('record_kind', 'contact')
+            ->where('status', 'ativo')->whereNull('deleted_at')->whereNull('merged_into_id')
+            ->orderBy('display_name')->orderBy('id')->limit(LawContactTransfer::MAX_ROWS + 1)->get();
+        abort_if($contacts->count() > LawContactTransfer::MAX_ROWS, 422, 'A exportação suporta até 500 contatos.');
+        abort_if($contacts->isEmpty(), 422, 'Nenhum contato próprio disponível para exportar.');
+        $rows = $contacts->map(function ($contact) use ($companyId, $canSensitive): array {
+            $row = array_fill_keys(LawContactTransfer::COLUMNS, '');
+            $row['display_name'] = $contact->display_name; $row['legal_nature'] = $contact->legal_nature; $row['legal_name'] = $contact->legal_name ?? '';
+            if ($canSensitive) foreach (DB::table('law_contact_documents')->where('company_id', $companyId)->where('law_contact_id', $contact->id)->whereIn('document_type', ['cpf', 'cnpj'])->get() as $document) $row[$document->document_type] = Crypt::decryptString($document->document_number_encrypted);
+            $channels = DB::table('law_contact_channels')->where('company_id', $companyId)->where('law_contact_id', $contact->id)->whereNull('law_contact_department_id')->where('is_personal', false)->orderByDesc('is_primary')->orderBy('sort_order')->get();
+            $row['email'] = $channels->firstWhere('channel_type', 'email')?->channel_value ?? '';
+            $row['phone'] = $channels->first(fn ($c) => in_array($c->channel_type, ['phone', 'mobile', 'whatsapp'], true))?->channel_value ?? '';
+            return $row;
+        })->all();
+        $format = $data['format']; $content = $format === 'csv' ? $transfer->csv($rows) : $transfer->pdf($rows);
+        abort_if(strlen($content) > LawContactTransfer::MAX_BYTES, 422, 'A exportação excede 2 MiB.');
+        return response()->json(['filename' => 'fokus-contatos.'.$format, 'mime_type' => $format === 'csv' ? 'text/csv;charset=utf-8' : 'application/pdf', 'content_base64' => base64_encode($content), 'exported_count' => count($rows)]);
+    }
+
+    public function importPreview(Request $request, LawContactTransfer $transfer, LawAuthorizationService $authorization)
+    {
+        $companyId = (string) $request->attributes->get('active_company_id');
+        $this->assertModuleEnabled($companyId);
+        $input = $request->validate(['format' => ['required', Rule::in(['csv', 'pdf'])], 'content_base64' => ['required', 'string', 'max:2796204']]);
+        $rows = $transfer->decode($input['format'], $input['content_base64']);
+        $canSensitive = $authorization->can($request, 'law.contacts.sensitive.view', $authorization->activeUnitId($request));
+        $preview = []; $seen = [];
+        foreach ($rows as $index => $row) {
+            $status = $this->transferRowStatus($companyId, $row, $canSensitive);
+            $keys = $this->transferDuplicateKeys($row);
+            if ($status === 'ready' && array_intersect($keys, $seen)) $status = 'duplicate';
+            $seen = array_merge($seen, $keys);
+            $preview[] = ['index' => $index, 'display_name' => $row['display_name'], 'legal_nature' => $row['legal_nature'], 'status' => $status];
+        }
+        $batchId = PrefixedUlid::make('LCI'); $expiresAt = now()->addMinutes(30);
+        DB::table('law_contact_import_batches')->insert(['id' => $batchId, 'company_id' => $companyId, 'user_id' => $request->user()->id, 'payload_encrypted' => Crypt::encryptString(json_encode(['rows' => $rows, 'statuses' => array_column($preview, 'status')], JSON_THROW_ON_ERROR)), 'expires_at' => $expiresAt, 'created_at' => now(), 'updated_at' => now()]);
+        return response()->json(['batch_id' => $batchId, 'expires_at' => $expiresAt->toIso8601String(), 'rows' => $preview, 'summary' => array_count_values(array_column($preview, 'status'))]);
+    }
+
+    public function importCommit(Request $request, LawUsageMeter $usage, AuditRecorder $audit, LawAuthorizationService $authorization, LawContactAgeTagService $ageTags)
+    {
+        $companyId = (string) $request->attributes->get('active_company_id');
+        $this->assertModuleEnabled($companyId);
+        $input = $request->validate(['batch_id' => ['required', 'string', 'size:30'], 'rows' => ['required', 'array', 'min:1', 'max:500'], 'rows.*' => ['required', 'integer', 'min:0', 'max:499', 'distinct'], 'confirmed' => ['required', 'accepted']]);
+        abort_unless($input['confirmed'] === true, 422, 'Confirme a seleção antes de importar.');
+        $ids = DB::transaction(function () use ($request, $companyId, $input, $usage, $audit, $authorization, $ageTags): array {
+            // Same order as manual creation: subscription, company, batch, contact data.
+            $this->lockContactWriteScope($companyId);
+            $batch = DB::table('law_contact_import_batches')->where('id', $input['batch_id'])->where('company_id', $companyId)->where('user_id', $request->user()->id)->lockForUpdate()->first();
+            abort_unless($batch && Carbon::parse($batch->expires_at)->isFuture(), 409, 'Prévia indisponível ou expirada. Gere uma nova prévia.');
+            $usage->assertContactCapacityAvailable($companyId, count($input['rows']));
+            $payload = json_decode(Crypt::decryptString($batch->payload_encrypted), true, flags: JSON_THROW_ON_ERROR);
+            $canSensitive = $authorization->can($request, 'law.contacts.sensitive.view', $authorization->activeUnitId($request));
+            $selected = []; $seen = [];
+            foreach ($input['rows'] as $index) {
+                abort_unless(isset($payload['rows'][$index]) && ($payload['statuses'][$index] ?? null) === 'ready', 409, 'Seleção inválida. Gere uma nova prévia.');
+                $row = $payload['rows'][$index]; $keys = $this->transferDuplicateKeys($row);
+                abort_unless($this->transferRowStatus($companyId, $row, $canSensitive, true) === 'ready' && !array_intersect($keys, $seen), 409, 'Um contato selecionado mudou ou já existe. Nenhuma linha foi importada.');
+                $selected[] = $row; $seen = array_merge($seen, $keys);
+            }
+            $ids = [];
+            foreach ($selected as $row) {
+                $child = Request::create('/api/law/contacts', 'POST', $this->transferContactData($row));
+                $child->setUserResolver(fn () => $request->user());
+                $child->attributes->add($request->attributes->all());
+                $response = $this->store($child, $usage, $audit, $authorization, $ageTags);
+                $ids[] = $response->getData(true)['contact']['id'];
+            }
+            DB::table('law_contact_import_batches')->where('id', $batch->id)->delete();
+            return $ids;
+        });
+        return response()->json(['imported_count' => count($ids), 'contact_ids' => $ids], 201);
+    }
+
+    private function transferContactData(array $row): array
+    {
+        $data = ['display_name' => $row['display_name'], 'legal_nature' => $row['legal_nature'], 'legal_name' => $row['legal_name'] ?: null, 'documents' => [], 'channels' => []];
+        foreach (['cpf', 'cnpj'] as $type) if ($row[$type] !== '') $data['documents'][] = ['type' => $type, 'number' => $row[$type]];
+        if ($data['documents'] === []) unset($data['documents']);
+        foreach (['email', 'phone'] as $type) if ($row[$type] !== '') $data['channels'][] = ['type' => $type, 'value' => $row[$type], 'personal' => false, 'primary' => true];
+        return $data;
+    }
+
+    private function lockContactWriteScope(string $companyId): void
+    {
+        // Match LawUsageMeter's subscription selection; never acquire company before subscription.
+        DB::table('subscriptions as subscription')->join('products as product', 'product.id', '=', 'subscription.product_id')
+            ->where('subscription.company_id', $companyId)->whereIn('product.code', ['law', 'fokus-law'])
+            ->whereIn('subscription.status', ['ativa', 'aguardando_pagamento', 'inadimplente', 'suspensa', 'cancelamento_agendado'])
+            ->orderByDesc('subscription.created_at')->select('subscription.id')->lockForUpdate()->first();
+        DB::table('companies')->where('id', $companyId)->lockForUpdate()->first();
+    }
+
+    private function transferDuplicateKeys(array $row): array
+    {
+        $keys = ['name:'.mb_strtolower($this->normalizeName($row['display_name']))];
+        foreach (['cpf', 'cnpj'] as $type) if ($row[$type] !== '') $keys[] = $type.':'.BrazilianDocuments::digits($row[$type]);
+        return $keys;
+    }
+
+    private function transferRowStatus(string $companyId, array $row, bool $canSensitive, bool $lock = false): string
+    {
+        $validator = validator($row, ['display_name' => 'required|string|min:2|max:180', 'legal_nature' => ['required', Rule::in(['pf', 'pj'])], 'legal_name' => 'nullable|string|max:180', 'email' => 'nullable|email|max:255', 'phone' => 'nullable|string|max:80', 'cpf' => 'nullable|string|max:20', 'cnpj' => 'nullable|string|max:20']);
+        if ($validator->fails()) return 'invalid';
+        if (($row['cpf'] !== '' && (!$canSensitive || $row['legal_nature'] !== 'pf' || !BrazilianDocuments::cpf($row['cpf']))) || ($row['cnpj'] !== '' && (!$canSensitive || $row['legal_nature'] !== 'pj' || !BrazilianDocuments::cnpj($row['cnpj'])))) return 'invalid';
+        $nameQuery = DB::table('law_contacts')->where('company_id', $companyId)->where('record_kind', 'contact')->whereNull('deleted_at')->whereNull('merged_into_id')->whereRaw('LOWER(display_name) = ?', [mb_strtolower($this->normalizeName($row['display_name']))]);
+        if ($lock) $nameQuery->lockForUpdate();
+        if ($nameQuery->first(['id'])) return 'duplicate';
+        foreach (['cpf', 'cnpj'] as $type) {
+            if ($row[$type] === '') continue;
+            $query = DB::table('law_contact_documents')->where('company_id', $companyId)->where('document_fingerprint', $this->fingerprint(BrazilianDocuments::digits($row[$type])));
+            if ($lock) $query->lockForUpdate();
+            if ($query->first(['id'])) return 'duplicate';
+        }
+        return 'ready';
+    }
 
     public function lookupCep(string $postalCode)
     {
@@ -146,7 +271,7 @@ class LawContactController extends Controller
                     }
                 });
             })
-            ->orderBy('display_name')->limit(200)->get();
+            ->orderBy('display_name')->orderBy('id')->get();
 
         $contacts = $ownRows->map(fn ($row) => $this->contactPayload($companyId, $row, $canSensitive))->values()->all();
         if ($authorization->can($request, 'law.contacts.shared.view', $unitId)) {
@@ -407,7 +532,13 @@ class LawContactController extends Controller
 
         try {
         DB::transaction(function () use ($usage, $companyId, $contactId, $userId, $data, $request, $audit, $recordKind, $nature, $ageTags): void {
+            $this->lockContactWriteScope($companyId);
             $usage->assertContactCapacityAvailable($companyId, 1);
+            if ($recordKind === 'contact') {
+                $duplicate = DB::table('law_contacts')->where('company_id', $companyId)->where('record_kind', 'contact')->whereNull('deleted_at')->whereNull('merged_into_id')
+                    ->whereRaw('LOWER(display_name) = ?', [mb_strtolower($this->normalizeName($data['display_name']))])->lockForUpdate()->first(['id']);
+                abort_if($duplicate, 409, 'Já existe um contato com este nome.');
+            }
             DB::table('law_contacts')->insert([
                 'id' => $contactId, 'company_id' => $companyId, 'law_unit_id' => null, 'parent_contact_id' => $data['parent_contact_id'] ?? null,
                 'display_name' => $this->normalizeName($data['display_name']), 'acronym' => isset($data['acronym']) ? trim($data['acronym']) : null, 'legal_name' => isset($data['legal_name']) ? $this->normalizeName($data['legal_name']) : null,
@@ -1188,7 +1319,7 @@ class LawContactController extends Controller
                     ->where(fn ($builder) => $this->applySharingScope($builder, $policy))
                 ->when($profession !== '', fn ($builder) => $builder->whereExists(fn ($sub) => $sub->from('law_contact_profession_assignments as assignment')->join('law_contact_professions as profession', 'profession.id', '=', 'assignment.profession_id')->whereColumn('assignment.law_contact_id', 'law_contacts.id')->whereColumn('assignment.company_id', 'law_contacts.company_id')->whereColumn('profession.company_id', 'assignment.company_id')->where('profession.normalized_name', $profession)))
                 ->when($query !== '', fn ($builder) => $builder->where(fn ($q) => $q->where('display_name', 'like', '%'.$this->like($query).'%')->orWhere('legal_name', 'like', '%'.$this->like($query).'%')))
-                ->orderBy('display_name')->limit(100)->get();
+                ->orderBy('display_name')->orderBy('id')->get();
             $sourceName = DB::table('companies')->where('id', $policy->source_company_id)->value('display_name') ?: DB::table('companies')->where('id', $policy->source_company_id)->value('legal_name');
             foreach ($rows as $row) {
                 $payload = $this->contactPayload($policy->source_company_id, $row, $canSensitive);

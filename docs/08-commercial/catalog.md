@@ -94,7 +94,7 @@ internas ou variantes dos cinco modulos, e nao modulos comerciais
 Law independentes.
 
 Gestao de Audiencias aparece no menu como `Audiencias`. Suas variantes atendem
-escritorios, varas criminais, varas civeis, juizados e orgaos publicos.
+varas criminais, varas civeis, juizados e orgaos publicos.
 `audiencias_externo` e add-on dependente para acompanhamento externo por partes.
 
 O modulo `processos` deve ser comercializado como Gestao de Processos. No menu

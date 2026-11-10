@@ -3,28 +3,33 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BackofficeController;
 use App\Http\Controllers\Api\CompanyUserController;
-use App\Http\Controllers\Api\LawHearingController;
-use App\Http\Controllers\Api\LawCompanyProfileController;
-use App\Http\Controllers\Api\LawShellController;
-use App\Http\Controllers\Api\LeadShellController;
-use App\Http\Controllers\Api\LawUnitController;
-use App\Http\Controllers\Api\LawContactController;
-use App\Http\Controllers\Api\LawCaseController;
 use App\Http\Controllers\Api\LawAccessController;
+use App\Http\Controllers\Api\LawAdministrativeProcessController;
+use App\Http\Controllers\Api\LawCaseController;
+use App\Http\Controllers\Api\LawCompanyProfileController;
+use App\Http\Controllers\Api\LawContactController;
+use App\Http\Controllers\Api\LawHearingController;
 use App\Http\Controllers\Api\LawNotificationController;
+use App\Http\Controllers\Api\LawShellController;
 use App\Http\Controllers\Api\LawSubscriptionController;
+use App\Http\Controllers\Api\LawTaskController;
+use App\Http\Controllers\Api\LawUnitController;
+use App\Http\Controllers\Api\LeadShellController;
 use App\Http\Controllers\Api\PlatformAdminController;
 use App\Http\Controllers\Api\PlatformAuthController;
 use App\Http\Controllers\Api\PlatformSupportController;
 use App\Http\Controllers\Api\PlatformUserDirectoryController;
+use App\Http\Controllers\Api\ProductInterestBackofficeController;
+use App\Http\Controllers\Api\ProductInterestController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\UsageSnapshotController;
-use App\Http\Controllers\Api\ProductInterestController;
-use App\Http\Controllers\Api\ProductInterestBackofficeController;
 use App\Http\Middleware\EnsureCompanyContext;
+use App\Http\Middleware\EnsureLawAdministrativeProcessContext;
+use App\Http\Middleware\EnsureLawCaseContext;
 use App\Http\Middleware\EnsurePlatformAdmin;
 use App\Http\Middleware\EnsurePlatformPermission;
 use App\Http\Middleware\EnsurePlatformSuperadmin;
+use App\Http\Middleware\LawCaseTransaction;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/register-company', [AuthController::class, 'registerCompany'])->middleware('throttle:5,10,customer-registration');
@@ -66,30 +71,31 @@ Route::middleware('auth')->group(function () {
     Route::middleware(EnsureCompanyContext::class)->group(function () {
         Route::get('/law/shell-context', [LawShellController::class, 'context']);
         Route::get('/lead/shell-context', [LeadShellController::class, 'context']);
-        Route::prefix('law/admin-cases')->middleware([App\Http\Middleware\EnsureLawAdministrativeProcessContext::class, 'law.permission:law.cases.view', App\Http\Middleware\LawCaseTransaction::class])->group(function () {
-            Route::get('/search', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'search']);
-            Route::get('/dashboard', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'dashboard']);
-            Route::get('/references', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'references']);
-            Route::get('/', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'index']);
-            Route::post('/', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'store']);
-            Route::post('/types', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'saveType']);
-            Route::post('/options/{kind}', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'addOption']);
-            Route::delete('/options/{kind}/{id}', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'deactivateOption']);
-            Route::get('/{case}', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'show']);
-            Route::patch('/{case}', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'update']);
-            Route::post('/{case}/archive', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'archive']);
-            Route::post('/{case}/reopen', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'reopen']);
-            Route::post('/{case}/contacts', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'addContact']);
-            Route::delete('/{case}/contacts/{link}', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'removeContact']);
-            Route::post('/{case}/tags', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'addTag']);
-            Route::delete('/{case}/tags/{tag}', [App\Http\Controllers\Api\LawAdministrativeProcessController::class, 'removeTag']);
+        Route::prefix('law/admin-cases')->middleware([EnsureLawAdministrativeProcessContext::class, 'law.permission:law.cases.view', LawCaseTransaction::class])->group(function () {
+            Route::get('/search', [LawAdministrativeProcessController::class, 'search']);
+            Route::get('/dashboard', [LawAdministrativeProcessController::class, 'dashboard']);
+            Route::get('/references', [LawAdministrativeProcessController::class, 'references']);
+            Route::get('/', [LawAdministrativeProcessController::class, 'index']);
+            Route::post('/', [LawAdministrativeProcessController::class, 'store']);
+            Route::post('/types', [LawAdministrativeProcessController::class, 'saveType']);
+            Route::post('/options/{kind}', [LawAdministrativeProcessController::class, 'addOption']);
+            Route::delete('/options/{kind}/{id}', [LawAdministrativeProcessController::class, 'deactivateOption']);
+            Route::get('/{case}', [LawAdministrativeProcessController::class, 'show']);
+            Route::patch('/{case}', [LawAdministrativeProcessController::class, 'update']);
+            Route::post('/{case}/archive', [LawAdministrativeProcessController::class, 'archive']);
+            Route::post('/{case}/reopen', [LawAdministrativeProcessController::class, 'reopen']);
+            Route::post('/{case}/contacts', [LawAdministrativeProcessController::class, 'addContact']);
+            Route::delete('/{case}/contacts/{link}', [LawAdministrativeProcessController::class, 'removeContact']);
+            Route::post('/{case}/tags', [LawAdministrativeProcessController::class, 'addTag']);
+            Route::delete('/{case}/tags/{tag}', [LawAdministrativeProcessController::class, 'removeTag']);
         });
-        Route::prefix('law/cases')->middleware([App\Http\Middleware\EnsureLawCaseContext::class, 'law.permission:law.cases.view', App\Http\Middleware\LawCaseTransaction::class])->group(function () {
+        Route::prefix('law/cases')->middleware([EnsureLawCaseContext::class, 'law.permission:law.cases.view', LawCaseTransaction::class])->group(function () {
             Route::get('/search', [LawCaseController::class, 'search']);
             Route::get('/', [LawCaseController::class, 'index']);
             Route::get('/references', [LawCaseController::class, 'references']);
             Route::get('/dashboard', [LawCaseController::class, 'dashboard']);
             Route::get('/access-management', [LawCaseController::class, 'accessManagement']);
+            Route::post('/portfolio/import', [LawCaseController::class, 'importPortfolio'])->middleware('law.permission:law.cases.create');
             Route::post('/', [LawCaseController::class, 'store'])->middleware('law.permission:law.cases.create');
             Route::post('/options/statuses', [LawCaseController::class, 'createStatusOption']);
             Route::post('/options/tags', [LawCaseController::class, 'createTag']);
@@ -97,6 +103,7 @@ Route::middleware('auth')->group(function () {
             Route::put('/settings/cnj-defaults', [LawCaseController::class, 'updateCnjDefaults']);
             Route::delete('/options/{type}/{option}', [LawCaseController::class, 'deactivateOption']);
             Route::get('/{case}', [LawCaseController::class, 'show']);
+            Route::patch('/{case}/publications/{key}', [LawCaseController::class, 'updatePublication'])->middleware('law.permission:law.cases.update');
             Route::patch('/{case}', [LawCaseController::class, 'update'])->middleware('law.permission:law.cases.update');
             Route::post('/{case}/archive', [LawCaseController::class, 'archive'])->middleware('law.permission:law.cases.archive');
             Route::post('/{case}/reopen', [LawCaseController::class, 'reopen'])->middleware('law.permission:law.cases.reopen');
@@ -138,6 +145,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/law/contacts/quality/duplicates', [LawContactController::class, 'duplicateAnalysis'])->middleware('law.permission:law.contacts.view');
         Route::get('/law/contacts/quality/review', [LawContactController::class, 'qualityReview'])->middleware('law.permission:law.contacts.view');
         Route::post('/law/contacts/quality/suggestions', [LawContactController::class, 'duplicateSuggestions'])->middleware('law.permission:law.contacts.create');
+        Route::get('/law/contacts/export', [LawContactController::class, 'export'])->middleware('law.permission:law.contacts.view');
+        Route::post('/law/contacts/import/preview', [LawContactController::class, 'importPreview'])->middleware('law.permission:law.contacts.create');
+        Route::post('/law/contacts/import/commit', [LawContactController::class, 'importCommit'])->middleware('law.permission:law.contacts.create');
         Route::get('/law/contacts/{contactId}', [LawContactController::class, 'show'])->middleware('law.permission:law.contacts.view');
         Route::post('/law/contacts', [LawContactController::class, 'store'])->middleware('law.permission:law.contacts.create');
         Route::patch('/law/contacts/{contactId}', [LawContactController::class, 'update'])->middleware('law.permission:law.contacts.update');
@@ -150,6 +160,15 @@ Route::middleware('auth')->group(function () {
         Route::post('/subscriptions/checkout', [SubscriptionController::class, 'checkout']);
         Route::post('/subscriptions/{subscription}/change', [SubscriptionController::class, 'change']);
         Route::delete('/subscriptions/{subscription}', [SubscriptionController::class, 'destroy']);
+        Route::prefix('law/tasks')->group(function () {
+            Route::get('/', [LawTaskController::class, 'index'])->middleware('law.permission:law.tasks.view');
+            Route::get('/references', [LawTaskController::class, 'references'])->middleware('law.permission:law.tasks.view');
+            Route::get('/{task}', [LawTaskController::class, 'show'])->middleware('law.permission:law.tasks.view');
+            Route::post('/', [LawTaskController::class, 'store'])->middleware('law.permission:law.tasks.create');
+            Route::patch('/{task}', [LawTaskController::class, 'update'])->middleware('law.permission:law.tasks.update');
+            Route::post('/{task}/status', [LawTaskController::class, 'status'])->middleware('law.permission:law.tasks.status.update');
+            Route::delete('/{task}', [LawTaskController::class, 'destroy'])->middleware('law.permission:law.tasks.delete');
+        });
         Route::get('/law/hearings', [LawHearingController::class, 'index'])->middleware('law.permission:law.hearings.view');
         Route::post('/law/hearings', [LawHearingController::class, 'store'])->middleware('law.permission:law.hearings.create');
         Route::get('/law/hearings/{hearing}', [LawHearingController::class, 'show'])->middleware('law.permission:law.hearings.view');

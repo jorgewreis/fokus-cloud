@@ -109,6 +109,7 @@
 <script src="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-contacts.js') }}" defer></script>
 <script src="{{ \App\Support\FokusLawAssets::url('portal/assets/law-record-ui.js') }}" defer></script>
 <script src="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-processes.js') }}" defer></script>
+<script src="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-tasks.js') }}" defer></script>
 <script src="{{ \App\Support\FokusLawAssets::url('portal/assets/fokus-law-shell.js') }}" defer></script>
 <script src="{{ \App\Support\FokusLawAssets::url('assets/js/portal-profile.js') }}" defer></script>
 </body>
