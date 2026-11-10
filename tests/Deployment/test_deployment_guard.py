@@ -375,18 +375,57 @@ class WorkflowContract(unittest.TestCase):
                             self.assertFalse(publish)
 
     def test_existing_job_bodies_preserved(self):
-        original = subprocess.check_output(['git', 'show', '8dd9835053b7dc986343e8cfc44b5c35bdde920a:.github/workflows/deploy.yml'], cwd=ROOT).decode()
+        # The historical workflow is a baseline for validation coverage, not a
+        # byte-for-byte freeze of authorized operational hardening.
+        original = subprocess.check_output(
+            ['git', 'show', '8dd9835053b7dc986343e8cfc44b5bdde920a:.github/workflows/deploy.yml'],
+            cwd=ROOT).decode()
         current = (ROOT / '.github/workflows/deploy.yml').read_text()
-        self.assertEqual(original.split('  validate:\n')[1].split('  deploy:\n')[0], current.split('  validate:\n')[1].split('  deploy:\n')[0])
-        self.assertEqual(original.split('    environment: production')[1], current.split('    environment: production')[1])
-        self.assertEqual(original.split('concurrency:\n')[1].split('jobs:\n')[0], current.split('concurrency:\n')[1].split('jobs:\n')[0])
+
+        def section(text, begin, end):
+            return text.split(begin, 1)[1].split(end, 1)[0]
+
+        old_validate = section(original, '  validate:\n', '  deploy:\n')
+        validate = section(current, '  validate:\n', '  deploy:\n')
+        # Every original validation step must still be present and in order.
+        import re
+        names = lambda body: re.findall(r'^      - name: (.+)$', body, re.MULTILINE)
+        expected = names(old_validate)
+        actual = names(validate)
+        self.assertTrue(expected)
+        positions = [actual.index(name) for name in expected]
+        self.assertEqual(positions, sorted(positions))
+        self.assertEqual(len(positions), len(set(positions)))
+        self.assertIn('Test operational deployment contracts', actual)
+        self.assertIn("python3 -m unittest discover -s tests/Deployment -p 'test_operational_*.py' -v", validate)
+
+        # Preserve deployment serialization, strict gating and safe checkout.
+        self.assertEqual(
+            section(original, 'concurrency:\n', 'jobs:\n'),
+            section(current, 'concurrency:\n', 'jobs:\n'))
         self.assertIn('needs: [validate, classify]', current)
         self.assertIn("github.ref == 'refs/heads/main' && needs.validate.result == 'success' && needs.classify.result == 'success' && needs.classify.outputs.docs_only == 'false'", current)
+        self.assertIn('    environment: production', current)
         self.assertIn('fetch-depth: 0', current)
         self.assertIn('persist-credentials: false', current)
-        self.assertNotIn('secrets.', current.split('  classify:\n')[1].split('  validate:\n')[0])
+        self.assertNotIn('secrets.', section(current, '  classify:\n', '  validate:\n'))
+
+        # Hardened runtime verification is intentional. Never restore the old
+        # fail-open FPM reload, remove the preflight, or omit the final probe.
+        deploy = current.split('  deploy:\n', 1)[1]
+        self.assertIn('Require verifiable deployment prerequisites', deploy)
+        self.assertIn('Apply explicitly selected PHP-FPM reload policy', deploy)
+        self.assertIn('Verify application health and expected active release', deploy)
+        self.assertIn('Report each publication phase', deploy)
+        self.assertIn('deploy/reload-runtime.sh', deploy)
+        self.assertNotIn('continuing deployment.', deploy)
+
         quality = '.github/workflows/application-quality.yml'
-        self.assertEqual(subprocess.check_output(['git', 'show', '8dd9835053b7dc986343e8cfc44b5c35bdde920a:' + quality], cwd=ROOT), (ROOT / quality).read_bytes())
+        self.assertEqual(
+            subprocess.check_output(
+                ['git', 'show', '8dd9835053b7dc986343e8cfc44b5bdde920a:' + quality],
+                cwd=ROOT),
+            (ROOT / quality).read_bytes())
 
 
 if __name__ == '__main__':
