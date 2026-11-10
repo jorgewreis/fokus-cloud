@@ -375,43 +375,77 @@ class WorkflowContract(unittest.TestCase):
                             self.assertFalse(publish)
 
     def test_existing_job_bodies_preserved(self):
-        # The historical workflow is a baseline for validation coverage, not a
-        # byte-for-byte freeze of authorized operational hardening.
-        original = subprocess.check_output(
-            ['git', 'show', '8dd9835053b7dc986343e8cfc44b5bdde920a:.github/workflows/deploy.yml'],
-            cwd=ROOT).decode()
+        # Checkout on a pull request can be shallow. Test the current workflow
+        # against an explicit security contract rather than depending on a
+        # historical Git object that may not be available in that checkout.
         current = (ROOT / '.github/workflows/deploy.yml').read_text()
 
         def section(text, begin, end):
             return text.split(begin, 1)[1].split(end, 1)[0]
 
-        old_validate = section(original, '  validate:\n', '  deploy:\n')
-        validate = section(current, '  validate:\n', '  deploy:\n')
-        # Every original validation step must still be present and in order.
         import re
         names = lambda body: re.findall(r'^      - name: (.+)$', body, re.MULTILINE)
-        expected = names(old_validate)
+        validate = section(current, '  validate:\n', '  deploy:\n')
         actual = names(validate)
-        self.assertTrue(expected)
-        positions = [actual.index(name) for name in expected]
+        required_validation = (
+            'Checkout source',
+            'Setup Node for deterministic Fokus Law asset generation',
+            'Generate content-addressed Fokus Law assets for tests',
+            'Verify immutable asset retention filter',
+            'Setup PHP with SQLite',
+            'Prepare SQLite database for package discovery',
+            'Install PHP dependencies',
+            'Validate migrations and seed data on SQLite',
+            'Run automated tests',
+            'Install Node dependencies',
+            'Validate generated Fokus Styles contract',
+            'Install Chromium for visual Backoffice tests',
+            'Run visual Backoffice regression tests',
+            'Upload visual regression report',
+            'Verify Node.js runtime',
+            'Validate published SEO metadata',
+        )
+        positions = [actual.index(name) for name in required_validation]
         self.assertEqual(positions, sorted(positions))
-        self.assertEqual(len(positions), len(set(positions)))
+        self.assertEqual(len(actual), len(set(actual)))
         self.assertIn('Test operational deployment contracts', actual)
-        self.assertIn("python3 -m unittest discover -s tests/Deployment -p 'test_operational_*.py' -v", validate)
+        self.assertIn(
+            "python3 -m unittest discover -s tests/Deployment -p 'test_operational_*.py' -v",
+            validate)
+        for command in (
+            'npm run law:assets:prepare',
+            'node tests/Deployment/fokus-law-assets-rsync.mjs',
+            'php artisan migrate:fresh --seed --force --no-interaction',
+            'php artisan test',
+            'npm ci',
+            'npm run tokens:check',
+            'npm run backoffice:contract:check',
+            'npm run test:backoffice:visual',
+            'npm run seo:check',
+        ):
+            self.assertIn(command, validate)
 
-        # Preserve deployment serialization, strict gating and safe checkout.
-        self.assertEqual(
-            section(original, 'concurrency:\n', 'jobs:\n'),
-            section(current, 'concurrency:\n', 'jobs:\n'))
+        # Fail closed on non-main refs, validation failure and docs exemptions.
+        concurrency = section(current, 'concurrency:\n', 'jobs:\n')
+        self.assertIn("'production-deploy'", concurrency)
+        self.assertIn('cancel-in-progress: false', concurrency)
         self.assertIn('needs: [validate, classify]', current)
-        self.assertIn("github.ref == 'refs/heads/main' && needs.validate.result == 'success' && needs.classify.result == 'success' && needs.classify.outputs.docs_only == 'false'", current)
+        self.assertIn(
+            "github.ref == 'refs/heads/main' && needs.validate.result == 'success' && needs.classify.result == 'success' && needs.classify.outputs.docs_only == 'false'",
+            current)
         self.assertIn('    environment: production', current)
-        self.assertIn('fetch-depth: 0', current)
-        self.assertIn('persist-credentials: false', current)
-        self.assertNotIn('secrets.', section(current, '  classify:\n', '  validate:\n'))
+        classify = section(current, '  classify:\n', '  validate:\n')
+        self.assertIn('fetch-depth: 0', classify)
+        self.assertIn('persist-credentials: false', classify)
+        self.assertNotIn('secrets.', classify)
+        for command in (
+            'test_deployment_guard.py',
+            'tools/ci/validate-knowledge.py',
+            'tools/ci/classify-deployment.py',
+        ):
+            self.assertIn(command, classify)
 
-        # Hardened runtime verification is intentional. Never restore the old
-        # fail-open FPM reload, remove the preflight, or omit the final probe.
+        # Preserve safety improvements after the authorized operational merges.
         deploy = current.split('  deploy:\n', 1)[1]
         self.assertIn('Require verifiable deployment prerequisites', deploy)
         self.assertIn('Apply explicitly selected PHP-FPM reload policy', deploy)
@@ -420,12 +454,20 @@ class WorkflowContract(unittest.TestCase):
         self.assertIn('deploy/reload-runtime.sh', deploy)
         self.assertNotIn('continuing deployment.', deploy)
 
-        quality = '.github/workflows/application-quality.yml'
-        self.assertEqual(
-            subprocess.check_output(
-                ['git', 'show', '8dd9835053b7dc986343e8cfc44b5bdde920a:' + quality],
-                cwd=ROOT),
-            (ROOT / quality).read_bytes())
+        # The independent application quality workflow must retain its core
+        # test and build gates without requiring an unavailable old Git object.
+        quality = (ROOT / '.github/workflows/application-quality.yml').read_text()
+        for command in (
+            'composer install --no-interaction --prefer-dist',
+            'php artisan test',
+            'npm run build',
+            'npm run tokens:check',
+            'npm run seo:check',
+            'npm run backoffice:contract:check',
+        ):
+            self.assertIn(command, quality)
+        self.assertIn('vendor/bin/pint --test', quality)
+        self.assertIn('persist-credentials: false', quality)
 
 
 if __name__ == '__main__':
