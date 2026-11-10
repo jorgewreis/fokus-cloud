@@ -1,0 +1,24 @@
+  classify:
+    name: Classify deployment impact
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    outputs:
+      docs_only: ${{ steps.impact.outputs.docs_only }}
+    steps:
+      - name: Checkout complete comparison history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - name: Test conservative deployment classification
+        run: python3 -m unittest discover -s tests/Deployment -p 'test_deployment_guard.py' -v
+      - name: Validate engineering knowledge structure
+        run: python3 tools/ci/validate-knowledge.py
+      - name: Classify changes and compare candidate builds
+        id: impact
+        run: python3 tools/ci/classify-deployment.py
