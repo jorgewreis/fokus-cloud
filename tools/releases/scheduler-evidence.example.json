@@ -1,0 +1,14 @@
+{
+  "base": null,
+  "root": null,
+  "receipt_sha256": null,
+  "node_sha256": null,
+  "php_binary": null,
+  "php_binary_sha256": null,
+  "platform_verified": null,
+  "no_descendants_verified": null,
+  "expires_at_epoch": null,
+  "runtime_uid": null,
+  "runtime_gid": null,
+  "runtime_permissions_verified": null
+}
