@@ -44,6 +44,10 @@ class PublicationSummaryTests(unittest.TestCase):
         report, complete = SUMMARY.render(env)
         self.assertTrue(complete)
         self.assertIn("not requested (verify-only); no OPcache claim", report)
+        self.assertIn("not requested (verify-only); no unit or sudo claim", report)
+        env["PHASE_RELEASE"] = "failure"
+        self.assertFalse(SUMMARY.render(env)[1])
+        env = self.successful()
         env["FPM_RELOAD_MODE"] = "unreviewed"
         self.assertFalse(SUMMARY.render(env)[1])
 
@@ -63,7 +67,7 @@ class WorkflowBoundaryTests(unittest.TestCase):
         cls.deployment = cls.workflow.split("  deploy:\n", 1)[1]
 
     def test_policy_and_required_application_checks_remain(self):
-        self.assertIn("if: github.ref == 'refs/heads/main'", self.deployment)
+        self.assertIn("if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'", self.deployment)
         self.assertRegex(self.deployment, r"needs: (validate|\[[^\]]*validate[^\]]*\])")
         self.assertIn("environment: production", self.deployment)
         self.assertIn("cancel-in-progress: false", self.workflow)
@@ -78,9 +82,13 @@ class WorkflowBoundaryTests(unittest.TestCase):
         probe = self.deployment.index("verify-deployment.py probe-current")
         ssh = self.deployment.index("- name: Configure SSH")
         schema = self.deployment.index("- name: Verify Law schema")
+        publication = self.deployment.index("deploy/publication_gate.py")
+        fpm = self.deployment.index("deploy/fpm_guard_cli.py preflight")
+        self.assertLess(publication, preflight)
         self.assertLess(preflight, probe)
         self.assertLess(probe, ssh)
-        self.assertLess(ssh, schema)
+        self.assertLess(ssh, fpm)
+        self.assertLess(fpm, schema)
 
     def test_old_outer_echo_reproduces_false_green(self):
         result = subprocess.run(["bash", "-e", "-c", "(exit 255) || echo 'continuing deployment'"], capture_output=True, text=True)
@@ -88,17 +96,17 @@ class WorkflowBoundaryTests(unittest.TestCase):
 
     def test_workflow_preserves_ssh_failure_and_never_runs_restart(self):
         step = self.deployment.split("- name: Apply explicitly selected PHP-FPM reload policy", 1)[1].split("      - name:", 1)[0]
-        script = step.split("        run: |\n", 1)[1]
-        script = "\n".join(line[10:] for line in script.splitlines() if line.startswith("          "))
+        script = step.split("        run: ", 1)[1].strip()
+        self.assertEqual(script, "python3 deploy/fpm_guard_cli.py activate")
         with tempfile.TemporaryDirectory(prefix="fokus-synthetic-ssh-") as temporary:
             fake = Path(temporary) / "ssh"
-            fake.write_text('#!/bin/sh\ncat >/dev/null\nexit "$SYNTHETIC_SSH_STATUS"\n')
+            fake.write_text('#!/bin/sh\ncat >/dev/null\nif [ "$SYNTHETIC_SSH_STATUS" != 0 ]; then exit "$SYNTHETIC_SSH_STATUS"; fi\nprintf "Id=php8.4-fpm.service\\nLoadState=loaded\\nActiveState=active\\nCanReload=yes\\n"\n')
             fake.chmod(0o700)
             for code in (0, 1, 42, 255):
                 with self.subTest(exit_code=code):
                     env = {**os.environ, "PATH": temporary + ":" + os.environ["PATH"], "SYNTHETIC_SSH_STATUS": str(code), "DEPLOY_HOST": "synthetic.invalid", "DEPLOY_USER": "synthetic", "DEPLOY_PORT": "2222", "FPM_RELOAD_MODE": "reload", "FPM_SERVICE": "php8.4-fpm.service"}
                     result = subprocess.run(["bash", "-e", "-c", script], cwd=ROOT, env=env, capture_output=True, text=True)
-                    self.assertEqual(result.returncode, code)
+                    self.assertEqual(result.returncode, 0 if code == 0 else 1)
                     self.assertNotIn("continuing", result.stdout)
 
     def test_summary_is_always_and_release_after_runtime(self):

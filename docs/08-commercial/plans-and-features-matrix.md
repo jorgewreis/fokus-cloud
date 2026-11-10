@@ -78,7 +78,7 @@ configuravel conforme a unidade.
 
 | Modulo tecnico | Variante/contexto | Advocacia | Cartorio Criminal | Cartorio Civel | Juizado | Orgao Publico |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| `audiencias` | Gestao de Audiencias | X | X | X | X | X |
+| `audiencias` | Gestao de Audiencias |  | X | X | X | X |
 | `audiencias_externo` | Acompanhamento Externo de Audiencias |  | X | X | X | X |
 
 As demais capacidades jurídicas, como custas, documentos, assinatura,

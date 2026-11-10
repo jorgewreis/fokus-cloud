@@ -46,12 +46,27 @@ async function requiredAssets() {
   return [...required].sort();
 }
 
+// Exact reviewed workflow pin, independent of the file under test. This accepts
+// only the manual-main-only FEKS workflow plus the authorized FPM glue. It is not a YAML
+// heuristic and does not grant publication permission. Any change needs review.
+const reviewedWorkflowSha256 = '4f816cff25990bb666dcf72c5234ae84703adbf022339260784a5c604cdc2396';
+const deployWorkflowPath = path.join(repositoryRoot, '.github/workflows/deploy.yml');
+const reviewedWorkflow = await readFile(deployWorkflowPath, 'utf8');
+function assertReviewedWorkflow(workflow) {
+  assert.equal(digest(workflow.replaceAll('\r\n', '\n')), reviewedWorkflowSha256,
+    'Deployment contract changed: review publication policy before enabling any delivery test');
+  return 'guarded-manual-main-only';
+}
+async function deploymentMode(workflowPath = deployWorkflowPath) {
+  return assertReviewedWorkflow(await readFile(workflowPath, 'utf8'));
+}
+
 // Read the actual source-sync command, preserving filter order and rsync flags.
 // Only remove SSH transport and replace its two endpoints with local fixtures.
 // Fail closed if the workflow gains unfamiliar arguments rather than testing an
 // approximation that no longer matches production.
-async function deploymentArguments(runnerTemp) {
-  const workflow = await readFile(path.join(repositoryRoot, '.github/workflows/deploy.yml'), 'utf8');
+async function deploymentArguments(runnerTemp, workflow) {
+  workflow ??= await readFile(deployWorkflowPath, 'utf8');
   const step = workflow.split('      - name: Sync application source\n')[1]?.split('\n      - name: ')[0];
   assert.ok(step, 'The deploy workflow must contain its application source sync');
   const command = step.match(/^          rsync (?:[^\n]*\\\n)*[^\n]*/m)?.[0].trim();
@@ -90,11 +105,66 @@ test('Styles uses the unchanged published CSS/license and existing deployable de
       .map(match => new URL(match[1], origin + page).pathname);
     assert.ok(links.includes(PUBLISHED_CSS_PATH), `${page} must load the pinned published CSS`);
   }
-  await deploymentArguments('/tmp/styles-deploy-fixture');
   console.log(`Verified ${assets.length} Styles files and local dependencies, published CSS and MIT license hashes.`);
 });
 
+test('publication keeps the exact manual-main-only gate and fail-closed FPM glue', async () => {
+  assert.equal(await deploymentMode(), 'guarded-manual-main-only');
+});
+
+test('publication contract rejects missing, malformed and permissive workflows', async t => {
+  const mutations = {
+    empty: '',
+    malformed: reviewedWorkflow.replace('jobs:', 'jobs: ['),
+    'wrong indentation': reviewedWorkflow.replace('    environment: production', 'environment: production'),
+    'shared production queue': reviewedWorkflow.replace("format('law-validation-dispatch-{0}', github.run_id)", "'production-deploy'"),
+    'automatic publishing': reviewedWorkflow.replace("github.event_name == 'workflow_dispatch' && ", ''),
+    'missing validation proof': reviewedWorkflow.replace('python3 deploy/publication_gate.py', 'true'),
+    'branch publishing': reviewedWorkflow.replace("github.ref == 'refs/heads/main'", 'true'),
+    'ignored failure': reviewedWorkflow.replace('    runs-on:', '    continue-on-error: true\n    runs-on:'),
+    'disabled guard': reviewedWorkflow.replace('        run: python3 deploy/fpm_guard_cli.py preflight', '        if: false\n        run: python3 deploy/fpm_guard_cli.py preflight'),
+    'missing guard': reviewedWorkflow.replace('python3 deploy/fpm_guard_cli.py preflight', 'true'),
+    'reload fallback': reviewedWorkflow.replace('python3 deploy/fpm_guard_cli.py activate', 'python3 deploy/fpm_guard_cli.py activate || true'),
+    'write permission': reviewedWorkflow.replace('contents: read', 'contents: write'),
+    'extra publishing job': reviewedWorkflow + '  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo publish\n',
+    'sync step': reviewedWorkflow + '      - name: Sync again\n        run: rsync ./ remote:/\n',
+  };
+  for (const [name, workflow] of Object.entries(mutations)) {
+    await t.test(name, () => assert.throws(() => assertReviewedWorkflow(workflow),
+      /Deployment contract changed/));
+  }
+  const directory = await mkdtemp(path.join(tmpdir(), 'styles-missing-workflow-'));
+  try {
+    await t.test('removed workflow', async () => {
+      await assert.rejects(deploymentMode(path.join(directory, 'deploy.yml')), { code: 'ENOENT' });
+    });
+  } finally { await rm(directory, { recursive: true, force: true }); }
+  assert.equal(assertReviewedWorkflow(reviewedWorkflow.replaceAll('\n', '\r\n')), 'guarded-manual-main-only');
+});
+
+// Synthetic parser fixtures only: these are not an approved deploy workflow,
+// do not enable a delivery mode and do not prove rsync execution or transfer.
+test('retained rsync parser preserves filter order and rejects unknown arguments', async () => {
+  const fixture = args => `      - name: Sync application source
+        run: |
+          rsync ${args} ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+      - name: End
+`;
+  const flags = '-rlDzvc --delete-delay --filter="merge $RUNNER_TEMP/fokus-law-assets/protect.rules" --include="public/styles/assets/***" --exclude="vendor/" -e "ssh -p 22"';
+  assert.deepEqual(await deploymentArguments('/fixture', fixture(flags)), [
+    '-rlDzvc', '--delete-delay', '--filter', 'merge /fixture/fokus-law-assets/protect.rules',
+    '--include', 'public/styles/assets/***', '--exclude', 'vendor/',
+  ]);
+  await assert.rejects(deploymentArguments('/fixture', fixture(flags + ' --unknown-publish')), /Review new deploy argument/);
+  await assert.rejects(deploymentArguments('/fixture', fixture(flags.replace('--exclude="vendor/"', ''))), /vendor exclusion/);
+  await assert.rejects(deploymentArguments('/fixture', fixture(flags.replace('$RUNNER_TEMP', '$UNKNOWN'))), /Unresolved deploy filter variable/);
+  await assert.rejects(deploymentArguments('/fixture', 'name: no source sync\n'), /application source sync/);
+});
+
 test('actual deploy rsync filters deliver Styles assets and still exclude vendor directories', async t => {
+  assert.equal(await deploymentMode(), 'guarded-manual-main-only');
+  // Exercise the restored filters only between temporary local directories.
+  // A manual-main-only workflow contract is not authorization to use its SSH target.
   const version = spawnSync('rsync', ['--version'], { encoding: 'utf8' });
   if (version.error?.code === 'ENOENT' && !process.env.CI) {
     t.skip('rsync is unavailable locally; required in CI. Static/hash contracts are tested separately.');

@@ -12,7 +12,7 @@ if [[ "$mode" != reload ]] || [[ ! "$service" =~ ^(clp-php-fpm|php([0-9]+\.[0-9]
   exit 64
 fi
 # Do not print sudo/systemctl output: host configuration may contain sensitive data.
-if sudo -n systemctl reload -- "$service" >/dev/null 2>&1; then
+if sudo -n -- /usr/bin/systemctl reload -- "$service" >/dev/null 2>&1; then
   printf '%s\n' 'runtime_reload=completed; active release still requires HTTP verification'
 else
   status=$?

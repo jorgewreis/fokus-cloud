@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\ManagesLawCaseWorkflow;
 use App\Http\Controllers\Controller;
 use App\Jobs\SyncLawCaseDatajud;
 use App\Jobs\SyncLawCaseDjen;
 use App\Services\AuditRecorder;
 use App\Services\LawAuthorizationService;
 use App\Services\LawCaseManagementService;
+use App\Services\LawCnjConfidentiality;
 use App\Services\LawCnjNumbering;
 use App\Services\LawDatajudClient;
 use App\Services\PrefixedUlid;
@@ -15,14 +17,18 @@ use App\Support\LawDjenClassName;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Str;
 
 class LawCaseController extends Controller
 {
+    use ManagesLawCaseWorkflow;
+
     private const PRIORITIES = ['normal', 'high', 'urgent'];
+
     private const PROCEDURAL_PRIORITIES = ['child_adolescent', 'elderly', 'elderly_80', 'defendant_detained', 'domestic_violence', 'disability'];
+
     private const PROCEDURAL_PRIORITY_LABELS = [
         'child_adolescent' => 'Criança ou adolescente',
         'elderly' => 'Pessoa idosa (60 anos ou mais)',
@@ -31,7 +37,9 @@ class LawCaseController extends Controller
         'domestic_violence' => 'Violência doméstica',
         'disability' => 'Pessoa com deficiência',
     ];
+
     private const CONFIDENTIALITY = ['public', 'cnj_1', 'cnj_2', 'cnj_3', 'cnj_4', 'cnj_5', 'secret', 'confidential'];
+
     private const RELATION_TYPES = ['dependent', 'apenso'];
 
     public function search(Request $request, LawCaseManagementService $cases)
@@ -45,7 +53,9 @@ class LawCaseController extends Controller
             ->where('law_cases.company_id', $companyId)
             ->where('law_cases.operational_status', '!=', 'archived')
             ->where(function ($query) use ($term, $digits): void {
-                if ($digits !== '') $query->where('law_cases.case_number', 'like', '%'.$digits.'%');
+                if ($digits !== '') {
+                    $query->where('law_cases.case_number', 'like', '%'.$digits.'%');
+                }
                 $query->orWhereExists(function ($party) use ($term): void {
                     $party->selectRaw('1')->from('law_case_contacts as link')
                         ->join('law_contacts as contact', function ($join): void {
@@ -91,23 +101,29 @@ class LawCaseController extends Controller
             ->leftJoin('users as responsible_user', 'responsible_user.id', '=', 'responsible_membership.user_id')
             ->where('law_cases.company_id', $companyId);
 
-        if (! $request->boolean('include_archived')) $query->where('law_cases.operational_status', '!=', 'archived');
+        if (! $request->boolean('include_archived')) {
+            $query->where('law_cases.operational_status', '!=', 'archived');
+        }
         $request->validate(['q' => ['nullable', 'string', 'max:100']]);
         $term = trim((string) $request->query('q', ''));
         $digits = preg_replace('/\D+/', '', $term) ?: '';
-        if ($term !== '') $query->where(function ($matches) use ($term, $digits): void {
-            if ($digits !== '') $matches->where('law_cases.case_number', 'like', '%'.$digits.'%');
-            $matches->orWhereExists(function ($party) use ($term): void {
-                $party->selectRaw('1')->from('law_case_contacts as link')
-                    ->join('law_contacts as contact', function ($join): void {
-                        $join->on('contact.id', '=', 'link.law_contact_id')->on('contact.company_id', '=', 'link.company_id');
-                    })
-                    ->whereColumn('link.law_case_id', 'law_cases.id')
-                    ->whereColumn('link.company_id', 'law_cases.company_id')
-                    ->whereNull('contact.deleted_at')->whereNull('contact.merged_into_id')
-                    ->where('contact.display_name', 'like', '%'.$term.'%');
+        if ($term !== '') {
+            $query->where(function ($matches) use ($term, $digits): void {
+                if ($digits !== '') {
+                    $matches->where('law_cases.case_number', 'like', '%'.$digits.'%');
+                }
+                $matches->orWhereExists(function ($party) use ($term): void {
+                    $party->selectRaw('1')->from('law_case_contacts as link')
+                        ->join('law_contacts as contact', function ($join): void {
+                            $join->on('contact.id', '=', 'link.law_contact_id')->on('contact.company_id', '=', 'link.company_id');
+                        })
+                        ->whereColumn('link.law_case_id', 'law_cases.id')
+                        ->whereColumn('link.company_id', 'law_cases.company_id')
+                        ->whereNull('contact.deleted_at')->whereNull('contact.merged_into_id')
+                        ->where('contact.display_name', 'like', '%'.$term.'%');
+                });
             });
-        });
+        }
 
         $summaryQuery = clone $query;
         $classRows = $summaryQuery->selectRaw('law_cases.case_class_code, law_cases.case_class, COUNT(*) as total')
@@ -115,12 +131,13 @@ class LawCaseController extends Controller
         $classNames = $this->classNames($companyId, $classRows->pluck('case_class_code')->filter()->unique()->all());
         $summary = $classRows->groupBy(function (object $row) use ($classNames): string {
             $code = (string) ($row->case_class_code ?? '');
+
             return $classNames[$code] ?? ($row->case_class ?: 'Não informada');
         })->map(fn ($rows, string $label): array => ['label' => $label, 'total' => (int) $rows->sum('total')])
             ->sortBy('label')->values();
 
         $page = max(1, (int) $request->query('page', 1));
-        $counts = (clone $query)->selectRaw("COUNT(DISTINCT law_cases.law_unit_id) as units, SUM(CASE WHEN law_cases.confidentiality_level IN ('cnj_5', 'secret') THEN 1 ELSE 0 END) as secret")->first();
+        $counts = (clone $query)->selectRaw("COUNT(DISTINCT law_cases.law_unit_id) as units, SUM(CASE WHEN COALESCE(law_cases.internal_confidentiality_level, law_cases.confidentiality_level) IN ('cnj_5', 'secret') THEN 1 ELSE 0 END) as secret")->first();
         $recentRows = (clone $query)->select('law_cases.id', 'law_cases.case_number', 'law_cases.case_class_code', 'law_cases.case_class', 'law_cases.created_at')->orderByDesc('law_cases.created_at')->orderByDesc('law_cases.id')->limit(5)->get();
         $recentNames = $this->classNames($companyId, $recentRows->pluck('case_class_code')->filter()->unique()->all());
         $recent = $recentRows->map(fn ($row) => ['id' => $row->id, 'case_number_formatted' => $cases->formatCaseNumber($row->case_number), 'case_class' => $recentNames[(string) ($row->case_class_code ?? '')] ?? ($row->case_class ?: 'Não informada'), 'created_at' => $row->created_at]);
@@ -128,7 +145,7 @@ class LawCaseController extends Controller
         $paginator = $query->select('law_cases.*', 'unit.name as unit_name', 'responsible_user.name as responsible_name')
             ->orderByDesc('law_cases.created_at')->orderByDesc('law_cases.id')
             ->paginate($perPage, ['*'], 'page', $page);
-        $confidentialityAlertCount = (clone $query)->where('law_cases.confidentiality_level', 'public')
+        $confidentialityAlertCount = (clone $query)->whereRaw('COALESCE(law_cases.internal_confidentiality_level, law_cases.confidentiality_level) = ?', ['public'])
             ->whereExists(function ($priorities): void {
                 $priorities->selectRaw('1')->from('law_case_procedural_priorities as priority')
                     ->whereColumn('priority.company_id', 'law_cases.company_id')->whereColumn('priority.law_case_id', 'law_cases.id')
@@ -158,9 +175,12 @@ class LawCaseController extends Controller
     /** Resolve display labels without correlated subqueries in aggregate SQL. */
     private function classNames(string $companyId, array $codes): array
     {
-        if ($codes === []) return [];
+        if ($codes === []) {
+            return [];
+        }
         $global = DB::table('law_cnj_metadata_options')->where('type', 'class')->where('is_active', true)->whereIn('code', $codes)->pluck('name', 'code');
         $local = DB::table('law_case_metadata_options')->where('company_id', $companyId)->where('type', 'class')->whereIn('code', $codes)->pluck('name', 'code');
+
         return $global->union($local)->all();
     }
 
@@ -177,13 +197,16 @@ class LawCaseController extends Controller
         $companyId = (string) $request->attributes->get('active_company_id');
         $unit = DB::table('law_units')->where('company_id', $companyId)->where('id', $data['law_unit_id'])->where('status', 'ativo')->first();
         abort_unless($unit, 404, 'Unidade não encontrada.');
+        $this->assertUnitPermission($request, (string) $unit->id, 'law.cases.view');
         $cases->ensureUnitOptions($companyId, (string) $unit->id, (string) $request->user()->id);
 
         $contacts = DB::table('law_contacts')->where('company_id', $companyId)->where('record_kind', 'contact')->where('status', 'ativo')
             ->whereNull('deleted_at')->whereNull('merged_into_id')
             ->where(fn ($query) => $query->whereNull('law_unit_id')->orWhere('law_unit_id', $unit->id));
         $search = trim((string) ($data['contact_search'] ?? ''));
-        if ($search !== '') $contacts->where('display_name', 'like', '%'.$search.'%');
+        if ($search !== '') {
+            $contacts->where('display_name', 'like', '%'.$search.'%');
+        }
 
         $catalogOptions = fn (string $type) => DB::table('law_cnj_metadata_options')->where('type', $type)->where('is_active', true)->orderBy('code')->get(['code', 'name'])
             ->concat(DB::table('law_case_metadata_options')->where('company_id', $companyId)->where('type', $type)->orderBy('code')->get(['code', 'name']))
@@ -194,7 +217,7 @@ class LawCaseController extends Controller
         }
 
         return response()->json([
-            'units' => DB::table('law_units')->where('company_id', $companyId)->where('status', 'ativo')->orderBy('name')->get(['id', 'name']),
+            'units' => app(LawAuthorizationService::class)->accessibleUnits($request),
             'selected_unit_id' => (string) $unit->id,
             'can_configure' => $this->mayManageUnit($request, (string) $unit->id),
             'statuses' => DB::table('law_case_status_options')->where('company_id', $companyId)->where('law_unit_id', $unit->id)->where('is_active', true)->orderBy('sort_order')->orderBy('label')->get(['id', 'code', 'label', 'is_system']),
@@ -212,7 +235,7 @@ class LawCaseController extends Controller
             'priorities' => self::PRIORITIES,
             'context_code' => (string) $request->attributes->get('law_case_context_code', ''),
             'procedural_priorities' => collect(self::PROCEDURAL_PRIORITY_LABELS)->only($this->proceduralPrioritiesFor($request))->map(fn (string $label, string $code): array => ['code' => $code, 'label' => $label])->values(),
-            'confidentiality_levels' => collect(\App\Services\LawCnjConfidentiality::levels())->map(fn (array $level): array => ['code' => \App\Services\LawCnjConfidentiality::codeForLevel($level['level']), 'label' => $level['label'], 'description' => $level['description']])->all(),
+            'confidentiality_levels' => collect(LawCnjConfidentiality::levels())->map(fn (array $level): array => ['code' => LawCnjConfidentiality::codeForLevel($level['level']), 'label' => $level['label'], 'description' => $level['description']])->all(),
         ]);
     }
 
@@ -225,11 +248,13 @@ class LawCaseController extends Controller
         $classNames = $this->classNames((string) $request->attributes->get('active_company_id'), $classRows->pluck('case_class_code')->filter()->unique()->all());
         $classes = $classRows->groupBy(function (object $row) use ($classNames): string {
             $code = (string) ($row->case_class_code ?? '');
+
             return $classNames[$code] ?? ($row->case_class ?: 'Não informada');
         })->map(fn ($rows, string $label): array => ['label' => $label, 'total' => (int) $rows->sum('total')])
             ->sort(fn (array $a, array $b): int => ($b['total'] <=> $a['total']) ?: strcmp($a['label'], $b['label']))->values();
         $recent = (clone $query)->orderByDesc('created_at')->orderByDesc('id')->limit(5)->get(['id', 'case_number'])
             ->map(fn ($row) => ['id' => $row->id, 'case_number_formatted' => $cases->formatCaseNumber($row->case_number)]);
+
         return response()->json(['summary' => ['cases_total' => $classes->sum('total'), 'by_class' => $classes->values(), 'recent' => $recent]]);
     }
 
@@ -246,6 +271,7 @@ class LawCaseController extends Controller
         $companyId = (string) $request->attributes->get('active_company_id');
         $unit = DB::table('law_units')->where('company_id', $companyId)->where('id', $data['law_unit_id'])->where('status', 'ativo')->first();
         abort_unless($unit, 422, 'Selecione uma unidade ativa da empresa.');
+        $this->assertUnitPermission($request, (string) $unit->id, 'law.cases.create');
         $caseNumber = $this->normalizeCaseNumber($data['case_number'], $companyId, (string) $unit->id);
         $this->assertValidCnj($caseNumber);
         $comarca = $cases->comarcaForCaseNumber($caseNumber);
@@ -259,7 +285,7 @@ class LawCaseController extends Controller
         $userId = (string) $request->user()->id;
         $now = now();
         try {
-            DB::transaction(function () use ($data, $caseNumber, $comarca, $companyId, $unit, $id, $userId, $now, $class, $subjects, $subjectCodes): void {
+            DB::transaction(function () use ($data, $caseNumber, $comarca, $companyId, $unit, $id, $userId, $now, $class, $subjectCodes): void {
                 DB::table('law_cases')->insert([
                     'id' => $id, 'company_id' => $companyId, 'law_unit_id' => $unit->id, 'case_number' => $caseNumber,
                     'case_class' => null, 'case_class_code' => $class['code'] ?? null,
@@ -268,7 +294,7 @@ class LawCaseController extends Controller
                     'subjects' => json_encode($subjectCodes, JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]',
                     'datajud_metadata' => '{}', 'djen_metadata' => '{}', 'manual_metadata' => json_encode(array_filter(['case_class_code' => $class['code'] ?? null, 'subjects' => $subjectCodes], fn ($v) => $v !== null && $v !== []), JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}', 'datajud_sync_status' => 'pending', 'djen_sync_status' => 'pending',
                     'filing_date' => $data['filing_date'] ?? null, 'distribution_date' => $data['distribution_date'] ?? null,
-                    'operational_status' => 'active', 'operational_priority' => 'normal', 'confidentiality_level' => 'public',
+                    'operational_status' => 'active', 'operational_priority' => 'normal', 'confidentiality_level' => 'public', 'internal_confidentiality_level' => 'public',
                     'version' => 1, 'created_by' => $userId, 'updated_by' => $userId, 'created_at' => $now, 'updated_at' => $now,
                 ]);
                 DB::table('law_case_events')->insert([
@@ -325,6 +351,7 @@ class LawCaseController extends Controller
         $relations = $relations->concat($reverse)->values();
         $relatedClassCodes = $relations->map(function (object $relation): string {
             $manual = json_decode((string) ($relation->manual_metadata ?? ''), true) ?: [];
+
             return trim((string) ($manual['case_class_code'] ?? $relation->case_class_code ?? ''));
         })->filter()->unique()->values();
         $cnjClassNames = $relatedClassCodes->isEmpty() ? collect() : DB::table('law_cnj_metadata_options')
@@ -334,6 +361,7 @@ class LawCaseController extends Controller
         $relations = $relations->map(function (object $relation) use ($cnjClassNames, $companyClassNames): array {
             $manual = json_decode((string) ($relation->manual_metadata ?? ''), true) ?: [];
             $classCode = trim((string) ($manual['case_class_code'] ?? $relation->case_class_code ?? ''));
+
             return [
                 'id' => (string) $relation->id,
                 'relation_type' => (string) $relation->relation_type,
@@ -358,17 +386,25 @@ class LawCaseController extends Controller
                 $isDatajud = in_array((string) $row->event_type, $datajudEventTypes, true);
 
                 // Failed, incomplete, and empty Datajud attempts are not process changes.
-                if ($isDatajud && ($after['datajud_sync_status'] ?? null) !== 'synced') return null;
+                if ($isDatajud && ($after['datajud_sync_status'] ?? null) !== 'synced') {
+                    return null;
+                }
 
                 $changed = [];
                 foreach (array_unique([...array_keys($before), ...array_keys($after)]) as $key) {
-                    if ($isDatajud && str_starts_with((string) $key, 'datajud_')) continue;
+                    if ($isDatajud && str_starts_with((string) $key, 'datajud_')) {
+                        continue;
+                    }
                     $beforeValue = $before[$key] ?? null;
                     $afterValue = $after[$key] ?? null;
-                    if ($beforeValue === $afterValue) continue;
+                    if ($beforeValue === $afterValue) {
+                        continue;
+                    }
                     $changed[$key] = true;
                 }
-                if ($changed === []) return null;
+                if ($changed === []) {
+                    return null;
+                }
 
                 return [
                     'id' => (string) $row->id, 'event_type' => (string) $row->event_type, 'title' => (string) $row->title,
@@ -397,6 +433,7 @@ class LawCaseController extends Controller
             'history_page' => $historyPage,
             'history_total' => $historyTotal,
             'can_manage_access' => $this->mayManageUnit($request, (string) $current->law_unit_id),
+            'workflow' => $this->workflowFor($current),
         ]);
     }
 
@@ -418,18 +455,29 @@ class LawCaseController extends Controller
             'procedural_priorities' => ['sometimes', 'array', 'max:6'],
             'procedural_priorities.*' => ['string', 'distinct', Rule::in($this->proceduralPrioritiesFor($request))],
             'confidentiality_level' => ['sometimes', 'required', Rule::in(self::CONFIDENTIALITY)],
+            'internal_confidentiality_level' => ['sometimes', 'required', Rule::in(self::CONFIDENTIALITY)],
+            'source_confidentiality_level' => ['prohibited'],
             'responsible_membership_id' => ['sometimes', 'nullable', 'string', 'max:30'],
         ]);
+        if (isset($data['internal_confidentiality_level'])) {
+            if (isset($data['confidentiality_level']) && $data['confidentiality_level'] !== $data['internal_confidentiality_level']) {
+                throw ValidationException::withMessages(['internal_confidentiality_level' => 'Os níveis de sigilo interno informados devem coincidir.']);
+            }
+            $data['confidentiality_level'] = $data['internal_confidentiality_level'];
+            unset($data['internal_confidentiality_level']);
+        }
         if (array_key_exists('comarca', $data) && trim((string) $data['comarca']) === '') {
             $mappedComarca = $cases->comarcaForCaseNumber((string) $current->case_number);
-            if ($mappedComarca !== null) $data['comarca'] = $mappedComarca;
+            if ($mappedComarca !== null) {
+                $data['comarca'] = $mappedComarca;
+            }
         }
         unset($data['version']);
         if (isset($data['operational_status']) && $data['operational_status'] !== $current->operational_status) {
             abort_if($data['operational_status'] === 'archived' || $current->operational_status === 'archived', 422, 'Use a ação Arquivar ou Reabrir e informe o motivo.');
             abort_unless(DB::table('law_case_status_options')->where('company_id', $current->company_id)->where('law_unit_id', $current->law_unit_id)->where('code', $data['operational_status'])->where('is_active', true)->exists(), 422, 'Selecione um estado operacional ativo.');
         }
-        if (isset($data['confidentiality_level']) && $data['confidentiality_level'] !== $current->confidentiality_level) {
+        if (isset($data['confidentiality_level']) && $data['confidentiality_level'] !== LawCnjConfidentiality::internalCode($current)) {
             $this->assertMayManageUnit($request, (string) $current->law_unit_id);
         }
         abort_if(($request->integer('version') !== (int) $current->version), 409, 'O processo foi alterado por outra pessoa. Atualize a página antes de salvar.');
@@ -440,7 +488,9 @@ class LawCaseController extends Controller
         $official = json_decode((string) ($current->datajud_metadata ?? ''), true) ?: [];
         $metadataFields = ['case_class', 'case_class_code', 'subjects', 'court_name', 'court_code', 'official_status_code', 'official_status_text'];
         foreach ($metadataFields as $field) {
-            if (! array_key_exists($field, $data)) continue;
+            if (! array_key_exists($field, $data)) {
+                continue;
+            }
             if ($field !== 'comarca' && array_key_exists($field, $official)) {
                 throw ValidationException::withMessages([$field => 'Este dado foi retornado pelo Datajud e não pode ser editado.']);
             }
@@ -459,28 +509,50 @@ class LawCaseController extends Controller
         }
 
         $columns = $data;
+        if (isset($data['confidentiality_level'])) {
+            $columns['internal_confidentiality_level'] = $data['confidentiality_level'];
+        }
         unset($columns['procedural_priorities']);
-        if (array_key_exists('subjects', $data)) $columns['subjects'] = json_encode(array_column($data['subjects'], 'code'), JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]';
+        if (array_key_exists('subjects', $data)) {
+            $columns['subjects'] = json_encode(array_column($data['subjects'], 'code'), JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]';
+        }
         $manual = json_decode((string) ($current->manual_metadata ?? ''), true) ?: [];
         foreach ($metadataFields as $field) {
-            if (! array_key_exists($field, $data)) continue;
+            if (! array_key_exists($field, $data)) {
+                continue;
+            }
             if ($field === 'case_class') {
-                if (! empty($data['case_class_code'])) $manual['case_class_code'] = $data['case_class_code'];
-                else unset($manual['case_class_code']);
+                if (! empty($data['case_class_code'])) {
+                    $manual['case_class_code'] = $data['case_class_code'];
+                } else {
+                    unset($manual['case_class_code']);
+                }
                 unset($manual['case_class']);
                 $columns['case_class'] = null;
+
                 continue;
             }
-            if ($field === 'case_class_code') continue;
+            if ($field === 'case_class_code') {
+                continue;
+            }
             if ($field === 'subjects') {
                 $codes = array_column($data['subjects'] ?? [], 'code');
-                if ($codes === []) unset($manual['subjects']);
-                else $manual['subjects'] = $codes;
+                if ($codes === []) {
+                    unset($manual['subjects']);
+                } else {
+                    $manual['subjects'] = $codes;
+                }
+
                 continue;
             }
-            if ($data[$field] === null || $data[$field] === '' || $data[$field] === []) unset($manual[$field]);
-            else $manual[$field] = $data[$field];
-            if (in_array($field, ['subjects'], true)) $columns[$field] = json_encode($data[$field], JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]';
+            if ($data[$field] === null || $data[$field] === '' || $data[$field] === []) {
+                unset($manual[$field]);
+            } else {
+                $manual[$field] = $data[$field];
+            }
+            if (in_array($field, ['subjects'], true)) {
+                $columns[$field] = json_encode($data[$field], JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]';
+            }
         }
         $columns['manual_metadata'] = json_encode($manual, JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
 
@@ -489,10 +561,16 @@ class LawCaseController extends Controller
         $after = [];
         foreach ($fieldsForHistory as $field => $value) {
             $old = in_array($field, ['subjects', 'procedural_priorities'], true) ? $cases->caseArray($current)[$field] : ($current->{$field} ?? null);
-            if ($old !== $value) { $before[$field] = $old; $after[$field] = $value; }
+            if ($old !== $value) {
+                $before[$field] = $old;
+                $after[$field] = $value;
+            }
         }
         if (! $after) {
-            if (! empty($data['comarca'])) DB::transaction(fn () => $cases->saveComarcaMapping((string) $current->case_number, (string) $data['comarca'], (string) $request->user()->id, (string) $current->company_id, (string) $current->id));
+            if (! empty($data['comarca'])) {
+                DB::transaction(fn () => $cases->saveComarcaMapping((string) $current->case_number, (string) $data['comarca'], (string) $request->user()->id, (string) $current->company_id, (string) $current->id));
+            }
+
             return response()->json(['case' => $cases->caseArray($this->findCase($request, $case, $cases))]);
         }
 
@@ -502,7 +580,9 @@ class LawCaseController extends Controller
             $columns['updated_at'] = now();
             $changed = DB::table('law_cases')->where('company_id', $current->company_id)->where('id', $current->id)->where('version', $current->version)->update($columns);
             abort_if($changed !== 1, 409, 'O processo foi alterado por outra pessoa. Atualize a página antes de salvar.');
-            if (! empty($data['comarca'])) $cases->saveComarcaMapping((string) $current->case_number, (string) $data['comarca'], (string) $request->user()->id, (string) $current->company_id, (string) $current->id);
+            if (! empty($data['comarca'])) {
+                $cases->saveComarcaMapping((string) $current->case_number, (string) $data['comarca'], (string) $request->user()->id, (string) $current->company_id, (string) $current->id);
+            }
             if (array_key_exists('procedural_priorities', $data)) {
                 $selected = array_values(array_unique($data['procedural_priorities']));
                 $existing = DB::table('law_case_procedural_priorities')->where('company_id', $current->company_id)->where('law_case_id', $current->id)->get(['id', 'code']);
@@ -515,16 +595,7 @@ class LawCaseController extends Controller
                     ]);
                 }
             }
-            if (\App\Services\LawCnjConfidentiality::requiresNamedAccess($after['confidentiality_level'] ?? null)) {
-                DB::table('law_confidential_case_accesses')->updateOrInsert([
-                    'company_id' => $current->company_id, 'law_case_id' => $current->id,
-                    'company_membership_id' => $request->attributes->get('active_membership')->id,
-                ], [
-                    'id' => PrefixedUlid::make('LCA'), 'granted_by' => $request->user()->id,
-                    'revoked_at' => null, 'created_at' => now(), 'updated_at' => now(),
-                ]);
-                $this->event($current, $request, 'confidential_access_granted', 'Autorização nominal concedida ao responsável pela restrição', null, ['company_membership_id' => $request->attributes->get('active_membership')->id]);
-            }
+            // Ordinary edits never create or restore nominal grants.
             DB::table('law_case_events')->insert([
                 'id' => PrefixedUlid::make('LCE'), 'company_id' => $current->company_id, 'law_case_id' => $current->id,
                 'actor_user_id' => $request->user()->id, 'event_type' => 'updated', 'title' => 'Dados do processo atualizados',
@@ -532,7 +603,8 @@ class LawCaseController extends Controller
             ]);
             $audit->company((string) $current->company_id, (string) $request->user()->id, 'law_case', (string) $current->id, 'update', $before, $after, request: $request);
         });
-        return response()->json(['case' => $cases->caseArray($this->findCase($request, $case, $cases))]);
+
+        return response()->json(['case' => $cases->caseArray(DB::table('law_cases')->where('company_id', $current->company_id)->where('id', $current->id)->first())]);
     }
 
     public function archive(Request $request, string $case, LawCaseManagementService $cases, AuditRecorder $audit)
@@ -556,6 +628,7 @@ class LawCaseController extends Controller
             ]);
             $audit->company((string) $current->company_id, (string) $request->user()->id, 'law_case', (string) $current->id, 'archive', ['operational_status' => $current->operational_status], ['operational_status' => 'archived'], trim($data['reason']), $request);
         });
+
         return response()->json(['case' => $cases->caseArray($this->findCase($request, $case, $cases))]);
     }
 
@@ -579,6 +652,7 @@ class LawCaseController extends Controller
             ]);
             $audit->company((string) $current->company_id, (string) $request->user()->id, 'law_case', (string) $current->id, 'reopen', ['operational_status' => 'archived'], ['operational_status' => 'active'], trim($data['reason']), $request);
         });
+
         return response()->json(['case' => $cases->caseArray($this->findCase($request, $case, $cases))]);
     }
 
@@ -589,6 +663,7 @@ class LawCaseController extends Controller
         DB::table('law_cases')->where('company_id', $current->company_id)->where('id', $current->id)->update(['djen_sync_status' => 'pending', 'djen_sync_message' => null]);
         SyncLawCaseDjen::dispatch((string) $current->company_id, (string) $current->id)
             ->onConnection('law-datajud')->onQueue('law-datajud');
+
         return response()->json(['case' => $cases->caseArray($this->findCase($request, $case, $cases)), 'datajud' => array_intersect_key($result, array_flip(['status', 'code', 'message']))]);
     }
 
@@ -598,6 +673,7 @@ class LawCaseController extends Controller
         DB::table('law_cases')->where('company_id', $current->company_id)->where('id', $current->id)->update(['djen_sync_status' => 'pending', 'djen_sync_message' => null]);
         SyncLawCaseDjen::dispatch((string) $current->company_id, (string) $current->id)
             ->onConnection('law-datajud')->onQueue('law-datajud');
+
         return response()->json(['djen' => ['status' => 'pending', 'message' => 'A consulta ao DJEN foi agendada.']]);
     }
 
@@ -614,8 +690,11 @@ class LawCaseController extends Controller
         $column = $item->field;
         abort_unless(in_array($column, ['case_class', 'case_class_code', 'subjects', 'court_name', 'court_code', 'official_status_code', 'official_status_text'], true), 422, 'Campo de divergência inválido.');
         $manual = json_decode((string) ($current->manual_metadata ?? ''), true) ?: [];
-        if ($data['choice'] === 'official') unset($manual[$column]);
-        else $manual[$column] = $column === 'subjects' && is_array($manualValue) ? array_values(array_map(fn ($subject) => is_array($subject) && ! empty($subject['code']) ? (string) $subject['code'] : $subject, $manualValue)) : $manualValue;
+        if ($data['choice'] === 'official') {
+            unset($manual[$column]);
+        } else {
+            $manual[$column] = $column === 'subjects' && is_array($manualValue) ? array_values(array_map(fn ($subject) => is_array($subject) && ! empty($subject['code']) ? (string) $subject['code'] : $subject, $manualValue)) : $manualValue;
+        }
         $storedValue = $column === 'subjects' && is_array($value) ? array_values(array_map(fn ($subject) => is_array($subject) && ! empty($subject['code']) ? (string) $subject['code'] : $subject, $value)) : $value;
         DB::transaction(function () use ($request, $current, $item, $column, $value, $storedValue, $manual, $data, $audit, $manualValue, $officialValue): void {
             DB::table('law_cases')->where('company_id', $current->company_id)->where('id', $current->id)->update([
@@ -633,6 +712,7 @@ class LawCaseController extends Controller
             ]);
             $audit->company((string) $current->company_id, (string) $request->user()->id, 'law_case', (string) $current->id, 'resolve_metadata_conflict', ['manual' => $manualValue, 'official' => $officialValue], ['choice' => $data['choice'], 'value' => $value], request: $request);
         });
+
         return response()->json(['case' => $cases->caseArray($this->findCase($request, $case, $cases))]);
     }
 
@@ -657,10 +737,13 @@ class LawCaseController extends Controller
                 'case_role_label' => $role->label, 'created_by' => $request->user()->id, 'created_at' => now(), 'updated_at' => now(),
             ]);
         } catch (QueryException $exception) {
-            if ((string) $exception->getCode() === '23000') abort(409, 'Este contato já está vinculado ao processo com esse papel.');
+            if ((string) $exception->getCode() === '23000') {
+                abort(409, 'Este contato já está vinculado ao processo com esse papel.');
+            }
             throw $exception;
         }
         $this->event($current, $request, 'contact_linked', 'Contato vinculado ao processo', null, ['contact_name' => $contact->display_name, 'role' => $role->label]);
+
         return response()->json(['id' => $id], 201);
     }
 
@@ -671,6 +754,7 @@ class LawCaseController extends Controller
         abort_unless($row, 404, 'Vínculo não encontrado.');
         DB::table('law_case_contacts')->where('id', $link)->delete();
         $this->event($current, $request, 'contact_unlinked', 'Contato desvinculado do processo', ['contact_id' => $row->law_contact_id, 'role' => $row->case_role_label], null);
+
         return response()->noContent();
     }
 
@@ -690,10 +774,13 @@ class LawCaseController extends Controller
                 'created_by' => $request->user()->id, 'created_at' => now(), 'updated_at' => now(),
             ]);
         } catch (QueryException $exception) {
-            if ((string) $exception->getCode() === '23000') abort(409, 'Esse vínculo já existe.');
+            if ((string) $exception->getCode() === '23000') {
+                abort(409, 'Esse vínculo já existe.');
+            }
             throw $exception;
         }
         $this->event($current, $request, 'case_related', 'Processo relacionado', null, ['related_case_id' => $related->id, 'relation_type' => $data['relation_type']]);
+
         return response()->json(['id' => $id], 201);
     }
 
@@ -701,12 +788,15 @@ class LawCaseController extends Controller
     {
         $current = $this->findCase($request, $case, $cases, true);
         $row = DB::table('law_case_relations')->where('company_id', $current->company_id)->where('law_case_id', $case)->where('id', $relation)->first();
-        if (! $row) $row = DB::table('law_case_relations')->where('company_id', $current->company_id)->where('related_law_case_id', $case)->where('id', $relation)->first();
+        if (! $row) {
+            $row = DB::table('law_case_relations')->where('company_id', $current->company_id)->where('related_law_case_id', $case)->where('id', $relation)->first();
+        }
         abort_unless($row, 404, 'Vínculo não encontrado.');
         $otherId = $row->law_case_id === $case ? $row->related_law_case_id : $row->law_case_id;
         $this->findCase($request, (string) $otherId, $cases);
         DB::table('law_case_relations')->where('id', $relation)->delete();
         $this->event($current, $request, 'case_relation_removed', 'Vínculo entre processos removido', ['source_case_id' => $row->law_case_id, 'related_case_id' => $row->related_law_case_id, 'relation_type' => $row->relation_type], null);
+
         return response()->noContent();
     }
 
@@ -721,7 +811,10 @@ class LawCaseController extends Controller
             'law_case_id' => $current->id, 'law_case_tag_id' => $tag->id,
             'created_by' => $request->user()->id, 'created_at' => now(),
         ]);
-        if ($inserted) $this->event($current, $request, 'tag_added', 'Etiqueta adicionada ao processo', null, ['tag' => $tag->name]);
+        if ($inserted) {
+            $this->event($current, $request, 'tag_added', 'Etiqueta adicionada ao processo', null, ['tag' => $tag->name]);
+        }
+
         return response()->noContent();
     }
 
@@ -734,6 +827,7 @@ class LawCaseController extends Controller
         abort_unless($tag, 404, 'Etiqueta não encontrada neste processo.');
         DB::table('law_case_tag_assignments')->where('company_id', $current->company_id)->where('law_case_id', $current->id)->where('law_case_tag_id', $tagId)->delete();
         $this->event($current, $request, 'tag_removed', 'Etiqueta removida do processo', ['tag' => $tag], null);
+
         return response()->noContent();
     }
 
@@ -746,6 +840,7 @@ class LawCaseController extends Controller
         })->join('users', 'users.id', '=', 'membership.user_id')
             ->where('access.company_id', $current->company_id)->where('access.law_case_id', $current->id)->whereNull('access.revoked_at')
             ->orderBy('users.name')->get(['access.id', 'membership.id as company_membership_id', 'users.name']);
+
         return response()->json(['users' => $users]);
     }
 
@@ -756,7 +851,8 @@ class LawCaseController extends Controller
         $case = DB::table('law_cases')->where('company_id', $companyId)->where('case_number', $this->normalizeCaseNumber($data['case_number']))->first();
         abort_unless($case, 404, 'Processo não encontrado ou sem autorização de administração.');
         $this->assertMayManageUnit($request, (string) $case->law_unit_id);
-        abort_unless(\App\Services\LawCnjConfidentiality::requiresNamedAccess($case->confidentiality_level), 422, 'Apenas processos em sigilo absoluto exigem autorização nominal.');
+        abort_unless(LawCnjConfidentiality::requiresNamedAccess(LawCnjConfidentiality::internalCode($case)), 422, 'Apenas processos em sigilo absoluto exigem autorização nominal.');
+
         return response()->json(['case_id' => $case->id, 'law_unit_id' => $case->law_unit_id]);
     }
 
@@ -764,12 +860,14 @@ class LawCaseController extends Controller
     {
         $current = $this->findManagedCase($request, $case);
         $this->assertMayManageUnit($request, (string) $current->law_unit_id);
-        abort_unless(\App\Services\LawCnjConfidentiality::requiresNamedAccess($current->confidentiality_level), 422, 'A autorização nominal só se aplica a processos em sigilo absoluto.');
+        abort_unless(LawCnjConfidentiality::requiresNamedAccess(LawCnjConfidentiality::internalCode($current)), 422, 'A autorização nominal só se aplica a processos em sigilo absoluto.');
         $data = $request->validate(['company_membership_id' => ['required', 'string', 'max:30']]);
         $membership = DB::table('company_memberships')->where('company_id', $current->company_id)->where('id', $data['company_membership_id'])->where('status', 'ativo')->whereNull('deleted_at')->first();
         abort_unless($membership, 404, 'Usuário ativo da empresa não encontrado.');
         $existing = DB::table('law_confidential_case_accesses')->where('company_id', $current->company_id)->where('law_case_id', $current->id)->where('company_membership_id', $membership->id)->first();
-        if ($existing && $existing->revoked_at === null) return response()->json(['id' => $existing->id]);
+        if ($existing && $existing->revoked_at === null) {
+            return response()->json(['id' => $existing->id]);
+        }
         if ($existing) {
             DB::table('law_confidential_case_accesses')->where('id', $existing->id)->update(['revoked_at' => null, 'granted_by' => $request->user()->id, 'updated_at' => now()]);
             $id = $existing->id;
@@ -781,6 +879,7 @@ class LawCaseController extends Controller
             ]);
         }
         $this->event($current, $request, 'confidential_access_granted', 'Acesso ao processo em sigilo absoluto concedido', null, ['company_membership_id' => $membership->id]);
+
         return response()->json(['id' => $id], 201);
     }
 
@@ -792,6 +891,7 @@ class LawCaseController extends Controller
         abort_unless($row, 404, 'Autorização não encontrada.');
         DB::table('law_confidential_case_accesses')->where('id', $access)->update(['revoked_at' => now(), 'updated_at' => now()]);
         $this->event($current, $request, 'confidential_access_revoked', 'Acesso ao processo em sigilo absoluto revogado', ['company_membership_id' => $row->company_membership_id], null);
+
         return response()->noContent();
     }
 
@@ -810,6 +910,7 @@ class LawCaseController extends Controller
             'sort_order' => 100, 'created_by' => $request->user()->id, 'created_at' => now(), 'updated_at' => now(),
         ]);
         app(AuditRecorder::class)->company($companyId, (string) $request->user()->id, 'law_case_status_option', $id, 'create', null, ['law_unit_id' => $unit->id, 'code' => $code, 'label' => trim($data['label'])], request: $request);
+
         return response()->json(['id' => $id, 'code' => $code, 'label' => trim($data['label'])], 201);
     }
 
@@ -828,10 +929,13 @@ class LawCaseController extends Controller
                 'created_at' => now(), 'updated_at' => now(),
             ]);
         } catch (QueryException $exception) {
-            if ((string) $exception->getCode() === '23000') abort(409, 'Esta etiqueta já existe na unidade.');
+            if ((string) $exception->getCode() === '23000') {
+                abort(409, 'Esta etiqueta já existe na unidade.');
+            }
             throw $exception;
         }
         app(AuditRecorder::class)->company($companyId, (string) $request->user()->id, 'law_case_tag', $id, 'create', null, ['law_unit_id' => $unit->id, 'name' => trim($data['name'])], request: $request);
+
         return response()->json(['id' => $id, 'name' => trim($data['name'])], 201);
     }
 
@@ -850,6 +954,7 @@ class LawCaseController extends Controller
             'created_by' => $request->user()->id, 'created_at' => now(), 'updated_at' => now(),
         ]);
         app(AuditRecorder::class)->company($companyId, (string) $request->user()->id, 'law_case_role_option', $id, 'create', null, ['law_unit_id' => $unit->id, 'code' => $code, 'label' => trim($data['label'])], request: $request);
+
         return response()->json(['id' => $id, 'code' => $code, 'label' => trim($data['label'])], 201);
     }
 
@@ -870,9 +975,13 @@ class LawCaseController extends Controller
         $this->assertMayManageUnit($request, (string) $unit->id);
         $existing = DB::table('law_case_cnj_defaults')->where('company_id', $companyId)->where('law_unit_id', $unit->id)->first();
         $values = ['segment' => $data['segment'], 'court' => $data['court'], 'origin' => $data['origin'], 'updated_by' => $request->user()->id, 'updated_at' => now()];
-        if ($existing) DB::table('law_case_cnj_defaults')->where('id', $existing->id)->update($values);
-        else DB::table('law_case_cnj_defaults')->insert($values + ['id' => PrefixedUlid::make('LCD'), 'company_id' => $companyId, 'law_unit_id' => $unit->id, 'created_at' => now()]);
+        if ($existing) {
+            DB::table('law_case_cnj_defaults')->where('id', $existing->id)->update($values);
+        } else {
+            DB::table('law_case_cnj_defaults')->insert($values + ['id' => PrefixedUlid::make('LCD'), 'company_id' => $companyId, 'law_unit_id' => $unit->id, 'created_at' => now()]);
+        }
         app(AuditRecorder::class)->company($companyId, (string) $request->user()->id, 'law_case_cnj_defaults', (string) ($existing->id ?? $unit->id), 'update', $existing ? ['segment' => $existing->segment, 'court' => $existing->court, 'origin' => $existing->origin] : null, ['segment' => $data['segment'], 'court' => $data['court'], 'origin' => $data['origin'], 'law_unit_id' => $unit->id], request: $request);
+
         return response()->json(['segment' => $data['segment'], 'court' => $data['court'], 'origin' => $data['origin']]);
     }
 
@@ -889,6 +998,7 @@ class LawCaseController extends Controller
         abort_if($type === 'statuses' && $row->code === 'archived', 422, 'O estado Arquivado não pode ser desativado.');
         DB::table($table)->where('id', $option)->update(['is_active' => false, 'updated_at' => now()]);
         app(AuditRecorder::class)->company($companyId, (string) $request->user()->id, $table, $option, 'update', ['is_active' => (bool) $row->is_active], ['is_active' => false], request: $request);
+
         return response()->noContent();
     }
 
@@ -896,42 +1006,42 @@ class LawCaseController extends Controller
     {
         $query = $this->visibleQuery($request, DB::table('law_cases'))->where('law_cases.company_id', $request->attributes->get('active_company_id'))->where('law_cases.id', $id);
         $query->select('law_cases.*')->leftJoin('law_units as unit', fn ($join) => $join->on('unit.id', '=', 'law_cases.law_unit_id')->on('unit.company_id', '=', 'law_cases.company_id'))->addSelect('unit.name as unit_name');
-        if (DB::transactionLevel() > 0) $query->lockForUpdate();
+        if (DB::transactionLevel() > 0) {
+            $query->lockForUpdate();
+        }
         $current = $query->first();
         abort_unless($current, 404, 'Processo não encontrado ou sem autorização para consulta.');
+
         return $current;
     }
 
     private function visibleQuery(Request $request, $query)
     {
-        $membershipId = (string) ($request->attributes->get('active_membership')?->id ?? '');
-        return $query->where(function ($visible) use ($membershipId): void {
-            $visible->whereNotIn('law_cases.confidentiality_level', ['cnj_5', 'secret'])
-                ->orWhereExists(function ($access) use ($membershipId): void {
-                    $access->selectRaw('1')->from('law_confidential_case_accesses as case_access')
-                        ->whereColumn('case_access.company_id', 'law_cases.company_id')
-                        ->whereColumn('case_access.law_case_id', 'law_cases.id')
-                        ->where('case_access.company_membership_id', $membershipId)->whereNull('case_access.revoked_at');
-                });
-        });
+        return app(LawCaseManagementService::class)->visibleQuery($request, $query);
     }
 
     private function visibleOther(Request $request, $query): void
     {
-        $query->whereNotIn('other.confidentiality_level', ['cnj_5', 'secret'])->orWhereExists(function ($access) use ($request): void {
-            $access->selectRaw('1')->from('law_confidential_case_accesses as related_access')
-                ->whereColumn('related_access.company_id', 'other.company_id')->whereColumn('related_access.law_case_id', 'other.id')
-                ->where('related_access.company_membership_id', $request->attributes->get('active_membership')->id)->whereNull('related_access.revoked_at');
-        });
+        app(LawCaseManagementService::class)->visibleQuery($request, $query, 'other');
+    }
+
+    private function assertUnitPermission(Request $request, string $unitId, string $permission): void
+    {
+        $authorization = app(LawAuthorizationService::class);
+        abort_unless($authorization->isCompanyAdmin($request) || $authorization->activeUnitId($request) === $unitId, 403);
+        $authorization->authorize($request, $permission, $unitId);
     }
 
     private function findManagedCase(Request $request, string $id): object
     {
         $query = DB::table('law_cases')->where('company_id', $request->attributes->get('active_company_id'))->where('id', $id);
-        if (DB::transactionLevel() > 0) $query->lockForUpdate();
+        if (DB::transactionLevel() > 0) {
+            $query->lockForUpdate();
+        }
         $case = $query->first();
         abort_unless($case, 404, 'Processo não encontrado.');
         $this->assertMayManageUnit($request, (string) $case->law_unit_id);
+
         return $case;
     }
 
@@ -942,12 +1052,21 @@ class LawCaseController extends Controller
 
     private function mayManageUnit(Request $request, string $unitId): bool
     {
-        if ($request->attributes->get('active_membership')?->role === 'admin') return true;
+        if (! DB::table('law_units')->where('company_id', $request->attributes->get('active_company_id'))->where('id', $unitId)->where('status', 'ativo')->exists()) {
+            return false;
+        }
+        if ($request->attributes->get('active_membership')?->role === 'admin') {
+            return true;
+        }
+        if (app(LawAuthorizationService::class)->activeUnitId($request) !== $unitId) {
+            return false;
+        }
         $allowed = DB::table('law_unit_memberships as membership')->join('law_access_roles as role', function ($join): void {
             $join->on('role.id', '=', 'membership.law_access_role_id')->on('role.company_id', '=', 'membership.company_id')->on('role.law_unit_id', '=', 'membership.law_unit_id');
         })->where('membership.company_id', $request->attributes->get('active_company_id'))
             ->where('membership.law_unit_id', $unitId)->where('membership.company_membership_id', $request->attributes->get('active_membership')?->id)
             ->where('membership.status', 'ativo')->whereNull('membership.deleted_at')->whereIn('role.code', ['unit_admin', 'chief_clerk'])->exists();
+
         return $allowed;
     }
 
@@ -958,6 +1077,7 @@ class LawCaseController extends Controller
         while (DB::table($table)->where('company_id', $companyId)->where('law_unit_id', $unitId)->where('code', $code)->exists()) {
             $code = mb_substr($base, 0, 27).'-'.Str::lower(Str::random(4));
         }
+
         return $code;
     }
 
@@ -966,37 +1086,59 @@ class LawCaseController extends Controller
         $digits = preg_replace('/\D+/', '', $number) ?: '';
         if (strlen($digits) === 13 && $companyId && $unitId) {
             $defaults = DB::table('law_case_cnj_defaults')->where('company_id', $companyId)->where('law_unit_id', $unitId)->first();
-            if ($defaults) $digits .= $defaults->segment.$defaults->court.$defaults->origin;
-            else throw ValidationException::withMessages(['case_number' => 'Configure o padrão CNJ da unidade selecionada ou informe todos os 20 dígitos.']);
+            if ($defaults) {
+                $digits .= $defaults->segment.$defaults->court.$defaults->origin;
+            } else {
+                throw ValidationException::withMessages(['case_number' => 'Configure o padrão CNJ da unidade selecionada ou informe todos os 20 dígitos.']);
+            }
         }
+
         return $digits;
     }
 
     private function resolveMetadataOption(string $companyId, string $type, ?string $code, ?string $name, string $actorId): ?array
     {
-        $code = trim((string) $code); $name = trim((string) $name);
-        if ($code === '' && $name === '') return null;
-        if ($code === '') throw ValidationException::withMessages([$type === 'class' ? 'case_class_code' : 'subjects' => 'Informe o código junto com o nome.']);
+        $code = trim((string) $code);
+        $name = trim((string) $name);
+        if ($code === '' && $name === '') {
+            return null;
+        }
+        if ($code === '') {
+            throw ValidationException::withMessages([$type === 'class' ? 'case_class_code' : 'subjects' => 'Informe o código junto com o nome.']);
+        }
         $existing = DB::table('law_cnj_metadata_options')->where('type', $type)->where('code', $code)->where('is_active', true)->first();
-        if ($existing) return ['code' => (string) $existing->code, 'name' => (string) $existing->name];
+        if ($existing) {
+            return ['code' => (string) $existing->code, 'name' => (string) $existing->name];
+        }
         $existing = DB::table('law_case_metadata_options')->where('company_id', $companyId)->where('type', $type)->where('code', $code)->first();
-        if ($existing) return ['code' => (string) $existing->code, 'name' => (string) $existing->name];
-        if ($name === '') throw ValidationException::withMessages([$type === 'class' ? 'case_class' : 'subjects' => 'Informe o nome para cadastrar este novo código.']);
+        if ($existing) {
+            return ['code' => (string) $existing->code, 'name' => (string) $existing->name];
+        }
+        if ($name === '') {
+            throw ValidationException::withMessages([$type === 'class' ? 'case_class' : 'subjects' => 'Informe o nome para cadastrar este novo código.']);
+        }
         DB::table('law_case_metadata_options')->insertOrIgnore([
             'id' => PrefixedUlid::make('LCO'), 'company_id' => $companyId, 'type' => $type,
             'code' => $code, 'name' => $name, 'created_by' => $actorId, 'created_at' => now(), 'updated_at' => now(),
         ]);
         $saved = DB::table('law_case_metadata_options')->where('company_id', $companyId)->where('type', $type)->where('code', $code)->first();
+
         return ['code' => (string) $saved->code, 'name' => (string) $saved->name];
     }
 
     private function assertValidCnj(string $digits): void
     {
-        if (! preg_match('/^\d{20}$/', $digits)) throw ValidationException::withMessages(['case_number' => 'Informe o número CNJ completo, com 20 dígitos.']);
+        if (! preg_match('/^\d{20}$/', $digits)) {
+            throw ValidationException::withMessages(['case_number' => 'Informe o número CNJ completo, com 20 dígitos.']);
+        }
         $remainder = 0;
         $verification = substr($digits, 0, 7).substr($digits, 9).substr($digits, 7, 2);
-        foreach (str_split($verification) as $digit) $remainder = (($remainder * 10) + (int) $digit) % 97;
-        if ($remainder !== 1) throw ValidationException::withMessages(['case_number' => 'O dígito verificador do número CNJ é inválido.']);
+        foreach (str_split($verification) as $digit) {
+            $remainder = (($remainder * 10) + (int) $digit) % 97;
+        }
+        if ($remainder !== 1) {
+            throw ValidationException::withMessages(['case_number' => 'O dígito verificador do número CNJ é inválido.']);
+        }
     }
 
     private function event(object $case, Request $request, string $type, string $title, ?array $before, ?array $after): void

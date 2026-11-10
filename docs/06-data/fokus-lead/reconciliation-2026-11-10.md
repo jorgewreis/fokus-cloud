@@ -58,3 +58,31 @@ rollback e ausência de contexto residual, validação dos acessos de métricas 
 homologação em navegador. Seguir `laravel-integration.md`; não habilitar flags
 como solução para indisponibilidade. Uploads e suporte operacional do Lead
 continuam fora deste escopo. Merge exige decisão explícita posterior.
+
+## Composição posterior com Law integrado
+
+Em 10/11, a main `ceaff20da3d87790ad3ceef8c554d8f9454c1631` foi
+incorporada à derivação Lead sem conflitos, preservando commits e PR25 original.
+Os lockfiles e todos os workflows permanecem idênticos à main; não houve
+atualização adicional de dependências nem mudança do gate manual de publicação.
+
+Validação repetida por mudança material da composição e do runtime Laravel:
+
+- PHP 8.4.27: 351 testes e 2.834 asserções aprovados; foco Lead/CompanyAdmin:
+  30 testes e 160 asserções, sem falhas.
+- Composer audit do lock combinado: zero advisories e zero pacotes abandonados.
+  O bloqueio dos 18 advisories relatado acima foi resolvido pela composição Law.
+- Pint nos 12 arquivos PHP do delta Lead, build Vite real, tokens, SEO e contrato
+  visual aprovados; teste browser de métricas Lead aprovado, sem retry.
+- Contrato de proteção documental: 34 testes aprovados, incluindo classificação
+  conservadora. O AUDIT_DIGEST não foi alterado por esta reconciliação.
+- SQL e modelo PGlite estão inalterados desde a validação anterior; reutiliza-se
+  a evidência 20/20, sem apresentá-la como execução nova ou como PostgreSQL/PDO real.
+- O build convencional novamente reescreveu somente hashes CSS dos cinco HTML
+  Styles. O diff gerado foi preservado separadamente como evidência local e não
+  integra o commit de composição. Não houve ajuste das fontes ou contrato para
+  esconder essa característica preexistente do build.
+
+CI remoto do novo head deve ser conferido antes de marcar pronto para revisão.
+Os portões reais de PostgreSQL, TLS, LOGINs, pool e provisionamento continuam
+pendentes e as flags seguem desativadas. Esta composição não é um deploy.

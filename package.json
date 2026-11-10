@@ -15,7 +15,8 @@
         "backoffice:contract:check": "node tools/check-backoffice-ui-contract.mjs",
         "backoffice:page:new": "node tools/create-backoffice-page.mjs",
         "test:backoffice:visual": "playwright test --config=playwright.backoffice.config.mjs",
-        "test:security:homologation": "playwright test --config=playwright.security.config.mjs"
+        "test:security:homologation": "playwright test --config=playwright.security.config.mjs",
+        "test:law:integration": "node tests/Frontend/law-portfolio-dom.cjs && node tests/Frontend/law-process-confidentiality-dom.cjs && node tests/Frontend/law-process-confidentiality-browser.cjs"
     },
     "devDependencies": {
         "@playwright/test": "^1.57.0",

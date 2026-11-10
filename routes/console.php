@@ -1,8 +1,12 @@
 <?php
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\Schema;
 
 Schedule::command('fokus:prune-expired-data')->daily();
+// Reconstruction decision: remove unusable import previews every fifteen minutes.
+Schedule::command('law:prune-expired-contact-imports')->everyFifteenMinutes()->withoutOverlapping(15);
 Schedule::command('law:sync-case-datajud')->everyFifteenMinutes()->withoutOverlapping(120);
 Schedule::command('law:sync-case-djen')->everyFifteenMinutes()->withoutOverlapping(120);
 Schedule::command('law:sync-contact-age-tags')->dailyAt('04:15')->withoutOverlapping(120);
@@ -22,3 +26,11 @@ use Illuminate\Support\Facades\Artisan;
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Artisan::command('law:prune-expired-contact-imports', function (): void {
+    if (! Schema::hasTable('law_contact_import_batches')) {
+        return;
+    }
+
+    DB::table('law_contact_import_batches')->where('expires_at', '<=', now())->delete();
+})->purpose('Remove only expired contact import previews');

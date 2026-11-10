@@ -6,6 +6,20 @@ O DJEN complementa o DataJud com metadados de comunicações e publicações. A 
 
 O sistema não armazena o teor integral da publicação nem documentos. Em `djen_metadata`, guarda apenas metadados da comunicação, nomes e polos dos destinatários e nomes dos advogados destinatários, quando fornecidos. Classe, tribunal e órgão julgador são exibidos como complementos identificados pela fonte, sem sobrescrever o cadastro, os dados do DataJud ou os contatos vinculados. O DJEN não fornece situação processual consolidada nem permite calcular prazos com segurança.
 
+A triagem guarda também um resumo de até 1.000 caracteres e, quando a fonte
+fornece texto válido, `content_fingerprint` SHA-256 do conteúdo completo
+normalizado com `content_fingerprint_version=1`. O resumo não é usado para
+fabricar esse fingerprint. HTML, entidades, espaços e Unicode canonicamente
+equivalentes são normalizados; o hash do provedor continua como evidência
+adicional. Alteração material depois do limite do resumo gera uma nova versão
+pendente, mesmo se o hash do provedor não mudar.
+
+Triagens antigas permanecem no histórico. No primeiro recebimento completo,
+a nova identidade não herda automaticamente a conclusão anterior. Conteúdo
+ausente ou inválido recebe aviso de identidade não verificada; isso não
+comprova revisão do teor integral. A transição ocorre nas sincronizações
+normais, sem migration destrutiva nem consulta externa de backfill.
+
 O usuário pode iniciar uma consulta pelo detalhe do processo. Cadastros novos também enfileiram a consulta automaticamente. A fila `law-datajud` processa o trabalho junto às consultas DataJud. O scheduler executa `law:sync-case-djen` diariamente às 03:45, limitado a 500 processos por execução, ajustável com `--limit`. Processos ativos são atualizados no máximo uma vez por mês; falhas contam como tentativa e não apagam metadados anteriores.
 
 ## Configuração

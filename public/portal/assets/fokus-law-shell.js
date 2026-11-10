@@ -91,6 +91,7 @@
   function visibleModules() {
     return (context.modules || []).filter((module) => {
       const family = String(module.family || module.module_code || module.code || '').toLowerCase();
+      if (family.startsWith('tarefas')) return context.features?.tasks_enabled === true && canLawPermission('law.tasks.view');
       if (family.startsWith('processos')) return canLawPermission('law.cases.view');
       return !family.startsWith('contatos') || canLawPermission('law.contacts.view');
     });
@@ -175,6 +176,8 @@
           appendNavLink(panel, 'Cadastro e consulta', '/portal/fokus-law/processos', 'processes');
           if (canLawPermission('law.cases.configure')) appendNavLink(panel, module.context_code === 'orgao_publico' ? 'Configurações do órgão' : 'Configurações da unidade', '/portal/fokus-law/processos/configuracoes', 'settings');
           if (module.context_code !== 'orgao_publico' && canLawPermission('law.cases.access.manage')) appendNavLink(panel, 'Autorizações', '/portal/fokus-law/processos/autorizacoes', 'users');
+        } else if (family.startsWith('tarefas')) {
+          appendNavLink(panel, 'Tarefas e prazos', '/portal/fokus-law/tarefas', 'tasks');
         } else panel.append(element('p', 'law-nav-description', 'As páginas funcionais deste módulo serão adicionadas aqui.'));
       }
       panel.querySelectorAll('.law-nav-item > img').forEach((image) => image.remove());
@@ -245,6 +248,8 @@
       appendNavLink(pageItems, 'Cadastro e consulta', '/portal/fokus-law/processos', 'processes', processesView === 'module');
       if (canLawPermission('law.cases.configure')) appendNavLink(pageItems, module.context_code === 'orgao_publico' ? 'Configurações do órgão' : 'Configurações da unidade', '/portal/fokus-law/processos/configuracoes', 'settings', processesView === 'processes-settings');
       if (module.context_code !== 'orgao_publico' && canLawPermission('law.cases.access.manage')) appendNavLink(pageItems, 'Autorizações', '/portal/fokus-law/processos/autorizacoes', 'users', processesView === 'processes-access');
+    } else if (String(module.family || module.code || '').startsWith('tarefas')) {
+      appendNavLink(pageItems, 'Tarefas e prazos', '/portal/fokus-law/tarefas', 'tasks', true);
     } else {
       appendNavButton(pageItems, `Visão geral de ${descriptor.label}`, descriptor.icon, true, () => renderContent('module'), true);
       pageItems.append(element('p', 'law-nav-description', 'As páginas funcionais deste módulo serão adicionadas aqui.'));
@@ -1104,6 +1109,10 @@
   }
 
   function renderModulePlaceholder(module) {
+    if (String(module.family || module.code || '').startsWith('tarefas')) {
+      window.FokusLawTasks?.render(contentRegion, context);
+      return;
+    }
     if (String(module.family || module.module_code || module.code || '').toLowerCase().startsWith('processos')) {
       if (!['judiciario', 'vara_criminal', 'orgao_publico', 'escritorio'].includes(module.context_code) && !String(module.code || '').includes('vara-criminal')) {
         contentRegion.append(element('h2', '', 'Processos'), element('p', 'fs-alert fs-alert-info', 'Este contexto de Processos não está disponível para esta assinatura.'));
@@ -1740,13 +1749,17 @@
     renderCompanyOptions();
     renderUnitOptions();
     const remember = localStorage.getItem(preferenceKey(context.user.id, 'remember-group')) === 'true';
-    if (!['profile', 'company', 'subscription', 'users', 'transfer', 'contacts-sharing', 'contacts-quality', 'processes', 'processes-settings', 'processes-access'].includes(initialPage) && remember) {
+    if (!['profile', 'company', 'subscription', 'users', 'transfer', 'contacts-sharing', 'contacts-quality', 'processes', 'processes-settings', 'processes-access', 'tasks'].includes(initialPage) && remember) {
       const lastGroup = localStorage.getItem(preferenceKey(context.user.id, 'last-group'));
       if ((lastGroup === 'settings' && context.permissions.manage_settings) || visibleModules().some((item) => `module:${item.id}` === lastGroup)) activeGroup = lastGroup;
     }
     if (['contacts-sharing', 'contacts-quality'].includes(initialPage)) {
       const contactsModule = visibleModules().find((item) => String(item.family || item.module_code || item.code || '').toLowerCase().startsWith('contatos'));
       if (contactsModule) activeGroup = `module:${contactsModule.id}`;
+    }
+    if (initialPage === 'tasks') {
+      const tasksModule = visibleModules().find((item) => String(item.family || item.code || '').startsWith('tarefas'));
+      if (tasksModule) activeGroup = `module:${tasksModule.id}`;
     }
     if (['processes', 'processes-settings', 'processes-access'].includes(initialPage)) {
       const processesModule = visibleModules().find((item) => String(item.family || item.module_code || item.code || '').toLowerCase().startsWith('processos'));

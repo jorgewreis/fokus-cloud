@@ -1,0 +1,34 @@
+{
+  "compatibility": {
+    "php_cli": "8.4.27",
+    "runtime_image": "fokus-law-linux-qa:20261107-node2413",
+    "dockerfile": "tests/Deployment/linux-runtime/Dockerfile",
+    "mysql_version": "8.4.13",
+    "mysql_image": "mysql@sha256:72c368d898861f3b3a07af0e6d690400f44f048799ed46822783d9224cc2c86d",
+    "redis_version": "7.4.11",
+    "redis_image": "redis@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499",
+    "cache_store": "redis",
+    "cache_limiter": "redis",
+    "session_driver": "database",
+    "redis_role": "active-cache-and-limiter"
+  },
+  "target": {
+    "php_cli": "8.5.7",
+    "runtime_image": "fokus-law-linux-qa:20261107-php857-node2413",
+    "dockerfile": "tests/Deployment/linux-runtime/php85/Dockerfile",
+    "mysql_version": "Percona 8.4.10-10",
+    "mysql_image": "percona/percona-server@sha256:d24391a363426239220c35b9707d6b26ce7522ac27abe55689baebfb48bd9fb3",
+    "redis_version": "7.0.15 upstream",
+    "redis_image": "redis@sha256:497aa9b1f103f2bbcb7f176465360aee4224a724b3438eb8131c94057cfb5659",
+    "limits": [
+      "Upstream Redis image does not attest Ubuntu backports.",
+      "CLI tests do not attest FPM/proxy execution."
+    ],
+    "mysql_tag": "percona/percona-server:8.4.10-10",
+    "redis_tag": "redis:7.0.15-bookworm",
+    "cache_store": "database",
+    "cache_limiter": "database",
+    "session_driver": "database",
+    "redis_role": "installed-not-active-cache"
+  }
+}

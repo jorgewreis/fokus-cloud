@@ -1,0 +1,384 @@
+name: Deploy Fokus Cloud Laravel
+
+"on":
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('law-validation-pr-{0}', github.event.pull_request.number) || 'production-deploy' }}
+  cancel-in-progress: false
+
+jobs:
+  classify:
+    name: Classify deployment impact
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    outputs:
+      docs_only: ${{ steps.impact.outputs.docs_only }}
+    steps:
+      - name: Checkout complete comparison history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - name: Test conservative deployment classification
+        run: python3 -m unittest discover -s tests/Deployment -p 'test_deployment_guard.py' -v
+      - name: Validate engineering knowledge structure
+        run: python3 tools/ci/validate-knowledge.py
+      - name: Classify changes and compare candidate builds
+        id: impact
+        run: python3 tools/ci/classify-deployment.py
+
+  validate:
+    name: Validate application
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      - name: Test operational deployment contracts
+        run: python3 -m unittest discover -s tests/Deployment -p 'test_operational_*.py' -v
+
+      - name: Setup Node for deterministic Fokus Law asset generation
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: Generate content-addressed Fokus Law assets for tests
+        run: npm run law:assets:prepare
+
+      - name: Verify immutable asset retention filter
+        run: node tests/Deployment/fokus-law-assets-rsync.mjs
+
+      - name: Setup PHP with SQLite
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite, sqlite3
+          coverage: none
+
+      - name: Prepare SQLite database for package discovery
+        run: touch database/database.sqlite
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Validate migrations and seed data on SQLite
+        run: |
+          cp .env.example .env
+          touch database/ci.sqlite
+          php artisan key:generate --force
+          DB_CONNECTION=sqlite DB_DATABASE="$GITHUB_WORKSPACE/database/ci.sqlite" php artisan migrate:fresh --seed --force --no-interaction
+
+      - name: Run automated tests
+        run: php artisan test
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Validate generated Fokus Styles contract
+        run: |
+          npm run styles:sync
+          git diff --exit-code -- public/assets/css/shared/fokus.css
+          npm run tokens:check
+          npm run backoffice:contract:check
+
+      - name: Install Chromium for visual Backoffice tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Run visual Backoffice regression tests
+        run: npm run test:backoffice:visual
+
+      - name: Upload visual regression report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backoffice-playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+
+      - name: Verify Node.js runtime
+        run: node --version
+
+      - name: Validate published SEO metadata
+        run: npm run seo:check
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && needs.validate.result == 'success' && needs.classify.result == 'success' && needs.classify.outputs.docs_only == 'false'
+    name: Publish Laravel application
+    needs: [validate, classify]
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+      DEPLOY_PUBLIC_BASE_URL: ${{ vars.DEPLOY_PUBLIC_BASE_URL }}
+      DEPLOY_RELEASE_URL: ${{ vars.DEPLOY_RELEASE_URL }}
+      FPM_RELOAD_MODE: ${{ vars.FPM_RELOAD_MODE }}
+      FPM_SERVICE: ${{ vars.FPM_SERVICE }}
+      EXPECTED_RELEASE: ${{ github.sha }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      # Intentionally fail before SSH or schema mutations until an independently
+      # reviewed, dynamic release endpoint and runtime policy are configured.
+      - name: Require verifiable deployment prerequisites
+        id: preflight
+        timeout-minutes: 2
+        run: |
+          python3 tools/ci/verify-deployment.py preflight
+          python3 tools/ci/verify-deployment.py probe-current
+
+      - name: Setup Node for immutable Fokus Law assets
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: Generate immutable assets and one-shot deploy payload
+        run: node tools/generate-fokus-law-assets.mjs --output-root "$GITHUB_WORKSPACE" --staging-dir "$RUNNER_TEMP/fokus-law-assets"
+
+      - name: Configure SSH
+        id: ssh
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_PORT"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY"
+          test -n "$DEPLOY_KNOWN_HOSTS"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" exit
+
+      - name: Verify Law schema before publishing application code
+        id: schema
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          # Reviewed additive migration only. Changing it requires a new review.
+          migration=database/migrations/2026_10_30_160000_add_encrypted_details_to_law_contacts.php
+          echo "2db13e1a8d350ac81577c042e915bdfea4bafe821b188ded125f2201e3e8b4d9  $migration" | sha256sum --check --status
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9_./-]+$ ]]
+          remote_dir="/tmp/fokuscloud-law-schema-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          ssh_args=(-o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT")
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          ssh "${ssh_args[@]}" "$target" "set -eu; test -f '$DEPLOY_PATH/vendor/autoload.php'; test -f '$DEPLOY_PATH/.env'; mkdir -m 700 '$remote_dir'"
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -P "$DEPLOY_PORT" "$migration" deploy/prepublish-law-schema.php "$target:$remote_dir/"
+          ssh "${ssh_args[@]}" "$target" "set -eu; cd '$DEPLOY_PATH'; php '$remote_dir/prepublish-law-schema.php' '$DEPLOY_PATH'; rm -f '$remote_dir/prepublish-law-schema.php' '$remote_dir/2026_10_30_160000_add_encrypted_details_to_law_contacts.php'; rmdir '$remote_dir'"
+
+      - name: Stage immutable Fokus Law assets before application references
+        id: assets
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9_./-]+$ ]]
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          rsync -rlDz --relative \
+            --files-from="$RUNNER_TEMP/fokus-law-assets/files.txt" \
+            -e "ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p $DEPLOY_PORT" \
+            "$RUNNER_TEMP/fokus-law-assets/" "$target:$DEPLOY_PATH/"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$target" \
+            "set -eu; cd '$DEPLOY_PATH'; sha256sum --check -" < "$RUNNER_TEMP/fokus-law-assets/checksums.sha256"
+
+      - name: Sync application source
+        id: files
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_PATH"
+          ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH'"
+          rsync -rlDzvc --delete-delay \
+            --filter="merge $RUNNER_TEMP/fokus-law-assets/protect.rules" \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude '.gitignore' \
+            --exclude '.env' \
+            --exclude '.env.*' \
+            --exclude 'node_modules/' \
+            --exclude 'vendor/' \
+            --exclude 'storage/' \
+            -e "ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -p $DEPLOY_PORT" \
+            ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+
+      - name: Check server runtime
+        id: runtime
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; cd '$DEPLOY_PATH'; printf 'user='; id -un; printf 'php='; php -r 'echo PHP_VERSION, PHP_EOL;'; printf 'composer='; composer --version; test -f composer.json; test -f composer.lock; test -f .env"
+
+      - name: Install dependencies on server
+        id: dependencies
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          remote_log=/tmp/fokuscloud-composer-install.log
+          remote_status=/tmp/fokuscloud-composer-install.status
+          ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=12 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; cd '$DEPLOY_PATH'; test -f .env; mkdir -p resources/views storage/framework/cache storage/framework/sessions storage/framework/views storage/logs; find storage bootstrap/cache -type d -exec chmod ug+rwx {} +; rm -f bootstrap/cache/*.php '$remote_log' '$remote_status'; nohup sh -c 'composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader; result=\$?; printf \"%s\\n\" \"\$result\" > \"$remote_status\"' > '$remote_log' 2>&1 </dev/null &"
+          for attempt in {1..45}; do
+            status="$(ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=12 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "test -f '$remote_status' && cat '$remote_status' || true" || true)"
+            if [ -n "$status" ]; then
+              ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=12 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "cat '$remote_log'"
+              test "$status" = "0"
+              exit 0
+            fi
+            sleep 2
+          done
+          ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=12 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "cat '$remote_log' 2>/dev/null || true" || true
+          echo "Composer did not finish within 90 seconds."
+          exit 1
+
+      - name: Migrate database on server
+        id: migrations
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; cd '$DEPLOY_PATH'; php artisan migrate --force --no-interaction"
+
+      - name: Configure public Datajud access on server
+        id: datajud_config
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DATAJUD_API_KEY: ${{ secrets.DATAJUD_API_KEY }}
+        run: |
+          printf '%s' "$DATAJUD_API_KEY" | ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; cd '$DEPLOY_PATH'; php deploy/configure-datajud.php"
+
+      - name: Optimize Laravel on server
+        id: caches
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; cd '$DEPLOY_PATH'; php artisan optimize"
+
+      - name: Synchronize automatic contact age tags
+        id: tags
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; cd '$DEPLOY_PATH'; php artisan law:sync-contact-age-tags --no-interaction"
+
+      - name: Check Datajud configuration and public endpoint
+        id: datajud
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; cd '$DEPLOY_PATH'; php artisan law:datajud-status; php artisan law:datajud-status --probe || printf '%s\n' '::warning::O Datajud não confirmou resposta externa; consulte o diagnóstico acima.'"
+
+      - name: Ensure Laravel scheduler is active
+        id: scheduler
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; cd '$DEPLOY_PATH'; bash deploy/install-scheduler.sh; php artisan schedule:list --no-ansi | grep law-datajud"
+
+      - name: Apply explicitly selected PHP-FPM reload policy
+        id: services
+        timeout-minutes: 2
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          # Preflight validates these exact, bounded arguments before any mutation.
+          # No restart fallback, privilege change, or swallowed SSH exit status.
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "bash -s -- '$FPM_RELOAD_MODE' '$FPM_SERVICE'" < deploy/reload-runtime.sh
+
+      - name: Purge Cloudflare cache
+        id: cdn
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ZONE_ID != '' }}
+        run: |
+          curl --fail-with-body --request POST \
+            "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data '{"purge_everything":true}'
+
+      - name: Verify application health and expected active release
+        id: release
+        timeout-minutes: 2
+        run: python3 tools/ci/verify-deployment.py verify
+
+      - name: Report each publication phase
+        if: ${{ always() }}
+        env:
+          PHASE_PREFLIGHT: ${{ steps.preflight.outcome }}
+          PHASE_SSH: ${{ steps.ssh.outcome }}
+          PHASE_SCHEMA: ${{ steps.schema.outcome }}
+          PHASE_ASSETS: ${{ steps.assets.outcome }}
+          PHASE_FILES: ${{ steps.files.outcome }}
+          PHASE_RUNTIME: ${{ steps.runtime.outcome }}
+          PHASE_DEPENDENCIES: ${{ steps.dependencies.outcome }}
+          PHASE_MIGRATIONS: ${{ steps.migrations.outcome }}
+          PHASE_DATAJUD_CONFIG: ${{ steps.datajud_config.outcome }}
+          PHASE_CACHES: ${{ steps.caches.outcome }}
+          PHASE_TAGS: ${{ steps.tags.outcome }}
+          PHASE_DATAJUD: ${{ steps.datajud.outcome }}
+          PHASE_SCHEDULER: ${{ steps.scheduler.outcome }}
+          PHASE_SERVICES: ${{ steps.services.outcome }}
+          PHASE_CDN: ${{ steps.cdn.outcome }}
+          PHASE_RELEASE: ${{ steps.release.outcome }}
+        run: python3 tools/ci/summarize-deployment.py
