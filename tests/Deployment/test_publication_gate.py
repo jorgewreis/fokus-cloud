@@ -221,6 +221,45 @@ class EntryPoint(unittest.TestCase):
         with patch.object(gate.subprocess, 'check_output', side_effect=subprocess.CalledProcessError(1, 'git')):
             with contextlib.redirect_stderr(io.StringIO()): self.assertEqual(gate.main(), 1)
 
+    def test_concurrency_preserves_main_pr_and_isolates_each_nonmain_dispatch(self):
+        source = (ROOT / '.github/workflows/deploy.yml').read_text()
+        expected = """  group: ${{ github.event_name == 'pull_request' && format('law-validation-pr-{0}', github.event.pull_request.number) || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && format('law-validation-dispatch-{0}', github.run_id) || 'production-deploy') }}
+  cancel-in-progress: false
+
+"""
+        self.assertEqual(source.split('concurrency:\n')[1].split('jobs:\n')[0], expected)
+        # Truth table for the exact pinned Actions expression above. This does not
+        # dispatch Actions or inspect/cancel any existing production execution.
+        cases = [
+            ('push', 'refs/heads/main', None, 101, 'production-deploy'),
+            ('workflow_dispatch', 'refs/heads/main', None, 102, 'production-deploy'),
+            ('pull_request', 'refs/pull/55/merge', 55, 103, 'law-validation-pr-55'),
+            ('pull_request', 'refs/pull/56/merge', 56, 104, 'law-validation-pr-56'),
+            ('workflow_dispatch', 'refs/heads/candidate', None, 105, 'law-validation-dispatch-105'),
+            ('workflow_dispatch', 'refs/heads/candidate', None, 106, 'law-validation-dispatch-106'),
+            ('workflow_dispatch', 'refs/heads/production-deploy', None, 107, 'law-validation-dispatch-107'),
+            ('workflow_dispatch', 'refs/tags/v1', None, 108, 'law-validation-dispatch-108'),
+            # PR has precedence exactly as before; unrelated trigger behavior is
+            # unchanged (non-main pushes are not enabled by this workflow).
+            ('pull_request', 'refs/heads/main', 55, 109, 'law-validation-pr-55'),
+            ('push', 'refs/heads/candidate', None, 110, 'production-deploy'),
+            # Actions equality is case-insensitive; this existing main-name
+            # ambiguity is not used by the reviewed isolated branch.
+            ('workflow_dispatch', 'refs/heads/MAIN', None, 111, 'production-deploy'),
+        ]
+        groups = []
+        for event, ref, pr, run_id, expected_group in cases:
+            with self.subTest(event=event, ref=ref, run_id=run_id):
+                group = ((event.casefold() == 'pull_request' and f'law-validation-pr-{pr}')
+                         or (event.casefold() == 'workflow_dispatch' and ref.casefold() != 'refs/heads/main'
+                             and f'law-validation-dispatch-{run_id}' or 'production-deploy'))
+                self.assertEqual(group, expected_group)
+                if event.casefold() == 'workflow_dispatch' and ref.casefold() != 'refs/heads/main':
+                    self.assertNotEqual(group, 'production-deploy')
+                    self.assertFalse(group.startswith('law-validation-pr-'))
+                    groups.append(group)
+        self.assertEqual(len(groups), len(set(groups)))
+
     def test_workflow_checks_after_local_preparation_before_ssh_with_no_destination_secrets(self):
         source = (ROOT / '.github/workflows/deploy.yml').read_text()
         deploy = source.split('  deploy:\n')[1]

@@ -49,7 +49,7 @@ async function requiredAssets() {
 // Exact reviewed workflow pin, independent of the file under test. This accepts
 // only the manual-main-only FEKS workflow plus the authorized FPM glue. It is not a YAML
 // heuristic and does not grant publication permission. Any change needs review.
-const reviewedWorkflowSha256 = 'c6a9dc5d6a599e6d7485994471c6c75fcd313ff150b30c1df3350cf1f2c3250d';
+const reviewedWorkflowSha256 = '390ab846cbd9b669fd97cc801ddd7c00a85de9faacdb78af75ba8555968f4040';
 const deployWorkflowPath = path.join(repositoryRoot, '.github/workflows/deploy.yml');
 const reviewedWorkflow = await readFile(deployWorkflowPath, 'utf8');
 function assertReviewedWorkflow(workflow) {
@@ -117,6 +117,7 @@ test('publication contract rejects missing, malformed and permissive workflows',
     empty: '',
     malformed: reviewedWorkflow.replace('jobs:', 'jobs: ['),
     'wrong indentation': reviewedWorkflow.replace('    environment: production', 'environment: production'),
+    'shared production queue': reviewedWorkflow.replace("format('law-validation-dispatch-{0}', github.run_id)", "'production-deploy'"),
     'automatic publishing': reviewedWorkflow.replace("github.event_name == 'workflow_dispatch' && ", ''),
     'missing validation proof': reviewedWorkflow.replace('python3 deploy/publication_gate.py', 'true'),
     'branch publishing': reviewedWorkflow.replace("github.ref == 'refs/heads/main'", 'true'),

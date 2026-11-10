@@ -445,7 +445,11 @@ class WorkflowContract(unittest.TestCase):
         # No unrelated body changes are permitted: #56 schema, immutable assets,
         # Composer, migrations, scheduler and purge remain exactly as reviewed.
         self.assertEqual(expected_deploy, current.split('    environment: production')[1])
-        self.assertEqual(original.split('concurrency:\n')[1].split('jobs:\n')[0], current.split('concurrency:\n')[1].split('jobs:\n')[0])
+        # Preserve main and PR queues, isolating only non-main dispatch validation.
+        expected_concurrency = original.split('concurrency:\n')[1].split('jobs:\n')[0].replace(
+            " || 'production-deploy' }}",
+            " || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && format('law-validation-dispatch-{0}', github.run_id) || 'production-deploy') }}")
+        self.assertEqual(expected_concurrency, current.split('concurrency:\n')[1].split('jobs:\n')[0])
         self.assertIn('needs: [validate, classify]', current)
         self.assertIn("if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.validate.result == 'success' && needs.classify.result == 'success' && needs.classify.outputs.docs_only == 'false'", current)
         self.assertIn('fetch-depth: 0', current)

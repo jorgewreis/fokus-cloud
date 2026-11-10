@@ -124,3 +124,37 @@ gate manual e escopo dos secrets Cloudflare.
 - Não houve API GitHub real, SSH, deploy ou mudança de servidor nesta validação.
   O commit/manifesto remoto final ainda precisa de homologação própria. A revisão
   local não substitui os resultados do Actions nem o preflight real do destino.
+
+
+## Isolamento da fila de validação
+
+Uma verificação anterior ao dispatch identificou que a concorrência global ainda
+usava a fila produtiva para dispatch fora da main, mesmo com o job deploy omitido.
+Como o Actions pode substituir uma execução pendente no mesmo grupo apesar de
+`cancel-in-progress: false`, o teste isolado não deve compartilhar essa fila.
+
+A adaptação altera somente a expressão de grupo: main continua usando exatamente
+`production-deploy`; PR mantém `law-validation-pr-{número}`; dispatch fora da main
+usa `law-validation-dispatch-{run_id}`, exclusivo de cada novo dispatch e sem
+colisão com PR ou produção. Tags fora da main também ficam nessa fila de validação;
+o gate continua impedindo sua publicação. `cancel-in-progress: false`, acionamento,
+permissões, jobs e scripts de publicação permanecem inalterados.
+
+Não houve cancelamento, consulta adicional ou alteração de execução produtiva.
+A tabela sintética cobre main push/dispatch, PRs, branches, nomes potencialmente
+confundíveis, tags e duas execuções da mesma branch. O contrato FEKS permite apenas
+a transformação explícita dessa expressão; o hash Styles fixa o workflow completo.
+
+
+Limite da expressão: igualdade de strings no Actions ignora maiúsculas/minúsculas.
+Uma branch chamada `MAIN` compartilha a interpretação de main nessa condição,
+embora o verificador Python rejeite sua publicação por exigir ref exata. A branch
+isolada revisada `codex/fokus-law-manual-gate-ci-20261110` não tem essa ambiguidade.
+Não foi introduzido mecanismo adicional para mudar essa semântica do Actions.
+
+Validação desta adaptação: 124 testes Python aprovados; contratos Node disponíveis,
+25 aprovados e 1 ignorado por falta de rsync. YAML e comparação estrutural confirmam
+jobs, acionamento e política de cancelamento inalterados. Revisão independente sem
+bloqueador no escopo da branch isolada; não houve dispatch ou atuação sobre a fila
+produtiva. A tabela também registra explicitamente a comparação sem distinção de
+caixa, sem tratá-la como prova de isolamento para um alias `MAIN`.
