@@ -8,12 +8,13 @@ from linux_release_common import ROOT, REPORT, guard, environment, php, run, ada
 
 
 
-# Measured composition: unchanged Law suite (327 / 2753) plus the main's
-# 7 unit + 3 feature identity tests (10 / 23). Counts never replace test results.
-EXPECTED_TESTS = 327 + 10
-MINIMUM_ASSERTIONS = 2753 + 23
+# Measured JUnit composition: Law (327 / 2753), main identity (10 / 23),
+# and Lead (14 / 58). Exact counts never replace individual test results.
+EXPECTED_TESTS = 327 + 10 + 14
+MINIMUM_ASSERTIONS = 2753 + 23 + 58
 MAIN_IDENTITY_TESTS = {'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_valid_snapshot_is_accepted': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_missing_identity_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_invalid_release_is_rejected_without_echoing_input': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_stale_captured_manifest_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_in_place_code_change_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_added_code_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_asset_storage_link_does_not_change_runtime_identity': 1, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_unsealed_checkout_fails_closed_without_debug_details': 4, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_invalid_or_missing_nonce_is_not_reflected': 11, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_existing_health_endpoint_is_preserved': 1}
 
+LEAD_TESTS = {'Tests\\Feature\\CompanyAdminTest::test_company_detail_exposes_separate_lead_usage_only_after_platform_authorization': 5, 'Tests\\Feature\\CompanyAdminTest::test_company_detail_permission_is_checked_before_reading_lead_usage': 2, 'Tests\\Feature\\LeadConnectionsTest::test_superuser_credentials_never_execute_application_operation': 7, 'Tests\\Feature\\LeadConnectionsTest::test_runtime_context_is_transaction_local_and_disconnects_on_application_failure': 10, 'Tests\\Feature\\LeadConnectionsTest::test_insecure_configuration_is_rejected_before_connecting': 1, 'Tests\\Feature\\LeadConnectionsTest::test_transaction_pooler_and_missing_ca_are_rejected_before_connecting': 3, 'Tests\\Feature\\LeadConnectionsTest::test_disabled_runtime_never_opens_connection': 1, 'Tests\\Feature\\LeadDatabaseTest::test_context_comes_from_server_session_and_fresh_membership': 2, 'Tests\\Feature\\LeadDatabaseTest::test_manager_role_is_resolved_from_current_membership': 2, 'Tests\\Feature\\LeadDatabaseTest::test_access_revocations_are_checked_before_any_lead_connection': 12, 'Tests\\Feature\\LeadDatabaseTest::test_support_and_cross_company_context_are_blocked': 4, 'Tests\\Feature\\LeadUsageReaderTest::test_unconfigured_metrics_are_unavailable_without_connecting': 1, 'Tests\\Feature\\LeadUsageReaderTest::test_reader_filters_company_and_distinguishes_missing_company_from_zero_usage': 5, 'Tests\\Feature\\LeadUsageReaderTest::test_outage_has_no_fabricated_counts': 3}
 
 def coverage(report):
     suites = list(report) if report.tag == 'testsuites' else [report]
@@ -26,10 +27,10 @@ def coverage(report):
             or len(cases) != EXPECTED_TESTS or len(set(identities)) != len(cases)
             or any(case.find(kind) is not None for case in cases for kind in ('failure', 'error', 'skipped'))):
         raise RuntimeError('Incomplete or failing suite; coverage gate rejected results')
-    for name, minimum in MAIN_IDENTITY_TESTS.items():
+    for name, minimum in {**MAIN_IDENTITY_TESTS, **LEAD_TESTS}.items():
         matches = [case for case, identity in zip(cases, identities) if identity == name]
         if len(matches) != 1 or int(matches[0].get('assertions', 0)) < minimum:
-            raise RuntimeError('Missing or weakened main identity test')
+            raise RuntimeError('Missing or weakened required identity or Lead test')
     return totals
 
 

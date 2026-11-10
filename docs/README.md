@@ -49,6 +49,7 @@ Sobre essa base, produtos derivados podem evoluir por modulos independentes:
 - [Requisitos do modulo identidade e acesso](05-requirements/identity-and-access.md)
 - [Template de requisitos de modulo](05-requirements/module-requirements-template.md)
 - [Modelo relacional](06-data/relational-model.md)
+- [Estrutura inicial PostgreSQL do Fokus Lead](06-data/fokus-lead/README.md)
 - [Politica de controle de acesso](07-security/access-control-policy.md)
 - [Seguranca e dados](07-security/security-and-data.md)
 - [Catalogo comercial](08-commercial/catalog.md)

@@ -26,7 +26,7 @@ class CoverageComposition(unittest.TestCase):
         report = ET.Element('testsuites')
         group = ET.SubElement(report, 'testsuite', tests=str(suite.EXPECTED_TESTS),
                               assertions=str(suite.MINIMUM_ASSERTIONS), failures='0', errors='0', skipped='0')
-        for identity, assertions in suite.MAIN_IDENTITY_TESTS.items():
+        for identity, assertions in {**suite.MAIN_IDENTITY_TESTS, **suite.LEAD_TESTS}.items():
             klass, name = identity.split('::')
             ET.SubElement(group, 'testcase', {'class': klass, 'name': name, 'assertions': str(assertions)})
         for number in range(327):
@@ -34,11 +34,11 @@ class CoverageComposition(unittest.TestCase):
         return report
 
     def test_measured_composition_preserves_all_law_and_main_tests(self):
-        self.assertEqual(suite.EXPECTED_TESTS, 337)
-        self.assertEqual(suite.MINIMUM_ASSERTIONS, 2776)
+        self.assertEqual(suite.EXPECTED_TESTS, 351)
+        self.assertEqual(suite.MINIMUM_ASSERTIONS, 2834)
         self.assertEqual(len(suite.MAIN_IDENTITY_TESTS), 10)
         self.assertEqual(sum(suite.MAIN_IDENTITY_TESTS.values()), 23)
-        self.assertEqual(suite.coverage(self.report())['tests'], 337)
+        self.assertEqual(suite.coverage(self.report())['tests'], 351)
 
     def test_omission_duplicate_or_weakened_identity_is_rejected_even_with_green_totals(self):
         for mutation in ('omit', 'duplicate', 'rename', 'assertions'):
@@ -50,8 +50,21 @@ class CoverageComposition(unittest.TestCase):
                 else: first.set('assertions', '0')
                 with self.assertRaises(RuntimeError): suite.coverage(report)
 
+    def test_every_lead_case_is_required_with_its_assertions(self):
+        self.assertEqual(len(suite.LEAD_TESTS), 14)
+        self.assertEqual(sum(suite.LEAD_TESTS.values()), 58)
+        for name in suite.LEAD_TESTS:
+            for mutation in ('omit', 'rename', 'assertions'):
+                with self.subTest(name=name, mutation=mutation):
+                    report = self.report(); group = report[0]
+                    case = next(c for c in group if c.get('class') + '::' + c.get('name') == name)
+                    if mutation == 'omit': group.remove(case)
+                    elif mutation == 'rename': case.set('name', 'unrelated_passing_case')
+                    else: case.set('assertions', '0')
+                    with self.assertRaises(RuntimeError): suite.coverage(report)
+
     def test_old_or_incomplete_totals_failures_errors_skips_and_hidden_failures_are_rejected(self):
-        for key, value in [('tests','327'),('tests','336'),('tests','338'),('assertions','2775'),
+        for key, value in [('tests','327'),('tests','336'),('tests','350'),('tests','352'),('assertions','2833'),
                            ('failures','1'),('errors','1'),('skipped','1')]:
             with self.subTest(key=key):
                 report = self.report(); report[0].set(key,value)
