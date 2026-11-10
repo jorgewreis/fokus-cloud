@@ -102,6 +102,15 @@ class Gate(unittest.TestCase):
             with self.assertRaises(RuntimeError):self.activate()
         latch=self.base/'activation-blocked.json';state=json.loads(latch.read_text())
         return latch,self.base/('activation-'+state['run']+'.json'),state['run']
+    def activated_terminal_latch(self):
+        self.ready();latch=self.base/'activation-blocked.json';original=Path.unlink
+        def fail_latch(path,*args,**kwargs):
+            if path==latch:raise OSError('synthetic activation latch unlink failure')
+            return original(path,*args,**kwargs)
+        with patch.object(Path,'unlink',fail_latch):
+            with self.assertRaisesRegex(OSError,'activation latch unlink failure'):self.activate()
+        state=json.loads(latch.read_text())
+        return latch,self.base/('activation-'+state['run']+'.json'),state['run']
     def test_verified_journal_before_latch_update_is_recoverable(self):
         self.ready();latch=self.base/'activation-blocked.json';original=g.record
         def interrupt_latch(path,value):
@@ -142,6 +151,34 @@ class Gate(unittest.TestCase):
         a.acknowledge_current(Contract,self.base,journal,run,self.newreceipt,self.base/'policy')
         self.assertFalse(latch.exists())
         self.assertEqual(json.loads(journal.read_text())['state'],'manually_verified_current')
+    def test_successive_terminal_journal_interruptions_are_recoverable(self):
+        latch,journal,run=self.activated_terminal_latch();original=g.record
+        def interrupt_manual_journal(path,value):
+            result=original(path,value)
+            if path==journal and value.get('state')=='manually_verified_current':raise OSError('synthetic second interruption')
+            return result
+        with patch.object(g,'record',side_effect=interrupt_manual_journal):
+            with self.assertRaisesRegex(OSError,'second interruption'):
+                a.acknowledge_current(Contract,self.base,journal,run,self.newreceipt,self.base/'policy')
+        self.assertEqual(json.loads(latch.read_text())['state'],'verified')
+        self.assertEqual(json.loads(journal.read_text())['state'],'manually_verified_current')
+        a.acknowledge_current(Contract,self.base,journal,run,self.newreceipt,self.base/'policy')
+        self.assertFalse(latch.exists())
+    def test_terminal_reconciliation_rejects_changed_intent(self):
+        latch,journal,run=self.activated_terminal_latch();state=json.loads(latch.read_text())
+        state['handoff_sha256']='not-the-consumed-proof';latch.write_text(json.dumps(state))
+        with self.assertRaisesRegex(g.Blocked,'recovery_binding'):
+            a.acknowledge_current(Contract,self.base,journal,run,self.newreceipt,self.base/'policy')
+        self.assertTrue(latch.exists())
+        self.assertEqual(json.loads(journal.read_text())['state'],'verified')
+    def test_terminal_reconciliation_requires_fresh_identity_verifier(self):
+        latch,journal,run=self.activated_terminal_latch()
+        with patch.object(Contract,'run_verifier',side_effect=RuntimeError('synthetic identity verification failure')):
+            with self.assertRaisesRegex(RuntimeError,'identity verification failure'):
+                a.acknowledge_current(Contract,self.base,journal,run,self.newreceipt,self.base/'policy')
+        self.assertTrue(latch.exists())
+        self.assertEqual(json.loads(latch.read_text())['state'],'verified')
+        self.assertEqual(json.loads(journal.read_text())['state'],'verified')
     def test_latch_unlink_failure_is_retryable(self):
         latch,journal,run=self.pending_recovery();original=Path.unlink
         def fail_latch(path,*args,**kwargs):

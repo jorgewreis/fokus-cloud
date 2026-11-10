@@ -139,7 +139,8 @@ def acknowledge_current(c,base,journal,expected_run,receipt,policy_file):
         pending=('switch_intent','activation_unverified_manual_recovery_required')
         terminal=('verified','manually_verified_current')
         same_intent={k:v for k,v in a.items() if k!='state'}=={k:v for k,v in j.items() if k not in ('state','verified_current')}
-        reconciled_terminal=a.get('state') in pending and j.get('state') in terminal and same_intent
+        reconciled_terminal=(a.get('state') in pending and j.get('state') in terminal or
+                             a.get('state')=='verified' and j.get('state')=='manually_verified_current') and same_intent
         g.require((a==j and a.get('state') in pending+terminal) or reconciled_terminal,'recovery_binding')
         g.require(a.get('boot')==boot() and a.get('node_sha256')==c.node_fingerprint(),'unknown_recovery')
         consumed=base/('consumed-'+a['handoff_run']+'.json')

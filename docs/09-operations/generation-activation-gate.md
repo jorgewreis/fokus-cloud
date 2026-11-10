@@ -65,8 +65,9 @@ remain mandatory.
 pending latch**. No automatic database, storage or migration rollback exists.
 
 `recover` is explicit manual acknowledgement, not a retry: the journal and latch must
-match exactly, or the pending latch must match a terminal journal in every intent field
-except its terminal state. The exact run, same boot/node, consumed proof, known
+match exactly, or advance monotonically from a pending latch to a terminal journal, or
+from a `verified` latch to `manually_verified_current`. The intent bindings must match;
+manual-terminal records also bind the verified current root. The exact run, same boot/node, consumed proof, known
 previous/candidate current root, fresh original policy, receipt and successful actual
 verifier are required before clearing a latch. It does not recreate consumed proof.
 Interrupted unknown states, missing consumption, other current roots or unresolved
@@ -75,10 +76,11 @@ needed for any later activation.
 
 ## Tests and evidence boundaries
 
-- 30 local process/state-machine gate regressions plus 22 supervisor tests
-  (30 and 22 passed locally on this consolidation branch). The gate regressions
+- 33 local process/state-machine gate regressions plus 22 supervisor tests
+  (33 and 22 passed locally on this consolidation branch). The gate regressions
   inject journal-before-latch interruptions and latch unlink failures in both activation
-  and acknowledgement, including safe retry.
+  and acknowledgement, including successive terminal interruptions and negative checks
+  for altered intent or failed fresh identity verification.
   Local gate fixtures stub artifact/runtime HTTP contracts and are not real runtime
   evidence. Cases include active descendants, double-fork, expiry, node/receipt/code
   mismatch, slots, overlap, failed later run, external unknown, concurrent locks,
