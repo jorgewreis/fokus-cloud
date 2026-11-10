@@ -1,0 +1,4 @@
+interface:
+  display_name: "Engenharia de testes"
+  short_description: "Testes por risco, contratos e reprodução honesta"
+  default_prompt: "Use $testing-quality-engineering para diagnosticar esta falha de teste e propor validação reproduzível."

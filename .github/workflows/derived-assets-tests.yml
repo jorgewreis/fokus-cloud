@@ -1,0 +1,34 @@
+name: Derived asset provenance
+"on":
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-build-provenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, pdo_sqlite, dom, xml, curl, zip, fileinfo
+          tools: composer:v2
+          coverage: none
+      - name: Compose exact identity contract in disposable checkout only
+        run: |
+          git fetch --no-tags origin b271260d1e9cf4778bf3304e961db73751a297f1 a4fab9f4a4bca022acaf60809f28c7af7a164f5d
+          git config user.name 'Synthetic composition'
+          git config user.email 'synthetic@example.invalid'
+          git merge --no-ff --no-edit b271260d1e9cf4778bf3304e961db73751a297f1
+      - name: Real builds and tamper regressions
+        run: python3 tools/releases/test_derived_assets.py -v
+      - name: Real PHP artifact and identity composition
+        run: python3 tools/releases/test_derived_composition.py
