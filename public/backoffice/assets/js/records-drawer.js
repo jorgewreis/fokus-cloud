@@ -8,6 +8,32 @@ export function createRecordsDrawer({ trigger, drawer }) {
         ? window.FokusStyles?.Offcanvas?.getOrCreateInstance(trigger)
         : null;
     const state = { mode: null, record: null };
+    let focusFrame = null;
+    const cancelPendingFocus = () => {
+        if (focusFrame !== null) cancelAnimationFrame(focusFrame);
+        focusFrame = null;
+    };
+    const focusWhenVisible = () => {
+        cancelPendingFocus();
+        const deadline = performance.now() + 2000;
+        const focus = () => {
+            focusFrame = null;
+            if (!offcanvas?.isOpen || !drawer?.isConnected) return;
+            if (drawer.contains(document.activeElement)) return;
+            if (getComputedStyle(drawer).visibility === "visible") {
+                const target = [...drawer.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+                    .find((element) => element.getClientRects().length && getComputedStyle(element).visibility === "visible");
+                (target || drawer).focus({ preventScroll: true });
+                if (drawer.contains(document.activeElement)) return;
+            }
+            if (performance.now() < deadline) focusFrame = requestAnimationFrame(focus);
+        };
+        focusFrame = requestAnimationFrame(focus);
+    };
+    // A fixed number of animation frames does not guarantee CSS visibility.
+    // Preserve the native focus trap; only complete its initial focus when visible.
+    trigger?.addEventListener("fs:shown", focusWhenVisible);
+    trigger?.addEventListener("fs:hide", cancelPendingFocus);
     const handleEscape = (event) => {
         if (event.key === "Escape" && !drawer?.hidden) close();
     };
@@ -26,6 +52,7 @@ export function createRecordsDrawer({ trigger, drawer }) {
     }
 
     function close() {
+        cancelPendingFocus();
         offcanvas?.hide();
         state.mode = null;
         state.record = null;
@@ -34,6 +61,8 @@ export function createRecordsDrawer({ trigger, drawer }) {
     function dispose() {
         close();
         document.removeEventListener("keydown", handleEscape);
+        trigger?.removeEventListener("fs:shown", focusWhenVisible);
+        trigger?.removeEventListener("fs:hide", cancelPendingFocus);
         offcanvas?.dispose?.();
     }
 

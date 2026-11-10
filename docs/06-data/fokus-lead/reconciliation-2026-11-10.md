@@ -86,3 +86,21 @@ Validação repetida por mudança material da composição e do runtime Laravel:
 CI remoto do novo head deve ser conferido antes de marcar pronto para revisão.
 Os portões reais de PostgreSQL, TLS, LOGINs, pool e provisionamento continuam
 pendentes e as flags seguem desativadas. Esta composição não é um deploy.
+
+### Correção comprovada do foco inicial
+
+O CI da composição passou com uma intermitência recuperada por retry no drawer
+de assinaturas (run 42827412477). A falha foi reproduzida sem retry sob concorrência
+(19/20 passaram). Instrumentação confirmou que Offcanvas tentou focar o botão de
+fechar enquanto `visibility` ainda era `hidden`, mesmo após duplo RAF.
+Uma regressão determinística com atraso CSS de 250ms falhou antes da correção.
+
+O adaptador Cloud `records-drawer.js` agora completa o foco inicial somente quando
+o drawer estiver efetivamente visível, sem substituir o focus trap Styles, sem
+roubar foco já atribuído internamente, e cancelando no fechamento/descarte. A busca
+é limitada a dois segundos para não manter frames infinitos em CSS inválido.
+A regressão cobre abertura, Escape, reabertura e fechamento durante a transição.
+Após correção, 40 repetições concorrentes (20 do caso original e 20 do caso novo)
+passaram com retries=0. Nenhuma dependência, timeout de teste ou asserção foi
+relaxada. CI e homologação Linux do novo SHA continuam necessários; os resultados
+do SHA anterior não comprovam a correção nova.
