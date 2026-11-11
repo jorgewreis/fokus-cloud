@@ -23,7 +23,9 @@ jobs:
           tools: composer:v2
           coverage: none
       - name: Real Linux process regressions
-        run: python3 tools/releases/test_generation_supervisor.py -v
+        run: |
+          python3 tools/releases/test_generation_supervisor.py -v
+          python3 tools/releases/test_generation_activation.py -v
       - name: Compose exact reviewed contracts in disposable checkout
         run: |
           git fetch --no-tags origin b271260d1e9cf4778bf3304e961db73751a297f1 a4fab9f4a4bca022acaf60809f28c7af7a164f5d 29df5490f29760fbb60d99862dbcbafb54c90051
@@ -31,4 +33,6 @@ jobs:
           git config user.email 'synthetic@example.invalid'
           git merge --no-ff --no-edit b271260d1e9cf4778bf3304e961db73751a297f1 a4fab9f4a4bca022acaf60809f28c7af7a164f5d 29df5490f29760fbb60d99862dbcbafb54c90051
       - name: Real Laravel background queue/cache and immutable artifact
-        run: python3 tools/releases/test_generation_laravel.py
+        run: |
+          python3 tools/releases/test_generation_laravel.py
+          python3 tools/releases/test_generation_gate_laravel.py
