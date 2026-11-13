@@ -2,6 +2,8 @@ Alvo: Codex com acesso aos dados fornecidos ou conectados autorizados.
 
 Analise [CAMPANHA OU PLANO], [CANAIS] e [PERÍODO] com [DADOS E FONTES], buscando [OBJETIVO]. Confirme fuso, cobertura, definições, denominadores e comparabilidade dos dados. Não trate dados inexistentes como zero e não atribua causalidade sem evidência.
 
+Se houver dúvidas ou informações faltantes que possam mudar materialmente a tarefa, consulte primeiro o contexto e as fontes disponíveis. Se a dúvida permanecer, faça uma pergunta por vez, com cinco alternativas, incluindo uma marcada como Recomendada e uma explicação de por que ela é a mais adequada. Inclua “outra resposta” ou “decidir depois” quando fizer sentido. Continue o trabalho independente e, para detalhes menores, declare uma suposição segura e prossiga.
+
 Apresente resultados por objetivo, alcance, seguidores e engajamento quando houver dados; explique fórmulas, fonte e período. Diferencie observações, hipóteses e limitações. Priorize aprendizados acionáveis e proponha experimentos com mudança, métrica primária, linha de base quando disponível, janela e critério de decisão. Sinalize amostras insuficientes, mudanças de formato e dados incompletos.
 
 Entregue relatório, fontes e próximos passos. Não prometa crescimento nem altere campanhas, publique ou faça gastos sem autorização específica aplicável.

@@ -2,6 +2,8 @@ Alvo: Codex com acesso às fontes do projeto.
 
 Elabore um plano de publicação para [PRODUTO], [PÚBLICO], [CANAIS] e [PERÍODO], usando [ESTRATÉGIA], [OBJETIVOS], [RECURSOS] e [REFERÊNCIAS]. Consulte as diretrizes atuais para a campanha e verifique formatos, frequência e restrições; não transporte as regras de uma campanha para outra.
 
+Se houver dúvidas ou informações faltantes que possam mudar materialmente a tarefa, consulte primeiro o contexto e as fontes disponíveis. Se a dúvida permanecer, faça uma pergunta por vez, com cinco alternativas, incluindo uma marcada como Recomendada e uma explicação de por que ela é a mais adequada. Inclua “outra resposta” ou “decidir depois” quando fizer sentido. Continue o trabalho independente e, para detalhes menores, declare uma suposição segura e prossiga.
+
 Proponha calendário em horário e fuso identificados. Para cada peça informe data sugerida, canal, formato, tema, pilar, objetivo, ideia central, texto ou roteiro, CTA, briefing visual, dependências, status e métrica. Conecte as pautas sem repetição excessiva e sinalize feriados ou afirmações que precisem de verificação. Dê alternativas para dados ausentes sem inventar desempenho.
 
 Se solicitado a salvar o plano, copie o modelo em social-media/modelos/plano-publicacao para a pasta do produto, com nome de data e plano, e salve o calendário ali. Identifique tudo como proposta até existir aprovação; não agende nem publique sem autorização aplicável.
