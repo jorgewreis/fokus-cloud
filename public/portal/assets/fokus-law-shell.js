@@ -944,8 +944,24 @@
       form.append(fieldset, readonly, formFeedback, footer);
       sections.replaceChildren(form, historyCard);
       cancel.addEventListener('click', () => renderCompany());
+      const companyErrors = new Map();
+      const clearCompanyErrors = () => {
+        companyErrors.forEach(({ input, message, invalidBefore, describedBefore }) => {
+          const tokens = (input.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
+          const remaining = describedBefore ? tokens : tokens.filter((token) => token !== message.id);
+          if (remaining.length) input.setAttribute('aria-describedby', remaining.join(' '));
+          else input.removeAttribute('aria-describedby');
+          if (input.getAttribute('aria-invalid') === 'true') {
+            if (invalidBefore === null) input.removeAttribute('aria-invalid');
+            else input.setAttribute('aria-invalid', invalidBefore);
+          }
+          message.remove();
+        });
+        companyErrors.clear();
+      };
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
+        clearCompanyErrors();
         save.disabled = true;
         formFeedback.textContent = 'Salvando…';
         const body = Object.fromEntries(new FormData(form).entries());
@@ -962,11 +978,21 @@
           Object.entries(error.errors || {}).forEach(([field, messages]) => {
             const input = form.elements.namedItem(field);
             if (!input || !messages?.[0]) return;
-            input.setAttribute('aria-invalid', 'true');
-            const errorMessage = input.parentElement.querySelector('.law-company-field-error');
+            const invalidBefore = input.getAttribute('aria-invalid');
+            const errorMessage = element('small', 'law-company-field-error');
+            let id = `law-company-error-${field}`;
+            for (let suffix = 1; document.getElementById(id); suffix += 1) id = `law-company-error-${field}-${suffix}`;
+            errorMessage.id = id;
             errorMessage.textContent = messages[0];
-            errorMessage.id = `law-company-error-${field}`;
-            input.setAttribute('aria-describedby', errorMessage.id);
+            const tokens = (input.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
+            const describedBefore = tokens.includes(id);
+            if (!describedBefore) tokens.push(id);
+            const existingMessage = input.parentElement.querySelector('.law-company-field-error');
+            if (existingMessage.attributes.length !== 1 || !existingMessage.hasAttribute('class') || existingMessage.textContent.trim()) input.parentElement.append(errorMessage);
+            else existingMessage.append(errorMessage);
+            companyErrors.set(field, { input, message: errorMessage, invalidBefore, describedBefore });
+            input.setAttribute('aria-invalid', 'true');
+            input.setAttribute('aria-describedby', tokens.join(' '));
           });
         }
       });
