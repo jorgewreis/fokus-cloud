@@ -1,5 +1,11 @@
 Alvo: Codex com acesso aos dados fornecidos ou conectados autorizados.
 
+RESPONSÁVEL: marketing-strategy-director coordena a análise e as recomendações. Se houver delegação disponível e autorizada, peça ao creative-campaign-director que avalie os criativos relacionados aos resultados, sem inferir causalidade; integre o retorno. Sem subagentes, execute diretamente.
+
+SKILLS: carregue marketing-analytics, marketing-strategy e social-content-strategy quando disponíveis; use conversion-rate-optimization se houver funil ou página pertinente e dados suficientes.
+
+PROCESSO: 1. Identifique fonte, acesso, período, fuso, granularidade e qualidade dos dados. 2. Calcule métricas com numeradores e denominadores explícitos. 3. Compare períodos ou peças equivalentes, registrando mudanças de distribuição e tamanho de amostra. 4. Separe fatos de hipóteses e destaque lacunas. 5. Priorize recomendações e testes com métrica, critério de decisão e responsável, sem alegar causalidade não demonstrada.
+
 Analise [CAMPANHA OU PLANO], [CANAIS] e [PERÍODO] com [DADOS E FONTES], buscando [OBJETIVO]. Confirme fuso, cobertura, definições, denominadores e comparabilidade dos dados. Não trate dados inexistentes como zero e não atribua causalidade sem evidência.
 
 Se houver dúvidas ou informações faltantes que possam mudar materialmente a tarefa, consulte primeiro o contexto e as fontes disponíveis. Se a dúvida permanecer, faça uma pergunta por vez, com cinco alternativas, incluindo uma marcada como Recomendada e uma explicação de por que ela é a mais adequada. Inclua “outra resposta” ou “decidir depois” quando fizer sentido. Continue o trabalho independente e, para detalhes menores, declare uma suposição segura e prossiga.

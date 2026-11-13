@@ -1,5 +1,11 @@
 Alvo: Codex com ferramentas de vídeo eventualmente disponíveis.
 
+RESPONSÁVEL: creative-campaign-director coordena conceito, roteiro e direção de vídeo. Quando disponíveis e autorizados, delegue ao marketing-strategy-director a revisão de público e mensagem e ao visual-graphics-engineer a avaliação técnica de movimento e renderização quando necessária. Sem subagentes, execute diretamente e informe a limitação.
+
+SKILLS: carregue video-motion-advertising, creative-art-direction, conversion-copywriting e consumer-psychology quando disponíveis; acrescente social-media-visual-production para peças derivadas. Use apenas ferramentas de vídeo disponíveis e autorizadas.
+
+PROCESSO: 1. Confirme que o formato é permitido na campanha e reúna fontes, identidade, duração e objetivo. 2. Escreva conceito e roteiro com gancho, desenvolvimento e CTA. 3. Descreva por cena tempos, enquadramento, movimento, fala, texto, áudio e legendas. 4. Verifique direitos e alegações. 5. Produza e inspecione sincronização, legibilidade e arquivo final somente se a ferramenta e autorização permitirem; caso contrário entregue roteiro e storyboard como tais.
+
 Desenvolva [ROTEIRO, STORYBOARD OU VÍDEO] para [PRODUTO], [PÚBLICO], [CANAL], [DURAÇÃO] e [OBJETIVO], usando [TEMA, REFERÊNCIAS E PLANO]. Confirme se vídeo é permitido na campanha específica; se a diretriz atual o excluir, apresente a incompatibilidade e peça a decisão necessária antes de produzir para essa campanha.
 
 Se houver dúvidas ou informações faltantes que possam mudar materialmente a tarefa, consulte primeiro o contexto e as fontes disponíveis. Se a dúvida permanecer, faça uma pergunta por vez, com cinco alternativas, incluindo uma marcada como Recomendada e uma explicação de por que ela é a mais adequada. Inclua “outra resposta” ou “decidir depois” quando fizer sentido. Continue o trabalho independente e, para detalhes menores, declare uma suposição segura e prossiga.

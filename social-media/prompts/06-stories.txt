@@ -1,5 +1,11 @@
 Alvo: Codex com ferramenta de geração de imagem disponível.
 
+RESPONSÁVEL: creative-campaign-director coordena roteiro e criação. Se houver delegação disponível e autorizada, peça ao marketing-strategy-director a revisão de objetivo, interação e CTA; caso contrário, execute diretamente.
+
+SKILLS: carregue social-content-strategy, creative-art-direction, social-media-visual-production, conversion-copywriting e imagegen quando disponíveis e pertinentes.
+
+PROCESSO: 1. Confira se o formato cabe na campanha e consulte identidade, público e fontes atuais. 2. Estruture sequência de abertura, desenvolvimento e ação. 3. Escreva texto, CTA e interação sugerida para cada tela; especifique composição vertical e áreas seguras. 4. Gere os arquivos quando possível e examine legibilidade, contraste e coerência em tela pequena. 5. Entregue arquivos ou briefing, ordem, descrição acessível e limitações.
+
 Crie uma sequência de [QUANTIDADE] stories para [PRODUTO], [PÚBLICO], [CANAL] e [OBJETIVO], sobre [TEMA], baseada em [PLANO E REFERÊNCIAS]. Verifique se o formato é permitido pela campanha atual e consulte as especificações atuais do canal quando forem relevantes.
 
 Se houver dúvidas ou informações faltantes que possam mudar materialmente a tarefa, consulte primeiro o contexto e as fontes disponíveis. Se a dúvida permanecer, faça uma pergunta por vez, com cinco alternativas, incluindo uma marcada como Recomendada e uma explicação de por que ela é a mais adequada. Inclua “outra resposta” ou “decidir depois” quando fizer sentido. Continue o trabalho independente e, para detalhes menores, declare uma suposição segura e prossiga.

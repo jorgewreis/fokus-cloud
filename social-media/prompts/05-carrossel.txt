@@ -1,5 +1,11 @@
 Alvo: Codex com ferramenta de geração de imagem disponível.
 
+RESPONSÁVEL: creative-campaign-director coordena roteiro, direção visual e produção. Se houver delegação disponível e autorizada, atribua ao marketing-strategy-director a avaliação de público, progressão e CTA; integre seu parecer. Se não houver, execute diretamente.
+
+SKILLS: carregue social-content-strategy, creative-art-direction, social-media-visual-production, conversion-copywriting, consumer-psychology e imagegen quando disponíveis e pertinentes.
+
+PROCESSO: 1. Examine estratégia, público, fontes, referências visuais e diretrizes da campanha. 2. Defina uma promessa verificável e uma progressão útil da capa ao encerramento. 3. Escreva o texto e objetivo de cada lâmina, legenda e CTA. 4. Planeje enquadramento, hierarquia, tipografia e continuidade do fundo. 5. Gere as lâminas quando possível, confira ordem, texto, legibilidade móvel e consistência entre imagens; corrija problemas observados. 6. Entregue peças ou briefing com limitações e a sequência identificada.
+
 Crie um carrossel para [PRODUTO], [PÚBLICO], [CANAL] e [OBJETIVO], sobre [TEMA], com [NÚMERO DE LÂMINAS] e referências [FONTES E PLANO]. Consulte as diretrizes atuais de identidade e campanha.
 
 Se houver dúvidas ou informações faltantes que possam mudar materialmente a tarefa, consulte primeiro o contexto e as fontes disponíveis. Se a dúvida permanecer, faça uma pergunta por vez, com cinco alternativas, incluindo uma marcada como Recomendada e uma explicação de por que ela é a mais adequada. Inclua “outra resposta” ou “decidir depois” quando fizer sentido. Continue o trabalho independente e, para detalhes menores, declare uma suposição segura e prossiga.

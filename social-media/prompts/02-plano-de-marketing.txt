@@ -1,5 +1,11 @@
 Alvo: Codex com acesso às fontes do projeto.
 
+RESPONSÁVEL: marketing-strategy-director coordena o plano. Se a delegação estiver disponível e autorizada, designe creative-campaign-director para conceito, formatos e capacidade criativa; mantenha objetivos, cronograma e consolidação sob o responsável. Sem agentes disponíveis, execute diretamente e declare a limitação.
+
+SKILLS: carregue marketing-campaign-orchestrator, marketing-strategy, social-content-strategy, consumer-psychology e marketing-analytics quando disponíveis; use paid-ads-strategy somente se mídia paga fizer parte do pedido autorizado.
+
+PROCESSO: 1. Consulte a estratégia existente, objetivos, oferta, orçamento e recursos disponíveis. 2. Traduza os objetivos em ações, canais e entregas. 3. Divida em etapas, subetapas e tarefas, com sequência, responsáveis, dependências e datas propostas. 4. Defina investimento apenas com base autorizada, métricas, linha de base e experimentos. 5. Confira consistência entre capacidade de produção, calendário e metas; registre dados ausentes e apresente o plano completo para revisão.
+
 Crie um plano de marketing para [PRODUTO], [PÚBLICO] e [PERÍODO], a partir de [ESTRATÉGIA E FONTES], respeitando [CAPACIDADE E ORÇAMENTO]. Consulte diretrizes atuais da marca e confirme a oferta antes de usá-la em alegações.
 
 Se houver dúvidas ou informações faltantes que possam mudar materialmente a tarefa, consulte primeiro o contexto e as fontes disponíveis. Se a dúvida permanecer, faça uma pergunta por vez, com cinco alternativas, incluindo uma marcada como Recomendada e uma explicação de por que ela é a mais adequada. Inclua “outra resposta” ou “decidir depois” quando fizer sentido. Continue o trabalho independente e, para detalhes menores, declare uma suposição segura e prossiga.

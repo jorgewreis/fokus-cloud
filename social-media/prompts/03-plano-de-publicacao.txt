@@ -1,5 +1,11 @@
 Alvo: Codex com acesso às fontes do projeto.
 
+RESPONSÁVEL: marketing-strategy-director responde pelo calendário editorial e pela coerência estratégica. Se a delegação estiver disponível e autorizada, atribua ao creative-campaign-director os briefings e a continuidade visual; integre e revise os resultados. Se não houver subagentes, execute diretamente.
+
+SKILLS: carregue social-content-strategy, marketing-strategy, consumer-psychology, conversion-copywriting e social-media-visual-production quando disponíveis; use marketing-analytics para estruturar a medição.
+
+PROCESSO: 1. Consulte a estratégia, as diretrizes atuais do produto, o histórico disponível e a capacidade de criação. 2. Defina pilares e distribua temas por estágio da jornada. 3. Monte a sequência por data, canal, formato e objetivo, respeitando o fuso e as restrições. 4. Para cada publicação, detalhe ideia, abertura, conteúdo, CTA, briefing visual, métrica e dependências. 5. Confira intervalos, repetição, consistência e alegações antes de apresentar o calendário e as pendências.
+
 Elabore um plano de publicação para [PRODUTO], [PÚBLICO], [CANAIS] e [PERÍODO], usando [ESTRATÉGIA], [OBJETIVOS], [RECURSOS] e [REFERÊNCIAS]. Consulte as diretrizes atuais para a campanha e verifique formatos, frequência e restrições; não transporte as regras de uma campanha para outra.
 
 Se houver dúvidas ou informações faltantes que possam mudar materialmente a tarefa, consulte primeiro o contexto e as fontes disponíveis. Se a dúvida permanecer, faça uma pergunta por vez, com cinco alternativas, incluindo uma marcada como Recomendada e uma explicação de por que ela é a mais adequada. Inclua “outra resposta” ou “decidir depois” quando fizer sentido. Continue o trabalho independente e, para detalhes menores, declare uma suposição segura e prossiga.

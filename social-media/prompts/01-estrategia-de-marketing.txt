@@ -1,5 +1,11 @@
 Alvo: Codex com acesso às fontes do projeto.
 
+RESPONSÁVEL: marketing-strategy-director coordena a estratégia e integra os resultados. Quando a delegação estiver disponível e autorizada, atribua ao creative-campaign-director o diagnóstico de identidade e viabilidade criativa; cada responsável deve devolver fontes, recomendações, limites e pendências. Se agentes não estiverem disponíveis, execute diretamente e informe isso.
+
+SKILLS: carregue marketing-campaign-orchestrator, marketing-strategy, brand-intelligence, consumer-psychology e marketing-analytics quando disponíveis; complemente com social-content-strategy se o canal orgânico fizer parte do pedido.
+
+PROCESSO: 1. Recupere briefing, decisões da marca, oferta, público, situação dos canais e dados existentes. 2. Identifique necessidades e objeções comprovadas ou marque-as como hipóteses. 3. Compare posicionamentos e canais por aderência, esforço e evidência. 4. Defina prioridades, pilares e jornada. 5. Associe cada hipótese comportamental a uma ação ética e a um experimento mensurável. 6. Consolide um plano com responsáveis, etapas, dependências e critérios de avaliação.
+
 Desenvolva uma estratégia de marketing para [PRODUTO], dirigida a [PÚBLICO], considerando [OBJETIVO], [MERCADO], [CANAIS], [PRAZO], [ORÇAMENTO] e [MATERIAIS DISPONÍVEIS].
 
 Consulte as decisões atuais da marca e fontes verificáveis do produto. Use as skills pertinentes de estratégia, marca e psicologia do consumidor quando disponíveis. Separe fatos, suposições e lacunas; verifique afirmações sobre mercado e plataforma em fontes atuais e cite-as.
