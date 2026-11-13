@@ -1,0 +1,7 @@
+Alvo: Codex com ferramenta de geração de imagem disponível.
+
+Crie uma sequência de [QUANTIDADE] stories para [PRODUTO], [PÚBLICO], [CANAL] e [OBJETIVO], sobre [TEMA], baseada em [PLANO E REFERÊNCIAS]. Verifique se o formato é permitido pela campanha atual e consulte as especificações atuais do canal quando forem relevantes.
+
+Para cada story apresente objetivo, texto, composição vertical, elementos interativos sugeridos, CTA e descrição acessível. Preserve área segura para elementos da plataforma e mantenha a identidade aprovada. Não invente alegações ou métricas; destaque o que precisa ser confirmado.
+
+Se houver ferramenta disponível e autorização para criação, gere e examine os arquivos; caso contrário entregue briefing e identifique a limitação. Guarde rascunhos no plano e, após aprovação identificável, salve imagens finais em imagens-aprovadas e registre-as. Não publique ou agende sem autorização aplicável.

@@ -1,0 +1,7 @@
+Alvo: Codex com acesso às fontes do projeto.
+
+Desenvolva uma estratégia de marketing para [PRODUTO], dirigida a [PÚBLICO], considerando [OBJETIVO], [MERCADO], [CANAIS], [PRAZO], [ORÇAMENTO] e [MATERIAIS DISPONÍVEIS].
+
+Consulte as decisões atuais da marca e fontes verificáveis do produto. Use as skills pertinentes de estratégia, marca e psicologia do consumidor quando disponíveis. Separe fatos, suposições e lacunas; verifique afirmações sobre mercado e plataforma em fontes atuais e cite-as. Se uma decisão essencial não puder ser obtida, faça uma pergunta por vez, com até cinco alternativas e uma recomendação justificada.
+
+Entregue diagnóstico, público e necessidades, posicionamento, proposta de valor, pilares, canais, jornada, prioridades e plano de execução proporcional aos recursos. Apresente hipóteses comportamentais éticas, sem manipulação ou promessas de resultado. Proponha métricas com definição, fonte e frequência, testes e critérios de decisão; não invente linha de base ou crescimento. Finalize com fontes, riscos e pendências. Não publique, agende ou comprometa recursos sem autorização específica aplicável.

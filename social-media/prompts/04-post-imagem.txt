@@ -1,0 +1,7 @@
+Alvo: Codex com ferramenta de geração de imagem disponível.
+
+Crie [QUANTIDADE] proposta(s) de post para [PRODUTO], [PÚBLICO], [CANAL] e [OBJETIVO], sobre [TEMA]. Use [BRIEFING], [REFERÊNCIAS] e [PLANO DE PUBLICAÇÃO]. Consulte a identidade e a disponibilidade do produto nas fontes atuais; diferencie fatos de hipóteses.
+
+Entregue conceito, texto da arte, legenda, CTA e direção visual com composição, tipografia, cores, acessibilidade e dimensões adequadas ao canal. Use psicologia do consumidor de forma ética, evitando promessas e prova social inventadas. Quando a geração de imagem estiver disponível e autorizada pelo pedido, gere a peça e examine o resultado, inclusive legibilidade. Se não estiver disponível, entregue briefing e sinalize que a imagem não foi produzida.
+
+Salve versões em rascunhos do plano indicado. Somente após aprovação identificável salve a imagem final em imagens-aprovadas desse plano e registre arquivo, versão, data e referência da aprovação. Não publique nem agende sem autorização aplicável.
