@@ -1,5 +1,7 @@
 Alvo: Codex com ferramentas de vídeo eventualmente disponíveis.
 
+PADRÃO VISUAL: Para planejar ou produzir novas postagens da Fokus Cloud e subprodutos, consulte social-media/identidade-visual.md e aplique a paleta e tipografia aprovadas. Preserve ativos oficiais e não altere publicações existentes sem autorização.
+
 RESPONSÁVEL: creative-campaign-director coordena conceito, roteiro e direção de vídeo. Quando disponíveis e autorizados, delegue ao marketing-strategy-director a revisão de público e mensagem e ao visual-graphics-engineer a avaliação técnica de movimento e renderização quando necessária. Sem subagentes, execute diretamente e informe a limitação.
 
 SKILLS: carregue video-motion-advertising, creative-art-direction, conversion-copywriting e consumer-psychology quando disponíveis; acrescente social-media-visual-production para peças derivadas. Use apenas ferramentas de vídeo disponíveis e autorizadas.

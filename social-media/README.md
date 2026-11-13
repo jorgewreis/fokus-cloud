@@ -2,6 +2,8 @@
 
 Base de trabalho para planejar marketing e produzir conteúdo da Fokus Cloud e de seus produtos. Os prompts em `prompts/` têm como alvo o **Codex com acesso ao projeto**; copie o arquivo desejado, preencha os campos e forneça as referências disponíveis. Se outra ferramenta for usada, adapte o prompt às capacidades dela.
 
+O [padrão visual das postagens](identidade-visual.md), aprovado em 13/11/2026, define paleta e tipografia para novas peças sociais. Consulte-o antes de produzir.
+
 ## Organização
 
 - `prompts/`: modelos reutilizáveis para estratégia, planejamento, publicação, imagem, carrossel, stories, vídeo e análise.

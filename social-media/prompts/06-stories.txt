@@ -1,5 +1,7 @@
 Alvo: Codex com ferramenta de geração de imagem disponível.
 
+PADRÃO VISUAL: Para planejar ou produzir novas postagens da Fokus Cloud e subprodutos, consulte social-media/identidade-visual.md e aplique a paleta e tipografia aprovadas. Preserve ativos oficiais e não altere publicações existentes sem autorização.
+
 RESPONSÁVEL: creative-campaign-director coordena roteiro e criação. Se houver delegação disponível e autorizada, peça ao marketing-strategy-director a revisão de objetivo, interação e CTA; caso contrário, execute diretamente.
 
 SKILLS: carregue social-content-strategy, creative-art-direction, social-media-visual-production, conversion-copywriting e imagegen quando disponíveis e pertinentes.

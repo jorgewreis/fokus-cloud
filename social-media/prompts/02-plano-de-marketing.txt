@@ -1,5 +1,7 @@
 Alvo: Codex com acesso às fontes do projeto.
 
+PADRÃO VISUAL: Para planejar ou produzir novas postagens da Fokus Cloud e subprodutos, consulte social-media/identidade-visual.md e aplique a paleta e tipografia aprovadas. Preserve ativos oficiais e não altere publicações existentes sem autorização.
+
 RESPONSÁVEL: marketing-strategy-director coordena o plano. Se a delegação estiver disponível e autorizada, designe creative-campaign-director para conceito, formatos e capacidade criativa; mantenha objetivos, cronograma e consolidação sob o responsável. Sem agentes disponíveis, execute diretamente e declare a limitação.
 
 SKILLS: carregue marketing-campaign-orchestrator, marketing-strategy, social-content-strategy, consumer-psychology e marketing-analytics quando disponíveis; use paid-ads-strategy somente se mídia paga fizer parte do pedido autorizado.
