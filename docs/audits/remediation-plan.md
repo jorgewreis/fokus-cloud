@@ -10,4 +10,4 @@ Estado: reconhecimento iniciado; auditoria, diagnóstico, plano de correções e
 
 Responsável atual: coordenador desta sessão. Subagentes solicitados não tiveram ferramentas de leitura; só atribuir a eles trabalho efetivo após confirmar acesso. Skills escolhidas até agora: `code-audit`, `autonomous-task-execution` e `principal-software-architect`; carregar especializações adicionais conforme os fluxos examinados.
 
-Próxima ação: reproduzir A-001 no Linux previsto pelo CI, estabelecer ambiente isolado com controle de chamadas externas, mapear caminhos críticos e investigar os avisos de seletores; não tratar como regressão sem reprodução. Preservar os arquivos alheios e não reutilizar a branch do PR de prompts.
+Próxima ação: avaliar o requisito de compatibilidade Windows da investigação A-001, estabelecer ambiente isolado com controle de chamadas externas, mapear caminhos críticos e investigar os avisos de seletores; não tratar como regressão sem reprodução. Preservar os arquivos alheios e não reutilizar a branch do PR de prompts.
