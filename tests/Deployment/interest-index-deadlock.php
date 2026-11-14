@@ -10,9 +10,13 @@ use Illuminate\Support\Facades\Mail;
 
 $root = dirname(__DIR__, 2);
 $sandbox = getenv('UPGRADE_SANDBOX');
+$url = getenv('DB_URL');
+$socket = getenv('DB_SOCKET');
+$port = getenv('DB_PORT');
 if (getenv('FOKUS_INTEREST_INDEX_DISPOSABLE') !== '1' || getenv('APP_ENV') !== 'testing'
     || getenv('RELEASE_DISPOSABLE_TESTS') !== '1' || getenv('DB_CONNECTION') !== 'mysql'
-    || getenv('DB_URL') || ! is_string($sandbox)
+    || ($url !== false && $url !== '') || ($socket !== false && $socket !== '')
+    || ($port !== false && $port !== '' && $port !== '3306') || ! is_string($sandbox)
     || ! is_file($sandbox.'/.disposable-upgrade') || getenv('DB_HOST') !== '127.0.0.1'
     || preg_match('/^fokus_upgrade_[a-f0-9]{16}$/D', (string) getenv('DB_DATABASE')) !== 1
     || is_file($root.'/.env') || is_file($root.'/.env.testing') || is_file($root.'/bootstrap/cache/config.php')) {
