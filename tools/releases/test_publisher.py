@@ -63,7 +63,7 @@ class PublisherPreflight(unittest.TestCase):
                          artifact=base / 'artifact', expected_digest='a'*64, base=self.control,
                          root=self.releases / ('b'*40), storage=self.storage,
                          configuration=self.configuration, receipt=base / 'receipt',
-                         transport=base / 'transport')
+                         transport=base / 'transport', runtime_uid=12345)
         self.contract = Contract()
 
     def invoke(self):
@@ -113,7 +113,11 @@ class PublisherPreflight(unittest.TestCase):
     def test_unpack_failure_never_links_seals_or_switches(self):
         self.contract.unpack.side_effect = ValueError('artifact_digest_mismatch')
         self.contract.shared_links = Mock()
-        with patch.object(publisher.derived, 'contract', return_value=self.contract), \
+        from contextlib import nullcontext
+        guard = types.ModuleType('preparation_guard')
+        guard.secure_preparation = Mock(return_value=nullcontext((lambda: None, lambda *args, **kwargs: None)))
+        with patch.dict(sys.modules, {'preparation_guard': guard}), \
+             patch.object(publisher.derived, 'contract', return_value=self.contract), \
              patch.object(publisher.derived, 'seal') as seal, \
              patch.object(publisher.activation, 'activate') as activate:
             with self.assertRaisesRegex(ValueError, 'artifact_digest_mismatch'):

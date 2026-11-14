@@ -3,6 +3,7 @@
 import importlib.util, json, os, shutil, socket, subprocess, sys, tempfile, time, urllib.request
 from pathlib import Path
 import publisher
+import pwd
 spec=importlib.util.spec_from_file_location('d',Path(__file__).with_name('derived_assets.py'));d=importlib.util.module_from_spec(spec);spec.loader.exec_module(d)
 source=Path(__file__).resolve().parents[2]
 with tempfile.TemporaryDirectory(prefix='rei25-composition-') as temp:
@@ -13,7 +14,8 @@ with tempfile.TemporaryDirectory(prefix='rei25-composition-') as temp:
     storage=temp/'shared-storage';storage.mkdir();configuration=temp/'synthetic.env';configuration.write_text('# synthetic, no credentials\n')
     for name in ('logs','framework/cache','framework/views','framework/sessions'):(storage/name).mkdir(parents=True,exist_ok=True)
     receipt=temp/'receipt.json'
-    prepared=publisher.prepare(source,candidate,evidence,artifact,packed['artifact_sha256'],base,root,storage,configuration,receipt,transport)
+    fd=os.open(base/'prepare.lock',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600);os.close(fd)
+    prepared=publisher.prepare(source,candidate,evidence,artifact,packed['artifact_sha256'],base,root,storage,configuration,receipt,transport,pwd.getpwnam('nobody').pw_uid)
     assert prepared=={'state':'sealed_not_active','source_sha':proof['source_sha']}
     assert not (base/'current').exists()
     links={'storage':str(storage),'.env':str(configuration)}

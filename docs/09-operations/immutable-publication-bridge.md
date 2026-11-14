@@ -51,6 +51,18 @@ fornecer destinos próprios e verificáveis; não há configuração produtiva p
 selo, com digest explícito, destino novo sob `base/releases` e registros fora
 da árvore de releases/storage. Uma falha pode deixar diretório inativo parcial
 para inspeção e nunca altera o ponteiro `current`; não faz limpeza automática.
+A preparação exige `--runtime-uid` explícito, distinto do operador e de root,
+e um `prepare.lock` previamente provisionado e privado. Ela rejeita diretórios
+de controle com proprietário não confiável ou escrita por grupo/outros, ancestrais
+inseguros, ACLs POSIX estendidas ou não verificáveis e substituição de diretórios,
+lock, configuração, storage ou raiz durante as etapas. A árvore candidata é
+reconferida antes e depois do selo; o lock exclusivo é mantido em todo o preparo.
+O operador e root permanecem na fronteira de confiança: isso não resiste a um
+ator com o mesmo UID ou privilégios equivalentes. O UID informado não comprova
+qual usuário ou capacidades o FPM realmente usa; essa verificação e o gate de
+política/evidência de runtime continuam obrigatórios antes de ativar. Invocar
+primitivas isoladas diretamente não equivale a executar este preparo protegido.
+
 Os comandos `activate` e `rollback` delegam ao gate de geração supervisionada e
 exigem explicitamente candidato, receipts, política, geração anterior e prova
 de fronteira; não há modo de forçar ou de reverter dados. A ferramenta opera em

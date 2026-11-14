@@ -10,7 +10,7 @@ import generation_activation as activation
 
 
 def prepare(source, candidate, evidence, artifact, expected_digest, base, root,
-            storage, configuration, receipt, transport):
+            storage, configuration, receipt, transport, runtime_uid):
     """Unpack a new candidate, attach approved shared paths and seal it.
 
     Failure can leave a partial *inactive* root for manual investigation. This
@@ -37,11 +37,20 @@ def prepare(source, candidate, evidence, artifact, expected_digest, base, root,
         contract.require(not path.is_relative_to(source) and not path.is_relative_to(candidate), 'record_outside_build_tree_required')
     contract.require(receipt != transport, 'distinct_records_required')
     contract.require(contract.DIGEST.fullmatch(expected_digest) is not None, 'artifact_digest_required')
-    unpacked = contract.unpack(artifact, expected_digest, root, transport)
-    links = contract.shared_links(root, storage, configuration)
-    sealed = derived.seal(source, candidate, evidence, root, receipt, transport, links=links)
-    contract.verify(root, receipt)
-    contract.require(unpacked['source_sha'] == sealed['source_sha'] == root.name, 'prepared_identity_mismatch')
+    # Linux-only control boundary: private owner/ACL-checked parents and a
+    # pre-provisioned exclusive lock remain held through unpack, links and seal.
+    # Operator and root are trusted; runtime evidence is still required to switch.
+    from preparation_guard import secure_preparation
+    with secure_preparation(base, root.parent, receipt.parent, transport.parent,
+                            configuration, storage, runtime_uid) as (checkpoint, check_tree):
+        unpacked = contract.unpack(artifact, expected_digest, root, transport)
+        checkpoint(); check_tree(root, sealed=False)
+        links = contract.shared_links(root, storage, configuration)
+        checkpoint(); check_tree(root, sealed=False)
+        sealed = derived.seal(source, candidate, evidence, root, receipt, transport, links=links)
+        checkpoint(); check_tree(root, sealed=True)
+        contract.verify(root, receipt)
+        contract.require(unpacked['source_sha'] == sealed['source_sha'] == root.name, 'prepared_identity_mismatch')
     return {'state': 'sealed_not_active', 'source_sha': root.name}
 
 
@@ -59,6 +68,7 @@ def main():
     for name in ('source', 'candidate', 'evidence', 'artifact', 'expected-digest', 'base', 'root',
                  'storage', 'configuration', 'receipt', 'transport'):
         build.add_argument('--' + name, required=True)
+    build.add_argument('--runtime-uid', required=True, type=int)
     for command in ('activate', 'rollback'):
         command_parser = commands.add_parser(command)
         for name in ('source', 'base', 'candidate', 'receipt', 'policy', 'previous', 'previous-receipt', 'boundary'):
