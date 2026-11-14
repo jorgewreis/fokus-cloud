@@ -17,10 +17,15 @@ final class PlatformSessionAuthority
      * Initial MFA only. The caller must obtain the web principal from the
      * authenticated guard, not request input. Context transitions are separate.
      */
-    public function completeInitialMfaForPrincipal(string $actor, string $marker, int $expiresAt, ?string $webUserId, callable $consume): void
+    public function completeInitialMfaForPrincipal(string $actor, string $marker, int $expiresAt, ?string $webUserId, ?int $expectedGeneration, callable $consume): void
     {
         $hash = $this->bindingHash($marker);
-        $register = function (?int $generation) use ($actor, $hash, $expiresAt, $webUserId, $consume): void {
+        abort_unless(($webUserId === null && $expectedGeneration === null) || ($webUserId !== null && $expectedGeneration !== null && $expectedGeneration >= 0), 503, 'Sessão indisponível.');
+        $register = function (?int $generation, ?object $user = null) use ($actor, $hash, $expiresAt, $webUserId, $expectedGeneration, $consume): void {
+            if ($webUserId !== null) {
+                abort_unless($generation === $expectedGeneration && $user && $user->status === 'ativa'
+                    && ($user->locked_until === null || Carbon::parse($user->locked_until)->isPast()), 401, 'Sessão indisponível.');
+            }
             $this->assertAvailable($this->lockActor($actor));
             if ($expiresAt <= now()->getTimestamp()) {
                 throw new InvalidArgumentException('Invalid session authorization expiry.');
@@ -44,10 +49,12 @@ final class PlatformSessionAuthority
     }
 
     /** Experimental only; caller must authenticate both principals beforehand. */
-    public function registerPrincipalAfterMfa(string $actor, string $marker, int $expiresAt, string $userId): void
+    public function registerPrincipalAfterMfa(string $actor, string $marker, int $expiresAt, string $userId, int $expectedGeneration): void
     {
         $hash = $this->bindingHash($marker);
-        (new WebPrincipalGeneration)->withLockedPrincipal($userId, function (int $generation) use ($actor, $hash, $expiresAt, $userId): void {
+        (new WebPrincipalGeneration)->withLockedPrincipal($userId, function (int $generation, object $user) use ($actor, $hash, $expiresAt, $userId, $expectedGeneration): void {
+            abort_unless($generation === $expectedGeneration && $user->status === 'ativa'
+                && ($user->locked_until === null || Carbon::parse($user->locked_until)->isPast()), 401, 'Sessão indisponível.');
             $this->assertAvailable($this->lockActor($actor));
             if ($expiresAt <= now()->getTimestamp()) {
                 throw new InvalidArgumentException('Invalid session authorization expiry.');
@@ -65,7 +72,8 @@ final class PlatformSessionAuthority
     {
         $hash = $this->bindingHash($marker);
 
-        return (new WebPrincipalGeneration)->withLockedPrincipal($userId, function (int $generation) use ($actor, $hash, $sessionId, $userId, $callback): mixed {
+        return (new WebPrincipalGeneration)->withLockedPrincipal($userId, function (int $generation, object $user) use ($actor, $hash, $sessionId, $userId, $callback): mixed {
+            abort_unless($user->status === 'ativa' && ($user->locked_until === null || Carbon::parse($user->locked_until)->isPast()), 401, 'Sessão indisponível.');
             $this->lockActor($actor);
             $binding = DB::table('platform_session_authorizations')->where('binding_hash', $hash)
                 ->where('actor_id', $actor)->lockForUpdate()->first();

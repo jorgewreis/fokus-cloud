@@ -23,11 +23,11 @@ final class WebPrincipalGeneration
         }
 
         return DB::transaction(function () use ($userId, $callback): mixed {
-            $user = DB::table('users')->where('id', $userId)->lockForUpdate()->first(['id']);
+            $user = DB::table('users')->where('id', $userId)->lockForUpdate()->first(['id', 'status', 'locked_until']);
             abort_unless($user, 401, 'Sessão indisponível.');
             $generation = DB::table('web_principal_generations')->where('user_id', $userId)->first();
 
-            return $callback($generation === null ? 0 : (int) $generation->generation);
+            return $callback($generation === null ? 0 : (int) $generation->generation, $user);
         });
     }
 

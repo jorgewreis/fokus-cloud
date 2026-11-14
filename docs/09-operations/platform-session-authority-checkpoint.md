@@ -160,3 +160,11 @@ only with a synthetic guard. It does not
 serialize support/login changes, session persistence or concurrent requests and
 must not be used to remove the MFA gate. The isolated SQLite smoke demonstrates
 only sequential success and rollback; it does not validate a real guard.
+
+A mixed initial MFA now requires a user ID and generation snapshot from the
+web session and checks both generation and user status under the user lock,
+before consuming the challenge. Existing login and support flows do not capture
+this snapshot, and reset does not yet advance this generation. Missing snapshot
+fails closed. The no-user case is not serialized against a concurrent web login;
+therefore the endpoint gate must stay closed. Synthetic tests provide their own
+snapshot and do not establish end-to-end authentication or concurrency behavior.

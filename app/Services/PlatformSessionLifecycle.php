@@ -42,8 +42,13 @@ final class PlatformSessionLifecycle
         }
         abort_if($this->binding->current($session) !== null || $previousActor !== null, 503, 'Sessão indisponível.');
         $webUserId = Auth::guard('web')->id();
+        $snapshot = $session->get('platform_web_principal_snapshot');
+        if ($webUserId !== null) {
+            abort_unless(is_array($snapshot) && ($snapshot['user_id'] ?? null) === (string) $webUserId
+                && is_int($snapshot['generation'] ?? null) && $snapshot['generation'] >= 0, 503, 'Sessão indisponível.');
+        }
         $marker = bin2hex(random_bytes(32));
-        $this->authority->completeInitialMfaForPrincipal($actor, $marker, $this->expiry(), $webUserId === null ? null : (string) $webUserId, $consumeChallenge);
+        $this->authority->completeInitialMfaForPrincipal($actor, $marker, $this->expiry(), $webUserId === null ? null : (string) $webUserId, $webUserId === null ? null : $snapshot['generation'], $consumeChallenge);
         $session->put(PlatformSessionBinding::SESSION_KEY, $marker);
     }
 
