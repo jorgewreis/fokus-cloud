@@ -35,6 +35,19 @@ class ChallengeStore(unittest.TestCase):
         return self.fake.token()
     def consume(self, audience, token, action='activate', candidate=None, artifact=None):
         return store.consume(self.base, audience, token, action, candidate or self.candidate, artifact or self.artifact)
+    def test_protocol_uses_real_store_and_signed_fixture_without_echoing_token(self):
+        import oidc_protocol
+        request = {'operation':'challenge','action':'activate','candidate':self.candidate,'artifact':self.artifact}
+        challenge = oidc_protocol.handle(self.base, json.dumps(request).encode())
+        token = self.token(challenge['audience'])
+        response = oidc_protocol.handle(self.base, json.dumps({**request,'operation':'consume',
+                                          'audience':challenge['audience'],'token':token}).encode())
+        self.assertEqual(response['state'],'verified_once')
+        self.assertNotIn(token,json.dumps(response))
+        with self.assertRaises(FileExistsError):
+            oidc_protocol.handle(self.base, json.dumps({**request,'operation':'consume',
+                                 'audience':challenge['audience'],'token':token}).encode())
+
     def test_valid_once_and_same_challenge_cannot_be_reused(self):
         aud=self.new()
         self.assertEqual(self.consume(aud,self.token(aud))['state'], 'verified_once')

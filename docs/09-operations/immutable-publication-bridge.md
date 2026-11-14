@@ -183,6 +183,15 @@ pode bloquear o serviço; o controle é local e não evita replay entre nós. A 
 integrada à ativação. Transmissão autenticada, permissão do environment, replay
 entre múltiplos nós e bootstrap remoto continuam pendentes.
 
+`oidc_protocol.py` fornece uma interface sintética para solicitar e consumir
+um desafio por JSON limitado em stdin, sem incluir token ou caminho de controle
+na resposta de erro. O diretório é argumento de bootstrap do servidor e não campo
+da requisição. Não há listener produtivo nem comando SSH forçado configurado;
+o protocolo não autentica sozinho o emissor, não verifica as aprovações do
+GitHub e não aciona a ativação. Na futura integração, o caminho de política deve
+ser fixado por bootstrap confiável, e o token não pode ser passado em argumentos,
+logs ou variáveis de ambiente remotas.
+
 ## Evidência e limites
 
 `tests/Deployment/test_legacy_publication_guard.py` verifica que a recusa não

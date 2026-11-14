@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""Synthetic OIDC challenge protocol; no activation and no production listener.
+
+The state directory is a server-owned bootstrap argument, not request data. A
+real deployment must additionally enforce a fixed trusted forced command, SSH
+peer identity, GitHub environment protections and independent artifact binding.
+"""
+import argparse
+import json
+import sys
+
+import github_oidc as oidc
+import oidc_challenge_store as store
+
+MAX_REQUEST = 32768
+
+
+def handle(directory, raw):
+    if not isinstance(raw, bytes) or len(raw) > MAX_REQUEST:
+        raise ValueError('invalid_request')
+    try:
+        value = json.loads(raw, object_pairs_hook=oidc.unique)
+    except (ValueError, UnicodeError) as error:
+        raise ValueError('invalid_request') from error
+    if not isinstance(value, dict):
+        raise ValueError('invalid_request')
+    kind = value.get('operation')
+    common = {'operation', 'action', 'candidate', 'artifact'}
+    expected = common if kind == 'challenge' else common | {'audience', 'token'} if kind == 'consume' else set()
+    if not expected or set(value) != expected:
+        raise ValueError('invalid_request')
+    if kind == 'challenge':
+        audience = store.challenge(directory, value['action'], value['candidate'], value['artifact'])
+        return {'state': 'challenge_issued', 'audience': audience}
+    result = store.consume(directory, value['audience'], value['token'], value['action'], value['candidate'], value['artifact'])
+    return {'state': result['state'], 'action': result['action'], 'candidate': result['candidate'],
+            'artifact': result['artifact'], 'run_id': result['run_id'], 'run_attempt': result['run_attempt']}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--state-dir', required=True)
+    args = parser.parse_args()
+    try:
+        print(json.dumps(handle(args.state_dir, sys.stdin.buffer.read(MAX_REQUEST + 1)), sort_keys=True))
+        return 0
+    except Exception:
+        # Never echo the request, token, server paths or exception details.
+        print('{"state":"blocked","reason":"authorization_protocol_failed"}', file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
