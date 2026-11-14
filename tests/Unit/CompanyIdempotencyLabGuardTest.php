@@ -4,12 +4,23 @@ namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Tests\Isolated\CompanyIdempotencyApiConcurrencyTest;
 use Tests\Isolated\CompanyIdempotencyMySqlLabGuard;
+use Tests\Isolated\CompanyIdempotencyPreflightRaceTest;
 
 require_once dirname(__DIR__).'/Isolated/CompanyIdempotencyMySqlLabGuard.php';
 
 class CompanyIdempotencyLabGuardTest extends TestCase
 {
+    public function test_unapproved_isolated_tests_never_invoke_artisan(): void
+    {
+        foreach ([CompanyIdempotencyApiConcurrencyTest::class, CompanyIdempotencyPreflightRaceTest::class] as $class) {
+            $test = $this->getMockBuilder($class)->setConstructorArgs(['test_unapproved_isolated_tests_never_invoke_artisan'])->onlyMethods(['artisan'])->getMock();
+            $test->expects(self::never())->method('artisan');
+            $this->assertGuardRejects(fn () => $test->runDatabaseMigrations());
+        }
+    }
+
     public function test_environment_guard_rejects_unsafe_targets_without_connecting(): void
     {
         $base = $this->environment();
@@ -39,7 +50,8 @@ class CompanyIdempotencyLabGuardTest extends TestCase
         CompanyIdempotencyMySqlLabGuard::checkConnection($valid, $env);
         self::assertTrue(true);
         foreach ([['driver' => 'sqlite'], ['host' => 'localhost'], ['port' => '3307'], ['database' => 'production'],
-            ['username' => 'other'], ['password' => 'wrong'], ['url' => '0'], ['unix_socket' => '0']] as $case) {
+            ['username' => 'other'], ['password' => 'wrong'], ['url' => '0'], ['unix_socket' => '0'],
+            ['read' => ['host' => '127.0.0.1']], ['write' => ['database' => 'production']], ['write' => []]] as $case) {
             $this->assertGuardRejects(fn () => CompanyIdempotencyMySqlLabGuard::checkConnection(array_replace($valid, $case), $env));
         }
         $this->assertGuardRejects(fn () => CompanyIdempotencyMySqlLabGuard::checkApproval(null, $env['LAB_MYSQL_UUID']));
@@ -55,6 +67,7 @@ class CompanyIdempotencyLabGuardTest extends TestCase
         $this->assertGuardRejects(fn () => CompanyIdempotencyMySqlLabGuard::checkInMemorySqlite('testing', 'mysql', $valid));
         $this->assertGuardRejects(fn () => CompanyIdempotencyMySqlLabGuard::checkInMemorySqlite('testing', 'sqlite', array_replace($valid, ['database' => '/tmp/persistent.sqlite'])));
         $this->assertGuardRejects(fn () => CompanyIdempotencyMySqlLabGuard::checkInMemorySqlite('testing', 'sqlite', array_replace($valid, ['url' => 'sqlite:/tmp/persistent.sqlite'])));
+        $this->assertGuardRejects(fn () => CompanyIdempotencyMySqlLabGuard::checkInMemorySqlite('testing', 'sqlite', array_replace($valid, ['write' => ['database' => '/tmp/persistent.sqlite']])));
     }
 
     public function test_target_identity_and_freshness_are_required_without_connecting(): void
