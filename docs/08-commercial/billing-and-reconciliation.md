@@ -307,3 +307,26 @@ HMAC com `x-signature`, `x-request-id` e `data.id`, persistem evento sanitizado
 antes do processamento e retornam `200` para processados ou duplicados. A
 tolerância de inadimplência é de sete dias. Correções de conciliação e execução
 de reembolso são exclusivas do superadministrador.
+
+## Reembolsos antigos em execução sem vínculo comprovado
+
+Um reembolso que já estava em `executando` antes da gravação do vínculo
+imutável com o pagamento permanece pendente. A consulta automática exige esse
+vínculo e não associa um identificador do provedor por valor ou data.
+
+1. Um superadministrador identifica a solicitação, empresa e pagamento no
+   backoffice e consulta os registros de auditoria disponíveis.
+2. Registra no acompanhamento operacional autorizado o identificador interno,
+   responsável, horários, motivo da análise e evidências sanitizadas; não
+   registra credenciais ou dados pessoais desnecessários.
+3. Encaminha o caso ao responsável pela plataforma e, quando necessário, ao
+   Mercado Pago, usando os canais e permissões autorizados, para preservar e
+   conferir as evidências do pagamento e da operação original.
+4. Mantém a solicitação pendente: não reenviar o estorno, não rejeitar ou
+   liberar o valor, não alterar o banco diretamente e não presumir vínculo por
+   coincidência de valor, data ou identificador informado sem proveniência.
+
+A confirmação ou regularização desses casos requer um mecanismo futuro,
+explicitamente auditado, que preserve a proveniência e comprove o vínculo. O
+fluxo atual não fornece resolução automática para solicitações sem o vínculo
+original; a análise externa, por si só, não altera o estado no sistema.

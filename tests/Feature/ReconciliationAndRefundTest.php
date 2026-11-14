@@ -442,6 +442,44 @@ class ReconciliationAndRefundTest extends TestCase
         $this->assertDatabaseHas('payments', ['id' => $fixture['payment_id'], 'status' => 'aprovado']);
     }
 
+    public function test_provider_id_unique_conflict_after_claim_is_audited_and_remains_uncertain(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $requester = $this->admin('administrador_comercial');
+        $admin = $this->admin('superadministrador');
+        $id = $this->actingAs($requester, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => 10, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertCreated()->json('id');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'aprovar', 'reason' => 'Teste'])->assertOk();
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::unprepared("CREATE TRIGGER refund_collision_probe BEFORE UPDATE ON refund_requests FOR EACH ROW BEGIN IF NEW.provider_refund_id = 'collision-trigger' THEN SIGNAL SQLSTATE '23000' SET MYSQL_ERRNO = 1062, MESSAGE_TEXT = 'Duplicate entry for key refund_requests_provider_refund_id_unique'; END IF; END");
+        } else {
+            DB::unprepared("CREATE TRIGGER refund_collision_probe BEFORE UPDATE OF provider_refund_id ON refund_requests WHEN NEW.provider_refund_id = 'collision-trigger' BEGIN SELECT RAISE(ABORT, 'UNIQUE constraint failed: refund_requests.provider_refund_id'); END");
+        }
+        Http::fake(['*' => Http::response(['id' => 'collision-trigger', 'payment_id' => 'pay-refund', 'amount' => 10, 'status' => 'approved'], 201)]);
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(202)->assertJsonPath('status', 'executando');
+        Http::assertSentCount(1);
+        $this->assertDatabaseHas('refund_requests', ['id' => $id, 'status' => 'executando', 'provider_refund_id' => null]);
+        $this->assertDatabaseHas('payments', ['id' => $fixture['payment_id'], 'status' => 'aprovado']);
+        $this->assertDatabaseHas('platform_audit_events', ['entity_id' => $id, 'action' => 'billing.refund_provider_id_collision']);
+    }
+
+    public function test_other_unique_errors_are_not_mistaken_for_provider_id_collision(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $requester = $this->admin('administrador_comercial');
+        $admin = $this->admin('superadministrador');
+        $id = $this->actingAs($requester, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => 10, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertCreated()->json('id');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'aprovar', 'reason' => 'Teste'])->assertOk();
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::unprepared("CREATE TRIGGER refund_other_constraint_probe BEFORE UPDATE ON refund_requests FOR EACH ROW BEGIN IF NEW.provider_refund_id = 'other-trigger' THEN SIGNAL SQLSTATE '23000' SET MYSQL_ERRNO = 1062, MESSAGE_TEXT = 'Duplicate entry for key another_unique_index'; END IF; END");
+        } else {
+            DB::unprepared("CREATE TRIGGER refund_other_constraint_probe BEFORE UPDATE OF provider_refund_id ON refund_requests WHEN NEW.provider_refund_id = 'other-trigger' BEGIN SELECT RAISE(ABORT, 'UNIQUE constraint failed: refund_requests.another_column'); END");
+        }
+        Http::fake(['*' => Http::response(['id' => 'other-trigger', 'payment_id' => 'pay-refund', 'amount' => 10, 'status' => 'approved'], 201)]);
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(500);
+        $this->assertDatabaseHas('refund_requests', ['id' => $id, 'status' => 'executando', 'provider_refund_id' => null]);
+        $this->assertDatabaseMissing('platform_audit_events', ['entity_id' => $id, 'action' => 'billing.refund_provider_id_collision']);
+    }
+
     private function companyIdForPayment(string $paymentId): string
     {
         return (string) DB::table('payments')->where('id', $paymentId)->value('company_id');

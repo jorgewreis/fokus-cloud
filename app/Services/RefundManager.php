@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -115,61 +116,92 @@ class RefundManager
 
     private function applyProviderResponse(string $id, string $providerPaymentId, array $remote, string $reason, object $admin, MercadoPagoClient $client, PlatformAudit $audit): object
     {
-        return DB::transaction(function () use ($id, $providerPaymentId, $remote, $reason, $admin, $client, $audit): object {
-            $refund = DB::table('refund_requests')->where('id', $id)->lockForUpdate()->first();
-            abort_unless($refund, 404, 'Solicitação de reembolso não encontrada.');
-            if ($refund->status === 'executado') {
-                return $refund;
-            }
-            abort_unless($refund->status === 'executando', 409, 'O estado do reembolso mudou durante a execução.');
-            $providerRefundId = $remote['id'] ?? null;
-            $remoteAmount = $remote['amount'] ?? null;
-            $payment = DB::table('payments')->where('id', $refund->payment_id)->lockForUpdate()->first();
-            $matches = (is_string($providerRefundId) || is_int($providerRefundId))
-                && trim((string) $providerRefundId) !== '' && strlen((string) $providerRefundId) <= 128
-                && (! $refund->provider_refund_id || (string) $refund->provider_refund_id === (string) $providerRefundId)
-                && (is_string($remote['payment_id'] ?? null) || is_int($remote['payment_id'] ?? null))
-                && (string) $remote['payment_id'] === $providerPaymentId
-                && $payment && (string) $payment->provider_payment_id === $providerPaymentId
-                && $this->matchesPaymentBinding($refund, $providerPaymentId)
-                && is_numeric($remoteAmount) && is_finite((float) $remoteAmount)
-                && (float) $remoteAmount === round((float) $remoteAmount, 2)
-                && (float) $remoteAmount === round((float) $refund->amount, 2);
-            if ($matches && DB::table('refund_requests')->where('provider_refund_id', (string) $providerRefundId)->where('id', '!=', $id)->exists()) {
-                $matches = false;
-            }
-            $existing = json_decode((string) $refund->provider_payload_sanitized, true) ?: [];
-            $safePayload = $client->sanitizePayload($remote) ?: [];
-            if (isset($existing['fokus_payment_binding_sha256'])) {
-                $safePayload['fokus_payment_binding_sha256'] = $existing['fokus_payment_binding_sha256'];
-            }
-            $sanitized = json_encode($safePayload);
-            if (! $matches || ($remote['status'] ?? null) !== 'approved') {
-                $update = ['provider_payload_sanitized' => $sanitized, 'updated_at' => now()];
-                // Only an ID returned for this payment and amount is a candidate for a later GET.
-                if ($matches && ! $refund->provider_refund_id) {
-                    $update['provider_refund_id'] = (string) $providerRefundId;
+        try {
+            return DB::transaction(function () use ($id, $providerPaymentId, $remote, $reason, $admin, $client, $audit): object {
+                $refund = DB::table('refund_requests')->where('id', $id)->lockForUpdate()->first();
+                abort_unless($refund, 404, 'Solicitação de reembolso não encontrada.');
+                if ($refund->status === 'executado') {
+                    return $refund;
                 }
-                DB::table('refund_requests')->where('id', $id)->update($update);
-                $audit->record($admin->id, 'billing.refund_execution_unconfirmed', 'refund_request', $id, $refund->company_id, $reason, after: ['status' => 'executando']);
+                abort_unless($refund->status === 'executando', 409, 'O estado do reembolso mudou durante a execução.');
+                $providerRefundId = $remote['id'] ?? null;
+                $remoteAmount = $remote['amount'] ?? null;
+                $payment = DB::table('payments')->where('id', $refund->payment_id)->lockForUpdate()->first();
+                $matches = (is_string($providerRefundId) || is_int($providerRefundId))
+                    && trim((string) $providerRefundId) !== '' && strlen((string) $providerRefundId) <= 128
+                    && (! $refund->provider_refund_id || (string) $refund->provider_refund_id === (string) $providerRefundId)
+                    && (is_string($remote['payment_id'] ?? null) || is_int($remote['payment_id'] ?? null))
+                    && (string) $remote['payment_id'] === $providerPaymentId
+                    && $payment && (string) $payment->provider_payment_id === $providerPaymentId
+                    && $this->matchesPaymentBinding($refund, $providerPaymentId)
+                    && is_numeric($remoteAmount) && is_finite((float) $remoteAmount)
+                    && (float) $remoteAmount === round((float) $remoteAmount, 2)
+                    && (float) $remoteAmount === round((float) $refund->amount, 2);
+                if ($matches && DB::table('refund_requests')->where('provider_refund_id', (string) $providerRefundId)->where('id', '!=', $id)->exists()) {
+                    $matches = false;
+                }
+                $existing = json_decode((string) $refund->provider_payload_sanitized, true) ?: [];
+                $safePayload = $client->sanitizePayload($remote) ?: [];
+                if (isset($existing['fokus_payment_binding_sha256'])) {
+                    $safePayload['fokus_payment_binding_sha256'] = $existing['fokus_payment_binding_sha256'];
+                }
+                $sanitized = json_encode($safePayload);
+                if (! $matches || ($remote['status'] ?? null) !== 'approved') {
+                    $update = ['provider_payload_sanitized' => $sanitized, 'updated_at' => now()];
+                    // Only an ID returned for this payment and amount is a candidate for a later GET.
+                    if ($matches && ! $refund->provider_refund_id) {
+                        $update['provider_refund_id'] = (string) $providerRefundId;
+                    }
+                    DB::table('refund_requests')->where('id', $id)->update($update);
+                    $audit->record($admin->id, 'billing.refund_execution_unconfirmed', 'refund_request', $id, $refund->company_id, $reason, after: ['status' => 'executando']);
+
+                    return DB::table('refund_requests')->where('id', $id)->first();
+                }
+                DB::table('refund_requests')->where('id', $id)->update([
+                    'status' => 'executado', 'provider_refund_id' => (string) $providerRefundId,
+                    'provider_payload_sanitized' => $sanitized, 'executed_at' => now(), 'updated_at' => now(),
+                ]);
+                $refunded = (float) DB::table('refund_requests')->where('payment_id', $refund->payment_id)->where('status', 'executado')->sum('amount');
+                if ($payment && $refunded >= (float) $payment->amount) {
+                    DB::table('payments')->where('id', $payment->id)->update(['status' => 'estornado', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
+                    $audit->record($admin->id, 'billing.payment_refunded', 'payment', $payment->id, $payment->company_id, $reason,
+                        before: ['status' => $payment->status, 'amount' => $payment->amount],
+                        after: ['status' => 'estornado', 'amount' => $payment->amount, 'refund_amount' => $refunded]);
+                }
+                $audit->record($admin->id, 'billing.refund_executed', 'refund_request', $id, $refund->company_id, $reason, before: ['status' => 'executando'], after: ['status' => 'executado', 'provider_refund_id' => $providerRefundId]);
 
                 return DB::table('refund_requests')->where('id', $id)->first();
+            });
+        } catch (QueryException $exception) {
+            if (! $this->isProviderRefundIdCollision($exception)) {
+                throw $exception;
             }
-            DB::table('refund_requests')->where('id', $id)->update([
-                'status' => 'executado', 'provider_refund_id' => (string) $providerRefundId,
-                'provider_payload_sanitized' => $sanitized, 'executed_at' => now(), 'updated_at' => now(),
-            ]);
-            $refunded = (float) DB::table('refund_requests')->where('payment_id', $refund->payment_id)->where('status', 'executado')->sum('amount');
-            if ($payment && $refunded >= (float) $payment->amount) {
-                DB::table('payments')->where('id', $payment->id)->update(['status' => 'estornado', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
-                $audit->record($admin->id, 'billing.payment_refunded', 'payment', $payment->id, $payment->company_id, $reason,
-                    before: ['status' => $payment->status, 'amount' => $payment->amount],
-                    after: ['status' => 'estornado', 'amount' => $payment->amount, 'refund_amount' => $refunded]);
-            }
-            $audit->record($admin->id, 'billing.refund_executed', 'refund_request', $id, $refund->company_id, $reason, before: ['status' => 'executando'], after: ['status' => 'executado', 'provider_refund_id' => $providerRefundId]);
 
-            return DB::table('refund_requests')->where('id', $id)->first();
-        });
+            // The failed transaction has rolled back; the previously committed
+            // execution claim remains reserved. Record the uncertain outcome
+            // without retrying the provider request or releasing that claim.
+            return DB::transaction(function () use ($id, $reason, $admin, $audit, $exception): object {
+                $refund = DB::table('refund_requests')->where('id', $id)->lockForUpdate()->first();
+                if (! $refund || $refund->status !== 'executando') {
+                    throw $exception;
+                }
+                $audit->record($admin->id, 'billing.refund_provider_id_collision', 'refund_request', $id, $refund->company_id, $reason, after: ['status' => 'executando']);
+
+                return $refund;
+            });
+        }
+    }
+
+    private function isProviderRefundIdCollision(QueryException $exception): bool
+    {
+        $state = (string) ($exception->errorInfo[0] ?? '');
+        $code = (int) ($exception->errorInfo[1] ?? 0);
+        $detail = (string) ($exception->errorInfo[2] ?? '');
+
+        return $state === '23000' && (
+            ($code === 1062 && str_contains($detail, 'refund_requests_provider_refund_id_unique'))
+            || (in_array($code, [19, 2067], true) && str_contains($detail, 'UNIQUE constraint failed: refund_requests.provider_refund_id'))
+        );
     }
 
     private function paymentBinding(string $refundId, string $providerPaymentId): string
