@@ -17,7 +17,7 @@ class RealSSH(unittest.TestCase):
     def test_pinned_fd_handshake_and_wrong_host_key(self):
         self.assertEqual(os.environ.get('GITHUB_ACTIONS'), 'true', 'CI-only disposable runner required')
         self.assertEqual(os.environ.get('RUNNER_OS'), 'Linux', 'Linux runner required')
-        with tempfile.TemporaryDirectory(prefix='fokus-ssh-proof-', dir='/tmp') as directory:
+        with tempfile.TemporaryDirectory(prefix='fokus-ssh-proof-', dir=Path.home()) as directory:
             folder = Path(directory)
             for name in ('host', 'wrong-host', 'client'):
                 subprocess.run(['/usr/bin/ssh-keygen', '-q', '-t', 'ed25519', '-N', '', '-f', str(folder / name)], check=True)
@@ -47,7 +47,7 @@ class RealSSH(unittest.TestCase):
                 'UsePAM yes', 'StrictModes yes', 'PubkeyAuthentication yes',
                 'PasswordAuthentication no', 'KbdInteractiveAuthentication no',
                 'PermitRootLogin no', 'AllowTcpForwarding no', 'X11Forwarding no',
-                'PermitTTY no', 'UseDNS no', 'LogLevel ERROR', f'AllowUsers {getpass.getuser()}',
+                'PermitTTY no', 'UseDNS no', 'LogLevel VERBOSE', f'AllowUsers {getpass.getuser()}',
                 '']))
             subprocess.run(['sudo', '-n', 'mkdir', '-p', '/run/sshd'], check=True)
             log = folder / 'sshd.log'
