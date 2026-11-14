@@ -687,9 +687,12 @@ export async function mount(root, context = {}) {
     });
     pageSignal?.addEventListener("abort", () => clearTimeout(searchTimer), { once: true });
     listen($("#voucher-search"), "input", () => {
+        const hadPendingSearch = searchTimer !== undefined;
         clearTimeout(searchTimer);
         searchTimer = undefined;
-        if ($("#voucher-search").value.trim() === requestedSearch) return;
+        if ($("#voucher-search").value.trim() === requestedSearch && !hadPendingSearch) return;
+        // Invalidate in-flight responses before waiting for the debounce.
+        state.requestId++;
         searchTimer = setTimeout(() => { state.page = 1; loadVouchers(); }, 250);
     });
     ["#voucher-product-filter", "#voucher-type-filter", "#voucher-status-filter"].forEach((selector) => listen($(selector), "change", () => { state.page = 1; loadVouchers(); }));

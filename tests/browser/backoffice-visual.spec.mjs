@@ -1514,3 +1514,36 @@ test('Vouchers recupera última página após exclusão e cancela busca ao sair'
     expect(requests.some(x => x.search === 'busca abandonada')).toBe(false);
     expect(errors).toEqual([]);
 });
+
+test('Busca digitada invalida resposta anterior antes do debounce', async ({ page }) => {
+    const requests = [];
+    let releaseStale;
+    const staleGate = new Promise(resolve => { releaseStale = resolve; });
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { role: 'superadministrador', name: 'Teste', permissions: ['platform.vouchers.manage', 'platform.catalog.publish'] } } }));
+    await page.route('**/api/backoffice/catalog', route => route.fulfill({ json: { products: [] } }));
+    await page.route(/\/api\/backoffice\/vouchers(?:\?.*)?$/, async route => {
+        const params = new URL(route.request().url()).searchParams;
+        const search = params.get('search') || '';
+        const pageNumber = Number(params.get('page') || 1);
+        requests.push({ search, page: pageNumber });
+        if (!search && pageNumber === 2) {
+            await staleGate;
+            return route.fulfill({ json: { data: [], meta: { total: 15, last_page: 1 } } });
+        }
+        return route.fulfill({ json: { data: [{ id: 'VCH_1', name: search || 'Original', code: 'CODE', status: 'ativa', computed_status: 'ativa' }], meta: { total: 16, last_page: 2 } } });
+    });
+    await page.goto('/backoffice/vouchers');
+    await expect(page.locator('#voucher-list')).toContainText('Original');
+    await page.getByRole('button', { name: 'Próxima página' }).click();
+    await expect.poll(() => requests.some(r => r.page === 2 && !r.search)).toBe(true);
+    await page.clock.install();
+    await page.locator('#voucher-search').fill('novo termo');
+    const staleResponse = page.waitForResponse(response => response.url().includes('/api/backoffice/vouchers?') && new URL(response.url()).searchParams.get('page') === '2');
+    releaseStale();
+    await staleResponse;
+    await page.clock.runFor(100);
+    expect(requests.filter(r => r.search === 'novo termo')).toEqual([]);
+    await page.clock.runFor(200);
+    await expect(page.locator('#voucher-list')).toContainText('novo termo');
+    expect(requests.filter(r => r.search === 'novo termo')).toEqual([{ search: 'novo termo', page: 1 }]);
+});
