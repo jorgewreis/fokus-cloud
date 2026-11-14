@@ -171,3 +171,48 @@ test('solicitação de reembolso abre a aba de acompanhamento após confirmaçã
     await expect(page.locator('#billing-refunds-list tr')).toHaveCount(1);
     await expect(page.locator('#billing-message')).toContainText('registrada para aprovação');
 });
+
+
+test('reembolso sem confirmação comunica pendência sem oferecer reexecução', async ({ page }) => {
+    let current = 'aprovado';
+    await page.route('**/api/backoffice/payments?**', route => route.fulfill({ json: { data: [], meta: { total: 0, current_page: 1, per_page: 15, last_page: 1 } } }));
+    await page.route('**/api/backoffice/refunds?**', route => route.fulfill({ json: { data: [{ ...refund, status: current }], meta: { total: 1, current_page: 1, per_page: 15, last_page: 1 } } }));
+    await page.route('**/api/backoffice/refunds/RFD_VISUAL_01', route => {
+        if (route.request().method() === 'PATCH') { current = 'executando'; return route.fulfill({ status: 202, json: { ...refund, status: current } }); }
+        return route.fulfill({ json: { ...refund, status: current } });
+    });
+    await grantBillingPermissions(page);
+    await page.goto('/backoffice/pagamentos');
+    await page.locator('#billing-refunds-tab').click();
+    await page.locator('#billing-refunds-list [data-billing-detail]').click();
+    await page.getByRole('button', { name: 'Executar reembolso no Mercado Pago' }).click();
+    await page.locator('#billing-action-reason').fill('Confirmação necessária.');
+    await page.getByRole('button', { name: 'Executar reembolso', exact: true }).click();
+    await expect(page.locator('#billing-detail-sections')).toContainText('Resultado ainda não confirmado');
+    await expect(page.getByRole('button', { name: 'Executar reembolso no Mercado Pago' })).toHaveCount(0);
+    await expect(page.locator('#billing-message')).not.toContainText('concluída');
+});
+
+
+test('consulta somente o identificador de reembolso recebido sem novo estorno', async ({ page }) => {
+    let current = 'executando';
+    const calls = [];
+    await page.route('**/api/backoffice/payments?**', route => route.fulfill({ json: { data: [], meta: { total: 0, current_page: 1, per_page: 15, last_page: 1 } } }));
+    await page.route('**/api/backoffice/refunds?**', route => route.fulfill({ json: { data: [{ ...refund, status: current, provider_refund_id: 'refund-known' }], meta: { total: 1, current_page: 1, per_page: 15, last_page: 1 } } }));
+    await page.route('**/api/backoffice/refunds/RFD_VISUAL_01', route => {
+        if (route.request().method() === 'PATCH') { calls.push(route.request().postDataJSON()); current = 'executado'; }
+        return route.fulfill({ json: { ...refund, status: current, provider_refund_id: 'refund-known' } });
+    });
+    await grantBillingPermissions(page);
+    await page.goto('/backoffice/pagamentos');
+    await page.locator('#billing-refunds-tab').click();
+    await page.locator('#billing-refunds-list [data-billing-detail]').click();
+    await page.getByRole('button', { name: 'Consultar reembolso no Mercado Pago' }).click();
+    await page.locator('#billing-action-reason').fill('Verificar confirmação.');
+    await page.getByRole('button', { name: 'Confirmar', exact: true }).click();
+    await expect.poll(() => calls.length).toBe(1);
+    await expect(page.locator('#billing-detail-sections')).toContainText('Executado');
+    await expect(page.getByRole('button', { name: 'Consultar reembolso no Mercado Pago' })).toHaveCount(0);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].action).toBe('consultar');
+});

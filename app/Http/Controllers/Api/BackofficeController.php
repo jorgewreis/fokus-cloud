@@ -870,7 +870,7 @@ class BackofficeController extends Controller
 
     public function createRefund(Request $request, RefundManager $manager, PlatformAudit $audit)
     {
-        $data = $request->validate(['payment_id' => ['required', 'string'], 'amount' => ['required', 'numeric', 'gt:0'], 'allowed_case' => ['required', Rule::in(RefundManager::CASES)], 'reason' => ['required', 'string', 'max:1000']]);
+        $data = $request->validate(['payment_id' => ['required', 'string'], 'amount' => ['required', 'numeric', 'min:0.01', 'decimal:0,2'], 'allowed_case' => ['required', Rule::in(RefundManager::CASES)], 'reason' => ['required', 'string', 'max:1000']]);
         $refund = $manager->request($data, $request->user());
         $audit->record($request->user()->id, 'backoffice.refund_requested', 'refund_request', $refund->id, $refund->company_id, $data['reason'], after: ['status' => 'solicitado', 'amount' => $refund->amount], request: $request);
 
@@ -879,9 +879,17 @@ class BackofficeController extends Controller
 
     public function updateRefund(Request $request, string $refund, RefundManager $manager, PlatformAudit $audit, MercadoPagoClient $client)
     {
-        $data = $request->validate(['action' => ['required', Rule::in(['aprovar', 'recusar', 'executar'])], 'reason' => ['required', 'string', 'max:1000']]);
+        $data = $request->validate(['action' => ['required', Rule::in(['aprovar', 'recusar', 'executar', 'consultar'])], 'reason' => ['required', 'string', 'max:1000']]);
 
-        return response()->json($manager->payload($manager->action($refund, $data['action'], $data['reason'], $request->user(), $client, $audit)));
+        $result = $manager->action($refund, $data['action'], $data['reason'], $request->user(), $client, $audit);
+        $payload = $manager->payload($result);
+        if ($result->status === 'executando') {
+            $payload['message'] = 'O resultado do reembolso ainda não foi confirmado. Consulte o Mercado Pago antes de qualquer nova ação.';
+
+            return response()->json($payload, 202);
+        }
+
+        return response()->json($payload);
     }
 
     public function catalog(Request $request, CatalogManager $catalog)

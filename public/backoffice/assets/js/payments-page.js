@@ -224,9 +224,14 @@ export function mount(root, context = {}) {
             actions.push(`<button class="fs-btn fs-btn-primary" type="button" data-billing-action="refunds:executar:${escapeHtml(item.id)}">Executar reembolso no Mercado Pago</button>`);
             actions.push(`<button class="fs-btn fs-btn-outline-danger" type="button" data-billing-action="refunds:recusar:${escapeHtml(item.id)}">Recusar reembolso</button>`);
         }
+        if (canManageRefund && item.status === "executando" && item.provider_refund_id) {
+            actions.push(`<button class="fs-btn fs-btn-outline-primary" type="button" data-billing-action="refunds:consultar:${escapeHtml(item.id)}">Consultar reembolso no Mercado Pago</button>`);
+        }
         const separationMessage = canManageRefund && String(item.requested_by_platform_admin_id || "") === adminId && ["solicitado", "aprovado"].includes(item.status)
             ? `<p class="fs-u-fs-sm fs-u-color-secondary">Outra pessoa administradora deve revisar e decidir esta solicitação.</p>` : "";
-        return `${card("Solicitação de reembolso", pairs)}${separationMessage ? card("Segregação de aprovação", separationMessage) : ""}${actions.length ? card("Ações", `<div class="fs-u-d-flex fs-u-flex-wrap fs-u-gap-2">${actions.join("")}</div>`) : ""}`;
+        const pendingMessage = item.status === "executando"
+            ? `<p role="status">Resultado ainda não confirmado. Consulte o Mercado Pago e encaminhe para conciliação; não solicite outro reembolso para o mesmo valor.</p>` : "";
+        return `${card("Solicitação de reembolso", pairs)}${pendingMessage ? card("Confirmação pendente", pendingMessage) : ""}${separationMessage ? card("Segregação de aprovação", separationMessage) : ""}${actions.length ? card("Ações", `<div class="fs-u-d-flex fs-u-flex-wrap fs-u-gap-2">${actions.join("")}</div>`) : ""}`;
     };
     const detailRenderers = { payments: paymentDetails, reconciliation: reconciliationDetails, refunds: refundDetails };
 
@@ -267,6 +272,7 @@ export function mount(root, context = {}) {
         aprovar: ["Aprovar solicitação de reembolso", "A aprovação autoriza a etapa de execução e será auditada."],
         recusar: ["Recusar solicitação de reembolso", "A recusa será registrada com o motivo informado."],
         executar: ["Executar reembolso no Mercado Pago", "Esta ação solicita o reembolso ao provedor e não pode ser desfeita pela aplicação."],
+        consultar: ["Consultar reembolso no Mercado Pago", "Esta ação consulta o identificador recebido do provedor; não solicita outro reembolso."],
     };
     const actionToggle = (action, kind, id) => {
         state.pendingAction = { action, kind, id };
@@ -288,12 +294,12 @@ export function mount(root, context = {}) {
         const button = $("#billing-action-submit");
         button.disabled = true;
         try {
-            await api.request(`/backoffice/${pending.kind}/${encodeURIComponent(pending.id)}`, {
+            const result = await api.request(`/backoffice/${pending.kind}/${encodeURIComponent(pending.id)}`, {
                 method: "PATCH", body: { action: pending.action, reason: $("#billing-action-reason").value.trim() }, signal: pageSignal,
             });
             state.pendingAction = null;
             modal?.hide?.();
-            showMessage("Ação financeira concluída e registrada.");
+            showMessage(result?.status === "executando" ? "Resultado do reembolso não confirmado. Consulte o Mercado Pago antes de qualquer nova ação." : "Ação financeira concluída e registrada.");
             await load(pending.kind, { force: true });
             if (state.detail?.kind === pending.kind && state.detail.id === pending.id) await openDetail(pending.kind, pending.id, state.lastTrigger);
         } catch (error) {
