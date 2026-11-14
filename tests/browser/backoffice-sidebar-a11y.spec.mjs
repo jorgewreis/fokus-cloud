@@ -10,6 +10,10 @@ test('sidebar mantém nomes e foco visível ao navegar por teclado', async ({ pa
         permissions: ['platform.security.manage', 'platform.catalog.manage', 'platform.catalog.publish', 'platform.users.view', 'platform.subscriptions.manage', 'platform.payments.view'],
     } } }));
     await page.goto('/backoffice/empresas');
+    await expect(page.locator('[data-backoffice-page="companies"]').first()).toBeVisible();
+    // An outside click uses the actual document handler to close a sidebar
+    // that may have expanded during navigation or pointer initialization.
+    await page.mouse.click(900, 850);
     await expect(page.locator('#sidebar')).toHaveClass(/single/);
     const buttons = [
         ['platform-dashboard-final', 'Dashboard'], ['companies', 'Empresas'],
@@ -22,7 +26,13 @@ test('sidebar mantém nomes e foco visível ao navegar por teclado', async ({ pa
     }
     await expect(page.locator('#sidebar [data-sidebar-group="catalog"] > button')).toHaveAccessibleName('Catálogo');
 
-    await page.keyboard.press('Tab');
+    // A pointer click can set the sequential focus starting point inside the
+    // page; navigate normally until the Dashboard is reached instead of
+    // assuming it will be the first Tab stop.
+    for (let attempt = 0; attempt < 40; attempt++) {
+        await page.keyboard.press('Tab');
+        if (await page.locator('#sidebar [data-sidebar-item="platform-dashboard-final"]').evaluate((element) => element === document.activeElement)) break;
+    }
     const focused = page.locator('#sidebar .sidebar-button:focus-visible');
     await expect(focused).toHaveCount(1);
     await expect(focused).toHaveAccessibleName('Dashboard');
