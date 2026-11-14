@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Services\CompanyIdempotencyFactory;
 use App\Services\PlatformAudit;
+use App\Services\PlatformSessionBinding;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -16,8 +17,10 @@ final class CompanyIdempotencyController extends Controller
     public function issue(Request $request): JsonResponse
     {
         $data = $this->operation($request);
+        $binding = $this->binding($request);
         $settings = $this->settings();
         $token = $settings['store']->issue((string) $request->user()->id, $data, $settings['lifetime_seconds']);
+        $token = $settings['session_keys']->bindSession($token, $binding);
 
         return response()->json(['message' => 'Chave emitida.'], 201)
             ->header('Idempotency-Key', $token)->header('Cache-Control', 'private, no-store');
@@ -27,8 +30,10 @@ final class CompanyIdempotencyController extends Controller
     {
         $operation = $this->operation($request);
         $token = $this->token($request);
+        $binding = $this->binding($request);
         $settings = $this->settings();
         try {
+            $token = $settings['session_keys']->unbindSession($token, $binding);
             $result = $settings['store']->status($token, (string) $request->user()->id, $operation, now()->getTimestamp());
         } catch (InvalidArgumentException) {
             abort(422, 'Chave de idempotência inválida.');
@@ -41,9 +46,11 @@ final class CompanyIdempotencyController extends Controller
     {
         $operation = $this->operation($request);
         $token = $this->token($request);
+        $binding = $this->binding($request);
         $actor = (string) $request->user()->id;
         $settings = $this->settings();
         try {
+            $token = $settings['session_keys']->unbindSession($token, $binding);
             $result = $settings['store']->revoke($token, $actor, $operation, now()->getTimestamp(), function () use ($audit, $actor, $operation, $request): void {
                 $audit->record($actor, 'backoffice.company_idempotency_revoked', 'company_idempotency', metadata: ['operation' => $operation], request: $request);
             });
@@ -76,5 +83,13 @@ final class CompanyIdempotencyController extends Controller
         } catch (InvalidArgumentException) {
             abort(503, 'Solicitação indisponível.');
         }
+    }
+
+    private function binding(Request $request): string
+    {
+        $binding = (new PlatformSessionBinding)->current($request->session());
+        abort_unless($binding !== null, 503, 'Sessão indisponível.');
+
+        return $binding;
     }
 }

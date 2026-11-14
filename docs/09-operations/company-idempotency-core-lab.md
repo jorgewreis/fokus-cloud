@@ -66,6 +66,22 @@ cross-node rollout, credential custody and provider behavior are not established
 Callback purity and normalization require independent review; type signatures
 alone cannot enforce them.
 
+An experimental session envelope signs the inner token and the current platform
+session marker with a separate HKDF-derived purpose. The marker is not stored
+in the idempotency table; the table continues to hold only the inner token hash.
+Issue requires a marker and status, revoke and keyed writes verify the envelope
+before accessing the store. An old token without an envelope, an absent marker,
+another session or a revoked key fails closed. This changes the token wire
+contract and deliberately provides no legacy-token fallback. No migration is
+needed for this laboratory approach; a future rollout must assess compatibility,
+key rotation, session persistence and recovery before enabling any route.
+
+The envelope does not prove instantaneous revocation of a request that loaded
+its session before logout or support-session rotation. Laravel session locking,
+concurrent requests, multiple nodes and cross-tab logout remain unverified. A
+same-actor different-marker rejection in a synthetic test is not proof of those
+races, and no public guard may be removed on that basis.
+
 The guarded MySQL API concurrency test was run against commit `93d52eaf`
 using a new, initially empty MySQL 8.4.13 container with networking disabled
 and temporary storage: one test and ten assertions passed. Native InnoDB AIO

@@ -8,6 +8,29 @@ use PHPUnit\Framework\TestCase;
 
 class CompanyIdempotencyKeysTest extends TestCase
 {
+    public function test_session_envelope_rejects_other_sessions_legacy_tokens_and_revoked_keys(): void
+    {
+        $ring = ['a' => base64_encode(str_repeat('a', 32)), 'b' => base64_encode(str_repeat('b', 32))];
+        $keys = new CompanyIdempotencyKeys($ring, 'a', []);
+        $token = $keys->issue('admin', 'company.create', 1000, 60);
+        $binding = str_repeat('a', 64);
+        $envelope = $keys->bindSession($token, $binding);
+        self::assertSame($token, $keys->unbindSession($envelope, $binding));
+        $rotated = new CompanyIdempotencyKeys($ring, 'b', []);
+        self::assertSame($token, $rotated->unbindSession($envelope, $binding));
+        $revoked = new CompanyIdempotencyKeys($ring, 'b', ['a']);
+        foreach ([[$keys, $envelope, str_repeat('b', 64)], [$keys, $token, $binding],
+            [$keys, $envelope.'x', $binding], [$keys, $envelope, 'invalid'], [$revoked, $envelope, $binding]] as [$verifier, $candidate, $session]) {
+            try {
+                $verifier->unbindSession($candidate, $session);
+                self::fail('Invalid session envelope was accepted.');
+            } catch (InvalidArgumentException $e) {
+                self::assertStringNotContainsString($binding, $e->getMessage());
+                self::assertStringNotContainsString($envelope, $e->getMessage());
+            }
+        }
+    }
+
     public function test_token_is_bound_to_actor_operation_and_expiry(): void
     {
         $keys = new CompanyIdempotencyKeys(['a' => base64_encode(str_repeat('a', 32))], 'a', []);

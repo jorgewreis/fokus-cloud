@@ -6,6 +6,7 @@ use App\Http\Middleware\RejectUnimplementedCompanyIdempotency;
 use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
 use App\Services\CompanyIdempotencyFactory;
+use App\Services\PlatformSessionBinding;
 use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
@@ -52,8 +53,9 @@ class CompanyIdempotencyApiConcurrencyTest extends TestCase
             'status' => 'ativo', 'platform_role_id' => PlatformRole::where('code', 'superadministrador')->value('id'),
             'email_verified_at' => now(),
         ]);
-        $store = (new CompanyIdempotencyFactory)->build(config('company_idempotency'))['store'];
-        $token = $store->issue($admin->id, 'company.create', 600);
+        $settings = (new CompanyIdempotencyFactory)->build(config('company_idempotency'));
+        $token = $settings['session_keys']->bindSession($settings['store']->issue($admin->id, 'company.create', 600), str_repeat('a', 64));
+        $this->withSession([PlatformSessionBinding::SESSION_KEY => str_repeat('a', 64)]);
         $payload = [
             'document_type' => 'cnpj', 'document_number' => '11.222.333/0001-81', 'legal_name' => 'Synthetic company',
             'name' => 'Synthetic Administrator', 'cpf' => '11144477735', 'email' => 'concurrency-created@example.test',

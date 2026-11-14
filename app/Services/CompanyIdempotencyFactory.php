@@ -41,7 +41,7 @@ final class CompanyIdempotencyFactory
             $keys = new CompanyIdempotencyKeys(get_object_vars($ring), $config['active_kid'], $revoked);
             $store = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, $outstanding, $issues, $window);
 
-            return ['store' => $store, 'lifetime_seconds' => $lifetime];
+            return ['store' => $store, 'session_keys' => $keys, 'lifetime_seconds' => $lifetime];
         } catch (InvalidArgumentException|JsonException) {
             // Never leak secret-bearing configuration through exceptions or logs.
             throw new InvalidArgumentException('Company idempotency is unavailable.');

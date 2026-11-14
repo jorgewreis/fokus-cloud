@@ -7,6 +7,7 @@ use App\Http\Middleware\RejectUnimplementedCompanyIdempotency;
 use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
 use App\Services\CompanyIdempotencyFactory;
+use App\Services\PlatformSessionBinding;
 use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
@@ -43,6 +44,7 @@ class CompanyIdempotencyApiLabTest extends TestCase
         $this->seed();
         Http::fake(['api.pwnedpasswords.com/*' => Http::response('', 200)]);
         $this->withoutMiddleware([RejectUnimplementedCompanyIdempotency::class, RejectCompanyIdempotencyEndpoints::class]);
+        $this->withSession([PlatformSessionBinding::SESSION_KEY => str_repeat('a', 64)]);
         config(['company_idempotency' => [
             'enabled' => true,
             'keyring_json' => '{"v1":"'.base64_encode(str_repeat('x', 32)).'"}',
@@ -151,7 +153,24 @@ class CompanyIdempotencyApiLabTest extends TestCase
     {
         $settings = (new CompanyIdempotencyFactory)->build(config('company_idempotency'));
 
-        return $settings['store']->issue($admin->id, $operation, $settings['lifetime_seconds']);
+        $token = $settings['store']->issue($admin->id, $operation, $settings['lifetime_seconds']);
+
+        return $settings['session_keys']->bindSession($token, str_repeat('a', 64));
+    }
+
+    public function test_another_session_of_same_actor_cannot_status_revoke_or_mutate(): void
+    {
+        $admin = $this->admin();
+        $token = $this->issue($admin, 'company.create');
+        $this->actingAs($admin, 'platform')->withSession([PlatformSessionBinding::SESSION_KEY => str_repeat('b', 64)])->withHeader('Idempotency-Key', $token);
+        $this->postJson('/api/backoffice/company-idempotency/status', ['operation' => 'company.create'])->assertStatus(422)->assertDontSee($token);
+        $this->postJson('/api/backoffice/company-idempotency/revoke', ['operation' => 'company.create'])->assertStatus(422)->assertDontSee($token);
+        $this->postJson('/api/backoffice/companies', $this->payload())->assertStatus(422)->assertDontSee($token);
+        self::assertSame(0, DB::table('companies')->where('document_number', '11222333000181')->count());
+        self::assertFalse((bool) DB::table('company_idempotency_requests')->value('revoked'));
+        $this->withSession([PlatformSessionBinding::SESSION_KEY => null]);
+        $this->postJson('/api/backoffice/company-idempotency/status', ['operation' => 'company.create'])->assertStatus(503);
+        $this->postJson('/api/backoffice/company-idempotency/issue', ['operation' => 'company.create'])->assertStatus(503);
     }
 
     private function admin(): PlatformAdmin

@@ -17,6 +17,7 @@ use App\Services\LawUsageMeter;
 use App\Services\MercadoPagoClient;
 use App\Services\PasswordSecurity;
 use App\Services\PlatformAudit;
+use App\Services\PlatformSessionBinding;
 use App\Services\PrefixedUlid;
 use App\Services\RefundManager;
 use App\Services\SubscriptionBillingManager;
@@ -619,7 +620,15 @@ class BackofficeController extends Controller
             abort(503, 'Solicitação indisponível.');
         }
 
-        return ['token' => $values[0], 'store' => $settings['store']];
+        $binding = (new PlatformSessionBinding)->current($request->session());
+        abort_unless($binding !== null, 503, 'Sessão indisponível.');
+        try {
+            $token = $settings['session_keys']->unbindSession($values[0], $binding);
+        } catch (InvalidArgumentException) {
+            abort(422, 'Chave de idempotência inválida.');
+        }
+
+        return ['token' => $token, 'store' => $settings['store']];
     }
 
     public function deactivateCompany(Request $request, string $company, PlatformAudit $audit)

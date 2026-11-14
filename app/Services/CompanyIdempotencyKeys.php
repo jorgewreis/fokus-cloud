@@ -46,6 +46,38 @@ final class CompanyIdempotencyKeys
         return $prefix.'.'.self::encode(hash_hmac('sha256', $this->signedMessage($prefix, $actor, $operation), $this->subkey($this->activeKid, 'token'), true));
     }
 
+    /** Wrap an internal token for the current platform session. */
+    public function bindSession(string $token, string $binding): string
+    {
+        if (! preg_match('/\A[0-9a-f]{64}\z/D', $binding) || strlen($token) > 210) {
+            throw new InvalidArgumentException('Invalid session token.');
+        }
+        $parts = explode('.', $token);
+        if (count($parts) !== 6 || $parts[0] !== 'v1' || ! isset($this->keys[$parts[1]]) || in_array($parts[1], $this->revokedKids, true)) {
+            throw new InvalidArgumentException('Invalid session token.');
+        }
+        $signature = hash_hmac('sha256', json_encode([$token, $binding], JSON_THROW_ON_ERROR), $this->subkey($parts[1], 'session'), true);
+
+        return $token.'.'.self::encode($signature);
+    }
+
+    /** Unwrap only a token bound to the currently authenticated session. */
+    public function unbindSession(string $envelope, string $binding): string
+    {
+        $parts = explode('.', $envelope);
+        if (strlen($envelope) > 256 || count($parts) !== 7) {
+            throw new InvalidArgumentException('Invalid session token.');
+        }
+        array_pop($parts);
+        $token = implode('.', $parts);
+        $expected = $this->bindSession($token, $binding);
+        if (! hash_equals($expected, $envelope)) {
+            throw new InvalidArgumentException('Invalid session token.');
+        }
+
+        return $token;
+    }
+
     /** @return array{kid:string,issued_at:int,expires_at:int} */
     public function verify(string $token, string $actor, string $operation, int $now, int $allowedClockSkewSeconds = 0): array
     {
