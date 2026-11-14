@@ -208,3 +208,34 @@ test('falha do novo filtro limpa resultado anterior e permite repetir', async ({
     await page.getByRole('button', { name: 'Tentar novamente' }).click();
     await expect(page.locator('#interest-list')).toContainText('novo');
 });
+
+test('falha de paginação mantém foco na nova tentativa e recupera', async ({ page }) => {
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { id: 'TEST', role: 'superadministrador', permissions: ['platform.product_interests.manage'] } } }));
+    await page.route('**/api/backoffice/product-interests-options?*', route => route.fulfill({ json: { products: [], meta: { current_page: 1, has_more: false }, historical_index_ready: true } }));
+    let fail = true;
+    await page.route('**/api/backoffice/product-interests?*', route => {
+        const current = Number(new URL(route.request().url()).searchParams.get('page') || 1);
+        if (current === 2 && fail) { fail = false; return route.fulfill({ status: 503, json: { message: 'Falha' } }); }
+        return route.fulfill({ json: { data: [], meta: { total: 30, current_page: current, last_page: 2 } } });
+    });
+    await page.goto('/backoffice/interesses');
+    const next = page.getByRole('button', { name: 'Próxima' });
+    await next.focus(); await page.keyboard.press('Enter');
+    const retry = page.getByRole('button', { name: 'Tentar novamente' });
+    await expect(retry).toBeFocused(); await page.keyboard.press('Enter');
+    await expect(page.locator('#interest-pagination [aria-current="page"]')).toHaveText('2');
+    await expect(page.locator('#interest-pagination [aria-current="page"]')).toBeFocused();
+});
+
+test('atualização mantém confirmação durante recarga da lista', async ({ page }) => {
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { id: 'TEST', role: 'superadministrador', permissions: ['platform.product_interests.manage'] } } }));
+    await page.route('**/api/backoffice/product-interests-options?*', route => route.fulfill({ json: { products: [], meta: { current_page: 1, has_more: false }, historical_index_ready: true } }));
+    const row = { id: '1', name: 'Cliente', email: 'teste@example.test', products: [], profiles: [], status: 'novo', last_submitted_at: '2026-01-01T00:00:00Z', consented_at: '2026-01-01T00:00:00Z' };
+    await page.route('**/api/backoffice/product-interests?*', route => route.fulfill({ json: { data: [row], meta: { total: 1, current_page: 1, last_page: 1 } } }));
+    await page.route('**/api/backoffice/product-interests/1', route => route.request().method() === 'PATCH' ? route.fulfill({ json: {} }) : route.fulfill({ json: { interest: row } }));
+    await page.goto('/backoffice/interesses'); await page.getByRole('button', { name: 'Detalhes' }).click();
+    await page.getByRole('button', { name: 'Salvar status' }).click();
+    await expect(page.locator('#interest-message')).toContainText('Status atualizado.');
+    await expect(page.locator('#interest-list')).toContainText('Cliente');
+    await expect(page.locator('#interest-message')).toContainText('Status atualizado.');
+});
