@@ -32,6 +32,7 @@ export async function mount(root, context = {}) {
     const state = { catalog: { products: [], options: {} }, modules: [], editing: null, pending: null, personalizations: [], page: 1 };
     const pageSize = 15;
     let disposed = false;
+    let drawerGeneration = 0;
     let catalogLoaded = false;
     let observedUncertainty = false;
     const adminKey = context.admin?.id ? String(context.admin.id) : "__unknown_admin__";
@@ -216,10 +217,14 @@ export async function mount(root, context = {}) {
         $("#module-view-panel").hidden = false;
     };
     const setDrawerHeader = (kicker, title, description) => { $("#module-drawer-kicker").textContent = kicker; $("#module-drawer-title").textContent = title; $("#module-drawer-description").textContent = description; };
-    const openCreate = () => { fillForm(); drawer.setState({ mode: "create" }); setDrawerHeader("CATÁLOGO", "Novo módulo", "Cadastre um componente comercial e suas funcionalidades."); drawer.show(); field("name").focus(); };
-    const openEdit = (module) => { fillForm(module); state.editing = String(module.id); drawer.setState({ mode: "edit", record: module }); setDrawerHeader("EDITAR MÓDULO", "Editar dados do módulo", "Altere os dados comerciais, técnicos e as regras permitidas."); $("#module-form-submit").textContent = "Salvar alterações"; drawer.show(); field("name").focus(); };
-    const openView = (module) => { state.editing = null; showDetails(module); drawer.setState({ mode: "view", record: module }); setDrawerHeader("CONSULTA", "Detalhes do módulo", "Consulte os dados, regras, publicação e vínculos do módulo."); drawer.show(); };
-    const closeDrawer = () => drawer.close();
+    const openCreate = () => { drawerGeneration += 1; fillForm(); drawer.setState({ mode: "create" }); setDrawerHeader("CATÁLOGO", "Novo módulo", "Cadastre um componente comercial e suas funcionalidades."); drawer.show(); field("name").focus(); };
+    const openEdit = (module) => { drawerGeneration += 1; fillForm(module); state.editing = String(module.id); drawer.setState({ mode: "edit", record: module }); setDrawerHeader("EDITAR MÓDULO", "Editar dados do módulo", "Altere os dados comerciais, técnicos e as regras permitidas."); $("#module-form-submit").textContent = "Salvar alterações"; drawer.show(); field("name").focus(); };
+    const openView = (module) => { drawerGeneration += 1; state.editing = null; showDetails(module); drawer.setState({ mode: "view", record: module }); setDrawerHeader("CONSULTA", "Detalhes do módulo", "Consulte os dados, regras, publicação e vínculos do módulo."); drawer.show(); };
+    const closeDrawer = () => { drawerGeneration += 1; drawer.close(); };
+    const invalidateDrawer = () => { drawerGeneration += 1; };
+    const onEscape = (event) => { if (event.key === "Escape") invalidateDrawer(); };
+    $("#module-new").addEventListener("fs:hide", invalidateDrawer);
+    document.addEventListener("keydown", onEscape);
     const load = async () => {
         try {
             state.catalog = await api.request("/backoffice/catalog");
@@ -273,9 +278,10 @@ export async function mount(root, context = {}) {
         const payload = { product_id: field("product_id").value, name: field("name").value, module_code: field("module_code").value, module_code_custom_name: field("module_code_custom_name").value, segments: selectedValues("#module-segments"), context_code: field("context_code").value || null, monthly_price: window.FokusCurrency?.parse(field("monthly_price").value) ?? 0, price_is_estimate: field("price_is_estimate").value === "1", technical_description: field("technical_description").value, commercial_content: field("commercial_content").value, capability_codes: selectedValues("#module-capabilities").filter((item) => item !== "outro"), dependency_ids: selectedValues("#module-dependencies"), incompatibility_ids: selectedValues("#module-incompatibilities"), personalizations: state.personalizations };
         if (editing) { payload.display_order = Number(field("display_order").value || 0); payload.featured = field("featured").value === "1"; }
         if (!beginMutation()) return;
+        const operationDrawerGeneration = drawerGeneration;
         try {
             await api.request(editing ? `/backoffice/catalog/modules/${editId}` : "/backoffice/catalog/modules", { method: editing ? "PATCH" : "POST", body: payload });
-            if (!alive()) { mutation.uncertain = true; notifyMutation(); return; }
+            if (!alive() || operationDrawerGeneration !== drawerGeneration) { mutation.uncertain = true; notifyMutation(); return; }
             closeDrawer(); await load();
             if (alive()) showMessage(editing ? "Módulo salvo. Ative, publique o módulo e republique o catálogo em Produtos." : "Módulo cadastrado como inativo.", "success");
         } catch (error) {
@@ -329,6 +335,8 @@ export async function mount(root, context = {}) {
     if (alive()) onMutationChange();
     return () => {
         disposed = true;
+        document.removeEventListener("keydown", onEscape);
+        $("#module-new").removeEventListener("fs:hide", invalidateDrawer);
         mutation.listeners.delete(onMutationChange);
         personalizationsDrawer?.dispose?.();
         destructiveModal?.dispose?.();

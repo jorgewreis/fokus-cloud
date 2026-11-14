@@ -60,3 +60,16 @@ test('resultado incerto continua bloqueado ao retornar e permite consulta e reco
     await page.getByRole('button', {name:'Já conferi o catálogo'}).click();
     await expect(page.locator('#module-form-submit')).toBeEnabled();
 });
+
+test('retorno tardio não fecha ou apaga um novo formulário', async ({ page }) => {
+    await setup(page);
+    await page.locator('#module-new').evaluate(el=>el.click());
+    await submit(page, '#module-form');
+    await page.locator('#module-drawer-close').evaluate(el=>el.click());
+    await page.locator('#module-new').evaluate(el=>el.click());
+    await page.locator('#module-name').fill('Novo rascunho');
+    await page.evaluate(()=>window.pending[0].resolve({}));
+    await expect(page.locator('#modules-message')).toContainText('Não foi possível confirmar');
+    await expect(page.locator('#module-name')).toHaveValue('Novo rascunho');
+    await expect(page.locator('#module-form-submit')).toBeDisabled();
+});
