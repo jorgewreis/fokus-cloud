@@ -1,0 +1,19 @@
+<?php
+namespace App\Services { class InterestProductIndex {} }
+namespace Illuminate\Contracts\Console { interface Kernel {} }
+namespace Illuminate\Support\Facades {
+    class DB {
+        public static function table($name) { return new FakeQuery($name); }
+    }
+    class FakeQuery {
+        public function __construct(private string $name) {}
+        public function where(...$args) { return $this; }
+        public function whereIn(...$args) { return $this; }
+        public function insert($row) { throw new \RuntimeException('synthetic id collision'); }
+        public function delete() { file_put_contents(getenv('FAKE_LOG'), 'DELETE '.$this->name."\n", FILE_APPEND); }
+    }
+}
+namespace {
+    function now() { return 'synthetic'; }
+    function app($name) { return new \App\Services\InterestProductIndex; }
+}

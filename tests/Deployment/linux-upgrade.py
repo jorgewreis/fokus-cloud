@@ -13,6 +13,7 @@ import tempfile
 from linux_release_common import ROOT, REPORT, BASELINE, guard, environment, php, run, adapt, write, sha, safe_extract_source_archive
 
 from linux_vendor import copy_verified_vendor
+from linux_disposable_mysql import execute_disposable_sql
 
 ORIGIN_METADATA = {
     'mysql_version': '8.4.10-10',
@@ -195,7 +196,9 @@ def main():
         mysql_env = dict(env, MYSQL_PWD='security-test-only')
         name = 'fokus_upgrade_' + secrets.token_hex(8)
         def sql(statement):
-            subprocess.run(['mysql', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '-e', statement], env=mysql_env, check=True, stdout=subprocess.DEVNULL)
+            # Recheck before both CREATE and DROP; never operate on a newly
+            # selected or replaced MySQL server using stale lab evidence.
+            execute_disposable_sql(statement, mysql_env)
         def execute(command, label, runtime=candidate, expected=0):
             result = run(php() + command, prefix + label, env, runtime, expected)
             evidence['steps'].append({'name': label, **result})

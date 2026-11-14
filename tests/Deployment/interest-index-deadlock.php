@@ -48,6 +48,8 @@ class DeadlockObservedConnection extends MySqlConnection
 }
 $app = require $root.'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
+require $root.'/tests/Deployment/release-disposable-mysql.php';
+assertReleaseDisposableMysql();
 set_exception_handler(function (Throwable $error): void {
     fwrite(STDERR, get_class($error).': '.$error->getMessage().PHP_EOL);
     exit(1);

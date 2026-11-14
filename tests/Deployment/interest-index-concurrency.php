@@ -27,6 +27,8 @@ if (getenv('FOKUS_INTEREST_INDEX_DISPOSABLE') !== '1' || getenv('APP_ENV') !== '
 require $root.'/vendor/autoload.php';
 $app = require $root.'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
+require $root.'/tests/Deployment/release-disposable-mysql.php';
+assertReleaseDisposableMysql();
 $index = app(InterestProductIndex::class);
 $runId = bin2hex(random_bytes(6));
 $directory = sys_get_temp_dir().'/interest-index-'.$runId;
@@ -34,11 +36,12 @@ if (! mkdir($directory, 0700)) {
     throw new RuntimeException('cannot create private synchronization directory');
 }
 $pid = null;
+$ownedIds = [];
 try {
     foreach (['backfill-first', 'writer-first'] as $scenario) {
         $id = 'QA_'.($scenario === 'backfill-first' ? 'B_' : 'W_').$runId;
-        DB::table('product_interests')->where('id', $id)->delete();
         DB::table('product_interests')->insert(['id' => $id, 'name' => 'QA', 'email' => $id.'@example.test', 'products' => '["legacy"]', 'profiles' => '[]', 'privacy_version' => '2.0', 'status' => 'novo', 'consented_at' => now(), 'last_submitted_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        $ownedIds[] = $id;
         DB::transaction(fn () => $index->replace($id, ['legacy']));
         DB::purge();
         $lock = $directory.'/'.$scenario.'-locked';
@@ -126,12 +129,16 @@ try {
             throw new RuntimeException('rollback mismatch');
         }
         DB::table('product_interests')->where('id', $id)->delete();
+        $ownedIds = array_values(array_diff($ownedIds, [$id]));
         echo $scenario." lock and rollback passed\n";
     }
 } finally {
     if ($pid !== null && $pid > 0) {
         posix_kill($pid, SIGKILL);
         pcntl_waitpid($pid, $status);
+    }
+    if ($ownedIds !== []) {
+        DB::table('product_interests')->whereIn('id', $ownedIds)->delete();
     }
     foreach (glob($directory.'/*') ?: [] as $path) {
         unlink($path);

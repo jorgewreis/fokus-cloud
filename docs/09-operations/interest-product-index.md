@@ -51,3 +51,17 @@ isso não comprova sucesso nem falha funcional da restauração. O fixture não
 representa a política real de cache, a infraestrutura ou o navegador do cliente.
 A substituição adversarial de listener e o bloqueio de destinos externos podem
 ser verificados com `node --test tests/Deployment/interest-real-bfcache-safety.test.mjs`.
+
+## Proteção das provas destrutivas
+
+O executor Linux de release cria o MySQL descartável, verifica a rede interna e
+o namespace compartilhado e grava em `/run/fokus-release-mysql.identity`, como
+root, o UUID do servidor criado e o namespace observado. O processo de teste
+sem privilégios não pode alterar essa identidade. Antes de criar ou remover o
+banco de upgrade, o harness compara o namespace e consulta o UUID; os ensaios
+de concorrência e deadlock também validam a configuração e o PDO de escrita.
+Essas verificações dependem da integridade do host e do daemon que criaram os
+containers; não constituem uma atestação contra um host malicioso. Execute-as
+somente em infraestrutura descartável e exclusiva. A limpeza de fixtures usa
+apenas IDs cuja inserção foi confirmada; interrupção ambígua pode deixar dados
+sintéticos residuais para inspeção, sem autorizar sua remoção em outro alvo.

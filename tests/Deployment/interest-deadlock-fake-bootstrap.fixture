@@ -1,6 +1,7 @@
 <?php
 namespace App\Http\Controllers\Api { class ProductInterestController { const PRIVACY_VERSION = 'test'; } }
 namespace Illuminate\Contracts\Console { interface Kernel {} }
+namespace Illuminate\Database { class MySqlConnection {} class QueryException extends \Exception {} }
 namespace Illuminate\Support\Facades {
     class DB {
         public static function table($name) { return new FakeQuery($name); }
