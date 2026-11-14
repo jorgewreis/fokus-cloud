@@ -11,6 +11,7 @@ import re
 import stat
 import sys
 import tempfile
+import time
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'deploy'))
 import publication_gate
@@ -18,6 +19,7 @@ import derived_assets
 
 EXECUTOR_ROOT = Path(__file__).resolve().parents[2]
 MAX_ARTIFACT_BYTES = 576 * 1024 * 1024
+HASH_TIMEOUT_SECONDS = 30
 
 
 def require(condition, reason):
@@ -25,14 +27,23 @@ def require(condition, reason):
 
 
 def stable_hash(fd):
+    deadline=time.monotonic()+HASH_TIMEOUT_SECONDS
     before=os.fstat(fd)
     require(stat.S_ISREG(before.st_mode) and before.st_nlink==1 and 0<before.st_size<=MAX_ARTIFACT_BYTES,'invalid_artifact')
     h=hashlib.sha256();os.lseek(fd,0,os.SEEK_SET)
-    while True:
-        chunk=os.read(fd,1024*1024)
-        if not chunk:break
-        h.update(chunk)
+    remaining=before.st_size
+    while remaining:
+        require(time.monotonic()<deadline,'artifact_hash_timeout')
+        chunk=os.read(fd,min(1024*1024,remaining))
+        require(time.monotonic()<deadline,'artifact_hash_timeout')
+        require(bool(chunk) and len(chunk)<=remaining,'artifact_changed')
+        h.update(chunk);remaining-=len(chunk)
+    require(time.monotonic()<deadline,'artifact_hash_timeout')
+    extra=os.read(fd,1)
+    require(time.monotonic()<deadline,'artifact_hash_timeout')
+    require(not extra,'artifact_grew')
     after=os.fstat(fd)
+    require(time.monotonic()<deadline,'artifact_hash_timeout')
     require((before.st_dev,before.st_ino,before.st_size,before.st_mtime_ns,before.st_ctime_ns)==
             (after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns),'artifact_changed')
     return h.hexdigest(),(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns)
@@ -69,9 +80,9 @@ def compare(source, artifact, environment, *, expected_repository, expected_repo
             try:rebuilt_digest,_=stable_hash(rebuilt_fd)
             finally:os.close(rebuilt_fd)
             require(rebuilt_digest==result['artifact_sha256'] and rebuilt_digest==digest,'independent_artifact_mismatch')
-        require(stable_hash(fd)==(digest,identity),'artifact_changed')
         info=artifact.lstat()
         require(stat.S_ISREG(info.st_mode) and (info.st_dev,info.st_ino)==identity[:2],'artifact_rebound')
+        require(stable_hash(fd)==(digest,identity),'artifact_changed')
         require(derived_assets.source_snapshot(source)[0]==context.sha,'source_changed')
         require(publication_gate.verify(context,api)==validation,'validation_changed')
         return {'state':'independent_rebuild_match_not_authorized','source_sha':context.sha,

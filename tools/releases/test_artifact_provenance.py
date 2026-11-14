@@ -3,6 +3,7 @@
 from pathlib import Path
 import os
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 import artifact_provenance as provenance
@@ -76,6 +77,51 @@ class Evidence(unittest.TestCase):
             return result
         self.build_mock.side_effect=replace
         with self.assertRaisesRegex(ValueError,'artifact_rebound'):self.compare()
+
+    def test_growth_during_hash_is_detected_with_bounded_reads(self):
+        initial=self.artifact.stat().st_size
+        fd=os.open(self.artifact,os.O_RDONLY)
+        start=threading.Event();done=threading.Event();errors=[];requests=[]
+        def append():
+            try:
+                if not start.wait(3):raise RuntimeError('writer was not signalled')
+                with self.artifact.open('ab') as stream:stream.write(b'extra bytes')
+            except Exception as error:errors.append(error)
+            finally:done.set()
+        thread=threading.Thread(target=append);thread.start()
+        original_read=os.read
+        def read(target,count):
+            requests.append(count)
+            if len(requests)==1:
+                start.set()
+                if not done.wait(3):raise RuntimeError('writer did not finish')
+            return original_read(target,count)
+        try:
+            with patch.object(provenance.os,'read',side_effect=read):
+                with self.assertRaisesRegex(ValueError,'artifact_grew'):
+                    provenance.stable_hash(fd)
+            self.assertFalse(errors)
+            self.assertLessEqual(sum(requests),initial+1)
+        finally:
+            os.close(fd);thread.join(timeout=3)
+
+    def test_unbounded_reader_cannot_exceed_initial_size_plus_probe(self):
+        initial=self.artifact.stat().st_size;fd=os.open(self.artifact,os.O_RDONLY);requests=[]
+        def endless(_fd,count):requests.append(count);return b'x'*count
+        try:
+            with patch.object(provenance.os,'read',side_effect=endless):
+                with self.assertRaisesRegex(ValueError,'artifact_grew'):provenance.stable_hash(fd)
+            self.assertEqual(sum(requests),initial+1)
+        finally:os.close(fd)
+
+    def test_hash_deadline_refuses_before_read(self):
+        fd=os.open(self.artifact,os.O_RDONLY)
+        try:
+            with patch.object(provenance.time,'monotonic',side_effect=[0,31]), \
+                 patch.object(provenance.os,'read') as read:
+                with self.assertRaisesRegex(ValueError,'artifact_hash_timeout'):provenance.stable_hash(fd)
+            read.assert_not_called()
+        finally:os.close(fd)
 
     def test_artifact_mutation_during_rebuild_is_rejected(self):
         original=self.build
