@@ -38,13 +38,13 @@ export async function mount(root, context = {}) {
                 status.setAttribute("role", "status");
                 $("#products-message").after(status);
             }
-            status.replaceChildren(document.createTextNode(mutation.inFlight ? "Salvando produto. Aguarde. " : "Não foi possível confirmar o estado atualizado. Recarregue e confira o catálogo antes de tentar novamente. "));
+            status.replaceChildren(document.createTextNode(mutation.inFlight ? "Salvando produto. Aguarde. " : "O resultado do salvamento ainda é desconhecido e a operação pode continuar em andamento, mesmo após atualizar o catálogo. Confira o catálogo e considere o risco de duplicidade antes de tentar novamente. "));
             if (mutation.uncertain && !mutation.inFlight) {
                 const reload = document.createElement("button");
                 reload.type = "button"; reload.className = "fs-btn fs-btn-outline-primary"; reload.textContent = "Recarregar catálogo";
                 reload.addEventListener("click", () => load()); status.append(reload);
                 const confirm = document.createElement("button");
-                confirm.type = "button"; confirm.className = "fs-btn fs-btn-outline-primary"; confirm.textContent = "Já conferi o catálogo";
+                confirm.type = "button"; confirm.className = "fs-btn fs-btn-outline-primary"; confirm.textContent = "Entendo o risco e quero liberar novo envio";
                 confirm.disabled = !catalogLoaded;
                 confirm.addEventListener("click", () => { mutation.uncertain = false; notify(); }); status.append(confirm);
             }

@@ -23,8 +23,10 @@ test('incerteza sobrevive à navegação e exige catálogo atualizado',async({pa
  await setup(page); await page.locator('#product-new').evaluate(el=>el.click()); await submit(page);
  await page.evaluate(()=>{window.controller.abort();window.dispose();window.pending[0].reject(new Error('rede'));});
  await page.evaluate(async()=>{await Promise.resolve();await window.mountPage()});
- await expect(page.locator('#product-form-submit')).toBeDisabled(); await expect(page.locator('[data-product-mutation-status]')).toContainText('Não foi possível confirmar');
- await page.getByRole('button',{name:'Recarregar catálogo'}).click(); await page.getByRole('button',{name:'Já conferi o catálogo'}).click();
+ await expect(page.locator('#product-form-submit')).toBeDisabled(); await expect(page.locator('[data-product-mutation-status]')).toContainText('resultado do salvamento ainda é desconhecido');
+ await expect(page.locator('[data-product-mutation-status]')).toContainText('operação pode continuar em andamento');
+ await page.getByRole('button',{name:'Recarregar catálogo'}).click(); await expect(page.locator('#product-form-submit')).toBeDisabled();
+ await page.getByRole('button',{name:'Entendo o risco e quero liberar novo envio'}).click();
  await expect(page.locator('#product-form-submit')).toBeEnabled();
 });
 test('retorno tardio preserva o novo formulário',async({page})=>{
@@ -39,7 +41,7 @@ test('leitura iniciada antes do resultado não libera reconhecimento',async({pag
  await page.evaluate(()=>{ window.controller.abort(); window.dispose(); window.controller=new AbortController(); window.remount=window.mod.mount(document.querySelector('main'),{admin:{id:'a'},signal:window.controller.signal,api:{request:(url,options)=>options?new Promise((resolve,reject)=>window.pending.push({resolve,reject})):new Promise(resolve=>window.resolveOldRead=resolve)}}); });
  await page.evaluate(()=>window.pending[0].reject(new Error('rede')));
  await page.evaluate(async()=>{await Promise.resolve();window.resolveOldRead({products:[]});window.dispose=await window.remount;});
- await expect(page.getByRole('button',{name:'Já conferi o catálogo'})).toBeDisabled();
+ await expect(page.getByRole('button',{name:'Entendo o risco e quero liberar novo envio'})).toBeDisabled();
 });
 
 test('roteador importa o módulo e drawer reais',async({page})=>{
