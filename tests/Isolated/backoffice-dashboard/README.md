@@ -110,3 +110,25 @@ produção e sem comprovação da equivalência do endpoint ou de outros drivers
 O agrupamento cobre todos os resgates, inclusive históricos; forçar plano por
 um único experimento pode degradar outras distribuições. Mantém-se o JOIN até
 que a decisão seja fundamentada em cargas, índices e drivers representativos.
+
+## Resultado HTTP MySQL após retomada
+
+O processo inicial encerrou e foi removido automaticamente sem preservar sua
+saída final; não há resultado recuperável daquela execução. Para nova prova,
+foram comparados os nomes das 84 migrations presentes no banco sintético
+`dashboard_test` com os arquivos da branch e conferidas as tabelas
+`subscriptions` e `platform_admins` vazias. Um bootstrap temporário, restrito
+a `APP_ENV=testing`, host `127.0.0.1`, banco `dashboard_test` e aceite explícito
+de reutilização sintética, marcou o esquema existente como migrado. O próprio
+`RefreshDatabase` iniciou transação; a infraestrutura de teste semeou os dados.
+Não foram refeitas as migrations nessa segunda execução.
+
+No contêiner `fokus-dashboard-http-reuse-20261114`, Laravel 13.40.0, PHP
+8.4.27 e MySQL 8.4, os testes HTTP de agregação e voucher concluíram com
+**2 testes e 64 asserções**, saída zero e duração de 26,531 s. A saída permanece
+consultável com `docker logs fokus-dashboard-http-reuse-20261114` enquanto o
+contêiner existir. O vendor empregado veio do ensaio da atualização Laravel,
+não do lockfile original deste protótipo. O bootstrap e a configuração PHPUnit
+utilizados estão nos arquivos temporários locais `phpunit.dashboard-reuse-bootstrap.php`
+e `phpunit.dashboard-reuse.xml`; não contêm credenciais. O resultado não prova
+a suíte completa, concorrência por HTTP ou validação de produção.
