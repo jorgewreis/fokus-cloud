@@ -45,6 +45,7 @@ try {
     foreach (['backfill', 'writer'] as $victim) {
         DB::table('product_interests')->whereIn('id', $ids)->delete();
         DB::table($ballast)->delete();
+        DB::table($ballast)->insert([['id' => 1000], ['id' => 1001]]);
         foreach ($ids as $i => $id) {
             DB::table('product_interests')->insert(['id' => $id, 'name' => 'Synthetic', 'email' => "qa-deadlock-$i-$run@example.test", 'products' => '["legacy"]', 'profiles' => '[]', 'privacy_version' => ProductInterestController::PRIVACY_VERSION, 'status' => 'novo', 'consented_at' => now(), 'last_submitted_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
         }
@@ -68,6 +69,11 @@ try {
                         if (++$attempts !== 1) {
                             return;
                         }
+                        // Force a real cycle inside the application transactions.
+                        // Depending on incidental index gap locks is nondeterministic.
+                        $ownLock = $actor === 'backfill' ? 1000 : 1001;
+                        $otherLock = $actor === 'backfill' ? 1001 : 1000;
+                        DB::table($ballast)->where('id', $ownLock)->lockForUpdate()->first();
                         if ($actor !== $victim) {
                             $rows = [];
                             for ($i = 0; $i < 200; $i++) {
@@ -83,6 +89,7 @@ try {
                         if (microtime(true) >= $deadline) {
                             throw new RuntimeException('barrier timed out');
                         }
+                        DB::table($ballast)->where('id', $otherLock)->lockForUpdate()->first();
                     });
                     if ($actor === 'backfill') {
                         $status = Artisan::call('fokus:backfill-interest-products', ['--confirm-drained' => true]);
