@@ -31,6 +31,14 @@ class IdempotencyEvidenceTest(unittest.TestCase):
         self.assertEqual(len(result["junit_sha256"]), 64)
         self.assertEqual(self.evidence(profile="mysql")["profile"], "mysql")
 
+    def test_consistent_root_and_nested_totals_are_accepted(self):
+        self.path.write_text('<testsuites tests="2" assertions="3" errors="0">'
+                             '<testsuite tests="2" assertions="3">' + ONE + TWO
+                             + '</testsuite></testsuites>', encoding="utf-8")
+        result = validate_selection(self.path, profile="sqlite", source_sha=SHA,
+                                    observed_sha=SHA, required=REQUIRED)
+        self.assertEqual((result["cases"], result["assertions"]), (2, 3))
+
     def test_missing_duplicate_unexpected_or_weakened_case_fails(self):
         for cases in (ONE, ONE + ONE, ONE + TWO.replace('test_two', 'other'),
                       ONE.replace('assertions="2"', 'assertions="1"') + TWO):
@@ -57,6 +65,40 @@ class IdempotencyEvidenceTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_selection(self.path, profile="sqlite", source_sha=SHA,
                                observed_sha=SHA, required=REQUIRED)
+
+    def test_root_and_nested_failure_aggregates_fail_closed(self):
+        for level in ("testsuites", "testsuite"):
+            for attribute in ("failures", "errors", "skipped", "disabled"):
+                for value in ("1", "-1", "invalid", ""):
+                    nested = f'<testsuite {attribute}="{value}">' + ONE + TWO + '</testsuite>'
+                    document = (f'<testsuites {attribute}="{value}"><testsuite>' + ONE + TWO
+                                + '</testsuite></testsuites>') if level == "testsuites" else '<testsuites>' + nested + '</testsuites>'
+                    self.path.write_text(document, encoding="utf-8")
+                    with self.subTest(level=level, attribute=attribute, value=value), self.assertRaises(ValueError):
+                        validate_selection(self.path, profile="sqlite", source_sha=SHA,
+                                           observed_sha=SHA, required=REQUIRED)
+
+    def test_summary_totals_must_match_descendants_at_each_level(self):
+        for level in ("testsuites", "testsuite"):
+            for attribute, value in (("tests", "3"), ("assertions", "4"), ("tests", "bad"),
+                                     ("assertions", "-1")):
+                inner = f'<testsuite {attribute}="{value}">' + ONE + TWO + '</testsuite>'
+                document = (f'<testsuites {attribute}="{value}"><testsuite>' + ONE + TWO
+                            + '</testsuite></testsuites>') if level == "testsuites" else '<testsuites>' + inner + '</testsuites>'
+                self.path.write_text(document, encoding="utf-8")
+                with self.subTest(level=level, attribute=attribute, value=value), self.assertRaises(ValueError):
+                    validate_selection(self.path, profile="sqlite", source_sha=SHA,
+                                       observed_sha=SHA, required=REQUIRED)
+
+    def test_suite_level_failure_elements_are_rejected(self):
+        for level in ("testsuites", "testsuite"):
+            for kind in ("failure", "error", "skipped"):
+                inner = '<testsuite>' + ONE + TWO + f'<{kind}/></testsuite>'
+                document = ('<testsuites><testsuite>' + ONE + TWO + f'</testsuite><{kind}/></testsuites>') if level == "testsuites" else '<testsuites>' + inner + '</testsuites>'
+                self.path.write_text(document, encoding="utf-8")
+                with self.subTest(level=level, kind=kind), self.assertRaises(ValueError):
+                    validate_selection(self.path, profile="sqlite", source_sha=SHA,
+                                       observed_sha=SHA, required=REQUIRED)
 
 
 if __name__ == "__main__":
