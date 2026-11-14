@@ -54,7 +54,8 @@ test('usuários: consultas e detalhes antigos não substituem o estado atual ou 
     await page.locator('#user-action-reason').fill('Motivo sintético');
     await page.locator('#user-action-form').evaluate((form) => form.requestSubmit());
     await page.evaluate(() => window.pending[9].resolve({}));
-    await expect(page.locator('#users-message')).toHaveText('Ação de segurança concluída.');
+    await expect(page.locator('#user-invite')).toBeDisabled();
+    await expect.poll(() => page.evaluate(() => window.pending.length)).toBe(11);
     await page.evaluate((value) => window.pending[10].resolve(value), result('Recuperado'));
     await expect(page.locator('#users-message')).toHaveText('Ação de segurança concluída.');
     await row.locator('[data-user-action="details"]').click();
@@ -74,12 +75,13 @@ test('usuários: respostas de empresas e ações não alteram tela após desmont
         window.disposeUsers = await module.mount(document.querySelector('main'), { signal: window.abortController.signal, admin: { role: 'superadministrador' }, api: { request: (url) => new Promise((resolve, reject) => window.pending.push({ url, resolve, reject })) } });
     }, source);
     await page.evaluate((value) => window.pending[0].resolve(value), result('Inicial'));
+    await page.locator('#user-invite').click();
+    await page.locator('#user-account-type').selectOption('empresa');
     await page.locator('#users-list [data-user-action="block"]').click();
     await page.locator('#user-action-reason').fill('Motivo sintético');
     await page.locator('#user-action-form').evaluate((form) => form.requestSubmit());
-    await page.locator('#user-invite').click();
-    await page.locator('#user-account-type').selectOption('empresa');
-    await page.evaluate(() => { window.abortController.abort(); window.disposeUsers(); window.pending[1].resolve({}); window.pending[2].resolve({ data: [{ id: 1, label: 'Empresa tardia' }] }); });
+    await expect(page.locator('#user-invite')).toBeDisabled();
+    await page.evaluate(() => { window.abortController.abort(); window.disposeUsers(); window.pending[1].resolve({ data: [{ id: 1, label: 'Empresa tardia' }] }); window.pending[2].resolve({}); });
     await expect(page.locator('#user-company')).not.toContainText('Empresa tardia');
     await expect(page.locator('#users-message')).not.toHaveText('Ação de segurança concluída.');
     expect(await page.evaluate(() => window.pending.length)).toBe(3);

@@ -1,5 +1,9 @@
 import { createRecordsDrawer } from "./records-drawer.js";
 
+let mutationState = null;
+const mutationListeners = new Set();
+const notifyMutation = () => mutationListeners.forEach((listener) => listener());
+
 export async function mount(root, context = {}) {
     const $ = (selector) => root.querySelector(selector) || document.querySelector(selector);
     const api = context.api || window.FokusApi;
@@ -70,11 +74,15 @@ export async function mount(root, context = {}) {
             const response = await api.request(`/backoffice/directory/users?${params}`, { signal: context.signal });
             if (!current(version, listVersion)) return;
             render(response);
+            if (mutationState) syncMutation();
+            return true;
         } catch (error) {
             if (!current(version, listVersion) || error?.name === "AbortError") return;
             list.innerHTML = '<tr><td colspan="5"><button class="fs-btn fs-btn-outline-primary fs-btn-sm" type="button" data-users-retry>Tentar novamente</button></td></tr>';
             list.querySelector("[data-users-retry]").addEventListener("click", load, { once: true });
             showMessage(error.message || "Não foi possível carregar os usuários.");
+            if (mutationState) syncMutation();
+            return false;
         }
     };
     let companiesLoaded = false;
@@ -84,7 +92,7 @@ export async function mount(root, context = {}) {
         $("#user-internal-role-field").hidden = isExternal;
         $("#user-role").disabled = isExternal;
         [$("#user-cpf"), $("#user-company"), $("#user-external-role")].forEach((field) => { field.disabled = !isExternal; field.required = isExternal; });
-        $("#user-form-submit").disabled = isExternal && !companiesLoaded;
+        $("#user-form-submit").disabled = Boolean(mutationState) || (isExternal && !companiesLoaded);
         $("#user-form-data-title").textContent = isExternal ? "Vínculo com empresa" : "Dados da conta interna";
         $("#user-form-submit").textContent = isExternal ? "Enviar convite externo" : "Enviar convite interno";
         if (isExternal && !companiesLoaded) loadCompanies();
@@ -98,14 +106,17 @@ export async function mount(root, context = {}) {
             const companies = response.data || [];
             select.innerHTML = '<option value="">Selecione a empresa e o sistema</option>' + companies.map((company) => `<option value="${esc(company.id)}">${esc(company.label)}</option>`).join("");
             select.disabled = companies.length === 0;
-            $("#user-form-submit").disabled = companies.length === 0 && $("#user-account-type").value === "empresa";
-            if (!companies.length) showMessage("Não há empresas ativas com assinatura ativa do Fokus Law para receber um vínculo.");
-            else { companiesLoaded = true; showMessage(""); }
+            $("#user-form-submit").disabled = Boolean(mutationState) || (companies.length === 0 && $("#user-account-type").value === "empresa");
+            if (companies.length) companiesLoaded = true;
+            if (mutationState) syncMutation();
+            else if (!companies.length) showMessage("Não há empresas ativas com assinatura ativa do Fokus Law para receber um vínculo.");
+            else showMessage("");
         } catch (error) {
             if (!active || context.signal?.aborted || error?.name === "AbortError") return;
             select.innerHTML = '<option value="">Não foi possível carregar as empresas</option>';
-            $("#user-form-submit").disabled = $("#user-account-type").value === "empresa";
-            showMessage(error.message || "Não foi possível carregar as empresas ativas.");
+            $("#user-form-submit").disabled = Boolean(mutationState) || $("#user-account-type").value === "empresa";
+            if (mutationState) syncMutation();
+            else showMessage(error.message || "Não foi possível carregar as empresas ativas.");
         }
     };
     const resetForm = () => {
@@ -164,49 +175,86 @@ export async function mount(root, context = {}) {
     const actionLabels = { block: ["Bloquear conta", "A conta perderá acesso ao Backoffice."], unblock: ["Desbloquear conta", "A conta poderá voltar a acessar o Backoffice."], deactivate: ["Desativar conta", "A conta interna será desativada."] };
     const submitAction = async (event) => {
         event.preventDefault();
-        if (!pendingAction || !$("#user-action-form").reportValidity()) return;
+        if (mutationState || !pendingAction || !$("#user-action-form").reportValidity()) return;
         const { action, id } = pendingAction;
+        const reason = $("#user-action-reason").value.trim();
+        mutationState = "pending";
+        notifyMutation();
         try {
-            await api.request(`/backoffice/admins/${encodeURIComponent(id)}/${action}`, { method: "POST", body: { reason: $("#user-action-reason").value.trim() } });
-            if (!active || context.signal?.aborted) return;
-            modal?.hide?.(); showMessage("Ação de segurança concluída.", "success"); pendingAction = null; await load({ preserveMessage: true });
-        } catch (error) { if (active && !context.signal?.aborted) showMessage(error.message || "Não foi possível concluir a ação."); }
+            await api.request(`/backoffice/admins/${encodeURIComponent(id)}/${action}`, { method: "POST", body: { reason } });
+            if (!active || context.signal?.aborted) { mutationState = "uncertain"; return; }
+            modal?.hide?.(); pendingAction = null;
+            const refreshed = await load({ preserveMessage: true });
+            if (!active || context.signal?.aborted || !refreshed) { mutationState = "uncertain"; return; }
+            mutationState = null;
+            showMessage("Ação de segurança concluída.", "success");
+        } catch (error) {
+            if (!error.status || error.status === 408 || error.status >= 500) mutationState = "uncertain";
+            else { mutationState = null; if (active && !context.signal?.aborted) showMessage(error.message || "Não foi possível concluir a ação."); }
+        } finally { notifyMutation(); }
     };
+    const syncMutation = () => {
+        if (!active || context.signal?.aborted) return;
+        $("#user-invite").disabled = !canManage || Boolean(mutationState);
+        list.querySelectorAll('[data-user-action]:not([data-user-action="details"])').forEach((button) => { button.disabled = Boolean(mutationState); });
+        const actionSubmit = $("#user-action-submit");
+        actionSubmit.disabled = Boolean(mutationState);
+        if (mutationState === "pending") actionSubmit.setAttribute("aria-busy", "true"); else actionSubmit.removeAttribute("aria-busy");
+        const submit = $("#user-form-submit");
+        submit.disabled = Boolean(mutationState) || ($("#user-account-type").value === "empresa" && !companiesLoaded);
+        if (mutationState === "pending") submit.setAttribute("aria-busy", "true"); else submit.removeAttribute("aria-busy");
+        const progress = $("#user-invite-progress");
+        progress.textContent = mutationState === "pending" ? "Há uma alteração de usuário em andamento. Aguarde o resultado." : "";
+        progress.hidden = mutationState !== "pending";
+        if (mutationState === "uncertain") showMessage("Atualize a página e confira a situação da conta antes de tentar novamente.");
+    };
+    mutationListeners.add(syncMutation);
     const submitForm = async (event) => {
         event.preventDefault();
-        if (!form.reportValidity()) return;
-        const values = Object.fromEntries(new FormData(form));
         const mode = drawerController.getState().mode;
+        if (mutationState || !form.reportValidity()) return;
+        const values = Object.fromEntries(new FormData(form));
         if (mode === "invite" && values.account_type === "empresa") {
             const cpfInput = $("#user-cpf");
             const cpf = window.FokusDocuments?.normalize(cpfInput.value, "cpf") || cpfInput.value.replace(/\D/g, "");
             if (!window.FokusDocuments?.cpf(cpf)) { showMessage("Informe um CPF válido, com os dígitos verificadores corretos."); cpfInput.focus(); return; }
             values.cpf = cpf;
         }
+        mutationState = "pending"; notifyMutation();
         try {
             if (mode === "invite") {
                 if (values.account_type === "empresa") {
                     await api.request("/backoffice/directory/users", { method: "POST", body: { name: values.name, email: values.email, cpf: values.cpf, company_id: values.company_id, role: values.role } });
-                    if (!active || context.signal?.aborted) return;
-                    showMessage("Convite enviado ao usuário externo.", "success");
                 } else {
                     await api.request("/backoffice/admins/invitations", { method: "POST", body: { name: values.name, email: values.email, role: values.role } });
-                    if (!active || context.signal?.aborted) return;
-                    showMessage("Convite enviado à conta interna.", "success");
                 }
+                if (!active || context.signal?.aborted) { mutationState = "uncertain"; return; }
+                drawerController.close();
+                const refreshed = await load({ preserveMessage: true });
+                if (!active || context.signal?.aborted || !refreshed) { mutationState = "uncertain"; return; }
+                mutationState = null;
+                showMessage(values.account_type === "empresa" ? "Convite enviado ao usuário externo." : "Convite enviado à conta interna.", "success");
             } else {
                 const result = await api.request(`/backoffice/admins/${encodeURIComponent(selected.id)}/profile`, { method: "PATCH", body: { name: values.name, email: values.email } });
-                if (!active || context.signal?.aborted) return;
+                if (!active || context.signal?.aborted) { mutationState = "uncertain"; return; }
+                drawerController.close();
+                const refreshed = await load({ preserveMessage: true });
+                if (!active || context.signal?.aborted || !refreshed) { mutationState = "uncertain"; return; }
+                mutationState = null;
                 showMessage(result.message || "Dados atualizados.", "success");
             }
-            drawerController.close(); await load({ preserveMessage: true });
-        } catch (error) { if (active && !context.signal?.aborted) showMessage(error.message || "Não foi possível salvar os dados."); }
+        } catch (error) {
+            if (!error.status || error.status === 408 || error.status >= 500) mutationState = "uncertain";
+            else { mutationState = null; if (active && !context.signal?.aborted) showMessage(error.message || "Não foi possível salvar os dados."); }
+        } finally {
+            notifyMutation();
+        }
     };
     $("#users-query").value = state.query;
     if (!canManage) $("#user-invite").hidden = true;
     $("#users-filter-form").addEventListener("submit", (event) => { event.preventDefault(); state.query = $("#users-query").value.trim(); state.page = 1; load(); });
     $("#user-invite").addEventListener("click", () => { ++detailVersion; openForm("invite"); });
-    $("#user-invite").disabled = !canManage;
+    $("#user-invite").disabled = !canManage || Boolean(mutationState);
     $("#user-drawer-close").addEventListener("click", () => { ++detailVersion; drawerController.close(); });
     $("#user-form-cancel").addEventListener("click", () => { ++detailVersion; drawerController.close(); });
     form.addEventListener("submit", submitForm);
@@ -214,6 +262,7 @@ export async function mount(root, context = {}) {
     list.addEventListener("click", async (event) => {
         const button = event.target.closest("[data-user-action]"); if (!button) return;
         const { userAction, userId } = button.dataset;
+        if (mutationState && userAction !== "details") return;
         if (userAction === "details" || userAction === "edit") { await openUser(userId, button.closest("tr").dataset.accountType, userAction === "edit" ? "edit" : "view"); return; }
         if (!actionLabels[userAction]) return;
         ++detailVersion;
@@ -225,8 +274,9 @@ export async function mount(root, context = {}) {
     const invalidateOnEscape = (event) => { if (event.key === "Escape") invalidateDetail(); };
     trigger?.addEventListener("fs:hide", invalidateDetail);
     document.addEventListener("keydown", invalidateOnEscape);
+    if (mutationState) syncMutation();
     load();
-    const dispose = () => { if (!active) return; trigger?.removeEventListener("fs:hide", invalidateDetail); document.removeEventListener("keydown", invalidateOnEscape); active = false; ++listVersion; ++detailVersion; drawerController.dispose(); modal?.dispose?.(); window.disposeBackofficeRecordsPage?.(root); };
+    const dispose = () => { if (!active) return; mutationListeners.delete(syncMutation); trigger?.removeEventListener("fs:hide", invalidateDetail); document.removeEventListener("keydown", invalidateOnEscape); active = false; ++listVersion; ++detailVersion; drawerController.dispose(); modal?.dispose?.(); window.disposeBackofficeRecordsPage?.(root); };
     context.signal?.addEventListener("abort", dispose, { once: true });
     return dispose;
 }
