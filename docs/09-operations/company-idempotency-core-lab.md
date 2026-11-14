@@ -34,6 +34,16 @@ The migration's automatic `down` deliberately fails closed; a reviewed forward
 recovery procedure is required rather than dropping request records. The Linux
 upgrade manifest and full migration/restore tests must be updated before merge.
 
+The isolated factory can construct the store only when explicitly enabled and
+all keyring, active-key, revocation-list, quota, window and lifetime settings
+are present and valid. This setting does not expose routes or bypass the guard.
+The keyring and revocation list use canonical compact JSON without whitespace;
+duplicate object keys, malformed values, missing revocation configuration and
+unknown or revoked active keys are rejected. JSON slash escaping must match the
+canonical unescaped form. Errors do not include configuration values. Keyring
+material can still be included in Laravel's configuration cache: permissions,
+custody, backup exclusion and recovery must be verified before provisioning.
+
 Required before integration: authenticated and CSRF-protected endpoints, fresh
 authorization across the real request and session lifecycle, canonicalization of
 the exact POST/PATCH fields including password without logging them, mutation
