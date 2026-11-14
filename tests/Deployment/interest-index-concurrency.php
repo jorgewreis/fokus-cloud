@@ -13,7 +13,15 @@ $local = getenv('DB_HOST') === 'mysql' && getenv('DB_DATABASE') === 'synthetic';
 $harness = getenv('RELEASE_DISPOSABLE_TESTS') === '1' && is_string($sandbox)
     && is_file($sandbox.'/.disposable-upgrade') && getenv('DB_HOST') === '127.0.0.1'
     && preg_match('/^fokus_upgrade_[a-f0-9]{16}$/D', (string) getenv('DB_DATABASE')) === 1;
-if (getenv('FOKUS_INTEREST_INDEX_DISPOSABLE') !== '1' || getenv('APP_ENV') !== 'testing' || (! $local && ! $harness)) {
+// DB_URL overrides the individual connection fields, and a Unix socket can
+// override the hostname. Reject both before Laravel or any database is loaded.
+$url = getenv('DB_URL');
+$socket = getenv('DB_SOCKET');
+$port = getenv('DB_PORT');
+if (getenv('FOKUS_INTEREST_INDEX_DISPOSABLE') !== '1' || getenv('APP_ENV') !== 'testing'
+    || getenv('DB_CONNECTION') !== 'mysql' || ($url !== false && $url !== '')
+    || ($socket !== false && $socket !== '') || ($port !== false && $port !== '' && $port !== '3306')
+    || (! $local && ! $harness)) {
     throw new RuntimeException('refuse non-disposable context');
 }
 require $root.'/vendor/autoload.php';
