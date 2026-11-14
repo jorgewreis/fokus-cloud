@@ -176,3 +176,12 @@ Other authentication paths and nullable-password accounts have not been proven;
 the reset path still does not advance the generation. Snapshot capture and
 session persistence are distinct operations. Sequential in-memory tests exercise
 both snapshot/advance orders but are not concurrent MySQL or HTTP proof.
+
+Registration of a pending user must not fail solely because this user cannot
+receive a platform authority. The prototype omits and clears the snapshot for
+such a user. If a platform actor or binding already exists, experimental
+registration is rejected before database writes and email because that context
+transition is not atomic yet. This is a temporary closed path, not complete
+support for mixed registration. Snapshot failures other than eligibility still
+need an end-to-end failure audit; real invite, support, session-save and reset
+paths have not been proven. The flag remains off and the routes stay guarded.

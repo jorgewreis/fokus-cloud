@@ -142,6 +142,11 @@ class AuthController extends Controller
 
     public function registerCompany(Request $request, PasswordSecurity $passwordSecurity)
     {
+        $lifecycle = app(PlatformSessionLifecycle::class);
+        if ($lifecycle->enabledForSecurityMutation()) {
+            $platformActor = Auth::guard('platform')->id();
+            $lifecycle->ensureRegistrationReady($request->session(), $platformActor === null ? null : (string) $platformActor);
+        }
         $data = $this->companyRegistrationData($request, true);
         $cpf = BrazilianDocuments::digits($data['cpf']);
         $document = BrazilianDocuments::digits($data['document_number']);
@@ -1009,6 +1014,8 @@ class AuthController extends Controller
         Auth::guard('web')->login($user);
         if ($principalSnapshot !== null) {
             $request->session()->put('platform_web_principal_snapshot', $principalSnapshot);
+        } elseif (app(PlatformSessionLifecycle::class)->enabledForSecurityMutation()) {
+            $request->session()->forget('platform_web_principal_snapshot');
         }
         $request->session()->forget('active_company_id');
         if ($companyId) {

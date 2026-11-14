@@ -86,6 +86,8 @@ class PlatformSupportController extends Controller
         Auth::guard('web')->login($supportUser);
         if ($principalSnapshot !== null) {
             $request->session()->put('platform_web_principal_snapshot', $principalSnapshot);
+        } elseif (app(PlatformSessionLifecycle::class)->enabledForSecurityMutation()) {
+            $request->session()->forget('platform_web_principal_snapshot');
         }
         $request->session()->regenerate();
         $audit->record(Auth::guard('platform')->id(), 'backoffice.support_access_started', 'platform_support_session', $id, $target->company_id, $data['reason'], metadata: ['subscription_id' => $target->subscription_id, 'membership_id' => $target->membership_id, 'target_user_id' => $target->user_id], after: ['status' => 'active', 'subscription_id' => $target->subscription_id], request: $request);

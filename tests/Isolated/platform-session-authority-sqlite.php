@@ -423,6 +423,10 @@ try {
 }
 $app['config']->set('session.driver', 'database');
 $lifecycle = new PlatformSessionLifecycle($authority);
+$pendingUser = (new User)->newFromBuilder(['id' => 'principal', 'status' => 'pendente', 'password' => 'synthetic-hash']);
+$check($lifecycle->captureWebLogin($pendingUser) === null);
+$staleLogin = (new User)->newFromBuilder(['id' => 'principal', 'status' => 'ativa', 'password' => 'stale-hash']);
+$check($lifecycle->captureWebLogin($staleLogin) === null);
 try {
     $lifecycle->ensurePasswordResetReady();
     throw new RuntimeException('Experimental password reset was accepted.');
@@ -494,6 +498,13 @@ $check(! $guardConsumed);
 $session = new Store('synthetic', new ArraySessionHandler(2));
 $session->start();
 $session->setId($sessionId);
+$lifecycle->ensureRegistrationReady($session, null);
+try {
+    $lifecycle->ensureRegistrationReady($session, 'actor-b');
+    throw new LogicException('Mixed registration was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 503);
+}
 $lifecycle->authenticated($session, 'actor-b', null, fn () => null);
 $sessionBinding = (new PlatformSessionBinding)->current($session);
 $check(is_string($sessionBinding) && strlen($sessionBinding) === 64);
