@@ -104,7 +104,10 @@ try {$unexpected=$connect($argv[2]); exit(4);} catch (PDOException $e) {if ((int
         subprocess.run(base + ['--skip-reconnect', '--init-command=' + init_statement(identity),
                                '-e', 'KILL CONNECTION ' + connection_id], env=env, timeout=15,
                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
-        proc.stdin.write('SELECT @fokus_identity_guard;\n')
+        # The first statement can fail with TLS EOF after KILL. --force is
+        # diagnostic-only: the next statement tests whether a later reconnect
+        # reinitializes the session; no interrupted statement is deemed safe.
+        proc.stdin.write('SELECT @fokus_identity_guard;\nSELECT @fokus_identity_guard;\n')
         proc.stdin.flush()
         try:
             value = lines.get(timeout=15)
