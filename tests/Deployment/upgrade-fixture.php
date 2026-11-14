@@ -26,6 +26,7 @@ $driver = getenv('DB_CONNECTION');
 $url = getenv('DB_URL');
 $socket = getenv('DB_SOCKET');
 $port = getenv('DB_PORT');
+$configCache = getenv('APP_CONFIG_CACHE');
 $database = getenv('DB_DATABASE');
 $sandboxPath = is_string($qa) ? realpath($qa) : false;
 $sqlitePath = $sandboxPath === false ? false : realpath($sandboxPath.'/upgrade.sqlite');
@@ -37,9 +38,11 @@ $validMysql = $driver === 'mysql' && getenv('DB_HOST') === '127.0.0.1'
 if (getenv('APP_ENV') !== 'testing' || getenv('RELEASE_DISPOSABLE_TESTS') !== '1'
     || $sandboxPath === false || ! is_file($sandboxPath.'/.disposable-upgrade')
     || ($url !== false && $url !== '') || ($socket !== false && $socket !== '')
+    || ($configCache !== false && $configCache !== '')
     || ($port !== false && $port !== '' && $port !== '3306')
-    || (! $validSqlite && ! $validMysql) || is_file($root.'/.env')
-    || is_file($root.'/.env.testing') || is_file($root.'/bootstrap/cache/config.php')) {
+    || (! $validSqlite && ! $validMysql) || file_exists($root.'/.env') || is_link($root.'/.env')
+    || file_exists($root.'/.env.testing') || is_link($root.'/.env.testing')
+    || file_exists($root.'/bootstrap/cache/config.php') || is_link($root.'/bootstrap/cache/config.php')) {
     throw new RuntimeException('refuse non-disposable upgrade fixture');
 }
 require $root.'/vendor/autoload.php';

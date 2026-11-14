@@ -65,7 +65,8 @@ namespace { function config($key) { return 'mysql'; } }
                                ('DB_SOCKET', '/tmp/other.sock'), ('DB_SOCKET', '0'),
                                ('DB_PORT', '3307'), ('DB_PORT', '0'), ('DB_HOST', 'example.invalid'),
                                ('DB_DATABASE', 'production'), ('DB_CONNECTION', 'pgsql'),
-                               ('APP_ENV', 'production'), ('RELEASE_DISPOSABLE_TESTS', '0')]:
+                               ('APP_ENV', 'production'), ('RELEASE_DISPOSABLE_TESTS', '0'),
+                               ('APP_CONFIG_CACHE', '0'), ('APP_CONFIG_CACHE', '/tmp/other-config.php')]:
                 with self.subTest(key=key, value=value):
                     result = invoke({**base, key: value})
                     self.assertNotEqual(result.returncode, 0)
@@ -87,6 +88,31 @@ namespace { function config($key) { return 'mysql'; } }
             result = invoke({**base, 'DB_CONNECTION': 'sqlite', 'DB_DATABASE': str(other)})
             self.assertIn('refuse non-disposable upgrade fixture', result.stderr)
             self.assertNotIn('autoload.php', result.stderr)
+
+    def test_broken_inherited_configuration_symlinks_fail_before_autoload(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            sandbox = root / 'sandbox'
+            sandbox.mkdir()
+            (sandbox / '.disposable-upgrade').touch()
+            base = {'PATH': os.environ.get('PATH', ''), 'APP_ENV': 'testing',
+                    'RELEASE_DISPOSABLE_TESTS': '1', 'UPGRADE_SANDBOX': str(sandbox),
+                    'DB_CONNECTION': 'mysql', 'DB_HOST': '127.0.0.1', 'DB_PORT': '3306',
+                    'DB_DATABASE': 'fokus_upgrade_0123456789abcdef'}
+            for path in (root / '.env', root / '.env.testing', root / 'bootstrap' / 'cache' / 'config.php'):
+                with self.subTest(path=str(path)):
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    try:
+                        path.symlink_to(root / 'nonexistent-target')
+                    except (OSError, NotImplementedError) as error:
+                        self.skipTest('creating symlinks is unavailable: '+str(error))
+                    try:
+                        result = subprocess.run(['php', str(SOURCE), str(root), 'versions'], env=base,
+                                                capture_output=True, text=True, timeout=15)
+                        self.assertIn('refuse non-disposable upgrade fixture', result.stderr)
+                        self.assertNotIn('autoload.php', result.stderr)
+                    finally:
+                        path.unlink()
 
 if __name__ == '__main__':
     unittest.main()
