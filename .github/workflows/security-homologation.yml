@@ -24,32 +24,6 @@ jobs:
   dashboard-synthetic-proof:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    services:
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_ROOT_PASSWORD: dashboard-ci-fixture-only
-          MYSQL_DATABASE: dashboard_bench
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot --password=dashboard-ci-fixture-only"
-          --health-interval=10s --health-timeout=5s --health-retries=12
-    env:
-      APP_ENV: testing
-      APP_KEY: base64:MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=
-      DB_CONNECTION: mysql
-      DB_HOST: 127.0.0.1
-      DB_PORT: 3306
-      DB_DATABASE: dashboard_bench
-      DB_USERNAME: root
-      DB_PASSWORD: dashboard-ci-fixture-only
-      DASHBOARD_PROOF_ACK: synthetic-only
-      DASHBOARD_PROOF_USER: root
-      DASHBOARD_PROOF_PASSWORD: dashboard-ci-fixture-only
-      CACHE_STORE: array
-      SESSION_DRIVER: array
-      MAIL_MAILER: array
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -63,43 +37,11 @@ jobs:
           [[ "$EXPECTED_CANDIDATE" =~ ^[0-9a-f]{40}$ ]]
           test "$(git rev-parse HEAD)" = "$EXPECTED_CANDIDATE"
           test "$GITHUB_SHA" = "$EXPECTED_CANDIDATE"
-      - uses: shivammathur/setup-php@d52fc211a0436f8839a587b3b5b8efddab4744ea # v2
-        with:
-          php-version: '8.4'
-          extensions: pdo_mysql
-          coverage: none
-      - name: Install locked dependencies without lifecycle scripts
-        run: composer install --no-interaction --prefer-dist --no-scripts --no-plugins
-      - name: Identify and mark only the job-owned MySQL service
-        env:
-          MYSQL_SERVICE_ID: ${{ job.services.mysql.id }}
-        run: |
-          set -euo pipefail
-          test -n "$MYSQL_SERVICE_ID"
-          test "$(docker inspect -f '{{.State.Running}}' "$MYSQL_SERVICE_ID")" = true
-          uuid=$(docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_SERVICE_ID" mysql -uroot -Nse 'SELECT @@server_uuid')
-          [[ "$uuid" =~ ^[0-9a-fA-F-]{36}$ ]]
-          marker=$(openssl rand -hex 16)
-          [[ "$marker" =~ ^[0-9a-f]{32}$ ]]
-          docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_SERVICE_ID" mysql -uroot dashboard_bench -e "CREATE TABLE dashboard_proof_marker (id TINYINT PRIMARY KEY, marker CHAR(32) NOT NULL); INSERT INTO dashboard_proof_marker VALUES (1, '$marker')"
-          printf 'DASHBOARD_PROOF_SERVER_UUID=%s\nDASHBOARD_PROOF_MARKER=%s\n' "$uuid" "$marker" >> "$GITHUB_ENV"
-      - name: Exercise fail-closed guards and real synthetic database
-        env:
-          MYSQL_SERVICE_ID: ${{ job.services.mysql.id }}
-        run: |
-          set -euo pipefail
-          php tests/Isolated/backoffice-dashboard/laravel-guard-negative.php
-          php tests/Isolated/backoffice-dashboard/laravel-guard-collision.php
-          safe_php=(php -d disable_functions=curl_exec,curl_multi_exec,fsockopen,pfsockopen,stream_socket_client)
-          "${safe_php[@]}" tests/Isolated/backoffice-dashboard/mysql-snapshot.php
-          "${safe_php[@]}" tests/Isolated/backoffice-dashboard/mysql-benchmark.php seed
-          "${safe_php[@]}" tests/Isolated/backoffice-dashboard/laravel-snapshot.php
-          "${safe_php[@]}" tests/Isolated/backoffice-dashboard/laravel-cursor-exception.php
-          before=$(docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_SERVICE_ID" mysql -uroot -Nse 'SELECT COUNT(*) FROM dashboard_bench.voucher_redemptions')
-          if DASHBOARD_PROOF_MARKER=ffffffffffffffffffffffffffffffff "${safe_php[@]}" tests/Isolated/backoffice-dashboard/mysql-amplify-seed.php; then exit 1; fi
-          if DASHBOARD_PROOF_SERVER_UUID=00000000-0000-0000-0000-000000000000 "${safe_php[@]}" tests/Isolated/backoffice-dashboard/mysql-amplify-seed.php; then exit 1; fi
-          after=$(docker exec -e MYSQL_PWD="$DB_PASSWORD" "$MYSQL_SERVICE_ID" mysql -uroot -Nse 'SELECT COUNT(*) FROM dashboard_bench.voucher_redemptions')
-          test "$before" = "$after"
+      - name: Verify isolated dashboard orchestration without Docker
+        run: bash tests/Deployment/test-dashboard-synthetic-isolation.sh
+      - name: Exercise fail-closed guards against isolated synthetic MySQL
+        shell: bash
+        run: bash tests/Deployment/dashboard-synthetic-proof.sh
 
   dependency-audit:
     runs-on: ubuntu-24.04
