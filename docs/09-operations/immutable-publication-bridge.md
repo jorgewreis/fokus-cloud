@@ -99,6 +99,18 @@ compatibilidade de dados, ACLs ou comportamento dos drivers em produção. A
 integração desse preparo ao workflow de publicação e ao transporte seguro
 continua pendente.
 
+`tools/releases/artifact_receiver.py` recebe bytes via stdin em diretório de
+staging privado explicitamente escolhido, com tamanho e SHA-256 obrigatórios.
+O arquivo só ganha o nome final após verificação e publicação atômica sem
+sobrescrever destino existente; a recepção não ativa nem prepara releases. Ela
+rejeita diretórios inseguros e ACLs não verificáveis. A origem dos bytes, a
+autenticidade do digest/tamanho e o canal de transporte devem ser estabelecidos
+independentemente: esta ferramenta não configura SSH nem comprova host remoto.
+Uma falha de sincronização após a criação do nome final pode deixar o arquivo
+recebido para inspeção; não pressupor que uma falha limpou todos os resultados.
+O receiver é um componente sintético, ainda não ligado ao workflow nem à
+entrada de produção, que permanecem bloqueados.
+
 ## Evidência e limites
 
 `tests/Deployment/test_legacy_publication_guard.py` verifica que a recusa não
