@@ -44,6 +44,27 @@ test("logout during issue prevents storage and repeated issue cannot overwrite",
     assert.equal(storage.length, 0);
 });
 
+test("logout or session change discards delayed completion without exposing the token", async () => {
+    for (const action of ["logout", "session-change"]) {
+        const storage = makeStorage();
+        let current = "a".repeat(64);
+        let resolveSubmit;
+        const transport = {
+            issue: async () => "synthetic-token",
+            submit: () => new Promise((resolve) => { resolveSubmit = resolve; }),
+        };
+        const client = createCompanyIdempotencyLab({ storage, transport, sessionBinding: async () => current, newId: () => "synthetic-id-00003" });
+        const id = await client.issue("company.create");
+        const pending = client.submit(id, { password: "synthetic-password" });
+        await new Promise((resolve) => setImmediate(resolve));
+        if (action === "logout") client.clear();
+        else current = "b".repeat(64);
+        resolveSubmit({ state: "completed", result: { id: "company-one", status: 201 } });
+        await assert.rejects(pending, (error) => error.message === "Sessão não verificada." && !error.message.includes("synthetic-token"));
+        if (action === "logout") assert.equal(storage.length, 0);
+    }
+});
+
 test("update remains blocked without a verifiable original target", async () => {
     const storage = makeStorage();
     let calls = 0;
