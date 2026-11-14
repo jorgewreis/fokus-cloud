@@ -552,6 +552,13 @@ test('descarte de mount atrasado preserva drawer da página seguinte', async ({ 
     let plansRequested;
     const requested = new Promise((resolve) => { plansRequested = resolve; });
     const released = new Promise((resolve) => { releasePlans = resolve; });
+    await page.route('**/backoffice/assets/js/subscription-plans-page.js?*', async (route) => {
+        const response = await route.fetch();
+        const source = await response.text();
+        const anchor = 'return () => { drawer.dispose();';
+        expect(source).toContain(anchor);
+        await route.fulfill({ response, body: source.replace(anchor, 'return () => { window.__oldMountDisposed = true; drawer.dispose();') });
+    });
     await page.route('**/api/backoffice/plans', async (route) => {
         plansRequested();
         await released;
@@ -559,20 +566,25 @@ test('descarte de mount atrasado preserva drawer da página seguinte', async ({ 
     });
     await page.goto('/backoffice/planos');
     await requested;
-    await page.evaluate(() => {
+    const oldOwner = await page.evaluate(() => {
+        const oldRoot = document.querySelector('[data-backoffice-mount]') || document.querySelector('#page-content');
+        const owner = oldRoot.dataset.backofficeOwner || oldRoot.dataset.backofficePage || 'legacy';
         const dispose = window.disposeBackofficeRecordsPage;
-        window.__recordsDisposeCount = 0;
+        window.__recordsDisposedOwners = [];
         window.disposeBackofficeRecordsPage = (...args) => {
-            window.__recordsDisposeCount += 1;
+            const root = args[0];
+            window.__recordsDisposedOwners.push(root?.dataset?.backofficeOwner || root?.dataset?.backofficePage || 'legacy');
             return dispose(...args);
         };
+        return owner;
     });
     await page.locator('[data-sidebar-item="companies"]').click();
     await page.getByRole('button', { name: 'Nova empresa' }).click();
     await expect(page.locator('#company-drawer')).toBeVisible();
-    const countBeforeRelease = await page.evaluate(() => window.__recordsDisposeCount);
+    const countBeforeRelease = await page.evaluate(() => window.__recordsDisposedOwners.length);
     releasePlans();
-    await expect.poll(() => page.evaluate(() => window.__recordsDisposeCount)).toBeGreaterThan(countBeforeRelease);
+    await expect.poll(() => page.evaluate(() => window.__oldMountDisposed)).toBe(true);
+    await expect.poll(() => page.evaluate((count) => window.__recordsDisposedOwners.slice(count), countBeforeRelease)).toContain(oldOwner);
     await expect(page.locator('#company-drawer')).toBeVisible();
     await expect(page.locator('[data-backoffice-page="companies"]').first()).toBeVisible();
 });
