@@ -13,6 +13,36 @@ use LogicException;
  */
 final class PlatformSessionAuthority
 {
+    /**
+     * Initial MFA only. The caller must obtain the web principal from the
+     * authenticated guard, not request input. Context transitions are separate.
+     */
+    public function completeInitialMfaForPrincipal(string $actor, string $marker, int $expiresAt, ?string $webUserId, callable $consume): void
+    {
+        $hash = $this->bindingHash($marker);
+        $register = function (?int $generation) use ($actor, $hash, $expiresAt, $webUserId, $consume): void {
+            $this->assertAvailable($this->lockActor($actor));
+            if ($expiresAt <= now()->getTimestamp()) {
+                throw new InvalidArgumentException('Invalid session authorization expiry.');
+            }
+            $consume();
+            DB::table('platform_session_authorizations')->insert([
+                'binding_hash' => $hash, 'actor_id' => $actor, 'principal_known' => true,
+                'web_user_id' => $webUserId, 'web_generation' => $generation,
+                'expires_at_epoch' => $expiresAt, 'revoked' => false,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        };
+
+        if ($webUserId !== null) {
+            (new WebPrincipalGeneration)->withLockedPrincipal($webUserId, $register);
+
+            return;
+        }
+        $this->requireTopLevel();
+        DB::transaction(fn () => $register(null));
+    }
+
     /** Experimental only; caller must authenticate both principals beforehand. */
     public function registerPrincipalAfterMfa(string $actor, string $marker, int $expiresAt, string $userId): void
     {

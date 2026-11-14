@@ -77,7 +77,7 @@ class PlatformAuthController extends Controller
         $admin = PlatformAdmin::findOrFail($adminId);
         abort_unless($admin->isAvailableForLogin(), 401, 'Acesso interno indisponível.');
         $previousActor = Auth::guard('platform')->id();
-        app(PlatformSessionLifecycle::class)->authenticated($request->session(), $admin->id, $previousActor === null ? null : (string) $previousActor, function () use ($challenge): void {
+        app(PlatformSessionLifecycle::class)->authenticatedFromGuards($request->session(), $admin->id, $previousActor === null ? null : (string) $previousActor, function () use ($challenge): void {
             $consumed = DB::table('platform_login_challenges')->where('id', $challenge->id)->whereNull('used_at')->where('expires_at', '>', now())
                 ->update(['used_at' => now(), 'updated_at' => now()]);
             abort_unless($consumed === 1, 422, 'Código inválido ou expirado.');

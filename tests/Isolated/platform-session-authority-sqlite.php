@@ -108,6 +108,26 @@ $db->statement('CREATE TABLE users (id TEXT PRIMARY KEY)');
 $db->statement('CREATE TABLE web_principal_generations (user_id TEXT PRIMARY KEY, generation INTEGER NOT NULL, updated_at TEXT NOT NULL)');
 $db->table('users')->insert(['id' => 'principal']);
 $generations = new WebPrincipalGeneration;
+$db->table('synthetic_challenges')->insert(['id' => 'initial-mfa', 'used' => 0]);
+$initialMarker = str_repeat('2', 64);
+try {
+    $authority->completeInitialMfaForPrincipal('actor-a', $initialMarker, $expiry, 'principal', function () use ($db): void {
+        $db->table('synthetic_challenges')->where('id', 'initial-mfa')->update(['used' => 1]);
+        throw new RuntimeException('initial challenge failure');
+    });
+    throw new LogicException('MFA failure was not propagated.');
+} catch (RuntimeException $e) {
+    $check($e->getMessage() === 'initial challenge failure');
+}
+$check((int) $db->table('synthetic_challenges')->where('id', 'initial-mfa')->value('used') === 0);
+$check($db->table('platform_session_authorizations')->where('binding_hash', hash('sha256', $initialMarker))->count() === 0);
+$authority->completeInitialMfaForPrincipal('actor-a', $initialMarker, $expiry, 'principal', function () use ($db): void {
+    $db->table('synthetic_challenges')->where('id', 'initial-mfa')->update(['used' => 1]);
+});
+$check($authority->withActivePrincipalSession('actor-a', $initialMarker, $sessionId, 'principal', fn () => 'initial') === 'initial');
+$initialPlatformMarker = str_repeat('1', 64);
+$authority->completeInitialMfaForPrincipal('actor-a', $initialPlatformMarker, $expiry, null, fn () => null);
+$check($authority->withActiveSession('actor-a', $initialPlatformMarker, $sessionId, fn () => 'platform-only') === 'platform-only');
 $check($generations->withLockedPrincipal('principal', fn (int $generation): int => $generation) === 0);
 try {
     $generations->advance('principal', function () use ($db): void {
@@ -394,6 +414,39 @@ try {
 } catch (HttpException $e) {
     $check($e->getStatusCode() === 503);
 }
+$app->instance('auth', new class
+{
+    public function guard(string $guard): object
+    {
+        if ($guard !== 'web') {
+            throw new LogicException('Unexpected synthetic guard.');
+        }
+
+        return new class
+        {
+            public function id(): string
+            {
+                return 'principal';
+            }
+        };
+    }
+});
+$guardSession = new Store('synthetic-guard', new ArraySessionHandler(2));
+$guardSession->start();
+$guardSession->setId($sessionId);
+$lifecycle->authenticatedFromGuards($guardSession, 'actor-a', null, fn () => null);
+$guardMarker = (new PlatformSessionBinding)->current($guardSession);
+$check($authority->withActivePrincipalSession('actor-a', $guardMarker, $sessionId, 'principal', fn () => 'guard') === 'guard');
+$guardConsumed = false;
+try {
+    $lifecycle->authenticatedFromGuards($guardSession, 'actor-a', 'actor-a', function () use (&$guardConsumed): void {
+        $guardConsumed = true;
+    });
+    throw new LogicException('Existing binding was accepted for initial MFA.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 503);
+}
+$check(! $guardConsumed);
 $session = new Store('synthetic', new ArraySessionHandler(2));
 $session->start();
 $session->setId($sessionId);

@@ -150,3 +150,13 @@ that state. The real MFA controller now fails closed before consuming a challeng
 flag is enabled. Direct primitive calls remain experimental and are not safe
 issuance APIs. Lifecycle activation remains prohibited until issuance verifies
 trusted context and tests cover the real flows.
+
+A separate initial-MFA primitive now commits challenge consumption and the
+explicit principal state together, acquiring the web user lock first when a
+web principal exists. The real MFA controller now calls an adapter which reads
+the web guard and rejects an existing binding, but its configuration gate
+still makes the experimental path unreachable. The guard adapter was tested
+only with a synthetic guard. It does not
+serialize support/login changes, session persistence or concurrent requests and
+must not be used to remove the MFA gate. The isolated SQLite smoke demonstrates
+only sequential success and rollback; it does not validate a real guard.

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Contracts\Session\Session;
+use Illuminate\Support\Facades\Auth;
 
 /** Experimental and disabled by default; route guards remain authoritative. */
 final class PlatformSessionLifecycle
@@ -28,6 +29,21 @@ final class PlatformSessionLifecycle
         } elseif ($consumeChallenge !== null) {
             $consumeChallenge();
         }
+        $session->put(PlatformSessionBinding::SESSION_KEY, $marker);
+    }
+
+    /** Initial issuance only; replacements remain closed pending transition serialization. */
+    public function authenticatedFromGuards(Session $session, string $actor, ?string $previousActor, callable $consumeChallenge): void
+    {
+        if (! $this->enabled()) {
+            $this->authenticated($session, $actor, $previousActor, $consumeChallenge);
+
+            return;
+        }
+        abort_if($this->binding->current($session) !== null || $previousActor !== null, 503, 'Sessão indisponível.');
+        $webUserId = Auth::guard('web')->id();
+        $marker = bin2hex(random_bytes(32));
+        $this->authority->completeInitialMfaForPrincipal($actor, $marker, $this->expiry(), $webUserId === null ? null : (string) $webUserId, $consumeChallenge);
         $session->put(PlatformSessionBinding::SESSION_KEY, $marker);
     }
 
