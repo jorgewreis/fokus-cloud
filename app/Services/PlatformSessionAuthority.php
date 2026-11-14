@@ -92,7 +92,8 @@ final class PlatformSessionAuthority
      * session, administrator and any web identity are locked together.
      *
      * @template T
-     * @param callable():T $writer
+     *
+     * @param  callable():T  $writer
      * @return T
      */
     public function withinMutation(Request $request, string $permission, callable $writer, ?string $companyId = null, ?string $expectedAdminId = null): mixed
