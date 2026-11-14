@@ -72,3 +72,22 @@ isoladas, com cargas e aquecimento diferentes; não estabelecem qual estratégia
 é melhor em produção. UNION pode exigir materialização e ordenação no servidor,
 e sua equivalência em todos os drivers e no endpoint ainda não foi validada.
 A alternativa permanece experimental; o controlador não foi alterado com ela.
+
+## Custo de materialização no MySQL
+
+`mysql-profile.php join` e `mysql-profile.php union` medem contadores da sessão
+MySQL durante a leitura de consultas equivalentes. Exigem a mesma instância
+sintética e variáveis `DASHBOARD_PROOF_*` acima. A prova com aproximadamente
+22 mil linhas observou no JOIN zero tabelas temporárias e zero linhas ordenadas;
+no UNION, uma tabela temporária em disco e 13 passes de mesclagem. Os tempos
+foram 0,109 s e 0,144 s, respectivamente, em uma execução local por variante.
+Não se trata de estimativa de produção e resultados dependem de índices,
+configuração e volume.
+
+Um protótipo separado em `codex/backoffice-dashboard-union-20261114` passou dois
+testes HTTP SQLite (63 asserções) e uma prova Laravel/MySQL sintética com
+alteração concorrente e escrita própria não confirmada. A contrapartida de
+tabela temporária em disco mostra risco operacional relevante para volumes e
+concorrência maiores; por ora, mantém-se o JOIN no protótipo principal. A
+repetição de snapshots na rede continua uma limitação explícita. A prova HTTP
+MySQL ainda é necessária para qualquer integração.
