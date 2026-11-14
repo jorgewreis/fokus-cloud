@@ -78,7 +78,7 @@ try:
     create(mysql,MYSQL,network,['-e','MYSQL_ROOT_PASSWORD=security-test-only','-e','MYSQL_DATABASE=fokuscloud_security'])
     create(redis,REDIS,'container:'+mysql)
     for attempt in range(90):
-        p=subprocess.run(docker('exec',mysql,'mysqladmin','ping','-h127.0.0.1','-uroot','--password=security-test-only'),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        p=subprocess.run(docker('exec',mysql,'mysqladmin','--no-defaults','ping','-h127.0.0.1','-uroot','--password=security-test-only'),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         if p.returncode==0:break
         time.sleep(2)
     else:raise RuntimeError('Disposable MySQL did not start')
@@ -86,10 +86,24 @@ try:
     env.update(RELEASE_DEPENDENCY_ROOT='/work/release-dependencies',HOME='/work/home',PYTHONDONTWRITEBYTECODE='1',RELEASE_CACHE_STORE=CACHE_STORE,CACHE_STORE=CACHE_STORE,CACHE_LIMITER=CACHE_STORE,SESSION_DRIVER='database')
     extra=['--mount','type=volume,src='+volume+',dst=/work','--user','1000:1000','-w','/work/release']
     for key,value in env.items():extra+=['-e',key+'='+value]
-    create(test,args.image,'container:'+mysql,extra)
+    mysql_id=capture('inspect','--format','{{.Id}}',mysql).strip()
+    assert re.fullmatch(r'[a-f0-9]{64}',mysql_id), 'Invalid MySQL container identity'
+    create(test,args.image,'container:'+mysql_id,extra)
+    # The identity is planted by the host orchestrator, not by the unprivileged
+    # test process. A direct linux-upgrade invocation cannot create it in /run.
+    assert capture('network','inspect','--format','{{.Internal}}',network).strip()=='true', 'MySQL network is not internal'
+    assert capture('inspect','--format','{{.HostConfig.NetworkMode}}',test).strip()=='container:'+mysql_id, 'Unexpected test network namespace'
+    mysql_ns=capture('exec',mysql,'readlink','/proc/self/ns/net').strip()
+    assert re.fullmatch(r'net:\[[0-9]+\]',mysql_ns), 'Invalid MySQL network namespace'
+    assert capture('exec',test,'readlink','/proc/self/ns/net').strip()==mysql_ns, 'Test and MySQL namespaces differ'
+    server_uuid=capture('exec',mysql,'mysql','--no-defaults','--protocol=TCP','-h127.0.0.1','-uroot','--password=security-test-only','-Nse','SELECT @@server_uuid').strip().lower()
+    assert re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}',server_uuid), 'Invalid disposable MySQL UUID'
+    run('plant-mysql-identity',docker('exec','--user','0',test,'sh','-ec',
+        'umask 022; printf "%s\\n%s\\n" "$1" "$2" > /run/fokus-release-mysql.identity; chmod 0444 /run/fokus-release-mysql.identity',
+        'identity',server_uuid,mysql_ns))
     run('namespace-isolation',docker('exec',test,'python3','-c',"import socket; s=socket.socket(); s.settimeout(2); assert s.connect_ex(('1.1.1.1',443)) != 0; print('Outbound connection blocked; loopback services only')"))
     gates=[]
-    for label,script,options in [('deploy-guard','test_fpm_guard.py',[]),('deploy-workflow','test_fpm_workflow.py',[]),('publication-gate','test_publication_gate.py',[]),('deploy-integration','test_deploy_candidate.py',[]),('static','linux-static.py',['--backend-only'] if args.backend_only else []),('rsync','linux-rsync.py',[]),('suite-sqlite','linux-release-suite.py',['--driver','sqlite']),('suite-mysql','linux-release-suite.py',['--driver','mysql']),('upgrade-sqlite','linux-upgrade.py',['--driver','sqlite']),('upgrade-mysql','linux-upgrade.py',['--driver','mysql'])]:
+    for label,script,options in [('disposable-mysql-guard','test_linux_disposable_mysql.py',[]),('deploy-guard','test_fpm_guard.py',[]),('deploy-workflow','test_fpm_workflow.py',[]),('publication-gate','test_publication_gate.py',[]),('deploy-integration','test_deploy_candidate.py',[]),('static','linux-static.py',['--backend-only'] if args.backend_only else []),('rsync','linux-rsync.py',[]),('suite-sqlite','linux-release-suite.py',['--driver','sqlite']),('suite-mysql','linux-release-suite.py',['--driver','mysql']),('upgrade-sqlite','linux-upgrade.py',['--driver','sqlite']),('upgrade-mysql','linux-upgrade.py',['--driver','mysql'])]:
         gates.append(run(label,docker('exec',test,'python3','tests/Deployment/'+script,*options),check=False))
     if (ROOT/'tests/Deployment/linux-http/run-all.py').is_file():
         gates.append(run('http',docker('exec','-e','RELEASE_REPORT_DIR=/work/reports/http',test,'python3','tests/Deployment/linux-http/run-all.py',*(['--concurrency-only'] if args.backend_only else [])),check=False))

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\ProductInterestNotification;
 use App\Models\PlatformAdmin;
 use App\Models\ProductInterest;
+use App\Services\InterestProductIndex;
 use App\Services\PrefixedUlid;
 use App\Support\LegalDocuments;
 use Illuminate\Http\Request;
@@ -76,10 +77,13 @@ class ProductInterestController extends Controller
             ];
             if ($interest) {
                 $interest->fill($attributes)->save();
-                return $interest;
+            } else {
+                $interest = ProductInterest::create(['id' => PrefixedUlid::make('INT'), 'status' => 'novo', ...$attributes]);
             }
-            return ProductInterest::create(['id' => PrefixedUlid::make('INT'), 'status' => 'novo', ...$attributes]);
-        });
+            app(InterestProductIndex::class)->replace($interest->id, $products);
+
+            return $interest;
+        }, 5);
 
         $adminRecipients = PlatformAdmin::query()
             ->where('status', 'ativo')

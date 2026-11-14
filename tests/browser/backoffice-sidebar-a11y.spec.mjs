@@ -90,3 +90,20 @@ test('sidebar mantém nomes e foco visível ao navegar por teclado', async ({ pa
     await expect(page.locator('#sidebar [data-sidebar-item="companies"]')).toBeFocused();
     await expect(page.locator('#sidebar [data-sidebar-item="companies"]')).toHaveCSS('outline-style', 'solid');
 });
+
+test('após navegar, o menu recolhe sozinho quando ponteiro e foco saem', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.clock.install();
+    await page.goto('/backoffice/assinaturas');
+    await expect(page.locator('[data-backoffice-page="subscriptions"]').first()).toBeVisible();
+    const sidebar = page.locator('#sidebar');
+    await sidebar.locator('[data-sidebar-item="companies"]').hover();
+    await expect(sidebar).toHaveClass(/expanded/);
+    await page.mouse.move(1100, 700);
+    expect(await sidebar.evaluate(element => ({ hovered: element.matches(':hover'), focus: element.contains(document.activeElement) }))).toEqual({ hovered: false, focus: false });
+    await page.clock.fastForward(59_000);
+    await expect(sidebar).toHaveClass(/expanded/);
+    await page.clock.fastForward(1_600);
+    await expect(sidebar).toHaveClass(/single/);
+    await expect(sidebar).not.toHaveClass(/expanded/);
+});

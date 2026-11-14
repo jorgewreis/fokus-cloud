@@ -13,7 +13,7 @@ This change is authorized in the working copy only, not as production DDL.
 
 ## Required evidence
 
-- Compare the exact five new migration names, not only their count.
+- Compare the exact six candidate migration names, including the interest product index, not only their count.
 - Check fresh-schema no-op and a separate synthetic origin-shaped baseline.
 - Require the origin-shaped baseline's 79 names and global 1,110-column projection
   to match the reviewed metadata digests. Synthetic migration batches are not
@@ -21,11 +21,13 @@ This change is authorized in the working copy only, not as production DDL.
 - Reproduce missing-column checkout/history failure using a fake gateway and no
   external HTTP, then prove checkout/history restoration and old values retained.
 - Preserve all original schema metadata across the upgrade. Allow only the four
-  Law migrations' additions and the complete reviewed checkout column definition.
+  Law migrations' additions, the complete reviewed checkout column definition,
+  and the explicitly checked interest index tables, indexes and foreign key.
 - Check repeat migration, UTC/-03 session behavior and unchanged timestamp epochs.
-- Laboratory rollback removes five ledger records but retains the repair column
-  and its values. Report that explicit delta rather than pretending to restore the
-  old schema. Production recovery remains forward-fix-only.
+- Laboratory rollback removes six ledger records and derived interest index tables,
+  preserves source interest rows, and retains the repair column and its values.
+  Report that explicit delta rather than pretending to restore the old schema.
+  Production recovery remains forward-fix-only.
 - Run negative definition tests, the complete application suites, production
   no-dev package proof, concurrency, real browser, rsync and offline build on the
   final source identity. Local auxiliary results do not replace final CI.

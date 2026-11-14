@@ -100,6 +100,7 @@ jobs:
           test "$GITHUB_SHA" = "$EXPECTED_CANDIDATE"
           python3 tests/Deployment/baseline-gate.py "$EXPECTED_BASELINE"
           python3 -m unittest discover -s tests/Deployment -p test_linux_release_harness.py
+          python3 -m unittest discover -s tests/Deployment -p test_interest_index_guard.py
           python3 -m unittest discover -s tests/Deployment -p test_linux_package.py
           python3 -m unittest discover -s tests/Deployment -p test_release_gate.py
           python3 -m unittest discover -s tests/Deployment/linux-http -p test_readiness.py

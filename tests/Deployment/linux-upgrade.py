@@ -1,4 +1,4 @@
-"""Exercise origin-shaped history, five migrations, reversal and synthetic restore."""
+"""Exercise origin-shaped history, six migrations, reversal and synthetic restore."""
 import argparse
 import hashlib
 import importlib.util
@@ -13,6 +13,7 @@ import tempfile
 from linux_release_common import ROOT, REPORT, BASELINE, guard, environment, php, run, adapt, write, sha, safe_extract_source_archive
 
 from linux_vendor import copy_verified_vendor
+from linux_disposable_mysql import assert_disposable_mysql, execute_disposable_sql
 
 ORIGIN_METADATA = {
     'mysql_version': '8.4.10-10',
@@ -29,12 +30,13 @@ EXPECTED_NEW_MIGRATIONS = [
     '2026_11_06_160000_create_law_contact_import_batches_table.php',
     '2026_11_06_170000_create_law_tasks.php',
     REPAIR_MIGRATION,
+    '2026_11_14_000100_create_interest_product_index.php',
 ]
 
 
 def require_new_migrations(names):
     if names != EXPECTED_NEW_MIGRATIONS:
-        raise RuntimeError('Expected exactly five named candidate migrations including the additive checkout repair')
+        raise RuntimeError('Expected exactly six named candidate migrations including the additive checkout repair')
 
 
 def require_origin_shape(result):
@@ -194,7 +196,9 @@ def main():
         mysql_env = dict(env, MYSQL_PWD='security-test-only')
         name = 'fokus_upgrade_' + secrets.token_hex(8)
         def sql(statement):
-            subprocess.run(['mysql', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '-e', statement], env=mysql_env, check=True, stdout=subprocess.DEVNULL)
+            # Recheck before both CREATE and DROP; never operate on a newly
+            # selected or replaced MySQL server using stale lab evidence.
+            execute_disposable_sql(statement, mysql_env)
         def execute(command, label, runtime=candidate, expected=0):
             result = run(php() + command, prefix + label, env, runtime, expected)
             evidence['steps'].append({'name': label, **result})
@@ -213,13 +217,14 @@ def main():
             execute([str(fixture), str(base), 'versions'], 'versions', base)
             execute(['artisan', 'migrate', '--seed', '--force', '--no-interaction'], 'baseline-migrate-seed', base)
             execute([str(fixture), str(base), 'seed'], 'populate-baseline', base)
+            execute([str(fixture), str(candidate), 'verify-pre-interest-index'], 'interest-index-pre-migration-compat')
             execute([str(origin_fixture), str(candidate), 'fresh-noop'], 'repair-fresh-noop')
             execute([str(origin_fixture), str(candidate), 'prepare-origin'], 'prepare-origin-shape')
             if args.driver == 'mysql':
                 evidence['origin_metadata_comparison'] = capture_baseline_metadata(base, env, sandbox, prefix)
                 evidence['origin_shape_gate'] = require_origin_shape(evidence['origin_metadata_comparison'])
             execute([str(origin_fixture), str(candidate), 'billing-before'], 'repair-billing-before')
-            execute(['artisan', 'migrate', '--force', '--no-interaction'], 'five-migrations')
+            execute(['artisan', 'migrate', '--force', '--no-interaction'], 'six-migrations')
             execute([str(fixture), str(candidate), 'verify-up'], 'verify-up')
             execute([str(origin_fixture), str(candidate), 'billing-after'], 'repair-billing-after')
             execute([str(origin_fixture), str(candidate), 'verify-up'], 'repair-origin-verify')
@@ -228,12 +233,21 @@ def main():
             execute([str(origin_fixture), str(candidate), 'verify-idempotent'], 'repair-origin-idempotent')
             if args.driver == 'mysql':
                 with backup.open('wb') as stream, (REPORT / (prefix + 'dump.log')).open('wb') as errors:
-                    subprocess.run(['mysqldump', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '--single-transaction', '--hex-blob', '--no-tablespaces', name], env=mysql_env, stdout=stream, stderr=errors, check=True)
+                    assert_disposable_mysql(mysql_env)
+                    subprocess.run(['mysqldump', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '--single-transaction', '--hex-blob', '--no-tablespaces', name], env=mysql_env, stdout=stream, stderr=errors, check=True)
             else:
                 # Every PHP process exited; no live SQLite writer exists at this point.
                 shutil.copyfile(db, backup)
             evidence['backup_sha256'] = sha(backup)
             evidence['backup_bytes'] = backup.stat().st_size
+            execute([str(fixture), str(candidate), 'verify-interest-index-backfill'], 'interest-index-backfill')
+            if args.driver == 'mysql':
+                env['FOKUS_INTEREST_INDEX_DISPOSABLE'] = '1'
+                try:
+                    execute([str(candidate / 'tests/Deployment/interest-index-concurrency.php')], 'interest-index-concurrency-rollback')
+                    execute([str(candidate / 'tests/Deployment/interest-index-deadlock.php')], 'interest-index-deadlock-retry')
+                finally:
+                    del env['FOKUS_INTEREST_INDEX_DISPOSABLE']
             execute([str(fixture), str(candidate), 'verify-recovery'], 'roll-forward')
             execute([str(reversal), str(candidate)], 'reversal')
             if (sandbox / 'origin-reversal-delta.json').exists():
@@ -242,7 +256,8 @@ def main():
                 raise RuntimeError('Backup bytes changed before restoration')
             if args.driver == 'mysql':
                 with backup.open('rb') as stream, (REPORT / (prefix + 'restore.log')).open('wb') as output:
-                    subprocess.run(['mysql', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', name], env=mysql_env, stdin=stream, stdout=output, stderr=subprocess.STDOUT, check=True)
+                    assert_disposable_mysql(mysql_env)
+                    subprocess.run(['mysql', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', name], env=mysql_env, stdin=stream, stdout=output, stderr=subprocess.STDOUT, check=True)
             else:
                 shutil.copyfile(backup, db)
                 if sha(db) != sha(backup):
