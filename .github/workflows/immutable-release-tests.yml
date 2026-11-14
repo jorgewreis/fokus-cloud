@@ -23,4 +23,5 @@ jobs:
           PYTHONDONTWRITEBYTECODE: '1'
         run: |
           python3 tools/releases/test_immutable.py -v
+          python3 -m unittest discover -s tests/Deployment -p test_legacy_publication_guard.py -v
           python3 tools/releases/test_derived_law_contract.py -v

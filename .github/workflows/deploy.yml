@@ -173,6 +173,12 @@ jobs:
           python3 tools/ci/verify-deployment.py preflight
           python3 tools/ci/verify-deployment.py probe-current
 
+      # The remaining legacy steps mutate DEPLOY_PATH in place and do not prepare,
+      # seal or activate a new immutable release. Never open SSH for that path.
+      - name: Block legacy in-place publication
+        id: immutable_guard
+        run: python3 deploy/legacy_publication_guard.py
+
       - name: Configure SSH
         id: ssh
         env:

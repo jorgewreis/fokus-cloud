@@ -47,9 +47,9 @@ async function requiredAssets() {
 }
 
 // Exact reviewed workflow pin, independent of the file under test. This accepts
-// only the manual-main-only FEKS workflow plus the authorized FPM glue. It is not a YAML
+// only the manual-main-only FEKS workflow, authorized FPM glue and in-place block. It is not a YAML
 // heuristic and does not grant publication permission. Any change needs review.
-const reviewedWorkflowSha256 = '4f816cff25990bb666dcf72c5234ae84703adbf022339260784a5c604cdc2396';
+const reviewedWorkflowSha256 = 'dbecce34a6b22da05147e8b952937311d3222bb879bbb19138295d107055be25';
 const deployWorkflowPath = path.join(repositoryRoot, '.github/workflows/deploy.yml');
 const reviewedWorkflow = await readFile(deployWorkflowPath, 'utf8');
 function assertReviewedWorkflow(workflow) {
