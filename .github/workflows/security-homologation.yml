@@ -157,17 +157,41 @@ jobs:
           printf 'Validated exact commit: %s\n' "$EXPECTED_CANDIDATE" >> "$GITHUB_STEP_SUMMARY"
           printf 'Linux synthetic validation only. No deployment, production credentials, production data, backups or diagnostics. HTTPS browser and destination readiness remain separate gates.\n' >> "$GITHUB_STEP_SUMMARY"
 
+  dashboard-synthetic-proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          persist-credentials: false
+      - name: Require exact candidate
+        env:
+          EXPECTED_CANDIDATE: ${{ inputs.candidate_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_CANDIDATE" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_CANDIDATE"
+          test "$GITHUB_SHA" = "$EXPECTED_CANDIDATE"
+      - name: Verify isolated dashboard orchestration without Docker
+        run: bash tests/Deployment/test-dashboard-synthetic-isolation.sh
+      - name: Exercise fail-closed guards against isolated synthetic MySQL
+        shell: bash
+        run: bash tests/Deployment/dashboard-synthetic-proof.sh
+
   release-gate:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [dependency-audit, isolated-linux]
+    needs: [dependency-audit, isolated-linux, dashboard-synthetic-proof]
     if: ${{ always() }}
     steps:
-      - name: Require audit and both runtime profiles
+      - name: Require audit, dashboard proof and both runtime profiles
         env:
           AUDIT_RESULT: ${{ needs.dependency-audit.result }}
           RUNTIME_RESULT: ${{ needs.isolated-linux.result }}
+          DASHBOARD_RESULT: ${{ needs.dashboard-synthetic-proof.result }}
         run: |
           test "$AUDIT_RESULT" = success
           test "$RUNTIME_RESULT" = success
+          test "$DASHBOARD_RESULT" = success
           echo 'All synthetic CI gates passed. Production HTTPS/FPM/proxy and deployment authorization remain separate.'

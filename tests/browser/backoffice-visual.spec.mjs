@@ -555,9 +555,9 @@ test('descarte de mount atrasado preserva drawer da página seguinte', async ({ 
     await page.route('**/backoffice/assets/js/subscription-plans-page.js?*', async (route) => {
         const response = await route.fetch();
         const source = await response.text();
-        const anchor = 'return () => { drawer.dispose();';
+        const anchor = 'return () => {';
         expect(source).toContain(anchor);
-        await route.fulfill({ response, body: source.replace(anchor, 'return () => { window.__oldMountDisposed = true; drawer.dispose();') });
+        await route.fulfill({ response, body: source.replace(anchor, 'return () => { window.__oldMountDisposed = true;') });
     });
     await page.route('**/api/backoffice/plans', async (route) => {
         plansRequested();
@@ -1243,6 +1243,87 @@ test('salvar alterações de plano usa PATCH no plano em edição', async ({ pag
     expect(saveRequests).toBe(1);
 });
 
+for (const result of ['success', 'network-error']) {
+    test(`salvar plano mantém bloqueio após navegar e voltar: ${result}`, async ({ page }) => {
+        let requests = 0;
+        let release;
+        const pageErrors = [];
+        page.on('pageerror', (error) => pageErrors.push(error.message));
+        await page.route('**/api/backoffice/plans', async (route) => {
+            const response = await route.fetch();
+            const data = await response.json();
+            await route.fulfill({ response, json: data.map((plan) => ({ ...plan, status: 'inativo', publication_state: 'pausado' })) });
+        });
+        await page.route('**/api/backoffice/catalog/plans/PLN_1', async (route) => {
+            requests += 1;
+            await new Promise((resolve) => { release = resolve; });
+            if (result === 'success') await route.fulfill({ json: { message: 'Plano salvo.' } });
+            else await route.abort('failed');
+        });
+        await page.goto('/backoffice/planos');
+        await page.getByRole('button', { name: 'Editar plano' }).click();
+        await page.locator('#plan-name').fill('Alteração sintética');
+        await page.locator('#plan-form-submit').click();
+        await expect.poll(() => requests).toBe(1);
+        await page.evaluate(() => window.__backofficeRouter.navigate('companies'));
+        await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'companies');
+        await page.evaluate(() => window.__backofficeRouter.navigate('subscription-plans'));
+        await expect(page.getByRole('button', { name: 'Editar plano' })).toBeDisabled();
+        await page.locator('#plan-form').evaluate((form) => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+        expect(requests).toBe(1);
+        release();
+        await expect(page.locator('#plans-message')).toContainText('Confira a situação do plano');
+        await expect(page.getByRole('button', { name: 'Editar plano' })).toBeDisabled();
+        expect(requests).toBe(1);
+        expect(pageErrors).toEqual([]);
+    });
+}
+
+for (const operation of ['save', 'activate']) {
+    test(`plano mantém bloqueio após HTTP 408 em ${operation}`, async ({ page }) => {
+        let requests = 0;
+        await page.route('**/api/backoffice/plans', async (route) => {
+            const response = await route.fetch();
+            const data = await response.json();
+            await route.fulfill({ response, json: data.map((plan) => ({ ...plan, status: 'inativo', publication_state: 'pausado' })) });
+        });
+        const url = operation === 'save' ? '**/api/backoffice/catalog/plans/PLN_1' : '**/api/backoffice/catalog/plans/PLN_1/activate';
+        await page.route(url, async (route) => { requests += 1; await route.fulfill({ status: 408, json: { message: 'Tempo esgotado.' } }); });
+        await page.goto('/backoffice/planos');
+        if (operation === 'save') {
+            await page.getByRole('button', { name: 'Editar plano' }).click();
+            await page.locator('#plan-form-submit').click();
+            await expect(page.locator('#plan-form-submit')).toBeDisabled();
+            await page.locator('#plan-form').evaluate((form) => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+        } else {
+            await page.locator('#plan-list [data-plan-action="activate"]').click();
+            await expect(page.locator('#plan-list [data-plan-action="activate"]')).toBeDisabled();
+        }
+        await expect(page.locator('#plans-message')).toContainText('Confira a situação do plano');
+        expect(requests).toBe(1);
+    });
+}
+
+test('salvar plano permite corrigir e reenviar após rejeição HTTP', async ({ page }) => {
+    let requests = 0;
+    await page.route('**/api/backoffice/plans', async (route) => {
+        const response = await route.fetch();
+        const data = await response.json();
+        await route.fulfill({ response, json: data.map((plan) => ({ ...plan, status: 'inativo', publication_state: 'pausado' })) });
+    });
+    await page.route('**/api/backoffice/catalog/plans/PLN_1', async (route) => {
+        requests += 1;
+        await route.fulfill({ status: 422, json: { message: 'Dados inválidos.' } });
+    });
+    await page.goto('/backoffice/planos');
+    await page.getByRole('button', { name: 'Editar plano' }).click();
+    await page.locator('#plan-form-submit').click();
+    await expect(page.locator('#plans-message')).toContainText('Dados inválidos');
+    await expect(page.locator('#plan-form-submit')).toBeEnabled();
+    await page.locator('#plan-form-submit').click();
+    await expect.poll(() => requests).toBe(2);
+});
+
 test('ativar módulo não dispara a ação nem o toast mais de uma vez', async ({ page }) => {
     let activationRequests = 0;
     page.on('request', (request) => {
@@ -1264,6 +1345,111 @@ test('ativar módulo não dispara a ação nem o toast mais de uma vez', async (
     await expect.poll(() => activationRequests).toBe(1);
     await expect.poll(() => page.locator('#backoffice-toast-container .fs-toast').count()).toBe(1);
 });
+
+test('planos impedem ações repetidas enquanto a ativação está em andamento', async ({ page }) => {
+    let requests = 0;
+    let release;
+    await page.route('**/api/backoffice/plans', async (route) => {
+        const response = await route.fetch();
+        const data = await response.json();
+        await route.fulfill({ response, json: data.map((plan) => ({ ...plan, status: 'inativo', publication_state: 'pausado' })) });
+    });
+    await page.route('**/api/backoffice/catalog/plans/PLN_1/activate', async (route) => {
+        requests += 1;
+        await new Promise((resolve) => { release = resolve; });
+        await route.fulfill({ status: 422, json: { message: 'Não foi possível ativar.' } });
+    });
+    await page.goto('/backoffice/planos');
+    const activate = page.locator('#plan-list [data-plan-action="activate"]');
+    await expect(activate).toHaveCount(1);
+    await activate.evaluate((button) => { button.click(); button.click(); });
+    await expect.poll(() => requests).toBe(1);
+    await page.waitForTimeout(200);
+    expect(requests).toBe(1);
+    release();
+    await expect(activate).toBeEnabled();
+    await activate.click();
+    await expect.poll(() => requests).toBe(2);
+    release();
+});
+
+test('planos sinalizam resultado incerto e bloqueiam nova ação até atualização', async ({ page }) => {
+    let requests = 0;
+    await page.route('**/api/backoffice/plans', async (route) => {
+        const response = await route.fetch();
+        const data = await response.json();
+        await route.fulfill({ response, json: data.map((plan) => ({ ...plan, status: 'inativo', publication_state: 'pausado' })) });
+    });
+    await page.route('**/api/backoffice/catalog/plans/PLN_1/activate', async (route) => {
+        requests += 1;
+        await route.abort('failed');
+    });
+    await page.goto('/backoffice/planos');
+    await page.locator('#plan-list [data-plan-action="activate"]').click();
+    await expect(page.locator('#plans-message')).toContainText('Confira a situação do plano');
+    await expect(page.locator('#plan-list [data-plan-action="activate"]')).toBeDisabled();
+    await page.locator('#plan-search').fill('Essencial');
+    await expect(page.locator('#plan-list [data-plan-action="activate"]')).toBeDisabled();
+    await expect(page.locator('#plan-list [data-plan-action="view"]')).toBeEnabled();
+    expect(requests).toBe(1);
+    await page.reload();
+    await expect(page.locator('#plan-list [data-plan-action="activate"]')).toBeEnabled();
+});
+
+test('plano mantém bloqueio quando atualização após sucesso falha', async ({ page }) => {
+    let planLoads = 0;
+    let requests = 0;
+    await page.route('**/api/backoffice/plans', async (route) => {
+        planLoads += 1;
+        if (planLoads > 1) return route.fulfill({ status: 500, json: { message: 'Lista indisponível.' } });
+        const response = await route.fetch();
+        const data = await response.json();
+        await route.fulfill({ response, json: data.map((plan) => ({ ...plan, status: 'inativo', publication_state: 'pausado' })) });
+    });
+    await page.route('**/api/backoffice/catalog/plans/PLN_1/activate', async (route) => {
+        requests += 1;
+        await route.fulfill({ json: { message: 'Plano ativado.' } });
+    });
+    await page.goto('/backoffice/planos');
+    await page.locator('#plan-list [data-plan-action="activate"]').click();
+    await expect(page.locator('#plans-message')).toContainText('Confira a situação do plano');
+    await expect(page.locator('#plan-list [data-plan-action="activate"]')).toBeDisabled();
+    expect(requests).toBe(1);
+});
+
+for (const result of ['success', 'network-error']) {
+    test(`plano mantém bloqueio ao navegar e voltar com resposta tardia: ${result}`, async ({ page }) => {
+        let release;
+        let requests = 0;
+        const pageErrors = [];
+        page.on('pageerror', (error) => pageErrors.push(error.message));
+        await page.route('**/api/backoffice/plans', async (route) => {
+            const response = await route.fetch();
+            const data = await response.json();
+            await route.fulfill({ response, json: data.map((plan) => ({ ...plan, status: 'inativo', publication_state: 'pausado' })) });
+        });
+        await page.route('**/api/backoffice/catalog/plans/PLN_1/activate', async (route) => {
+            requests += 1;
+            await new Promise((resolve) => { release = resolve; });
+            if (result === 'success') await route.fulfill({ json: { message: 'Plano ativado.' } });
+            else await route.abort('failed');
+        });
+        await page.goto('/backoffice/planos');
+        await page.locator('#plan-list [data-plan-action="activate"]').click();
+        await expect.poll(() => requests).toBe(1);
+        await page.evaluate(() => window.__backofficeRouter.navigate('companies'));
+        await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'companies');
+        await page.evaluate(() => window.__backofficeRouter.navigate('subscription-plans'));
+        await expect(page.locator('#plan-list [data-plan-action="activate"]')).toBeDisabled();
+        await page.locator('#plan-list [data-plan-action="activate"]').evaluate((button) => button.click());
+        expect(requests).toBe(1);
+        release();
+        await expect(page.locator('#plans-message')).toContainText('Confira a situação do plano');
+        await expect(page.locator('#plan-list [data-plan-action="activate"]')).toBeDisabled();
+        expect(requests).toBe(1);
+        expect(pageErrors).toEqual([]);
+    });
+}
 
 test('planos replica o contrato visual, composição e estados do drawer', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
