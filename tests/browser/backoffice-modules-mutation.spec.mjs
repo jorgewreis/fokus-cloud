@@ -21,9 +21,12 @@ test('bloqueia envios duplicados e permite correção após rejeição conhecida
     await submit(page, '#module-form'); await submit(page, '#module-form');
     expect(await page.evaluate(()=>window.pending.length)).toBe(1);
     await expect(page.locator('#module-form-submit')).toBeDisabled();
+    await expect(page.locator('#module-form')).toHaveJSProperty('inert', true);
+    await expect(page.locator('#module-form')).toHaveAttribute('aria-busy', 'true');
     await page.evaluate(()=>window.pending[0].reject(Object.assign(new Error('Dados inválidos'), {status:422})));
     await expect(page.locator('#modules-message')).toHaveText('Dados inválidos');
     await expect(page.locator('#module-form-submit')).toBeEnabled();
+    await expect(page.locator('#module-form')).toHaveJSProperty('inert', false);
     await submit(page, '#module-form');
     expect(await page.evaluate(()=>window.pending.length)).toBe(2);
     await page.evaluate(()=>window.pending[1].reject(new Error('Falha de rede')));

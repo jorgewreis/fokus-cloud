@@ -45,6 +45,8 @@ export async function mount(root, context = {}) {
     const onMutationChange = () => {
         if (!alive()) return;
         syncMutationButtons();
+        form.inert = mutation.inFlight;
+        form.setAttribute("aria-busy", mutation.inFlight ? "true" : "false");
         if (mutation.uncertain && !observedUncertainty) { catalogLoaded = false; observedUncertainty = true; }
         if (!mutation.uncertain) observedUncertainty = false;
         for (const currentForm of [form, $("#module-destructive-form")]) {
