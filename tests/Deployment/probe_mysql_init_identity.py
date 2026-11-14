@@ -4,7 +4,9 @@ Run only inside the existing host-orchestrated disposable release environment.
 This intentionally does not change CI or enable the MySQL upgrade harness.
 """
 import os
+import queue
 import subprocess
+import threading
 
 from linux_disposable_mysql import IDENTITY, UUID, assert_disposable_mysql
 
@@ -29,7 +31,7 @@ try {$pdo=new PDO('mysql:host=127.0.0.1;port=3306;dbname=fokuscloud_security',ge
     for label, command in (
         ('pdo', lambda sql: ['php', '-r', pdo, sql]),
         ('mysql', lambda sql: ['mysql', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '--skip-reconnect', '--init-command=' + sql, '-Nse', 'SELECT 1']),
-        ('mysqldump', lambda sql: ['mysqldump', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '--init-command=' + sql, '--no-data', '--no-tablespaces', 'fokuscloud_security']),
+        ('mysqldump', lambda sql: ['mysql84-mysqldump', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '--init-command=' + sql, '--no-data', '--no-tablespaces', 'fokuscloud_security']),
     ):
         for expected, value in ((True, identity), (False, other)):
             result = subprocess.run(command(init_statement(value)), env=env, stdout=subprocess.DEVNULL,
@@ -44,6 +46,26 @@ try {$pdo=new PDO('mysql:host=127.0.0.1;port=3306;dbname=fokuscloud_security',ge
                 continue
             print(label, 'matching' if expected else 'mismatch', 'ok')
 
+    if not failures:
+        # This database exists only inside the pinned disposable server; the
+        # exact table name and content are synthetic. Both dump and restore
+        # must pass the init check in the session that performs the operation.
+        mysql = ['mysql', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot',
+                 '--skip-reconnect', '--init-command=' + init_statement(identity), 'fokuscloud_security']
+        subprocess.run(mysql + ['-e', "CREATE TABLE fokus_session_probe (id INT PRIMARY KEY, payload VARBINARY(16)); INSERT INTO fokus_session_probe VALUES (1, UNHEX('0001FEFF'))"],
+                       env=env, timeout=15, check=True, stdout=subprocess.DEVNULL)
+        dump = subprocess.run(['mysql84-mysqldump', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot',
+                               '--init-command=' + init_statement(identity), '--single-transaction', '--hex-blob',
+                               '--no-tablespaces', '--set-gtid-purged=OFF', 'fokuscloud_security', 'fokus_session_probe'],
+                              env=env, timeout=30, check=True, stdout=subprocess.PIPE)
+        subprocess.run(mysql + ['-e', 'DROP TABLE fokus_session_probe'], env=env, timeout=15, check=True)
+        subprocess.run(mysql, env=env, input=dump.stdout, timeout=30, check=True, stdout=subprocess.DEVNULL)
+        restored = subprocess.check_output(mysql + ['-Nse', 'SELECT HEX(payload) FROM fokus_session_probe WHERE id=1'],
+                                           env=env, timeout=15, text=True).strip()
+        if restored != '0001FEFF':
+            raise RuntimeError('synthetic dump restoration did not preserve binary value')
+        print('verified session dump and restore preserve synthetic binary data')
+
     # Kill only a session created by this very process in the synthetic server.
     # PDO must not silently resume work after that connection is lost. A newly
     # constructed connection must re-run its own initialization command.
@@ -57,6 +79,37 @@ try {$unexpected=$connect($argv[2]); exit(4);} catch (PDOException $e) {if ((int
     subprocess.run(['php', '-r', reconnect, init_statement(identity), init_statement(other)],
                    env=env, timeout=30, check=True)
     print('pdo killed session and new connections ok')
+
+    # mysql's automatic reconnect must re-run the initialization command;
+    # a session variable is cleared by reconnect and therefore proves that
+    # the initialization ran again on the replacement connection.
+    base = ['mysql', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot']
+    proc = subprocess.Popen(base + ['--reconnect', '--unbuffered', '--batch', '--skip-column-names',
+                                   '--init-command=' + init_statement(identity)], env=env,
+                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                            text=True, bufsize=1)
+    lines = queue.Queue()
+    def read_lines():
+        for line in proc.stdout:
+            lines.put(line.strip())
+    threading.Thread(target=read_lines, daemon=True).start()
+    try:
+        proc.stdin.write('SELECT CONNECTION_ID();\n')
+        proc.stdin.flush()
+        connection_id = lines.get(timeout=15)
+        if not connection_id.isascii() or not connection_id.isdigit():
+            raise RuntimeError('invalid connection id')
+        subprocess.run(base + ['--skip-reconnect', '--init-command=' + init_statement(identity),
+                               '-e', 'KILL CONNECTION ' + connection_id], env=env, timeout=15,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
+        proc.stdin.write('SELECT @fokus_identity_guard;\n')
+        proc.stdin.flush()
+        if lines.get(timeout=15) != '1':
+            raise RuntimeError('mysql did not reinitialize after reconnect')
+        print('mysql reconnect reapplied init command ok')
+    finally:
+        proc.kill()
+        proc.wait(timeout=5)
     if failures:
         raise RuntimeError('; '.join(failures))
 
