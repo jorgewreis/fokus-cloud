@@ -44,6 +44,10 @@ const json = (response, payload, status = 200) => {
 };
 
 createServer(async (request, response) => {
+    // Optional per-run proof for a parent-owned local proxy. Never used by the application.
+    const fixtureProof = process.env.FOKUS_VISUAL_FIXTURE_PROOF;
+    if (fixtureProof && request.headers['x-fokus-fixture-proof'] !== fixtureProof) { response.writeHead(403); response.end(); return; }
+    if (fixtureProof) response.setHeader('x-fokus-fixture-proof', fixtureProof);
     const url = new URL(request.url, `http://${request.headers.host}`);
     if (url.pathname === '/api/csrf-token') return json(response, { token: 'visual-test-token' });
     if (url.pathname === '/api/auth/law-context') return json(response, { user: { name: 'Pessoa Teste' }, systems: [{ value: 'CMP_VISUAL', label: 'Empresa de Demonstração — Fokus Law · Advocacia', profiles: [{ value: 'usuario', label: 'Usuário comum' }] }] });

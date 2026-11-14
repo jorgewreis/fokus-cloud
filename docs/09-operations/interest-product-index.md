@@ -25,7 +25,10 @@ local descartável e um proxy restrito a `127.0.0.1`. Ele substitui `no-store`
 BFCache, e simula as respostas de autenticação e interesses. Ele não acessa a
 aplicação real, credenciais, dados reais ou o provedor, e não altera cabeçalhos
 de produção. Ele falha se uma porta necessária já estiver ocupada e bloqueia
-requisições do navegador para outros endereços. As dependências do projeto e o
+requisições do navegador para outros endereços. O proxy verifica uma prova
+efêmera fornecida somente ao servidor filho em todas as respostas e a remove
+antes de repassá-las ao navegador; a inicialização espera o próprio filho
+confirmar que ocupou a porta. As dependências do projeto e o
 navegador Playwright devem estar instalados; opcionalmente `FOKUS_TEST_BROWSER`
 aponta para um executável Chromium/Edge local.
 
@@ -47,4 +50,6 @@ autenticação do ambiente. Caso o navegador não aceite BFCache, o roteiro falh
 isso não comprova sucesso nem falha funcional da restauração. O fixture não
 representa a política real de cache, a infraestrutura ou o navegador do cliente.
 As portas de fixture e proxy podem ser alteradas com
-`FOKUS_BFCACHE_FIXTURE_PORT` e `FOKUS_BFCACHE_PROXY_PORT`.
+`FOKUS_BFCACHE_FIXTURE_PORT` e `FOKUS_BFCACHE_PROXY_PORT`; o proxy também
+aceita a porta `0` para seleção pelo sistema. O isolamento contra colisões pode
+ser verificado com `node --test tests/Deployment/interest-real-bfcache-safety.test.mjs`.
