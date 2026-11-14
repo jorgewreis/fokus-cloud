@@ -18,6 +18,8 @@ test('campos de busca de planos e usuários permanecem dentro dos cartões no ce
             });
             expect(bounds.left).toBeGreaterThanOrEqual(bounds.cardLeft);
             expect(bounds.right).toBeLessThanOrEqual(bounds.cardRight);
+            expect(bounds.left).toBeGreaterThanOrEqual(0);
+            expect(bounds.right).toBeLessThanOrEqual(width);
             await field.fill('teste');
             await expect(field).toHaveValue('teste');
         }
