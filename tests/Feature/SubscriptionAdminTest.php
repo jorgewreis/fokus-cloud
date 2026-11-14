@@ -22,6 +22,47 @@ class SubscriptionAdminTest extends TestCase
         $this->seed();
     }
 
+    public function test_dashboard_aggregates_active_subscriptions_across_chunks(): void
+    {
+        $admin = $this->platformAdmin();
+        $fixture = $this->subscriptionFixture();
+        $original = (array) DB::table('subscriptions')->where('id', $fixture['subscription_id'])->first();
+        for ($i = 0; $i < 251; $i++) {
+            $copy = $original;
+            $copy['id'] = PrefixedUlid::make('ASS');
+            $copy['open_company_product'] = null;
+            $copy['commercial_snapshot'] = json_encode(['monthly_amount' => 10]);
+            DB::table('subscriptions')->insert($copy);
+        }
+
+        $this->actingAs($admin, 'platform')->postJson('/api/backoffice/vouchers', [
+            'code' => 'DASHBOARDFREE', 'discount_type' => 'percentage', 'discount_value' => 10,
+        ])->assertCreated();
+        DB::table('voucher_redemptions')->insert([
+            'id' => PrefixedUlid::make('VRE'),
+            'voucher_id' => DB::table('vouchers')->where('code', 'DASHBOARDFREE')->value('id'),
+            'company_id' => $fixture['company_id'],
+            'subscription_id' => $fixture['subscription_id'],
+            'discount_amount' => 0,
+            'snapshot' => json_encode(['discount_type' => 'trial_free']),
+            'benefit_ends_at' => now()->addDay(),
+            'created_at' => now(),
+        ]);
+
+        $redemptionBindingCounts = [];
+        DB::listen(function ($query) use (&$redemptionBindingCounts): void {
+            if (str_contains(strtolower($query->sql), 'voucher_redemptions')) {
+                $redemptionBindingCounts[] = count($query->bindings);
+            }
+        });
+        $response = $this->actingAs($admin, 'platform')->getJson('/api/backoffice/dashboard')->assertOk();
+        $response->assertJsonPath('metrics.active_subscriptions', 252)
+            ->assertJsonPath('metrics.mrr', 2510)
+            ->assertJsonPath('subscription_registrations_6m.5.value', 252);
+        $this->assertCount(2, $redemptionBindingCounts);
+        $this->assertLessThanOrEqual(250, max($redemptionBindingCounts));
+    }
+
     public function test_assisted_checkout_and_free_voucher_activate_pending_subscription_until_expiry(): void
     {
         config(['services.mercado_pago.access_token' => 'test-token', 'services.mercado_pago.test_payer_email' => 'test_user_123@testuser.com']);

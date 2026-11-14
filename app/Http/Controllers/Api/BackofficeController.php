@@ -36,41 +36,44 @@ class BackofficeController extends Controller
         $audit->record($request->user()->id, 'backoffice.dashboard_viewed', request: $request);
         $admin = $request->user()->loadMissing('role');
 
-        $activeSubscriptions = DB::table('subscriptions')
-            ->where('status', 'ativa')
-            ->get(['id', 'created_at', 'commercial_snapshot']);
-        $activeFreeSubscriptionIds = DB::table('voucher_redemptions')
-            ->whereIn('subscription_id', $activeSubscriptions->pluck('id'))
-            ->get(['subscription_id', 'snapshot', 'benefit_ends_at'])
-            ->filter(function (object $redemption): bool {
-                $snapshot = json_decode((string) $redemption->snapshot, true) ?: [];
-
-                return ($snapshot['discount_type'] ?? null) === 'trial_free'
-                    && $redemption->benefit_ends_at
-                    && now()->lt($redemption->benefit_ends_at);
-            })
-            ->pluck('subscription_id')
-            ->all();
         $trendStart = now()->startOfMonth()->subMonths(5);
-        $trend = collect(range(0, 5))->map(function (int $offset) use ($activeSubscriptions, $trendStart): array {
+        $trendCounts = collect(range(0, 5))->mapWithKeys(fn (int $offset): array => [$trendStart->copy()->addMonths($offset)->format('Y-m') => 0])->all();
+        $activeSubscriptionCount = 0;
+        $mrr = 0.0;
+        DB::table('subscriptions')->select('id', 'created_at', 'commercial_snapshot')->where('status', 'ativa')->orderBy('id')
+            ->chunkById(250, function ($subscriptions) use (&$activeSubscriptionCount, &$trendCounts, &$mrr): void {
+                $freeIds = DB::table('voucher_redemptions')
+                    ->whereIn('subscription_id', $subscriptions->pluck('id'))
+                    ->get(['subscription_id', 'snapshot', 'benefit_ends_at'])
+                    ->filter(function (object $redemption): bool {
+                        $snapshot = json_decode((string) $redemption->snapshot, true) ?: [];
+
+                        return ($snapshot['discount_type'] ?? null) === 'trial_free'
+                            && $redemption->benefit_ends_at
+                            && now()->lt($redemption->benefit_ends_at);
+                    })->pluck('subscription_id')->flip();
+
+                foreach ($subscriptions as $subscription) {
+                    $activeSubscriptionCount++;
+                    $month = Carbon::parse($subscription->created_at)->format('Y-m');
+                    if (array_key_exists($month, $trendCounts)) {
+                        $trendCounts[$month]++;
+                    }
+                    if (! $freeIds->has($subscription->id)) {
+                        $snapshot = json_decode((string) $subscription->commercial_snapshot, true) ?: [];
+                        $mrr += (float) ($snapshot['monthly_amount'] ?? 0);
+                    }
+                }
+            }, 'id');
+        $trend = collect(range(0, 5))->map(function (int $offset) use ($trendCounts, $trendStart): array {
             $month = $trendStart->copy()->addMonths($offset);
 
             return [
                 'month' => $month->format('Y-m'),
                 'label' => ucfirst($month->locale('pt_BR')->translatedFormat('M Y')),
-                'value' => $activeSubscriptions->filter(fn (object $subscription): bool => Carbon::parse($subscription->created_at)->format('Y-m') === $month->format('Y-m'))->count(),
+                'value' => $trendCounts[$month->format('Y-m')] ?? 0,
             ];
         })->values();
-        $mrr = $activeSubscriptions->sum(function (object $subscription) use ($activeFreeSubscriptionIds): float {
-            if (in_array($subscription->id, $activeFreeSubscriptionIds, true)) {
-                return 0.0;
-            }
-
-            $snapshot = json_decode((string) $subscription->commercial_snapshot, true) ?: [];
-
-            return (float) ($snapshot['monthly_amount'] ?? 0);
-        });
-
         $alerts = [
             [
                 'key' => 'declined_payments',
@@ -345,7 +348,7 @@ class BackofficeController extends Controller
             'metrics' => [
                 'active_companies' => DB::table('companies')->whereNull('deleted_at')->where('status', 'ativa')->count(),
                 'active_people' => DB::table('company_memberships as membership')->join('companies as company', 'company.id', '=', 'membership.company_id')->join('users as user', 'user.id', '=', 'membership.user_id')->whereNull('membership.deleted_at')->whereNull('company.deleted_at')->where('membership.status', 'ativo')->where('user.status', 'ativa')->distinct('user.id')->count('user.id'),
-                'active_subscriptions' => $activeSubscriptions->count(),
+                'active_subscriptions' => $activeSubscriptionCount,
                 'mrr' => $mrr,
             ],
             'subscription_registrations_6m' => $trend,
