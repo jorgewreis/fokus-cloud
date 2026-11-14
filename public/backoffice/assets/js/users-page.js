@@ -21,6 +21,10 @@ export async function mount(root, context = {}) {
     };
     const drawerController = createRecordsDrawer({ trigger, drawer });
     const modal = window.FokusStyles?.Modal?.getOrCreateInstance($("#user-action-trigger"));
+    let active = true;
+    let listVersion = 0;
+    let detailVersion = 0;
+    const current = (version, latest) => active && !context.signal?.aborted && version === latest;
     let selected = null;
     let pendingAction = null;
     const esc = (value) => String(value ?? "").replace(/[&<>\x27"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\x27": "&#039;", "\"": "&quot;" })[c]);
@@ -52,12 +56,26 @@ export async function mount(root, context = {}) {
         window.refreshFokusDataTables?.();
     };
     const load = async () => {
+        if (!active || context.signal?.aborted) return;
+        const version = ++listVersion;
+        ++detailVersion;
+        list.innerHTML = '<tr><td colspan="5">Carregando usuários...</td></tr>';
+        $("#users-table-summary").textContent = "";
+        $("#users-table-footer-summary").textContent = "";
+        $("#users-pagination").innerHTML = "";
+        showMessage("");
         try {
             const params = new URLSearchParams({ page: String(state.page), per_page: "15" });
             if (state.query) params.set("q", state.query);
-            render(await api.request(`/backoffice/directory/users?${params}`));
-            showMessage("");
-        } catch (error) { showMessage(error.message || "Não foi possível carregar os usuários."); }
+            const response = await api.request(`/backoffice/directory/users?${params}`, { signal: context.signal });
+            if (!current(version, listVersion)) return;
+            render(response);
+        } catch (error) {
+            if (!current(version, listVersion) || error?.name === "AbortError") return;
+            list.innerHTML = '<tr><td colspan="5"><button class="fs-btn fs-btn-outline-primary fs-btn-sm" type="button" data-users-retry>Tentar novamente</button></td></tr>';
+            list.querySelector("[data-users-retry]").addEventListener("click", load, { once: true });
+            showMessage(error.message || "Não foi possível carregar os usuários.");
+        }
     };
     let companiesLoaded = false;
     const setAccountType = (type) => {
@@ -130,10 +148,16 @@ export async function mount(root, context = {}) {
         drawerController.show();
     };
     const openUser = async (id, type, mode) => {
+        if (!active || context.signal?.aborted) return;
+        const version = ++detailVersion;
         try {
-            const record = await api.request(`/backoffice/directory/users/${encodeURIComponent(type)}/${encodeURIComponent(id)}`);
+            const record = await api.request(`/backoffice/directory/users/${encodeURIComponent(type)}/${encodeURIComponent(id)}`, { signal: context.signal });
+            if (!current(version, detailVersion)) return;
             if (mode === "edit") openForm(mode, record); else openDetails(record);
-        } catch (error) { showMessage(error.message || "Não foi possível consultar esta conta."); }
+        } catch (error) {
+            if (!current(version, detailVersion) || error?.name === "AbortError") return;
+            showMessage(error.message || "Não foi possível consultar esta conta.");
+        }
     };
     const actionLabels = { block: ["Bloquear conta", "A conta perderá acesso ao Backoffice."], unblock: ["Desbloquear conta", "A conta poderá voltar a acessar o Backoffice."], deactivate: ["Desativar conta", "A conta interna será desativada."] };
     const submitAction = async (event) => {
@@ -175,10 +199,10 @@ export async function mount(root, context = {}) {
     $("#users-query").value = state.query;
     if (!canManage) $("#user-invite").hidden = true;
     $("#users-filter-form").addEventListener("submit", (event) => { event.preventDefault(); state.query = $("#users-query").value.trim(); state.page = 1; load(); });
-    $("#user-invite").addEventListener("click", () => openForm("invite"));
+    $("#user-invite").addEventListener("click", () => { ++detailVersion; openForm("invite"); });
     $("#user-invite").disabled = !canManage;
-    $("#user-drawer-close").addEventListener("click", () => drawerController.close());
-    $("#user-form-cancel").addEventListener("click", () => drawerController.close());
+    $("#user-drawer-close").addEventListener("click", () => { ++detailVersion; drawerController.close(); });
+    $("#user-form-cancel").addEventListener("click", () => { ++detailVersion; drawerController.close(); });
     form.addEventListener("submit", submitForm);
     $("#users-pagination").addEventListener("click", (event) => { const button = event.target.closest("[data-users-page]"); if (!button || button.disabled) return; state.page = Number(button.dataset.usersPage); load(); });
     list.addEventListener("click", async (event) => {
@@ -191,6 +215,7 @@ export async function mount(root, context = {}) {
     });
     $("#user-action-form").addEventListener("submit", submitAction);
     load();
-    context.signal?.addEventListener("abort", () => { drawerController.dispose(); modal?.dispose?.(); }, { once: true });
-    return () => { drawerController.dispose(); modal?.dispose?.(); window.disposeBackofficeRecordsPage?.(root); };
+    const dispose = () => { if (!active) return; active = false; ++listVersion; ++detailVersion; drawerController.dispose(); modal?.dispose?.(); window.disposeBackofficeRecordsPage?.(root); };
+    context.signal?.addEventListener("abort", dispose, { once: true });
+    return dispose;
 }
