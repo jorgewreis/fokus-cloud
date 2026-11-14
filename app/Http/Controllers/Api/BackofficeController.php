@@ -40,42 +40,60 @@ class BackofficeController extends Controller
         $trendCounts = collect(range(0, 5))->mapWithKeys(fn (int $offset): array => [$trendStart->copy()->addMonths($offset)->format('Y-m') => 0])->all();
         $activeSubscriptionCount = 0;
         $mrr = 0.0;
-        DB::table('subscriptions')->select('id', 'created_at', 'commercial_snapshot')->where('status', 'ativa')->orderBy('id')
-            ->chunkById(250, function ($subscriptions) use (&$activeSubscriptionCount, &$trendCounts, &$mrr): void {
-                $redemptions = DB::table('voucher_redemptions')
-                    ->whereIn('subscription_id', $subscriptions->pluck('id'))
-                    ->where('benefit_ends_at', '>', now());
-                $driver = DB::connection()->getDriverName();
-                if (in_array($driver, ['mysql', 'mariadb'], true)) {
-                    // JSON_UNQUOTE inherits a possibly case-insensitive connection collation.
-                    $redemptions->whereRaw("BINARY JSON_UNQUOTE(JSON_EXTRACT(snapshot, '$.discount_type')) = ?", ['trial_free']);
-                    $freeIds = $redemptions->distinct()->pluck('subscription_id')->flip();
-                } elseif ($driver === 'sqlite') {
-                    $redemptions->where('snapshot->discount_type', 'trial_free');
-                    $freeIds = $redemptions->distinct()->pluck('subscription_id')->flip();
-                } else {
-                    // Preserve strict PHP comparison for other drivers and their collations.
-                    $freeIds = collect();
-                    foreach ($redemptions->cursor(['subscription_id', 'snapshot']) as $redemption) {
-                        $snapshot = json_decode((string) $redemption->snapshot, true) ?: [];
-                        if (($snapshot['discount_type'] ?? null) === 'trial_free') {
-                            $freeIds->put($redemption->subscription_id, true);
-                        }
-                    }
+        // A single statement gives the subscription and its redemptions one database
+        // snapshot even when an enclosing transaction uses READ COMMITTED. Decode the
+        // original JSON in PHP so historic value types retain their prior semantics.
+        $rows = DB::table('subscriptions as subscription')
+            ->leftJoin('voucher_redemptions as redemption', 'redemption.subscription_id', '=', 'subscription.id')
+            ->where('subscription.status', 'ativa')
+            ->orderBy('subscription.id')
+            ->select([
+                'subscription.id', 'subscription.created_at', 'subscription.commercial_snapshot',
+                'redemption.snapshot as redemption_snapshot', 'redemption.benefit_ends_at',
+            ]);
+        $connection = $rows->getConnection();
+        $mysql = in_array($connection->getDriverName(), ['mysql', 'mariadb'], true);
+        $pdo = $mysql ? $connection->getReadPdo() : null;
+        $buffered = $pdo?->getAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY);
+        $current = null;
+        $isFree = false;
+        $accumulate = function () use (&$current, &$isFree, &$activeSubscriptionCount, &$trendCounts, &$mrr): void {
+            if ($current === null) {
+                return;
+            }
+            $activeSubscriptionCount++;
+            $month = Carbon::parse($current->created_at)->format('Y-m');
+            if (array_key_exists($month, $trendCounts)) {
+                $trendCounts[$month]++;
+            }
+            if (! $isFree) {
+                $snapshot = json_decode((string) $current->commercial_snapshot, true) ?: [];
+                $mrr += (float) ($snapshot['monthly_amount'] ?? 0);
+            }
+        };
+        try {
+            if ($pdo !== null) {
+                $pdo->setAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
+            }
+            foreach ($rows->cursor() as $row) {
+                if ($current === null || $current->id !== $row->id) {
+                    $accumulate();
+                    $current = $row;
+                    $isFree = false;
                 }
-
-                foreach ($subscriptions as $subscription) {
-                    $activeSubscriptionCount++;
-                    $month = Carbon::parse($subscription->created_at)->format('Y-m');
-                    if (array_key_exists($month, $trendCounts)) {
-                        $trendCounts[$month]++;
-                    }
-                    if (! $freeIds->has($subscription->id)) {
-                        $snapshot = json_decode((string) $subscription->commercial_snapshot, true) ?: [];
-                        $mrr += (float) ($snapshot['monthly_amount'] ?? 0);
-                    }
+                if (! $isFree) {
+                    $snapshot = json_decode((string) $row->redemption_snapshot, true) ?: [];
+                    $isFree = ($snapshot['discount_type'] ?? null) === 'trial_free'
+                        && $row->benefit_ends_at
+                        && now()->lt($row->benefit_ends_at);
                 }
-            }, 'id');
+            }
+            $accumulate();
+        } finally {
+            if ($pdo !== null) {
+                $pdo->setAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $buffered);
+            }
+        }
         $trend = collect(range(0, 5))->map(function (int $offset) use ($trendCounts, $trendStart): array {
             $month = $trendStart->copy()->addMonths($offset);
 

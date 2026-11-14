@@ -25,7 +25,7 @@ class SubscriptionAdminTest extends TestCase
         $this->seed();
     }
 
-    public function test_dashboard_aggregates_active_subscriptions_across_chunks(): void
+    public function test_dashboard_aggregates_active_subscriptions_in_one_snapshot(): void
     {
         $admin = $this->platformAdmin();
         $fixture = $this->subscriptionFixture();
@@ -68,18 +68,24 @@ class SubscriptionAdminTest extends TestCase
         $redemption['snapshot'] = json_encode(['discount_type' => 123]);
         DB::table('voucher_redemptions')->insert($redemption);
 
-        $redemptionBindingCounts = [];
-        DB::listen(function ($query) use (&$redemptionBindingCounts): void {
+        $pdo = in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)
+            ? DB::connection()->getReadPdo()
+            : null;
+        $bufferedBefore = $pdo?->getAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY);
+        $redemptionQueries = [];
+        DB::listen(function ($query) use (&$redemptionQueries): void {
             if (str_contains(strtolower($query->sql), 'voucher_redemptions')) {
-                $redemptionBindingCounts[] = count($query->bindings);
+                $redemptionQueries[] = $query->sql;
             }
         });
         $response = $this->actingAs($admin, 'platform')->getJson('/api/backoffice/dashboard')->assertOk();
         $response->assertJsonPath('metrics.active_subscriptions', 252)
             ->assertJsonPath('metrics.mrr', 2510)
             ->assertJsonPath('subscription_registrations_6m.5.value', 252);
-        $this->assertCount(2, $redemptionBindingCounts);
-        $this->assertLessThanOrEqual(252, max($redemptionBindingCounts));
+        $this->assertCount(1, $redemptionQueries);
+        if ($pdo !== null) {
+            $this->assertSame($bufferedBefore, $pdo->getAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY));
+        }
     }
 
     public function test_assisted_checkout_and_free_voucher_activate_pending_subscription_until_expiry(): void
