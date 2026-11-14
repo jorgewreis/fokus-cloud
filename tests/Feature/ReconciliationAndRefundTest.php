@@ -480,6 +480,42 @@ class ReconciliationAndRefundTest extends TestCase
         $this->assertDatabaseMissing('platform_audit_events', ['entity_id' => $id, 'action' => 'billing.refund_provider_id_collision']);
     }
 
+    public function test_refund_execution_and_lookup_fail_closed_without_the_expected_unique_index(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $requester = $this->admin('administrador_comercial');
+        $admin = $this->admin('superadministrador');
+        $id = $this->actingAs($requester, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => 10, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertCreated()->json('id');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'aprovar', 'reason' => 'Teste'])->assertOk();
+        $mysql = DB::connection()->getDriverName() === 'mysql';
+        DB::statement($mysql ? 'DROP INDEX refund_requests_provider_refund_id_unique ON refund_requests' : 'DROP INDEX refund_requests_provider_refund_id_unique');
+        Http::fake();
+        try {
+            $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(503);
+            $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'consultar', 'reason' => 'Teste'])->assertStatus(503);
+            $this->assertDatabaseHas('refund_requests', ['id' => $id, 'status' => 'aprovado', 'provider_refund_id' => null]);
+            Http::assertNothingSent();
+            DB::statement('CREATE INDEX refund_requests_provider_refund_id_unique ON refund_requests (provider_refund_id)');
+            $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(503);
+            Http::assertNothingSent();
+            DB::statement($mysql ? 'DROP INDEX refund_requests_provider_refund_id_unique ON refund_requests' : 'DROP INDEX refund_requests_provider_refund_id_unique');
+            DB::statement($mysql
+                ? 'CREATE UNIQUE INDEX refund_requests_provider_refund_id_unique ON refund_requests (provider_refund_id(20))'
+                : 'CREATE UNIQUE INDEX refund_requests_provider_refund_id_unique ON refund_requests (provider_refund_id) WHERE provider_refund_id IS NOT NULL');
+            $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(503);
+            Http::assertNothingSent();
+        } finally {
+            if ($mysql) {
+                if (DB::selectOne("SELECT 1 AS present FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'refund_requests' AND INDEX_NAME = 'refund_requests_provider_refund_id_unique' LIMIT 1")) {
+                    DB::statement('DROP INDEX refund_requests_provider_refund_id_unique ON refund_requests');
+                }
+            } else {
+                DB::statement('DROP INDEX IF EXISTS refund_requests_provider_refund_id_unique');
+            }
+            DB::statement('CREATE UNIQUE INDEX refund_requests_provider_refund_id_unique ON refund_requests (provider_refund_id)');
+        }
+    }
+
     private function companyIdForPayment(string $paymentId): string
     {
         return (string) DB::table('payments')->where('id', $paymentId)->value('company_id');

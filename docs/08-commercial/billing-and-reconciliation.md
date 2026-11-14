@@ -330,3 +330,19 @@ A confirmação ou regularização desses casos requer um mecanismo futuro,
 explicitamente auditado, que preserve a proveniência e comprove o vínculo. O
 fluxo atual não fornece resolução automática para solicitações sem o vínculo
 original; a análise externa, por si só, não altera o estado no sistema.
+
+## Proteção de unicidade para reembolsos
+
+Antes de executar ou consultar um estorno, o sistema verifica nos metadados do
+banco se existe o índice único integral `refund_requests_provider_refund_id_unique`
+sobre a única coluna `provider_refund_id`. Índices ausentes, renomeados,
+parciais, por prefixo, compostos ou sem unicidade bloqueiam essas operações.
+Bancos diferentes de MySQL e SQLite também permanecem bloqueados até que seu
+comportamento seja implementado e validado. O bloqueio ocorre antes do contato
+com o provedor e preserva o estado existente.
+
+Em instalação antiga bloqueada, a equipe de banco deve inspecionar o esquema e
+os identificadores duplicados por procedimento autorizado e auditado, planejar
+uma migração adequada e verificar a restrição antes de reativar o fluxo. Não
+criar o índice às cegas nem deduzir vínculos de operações antigas. Mudanças de
+DDL devem ocorrer em janela controlada, sem concorrência com o fluxo financeiro.

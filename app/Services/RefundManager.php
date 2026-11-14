@@ -39,6 +39,10 @@ class RefundManager
 
     public function action(string $id, string $action, string $reason, object $admin, MercadoPagoClient $client, PlatformAudit $audit): object
     {
+        if (in_array($action, ['executar', 'consultar'], true)) {
+            $this->assertProviderRefundUniqueness();
+        }
+
         if ($action === 'consultar') {
             return $this->consultPending($id, $reason, $admin, $client, $audit);
         }
@@ -93,6 +97,32 @@ class RefundManager
         }
 
         return $this->applyProviderResponse($id, $providerPaymentId, $remote, $reason, $admin, $client, $audit);
+    }
+
+    private function assertProviderRefundUniqueness(): void
+    {
+        // The database constraint is the concurrency guard, including on older installations.
+        // Unknown drivers, prefix/partial indexes and metadata failures fail closed.
+        try {
+            $driver = DB::connection()->getDriverName();
+            if ($driver === 'mysql') {
+                $indexes = DB::select("SELECT COLUMN_NAME AS column_name, NON_UNIQUE AS non_unique, SUB_PART AS sub_part FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'refund_requests' AND INDEX_NAME = 'refund_requests_provider_refund_id_unique' ORDER BY SEQ_IN_INDEX");
+                $valid = count($indexes) === 1 && $indexes[0]->column_name === 'provider_refund_id'
+                    && (int) $indexes[0]->non_unique === 0 && $indexes[0]->sub_part === null;
+            } elseif ($driver === 'sqlite') {
+                $indexes = DB::select("PRAGMA index_list('refund_requests')");
+                $index = collect($indexes)->first(fn ($item) => $item->name === 'refund_requests_provider_refund_id_unique');
+                $columns = $index ? DB::select("PRAGMA index_info('refund_requests_provider_refund_id_unique')") : [];
+                $valid = $index && (int) $index->unique === 1 && (int) $index->partial === 0
+                    && count($columns) === 1 && $columns[0]->name === 'provider_refund_id';
+            } else {
+                $valid = false;
+            }
+        } catch (\Throwable $exception) {
+            $valid = false;
+        }
+
+        abort_unless($valid, 503, 'Proteção de unicidade de reembolso indisponível; acione a operação antes de executar ou consultar.');
     }
 
     private function consultPending(string $id, string $reason, object $admin, MercadoPagoClient $client, PlatformAudit $audit): object
