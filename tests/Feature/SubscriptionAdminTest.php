@@ -35,7 +35,7 @@ class SubscriptionAdminTest extends TestCase
             $copy = $original;
             $copy['id'] = PrefixedUlid::make('ASS');
             $copy['open_company_product'] = null;
-            $copy['commercial_snapshot'] = json_encode(['monthly_amount' => 10]);
+            $copy['commercial_snapshot'] = $i === 1 ? null : json_encode(['monthly_amount' => 10]);
             $expiredSubscriptionId ??= $copy['id'];
             DB::table('subscriptions')->insert($copy);
         }
@@ -80,7 +80,7 @@ class SubscriptionAdminTest extends TestCase
         });
         $response = $this->actingAs($admin, 'platform')->getJson('/api/backoffice/dashboard')->assertOk();
         $response->assertJsonPath('metrics.active_subscriptions', 252)
-            ->assertJsonPath('metrics.mrr', 2510)
+            ->assertJsonPath('metrics.mrr', 2500)
             ->assertJsonPath('subscription_registrations_6m.5.value', 252);
         $this->assertCount(1, $redemptionQueries);
         if ($pdo !== null) {

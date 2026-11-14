@@ -43,14 +43,17 @@ class BackofficeController extends Controller
         // A single statement gives the subscription and its redemptions one database
         // snapshot even when an enclosing transaction uses READ COMMITTED. Decode the
         // original JSON in PHP so historic value types retain their prior semantics.
-        $rows = DB::table('subscriptions as subscription')
-            ->leftJoin('voucher_redemptions as redemption', 'redemption.subscription_id', '=', 'subscription.id')
+        // Emit each subscription once and its redemptions separately. A single
+        // statement preserves the snapshot without repeating the commercial JSON
+        // for every redemption. The type orders the subscription before its rows.
+        $subscriptions = DB::table('subscriptions as subscription')
             ->where('subscription.status', 'ativa')
-            ->orderBy('subscription.id')
-            ->select([
-                'subscription.id', 'subscription.created_at', 'subscription.commercial_snapshot',
-                'redemption.snapshot as redemption_snapshot', 'redemption.benefit_ends_at',
-            ]);
+            ->selectRaw('subscription.id, subscription.created_at, subscription.commercial_snapshot, NULL as redemption_snapshot, NULL as benefit_ends_at, 0 as row_type');
+        $redemptions = DB::table('subscriptions as subscription')
+            ->join('voucher_redemptions as redemption', 'redemption.subscription_id', '=', 'subscription.id')
+            ->where('subscription.status', 'ativa')
+            ->selectRaw('subscription.id, NULL as created_at, NULL as commercial_snapshot, redemption.snapshot as redemption_snapshot, redemption.benefit_ends_at, 1 as row_type');
+        $rows = $subscriptions->unionAll($redemptions)->orderBy('id')->orderBy('row_type');
         $connection = $rows->getConnection();
         $mysql = in_array($connection->getDriverName(), ['mysql', 'mariadb'], true);
         $pdo = $mysql ? $connection->getReadPdo() : null;
@@ -76,12 +79,11 @@ class BackofficeController extends Controller
                 $pdo->setAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
             }
             foreach ($rows->cursor() as $row) {
-                if ($current === null || $current->id !== $row->id) {
+                if ((int) $row->row_type === 0) {
                     $accumulate();
                     $current = $row;
                     $isFree = false;
-                }
-                if (! $isFree) {
+                } elseif (! $isFree) {
                     $snapshot = json_decode((string) $row->redemption_snapshot, true) ?: [];
                     $isFree = ($snapshot['discount_type'] ?? null) === 'trial_free'
                         && $row->benefit_ends_at
