@@ -211,6 +211,8 @@
 </main>
 <script>
     (() => {
+        const dashboardRoot = document.querySelector(".admin-final-dashboard");
+        const isDashboardActive = () => dashboardRoot?.isConnected === true;
         let B = "/backoffice/assets/icons/",
             I = {
                 alert: "Single-Man-Actions-Warning--Streamline-Ultimate.png",
@@ -443,7 +445,7 @@
                 });
                 if (!r.ok) throw Error();
                 const data = await r.json();
-                subscriptions({ ...data, ...data.meta });
+                if (isDashboardActive()) subscriptions({ ...data, ...data.meta });
             },
             load = async () => {
                 let r = await fetch("/api/backoffice/dashboard", {
@@ -451,6 +453,7 @@
                 });
                 if (!r.ok) throw Error();
                 let p = await r.json();
+                if (!isDashboardActive()) return;
                 user(p.user);
                 document.querySelector("#metric-active-companies").textContent =
                     N.format(p.metrics.active_companies || 0);
@@ -468,7 +471,9 @@
                 activity(p.recent_activity || []);
             };
         const showLoadError = () => {
-            const error = document.querySelector("#dashboard-load-error");
+            if (!isDashboardActive()) return;
+            const error = dashboardRoot.querySelector("#dashboard-load-error");
+            if (!error?.isConnected) return;
             error.textContent = "Não foi possível carregar os dados do Dashboard. Atualize a página ou entre novamente.";
             error.hidden = false;
         };

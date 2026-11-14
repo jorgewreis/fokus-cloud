@@ -139,3 +139,68 @@ test('suspensões sucessivas não mantêm a interface oculta após confirmação
     await expect(page.locator('#company-create')).toBeVisible();
     await expect(page.locator('html')).not.toHaveAttribute('inert', '');
 });
+
+for (const transition of ['bfcache', 'navigation']) {
+    test(`detalhe atrasado não altera a tela após ${transition}`, async ({ page }) => {
+        const company = { id: 'CMP_TEST', legal_name: 'Empresa Exemplo', document_type: 'cnpj', document_number: '11222333000181', status: 'ativa', version: 3, active_subscriptions: 0, admin: { name: 'Admin Exemplo', cpf: '52998224725', email: 'exemplo@example.test' }, data_volume: {} };
+        let releaseDetail, markRequested;
+        const gate = new Promise((resolve) => { releaseDetail = resolve; });
+        const requested = new Promise((resolve) => { markRequested = resolve; });
+        const errors = [];
+        page.on('pageerror', (error) => errors.push(error.stack));
+        await page.route('**/api/backoffice/companies**', async (route) => {
+            if (new URL(route.request().url()).pathname.endsWith('/CMP_TEST')) {
+                markRequested();
+                await gate;
+                return route.fulfill({ json: { company: { ...company, legal_name: 'DADO ANTIGO SENSÍVEL' } } }).catch(() => {});
+            }
+            return route.fulfill({ json: { data: [company], meta: { total: 1, current_page: 1, per_page: 15, last_page: 1 }, summary: {} } });
+        });
+        await page.goto('/backoffice/empresas');
+        await page.getByRole('button', { name: 'Editar empresa' }).click();
+        await requested;
+        if (transition === 'bfcache') {
+            await page.evaluate(() => {
+                window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+                window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+            });
+            await expect(page.locator('html')).not.toHaveAttribute('inert', '');
+        } else {
+            await page.evaluate(() => window.__backofficeRouter.navigate('platform-dashboard-final'));
+            await page.evaluate(() => window.__backofficeRouter.navigate('companies'));
+        }
+        await expect(page.locator('#company-create')).toBeVisible();
+        releaseDetail();
+        await page.waitForTimeout(250);
+        await expect(page.locator('#company-drawer')).toBeHidden();
+        await expect(page.locator('body')).not.toContainText('DADO ANTIGO SENSÍVEL');
+        expect(errors).toEqual([]);
+    });
+}
+
+test('erro tardio do dashboard não altera a página seguinte', async ({ page }) => {
+    let release, requested;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const started = new Promise((resolve) => { requested = resolve; });
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.stack));
+    await page.route('**/api/backoffice/dashboard', async (route) => {
+        requested();
+        await gate;
+        await route.fulfill({ status: 500, json: { message: 'ERRO ANTIGO DO DASHBOARD' } }).catch(() => {});
+    });
+    await page.goto('/backoffice/painel');
+    await started;
+    await page.evaluate(() => window.__backofficeRouter.navigate('companies'));
+    await expect(page.locator('#company-create')).toBeVisible();
+    release();
+    await page.waitForTimeout(250);
+    await expect(page.locator('body')).not.toContainText('ERRO ANTIGO DO DASHBOARD');
+    expect(errors).toEqual([]);
+});
+
+test('erro do dashboard ativo continua visível', async ({ page }) => {
+    await page.route('**/api/backoffice/dashboard', (route) => route.fulfill({ status: 500, json: {} }));
+    await page.goto('/backoffice/painel');
+    await expect(page.locator('#dashboard-load-error')).toBeVisible();
+});

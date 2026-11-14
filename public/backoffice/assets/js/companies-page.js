@@ -104,7 +104,10 @@ function publishPreviousOperation(adminId, outcome, epoch) {
  * Empresas: lista, filtros e estados create/edit/view do drawer compartilhado.
  */
 export async function mount(root, context = {}) {
-    const $ = (selector) => root.querySelector(selector) || document.querySelector(selector);
+    // Drawers are portalled to body; never fall back to another mount's DOM.
+    const owner = root.dataset.backofficeOwner;
+    const ownedDrawer = root.querySelector('#company-drawer') || [...document.querySelectorAll('body > #company-drawer')].find((node) => owner && node.dataset.backofficeOwner === owner);
+    const $ = (selector) => root.querySelector(selector) || (ownedDrawer?.matches(selector) ? ownedDrawer : ownedDrawer?.querySelector(selector));
     const api = context.api || window.FokusApi;
     const state = { page: 1, query: new URLSearchParams(location.search).get("q")?.trim() || "", status: "" };
     const list = $("#company-list");
@@ -119,6 +122,9 @@ export async function mount(root, context = {}) {
     let submitting = false;
     let drawerSession = 0;
     let loadSequence = 0;
+    let detailSequence = 0;
+    const mountRestoreGeneration = restoreGeneration;
+    const mountEpoch = operationEpoch;
     const refreshStatus = $("#company-refresh-status");
     const refreshPageStatus = $("#company-refresh-page-status");
     const operationDrawerStatus = $("#company-operation-drawer-status");
@@ -145,7 +151,7 @@ export async function mount(root, context = {}) {
     const drawerHidden = () => syncRefreshStatus(false);
     createTrigger.addEventListener("fs:shown", drawerShown);
     createTrigger.addEventListener("fs:hidden", drawerHidden);
-    const isPageActive = () => !context.signal?.aborted && root.isConnected;
+    const isPageActive = () => !context.signal?.aborted && root.isConnected && mountRestoreGeneration === restoreGeneration && mountEpoch === operationEpoch;
     const formError = $("#company-form-error");
     const clearFormError = () => { formError.hidden = true; formError.textContent = ""; };
     const showFormError = (value) => {
@@ -237,8 +243,17 @@ export async function mount(root, context = {}) {
         }
     };
     const openDrawer = (company = null, mode = "edit") => { drawerSession++; clearFormError(); resetForm(); renderLeadUsage(company?.data_volume?.lead); currentCompany = company; const viewPanel = $("#company-view-panel"); drawerController.setState({ mode: company ? mode : "create", record: company }); viewPanel.hidden = true; form.hidden = false; if (company) { const readOnly = mode === "view"; $("#company-drawer-kicker").textContent = readOnly ? "Consulta" : "Editar empresa"; $("#company-drawer-title").textContent = readOnly ? "Detalhes da empresa" : "Editar dados da empresa"; $("#company-drawer-description").textContent = readOnly ? "Consulte os dados cadastrais e do administrador." : "Altere somente os dados permitidos."; $("#company-form-submit").textContent = "Salvar alterações"; if (readOnly) { form.hidden = true; viewPanel.hidden = false; $("#company-view-name").textContent = company.legal_name || "-"; $("#company-view-document").textContent = formatDocument(company.document_number, company.document_type); $("#company-view-status").innerHTML = statusBadge(company.status); $("#company-view-admin-name").textContent = company.admin?.name || "-"; $("#company-view-admin-cpf").textContent = formatDocument(company.admin?.cpf, "cpf"); $("#company-view-admin-email").textContent = company.admin?.email || "-"; $("#company-view-subscriptions").textContent = String(company.subscriptions_count ?? 0); $("#company-view-created").textContent = company.created_at ? new Date(company.created_at).toLocaleDateString("pt-BR") : "-"; const contacts = company.data_volume?.contacts || {}; const registeredContacts = contacts.registered_count ?? contacts.used; $("#company-view-contacts-used").textContent = registeredContacts == null ? "Não disponível" : `${Number(registeredContacts).toLocaleString("pt-BR")} registros`; $("#company-view-contacts-limit").textContent = contacts.limit == null ? "Não configurado" : `${Number(contacts.limit).toLocaleString("pt-BR")} registros`; $("#company-view-contacts-percentage").textContent = contacts.limit > 0 && registeredContacts != null ? `${Number((registeredContacts / contacts.limit) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} %` : "-"; $("#company-view-contacts-storage-estimate").textContent = formatBytes(company.data_volume?.contact_data_size_bytes);  } else { $("#company-legal-name").value = company.legal_name || ""; $("#company-document-type").value = company.document_type; $("#company-document-number").value = formatDocument(company.document_number, company.document_type); $("#company-document-number").disabled = true; $("#company-document-type").disabled = true; $("#company-version").value = company.version; $("#company-admin-name").value = company.admin?.name || ""; $("#company-admin-cpf").value = formatDocument(company.admin?.cpf, "cpf"); $("#company-admin-email").value = company.admin?.email || ""; $("#company-password-field").hidden = true; $("#company-admin-password").required = false; $("#company-name-label").textContent = company.document_type === "cpf" ? "Nome completo" : "Razão social"; } } drawerController.show(); if (!company || mode !== "view") $(company ? "#company-legal-name" : "#company-document-number").focus(); };
-    const closeDrawer = () => { drawerSession++; clearFormError(); drawerController.close(); currentCompany = null; };
-    const loadCompany = async (id) => { try { const response = await api.request(`/backoffice/companies/${id}?view=company`); return response.company || response; } catch (error) { showMessage(error.message || "Não foi possível carregar os dados da empresa."); return null; } };
+    const closeDrawer = () => { detailSequence++; drawerSession++; clearFormError(); drawerController.close(); currentCompany = null; };
+    const loadCompany = async (id) => {
+        const sequence = ++detailSequence;
+        try {
+            const response = await api.request(`/backoffice/companies/${id}?view=company`, { signal: context.signal });
+            return isPageActive() && sequence === detailSequence ? response.company || response : null;
+        } catch (error) {
+            if (isPageActive() && sequence === detailSequence && error?.name !== 'AbortError') showMessage(error.message || "Não foi possível carregar os dados da empresa.");
+            return null;
+        }
+    };
     const validateDocument = (input, type, errorId) => { const value = type === "cpf" ? documents.formatCpf(input.value) : documents.formatCnpj(input.value); const valid = type === "cnpj" ? documents.cnpj(value) : documents.cpf(value); input.value = value; if (valid) { window.FokusForm?.clearField(input); return true; } window.FokusForm?.setFeedback(input, `${type.toUpperCase()} inválido. Confira os dígitos verificadores.`); return false; };
     const submit = async (event) => {
         event.preventDefault();
@@ -329,7 +344,7 @@ export async function mount(root, context = {}) {
     };
     $("#company-query").value = state.query;
     $("#company-filter-form").addEventListener("submit", (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); state.query = data.get("q")?.trim() || ""; state.status = data.get("status") || ""; state.page = 1; load(); });
-    $("#company-create").addEventListener("click", () => openDrawer());
+    $("#company-create").addEventListener("click", () => { detailSequence++; openDrawer(); });
     $("#company-drawer-close").addEventListener("click", closeDrawer);
     $("#company-form-cancel").addEventListener("click", closeDrawer);
     form.addEventListener("submit", submit);
@@ -341,7 +356,32 @@ export async function mount(root, context = {}) {
     $("#company-admin-cpf").addEventListener("input", (event) => { event.target.value = documents.formatCpf(event.target.value); });
     $("#company-admin-cpf").addEventListener("blur", (event) => validateDocument(event.target, "cpf", "#company-admin-cpf-error"));
     pagination.addEventListener("click", (event) => { const button = event.target.closest("[data-company-page]"); if (!button) return; state.page = Number(button.dataset.companyPage); load(); });
-    list.addEventListener("click", async (event) => { const button = event.target.closest("[data-company-action]"); if (!button) return; const id = button.dataset.companyId; const type = button.dataset.companyAction; if (type === "details" || type === "edit") { const company = await loadCompany(id); if (company) { openDrawer(company, type === "details" ? "view" : "edit"); normalizeDrawer(); } return; } const labels = { deactivate: "desativar", activate: "reativar", remove: "remover" }; if (!window.confirm(`Deseja ${labels[type]} esta empresa?`)) return; try { const endpoint = type === "remove" ? `/backoffice/companies/${id}` : `/backoffice/companies/${id}/${type}`; await api.request(endpoint, { method: type === "remove" ? "DELETE" : "POST" }); showMessage(type === "remove" ? "Empresa removida da listagem." : type === "activate" ? "Empresa reativada." : "Empresa desativada.", "success"); await load(); } catch (error) { showMessage(error.message || "Não foi possível concluir a ação."); } });
+    list.addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-company-action]");
+        if (!button || !isPageActive()) return;
+        const id = button.dataset.companyId;
+        const type = button.dataset.companyAction;
+        if (type === "details" || type === "edit") {
+            const company = await loadCompany(id);
+            if (company && isPageActive()) { openDrawer(company, type === "details" ? "view" : "edit"); normalizeDrawer(); }
+            return;
+        }
+        const labels = { deactivate: "desativar", activate: "reativar", remove: "remover" };
+        if (!window.confirm(`Deseja ${labels[type]} esta empresa?`)) return;
+        const epoch = operationEpoch;
+        try {
+            const endpoint = type === "remove" ? `/backoffice/companies/${id}` : `/backoffice/companies/${id}/${type}`;
+            await api.request(endpoint, { method: type === "remove" ? "DELETE" : "POST" });
+            if (!await restoreBarrier || epoch !== operationEpoch) return;
+            if (!isPageActive()) { if (adminId) publishPreviousOperation(adminId, "unknown", epoch); return; }
+            showMessage(type === "remove" ? "Empresa removida da listagem." : type === "activate" ? "Empresa reativada." : "Empresa desativada.", "success");
+            await load();
+        } catch (error) {
+            if (!await restoreBarrier || epoch !== operationEpoch) return;
+            if (!isPageActive()) { if (adminId) publishPreviousOperation(adminId, "unknown", epoch); return; }
+            showMessage(error.message || "Não foi possível concluir a ação.");
+        }
+    });
     const normalizeDrawer = () => { if (drawer.hidden) return; const mode = drawer.dataset.mode; const typeField = $("#company-document-type"); const documentField = $("#company-document-number"); const submitButton = $("#company-form-submit"); submitButton.textContent = mode === "edit" ? "Salvar alterações" : "Cadastrar empresa"; if (mode === "edit") { $("#company-drawer-title").textContent = "Editar dados da empresa"; $("#company-drawer-description").textContent = "Altere somente os dados cadastrais e do administrador permitidos."; typeField.disabled = true; documentField.disabled = true; documentField.value = formatDocument(documentField.value, typeField.value); } if (mode === "view") { const viewDocument = $("#company-view-document"); const viewAdminCpf = $("#company-view-admin-cpf"); const viewType = documents.compact(viewDocument.textContent).length === 11 ? "cpf" : typeField.value; viewDocument.textContent = formatDocument(viewDocument.textContent, viewType); viewAdminCpf.textContent = formatDocument(viewAdminCpf.textContent, "cpf"); } };
     load();
     const summary = root.querySelector('#company-table-summary');
