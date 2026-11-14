@@ -2034,3 +2034,25 @@ html[data-role="admin"] .fs-sidebar .sidebar-button:focus-visible {
         flex: 1 1 0;
     }
 }
+
+/* Keep financial and voucher filters inside mobile cards. */
+@media (max-width: 680px) {
+    html[data-role="admin"] .backoffice-records-page :is(#billing-payments-panel, #billing-reconciliation-panel, #billing-refunds-panel) {
+        min-width: 0;
+        max-width: 100%;
+    }
+    html[data-role="admin"] .backoffice-records-page :is(#billing-payments-filter-form, #billing-reconciliation-filter-form, #billing-refunds-filter-form, #voucher-filter-form) .fs-form-label {
+        min-width: 0;
+        width: 100%;
+        flex: 0 1 100%;
+    }
+    html[data-role="admin"] .backoffice-records-page :is(#billing-payments-filter-form, #billing-reconciliation-filter-form, #billing-refunds-filter-form, #voucher-filter-form) :is(.fs-input-group-subtle, .fs-form-control, .fs-form-select) {
+        box-sizing: border-box;
+        min-width: 0;
+        width: 100%;
+        max-width: 100%;
+    }
+    html[data-role="admin"] .backoffice-records-page #voucher-filter-form .fs-input-group-subtle > .fs-form-control {
+        flex: 1 1 0;
+    }
+}
