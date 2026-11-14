@@ -4,7 +4,7 @@ import { companyIdempotencyOutcome } from "../../public/backoffice/assets/js/com
 
 test("only a valid completed result is conclusive", () => {
     assert.equal(companyIdempotencyOutcome({ state: "completed", revoked: false, result: { id: "synthetic", status: 201 } }, "company.create"), "completed");
-    assert.equal(companyIdempotencyOutcome({ state: "completed", revoked: true, result: { id: "synthetic", status: 200 } }, "company.update", "synthetic"), "completed");
+    assert.equal(companyIdempotencyOutcome({ state: "completed", revoked: true, result: { id: "synthetic", status: 200 } }, "company.update", "synthetic"), "indeterminate");
     for (const state of ["issued", "observed", "absent", "unknown"]) {
         for (const revoked of [true, false, null]) {
             assert.equal(companyIdempotencyOutcome({ state, revoked }, "company.create"), "indeterminate");

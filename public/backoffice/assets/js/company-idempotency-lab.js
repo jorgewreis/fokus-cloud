@@ -70,7 +70,8 @@ export function createCompanyIdempotencyLab({ storage, transport, sessionBinding
         },
         async submit(id, body, expectedTarget) {
             return run(id, async (record) => {
-                if (record.operation === "company.update" && (typeof expectedTarget !== "string" || !expectedTarget.trim())) return "indeterminate";
+                // A caller-supplied target cannot prove the token's original target.
+                if (record.operation === "company.update") return "indeterminate";
                 try {
                     const result = await transport.submit(record.operation, record.token, body, expectedTarget);
                     return companyIdempotencyOutcome(result, record.operation, expectedTarget);

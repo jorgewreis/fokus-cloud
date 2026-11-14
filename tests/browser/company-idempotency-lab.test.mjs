@@ -44,7 +44,7 @@ test("logout during issue prevents storage and repeated issue cannot overwrite",
     assert.equal(storage.length, 0);
 });
 
-test("update needs an explicit target and accepts only its matching result", async () => {
+test("update remains blocked without a verifiable original target", async () => {
     const storage = makeStorage();
     let calls = 0;
     let resultId = "other";
@@ -62,8 +62,10 @@ test("update needs an explicit target and accepts only its matching result", asy
     assert.equal(await client.submit(id, {}), "indeterminate");
     assert.equal(calls, 0);
     assert.equal(await client.submit(id, {}, "company-one"), "indeterminate");
+    assert.equal(calls, 0);
     assert.equal(await client.status(id, "company-one"), "indeterminate");
     resultId = "company-one";
-    assert.equal(await client.submit(id, {}, "company-one"), "completed");
-    assert.equal(await client.status(id, "company-one"), "completed");
+    assert.equal(await client.submit(id, {}, "company-one"), "indeterminate");
+    assert.equal(await client.status(id, "company-one"), "indeterminate");
+    assert.equal(calls, 0);
 });

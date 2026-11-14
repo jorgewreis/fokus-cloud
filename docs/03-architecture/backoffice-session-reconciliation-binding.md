@@ -30,8 +30,17 @@ ausência de resposta conclusiva nunca prova que a operação não será confirm
 `clear()` afeta somente o storage fornecido e não demonstra propagação de
 logout entre abas. Não se deve conectar o protótipo antes de resolver esses
 contratos e validar o fluxo completo em navegador e servidor isolados.
-Na atualização, o chamador deve fornecer o alvo e o protótipo exige resultado
-com esse mesmo ID e status 200; criação exige status 201 e ID não vazio. Como
-o alvo não é persistido nem associado pelo cliente ao token, após reload não há
-prova de que o alvo informado seja o original. Resolver isso antes da conexão;
-uma comparação com um valor fornecido pelo chamador não constitui essa prova.
+Na atualização, o alvo não é persistido nem associado pelo cliente ao token;
+após reload não há prova de que o alvo informado seja o original. Portanto o
+protótipo não envia PATCH nem confirma atualização, mesmo se o chamador
+informar um alvo. O backend atual inclui o alvo no HMAC do payload, mas não
+expõe uma associação verificável ao cliente no status. Um contrato futuro de
+vínculo ao alvo exige projeto e validação no servidor; comparar apenas um
+valor fornecido pelo chamador não constitui essa prova.
+
+O adaptador experimental conhece os formatos atuais de emissão por header,
+criação com `company_id` e status. Uma resposta direta de criação, inclusive
+201, não prova que um nó antigo respeitou o header; o adaptador a mantém
+indeterminada até confirmação por status. Ele só é exercitado com `Response` e
+transporte sintéticos; não é carregado pela interface. O teste não prova
+comunicação com Laravel, sessão, CSRF, migração ou múltiplas abas reais.
