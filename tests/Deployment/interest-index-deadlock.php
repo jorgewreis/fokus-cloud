@@ -3,13 +3,13 @@
 use App\Http\Controllers\Api\ProductInterestController;
 use App\Mail\ProductInterestNotification;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Database\Connection;
+use Illuminate\Database\MySqlConnection;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Database\Connection;
-use Illuminate\Database\MySqlConnection;
-use Illuminate\Database\QueryException;
 
 $root = dirname(__DIR__, 2);
 $sandbox = getenv('UPGRADE_SANDBOX');
