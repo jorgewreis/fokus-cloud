@@ -233,7 +233,7 @@ for (const [status, reopen] of [[200, false], [200, true], [422, true]]) {
     });
 }
 
-test('POST tardio após navegação SPA não afeta nova montagem de empresas', async ({ page }) => {
+test('POST tardio após navegação SPA atualiza a nova montagem sem afetar o formulário', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.route('**/*', (route) => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
     let release;
@@ -274,7 +274,114 @@ test('POST tardio após navegação SPA não afeta nova montagem de empresas', a
     await expect(page.locator('#company-drawer')).toBeVisible();
     await expect(page.locator('#company-form-error')).toBeHidden();
     await expect(page.locator('.fs-backoffice-toast')).toHaveCount(0);
-    expect(listRequests).toBe(before);
+    await expect(page.locator('#company-operation-drawer-status')).toContainText('operação anterior foi concluída');
+    await expect.poll(() => listRequests).toBe(before + 1);
+});
+
+for (const method of ['POST', 'PATCH']) for (const success of [false, true]) for (const returnBeforeResponse of [false, true]) {
+    test(`${method} ${success ? 'concluído' : 'incerto'} após navegação SPA, retorno antes=${returnBeforeResponse}`, async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.route('**/*', (route) => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+        let release, markRequested, saved = false, listRequests = 0;
+        const gate = new Promise((resolve) => { release = resolve; });
+        const requested = new Promise((resolve) => { markRequested = resolve; });
+        await page.route('**/api/backoffice/companies**', async (route) => {
+            const request = route.request();
+            if (request.method() === method) {
+                markRequested();
+                await gate;
+                saved = success;
+                return route.fulfill({ status: success ? 200 : 422, contentType: 'application/json', body: JSON.stringify(success ? {} : { message: 'DADO ANTIGO PRIVADO' }) });
+            }
+            if (new URL(request.url()).pathname.endsWith('/CMP_TEST')) return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ company: fakeCompany }) });
+            listRequests++;
+            return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: [{ ...fakeCompany, legal_name: saved ? 'Resultado atualizado' : fakeCompany.legal_name }], meta: { total: 1, current_page: 1, per_page: 15, last_page: 1 }, summary: {} }) });
+        });
+        await page.goto('/backoffice/empresas');
+        if (method === 'PATCH') {
+            await page.getByRole('button', { name: 'Editar empresa' }).click();
+        } else {
+            await page.locator('#company-create').click();
+            await page.locator('#company-document-number').fill('11222333000181');
+            await page.locator('#company-legal-name').fill('Empresa Exemplo');
+            await page.locator('#company-admin-name').fill('Admin Exemplo');
+            await page.locator('#company-admin-cpf').fill('52998224725');
+            await page.locator('#company-admin-email').fill('exemplo@example.test');
+            await page.locator('#company-admin-password').fill('SenhaExemplo123!');
+        }
+        await page.locator('#company-form-submit').click();
+        await requested;
+        await page.evaluate(() => window.__backofficeRouter.navigate('platform-dashboard-final'));
+        await expect(page.locator('[data-backoffice-page="platform-dashboard-final"]')).toBeVisible();
+        if (returnBeforeResponse) {
+            await page.evaluate(() => window.__backofficeRouter.navigate('companies'));
+            await page.locator('#company-create').click();
+            await page.locator('#company-legal-name').fill('Sessão nova');
+            await page.locator('#company-legal-name').focus();
+        }
+        const before = listRequests;
+        const response = page.waitForResponse((item) => item.request().method() === method && item.url().includes('/api/backoffice/companies'));
+        release();
+        await response;
+        if (!returnBeforeResponse) {
+            await page.evaluate(() => window.__backofficeRouter.navigate('companies'));
+            await expect(page.locator('#company-create')).toBeVisible();
+        }
+        const notice = page.locator(returnBeforeResponse ? '#company-operation-drawer-status' : '#company-operation-page-status');
+        await expect(notice).toBeVisible();
+        await expect(notice).toContainText(success ? 'operação anterior foi concluída' : 'resultado da operação anterior');
+        await expect(notice).not.toContainText('DADO ANTIGO PRIVADO');
+        await expect(page.locator('#company-form-error')).toBeHidden();
+        if (returnBeforeResponse) {
+            await expect(page.locator('#company-legal-name')).toHaveValue('Sessão nova');
+            await expect(page.locator('#company-legal-name')).toBeFocused();
+        }
+        if (success) {
+            await expect.poll(() => listRequests).toBeGreaterThan(before);
+            await expect(page.locator('#company-list')).toContainText('Resultado atualizado');
+        }
+    });
+}
+
+test('resultados tardios de duas montagens preservam incerteza e sucesso sem dados do servidor', async ({ page }) => {
+    await page.route('**/*', (route) => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+    const releases = [];
+    let requests = 0;
+    await page.route('**/api/backoffice/companies**', async (route) => {
+        if (route.request().method() !== 'POST') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: [], meta: { total: 0, current_page: 1, per_page: 15, last_page: 1 }, summary: {} }) });
+        const number = ++requests;
+        await new Promise((resolve) => { releases[number] = resolve; });
+        return route.fulfill({ status: number === 1 ? 422 : 201, contentType: 'application/json', body: JSON.stringify(number === 1 ? { message: 'DADO ANTIGO PRIVADO' } : {}) });
+    });
+    const submitCompany = async () => {
+        await page.locator('#company-create').click();
+        await page.locator('#company-document-number').fill('11222333000181');
+        await page.locator('#company-legal-name').fill('Empresa Exemplo');
+        await page.locator('#company-admin-name').fill('Admin Exemplo');
+        await page.locator('#company-admin-cpf').fill('52998224725');
+        await page.locator('#company-admin-email').fill('exemplo@example.test');
+        await page.locator('#company-admin-password').fill('SenhaExemplo123!');
+        await page.locator('#company-form-submit').click();
+    };
+    await page.goto('/backoffice/empresas');
+    await submitCompany();
+    await expect.poll(() => requests).toBe(1);
+    await page.evaluate(() => window.__backofficeRouter.navigate('platform-dashboard-final'));
+    await page.evaluate(() => window.__backofficeRouter.navigate('companies'));
+    await submitCompany();
+    await expect.poll(() => requests).toBe(2);
+    await page.evaluate(() => window.__backofficeRouter.navigate('platform-dashboard-final'));
+    const first = page.waitForResponse((response) => response.request().method() === 'POST' && response.status() === 422);
+    releases[1]();
+    await first;
+    const second = page.waitForResponse((response) => response.request().method() === 'POST' && response.status() === 201);
+    releases[2]();
+    await second;
+    await page.evaluate(() => window.__backofficeRouter.navigate('companies'));
+    const notice = page.locator('#company-operation-page-status');
+    await expect(notice).toContainText('operação anterior foi concluída');
+    await expect(notice).toContainText('confirmar o resultado de outra operação anterior');
+    await expect(notice).not.toContainText('DADO ANTIGO PRIVADO');
 });
 
 

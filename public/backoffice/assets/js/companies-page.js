@@ -1,5 +1,16 @@
 import { createRecordsDrawer } from "./records-drawer.js";
 
+// Only an outcome code is retained across SPA mounts; no form data or server
+// message is shared. Scope notices to the authenticated platform admin.
+const previousOperations = new Map();
+const operationListeners = new Map();
+function publishPreviousOperation(adminId, outcome) {
+    if (!adminId) return;
+    const outcomes = { ...previousOperations.get(adminId), [outcome]: true };
+    previousOperations.set(adminId, outcomes);
+    operationListeners.get(adminId)?.forEach((listener) => listener(outcomes, outcome));
+}
+
 /**
  * Empresas: lista, filtros e estados create/edit/view do drawer compartilhado.
  */
@@ -24,17 +35,21 @@ export async function mount(root, context = {}) {
     const operationDrawerStatus = $("#company-operation-drawer-status");
     const operationPageStatus = $("#company-operation-page-status");
     let refreshError = "";
-    let operationUnconfirmed = false;
+    const adminId = context.admin?.id ? String(context.admin.id) : null;
+    let operationOutcome = adminId ? previousOperations.get(adminId) : null;
     const syncRefreshStatus = (drawerOpen) => {
         refreshStatus.textContent = refreshError;
         refreshPageStatus.textContent = refreshError;
         refreshStatus.hidden = !refreshError || !drawerOpen;
         refreshPageStatus.hidden = !refreshError || drawerOpen;
-        const operationText = operationUnconfirmed ? "Não foi possível confirmar o resultado da operação anterior. Confira a lista antes de tentar novamente." : "";
+        const operationText = operationOutcome?.unknown && operationOutcome?.completed
+            ? "Uma operação anterior foi concluída. Não foi possível confirmar o resultado de outra operação anterior. Confira a lista antes de tentar novamente."
+            : operationOutcome?.unknown ? "Não foi possível confirmar o resultado da operação anterior. Confira a lista antes de tentar novamente."
+            : operationOutcome?.completed ? "Uma operação anterior foi concluída. Confira a lista de empresas." : "";
         operationDrawerStatus.textContent = operationText;
         operationPageStatus.textContent = operationText;
-        operationDrawerStatus.hidden = !operationUnconfirmed || !drawerOpen;
-        operationPageStatus.hidden = !operationUnconfirmed || drawerOpen;
+        operationDrawerStatus.hidden = !operationOutcome || !drawerOpen;
+        operationPageStatus.hidden = !operationOutcome || drawerOpen;
     };
     const drawerShown = () => syncRefreshStatus(true);
     const drawerHidden = () => syncRefreshStatus(false);
@@ -87,6 +102,24 @@ export async function mount(root, context = {}) {
             }
         }
     };
+    const onPreviousOperation = (outcomes, latest) => {
+        if (!isPageActive()) return;
+        operationOutcome = outcomes;
+        syncRefreshStatus(drawer.getAttribute("aria-hidden") === "false");
+        if (latest === "completed") void load({ silent: true });
+    };
+    if (adminId) {
+        if (!operationListeners.has(adminId)) operationListeners.set(adminId, new Set());
+        operationListeners.get(adminId).add(onPreviousOperation);
+    }
+    const removeOperationListener = () => {
+        if (!adminId) return;
+        const listeners = operationListeners.get(adminId);
+        listeners?.delete(onPreviousOperation);
+        if (!listeners?.size) operationListeners.delete(adminId);
+    };
+    context.signal?.addEventListener("abort", removeOperationListener, { once: true });
+    syncRefreshStatus(false);
     const resetForm = () => { form.reset(); form.hidden = false; $("#company-view-panel").hidden = true; form.querySelectorAll("input, select").forEach((field) => { field.disabled = false; }); $("#company-document-type").value = "cnpj"; $("#company-version").value = ""; $("#company-document-number").readOnly = false; $("#company-password-field").hidden = false; $("#company-admin-password").required = true; $("#company-form-submit").hidden = false; $("#company-form-submit").disabled = submitting; $("#company-form-cancel").textContent = "Cancelar"; $("#company-form-submit").textContent = "Cadastrar empresa"; $("#company-drawer-kicker").textContent = "EMPRESAS"; $("#company-drawer-title").textContent = "Nova empresa"; $("#company-drawer-description").textContent = "Cadastre os dados da empresa e do administrador responsável."; $("#company-name-label").textContent = "Razão social"; currentCompany = null; };
     const renderLeadUsage = (usage) => {
         const panel = $("#company-view-lead-metrics");
@@ -125,9 +158,9 @@ export async function mount(root, context = {}) {
         submitButton.disabled = true;
         try {
             await api.request(endpoint, { method: editing ? "PATCH" : "POST", body });
-            if (!isPageActive()) return;
-            if (session !== drawerSession || !drawerController.getState().mode) {
-                await load({ silent: true });
+            if (!isPageActive() || session !== drawerSession || !drawerController.getState().mode) {
+                if (adminId) publishPreviousOperation(adminId, "completed");
+                else if (isPageActive()) onPreviousOperation({ ...operationOutcome, completed: true }, "completed");
                 return;
             }
             closeDrawer();
@@ -136,10 +169,8 @@ export async function mount(root, context = {}) {
         } catch (error) {
             const text = error.message || "Não foi possível salvar a empresa.";
             if (isPageActive() && session === drawerSession && drawerController.getState().mode && drawer.isConnected) showFormError(text);
-            else if (isPageActive()) {
-                operationUnconfirmed = true;
-                syncRefreshStatus(drawer.getAttribute("aria-hidden") === "false");
-            }
+            else if (adminId) publishPreviousOperation(adminId, "unknown");
+            else if (isPageActive()) onPreviousOperation({ ...operationOutcome, unknown: true }, "unknown");
         } finally {
             submitting = false;
             submitButton.disabled = false;
@@ -174,6 +205,7 @@ export async function mount(root, context = {}) {
     normalizeSummary();
     context.signal?.addEventListener('abort', () => summaryObserver?.disconnect(), { once: true });
     return () => {
+        removeOperationListener();
         createTrigger.removeEventListener("fs:shown", drawerShown);
         createTrigger.removeEventListener("fs:hidden", drawerHidden);
         summaryObserver?.disconnect();
