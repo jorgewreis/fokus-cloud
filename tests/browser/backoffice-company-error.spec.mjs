@@ -48,9 +48,13 @@ for (const width of [375, 1440]) {
         })).toBe(true);
         await page.screenshot({ path: `${process.env.TEMP}/company-error-${width}.png` });
         await button.click();
-        await expect(error).toHaveText('Erro temporário');
+        await expect(error).toContainText('Não foi possível confirmar o resultado');
         await expect(error).toBeVisible();
         await expect(button).toBeEnabled();
+        await button.click();
+        await expect(error).toContainText('reconheça o aviso');
+        expect(requests).toBe(2);
+        await page.locator('#company-operation-drawer-status').getByRole('button', { name: 'Entendi' }).click();
         await button.click();
         await expect(error).toBeHidden();
         await expect(page.locator('#company-drawer')).toBeHidden();
@@ -794,3 +798,47 @@ test('falha de atualização com drawer fechado mostra aviso sem alterar o foco'
     await expect(page.locator('#company-refresh-page-status')).toBeVisible();
     await expect(page.locator('#company-create')).toBeFocused();
 });
+
+for (const method of ['POST', 'PATCH']) for (const result of ['network', 408, 500, 409, 422]) {
+    test(`${method} aberto trata ${result} conforme certeza do resultado`, async ({ page }) => {
+        await page.route('**/*', (route) => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+        let requests = 0;
+        let persisted = 0;
+        await page.route('**/api/backoffice/companies**', async (route) => {
+            const request = route.request();
+            if (request.method() === method) {
+                requests++;
+                if (requests > 1) return route.fulfill({ status: 422, json: { message: 'Rejeitado' } });
+                // The synthetic provider commits before losing its response for uncertain outcomes.
+                if (['network', 408, 500].includes(result)) persisted++;
+                return result === 'network' ? route.abort('failed') : route.fulfill({ status: result, json: { message: 'Resposta sintética' } });
+            }
+            if (new URL(request.url()).pathname.endsWith('/CMP_TEST')) return route.fulfill({ json: { company: fakeCompany } });
+            return route.fulfill({ json: { data: [fakeCompany], meta: { total: 1, current_page: 1, per_page: 15, last_page: 1 }, summary: {} } });
+        });
+        await page.goto('/backoffice/empresas');
+        if (method === 'PATCH') {
+            await page.getByRole('button', { name: 'Editar empresa' }).click();
+            await page.locator('#company-legal-name').fill('Alteração sintética');
+        } else {
+            await page.locator('#company-create').click();
+            for (const [selector, value] of Object.entries({ '#company-document-number': '11222333000181', '#company-legal-name': 'Empresa Exemplo', '#company-admin-name': 'Admin Exemplo', '#company-admin-cpf': '52998224725', '#company-admin-email': 'exemplo@example.test', '#company-admin-password': 'SenhaExemplo123!' })) await page.locator(selector).fill(value);
+        }
+        const button = page.locator('#company-form-submit');
+        await button.click();
+        const uncertain = ['network', 408, 500].includes(result);
+        if (uncertain) {
+            await expect(page.locator('#company-operation-drawer-status')).toContainText('Não foi possível confirmar o resultado');
+            expect(persisted).toBe(1);
+            await button.click();
+            await expect(page.locator('#company-form-error')).toContainText('reconheça o aviso');
+            expect(requests).toBe(1);
+            await page.locator('#company-operation-drawer-status').getByRole('button', { name: 'Entendi' }).click();
+        } else {
+            await expect(page.locator('#company-form-error')).toContainText('Resposta sintética');
+            await expect(page.locator('#company-operation-drawer-status')).toBeHidden();
+        }
+        await button.click();
+        await expect.poll(() => requests).toBe(2);
+    });
+}

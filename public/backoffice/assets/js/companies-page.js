@@ -326,15 +326,15 @@ export async function mount(root, context = {}) {
                 else if (isPageActive()) onPreviousOperation({ ...operationOutcome, unknown: true }, "unknown");
                 return;
             }
-            const text = error.message || "Não foi possível salvar a empresa.";
-            if (isPageActive() && session === drawerSession && drawerController.getState().mode && drawer.isConnected) showFormError(text);
-            else if (requestStarted) {
-                // The controller rejects 409/422 before commit or rolls back its transaction.
-                // Timeouts, transport failures and other responses do not establish the outcome.
-                const outcome = [409, 422].includes(error.status) ? "rejected" : "unknown";
+            // Only these responses establish that the controller rejected the change.
+            // A transport failure or server error may occur after the transaction committed.
+            const outcome = requestStarted && ![409, 422].includes(error.status) ? "unknown" : "rejected";
+            const drawerStillOpen = isPageActive() && session === drawerSession && drawerController.getState().mode && drawer.isConnected;
+            if (requestStarted && (outcome === "unknown" || !drawerStillOpen)) {
                 if (adminId) publishPreviousOperation(adminId, outcome, epoch);
                 else if (isPageActive()) onPreviousOperation({ ...operationOutcome, [outcome]: true }, outcome);
             }
+            if (drawerStillOpen) showFormError(outcome === "unknown" ? "Não foi possível confirmar o resultado. Confira a lista e reconheça o aviso antes de tentar novamente." : (error.message || "Não foi possível salvar a empresa."));
         } finally {
             if (registered) pending?.delete(signature);
             if (pending && !pending.size && pendingOperations.get(adminId || "anonymous") === pending) pendingOperations.delete(adminId || "anonymous");
