@@ -82,8 +82,8 @@ sob os locks e antes de latch/switch, tanto para o comando direto quanto para o
 publicador. O CLI atual de `immutable.py` recusa explicitamente `activate` e
 `rollback` antes de operações; suas primitivas históricas seguem disponíveis para
 verificação do contrato fixado, não como caminho produtivo de ativação. O CLI
-supervisionado exige uma cópia do contrato histórico cujo digest corresponda ao
-valor fixado, e o teste a extrai do commit revisado. Isso não impede um operador
+supervisionado exige o contrato atual revisado cujo digest corresponda ao
+valor fixado; o contrato histórico permanece usado apenas na composição fixada. Isso não impede um operador
 confiável de escrever código Python arbitrário; preservar o controle do operador
 continua essencial. O workflow legado permanece bloqueado.
 

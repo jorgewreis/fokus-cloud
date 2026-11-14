@@ -205,7 +205,7 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     # evidence: it must reject before writing a latch or changing current.
     incomplete=dict(p);incomplete.pop('runtime_evidence_path');incomplete.pop('runtime_evidence_sha256')
     incomplete_policy=temp/'policy-without-runtime.json';incomplete_policy.write_text(json.dumps(incomplete));incomplete_policy.chmod(0o600)
-    reviewed_contract=temp/'immutable-reviewed.py';reviewed_contract.write_bytes(subprocess.check_output(['git','show',d.CONTRACT61+':tools/releases/immutable.py'],cwd=clone))
+    reviewed_contract=source/'tools/releases/immutable.py'
     assert hashlib.sha256(reviewed_contract.read_bytes()).hexdigest()==g.CONTRACT_DIGEST
     ready_before=(base/'scheduler-ready.json').read_bytes()
     direct=subprocess.run([sys.executable,str(source/'tools/releases/generation_activation.py'),'activate',

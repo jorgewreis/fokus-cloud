@@ -6,6 +6,28 @@ from unittest.mock import patch
 import generation_supervisor as g
 import generation_activation as a
 
+class ContractEntrypoints(unittest.TestCase):
+    def test_current_contract_is_pinned_and_both_clis_reject_modification(self):
+        import hashlib
+        contract = Path(__file__).with_name('immutable.py')
+        self.assertEqual(hashlib.sha256(contract.read_bytes()).hexdigest(), g.CONTRACT_DIGEST)
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            altered = base / 'altered.py'
+            altered.write_bytes(contract.read_bytes() + b'\n# altered\n')
+            common = ['--base', str(base / 'missing'), '--receipt', str(base / 'receipt'),
+                      '--policy', str(base / 'policy')]
+            commands = [(g.cli, common + ['--root', str(base / 'root'), '--events', str(base / 'events')]),
+                        (a.cli, ['activate'] + common)]
+            for cli, args in commands:
+                with self.subTest(cli=cli.__module__):
+                    with patch.object(sys, 'argv', ['entrypoint'] + args + ['--immutable-contract', str(contract)]):
+                        with self.assertRaises(FileNotFoundError):
+                            cli()  # Correct digest passes contract load and reaches missing fixture input.
+                    with patch.object(sys, 'argv', ['entrypoint'] + args + ['--immutable-contract', str(altered)]):
+                        with self.assertRaisesRegex(g.Blocked, '^contract_mismatch$'):
+                            cli()
+
 class Contract:
     canonical=staticmethod(lambda p:Path(p).resolve())
     lock=staticmethod(g.lock)
