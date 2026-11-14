@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 test('resultado de envio após restauração exige conferência sem reenviar', async ({ page }) => {
+    const pageErrors = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
     let releasePost;
     let postStarted;
     const gate = new Promise((resolve) => { releasePost = resolve; });
@@ -29,9 +31,12 @@ test('resultado de envio após restauração exige conferência sem reenviar', a
         results.textContent = 'resultado antigo';
         results.hidden = false;
         document.querySelector('#admin-header-toast-content').textContent = 'aviso antigo';
+        window.FokusToast.show('mensagem da sessão anterior');
+        window.__oldSessionToast = document.querySelector('#backoffice-toast-container .fs-toast');
     });
     await page.evaluate(() => {
         window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+        window.FokusToast.show('mensagem durante suspensão');
         window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
     });
     await expect(page.locator('html')).not.toHaveAttribute('inert', '');
@@ -41,6 +46,14 @@ test('resultado de envio após restauração exige conferência sem reenviar', a
     await expect(page.locator('#admin-global-search-results')).toBeHidden();
     await expect(page.locator('#admin-global-search-results')).toBeEmpty();
     await expect(page.locator('#admin-header-toast-content')).toBeEmpty();
+    await expect(page.locator('#backoffice-toast-container')).not.toContainText('mensagem da sessão anterior');
+    await expect(page.locator('#backoffice-toast-container')).not.toContainText('mensagem durante suspensão');
+    await page.evaluate(() => {
+        window.FokusToast.show('mensagem da sessão atual');
+        window.__oldSessionToast.dispatchEvent(new Event('fs:toast:hidden'));
+    });
+    await expect(page.locator('#backoffice-toast-container')).toContainText('mensagem da sessão atual');
+    expect(pageErrors).toEqual([]);
     releasePost();
     await expect(page.locator('#company-operation-page-status')).toContainText('Não foi possível confirmar');
     await page.locator('#company-create').click();

@@ -79,6 +79,7 @@ window.addEventListener("pageshow", async (event) => {
     html.style.visibility = html.dataset.companyRestoreVisibility || "";
     delete html.dataset.companyRestoreInert;
     delete html.dataset.companyRestoreVisibility;
+    window.dispatchEvent(new Event("fokus:backoffice-resume"));
     finishRestore?.(true);
     finishRestore = undefined;
 });
