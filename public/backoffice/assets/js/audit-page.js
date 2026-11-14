@@ -30,6 +30,10 @@ export async function mount(root, context = {}) {
     const api = context.api || window.FokusApi;
     const mode = root.querySelector("[data-audit-mode]")?.dataset.auditMode;
     const disposers = [];
+    let active = true;
+    let requestVersion = 0;
+    const isCurrent = (version) => active && !context.signal?.aborted && version === requestVersion;
+    disposers.push(() => { active = false; requestVersion++; });
     root.querySelectorAll("[data-audit-nav]").forEach((button) => {
         const handler = () => context.router?.navigate(button.dataset.auditNav);
         button.addEventListener("click", handler);
@@ -55,9 +59,17 @@ export async function mount(root, context = {}) {
             window.FokusStyles?.Offcanvas?.getOrCreateInstance(detail)?.show();
         };
         const load = async () => {
+            if (!active || context.signal?.aborted) return;
+            const version = ++requestVersion;
+            body.innerHTML = '<tr><td colspan="7">Carregando acessos...</td></tr>';
+            summary.textContent = "";
+            pageSummary.textContent = "";
+            pagination.innerHTML = "";
+            showMessage("");
             try {
                 const params = new URLSearchParams({ page: String(state.page), per_page: "20", ...state.filters });
                 const response = await api.request(`/backoffice/audit/access-control?${params}`, { signal: context.signal });
+                if (!isCurrent(version)) return;
                 const items = response.data || [];
                 const meta = response.meta || {};
                 summary.textContent = `${meta.total || 0} registros disponíveis`;
@@ -66,7 +78,11 @@ export async function mount(root, context = {}) {
                 body.querySelectorAll("[data-access-detail]").forEach((button) => button.addEventListener("click", () => showDetail(items[Number(button.dataset.accessDetail)])));
                 renderPagination(meta);
                 showMessage("");
-            } catch (error) { if (error?.name !== "AbortError") showMessage(error.message || "Não foi possível carregar o controle de acessos."); }
+            } catch (error) {
+                if (!isCurrent(version) || error?.name === "AbortError") return;
+                body.innerHTML = '<tr><td colspan="7">Não foi possível carregar os acessos.</td></tr>';
+                showMessage(error.message || "Não foi possível carregar o controle de acessos.");
+            }
         };
         const onAccessPageClick = (event) => {
             const button = event.target.closest("[data-access-page]");
@@ -77,9 +93,12 @@ export async function mount(root, context = {}) {
         const submit = (event) => { event.preventDefault(); state.page = 1; state.filters = Object.fromEntries([...new FormData(filters)].filter(([, value]) => value)); load(); };
         filters.addEventListener("submit", submit);
         pagination.addEventListener("click", onAccessPageClick);
-        root.querySelector("#access-clear").addEventListener("click", () => { filters.reset(); state.page = 1; state.filters = {}; load(); });
+        const clear = () => { filters.reset(); state.page = 1; state.filters = {}; load(); };
+        const clearButton = root.querySelector("#access-clear");
+        clearButton.addEventListener("click", clear);
         disposers.push(() => filters.removeEventListener("submit", submit));
         disposers.push(() => pagination.removeEventListener("click", onAccessPageClick));
+        disposers.push(() => clearButton.removeEventListener("click", clear));
         await load();
     }
     if (mode === "activity") {
@@ -100,8 +119,15 @@ export async function mount(root, context = {}) {
             load();
         };
         const load = async () => {
+        if (!active || context.signal?.aborted) return;
+        const version = ++requestVersion;
+        body.innerHTML = '<tr><td colspan="4">Carregando eventos...</td></tr>';
+        summary.textContent = "";
+        pageSummary.textContent = "";
+        pagination.innerHTML = "";
         try {
             const response = await api.request(`/backoffice/audit?page=${state.page}&per_page=20`, { signal: context.signal });
+            if (!isCurrent(version)) return;
             const events = response.data || [];
             const meta = response.meta || {};
             const total = Number(meta.total || 0);
@@ -111,7 +137,7 @@ export async function mount(root, context = {}) {
             pageSummary.textContent = total ? `Mostrando ${((current - 1) * perPage) + 1}–${((current - 1) * perPage) + events.length} de ${total}` : "Nenhum evento recente encontrado.";
             body.innerHTML = events.map((event) => `<tr><td>${escapeHtml(eventLabel(event.action))}</td><td>${escapeHtml(event.actor_name || (event.actor_type === "system" ? "Sistema" : event.actor_type === "anonymous" ? "Não autenticado" : "Usuário não identificado"))}</td><td>${escapeHtml(dateTime(event.created_at))}</td><td>${escapeHtml(event.origin_context || event.origin_channel || "—")}</td></tr>`).join("") || '<tr><td colspan="4">Nenhum evento recente encontrado.</td></tr>';
             renderPagination(meta);
-        } catch (error) { if (error?.name !== "AbortError") body.innerHTML = `<tr><td colspan="4">${escapeHtml(error.message || "Não foi possível carregar os eventos.")}</td></tr>`; }
+        } catch (error) { if (isCurrent(version) && error?.name !== "AbortError") body.innerHTML = `<tr><td colspan="4">${escapeHtml(error.message || "Não foi possível carregar os eventos.")}</td></tr>`; }
         };
         pagination.addEventListener("click", onPageClick);
         disposers.push(() => pagination.removeEventListener("click", onPageClick));
