@@ -32,6 +32,7 @@ jobs:
         run: |
           python3 tools/releases/test_derived_shared_links.py -v
           python3 tools/releases/test_publisher.py -v
+          python3 tools/releases/test_artifact_provenance.py -v
           python3 tools/releases/test_preparation_guard.py -v
       - name: Verify read-only access under an actual distinct synthetic UID
         run: sudo -n env FOKUS_REQUIRE_ROOT_RUNTIME_TEST=1 python3 tools/releases/test_runtime_access.py -v

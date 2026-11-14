@@ -3,11 +3,21 @@
 import importlib.util, json, os, shutil, socket, subprocess, sys, tempfile, time, urllib.request
 from pathlib import Path
 import publisher
+import artifact_provenance
+from types import SimpleNamespace
+from unittest.mock import patch
 spec=importlib.util.spec_from_file_location('d',Path(__file__).with_name('derived_assets.py'));d=importlib.util.module_from_spec(spec);spec.loader.exec_module(d)
 source=Path(__file__).resolve().parents[2]
 with tempfile.TemporaryDirectory(prefix='rei25-composition-') as temp:
     temp=Path(temp);temp.chmod(0o750);candidate=temp/'candidate';proof=d.build(source,candidate);evidence=temp/'proof.json';evidence.write_bytes(d.encoded(proof))
     artifact=temp/'release.tar';packed=d.package(source,candidate,evidence,artifact)
+    # Real rebuild and byte comparison; only the external GitHub gate is synthetic.
+    with patch.object(artifact_provenance.publication_gate,'context',return_value=SimpleNamespace(sha=proof['source_sha'],repository='example/project',repository_id=123)), \
+         patch.object(artifact_provenance.publication_gate,'GitHub',return_value=object()), \
+         patch.object(artifact_provenance.publication_gate,'verify',return_value=(123,1)):
+        independent=artifact_provenance.compare(source,artifact,{'GH_TOKEN':'synthetic'},expected_repository='example/project',expected_repository_id='123')
+    assert independent['artifact_sha256']==packed['artifact_sha256']
+    assert independent['state']=='independent_rebuild_match_not_authorized'
     c=d.contract(source);base=temp/'control';base.mkdir();releases=base/'releases';releases.mkdir();root=releases/proof['source_sha'];transport=temp/'transport.json'
     # Shared targets are synthetic, outside the immutable code root.
     storage=temp/'shared-storage';storage.mkdir();configuration=temp/'synthetic.env';configuration.write_text('# synthetic, no credentials\n')

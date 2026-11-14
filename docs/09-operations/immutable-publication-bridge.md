@@ -241,6 +241,18 @@ Seu único resultado positivo é `evidence_consistent_not_authorized`, sem latch
 ou switch. Entre a última consulta e a eventual ativação, o estado do GitHub pode
 mudar; não há prova histórica atômica, endpoint produtivo ou integração ao ativador.
 
+`artifact_provenance.py` acrescenta comparação independente local dos bytes:
+exige checkout do executor igual ao SHA validado e repositório/ID explícitos de
+política confiável, executa o gate GitHub antes e depois de reconstruir e
+empacotar novamente, e compara os SHA-256 dos arquivos.
+A fonte e o arquivo são reconferidos; alteração de conteúdo ou substituição do
+caminho falha. O resultado `independent_rebuild_match_not_authorized` vincula a
+comparação ao mesmo run de homologação, mas esse run **não atesta o digest do
+artefato** nem comprova aprovação do environment. O teste de composição usa
+rebuild real com gate GitHub simulado. Determinismo e integridade da máquina,
+Git, dependências externas e fluxo de autenticação permanecem requisitos; esta
+prova não ativa nem é integrada à publicação ou ao receipt remoto.
+
 ## Evidência e limites
 
 `tests/Deployment/test_legacy_publication_guard.py` verifica que a recusa não
