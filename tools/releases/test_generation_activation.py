@@ -22,6 +22,8 @@ class Contract:
 class Gate(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.base=Path(self.tmp.name)
+        # Unit fixtures stub only runtime inspection; dedicated tests exercise the real gate.
+        runtime=patch.object(a,'runtime_gate_policy',side_effect=lambda _c,p,_root,_receipt:p);runtime.start();self.addCleanup(runtime.stop)
         self.root=self.base/'releases'/('a'*40);self.root.mkdir(parents=True);self.new=self.base/'releases'/('b'*40);self.new.mkdir()
         (self.base/'current').symlink_to(self.root);self.receipt=self.base/'old.json';self.receipt.write_text(json.dumps({'root':str(self.root)}));self.newreceipt=self.base/'new.json';self.newreceipt.write_text(json.dumps({'root':str(self.new)}))
         self.scope=self.base/'scope.json';self.scope.write_text(json.dumps(dict(schema=a.SCHEMA,base=str(self.base),root=str(self.root),receipt_sha256=a.digest(self.receipt),node_sha256=Contract.node_fingerprint(),boot=a.boot(),operator_uid=os.geteuid(),verified_at=time.time(),expires_at=time.time()+240,evidence_reference='synthetic isolated process namespace only',**{k:True for k in a.BOUNDARIES})))
@@ -66,6 +68,14 @@ class Gate(unittest.TestCase):
             if (self.base/'activation-blocked.json').exists():break
             time.sleep(.002)
         self.rejected();self.assertEqual(os.waitstatus_to_exitcode(os.waitpid(pid,0)[1]),0)
+    def test_direct_activation_stops_before_switch_when_runtime_evidence_is_rejected(self):
+        self.ready()
+        with patch.object(a,'runtime_gate_policy',side_effect=ValueError('runtime_evidence_required')):
+            with self.assertRaisesRegex(ValueError,'runtime_evidence_required'):self.activate()
+        self.assertEqual((self.base/'current').resolve(),self.root)
+        self.assertFalse((self.base/'activation-blocked.json').exists())
+        self.assertTrue((self.base/'scheduler-ready.json').exists())
+
     def test_double_fork_then_accept(self):
         pid=self.runjob("if os.fork()==0:\n os.setsid()\n if os.fork()==0:\n  time.sleep(.1);os._exit(0)\n os._exit(0)\nos._exit(0)")
         self.assertEqual(os.waitstatus_to_exitcode(os.waitpid(pid,0)[1]),0);self.activate()

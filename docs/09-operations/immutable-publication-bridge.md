@@ -77,6 +77,14 @@ não coleta automática dos processos: um JSON preenchido sem inspeção real n�
 comprova o FPM, seus grupos, capabilities ou cobertura da frota. Produção exige
 medição e revisão independentes, e o gate original permanece obrigatório.
 
+A exigência de evidência é aplicada dentro de `generation_activation.activate`,
+sob os locks e antes de latch/switch, tanto para o comando direto quanto para o
+publicador. O CLI legado separado de `immutable.py` pertence ao contrato fixado
+anterior e não passa por essa exigência; seu scheduler conservador permanece,
+mas ele não deve ser exposto como caminho produtivo alternativo. A integração
+final precisa impedir ou substituir esse entrypoint sem enfraquecer o contrato
+fixado e seus testes. O workflow legado continua bloqueado.
+
 Os comandos `activate` e `rollback` delegam ao gate de geração supervisionada e
 exigem explicitamente candidato, receipts, política, geração anterior e prova
 de fronteira; não há modo de forçar ou de reverter dados. A ferramenta opera em

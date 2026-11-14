@@ -201,6 +201,20 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     # Validate exact #61 policy before asserting any post-switch failure scenario.
     c.policy(policy,newroot,base,newreceipt)
     run('success',8,0)
+    # Exercise the real direct CLI with otherwise-valid policy but no runtime
+    # evidence: it must reject before writing a latch or changing current.
+    incomplete=dict(p);incomplete.pop('runtime_evidence_path');incomplete.pop('runtime_evidence_sha256')
+    incomplete_policy=temp/'policy-without-runtime.json';incomplete_policy.write_text(json.dumps(incomplete));incomplete_policy.chmod(0o600)
+    ready_before=(base/'scheduler-ready.json').read_bytes()
+    direct=subprocess.run([sys.executable,str(source/'tools/releases/generation_activation.py'),'activate',
+        '--base',str(base),'--candidate',str(newroot),'--receipt',str(newreceipt),
+        '--policy',str(incomplete_policy),'--previous',str(old),'--previous-receipt',str(oldreceipt),
+        '--boundary',str(temp/'scope.json'),'--immutable-contract',str(clone/'tools/releases/immutable.py')],
+        env={'PATH':os.environ['PATH'],'HOME':str(temp)},capture_output=True,text=True,timeout=45)
+    assert direct.returncode!=0 and 'runtime_evidence_rejected' in direct.stderr
+    assert (base/'current').resolve()==old and not (base/'activation-blocked.json').exists()
+    assert (base/'scheduler-ready.json').read_bytes()==ready_before
+    print('direct_activation_without_runtime_evidence_blocked')
     try:publisher.switch(clone,base,newroot,newreceipt,policy,old,oldreceipt,temp/'scope.json')
     except vp['VerificationError'] as error:
         assert str(error)=='active_release_mismatch', ('unexpected verifier reason',str(error))

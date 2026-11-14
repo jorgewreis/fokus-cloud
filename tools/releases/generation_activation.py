@@ -3,6 +3,7 @@
 import hashlib, json, os, re, time, uuid, stat
 from pathlib import Path
 import generation_supervisor as g
+import runtime_evidence
 
 SCHEMA='fokus-generation-handoff-v1'
 BOUNDARIES=('all_scheduler_entrypoints_controlled','external_workers_absent_verified','no_external_process_delegation_verified','pre_supervision_work_absent_verified','permanent_workers_absent_verified','queue_generation_compatibility_verified')
@@ -95,6 +96,16 @@ def check(c,base,root,receipt,boundary_file):
     g.require(not (base/('consumed-'+p['run']+'.json')).exists(),'proof_already_consumed')
     return p
 
+def runtime_gate_policy(c,policy,candidate,receipt):
+    """Require operator-reviewed runtime evidence inside the activation locks."""
+    expiry=runtime_evidence.read_verified(policy,root=candidate,receipt=receipt,
+        node_sha256=c.node_fingerprint(),boot_id=boot(),operator_uid=os.geteuid(),protect=protected)
+    from preparation_guard import verify_runtime_read
+    runtime_evidence.require(candidate.stat().st_gid==policy['runtime_gid'],'runtime_root_group_mismatch')
+    verify_runtime_read(candidate,policy['runtime_uid'],policy['runtime_gid'])
+    bounded=dict(policy);bounded['expires_at_epoch']=min(policy['expires_at_epoch'],expiry)
+    return bounded
+
 def activate(c,base,candidate,receipt,policy_file,expected_previous,previous_receipt,boundary_file,rollback=False):
     protected(base,True)
     for value in (receipt,policy_file,previous_receipt,boundary_file):protected(value)
@@ -107,6 +118,7 @@ def activate(c,base,candidate,receipt,policy_file,expected_previous,previous_rec
         g.require(c.current_target(base)==expected_previous,'previous_changed')
         c.verify(candidate,receipt)
         proof=check(c,base,expected_previous,previous_receipt,boundary_file)
+        p=runtime_gate_policy(c,p,candidate,receipt)
         g.require(candidate.stat().st_dev==base.stat().st_dev,'cross_device_activation')
         run=uuid.uuid4().hex;journal=base/('activation-'+run+'.json');latch=base/'activation-blocked.json'
         state={'schema':SCHEMA,'run':run,'state':'switch_intent','candidate':str(candidate),'previous':str(expected_previous),'handoff_run':proof['run'],'handoff_sha256':digest(base/'scheduler-ready.json'),'node_sha256':c.node_fingerprint(),'boot':boot()}
@@ -176,6 +188,9 @@ def cli():
 
 if __name__=='__main__':
     try:cli()
+    except runtime_evidence.MissingRuntimeEvidence:
+        import sys
+        print('{"state":"blocked","reason":"runtime_evidence_rejected"}',file=sys.stderr);sys.exit(1)
     except BaseException:
         import sys
         print('{"state":"blocked","reason":"generation_gate_failed"}',file=sys.stderr);sys.exit(1)
