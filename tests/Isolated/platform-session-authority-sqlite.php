@@ -97,6 +97,35 @@ $check($generations->withLockedPrincipal('principal', fn (int $generation): int 
 $principalMarker = str_repeat('9', 64);
 $authority->registerPrincipalAfterMfa('actor-a', $principalMarker, $expiry, 'principal');
 $check($authority->withActivePrincipalSession('actor-a', $principalMarker, $sessionId, 'principal', fn () => 'allowed') === 'allowed');
+$mfaConsumed = false;
+foreach ([
+    fn () => $authority->withActiveSession('actor-a', $principalMarker, $sessionId, fn () => null),
+    fn () => $authority->rotate('actor-a', $principalMarker, str_repeat('8', 64), $expiry),
+    function () use ($authority, $expiry, $principalMarker, &$mfaConsumed): void {
+        $authority->completeMfa('actor-a', str_repeat('7', 64), $expiry, 'actor-a', $principalMarker, function () use (&$mfaConsumed): void {
+            $mfaConsumed = true;
+        });
+    },
+] as $mixedOperation) {
+    try {
+        $mixedOperation();
+        throw new LogicException('Legacy mixed-context operation was accepted.');
+    } catch (HttpException $e) {
+        $check($e->getStatusCode() === 503);
+    }
+}
+$check($db->table('platform_session_authorizations')->where('binding_hash', hash('sha256', $principalMarker))->value('revoked') === 0);
+$check($db->table('platform_session_authorizations')->where('binding_hash', hash('sha256', str_repeat('7', 64)))->count() === 0);
+$check(! $mfaConsumed);
+try {
+    $authority->completeMfa('actor-a', str_repeat('6', 64), $expiry, 'actor-a', str_repeat('5', 64), function () use (&$mfaConsumed): void {
+        $mfaConsumed = true;
+    });
+    throw new LogicException('Missing prior authority was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 503);
+}
+$check(! $mfaConsumed);
 $db->table('users')->insert(['id' => 'other-principal']);
 try {
     $authority->withActivePrincipalSession('actor-a', $principalMarker, $sessionId, 'other-principal', fn () => null);

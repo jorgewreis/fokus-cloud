@@ -133,3 +133,10 @@ support contexts, deadlock victim rollback, and failures at each membership or
 invitation update. Real HTTP tests must cover Laravel StartSession persistence,
 cookies, CSRF and guard selection. Only remove the temporary 503 when those
 proofs pass and independent review confirms every affected path.
+
+The legacy writer, rotation and MFA replacement now reject records explicitly
+bound to a web principal; MFA replacement also rejects a missing prior record.
+A null web principal is still an unknown legacy state, not proof that the session
+has no web guard. Consequently these checks cannot establish that all mixed
+sessions are detected. Explicit no-user state, trusted context transitions and
+integration with the real store remain mandatory before removing the route guards.

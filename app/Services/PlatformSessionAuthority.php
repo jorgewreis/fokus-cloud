@@ -96,6 +96,9 @@ final class PlatformSessionAuthority
                 throw new InvalidArgumentException('Invalid session authorization expiry.');
             }
             if ($previousHash !== null) {
+                $previous = DB::table('platform_session_authorizations')->where('actor_id', $previousActor)
+                    ->where('binding_hash', $previousHash)->lockForUpdate()->first();
+                abort_unless($previous && $previous->web_user_id === null && $previous->web_generation === null, 503, 'Sessão indisponível.');
                 DB::table('platform_session_authorizations')->where('actor_id', $previousActor)->where('binding_hash', $previousHash)
                     ->update(['revoked' => true, 'updated_at' => now()]);
             }
@@ -149,6 +152,7 @@ final class PlatformSessionAuthority
                 ->where('actor_id', $actor)->lockForUpdate()->first();
             $now = now();
             abort_unless($current && ! $current->revoked && (int) $current->expires_at_epoch > $now->getTimestamp(), 401, 'Sessão indisponível.');
+            abort_if($current->web_user_id !== null || $current->web_generation !== null, 503, 'Sessão indisponível.');
             if ($expiresAt <= $now->getTimestamp()) {
                 throw new InvalidArgumentException('Invalid session authorization expiry.');
             }
@@ -177,6 +181,7 @@ final class PlatformSessionAuthority
             $binding = DB::table('platform_session_authorizations')->where('binding_hash', $hash)
                 ->where('actor_id', $actor)->lockForUpdate()->first();
             abort_unless($binding && ! $binding->revoked && (int) $binding->expires_at_epoch > now()->getTimestamp(), 401, 'Sessão indisponível.');
+            abort_if($binding->web_user_id !== null || $binding->web_generation !== null, 503, 'Sessão indisponível.');
             $this->lockLaravelSession($sessionId);
 
             return $callback();
