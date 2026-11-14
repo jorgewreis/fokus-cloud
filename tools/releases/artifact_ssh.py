@@ -86,12 +86,12 @@ def send(*, artifact, expected_digest, host, user, port, known_hosts, identity,
             remote_command = shlex.join(remote_args)
             command = ['/usr/bin/ssh', '-F', '/dev/null', '-T', '-o', 'BatchMode=yes',
                        '-o', 'StrictHostKeyChecking=yes', '-o', 'GlobalKnownHostsFile=/dev/null',
-                       '-o', 'UserKnownHostsFile=/proc/self/fd/' + str(known_fd), '-o', 'IdentitiesOnly=yes',
-                       '-o', 'IdentityFile=/proc/self/fd/' + str(identity_fd), '-o', 'ClearAllForwardings=yes',
+                       '-o', 'UserKnownHostsFile=/proc/' + str(os.getpid()) + '/fd/' + str(known_fd), '-o', 'IdentitiesOnly=yes',
+                       '-o', 'IdentityFile=/proc/' + str(os.getpid()) + '/fd/' + str(identity_fd), '-o', 'ClearAllForwardings=yes',
                        '-o', 'ConnectTimeout=20', '-o', 'ConnectionAttempts=1',
                        '-p', str(port), '--', user + '@' + host, remote_command]
             result = run(command, stdin=stream, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                         timeout=900, check=False, pass_fds=(known_fd, identity_fd),
+                         timeout=900, check=False,
                          env={'PATH': '/usr/bin:/bin', 'LC_ALL': 'C'})
             require(result.returncode == 0, 'transport_failed')
     # A remote ForceCommand may return zero without running the receiver.

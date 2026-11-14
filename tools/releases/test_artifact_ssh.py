@@ -36,9 +36,12 @@ class Transport(unittest.TestCase):
         def fake_run(command, **kwargs):
             self.assertEqual(command[0:3], ['/usr/bin/ssh', '-F', '/dev/null'])
             self.assertIn('StrictHostKeyChecking=yes', command)
-            known_fd, identity_fd = kwargs['pass_fds']
-            self.assertIn('UserKnownHostsFile=/proc/self/fd/' + str(known_fd), command)
-            self.assertIn('IdentityFile=/proc/self/fd/' + str(identity_fd), command)
+            known_option = next(x for x in command if x.startswith('UserKnownHostsFile='))
+            identity_option = next(x for x in command if x.startswith('IdentityFile='))
+            known_fd = int(known_option.rsplit('/', 1)[1])
+            identity_fd = int(identity_option.rsplit('/', 1)[1])
+            self.assertIn('/proc/' + str(os.getpid()) + '/fd/', known_option)
+            self.assertIn('/proc/' + str(os.getpid()) + '/fd/', identity_option)
             self.assertEqual(os.pread(known_fd, 32, 0), b'fixture only')
             self.assertEqual(os.pread(identity_fd, 32, 0), b'fixture only')
             self.assertIn('IdentitiesOnly=yes', command)
@@ -92,7 +95,8 @@ class Transport(unittest.TestCase):
                 replacement = path.with_name(path.name + '.replacement')
                 replacement.write_text('different untrusted fixture')
                 replacement.replace(path)
-            known_fd, identity_fd = kwargs['pass_fds']
+            known_fd = int(next(x for x in command if x.startswith('UserKnownHostsFile=')).rsplit('/', 1)[1])
+            identity_fd = int(next(x for x in command if x.startswith('IdentityFile=')).rsplit('/', 1)[1])
             self.assertEqual(os.pread(known_fd, 32, 0), b'fixture only')
             self.assertEqual(os.pread(identity_fd, 32, 0), b'fixture only')
             return types.SimpleNamespace(returncode=0)
