@@ -32,12 +32,13 @@ class PlatformSessionAuthorityTest extends TestCase
     {
         $admin = $this->admin();
         $request = $this->request('authority-session-a');
-        $this->sessionRow('authority-session-a');
+        $sessionId = $request->session()->getId();
+        $this->sessionRow($sessionId);
 
         app(PlatformSessionAuthority::class)->activate($request, $admin);
 
         $this->assertDatabaseHas('platform_session_authorities', [
-            'session_id' => 'authority-session-a',
+            'session_id' => $sessionId,
             'platform_admin_id' => $admin->id,
             'web_principal_state' => 'none',
             'state' => 'active',
@@ -45,7 +46,7 @@ class PlatformSessionAuthorityTest extends TestCase
         ]);
         app(PlatformSessionAuthority::class)->invalidate($request);
         $this->assertDatabaseHas('platform_session_authorities', [
-            'session_id' => 'authority-session-a',
+            'session_id' => $sessionId,
             'state' => 'revoked',
             'generation' => 2,
         ]);
@@ -55,7 +56,7 @@ class PlatformSessionAuthorityTest extends TestCase
     {
         $admin = $this->admin();
         $request = $this->request('authority-session-b');
-        $this->sessionRow('authority-session-b');
+        $this->sessionRow($request->session()->getId());
         app(PlatformSessionAuthority::class)->activate($request, $admin);
         Auth::guard('platform')->login($admin);
 
@@ -68,7 +69,7 @@ class PlatformSessionAuthorityTest extends TestCase
     {
         $admin = $this->admin();
         $request = $this->request('authority-session-c');
-        $this->sessionRow('authority-session-c');
+        $this->sessionRow($request->session()->getId());
         app(PlatformSessionAuthority::class)->activate($request, $admin);
         app(PlatformSessionAuthority::class)->invalidate($request);
         Auth::guard('platform')->login($admin);
