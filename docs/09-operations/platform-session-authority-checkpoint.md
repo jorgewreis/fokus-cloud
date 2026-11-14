@@ -223,3 +223,25 @@ rolls back; audit and observers need review. Current invitation lock order start
 with user, while existing invitation creation locks company first; concurrent
 MySQL deadlock and rollback tests are mandatory, and no global lock order has
 been proven.
+
+The current emitters store only `membership_id` in token payload and cannot
+unambiguously map historical tokens to an invitation. The isolated acceptance
+candidate now requires `invitation_id` in the locked token payload and checks
+that exact row's membership, company, expiry and acceptance state. Legacy
+tokens without it fail closed in this candidate; no emitter or public route is
+connected, and issuing a replacement must be designed without inventing a
+commercial expiry or invalidation policy. Tests verify an absent/wrong ID and
+that accepting one of two matching invitations leaves the other untouched.
+
+Lock order cannot be declared solved: platform invitation creation locks company
+before user; company-user creation locks user before creating membership; the
+prototype locks user, token, membership, company and invitation. A candidate
+unified order is company -> user -> token -> membership -> invitation (with
+actor/session locks placed consistently for every affected flow). It requires
+changing and testing *all* issuers, acceptance, cancellation, account and session
+paths; reading untrusted token or membership hints before locking must be followed
+by full revalidation after locks. SQLite records the candidate's current query
+sequence only; it cannot prove MySQL locking, gap-lock behavior, deadlock freedom,
+or safe cross-product integration. The existing sendToken also expires all
+unused tokens of the same user/purpose, potentially affecting another company's
+invite; preserve this as a documented legacy risk pending an explicit design.

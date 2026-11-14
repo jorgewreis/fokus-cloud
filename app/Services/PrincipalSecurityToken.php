@@ -42,22 +42,23 @@ final class PrincipalSecurityToken
             $this->ensureEligibleUser($lockedUser);
             $payload = json_decode($token->payload ?? '', true) ?: [];
             $membershipId = $payload['membership_id'] ?? null;
-            abort_unless(is_string($membershipId) && $membershipId !== '', 422, 'Convite inválido.');
+            $invitationId = $payload['invitation_id'] ?? null;
+            abort_unless(is_string($membershipId) && $membershipId !== '' && is_string($invitationId) && $invitationId !== '', 422, 'Convite inválido.');
             $membership = DB::table('company_memberships')->where('id', $membershipId)->where('user_id', $token->user_id)
                 ->where('status', 'pendente')->whereNull('deleted_at')->lockForUpdate()->first();
             abort_unless($membership, 422, 'Este convite não pode mais ser aceito.');
             $company = DB::table('companies')->where('id', $membership->company_id)->where('status', 'ativa')
                 ->whereNull('deleted_at')->lockForUpdate()->first(['id']);
             abort_unless($company, 422, 'Este convite não pode mais ser aceito.');
-            $invitations = DB::table('company_invitations')->where('membership_id', $membershipId)->where('company_id', $company->id)
-                ->whereNull('accepted_at')->where('expires_at', '>', now())->lockForUpdate()->get(['id']);
-            abort_unless($invitations->count() === 1, 422, 'Este convite não pode mais ser aceito.');
+            $invitation = DB::table('company_invitations')->where('id', $invitationId)->where('membership_id', $membershipId)->where('company_id', $company->id)
+                ->whereNull('accepted_at')->where('expires_at', '>', now())->lockForUpdate()->first(['id']);
+            abort_unless($invitation, 422, 'Este convite não pode mais ser aceito.');
             $changed = DB::table('company_memberships')->where('id', $membershipId)->where('user_id', $token->user_id)->where('status', 'pendente')
                 ->update(['status' => 'ativo', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
             abort_unless($changed === 1, 422, 'Este convite não pode mais ser aceito.');
             DB::table('law_unit_memberships')->where('company_membership_id', $membershipId)->where('status', 'pendente')
                 ->update(['status' => 'ativo', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
-            DB::table('company_invitations')->where('id', $invitations->first()->id)->whereNull('accepted_at')
+            DB::table('company_invitations')->where('id', $invitation->id)->whereNull('accepted_at')
                 ->update(['accepted_at' => now(), 'updated_at' => now()]);
 
             return ['user_id' => $token->user_id, 'company_id' => DB::table('company_memberships')->where('id', $membershipId)->value('company_id')];

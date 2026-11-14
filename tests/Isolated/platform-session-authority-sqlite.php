@@ -289,6 +289,14 @@ $db->table('law_unit_memberships')->insert(['id' => 'unit', 'company_membership_
 $db->table('company_invitations')->insert(['id' => 'invite', 'membership_id' => 'member', 'company_id' => 'company', 'expires_at' => now()->addHour()]);
 $db->table('users')->insert(['id' => 'synthetic-user', 'password' => 'synthetic-hash']);
 $db->table('security_tokens')->insert(['id' => 'membership-token', 'user_id' => 'synthetic-user', 'purpose' => 'membership_acceptance', 'token_hash' => hash('sha256', 'membership-plain'), 'payload' => json_encode(['membership_id' => 'member']), 'expires_at' => now()->addHour()]);
+try {
+    $tokenPrimitive->acceptMembership('membership-plain');
+    throw new LogicException('Legacy unbound invitation was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 422);
+}
+$check($db->table('security_tokens')->where('id', 'membership-token')->value('used_at') === null);
+$db->table('security_tokens')->where('id', 'membership-token')->update(['payload' => json_encode(['membership_id' => 'member', 'invitation_id' => 'invite'])]);
 $db->table('companies')->where('id', 'company')->update(['status' => 'suspensa']);
 try {
     $tokenPrimitive->acceptMembership('membership-plain');
@@ -324,14 +332,15 @@ try {
 $check($db->table('security_tokens')->where('id', 'membership-token')->value('used_at') === null);
 $db->table('company_invitations')->where('id', 'invite')->update(['expires_at' => now()->addHour()]);
 $db->table('company_invitations')->insert(['id' => 'duplicate-invite', 'membership_id' => 'member', 'company_id' => 'company', 'expires_at' => now()->addHour()]);
+$db->table('security_tokens')->where('id', 'membership-token')->update(['payload' => json_encode(['membership_id' => 'member', 'invitation_id' => 'missing'])]);
 try {
     $tokenPrimitive->acceptMembership('membership-plain');
-    throw new LogicException('Ambiguous invitation was accepted.');
+    throw new LogicException('Wrong invitation was accepted.');
 } catch (HttpException $e) {
     $check($e->getStatusCode() === 422);
 }
 $check($db->table('security_tokens')->where('id', 'membership-token')->value('used_at') === null);
-$db->table('company_invitations')->where('id', 'duplicate-invite')->delete();
+$db->table('security_tokens')->where('id', 'membership-token')->update(['payload' => json_encode(['membership_id' => 'member', 'invitation_id' => 'invite'])]);
 $db->statement("CREATE TRIGGER fail_atomic_invite BEFORE UPDATE ON company_invitations BEGIN SELECT RAISE(FAIL, 'synthetic invite failure'); END");
 try {
     $tokenPrimitive->acceptMembership('membership-plain');
@@ -342,7 +351,23 @@ try {
 $check($db->table('company_memberships')->where('id', 'member')->value('status') === 'pendente');
 $check($db->table('law_unit_memberships')->where('id', 'unit')->value('status') === 'pendente');
 $db->statement('DROP TRIGGER fail_atomic_invite');
+$invitationQueries = [];
+$db->beforeExecuting(function (string $query) use (&$invitationQueries): void {
+    $invitationQueries[] = strtolower($query);
+});
 $check($tokenPrimitive->acceptMembership('membership-plain') === ['user_id' => 'synthetic-user', 'company_id' => 'company']);
+$positions = [];
+foreach ($invitationQueries as $index => $query) {
+    foreach (['users', 'company_memberships', 'companies', 'company_invitations'] as $table) {
+        if (! isset($positions[$table]) && str_contains($query, 'from "'.$table.'"')) {
+            $positions[$table] = $index;
+        }
+    }
+}
+$check(isset($positions['users'], $positions['company_memberships'], $positions['companies'], $positions['company_invitations'])
+    && $positions['users'] < $positions['company_memberships'] && $positions['company_memberships'] < $positions['companies']
+    && $positions['companies'] < $positions['company_invitations']);
+$check($db->table('company_invitations')->where('id', 'duplicate-invite')->value('accepted_at') === null);
 $db->table('company_memberships')->where('id', 'member')->update(['status' => 'pendente', 'version' => 1]);
 $db->table('law_unit_memberships')->where('id', 'unit')->update(['status' => 'pendente', 'version' => 1]);
 $db->table('company_invitations')->where('id', 'invite')->update(['accepted_at' => null]);
