@@ -27,6 +27,8 @@ class RealSSH(unittest.TestCase):
             (state/'authorization.lock').touch(mode=0o600)
             (state/'policy.json').write_text(json.dumps({'repository':'example/project','repository_id':'123','workflow_sha':'b'*40}))
             (state/'policy.json').chmod(0o600)
+            (state/'environment.json').write_text(json.dumps({'environment_id':55,'reviewer_ids':[77]}))
+            (state/'environment.json').chmod(0o600)
             slots = folder / 'oidc-slots'; slots.mkdir(mode=0o700)
             for index in range(4): (slots/('slot-'+str(index)+'.lock')).touch(mode=0o600)
             protocol = Path(__file__).with_name('oidc_protocol.py').resolve()

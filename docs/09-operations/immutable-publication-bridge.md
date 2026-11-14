@@ -195,8 +195,9 @@ logs ou variáveis de ambiente remotas.
 
 O protocolo experimental exige um diretório de slots privado com quatro locks
 pré-provisionados e usa prazo global de 30 segundos além do prazo de leitura.
-O prazo usa sinal no processo Python: chamadas de sistema não interrompíveis ou
-código nativo que não devolva controle ao interpretador podem ultrapassá-lo.
+O supervisor usa sinal para encerrar um processo filho ao atingir o prazo;
+chamadas de sistema em estado não interrompível podem impedir seu encerramento
+imediato. Os slots permanecem ocupados enquanto o filho não for recolhido.
 As cotas valem apenas para processos que entram nesse protocolo e compartilham
 o mesmo diretório; não limitam conexões anteriores ao comando forçado nem outros
 nós. Um teste CI cria sshd restrito a loopback e usa chave sintética com comando
@@ -212,6 +213,17 @@ previamente autorizados e exige evidência de que o bypass administrativo está
 desabilitado. Esses valores e a forma real da resposta não foram consultados nem
 inventados. O módulo não autentica sozinho os claims recebidos e não está ligado
 à ativação; suas verificações são testes sintéticos, não prova de aprovação real.
+
+O fluxo interno experimental `oidc_evidence_flow.py` recebe a identidade tipada
+após a verificação da assinatura e consumo único; o cliente não fornece os IDs
+de job, ator ou repositório para a consulta. A política do environment é lida
+do diretório do servidor e seu digest é vinculado ao desafio e conferido após as
+consultas. A classe tipada é fabricável por código Python com privilégios locais:
+somente a chamada interna `assess → consume → verify` pode originar essa prova.
+Duas leituras da API não demonstram histórico atômico nem aprovam implantação.
+Falhas após consumo queimam o desafio; nova tentativa requer novo desafio. O fluxo
+não está conectado ao protocolo público ou à ativação, e a identidade do job,
+o artefato independente e a autorização produtiva continuam sem prova completa.
 
 ## Evidência e limites
 

@@ -62,6 +62,49 @@ def read_frame(fd):
     return read_exact(length)
 
 
+def run_supervised(operation):
+    """Run one request in a child killed and reaped on the parent's deadline."""
+    read_fd, write_fd = os.pipe()
+    try:
+        pid = os.fork()
+    except BaseException:
+        os.close(read_fd); os.close(write_fd)
+        raise
+    if pid == 0:
+        os.close(read_fd)
+        try:
+            payload=json.dumps(operation(),sort_keys=True).encode()
+            if len(payload)>4096: raise ValueError('oversized_response')
+            if os.write(write_fd,payload)!=len(payload): raise ValueError('incomplete_response')
+            os.close(write_fd)
+            os._exit(0)
+        except BaseException:
+            os.close(write_fd)
+            os._exit(1)
+    os.close(write_fd)
+    reaped=False
+    try:
+        chunks=[];total=0
+        while True:
+            chunk=os.read(read_fd,4097-total)
+            if not chunk:break
+            total+=len(chunk)
+            if total>4096:raise ValueError('oversized_response')
+            chunks.append(chunk)
+        _,status=os.waitpid(pid,0);reaped=True
+        if not os.WIFEXITED(status) or os.WEXITSTATUS(status)!=0:raise ValueError('worker_failed')
+        result=json.loads(b''.join(chunks),object_pairs_hook=oidc.unique)
+        if not isinstance(result,dict):raise ValueError('invalid_response')
+        return result
+    finally:
+        os.close(read_fd)
+        if not reaped:
+            try: os.kill(pid,signal.SIGKILL)
+            except ProcessLookupError: pass
+            try: os.waitpid(pid,0)
+            except ChildProcessError: pass
+
+
 def handle(directory, raw):
     if not isinstance(raw, bytes) or len(raw) > MAX_REQUEST:
         raise ValueError('invalid_request')
@@ -92,7 +135,7 @@ def main():
     try:
         with total_deadline():
             with protocol_slots.acquire(args.slot_dir):
-                result = handle(args.state_dir, read_frame(sys.stdin.buffer.fileno()))
+                result = run_supervised(lambda: handle(args.state_dir, read_frame(sys.stdin.buffer.fileno())))
         print(json.dumps(result, sort_keys=True))
         return 0
     except Exception:

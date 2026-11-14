@@ -94,6 +94,17 @@ def policy(directory, dfd):
     return value, digest
 
 
+def environment_policy(directory, dfd):
+    value, digest = read_record(directory, dfd, 'environment.json')
+    require(set(value) == {'environment_id', 'reviewer_ids'}, 'invalid_environment_policy')
+    reviewers = value['reviewer_ids']
+    require(type(value['environment_id']) is int and value['environment_id'] > 0
+            and isinstance(reviewers, list) and 0 < len(reviewers) <= 6
+            and all(type(item) is int and item > 0 for item in reviewers)
+            and len(set(reviewers)) == len(reviewers), 'invalid_environment_policy')
+    return value, digest
+
+
 def valid_binding(action, candidate, artifact):
     require(action in ('activate', 'rollback'), 'invalid_action')
     require(isinstance(candidate, str) and re.fullmatch(r'[a-f0-9]{40}', candidate), 'invalid_candidate')
@@ -140,7 +151,7 @@ def prune(directory, dfd, now):
     challenge_names = [name for name in entries if re.fullmatch(r'challenge-[a-f0-9]{64}\.json', name)]
     consumed_names = [name for name in entries if re.fullmatch(r'consumed-[a-f0-9]{64}\.json', name)]
     jti_names = [name for name in entries if re.fullmatch(r'jti-[a-f0-9]{64}\.json', name)]
-    allowed = set(challenge_names + consumed_names + jti_names + ['policy.json', 'authorization.lock', 'clock.json'])
+    allowed = set(challenge_names + consumed_names + jti_names + ['policy.json', 'environment.json', 'authorization.lock', 'clock.json'])
     require(set(entries) <= allowed, 'unexpected_store_entry')
     for name in challenge_names:
         record, _ = read_record(directory, dfd, name)
@@ -161,10 +172,11 @@ def prune(directory, dfd, now):
             sum(name.startswith('jti-') for name in remaining))
 
 
-def validate_record(record, settings, policy_digest, now, action, candidate, artifact):
-    require(set(record) == {'action', 'candidate', 'artifact', 'workflow_sha', 'policy_digest', 'created', 'expires'}, 'invalid_challenge')
+def validate_record(record, settings, policy_digest, environment_digest, now, action, candidate, artifact):
+    require(set(record) == {'action', 'candidate', 'artifact', 'workflow_sha', 'policy_digest', 'environment_digest', 'created', 'expires'}, 'invalid_challenge')
     require(record['action'] == action and record['candidate'] == candidate and record['artifact'] == artifact
-            and record['workflow_sha'] == settings['workflow_sha'] and record['policy_digest'] == policy_digest, 'challenge_binding')
+            and record['workflow_sha'] == settings['workflow_sha'] and record['policy_digest'] == policy_digest
+            and record['environment_digest'] == environment_digest, 'challenge_binding')
     require(type(record['created']) is int and type(record['expires']) is int
             and record['created'] <= now < record['expires'] and record['expires'] - record['created'] == 120, 'challenge_expired')
 
@@ -173,12 +185,13 @@ def challenge(directory, action, candidate, artifact):
     valid_binding(action, candidate, artifact)
     with locked(directory) as (dfd, checkpoint):
         settings, policy_digest = policy(directory, dfd)
+        _, environment_digest = environment_policy(directory, dfd)
         now = trusted_time(directory, dfd)
         challenge_count, _ = prune(directory, dfd, now)
         require(challenge_count < MAX_CHALLENGES, 'challenge_quota')
         nonce = secrets.token_hex(32)
         record = {'action': action, 'candidate': candidate, 'artifact': artifact,
-                  'workflow_sha': settings['workflow_sha'], 'policy_digest': policy_digest,
+                  'workflow_sha': settings['workflow_sha'], 'policy_digest': policy_digest, 'environment_digest': environment_digest,
                   'created': now, 'expires': now + 120}
         checkpoint()
         create_file(dfd, 'challenge-' + nonce + '.json', record)
@@ -191,9 +204,10 @@ def consume(directory, audience, token, action, candidate, artifact):
     nonce = audience.rsplit(':', 1)[-1]
     with locked(directory) as (dfd, checkpoint):
         settings, policy_digest = policy(directory, dfd)
+        _, environment_digest = environment_policy(directory, dfd)
         record, record_digest = read_record(directory, dfd, 'challenge-' + nonce + '.json')
         now = trusted_time(directory, dfd)
-        validate_record(record, settings, policy_digest, now, action, candidate, artifact)
+        validate_record(record, settings, policy_digest, environment_digest, now, action, candidate, artifact)
         checkpoint()
     # Never hold the server lock while consulting the network or verifying a signature.
     keys = oidc.fetch_jwks()
@@ -203,9 +217,10 @@ def consume(directory, audience, token, action, candidate, artifact):
     with locked(directory) as (dfd, checkpoint):
         now = trusted_time(directory, dfd)
         current_settings, policy_after = policy(directory, dfd)
+        _, environment_after = environment_policy(directory, dfd)
         current_record, record_after = read_record(directory, dfd, 'challenge-' + nonce + '.json')
-        require(policy_after == policy_digest and record_after == record_digest, 'authorization_changed')
-        validate_record(current_record, current_settings, policy_after, now, action, candidate, artifact)
+        require(policy_after == policy_digest and environment_after == environment_digest and record_after == record_digest, 'authorization_changed')
+        validate_record(current_record, current_settings, policy_after, environment_after, now, action, candidate, artifact)
         oidc.validate_window(result['issued'], result['not_before'], result['expires'], now)
         _, jti_count = prune(directory, dfd, now)
         require(jti_count < MAX_JTIS, 'jti_quota')
@@ -224,4 +239,5 @@ def consume(directory, audience, token, action, candidate, artifact):
         require(record['created'] <= final_time < record['expires'], 'authorization_expired')
         oidc.validate_window(result['issued'], result['not_before'], result['expires'], final_time)
         return {'state':'verified_once', 'action':action, 'candidate':candidate, 'artifact':artifact,
-                'run_id':result['run_id'], 'run_attempt':result['run_attempt']}
+                'run_id':result['run_id'], 'run_attempt':result['run_attempt'],
+                'identity':result['identity'], 'policy_digest':policy_digest, 'environment_digest':environment_digest}

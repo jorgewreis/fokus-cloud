@@ -6,6 +6,7 @@ fresh remote challenge. Replay consumption and environment configuration are
 separate mandatory controls. No network, token output or mutation here.
 """
 import base64
+from dataclasses import dataclass
 import json
 import re
 import ssl
@@ -16,6 +17,20 @@ ISSUER = 'https://token.actions.githubusercontent.com'
 JWKS_URL = ISSUER + '/.well-known/jwks'
 MAX_TOKEN = 16384
 CA_BUNDLE = '/etc/ssl/certs/ca-certificates.crt'
+
+
+@dataclass(frozen=True)
+class VerifiedIdentity:
+    repository: str
+    repository_id: str
+    sha: str
+    run_id: str
+    run_attempt: str
+    check_run_id: str
+    actor_id: str
+    issued: int
+    not_before: int
+    expires: int
 
 
 def require(condition, reason):
@@ -117,6 +132,7 @@ def verify(token, jwks, *, audience, repository, repository_id, sha, now):
         require(isinstance(claims.get(key), str) and re.fullmatch(r'[1-9][0-9]*', claims[key]), 'invalid_run_identity')
     require(isinstance(claims.get('jti'), str) and re.fullmatch(r'[A-Za-z0-9_-]{16,128}', claims['jti']), 'invalid_jti')
     validate_window(claims.get('iat'), claims.get('nbf'), claims.get('exp'), now)
+    identity=VerifiedIdentity(repository,repository_id,sha,claims['run_id'],claims['run_attempt'],
+                              claims['check_run_id'],claims['actor_id'],claims['iat'],claims['nbf'],claims['exp'])
     return {'jti': claims['jti'], 'run_id': claims['run_id'], 'run_attempt': claims['run_attempt'],
-            'check_run_id': claims['check_run_id'], 'actor_id': claims['actor_id'], 'sha': sha, 'issued': claims['iat'],
-            'not_before': claims['nbf'], 'expires': claims['exp']}
+            'issued': claims['iat'], 'not_before': claims['nbf'], 'expires': claims['exp'], 'identity':identity}

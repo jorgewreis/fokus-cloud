@@ -3,6 +3,8 @@
 import copy
 import unittest
 import environment_evidence as evidence
+from dataclasses import replace
+from github_oidc import VerifiedIdentity
 
 
 class FakeAPI:
@@ -13,7 +15,7 @@ class FakeAPI:
 class Evidence(unittest.TestCase):
     def setUp(self):
         self.sha='a'*40
-        self.identity={'sha':self.sha,'run_id':'12','run_attempt':'1','check_run_id':'34','actor_id':'22'}
+        self.identity=VerifiedIdentity('example/project','123',self.sha,'12','1','34','22',1,1,2)
         self.policy={'repository':'example/project','repository_id':'123','environment_id':55,'reviewer_ids':[77]}
         repo={'id':123,'full_name':'example/project'}
         self.data={'/git/ref/heads/main':{'ref':'refs/heads/main','object':{'type':'commit','sha':self.sha}},
@@ -31,8 +33,14 @@ class Evidence(unittest.TestCase):
         api=FakeAPI(self.data)
         self.assertEqual(evidence.check(self.identity,self.policy,api)['state'],'evidence_consistent')
         self.assertEqual(api.calls,12)
+    def test_spoofed_dictionary_and_other_repository_are_refused(self):
+        with self.assertRaisesRegex(ValueError,'invalid_input'):
+            evidence.check({'run_id':'12'},self.policy,FakeAPI(self.data))
+        self.identity=replace(self.identity,repository='attacker/project')
+        with self.assertRaisesRegex(ValueError,'identity_repository_mismatch'):self.check()
+
     def test_rerun_is_refused_as_ambiguous(self):
-        self.identity['run_attempt']='2'
+        self.identity=replace(self.identity,run_attempt='2')
         with self.assertRaisesRegex(ValueError,'rerun_approval_ambiguous'):self.check()
     def test_missing_or_unsafe_protection_and_approvals_are_refused(self):
         cases=[('/environments/production','can_admins_bypass',True),

@@ -98,6 +98,19 @@ class Protocol(unittest.TestCase):
                     time.sleep(2)
             self.assertLess(time.monotonic()-start,1.5)
 
+    def test_global_deadline_terminates_worker_after_frame(self):
+        with patch.object(protocol,'TOTAL_TIMEOUT_SECONDS',.15):
+            start=time.monotonic()
+            with self.assertRaisesRegex(TimeoutError,'operation_timeout'):
+                with protocol.total_deadline():
+                    protocol.run_supervised(lambda:time.sleep(2))
+            self.assertLess(time.monotonic()-start,1.5)
+
+    def test_supervisor_never_returns_worker_exception_text(self):
+        def fail(): raise ValueError('CANARY_SECRET_VALUE')
+        with self.assertRaisesRegex(ValueError,'worker_failed'):
+            with protocol.total_deadline():protocol.run_supervised(fail)
+
     def test_slot_capacity_is_bounded_and_released(self):
         with ExitStack() as stack:
             for _ in range(protocol.protocol_slots.SLOTS):

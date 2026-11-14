@@ -48,18 +48,20 @@ class GitHubRead:
 
 def check(identity, policy, api):
     """Check only first-attempt synthetic evidence; reject ambiguous review history."""
-    require(isinstance(identity,dict) and isinstance(policy,dict),'invalid_input')
+    require(type(identity) is github_oidc.VerifiedIdentity and isinstance(policy,dict),'invalid_input')
     require(set(policy)=={'repository','repository_id','environment_id','reviewer_ids'},'invalid_policy')
     repo=policy['repository']; repo_id=policy['repository_id']; env_id=policy['environment_id']; reviewers=policy['reviewer_ids']
     require(isinstance(repo_id,str) and re.fullmatch(r'[1-9][0-9]*',repo_id),'invalid_policy')
     require(type(env_id) is int and env_id>0 and isinstance(reviewers,list) and 0<len(reviewers)<=6
             and all(type(x) is int and x>0 for x in reviewers) and len(set(reviewers))==len(reviewers),'invalid_policy')
+    require(identity.repository==repo and identity.repository_id==repo_id,'identity_repository_mismatch')
     for key in ('run_id','run_attempt','check_run_id','actor_id'):
-        require(isinstance(identity.get(key),str) and re.fullmatch(r'[1-9][0-9]*',identity[key]),'invalid_identity')
-    require(identity['run_attempt']=='1','rerun_approval_ambiguous')
-    sha=identity.get('sha');require(isinstance(sha,str) and re.fullmatch(r'[a-f0-9]{40}',sha),'invalid_identity')
-    env_path='/environments/production'; run_path='/actions/runs/'+identity['run_id']
-    check_path='/check-runs/'+identity['check_run_id']; reviews_path=run_path+'/approvals'
+        value=getattr(identity,key)
+        require(isinstance(value,str) and re.fullmatch(r'[1-9][0-9]*',value),'invalid_identity')
+    require(identity.run_attempt=='1','rerun_approval_ambiguous')
+    sha=identity.sha;require(isinstance(sha,str) and re.fullmatch(r'[a-f0-9]{40}',sha),'invalid_identity')
+    env_path='/environments/production'; run_path='/actions/runs/'+identity.run_id
+    check_path='/check-runs/'+identity.check_run_id; reviews_path=run_path+'/approvals'
     paths=('/git/ref/heads/main','/actions/workflows/deploy.yml',env_path,run_path,check_path,reviews_path)
     first=[api.get(path) for path in paths]
     ref, workflow, environment, run, job, approvals=first
@@ -67,14 +69,14 @@ def check(identity, policy, api):
             and ref['object'].get('type')=='commit' and ref['object'].get('sha')==sha,'main_changed')
     require(isinstance(workflow,dict) and type(workflow.get('id')) is int and workflow.get('id')>0
             and workflow.get('path')=='.github/workflows/deploy.yml' and workflow.get('state')=='active','workflow_mismatch')
-    require(isinstance(run,dict) and run.get('id')==int(identity['run_id']) and run.get('run_attempt')==1
+    require(isinstance(run,dict) and run.get('id')==int(identity.run_id) and run.get('run_attempt')==1
             and run.get('workflow_id')==workflow['id'] and run.get('head_sha')==sha and run.get('head_branch')=='main'
             and run.get('event')=='workflow_dispatch' and run.get('status')=='in_progress','run_mismatch')
-    require(isinstance(run.get('actor'),dict) and run['actor'].get('id')==int(identity['actor_id']),'actor_mismatch')
+    require(isinstance(run.get('actor'),dict) and run['actor'].get('id')==int(identity.actor_id),'actor_mismatch')
     for key in ('repository','head_repository'):
         item=run.get(key);require(isinstance(item,dict) and item.get('id')==int(repo_id) and item.get('full_name')==repo,'repository_mismatch')
     suite=run.get('check_suite_id');require(type(suite) is int and suite>0,'missing_check_suite')
-    require(isinstance(job,dict) and job.get('id')==int(identity['check_run_id']) and job.get('head_sha')==sha
+    require(isinstance(job,dict) and job.get('id')==int(identity.check_run_id) and job.get('head_sha')==sha
             and job.get('name')=='Publish Laravel application' and job.get('status')=='in_progress'
             and isinstance(job.get('check_suite'),dict) and job['check_suite'].get('id')==suite
             and isinstance(job.get('app'),dict) and job['app'].get('slug')=='github-actions','job_mismatch')
@@ -92,9 +94,9 @@ def check(identity, policy, api):
     require(isinstance(approvals,list) and len(approvals)==1,'approval_history_ambiguous')
     approval=approvals[0];require(isinstance(approval,dict) and approval.get('state')=='approved'
             and isinstance(approval.get('user'),dict) and approval['user'].get('id') in ids
-            and approval['user']['id']!=int(identity['actor_id']),'approval_missing')
+            and approval['user']['id']!=int(identity.actor_id),'approval_missing')
     environments=approval.get('environments');require(isinstance(environments,list) and len(environments)==1
             and isinstance(environments[0],dict) and environments[0].get('id')==env_id
             and environments[0].get('name')=='production','approval_environment_mismatch')
     require([api.get(path) for path in paths]==first,'github_evidence_changed')
-    return {'state':'evidence_consistent','run_id':identity['run_id'],'check_run_id':identity['check_run_id']}
+    return {'state':'evidence_consistent','run_id':identity.run_id,'check_run_id':identity.check_run_id}
