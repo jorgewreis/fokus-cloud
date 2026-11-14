@@ -6,6 +6,7 @@ This intentionally does not change CI or enable the MySQL upgrade harness.
 import os
 import queue
 import subprocess
+import tempfile
 import threading
 
 from linux_disposable_mysql import IDENTITY, UUID, assert_disposable_mysql
@@ -84,9 +85,10 @@ try {$unexpected=$connect($argv[2]); exit(4);} catch (PDOException $e) {if ((int
     # a session variable is cleared by reconnect and therefore proves that
     # the initialization ran again on the replacement connection.
     base = ['mysql', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot']
-    proc = subprocess.Popen(base + ['--reconnect', '--unbuffered', '--batch', '--skip-column-names',
+    stderr = tempfile.TemporaryFile(mode='w+t')
+    proc = subprocess.Popen(base + ['--reconnect', '--force', '--unbuffered', '--batch', '--skip-column-names',
                                    '--init-command=' + init_statement(identity)], env=env,
-                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr,
                             text=True, bufsize=1)
     lines = queue.Queue()
     def read_lines():
@@ -104,12 +106,18 @@ try {$unexpected=$connect($argv[2]); exit(4);} catch (PDOException $e) {if ((int
                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
         proc.stdin.write('SELECT @fokus_identity_guard;\n')
         proc.stdin.flush()
-        if lines.get(timeout=15) != '1':
+        try:
+            value = lines.get(timeout=15)
+        except queue.Empty as error:
+            stderr.seek(0)
+            raise RuntimeError('mysql reconnect returned no value: ' + stderr.read(1000)) from error
+        if value != '1':
             raise RuntimeError('mysql did not reinitialize after reconnect')
         print('mysql reconnect reapplied init command ok')
     finally:
         proc.kill()
         proc.wait(timeout=5)
+        stderr.close()
     if failures:
         raise RuntimeError('; '.join(failures))
 
