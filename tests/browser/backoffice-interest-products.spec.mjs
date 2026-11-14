@@ -297,6 +297,6 @@ test('resposta antiga não encerra carregamento ou erro da consulta nova', async
     await page.goto('/backoffice/interesses'); await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'false');
     await page.locator('#interest-product-filter').fill('antigo'); await page.getByRole('button', { name: 'Filtrar' }).click(); await begunOld;
     await page.locator('#interest-product-filter').fill('novo'); await page.getByRole('button', { name: 'Filtrar' }).click(); await begunNew;
-    releaseOld(); await expect(page.locator('#interest-loading')).toBeVisible(); await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'true');
+    const oldResponse = page.waitForResponse(response => response.url().includes("product=antigo")); releaseOld(); await oldResponse; await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 0))); await expect(page.locator('#interest-loading')).toBeVisible(); await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'true');
     releaseNew(); await expect(page.locator('#interest-loading')).toBeHidden(); await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'false'); await expect(page.getByRole('button', { name: 'Tentar novamente' })).toBeVisible();
 });
