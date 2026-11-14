@@ -50,6 +50,29 @@ class AuthenticationAndIsolationTest extends TestCase
         Mail::assertNothingSent();
     }
 
+    public function test_experimental_token_login_gates_leave_tokens_and_user_untouched(): void
+    {
+        $this->postJson('/api/auth/register-company', $this->registration())->assertCreated();
+        $user = User::query()->firstOrFail();
+        DB::table('security_tokens')->insert([
+            'id' => PrefixedUlid::make('TOK'), 'user_id' => $user->id, 'purpose' => 'membership_acceptance',
+            'token_hash' => hash('sha256', 'synthetic-invitation'), 'payload' => '{}',
+            'expires_at' => now()->addHour(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('security_tokens')->insert([
+            'id' => PrefixedUlid::make('TOK'), 'user_id' => $user->id, 'purpose' => 'email_verification',
+            'token_hash' => hash('sha256', 'synthetic-verification'), 'payload' => '{}',
+            'expires_at' => now()->addHour(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        config(['company_idempotency.session_authority_lifecycle' => true]);
+
+        $this->postJson('/api/auth/verify-email', ['token' => 'synthetic-verification'])->assertStatus(503);
+        $this->postJson('/api/auth/accept-membership', ['token' => 'synthetic-invitation'])->assertStatus(503);
+        self::assertNull(DB::table('security_tokens')->where('token_hash', hash('sha256', 'synthetic-verification'))->value('used_at'));
+        self::assertNull(DB::table('security_tokens')->where('purpose', 'membership_acceptance')->value('used_at'));
+        self::assertSame('pendente', $user->fresh()->status);
+    }
+
     public function test_registration_requires_explicit_legal_manifestations(): void
     {
         $payload = $this->registration();

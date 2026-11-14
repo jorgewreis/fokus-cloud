@@ -118,6 +118,12 @@ final class PlatformSessionLifecycle
         abort_if($this->enabled(), 503, 'Cadastro temporariamente indisponível nesta sessão.');
     }
 
+    /** Token workflows remain closed until their writes and login are atomic. */
+    public function ensureTokenLoginReady(): void
+    {
+        abort_if($this->enabled(), 503, 'Acesso temporariamente indisponível.');
+    }
+
     public function transactionalSessionTable(): string
     {
         abort_unless($this->enabled(), 503, 'Sessão indisponível.');

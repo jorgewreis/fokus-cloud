@@ -518,6 +518,7 @@ class AuthController extends Controller
 
     public function verifyEmail(Request $request)
     {
+        app(PlatformSessionLifecycle::class)->ensureTokenLoginReady();
         $token = $this->consumeToken($request->validate(['token' => ['required', 'string']])['token'], 'email_verification');
         $user = User::findOrFail($token->user_id);
         $payload = $token->payload ? json_decode($token->payload, true) : [];
@@ -626,6 +627,7 @@ class AuthController extends Controller
 
     public function acceptMembership(Request $request)
     {
+        app(PlatformSessionLifecycle::class)->ensureTokenLoginReady();
         $token = $this->consumeToken($request->validate(['token' => ['required', 'string']])['token'], 'membership_acceptance');
         $payload = json_decode($token->payload, true) ?: [];
         $membershipId = $payload['membership_id'] ?? null;
@@ -1005,10 +1007,10 @@ class AuthController extends Controller
 
     private function authenticateIntoSession(Request $request, User $user, ?string $companyId = null, bool $recordAccess = true): void
     {
+        $principalSnapshot = app(PlatformSessionLifecycle::class)->captureWebLogin($user);
         app(SupportSessionSecurity::class)->end($request, 'Acesso de suporte encerrado por novo login de cliente.', true);
         $platformActor = Auth::guard('platform')->id();
         app(PlatformSessionLifecycle::class)->rotateIfEnabled($request->session(), $platformActor === null ? null : (string) $platformActor);
-        $principalSnapshot = app(PlatformSessionLifecycle::class)->captureWebLogin($user);
         $request->session()->regenerate();
         Auth::guard('web')->login($user);
         if ($principalSnapshot !== null) {

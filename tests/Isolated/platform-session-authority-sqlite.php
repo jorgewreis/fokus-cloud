@@ -423,6 +423,16 @@ try {
 }
 $app['config']->set('session.driver', 'database');
 $lifecycle = new PlatformSessionLifecycle($authority);
+try {
+    $lifecycle->ensureTokenLoginReady();
+    throw new LogicException('Experimental token login was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 503);
+}
+$app['config']->set('company_idempotency.session_authority_lifecycle', false);
+$lifecycle->ensureTokenLoginReady();
+$check(true);
+$app['config']->set('company_idempotency.session_authority_lifecycle', true);
 $activeLogin = (new User)->newFromBuilder(['id' => 'principal', 'status' => 'ativa', 'password' => 'synthetic-hash']);
 $db->table('users')->where('id', 'principal')->update(['status' => 'bloqueada']);
 try {

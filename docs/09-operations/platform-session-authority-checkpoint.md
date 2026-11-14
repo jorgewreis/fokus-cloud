@@ -192,3 +192,11 @@ snapshot only after matching both status and password against the locked row.
 Experimental registration is currently blocked before all writes and external
 notification, including for an otherwise legitimate pending account, until
 its transaction and session effects are proven. The flag-off path is unchanged.
+
+The experimental flag now blocks verify-email and accept-membership before
+consuming their tokens, until token effects and session transitions are atomic.
+The shared authentication helper captures the principal before ending support,
+so a capture denial cannot itself end support first. Neither change proves all
+login or support races; the default flag is still false. HTTP tests for these
+pre-effect gates use synthetic tokens and must run only against an isolated test
+database. Never infer production readiness from the temporary 503 responses.
