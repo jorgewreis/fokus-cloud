@@ -15,6 +15,8 @@ require __DIR__.'/../../app/Services/PlatformSessionBinding.php';
 require __DIR__.'/../../app/Services/PlatformSessionLifecycle.php';
 require __DIR__.'/../../app/Services/WebPrincipalGeneration.php';
 require __DIR__.'/../../app/Services/PrincipalSecurityToken.php';
+require __DIR__.'/../../app/Services/PortalInvitationAuthorization.php';
+require __DIR__.'/../../app/Services/PortalInvitationGraphWriter.php';
 require __DIR__.'/../../app/Services/InvitationDeliveryOutbox.php';
 require __DIR__.'/../../app/Http/Controllers/Api/AuthController.php';
 
@@ -28,6 +30,8 @@ use App\Services\InvitationDeliveryOutbox;
 use App\Services\PlatformSessionAuthority;
 use App\Services\PlatformSessionBinding;
 use App\Services\PlatformSessionLifecycle;
+use App\Services\PortalInvitationAuthorization;
+use App\Services\PortalInvitationGraphWriter;
 use App\Services\PrincipalSecurityToken;
 use App\Services\WebPrincipalGeneration;
 use Illuminate\Config\Repository;
@@ -302,6 +306,25 @@ $db->table('invitation_delivery_outbox')->where('id', $pendingOutbox)->delete();
 $db->table('security_tokens')->where('user_id', 'synthetic-user')->delete();
 $db->table('users')->where('id', 'synthetic-user')->update(['email_verified_at' => now(), 'status' => 'ativa']);
 $db->table('companies')->insert(['id' => 'compose-company', 'status' => 'ativa']);
+$authAdapter = fn (Closure $callback) => new class($callback) implements PortalInvitationAuthorization
+{
+    public function __construct(private Closure $callback) {}
+
+    public function check(string $companyId): mixed
+    {
+        return ($this->callback)($companyId);
+    }
+};
+$writerAdapter = fn (Closure $callback) => new class($callback) implements PortalInvitationGraphWriter
+{
+    public function __construct(private Closure $callback) {}
+
+    public function create(?string $existingUserId): array
+    {
+        return ($this->callback)($existingUserId);
+    }
+};
+$allowAuth = $authAdapter(fn () => true);
 $graphCalls = 0;
 $newGraph = function (?string $existingId) use ($db, &$graphCalls): array {
     $graphCalls++;
@@ -314,12 +337,28 @@ $newGraph = function (?string $existingId) use ($db, &$graphCalls): array {
 
     return ['user_id' => 'compose-user', 'membership_id' => 'compose-member', 'invitation_id' => 'compose-invite'];
 };
+$newGraph = $writerAdapter($newGraph);
 $composeKey = str_repeat('1', 64);
+foreach ([false, null, 1, 'true'] as $denial) {
+    try {
+        $outbox->composePortal('compose-company', 'compose-cpf', 'compose@example.test', $composeKey, $outboxExpiry, ['role' => 'synthetic'], $authAdapter(fn () => $denial), $newGraph);
+        throw new LogicException('False or null authorization was accepted.');
+    } catch (HttpException $e) {
+        $check($e->getStatusCode() === 403);
+    }
+}
+$check($graphCalls === 0);
+try {
+    $outbox->composePortal('compose-company', 'compose-cpf', 'compose@example.test', $composeKey, $outboxExpiry, ['role' => new stdClass], $allowAuth, $newGraph);
+    throw new LogicException('Unsupported intent was accepted.');
+} catch (InvalidArgumentException) {
+    $check(true);
+}
 $composeQueries = [];
 $db->beforeExecuting(function (string $query) use (&$composeQueries): void {
     $composeQueries[] = strtolower($query);
 });
-$composedId = $outbox->composePortal('compose-company', 'compose-cpf', 'compose@example.test', $composeKey, $outboxExpiry, ['role' => 'synthetic'], fn () => null, $newGraph);
+$composedId = $outbox->composePortal('compose-company', 'compose-cpf', 'compose@example.test', $composeKey, $outboxExpiry, ['role' => 'synthetic', 'scope' => ['unit' => 'a', 'role' => 'b']], $allowAuth, $newGraph);
 $companyQuery = $userQuery = null;
 foreach ($composeQueries as $index => $query) {
     if ($companyQuery === null && str_contains($query, 'from "companies"')) {
@@ -332,10 +371,19 @@ foreach ($composeQueries as $index => $query) {
 $check($companyQuery !== null && $userQuery !== null && $companyQuery < $userQuery);
 $check($db->table('invitation_delivery_outbox')->where('id', $composedId)->value('issuer') === 'portal_new');
 $check($db->table('security_tokens')->where('user_id', 'compose-user')->value('purpose') === 'password_creation');
-$check($outbox->composePortal('compose-company', 'compose-cpf', 'compose@example.test', $composeKey, $outboxExpiry, ['role' => 'synthetic'], fn () => null, $newGraph) === $composedId);
+$check($outbox->composePortal('compose-company', 'compose-cpf', 'compose@example.test', $composeKey, $outboxExpiry, ['scope' => ['role' => 'b', 'unit' => 'a'], 'role' => 'synthetic'], $allowAuth, $newGraph) === $composedId);
+$check($graphCalls === 1);
+foreach ([false, null, 1, 'true'] as $denial) {
+    try {
+        $outbox->composePortal('compose-company', 'compose-cpf', 'compose@example.test', $composeKey, $outboxExpiry, ['role' => 'synthetic'], $authAdapter(fn () => $denial), $newGraph);
+        throw new LogicException('Revoked authorization was accepted on replay.');
+    } catch (HttpException $e) {
+        $check($e->getStatusCode() === 403);
+    }
+}
 $check($graphCalls === 1);
 try {
-    $outbox->composePortal('compose-company', 'compose-cpf', 'compose@example.test', $composeKey, $outboxExpiry, ['role' => 'synthetic'], fn () => abort(403), $newGraph);
+    $outbox->composePortal('compose-company', 'compose-cpf', 'compose@example.test', $composeKey, $outboxExpiry, ['role' => 'synthetic'], $authAdapter(fn () => abort(403)), $newGraph);
     throw new LogicException('Replay bypassed authorization.');
 } catch (HttpException $e) {
     $check($e->getStatusCode() === 403);
@@ -343,7 +391,7 @@ try {
 $check($graphCalls === 1);
 $db->table('companies')->insert(['id' => 'existing-company', 'status' => 'ativa']);
 $db->table('users')->where('id', 'synthetic-user')->update(['email_verified_at' => null]);
-$existingComposed = $outbox->composePortal('existing-company', 'synthetic-cpf', 'outbox@example.test', str_repeat('3', 64), $outboxExpiry, ['role' => 'synthetic'], fn () => null, function (?string $existingId) use ($db): array {
+$existingComposed = $outbox->composePortal('existing-company', 'synthetic-cpf', 'outbox@example.test', str_repeat('3', 64), $outboxExpiry, ['role' => 'synthetic'], $allowAuth, $writerAdapter(function (?string $existingId) use ($db): array {
     if ($existingId !== 'synthetic-user') {
         throw new LogicException('Existing user was not derived.');
     }
@@ -351,7 +399,7 @@ $existingComposed = $outbox->composePortal('existing-company', 'synthetic-cpf', 
     $db->table('company_invitations')->insert(['id' => 'existing-invite', 'company_id' => 'existing-company', 'membership_id' => 'existing-member', 'expires_at' => now()->addHour()]);
 
     return ['user_id' => $existingId, 'membership_id' => 'existing-member', 'invitation_id' => 'existing-invite'];
-});
+}));
 $check($db->table('invitation_delivery_outbox')->where('id', $existingComposed)->value('issuer') === 'portal_existing');
 $check($db->table('security_tokens')->where('user_id', 'synthetic-user')->value('purpose') === 'membership_acceptance');
 $existingTokenId = $db->table('invitation_delivery_outbox')->where('id', $existingComposed)->value('security_token_id');
@@ -362,7 +410,7 @@ $db->table('company_memberships')->where('id', 'existing-member')->delete();
 $db->table('companies')->where('id', 'existing-company')->delete();
 $db->table('users')->where('id', 'synthetic-user')->update(['email_verified_at' => now()]);
 try {
-    $outbox->composePortal('compose-company', 'compose-cpf', 'compose@example.test', $composeKey, $outboxExpiry, ['role' => 'changed'], fn () => null, $newGraph);
+    $outbox->composePortal('compose-company', 'compose-cpf', 'compose@example.test', $composeKey, $outboxExpiry, ['role' => 'changed'], $allowAuth, $newGraph);
     throw new LogicException('Changed invitation intent was accepted.');
 } catch (HttpException $e) {
     $check($e->getStatusCode() === 409);
@@ -370,13 +418,13 @@ try {
 $check($graphCalls === 1);
 $db->statement("CREATE TRIGGER fail_composed_outbox BEFORE INSERT ON invitation_delivery_outbox BEGIN SELECT RAISE(FAIL, 'outbox failure'); END");
 try {
-    $outbox->composePortal('compose-company', 'rollback-cpf', 'rollback@example.test', str_repeat('2', 64), $outboxExpiry, ['role' => 'synthetic'], fn () => null, function () use ($db): array {
+    $outbox->composePortal('compose-company', 'rollback-cpf', 'rollback@example.test', str_repeat('2', 64), $outboxExpiry, ['role' => 'synthetic'], $allowAuth, $writerAdapter(function () use ($db): array {
         $db->table('users')->insert(['id' => 'rollback-user', 'cpf' => 'rollback-cpf', 'email' => 'rollback@example.test', 'password' => 'synthetic-hash', 'status' => 'pendente']);
         $db->table('company_memberships')->insert(['id' => 'rollback-member', 'company_id' => 'compose-company', 'user_id' => 'rollback-user', 'status' => 'pendente', 'version' => 1]);
         $db->table('company_invitations')->insert(['id' => 'rollback-invite', 'company_id' => 'compose-company', 'membership_id' => 'rollback-member', 'expires_at' => now()->addHour()]);
 
         return ['user_id' => 'rollback-user', 'membership_id' => 'rollback-member', 'invitation_id' => 'rollback-invite'];
-    });
+    }));
     throw new LogicException('Composition failure was suppressed.');
 } catch (QueryException) {
     $check($db->table('users')->where('id', 'rollback-user')->count() === 0);

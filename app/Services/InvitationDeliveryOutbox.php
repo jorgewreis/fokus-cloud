@@ -34,7 +34,7 @@ final class InvitationDeliveryOutbox
      * every request, including replay, while the company row is locked.
      * The caller supplies canonical intent covering every callback mutation.
      */
-    public function composePortal(string $companyId, string $cpf, string $email, string $requestKey, int $expiresAt, array $intent, callable $authorize, callable $createGraph): string
+    public function composePortal(string $companyId, string $cpf, string $email, string $requestKey, int $expiresAt, array $intent, PortalInvitationAuthorization $authorize, PortalInvitationGraphWriter $createGraph): string
     {
         if ($companyId === '' || $cpf === '' || $email === '' || preg_match('/\A[a-f0-9]{64}\z/D', $requestKey) !== 1) {
             throw new InvalidArgumentException('Invalid portal invitation request.');
@@ -42,12 +42,12 @@ final class InvitationDeliveryOutbox
         if (DB::connection()->transactionLevel() !== 0) {
             throw new LogicException('Portal invitation requires a top-level transaction.');
         }
-        $intentHash = hash_hmac('sha256', json_encode([$companyId, $cpf, mb_strtolower($email), $expiresAt, $intent], JSON_THROW_ON_ERROR), $this->encrypter->getKey());
+        $intentHash = hash_hmac('sha256', json_encode([$companyId, $cpf, mb_strtolower($email), $expiresAt, $this->canonicalIntent($intent)], JSON_THROW_ON_ERROR), $this->encrypter->getKey());
 
         return DB::transaction(function () use ($companyId, $cpf, $email, $requestKey, $expiresAt, $intentHash, $authorize, $createGraph): string {
             $company = DB::table('companies')->where('id', $companyId)->where('status', 'ativa')->whereNull('deleted_at')->lockForUpdate()->first(['id']);
             abort_unless($company, 422, 'Convite indisponível.');
-            $authorize($companyId);
+            abort_unless($authorize->check($companyId) === true, 403, 'Acesso indisponível.');
             $prior = DB::table('invitation_delivery_outbox')->where('request_hash', hash('sha256', $requestKey))->first();
             if ($prior) {
                 abort_unless($prior->company_id === $companyId && is_string($prior->intent_hash) && hash_equals($prior->intent_hash, $intentHash), 409, 'Solicitação indisponível.');
@@ -64,7 +64,7 @@ final class InvitationDeliveryOutbox
             if ($existing) {
                 abort_unless(mb_strtolower($existing->email) === mb_strtolower($email), 409, 'Solicitação indisponível.');
             }
-            $graph = $createGraph($existing?->id);
+            $graph = $createGraph->create($existing?->id);
             abort_unless(is_array($graph) && is_string($graph['user_id'] ?? null) && is_string($graph['membership_id'] ?? null)
                 && is_string($graph['invitation_id'] ?? null) && (! $existing || $graph['user_id'] === $existing->id), 409, 'Solicitação indisponível.');
             $createdUser = DB::table('users')->where('id', $graph['user_id'])->where('cpf', $cpf)->lockForUpdate()->first(['id', 'email']);
@@ -74,6 +74,25 @@ final class InvitationDeliveryOutbox
 
             return $id;
         });
+    }
+
+    private function canonicalIntent(mixed $value): mixed
+    {
+        if (is_array($value)) {
+            if (! array_is_list($value)) {
+                ksort($value, SORT_STRING);
+            }
+            foreach ($value as $key => $item) {
+                $value[$key] = $this->canonicalIntent($item);
+            }
+
+            return $value;
+        }
+        if ($value === null || is_bool($value) || is_int($value) || is_string($value)) {
+            return $value;
+        }
+
+        throw new InvalidArgumentException('Unsupported portal invitation intent.');
     }
 
     private function stageLocked(string $companyId, string $userId, string $membershipId, string $invitationId, string $requestKey, int $expiresAt, string $issuer): string

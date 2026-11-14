@@ -352,3 +352,13 @@ uses the same connection. Key rotation currently invalidates old intent digests;
 a versioned key strategy is required. Unique-CPF gap locking, duplicate-key
 races, other writers and both transaction orders require real MySQL tests. No
 route or worker is connected and the experimental gates remain closed.
+
+The experimental portal composer now requires typed internal authorization and
+graph-writer contracts. Authorization must return exactly true, including on
+replay; false and null fail closed. Intent normalization recursively sorts map
+keys, preserves list order and rejects objects and floating-point values before
+HMAC. These types do not prove authorization correctness, same-connection writes,
+or absence of SMTP/other side effects: implementations must be reviewed and
+never constructed from HTTP input. CPF-absence provenance and unique-insert
+races still require two independent MySQL connections; no real emitter or route
+uses the composer and no concurrency claim is made.
