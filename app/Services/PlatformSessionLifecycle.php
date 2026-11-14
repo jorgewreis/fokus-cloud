@@ -130,6 +130,11 @@ final class PlatformSessionLifecycle
         abort_if($this->enabled(), 503, 'Convites temporariamente indisponíveis.');
     }
 
+    public function ensureTokenIssuanceReady(): void
+    {
+        abort_if($this->enabled(), 503, 'Acesso temporariamente indisponível.');
+    }
+
     public function transactionalSessionTable(): string
     {
         abort_unless($this->enabled(), 503, 'Sessão indisponível.');

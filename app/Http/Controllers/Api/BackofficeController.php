@@ -18,6 +18,7 @@ use App\Services\MercadoPagoClient;
 use App\Services\PasswordSecurity;
 use App\Services\PlatformAudit;
 use App\Services\PlatformSessionBinding;
+use App\Services\PlatformSessionLifecycle;
 use App\Services\PrefixedUlid;
 use App\Services\RefundManager;
 use App\Services\SubscriptionBillingManager;
@@ -2094,6 +2095,7 @@ class BackofficeController extends Controller
 
     public function forcePasswordReset(Request $request, string $user, AuthController $auth, PlatformAudit $audit)
     {
+        app(PlatformSessionLifecycle::class)->ensureTokenIssuanceReady();
         $data = $request->validate(['reason' => ['required', 'string', 'max:1000'], 'support_ticket' => ['required', 'string', 'max:100']]);
         $target = User::findOrFail($user);
         $auth->sendToken($target, 'password_reset', '/criar-senha', ['forced_by_support' => true, 'support_ticket' => $data['support_ticket']]);

@@ -2,13 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Api\AuthController;
 use App\Models\User;
 use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class AuthenticationAndIsolationTest extends TestCase
@@ -71,6 +72,67 @@ class AuthenticationAndIsolationTest extends TestCase
         self::assertNull(DB::table('security_tokens')->where('token_hash', hash('sha256', 'synthetic-verification'))->value('used_at'));
         self::assertNull(DB::table('security_tokens')->where('purpose', 'membership_acceptance')->value('used_at'));
         self::assertSame('pendente', $user->fresh()->status);
+    }
+
+    public function test_experimental_password_request_preserves_anti_enumeration_and_legacy_flow(): void
+    {
+        User::create(['id' => PrefixedUlid::make('USR'), 'name' => 'Pessoa Teste', 'cpf' => '11144477735', 'email' => 'pessoa@example.test', 'password' => 'SenhaSegura!2026', 'status' => 'ativa', 'email_verified_at' => now()]);
+        config(['company_idempotency.session_authority_lifecycle' => true]);
+        $known = $this->postJson('/api/auth/request-password-reset', ['cpf' => '11144477735'])->assertStatus(503);
+        $unknown = $this->postJson('/api/auth/request-password-reset', ['cpf' => '52998224725'])->assertStatus(503);
+        self::assertSame($known->json('message'), $unknown->json('message'));
+        $this->assertDatabaseCount('security_tokens', 0);
+        Mail::assertNothingSent();
+        config(['company_idempotency.session_authority_lifecycle' => false]);
+        $this->postJson('/api/auth/request-password-reset', ['cpf' => '11144477735'])->assertOk();
+        $this->assertDatabaseCount('security_tokens', 1);
+        Mail::assertSentCount(1);
+    }
+
+    public function test_experimental_email_issuance_is_blocked_without_blocking_profile_name(): void
+    {
+        $user = User::create(['id' => PrefixedUlid::make('USR'), 'name' => 'Pessoa Teste', 'cpf' => '11144477735', 'email' => 'pessoa@example.test', 'password' => 'SenhaSegura!2026', 'status' => 'pendente']);
+        config(['company_idempotency.session_authority_lifecycle' => true]);
+        $this->actingAs($user)->postJson('/api/auth/resend-verification', [])->assertStatus(503);
+        $this->actingAs($user)->postJson('/api/auth/register-company-for-current-user', $this->registration())->assertStatus(503);
+        $this->actingAs($user)->patchJson('/api/auth/profile', ['email' => 'novo@example.test', 'name' => 'Não salvar', 'current_password' => 'SenhaSegura!2026'])->assertStatus(503);
+        self::assertSame('Pessoa Teste', $user->fresh()->name);
+        $this->assertDatabaseCount('companies', 0);
+        $this->assertDatabaseCount('security_tokens', 0);
+        Mail::assertNothingSent();
+        $this->actingAs($user)->patchJson('/api/auth/profile', ['name' => 'Nome permitido'])->assertOk();
+        self::assertSame('Nome permitido', $user->fresh()->name);
+    }
+
+    public function test_experimental_flag_does_not_block_verified_user_company_creation(): void
+    {
+        $user = User::create(['id' => PrefixedUlid::make('USR'), 'name' => 'Pessoa Teste', 'cpf' => '11144477735', 'email' => 'pessoa@example.test', 'password' => 'SenhaSegura!2026', 'status' => 'ativa', 'email_verified_at' => now()]);
+        config(['company_idempotency.session_authority_lifecycle' => true]);
+        $this->actingAs($user)->postJson('/api/auth/register-company-for-current-user', $this->registration())->assertCreated();
+        $this->assertDatabaseCount('companies', 1);
+        $this->assertDatabaseCount('security_tokens', 0);
+        Mail::assertNothingSent();
+    }
+
+    public function test_experimental_flag_does_not_block_admin_transfer_tokens(): void
+    {
+        $user = User::create(['id' => PrefixedUlid::make('USR'), 'name' => 'Pessoa Teste', 'cpf' => '11144477735', 'email' => 'pessoa@example.test', 'password' => 'SenhaSegura!2026', 'status' => 'ativa']);
+        config(['company_idempotency.session_authority_lifecycle' => true]);
+        app(AuthController::class)->sendToken($user, 'admin_transfer', '/aceitar-transferencia');
+        $this->assertDatabaseHas('security_tokens', ['user_id' => $user->id, 'purpose' => 'admin_transfer']);
+        Mail::assertSentCount(1);
+    }
+
+    public function test_legacy_email_issuers_remain_available_when_flag_is_off(): void
+    {
+        $user = User::create(['id' => PrefixedUlid::make('USR'), 'name' => 'Pessoa Teste', 'cpf' => '11144477735', 'email' => 'pessoa@example.test', 'password' => 'SenhaSegura!2026', 'status' => 'pendente']);
+        config(['company_idempotency.session_authority_lifecycle' => false]);
+        $this->actingAs($user)->postJson('/api/auth/resend-verification', [])->assertOk();
+        $this->actingAs($user)->patchJson('/api/auth/profile', ['email' => 'novo@example.test', 'current_password' => 'SenhaSegura!2026'])->assertOk();
+        $this->actingAs($user)->postJson('/api/auth/register-company-for-current-user', $this->registration())->assertCreated();
+        $this->assertDatabaseCount('companies', 1);
+        $this->assertDatabaseCount('security_tokens', 3);
+        Mail::assertSentCount(4);
     }
 
     public function test_registration_requires_explicit_legal_manifestations(): void

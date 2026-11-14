@@ -276,3 +276,13 @@ and operational policy. Reissue must target one specific invitation and avoid
 invalidating unrelated companies' tokens, while preserving existing links until
 a compatible migration policy is settled. No outbox, scheduler, queue, key or
 commercial-expiry policy is configured or implemented by this checkpoint.
+
+Additional pre-effect gates now cover password-reset requests, verification
+resends, email-changing profile updates, company registration for an unverified
+current user, and platform-forced password reset. The common sendToken also
+rejects the four affected purposes as a defense in depth. Other purposes such as
+admin transfer are not gated. Password reset returns the same unavailable response
+before CPF lookup for known and unknown accounts; it does not falsely report that
+an email was sent. Profile-only changes and company creation by a verified user
+remain available. Tests use synthetic records and an isolated SQLite database;
+these gates do not solve legacy delivery or provide an outbox.

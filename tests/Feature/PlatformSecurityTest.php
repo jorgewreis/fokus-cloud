@@ -276,6 +276,21 @@ class PlatformSecurityTest extends TestCase
         self::assertSame(['membership_id' => $membership->id], json_decode($token->payload, true));
     }
 
+    public function test_experimental_forced_reset_is_blocked_without_token_or_email(): void
+    {
+        $admin = $this->admin();
+        $user = User::create(['id' => PrefixedUlid::make('USR'), 'name' => 'Pessoa', 'cpf' => '11144477735', 'email' => 'pessoa@example.test', 'password' => 'SenhaSegura!2026', 'status' => 'ativa']);
+        $data = ['reason' => 'Solicitação de suporte', 'support_ticket' => 'TEST-123'];
+        config(['company_idempotency.session_authority_lifecycle' => true]);
+        $this->actingAs($admin, 'platform')->postJson('/api/backoffice/users/'.$user->id.'/force-password-reset', $data)->assertStatus(503);
+        $this->assertDatabaseCount('security_tokens', 0);
+        Mail::assertNothingSent();
+        config(['company_idempotency.session_authority_lifecycle' => false]);
+        $this->actingAs($admin, 'platform')->postJson('/api/backoffice/users/'.$user->id.'/force-password-reset', $data)->assertOk();
+        $this->assertDatabaseCount('security_tokens', 1);
+        Mail::assertSentCount(2);
+    }
+
     public function test_only_superadmin_can_list_law_subscriptions_for_support(): void
     {
         $commercial = $this->admin('administrador_comercial');

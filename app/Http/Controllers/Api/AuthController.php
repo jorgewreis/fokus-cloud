@@ -198,6 +198,9 @@ class AuthController extends Controller
 
     public function registerCompanyForCurrentUser(Request $request)
     {
+        if (! $request->user()->email_verified_at) {
+            app(PlatformSessionLifecycle::class)->ensureTokenIssuanceReady();
+        }
         $data = $this->companyRegistrationData($request, false);
         $user = $request->user();
         $document = BrazilianDocuments::digits($data['document_number']);
@@ -453,6 +456,9 @@ class AuthController extends Controller
         $changes = [];
         $requestedEmail = isset($data['email']) ? Str::lower(trim($data['email'])) : null;
         $emailChangeRequested = $requestedEmail !== null && $requestedEmail !== Str::lower($user->email);
+        if ($emailChangeRequested) {
+            app(PlatformSessionLifecycle::class)->ensureTokenIssuanceReady();
+        }
 
         if ((isset($data['password']) || $emailChangeRequested) && ! Hash::check($data['current_password'] ?? '', $user->password)) {
             throw ValidationException::withMessages(['current_password' => 'Informe sua senha atual para alterar e-mail ou senha.']);
@@ -547,6 +553,7 @@ class AuthController extends Controller
 
     public function resendVerification(Request $request)
     {
+        app(PlatformSessionLifecycle::class)->ensureTokenIssuanceReady();
         $returnTo = $request->validate([
             'return_to' => ['nullable', Rule::in(['/portal', '/portal/fokus-law', '/portal/fokus-law/assinatura', '/contratar/fokus-law', '/assinaturas/fokus-lead'])],
         ])['return_to'] ?? '/portal';
@@ -561,6 +568,7 @@ class AuthController extends Controller
 
     public function requestPasswordReset(Request $request)
     {
+        app(PlatformSessionLifecycle::class)->ensureTokenIssuanceReady();
         $cpf = BrazilianDocuments::digits($request->validate(['cpf' => ['required', 'string']])['cpf']);
         if (BrazilianDocuments::cpf($cpf) && ($user = User::where('cpf', $cpf)->first()) && $user->email_verified_at) {
             $this->sendToken($user, 'password_reset', '/criar-senha');
@@ -807,6 +815,9 @@ class AuthController extends Controller
 
     public function sendToken(User $user, string $purpose, string $path, array $payload = [], ?string $recipient = null): void
     {
+        if (in_array($purpose, ['email_verification', 'password_reset', 'password_creation', 'membership_acceptance'], true)) {
+            app(PlatformSessionLifecycle::class)->ensureTokenIssuanceReady();
+        }
         $plain = Str::random(64);
         DB::table('security_tokens')->where('user_id', $user->id)->where('purpose', $purpose)->whereNull('used_at')->update(['expires_at' => now(), 'updated_at' => now()]);
         DB::table('security_tokens')->insert([
