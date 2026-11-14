@@ -6,6 +6,7 @@ use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
 use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -21,6 +22,22 @@ class ReconciliationAndRefundTest extends TestCase
     public function runDatabaseMigrations(): void
     {
         $this->artisan('migrate:fresh')->assertSuccessful();
+
+        // This class cannot use an outer transaction: provider calls must observe
+        // committed claims, and MySQL DDL commits implicitly. Rebuild the schema
+        // now so even a following test without RefreshDatabase sees no fixtures.
+        // An in-memory SQLite database is discarded with its PDO instead.
+        $this->beforeApplicationDestroyed(function (): void {
+            try {
+                $connection = DB::connection();
+                if (! ($connection->getDriverName() === 'sqlite' && $connection->getDatabaseName() === ':memory:')) {
+                    $this->artisan('migrate:fresh')->assertSuccessful();
+                }
+            } finally {
+                RefreshDatabaseState::$migrated = false;
+                RefreshDatabaseState::$inMemoryConnections = [];
+            }
+        });
     }
 
     protected function setUp(): void
