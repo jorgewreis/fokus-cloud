@@ -7,7 +7,9 @@ use App\Mail\FokusLawSystemMail;
 use App\Models\PlatformAdmin;
 use App\Services\PlatformAudit;
 use App\Services\PlatformSecurity;
+use App\Services\PlatformSessionBinding;
 use App\Services\PrefixedUlid;
+use App\Services\SupportSessionSecurity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -77,6 +79,7 @@ class PlatformAuthController extends Controller
         Auth::guard('platform')->login($admin);
         $request->session()->forget('platform_pending_admin_id');
         $request->session()->regenerate();
+        (new PlatformSessionBinding)->rotate($request->session());
         $admin->forceFill(['last_login_at' => now()])->save();
         $audit->record($admin->id, 'backoffice.login_succeeded', 'platform_admin', $admin->id, request: $request, expiresInDays: 30);
 
@@ -114,7 +117,7 @@ class PlatformAuthController extends Controller
         return response()->json(['admin' => $this->adminPayload($admin)]);
     }
 
-    public function logout(Request $request, PlatformAudit $audit, \App\Services\SupportSessionSecurity $supportSecurity)
+    public function logout(Request $request, PlatformAudit $audit, SupportSessionSecurity $supportSecurity)
     {
         $adminId = Auth::guard('platform')->id();
         $supportSecurity->end($request, 'Sessão encerrada ao sair do Backoffice.');
