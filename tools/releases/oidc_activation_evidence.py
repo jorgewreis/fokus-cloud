@@ -9,12 +9,13 @@ import time
 
 import generation_activation as gate
 import oidc_evidence_flow
+import oidc_protocol as protocol
 
 EVIDENCE_TIMEOUT_SECONDS=30
 
 
-def inspect(contract, base, candidate, receipt, policy_file, previous, previous_receipt,
-            boundary_file, *, audience, oidc_token, read_token, rollback=False):
+def _inspect(contract, base, candidate, receipt, policy_file, previous, previous_receipt,
+             boundary_file, *, audience, oidc_token, read_token, rollback=False):
     deadline=time.monotonic()+EVIDENCE_TIMEOUT_SECONDS
     gate.protected(base,True)
     for value in (receipt,policy_file,previous_receipt,boundary_file):gate.protected(value)
@@ -51,3 +52,13 @@ def inspect(contract, base, candidate, receipt, policy_file, previous, previous_
         oidc_evidence_flow.recheck(base/'authorization',result)
         gate.g.require(time.monotonic()<deadline,'evidence_timeout')
         return {'state':'evidence_consistent_not_authorized','candidate':candidate.name,'artifact':artifact}
+
+
+def inspect(contract, base, candidate, receipt, policy_file, previous, previous_receipt,
+            boundary_file, *, slot_dir, audience, oidc_token, read_token, rollback=False):
+    """Run the non-authorizing probe under a trusted local process supervisor."""
+    with protocol.total_deadline():
+        with protocol.protocol_slots.acquire(slot_dir):
+            return protocol.run_supervised(lambda: _inspect(contract,base,candidate,receipt,policy_file,
+                previous,previous_receipt,boundary_file,audience=audience,oidc_token=oidc_token,
+                read_token=read_token,rollback=rollback))

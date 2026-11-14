@@ -230,9 +230,13 @@ o artefato independente e a autorização produtiva continuam sem prova completa
 locks antes e depois das consultas OIDC e de environment, que ocorrem fora dos
 locks. Após a rede, reconfere ponteiro, receipt, políticas, handoff, runtime e a
 janela assinada, e recusa resultados após o prazo monotônico de 30 segundos.
-O prazo verificado ao retornar não interrompe, por si só, uma rede bloqueada;
-um processo externo precisa impor o limite de execução. O digest depende do
-receipt e do operador confiável; o ensaio não comprova origem independente.
+A entrada `inspect` executa o ensaio em filho supervisionado, com slot local,
+prazo global, temporizador próprio e vínculo de morte do supervisor; o processo
+pai termina o filho ao atingir o prazo. `_inspect` é uma primitiva interna,
+não uma fronteira contra código Python privilegiado; o bootstrap confiável deve
+chamar `inspect`. Uma chamada em estado de kernel não
+interrompível ainda pode impedir término imediato; não há cgroup multinó. O
+digest depende do receipt e do operador confiável; o ensaio não comprova origem independente.
 Seu único resultado positivo é `evidence_consistent_not_authorized`, sem latch
 ou switch. Entre a última consulta e a eventual ativação, o estado do GitHub pode
 mudar; não há prova histórica atômica, endpoint produtivo ou integração ao ativador.
