@@ -158,3 +158,8 @@ antes da conexão; cada um dos nove scripts também recusou uma `DB_URL` hostil.
 A prova positiva da nova proteção contra MySQL permanece pendente: a instância
 descartável não ficou disponível e o Docker deixou de responder durante a
 tentativa. Os ensaios registrados acima são anteriores a esta alteração.
+
+Os testes negativos usam apenas diretório temporário próprio, com nomes
+aleatórios e criação exclusiva; eles não criam nem removem `.env` ou cache no
+checkout. `laravel-guard-collision.php` inicia dois processos concorrentes para
+tentar criar o mesmo arquivo e verifica exatamente um vencedor, sem sobrescrita.

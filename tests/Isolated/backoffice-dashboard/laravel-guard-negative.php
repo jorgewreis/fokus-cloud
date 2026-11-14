@@ -1,6 +1,8 @@
 <?php
 require __DIR__.'/laravel-synthetic-bootstrap.php';
-$root = dirname(__DIR__, 3);
+$root = sys_get_temp_dir().DIRECTORY_SEPARATOR.'dashboard-guard-'.bin2hex(random_bytes(16));
+if (! mkdir($root, 0700)) throw new RuntimeException('Cannot create isolated test directory');
+if (! mkdir($root.'/bootstrap', 0700) || ! mkdir($root.'/bootstrap/cache', 0700)) throw new RuntimeException('Cannot create isolated cache directory');
 $base = [
     'DASHBOARD_PROOF_ACK' => 'synthetic-only', 'APP_ENV' => 'testing', 'DB_CONNECTION' => 'mysql',
     'DB_HOST' => '127.0.0.1', 'DB_PORT' => '3306', 'DB_DATABASE' => 'dashboard_bench',
@@ -28,18 +30,34 @@ $reset = static function () use ($base): void {
 $checked = 0;
 foreach ($cases as [$key, $value, $message]) {
     $reset(); putenv("{$key}={$value}");
-    try { dashboardProofBootstrap(); throw new LogicException('Guard unexpectedly allowed '.$key); }
+    try { dashboardProofPreflight($root); throw new LogicException('Guard unexpectedly allowed '.$key); }
     catch (RuntimeException $e) { if ($e->getMessage() !== $message) throw $e; }
     $checked++;
 }
-foreach (['.env', '.env.testing', 'bootstrap/cache/config.php'] as $relative) {
-    $reset(); $path="{$root}/{$relative}";
-    if (file_exists($path) || is_link($path)) throw new LogicException('Refusing to replace existing file '.$relative);
-    if (file_put_contents($path, 'synthetic guard test') === false) throw new RuntimeException('Cannot write temporary fixture');
+try {
+    foreach (['.env', '.env.testing', 'bootstrap/cache/config.php'] as $relative) {
+        $reset(); $path="{$root}/{$relative}";
+        $handle = @fopen($path, 'x');
+        if ($handle === false) throw new RuntimeException('Cannot exclusively create synthetic fixture');
+        fwrite($handle, 'synthetic guard test'); fclose($handle);
+        try {
+            try { dashboardProofPreflight($root); throw new LogicException('Guard unexpectedly allowed '.$relative); }
+            catch (RuntimeException $e) { if ($e->getMessage() !== 'Forbidden local environment or cache: '.$relative) throw $e; }
+        } finally { unlink($path); }
+        $checked++;
+    }
+    // An already-created file must never be opened for writing or truncated.
+    $path = $root.'/.env';
+    $owner = fopen($path, 'x');
+    if ($owner === false) throw new RuntimeException('Cannot create collision fixture');
+    fwrite($owner, 'preserve-existing-content'); fclose($owner);
     try {
-        try { dashboardProofBootstrap(); throw new LogicException('Guard unexpectedly allowed '.$relative); }
-        catch (RuntimeException $e) { if ($e->getMessage() !== 'Forbidden local environment or cache: '.$relative) throw $e; }
+        $competitor = @fopen($path, 'x');
+        if ($competitor !== false) { fclose($competitor); throw new LogicException('Exclusive creation unexpectedly succeeded'); }
+        if (file_get_contents($path) !== 'preserve-existing-content') throw new LogicException('Collision modified existing content');
+        $checked++;
     } finally { unlink($path); }
-    $checked++;
+} finally {
+    rmdir($root.'/bootstrap/cache'); rmdir($root.'/bootstrap'); rmdir($root);
 }
-echo "Blocked {$checked} unsafe configurations before connection or bootstrap\n";
+echo "Blocked {$checked} unsafe configurations or collision before connection or bootstrap\n";

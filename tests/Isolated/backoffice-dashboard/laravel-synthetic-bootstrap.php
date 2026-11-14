@@ -1,7 +1,7 @@
 <?php
 
-/** Bootstrap only after identifying a disposable MySQL server and schema. */
-function dashboardProofTarget(): array
+/** Validate inputs before opening a database connection or bootstrapping Laravel. */
+function dashboardProofPreflight(string $root): array
 {
     $required = [
         'DASHBOARD_PROOF_ACK' => 'synthetic-only',
@@ -21,7 +21,6 @@ function dashboardProofTarget(): array
             throw new RuntimeException("Forbidden connection or cache override: {$name}");
         }
     }
-    $root = dirname(__DIR__, 3);
     foreach (['.env', '.env.testing', 'bootstrap/cache/config.php'] as $path) {
         if (file_exists("{$root}/{$path}") || is_link("{$root}/{$path}")) {
             throw new RuntimeException("Forbidden local environment or cache: {$path}");
@@ -37,6 +36,14 @@ function dashboardProofTarget(): array
         || getenv('DB_USERNAME') !== $user || getenv('DB_PASSWORD') !== $password) {
         throw new RuntimeException('Missing or mismatched synthetic identity and credentials');
     }
+    return [$user, $password, $uuid, $marker];
+}
+
+/** Bootstrap only after identifying a disposable MySQL server and schema. */
+function dashboardProofTarget(): array
+{
+    $root = dirname(__DIR__, 3);
+    [$user, $password, $uuid, $marker] = dashboardProofPreflight($root);
     $pdo = new PDO('mysql:host=127.0.0.1;port=3306;dbname=dashboard_bench;charset=utf8mb4', $user, $password, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
     $verifyTarget = static function (PDO $connection) use ($uuid, $marker): void {
         $target = $connection->query('SELECT @@server_uuid AS server_uuid, DATABASE() AS database_name')->fetch(PDO::FETCH_ASSOC);
