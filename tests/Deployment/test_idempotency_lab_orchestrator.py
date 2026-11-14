@@ -1,4 +1,5 @@
 import unittest
+import copy
 import io
 from pathlib import Path
 import json
@@ -18,10 +19,12 @@ from idempotency_suite_evidence import validate_selection
 
 class IdempotencyOrchestratorTest(unittest.TestCase):
     def test_only_exact_ci_candidate_is_accepted(self):
-        valid = dict(ci="true", opt_in="1", platform="posix", github_sha="a" * 40, candidate_sha="a" * 40)
+        valid = dict(ci="true", opt_in="1", platform="posix", github_sha="a" * 40,
+                     candidate_sha="a" * 40, repository="jorgewreis/fokus-cloud")
         validate_context(**valid)
         for change in ({"ci": "false"}, {"opt_in": "0"}, {"platform": "nt"},
-                       {"github_sha": "b" * 40}, {"candidate_sha": "a" * 39}, {"github_sha": None}):
+                       {"github_sha": "b" * 40}, {"candidate_sha": "a" * 39}, {"github_sha": None},
+                       {"repository": "untrusted/fork"}):
             with self.subTest(change=change), self.assertRaises(ValueError):
                 validate_context(**dict(valid, **change))
 
@@ -39,11 +42,48 @@ class IdempotencyOrchestratorTest(unittest.TestCase):
         self.assertIn("--no-scripts", COMPOSER)
         self.assertIn("--no-interaction", COMPOSER)
 
+    def test_pr_event_requires_explicit_exact_head_from_same_repository(self):
+        candidate = "a" * 40
+        repository = "jorgewreis/fokus-cloud"
+        event = {"action": "labeled", "label": {"name": "lab-" + candidate},
+                 "pull_request": {"number": 99,
+                                  "head": {"sha": candidate, "ref": "codex/idempotency-harness-20261114",
+                                           "repo": {"full_name": repository}},
+                                  "base": {"ref": "codex/company-idempotency-core-20261114",
+                                           "repo": {"full_name": repository}}}}
+        valid = dict(ci="true", opt_in="1", platform="posix", github_sha="b" * 40,
+                     candidate_sha=candidate, event_name="pull_request", event=event,
+                     repository=repository, github_ref="refs/pull/99/merge")
+        validate_context(**valid)
+        changes = [lambda x: x.update(action="synchronize"),
+                   lambda x: x["label"].update(name="lab-" + "b" * 40),
+                   lambda x: x["pull_request"].update(number=98),
+                   lambda x: x["pull_request"]["head"].update(sha="b" * 40),
+                   lambda x: x["pull_request"]["head"].update(ref="other"),
+                   lambda x: x["pull_request"]["base"].update(ref="main"),
+                   lambda x: x["pull_request"]["head"]["repo"].update(full_name="untrusted/fork"),
+                   lambda x: x["pull_request"]["base"]["repo"].update(full_name="untrusted/fork")]
+        for change in changes:
+            edited = copy.deepcopy(event)
+            change(edited)
+            with self.subTest(edited=edited), self.assertRaises(ValueError):
+                validate_context(**dict(valid, event=edited))
+        for change in ({"github_ref": "refs/pull/98/merge"}, {"repository": "untrusted/fork"},
+                       {"event_name": "push"}, {"event": None}, {"github_sha": "bad"}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                validate_context(**dict(valid, **change))
+
     def test_manual_workflow_has_no_publication_or_secret_permissions(self):
         root = Path(__file__).resolve().parents[2]
         workflow = (root / ".github/workflows/idempotency-lab-ci.yml").read_text(encoding="utf-8")
         self.assertRegex(workflow, r"(?m)^  workflow_dispatch:\s*$")
-        self.assertNotRegex(workflow, r"(?m)^  (push|pull_request|schedule):")
+        self.assertNotRegex(workflow, r"(?m)^  (push|schedule):")
+        self.assertRegex(workflow, r"(?m)^  pull_request:\s*$")
+        self.assertIn("types: [labeled]", workflow)
+        self.assertIn("github.event.pull_request.number == 99", workflow)
+        self.assertIn("format('lab-{0}', github.event.pull_request.head.sha)", workflow)
+        self.assertIn("github.event.pull_request.head.repo.full_name == github.repository", workflow)
+        self.assertIn("github.event.pull_request.base.repo.full_name == github.repository", workflow)
         self.assertIn("contents: read", workflow)
         self.assertNotIn("secrets.", workflow)
         self.assertNotIn("environment: production", workflow)
