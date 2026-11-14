@@ -81,12 +81,10 @@ try {$unexpected=$connect($argv[2]); exit(4);} catch (PDOException $e) {if ((int
                    env=env, timeout=30, check=True)
     print('pdo killed session and new connections ok')
 
-    # mysql's automatic reconnect must re-run the initialization command;
-    # a session variable is cleared by reconnect and therefore proves that
-    # the initialization ran again on the replacement connection.
-    base = ['mysql', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot']
+    # The restore client must stop instead of reconnecting after interruption.
+    base = ['mysql84', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot']
     stderr = tempfile.TemporaryFile(mode='w+t')
-    proc = subprocess.Popen(base + ['--reconnect', '--force', '--unbuffered', '--batch', '--skip-column-names',
+    proc = subprocess.Popen(base + ['--skip-reconnect', '--unbuffered', '--batch', '--skip-column-names',
                                    '--init-command=' + init_statement(identity)], env=env,
                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr,
                             text=True, bufsize=1)
@@ -104,21 +102,19 @@ try {$unexpected=$connect($argv[2]); exit(4);} catch (PDOException $e) {if ((int
         subprocess.run(base + ['--skip-reconnect', '--init-command=' + init_statement(identity),
                                '-e', 'KILL CONNECTION ' + connection_id], env=env, timeout=15,
                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
-        # The first statement can fail with TLS EOF after KILL. --force is
-        # diagnostic-only: the next statement tests whether a later reconnect
-        # reinitializes the session; no interrupted statement is deemed safe.
-        proc.stdin.write('SELECT @fokus_identity_guard;\nSELECT @fokus_identity_guard;\n')
+        proc.stdin.write('SELECT @fokus_identity_guard;\n')
         proc.stdin.flush()
-        try:
-            value = lines.get(timeout=15)
-        except queue.Empty as error:
-            stderr.seek(0)
-            raise RuntimeError('mysql reconnect returned no value: ' + stderr.read(1000)) from error
-        if value != '1':
-            raise RuntimeError('mysql did not reinitialize after reconnect')
-        print('mysql reconnect reapplied init command ok')
+        if proc.wait(timeout=15) == 0:
+            raise RuntimeError('mysql accepted an interrupted session')
+        stderr.seek(0)
+        if not any(code in stderr.read(1000) for code in ('ERROR 2026', 'ERROR 2006', 'ERROR 2013')):
+            raise RuntimeError('mysql failed for an unexpected reason after interruption')
+        if not lines.empty():
+            raise RuntimeError('mysql executed the statement after interruption')
+        print('mysql skip-reconnect fails interrupted session ok')
     finally:
-        proc.kill()
+        if proc.poll() is None:
+            proc.kill()
         proc.wait(timeout=5)
         stderr.close()
     if failures:

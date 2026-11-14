@@ -7,6 +7,8 @@ on:
       - '.github/workflows/mysql-session-identity-experiment.yml'
       - 'tests/Deployment/probe_mysql_init_identity.py'
       - 'tests/Deployment/test_probe_mysql_init_identity.py'
+      - 'tests/Deployment/probe_laravel_mysql.py'
+      - 'tests/Deployment/probe_laravel_mysql.php'
 
 permissions:
   contents: read
@@ -23,7 +25,9 @@ jobs:
       - name: Build the existing target-profile test runtime
         run: |
           docker build -t mysql-session-base -f tests/Deployment/linux-runtime/php85/Dockerfile .
-          printf '%s\n' 'FROM mysql@sha256:72c368d898861f3b3a07af0e6d690400f44f048799ed46822783d9224cc2c86d AS mysql84' 'FROM mysql-session-base' 'COPY --from=mysql84 /usr/bin/mysqldump /usr/local/bin/mysql84-mysqldump' 'RUN ldd /usr/local/bin/mysql84-mysqldump && ! ldd /usr/local/bin/mysql84-mysqldump | grep -q "not found" && mysql84-mysqldump --version' | docker build -t mysql-session-probe -f - .
+          printf '%s\n' 'FROM mysql@sha256:72c368d898861f3b3a07af0e6d690400f44f048799ed46822783d9224cc2c86d AS mysql84' 'FROM mysql-session-base' 'COPY --from=mysql84 /usr/bin/mysqldump /usr/local/bin/mysql84-mysqldump' 'COPY --from=mysql84 /usr/bin/mysql /usr/local/bin/mysql84' 'RUN ldd /usr/local/bin/mysql84-mysqldump && ! ldd /usr/local/bin/mysql84-mysqldump | grep -q "not found" && mysql84-mysqldump --version && ! ldd /usr/local/bin/mysql84 | grep -q "not found" && mysql84 --version' | docker build -t mysql-session-probe -f - .
+      - name: Install locked dependencies without scripts or plugins
+        run: docker run --rm -e COMPOSER_HOME=/tmp/composer -v "$PWD:/workspace" -w /workspace mysql-session-base composer install --no-interaction --no-scripts --no-plugins --no-progress --prefer-dist
       - name: Verify correct and incorrect identities in disposable sessions
         shell: bash
         run: |
@@ -52,4 +56,10 @@ jobs:
           docker exec --user 0 "$qa" sh -ec 'umask 022; printf "%s\n%s\n" "$1" "$2" > /run/fokus-release-mysql.identity; chmod 0444 /run/fokus-release-mysql.identity' identity "$uuid" "$ns"
           docker cp tests/Deployment/linux_disposable_mysql.py "$qa":/tmp/
           docker cp tests/Deployment/probe_mysql_init_identity.py "$qa":/tmp/
+          docker cp tests/Deployment/probe_laravel_mysql.py "$qa":/tmp/
+          docker cp tests/Deployment/probe_laravel_mysql.php "$qa":/tmp/
+          docker exec --user 1000:1000 "$qa" mkdir /tmp/fokus-probe-app
+          git archive HEAD | docker exec -i --user 1000:1000 "$qa" tar -x -C /tmp/fokus-probe-app
+          docker cp vendor "$qa":/tmp/fokus-probe-app/
           docker exec --user 1000:1000 -w /tmp "$qa" sh -ec 'php --version; mysql --version; mysql84-mysqldump --version; python3 probe_mysql_init_identity.py'
+          docker exec --user 1000:1000 -w /tmp "$qa" python3 probe_laravel_mysql.py /tmp/fokus-probe-app
