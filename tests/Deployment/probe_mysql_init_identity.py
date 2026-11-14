@@ -107,8 +107,9 @@ try {$unexpected=$connect($argv[2]); exit(4);} catch (PDOException $e) {if ((int
         if proc.wait(timeout=15) == 0:
             raise RuntimeError('mysql accepted an interrupted session')
         stderr.seek(0)
-        if not any(code in stderr.read(1000) for code in ('ERROR 2026', 'ERROR 2006', 'ERROR 2013')):
-            raise RuntimeError('mysql failed for an unexpected reason after interruption')
+        error_output = stderr.read(1000)
+        if not any(code in error_output for code in ('ERROR 2026', 'ERROR 2006', 'ERROR 2013')):
+            raise RuntimeError('mysql failed for an unexpected reason after interruption: ' + error_output)
         if not lines.empty():
             raise RuntimeError('mysql executed the statement after interruption')
         print('mysql skip-reconnect fails interrupted session ok')
