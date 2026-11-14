@@ -15,6 +15,8 @@ sys.path.insert(0, str(MODULE.parent))
 # verified here with a double and exercised separately with real Linux processes.
 activation_double = types.ModuleType('generation_activation')
 activation_double.activate = Mock()
+activation_double.boot = lambda: 'synthetic-boot'
+activation_double.protected = lambda path: None
 with patch.dict(sys.modules, {'generation_activation': activation_double}):
     spec = importlib.util.spec_from_file_location('publisher_under_test', MODULE)
     publisher = importlib.util.module_from_spec(spec)
@@ -143,6 +145,34 @@ class PublisherPreflight(unittest.TestCase):
         activate.assert_not_called()
         self.assertFalse(self.args['root'].exists())
 
+    def test_activation_policy_rejects_absent_runtime_evidence(self):
+        base_policy = {'runtime_uid': 12345, 'runtime_gid': 12346, 'expires_at_epoch': 9999999999}
+        contract = Mock()
+        contract.policy.return_value = base_policy
+        contract.node_fingerprint.return_value = 'synthetic-node'
+        wrapped = publisher.RuntimeEvidenceContract(contract)
+        with patch.object(publisher.os, 'geteuid', return_value=1000, create=True), \
+             patch.object(publisher.runtime_evidence, 'read_verified', side_effect=ValueError('runtime_evidence_required')):
+            with self.assertRaisesRegex(ValueError, 'runtime_evidence_required'):
+                wrapped.policy('policy', 'root', 'base', 'receipt')
+        contract.policy.assert_called_once_with('policy', 'root', 'base', 'receipt')
+
+    def test_runtime_evidence_expiry_bounds_original_policy(self):
+        gid = self.control.stat().st_gid
+        base_policy = {'runtime_uid': 12345, 'runtime_gid': gid, 'expires_at_epoch': 2000}
+        contract = Mock()
+        contract.policy.return_value = base_policy
+        contract.node_fingerprint.return_value = 'synthetic-node'
+        guard = types.ModuleType('preparation_guard')
+        guard.verify_runtime_read = Mock()
+        with patch.dict(sys.modules, {'preparation_guard': guard}), \
+             patch.object(publisher.os, 'geteuid', return_value=1000, create=True), \
+             patch.object(publisher.runtime_evidence, 'read_verified', return_value=1100):
+            result = publisher.RuntimeEvidenceContract(contract).policy('policy', self.control, 'base', 'receipt')
+        self.assertEqual(result['expires_at_epoch'], 1100)
+        self.assertEqual(base_policy['expires_at_epoch'], 2000)
+        guard.verify_runtime_read.assert_called_once_with(self.control, 12345, gid)
+
     def test_code_rollback_is_delegated_to_supervised_gate(self):
         gate = Mock(return_value={'state': 'verified'})
         with patch.object(publisher.derived, 'contract', return_value=self.contract), \
@@ -150,8 +180,12 @@ class PublisherPreflight(unittest.TestCase):
             result = publisher.switch('source', 'base', 'candidate', 'receipt', 'policy',
                                       'previous', 'previous-receipt', 'boundary', rollback=True)
         self.assertEqual(result, {'state': 'verified'})
-        gate.assert_called_once_with(self.contract, 'base', 'candidate', 'receipt', 'policy',
-                                     'previous', 'previous-receipt', 'boundary', rollback=True)
+        gate.assert_called_once()
+        args, kwargs = gate.call_args
+        self.assertIsInstance(args[0], publisher.RuntimeEvidenceContract)
+        self.assertIs(args[0].contract, self.contract)
+        self.assertEqual(args[1:], ('base', 'candidate', 'receipt', 'policy', 'previous', 'previous-receipt', 'boundary'))
+        self.assertEqual(kwargs, {'rollback': True})
 
 
 if __name__ == '__main__':

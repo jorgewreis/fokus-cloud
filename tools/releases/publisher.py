@@ -2,11 +2,13 @@
 """Explicit immutable preparation and activation; no SSH, migrations or defaults."""
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
 
 import derived_assets as derived
 import generation_activation as activation
+import runtime_evidence
 
 
 def prepare(source, candidate, evidence, artifact, expected_digest, base, root,
@@ -58,9 +60,32 @@ def prepare(source, candidate, evidence, artifact, expected_digest, base, root,
     return {'state': 'sealed_not_active', 'source_sha': root.name}
 
 
+class RuntimeEvidenceContract:
+    """Add runtime evidence to the original policy without replacing its checks."""
+    def __init__(self, contract):
+        self.contract = contract
+
+    def __getattr__(self, name):
+        return getattr(self.contract, name)
+
+    def policy(self, policy_file, root, base, receipt):
+        policy = self.contract.policy(policy_file, root, base, receipt)
+        expiry = runtime_evidence.read_verified(
+            policy, root=root, receipt=receipt, node_sha256=self.contract.node_fingerprint(),
+            boot_id=activation.boot(), operator_uid=os.geteuid(), protect=activation.protected,
+        )
+        from preparation_guard import verify_runtime_read
+        runtime_evidence.require(Path(root).stat().st_gid == policy['runtime_gid'], 'runtime_root_group_mismatch')
+        verify_runtime_read(root, policy['runtime_uid'], policy['runtime_gid'])
+        # The existing post-switch expiry check must also cover this evidence.
+        policy = dict(policy)
+        policy['expires_at_epoch'] = min(policy['expires_at_epoch'], expiry)
+        return policy
+
+
 def switch(source, base, candidate, receipt, policy, previous, previous_receipt, boundary, rollback=False):
     """Delegate switch or code-only rollback to the existing supervised gate."""
-    contract = derived.contract(source)
+    contract = RuntimeEvidenceContract(derived.contract(source))
     return activation.activate(contract, base, candidate, receipt, policy, previous,
                                previous_receipt, boundary, rollback=rollback)
 

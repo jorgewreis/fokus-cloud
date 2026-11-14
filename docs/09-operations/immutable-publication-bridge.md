@@ -52,7 +52,7 @@ selo, com digest explícito, destino novo sob `base/releases` e registros fora
 da árvore de releases/storage. Uma falha pode deixar diretório inativo parcial
 para inspeção e nunca altera o ponteiro `current`; não faz limpeza automática.
 A preparação exige `--runtime-uid` e `--runtime-gid` explícitos, usuário distinto
-do operador e de root, grupo não privilegiado e filiação local verificada, além
+do operador e de root, GID maior que zero e filiação local verificada, além
 de um `prepare.lock` previamente provisionado e privado. A raiz inativa recebe
 leitura/travessia para esse grupo, sem escrita; após o selo, o modo de cada
 arquivo e diretório e a travessia dos ancestrais são conferidos. Ela rejeita diretórios
@@ -65,6 +65,17 @@ ator com o mesmo UID ou privilégios equivalentes. O UID informado não comprova
 qual usuário ou capacidades o FPM realmente usa; essa verificação e o gate de
 política/evidência de runtime continuam obrigatórios antes de ativar. Invocar
 primitivas isoladas diretamente não equivale a executar este preparo protegido.
+
+Um GID maior que zero não demonstra ausência de privilégios. Para `activate` ou
+`rollback`, o gate adicional exige registro privado de evidência vinculado ao
+SHA/raiz, receipt, nó, boot e operador, com UID/GID, grupos efetivos, capacidades
+conferidas como vazias, revisão dos privilégios dos grupos e ACLs, escopo de todos
+os workers e validade de até cinco minutos. O hash do registro integra a política;
+a expiração do registro também limita a verificação após o switch. A referência
+à evidência é obrigatória. Esses campos são atestações revisadas pelo operador,
+não coleta automática dos processos: um JSON preenchido sem inspeção real não
+comprova o FPM, seus grupos, capabilities ou cobertura da frota. Produção exige
+medição e revisão independentes, e o gate original permanece obrigatório.
 
 Os comandos `activate` e `rollback` delegam ao gate de geração supervisionada e
 exigem explicitamente candidato, receipts, política, geração anterior e prova

@@ -9,7 +9,7 @@ def module(name,path):
     spec=importlib.util.spec_from_file_location(name,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 source=Path(__file__).resolve().parents[2];g=module('g',source/'tools/releases/generation_supervisor.py')
 with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
-    temp=Path(temp);clone=temp/'source'
+    temp=Path(temp);temp.chmod(0o750);clone=temp/'source'
     subprocess.run(['git','clone','--quiet','--no-hardlinks',str(source),str(clone)],check=True)
     shutil.copyfile(source/'tests/Fixtures/Generation/console.php',clone/'routes/console.php')
     shutil.copyfile(source/'tests/Fixtures/Generation/GenerationProbe.php.stub',clone/'app/Jobs/GenerationProbe.php')
@@ -28,6 +28,7 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     shared=temp/'shared-storage';shared.mkdir();configuration=temp/'synthetic.env';configuration.write_text('# synthetic, no credentials\n')
     for name in ('logs','framework/cache','framework/views','framework/sessions'):(shared/name).mkdir(parents=True,exist_ok=True)
     links=c.shared_links(root,shared,configuration)
+    root.chmod(0o750)  # Synthetic runtime group has read/traverse, never write.
     receipt=temp/'receipt.json';d.seal(clone,candidate,evidence,root,receipt,transport,links=links)
     assert c.verify(root,receipt)['links']==links
     (base/'current').symlink_to(root);db=temp/'database.sqlite';db.touch();marker=temp/'marker'
@@ -112,6 +113,7 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     nextartifact=temp/'next.tar';nextpack=d.package(clone,built,nextproofpath,nextartifact)
     newroot=base/'releases'/nextproof['source_sha'];nexttransport=temp/'next-transport.json';c.unpack(nextartifact,nextpack['artifact_sha256'],newroot,nexttransport)
     nextlinks=c.shared_links(newroot,shared,configuration)
+    newroot.chmod(0o750)
     newreceipt=temp/'next-receipt.json';d.seal(clone,built,nextproofpath,newroot,newreceipt,nexttransport,links=nextlinks)
     assert c.verify(newroot,newreceipt)['links']==nextlinks
     verifier=temp/'verifier.py';verifier.write_bytes(subprocess.check_output(['git','show','a8cc9729181471c9f46ccb15d51383e1aceb61ab:tools/ci/verify-deployment.py'],cwd=source))
@@ -188,8 +190,14 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     publisher.derived.contract=lambda _source:c
     required=('target_binding_verified','php_cli_platform_verified','php_fpm_platform_verified','extensions_verified','fastcgi_physical_root_verified','permissions_acl_verified','runtime_cannot_write_release','workers_drained','shared_drivers_verified','schema_compatible','recovery_verified','publication_authorized','caches_finalized','laravel_boot_verified','assets_complete_verified','scheduler_descendants_absent_verified','build_provenance_verified')
     p={k:True for k in required}
-    p.update(schema=c.SCHEMA,release=newroot.name,base=str(base),root=str(newroot),receipt_sha256=c.digest(newreceipt.read_bytes()),node_sha256=c.node_fingerprint(),operator_uid=os.geteuid(),runtime_uid=pwd.getpwnam('nobody').pw_uid,php_binary=php,expires_at_epoch=time.time()+120,evidence_reference='Synthetic policy only, not VPS runtime',fpm_opcache_enabled=False,preload_configured_or_loaded=False,fpm_reload_mode='verify-only',fpm_service='',verifier_script=str(verifier),public_base_url='https://fixture.invalid',release_url='https://fixture.invalid/_deployment/release')
-    policy=temp/'activation-policy.json';policy.write_text(json.dumps(p))
+    p.update(schema=c.SCHEMA,release=newroot.name,base=str(base),root=str(newroot),receipt_sha256=c.digest(newreceipt.read_bytes()),node_sha256=c.node_fingerprint(),operator_uid=os.geteuid(),runtime_uid=int(os.environ['FOKUS_SYNTHETIC_RUNTIME_UID']),runtime_gid=int(os.environ['FOKUS_SYNTHETIC_RUNTIME_GID']),php_binary=php,expires_at_epoch=time.time()+120,evidence_reference='Synthetic policy only, not VPS runtime',fpm_opcache_enabled=False,preload_configured_or_loaded=False,fpm_reload_mode='verify-only',fpm_service='',verifier_script=str(verifier),public_base_url='https://fixture.invalid',release_url='https://fixture.invalid/_deployment/release')
+    def set_runtime_evidence(candidate, candidate_receipt):
+        # Operator attestation is synthetic here, not a measurement of FPM.
+        now=time.time();gid=p['runtime_gid']
+        record=dict(schema='fokus-runtime-access-v1',root=str(candidate),receipt_sha256=gate.digest(candidate_receipt),node_sha256=c.node_fingerprint(),boot=gate.boot(),operator_uid=os.geteuid(),runtime_uid=p['runtime_uid'],runtime_gid=gid,effective_groups=[gid],capabilities=dict(effective=0,permitted=0,inheritable=0,ambient=0),all_workers_covered=True,groups_privileges_reviewed=True,acl_and_write_access_reviewed=True,evidence_reference='Synthetic fixture only; not FPM evidence',observed_at=now,expires_at=now+120)
+        path=temp/'runtime-evidence.json';path.write_text(json.dumps(record));path.chmod(0o600)
+        p.update(runtime_evidence_path=str(path),runtime_evidence_sha256=gate.digest(path))
+    policy=temp/'activation-policy.json';set_runtime_evidence(newroot,newreceipt);policy.write_text(json.dumps(p))
     # Validate exact #61 policy before asserting any post-switch failure scenario.
     c.policy(policy,newroot,base,newreceipt)
     run('success',8,0)
@@ -206,7 +214,7 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     # Explicit synthetic code-only rollback, never automatic data rollback.
     root=newroot;receipt=newreceipt;run('success',9,0)
     p.update(release=old.name,root=str(old),receipt_sha256=c.digest(oldreceipt.read_bytes()),rollback_code_compatible=True,data_restore_required=False,expires_at_epoch=time.time()+120)
-    policy.write_text(json.dumps(p))
+    set_runtime_evidence(old,oldreceipt);policy.write_text(json.dumps(p))
     result=publisher.switch(clone,base,old,oldreceipt,policy,newroot,newreceipt,temp/'scope.json',rollback=True)
     assert result['state']=='verified' and (base/'current').resolve()==old
     assert not (base/'scheduler-ready.json').exists()
@@ -217,13 +225,13 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     # Both verifications hit the real sealed release endpoint over loopback.
     root=old;receipt=oldreceipt;run('success',10,0)
     p.update(release=newroot.name,root=str(newroot),receipt_sha256=c.digest(newreceipt.read_bytes()),expires_at_epoch=time.time()+120)
-    policy.write_text(json.dumps(p))
+    set_runtime_evidence(newroot,newreceipt);policy.write_text(json.dumps(p))
     result=publisher.switch(clone,base,newroot,newreceipt,policy,old,oldreceipt,temp/'scope.json')
     assert result['state']=='verified' and (base/'current').resolve()==newroot
     c.verify(old,oldreceipt);c.verify(newroot,newreceipt)
     root=newroot;receipt=newreceipt;run('success',11,0)
     p.update(release=old.name,root=str(old),receipt_sha256=c.digest(oldreceipt.read_bytes()),rollback_code_compatible=True,data_restore_required=False,expires_at_epoch=time.time()+120)
-    policy.write_text(json.dumps(p))
+    set_runtime_evidence(old,oldreceipt);policy.write_text(json.dumps(p))
     result=publisher.switch(clone,base,old,oldreceipt,policy,newroot,newreceipt,temp/'scope.json',rollback=True)
     assert result['state']=='verified' and (base/'current').resolve()==old
     assert c.verify(old,oldreceipt)['links']==links and c.verify(newroot,newreceipt)['links']==nextlinks
