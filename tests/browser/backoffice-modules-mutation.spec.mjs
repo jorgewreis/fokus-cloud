@@ -33,7 +33,7 @@ test('bloqueia envios duplicados e permite correção após rejeição conhecida
     await submit(page, '#module-form');
     expect(await page.evaluate(()=>window.pending.length)).toBe(2);
     await page.evaluate(()=>window.pending[1].reject(new Error('Falha de rede')));
-    await expect(page.locator('#modules-message')).toContainText('Não foi possível confirmar');
+    await expect(page.locator('[data-module-reconciliation]')).toContainText('Não foi possível confirmar');
     await expect(page.locator('#module-form-submit')).toBeDisabled();
     await submit(page, '#module-form'); expect(await page.evaluate(()=>window.pending.length)).toBe(2);
 });
@@ -58,7 +58,7 @@ test('resultado incerto continua bloqueado ao retornar e permite consulta e reco
         window.dispose = await window.moduleUnderTest.mount(document.querySelector('main'), { admin:{id:'admin1'}, signal:window.controller.signal, permissions:new Set(['platform.catalog.publish']), api:{request:(url,options)=>options?new Promise((resolve,reject)=>window.pending.push({url,resolve,reject})):Promise.resolve(window.catalogFixture)} });
     });
     await expect(page.locator('#module-form-submit')).toBeDisabled();
-    await expect(page.locator('#modules-message')).toContainText('Não foi possível confirmar');
+    await expect(page.locator('[data-module-reconciliation]')).toContainText('Não foi possível confirmar');
     await page.locator('#module-list [data-module-action="view"]').evaluate(el=>el.click());
     await expect(page.locator('#module-view-panel')).toBeVisible();
     await expect(page.getByRole('button', {name:'Já conferi o catálogo'})).toBeDisabled();
@@ -76,7 +76,7 @@ test('retorno tardio não fecha ou apaga um novo formulário', async ({ page }) 
     await expect(page.locator('#module-form')).toHaveJSProperty('inert', true);
     await page.locator('#module-name').evaluate(el => { el.value = 'Novo rascunho'; });
     await page.evaluate(()=>window.pending[0].resolve({}));
-    await expect(page.locator('#modules-message')).toContainText('A alteração foi concluída');
+    await expect(page.locator('[data-module-reconciliation]')).toContainText('A alteração foi concluída');
     await expect(page.locator('#module-name')).toHaveValue('Novo rascunho');
     await expect(page.locator('#module-form-submit')).toBeDisabled();
 });
@@ -117,7 +117,7 @@ test('falha na atualização após sucesso exige consulta antes de outra altera�
     await page.evaluate(()=>{window.holdCatalog = true; window.pending[0].resolve({});});
     await expect.poll(()=>page.evaluate(()=>typeof window.rejectCatalog)).toBe('function');
     await page.evaluate(()=>window.rejectCatalog(new Error('Catálogo indisponível')));
-    await expect(page.locator('#modules-message')).toContainText('A alteração foi concluída');
+    await expect(page.locator('[data-module-reconciliation]')).toContainText('A alteração foi concluída');
     await expect(page.locator('#module-form-submit')).toBeDisabled();
     await expect(page.getByRole('button', {name:'Já conferi o catálogo'})).toBeDisabled();
 });
@@ -131,6 +131,6 @@ test('ação confirmada após sair informa resultado e exige atualização ao re
         await Promise.resolve(); window.controller = new AbortController();
         window.dispose = await window.moduleUnderTest.mount(document.querySelector('main'), { admin:{id:'admin1'}, signal:window.controller.signal, permissions:new Set(['platform.catalog.publish']), api:{request:()=>Promise.resolve(window.catalogFixture)} });
     });
-    await expect(page.locator('#modules-message')).toContainText('A alteração foi concluída');
+    await expect(page.locator('[data-module-reconciliation]')).toContainText('A alteração foi concluída');
     await expect(page.locator('#module-form-submit')).toBeDisabled();
 });

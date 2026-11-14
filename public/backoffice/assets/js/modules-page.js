@@ -67,9 +67,22 @@ export async function mount(root, context = {}) {
                 ? "Alteração concluída. Feche esta janela, atualize e confira o catálogo antes de continuar."
                 : "Resultado não confirmado. Feche esta janela e confira o catálogo antes de tentar novamente.";
         }
-        if (mutation.inFlight && !mutation.uncertain) showMessage("Processando alteração do módulo.", "info");
+        let pageProgress = root.querySelector('[data-module-page-progress]');
+        if (mutation.inFlight && !pageProgress) {
+            pageProgress = document.createElement("div"); pageProgress.dataset.modulePageProgress = "true";
+            pageProgress.setAttribute("role", "status"); pageProgress.setAttribute("aria-live", "polite");
+            pageProgress.textContent = "Processando alteração do módulo."; root.prepend(pageProgress);
+        } else if (!mutation.inFlight) pageProgress?.remove();
+        let reconciliation = root.querySelector('[data-module-reconciliation]');
         if (mutation.uncertain) {
-            const node = $("#modules-message");
+            if (!reconciliation) {
+                reconciliation = document.createElement("div");
+                reconciliation.dataset.moduleReconciliation = "true";
+                reconciliation.className = "fs-alert";
+                reconciliation.setAttribute("role", "alert");
+                $("#modules-message").after(reconciliation);
+            }
+            const node = reconciliation;
             node.replaceChildren(document.createTextNode(mutation.confirmedStale ? "A alteração foi concluída, mas o catálogo não pôde ser atualizado. Recarregue e confira antes de continuar. " : "Não foi possível confirmar o resultado. Consulte o catálogo antes de tentar novamente. "));
             const button = document.createElement("button");
             button.type = "button";
@@ -84,7 +97,7 @@ export async function mount(root, context = {}) {
                 reload.addEventListener("click", () => load()); node.append(reload);
             }
             node.dataset.tone = "danger"; node.hidden = false;
-        }
+        } else reconciliation?.remove();
     };
     mutation.listeners.add(onMutationChange);
     const beginMutation = () => {
