@@ -297,3 +297,38 @@ reconciliation or tested MySQL concurrency. Do not deploy the migration or
 activate a route from this partial primitive; encrypted token retention is a
 security and operational liability until those parts are implemented and
 reviewed. The caller must generate and protect the random request key.
+
+Outbox review: staging currently permits only active accounts with verified
+email for `membership_acceptance`; unverified/pending accounts fail closed until
+password-creation delivery and acceptance are designed. Repeating the same
+request key compares the encrypted recipient with the currently locked user;
+a different key is rejected while any unused unexpired membership-acceptance
+token exists for that user. This conservative temporary rule may block unrelated
+company invites and does not serialize legacy issuers; no reissue policy is
+claimed.
+
+A future worker must lock and revalidate company, user, token, membership,
+invitation and delivery record in a single consistent order, then compare the
+current verified address, user status, exact token purpose/binding, expiry,
+invitation status and encrypted envelope. If any change is found, revoke the
+pending token and remove recoverable ciphertext atomically; do not send. A
+separate policy is required for reissue, simultaneous invitations, key rotation,
+retry, manual reconciliation and old ciphertext purge. Revalidation immediately
+before SMTP still has a race with a later email change once locks are released;
+SMTP cannot participate in the DB transaction. Holding locks through SMTP has
+its own failure and availability costs. The system must explicitly choose and
+prove a cross-flow synchronization or acceptable-delivery policy before a worker
+can be enabled; neither this code nor sequential SQLite tests resolve that race.
+
+Follow-up: the isolated staging method now follows the existing platform issuer:
+verified email uses membership_acceptance; an unverified user receives a
+password_creation token. The password-creation consumer remains closed and has
+not been adapted to the exact invitation ID. A different request key cannot
+stage another unexpired token for the same invitation if it was staged through
+this outbox; another company/invitation for the same user remains eligible.
+Same-key retry additionally checks the current address and the original token's
+purpose, active state and hash. No old token is invalidated. Tokens issued by
+legacy paths without an outbox record cannot be mapped reliably, and a legacy
+issuer can race this check. This is not a complete reissue policy or proof that
+only one valid token exists across all issuers. The previous paragraph describing
+blanket per-user blocking is superseded by this narrower experimental behavior.

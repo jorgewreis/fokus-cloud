@@ -27,9 +27,11 @@ final class InvitationDeliveryOutbox
         return DB::transaction(function () use ($companyId, $userId, $membershipId, $invitationId, $requestKey, $expiresAt): string {
             $company = DB::table('companies')->where('id', $companyId)->where('status', 'ativa')->whereNull('deleted_at')->lockForUpdate()->first(['id']);
             abort_unless($company, 422, 'Convite indisponível.');
-            $user = DB::table('users')->where('id', $userId)->lockForUpdate()->first(['id', 'status', 'locked_until', 'email']);
+            $user = DB::table('users')->where('id', $userId)->lockForUpdate()->first(['id', 'status', 'locked_until', 'email', 'email_verified_at']);
             abort_unless($user && in_array($user->status, ['ativa', 'pendente'], true) && is_string($user->email) && $user->email !== ''
                 && ($user->locked_until === null || Carbon::parse($user->locked_until)->isPast()), 422, 'Convite indisponível.');
+            // Match the existing platform issuer; the password-creation consumer remains gated.
+            $purpose = $user->email_verified_at === null ? 'password_creation' : 'membership_acceptance';
             $membership = DB::table('company_memberships')->where('id', $membershipId)->where('company_id', $companyId)
                 ->where('user_id', $userId)->where('status', 'pendente')->whereNull('deleted_at')->lockForUpdate()->first(['id']);
             abort_unless($membership, 422, 'Convite indisponível.');
@@ -40,14 +42,25 @@ final class InvitationDeliveryOutbox
             if ($existing) {
                 abort_unless($existing->company_id === $companyId && $existing->user_id === $userId && $existing->membership_id === $membershipId
                     && $existing->invitation_id === $invitationId && (int) $existing->expires_at_epoch === $expiresAt, 409, 'Solicitação indisponível.');
+                $envelope = json_decode($this->encrypter->decrypt($existing->ciphertext, false), true);
+                abort_unless(is_array($envelope) && ($envelope['recipient'] ?? null) === $user->email, 409, 'Solicitação indisponível.');
+                $existingToken = DB::table('security_tokens')->where('id', $existing->security_token_id)->where('user_id', $userId)
+                    ->where('purpose', $purpose)->whereNull('used_at')->where('expires_at', '>', now())->lockForUpdate()->first(['token_hash']);
+                abort_unless($existing->state === 'pending' && $existingToken && is_string($envelope['token'] ?? null)
+                    && hash_equals($existingToken->token_hash, hash('sha256', $envelope['token'])), 409, 'Solicitação indisponível.');
 
                 return (string) $existing->id;
             }
+            // Reissue policy is not settled: block another staged active token for this invitation.
+            $activeTokens = DB::table('invitation_delivery_outbox as outbox')->join('security_tokens as token', 'token.id', '=', 'outbox.security_token_id')
+                ->where('outbox.invitation_id', $invitationId)->whereNull('token.used_at')->where('token.expires_at', '>', now())
+                ->lockForUpdate()->get(['token.id']);
+            abort_if($activeTokens->isNotEmpty(), 409, 'Solicitação indisponível.');
             $plain = bin2hex(random_bytes(32));
             $tokenId = PrefixedUlid::make('TKN');
             $outboxId = PrefixedUlid::make('OUT');
             DB::table('security_tokens')->insert([
-                'id' => $tokenId, 'user_id' => $userId, 'purpose' => 'membership_acceptance', 'token_hash' => hash('sha256', $plain),
+                'id' => $tokenId, 'user_id' => $userId, 'purpose' => $purpose, 'token_hash' => hash('sha256', $plain),
                 'payload' => json_encode(['membership_id' => $membershipId, 'invitation_id' => $invitationId], JSON_THROW_ON_ERROR),
                 'expires_at' => Carbon::createFromTimestampUTC($expiresAt), 'created_at' => now(), 'updated_at' => now(),
             ]);
