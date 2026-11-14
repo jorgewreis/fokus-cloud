@@ -47,6 +47,14 @@ export async function mount(root, context = {}) {
         syncMutationButtons();
         form.inert = mutation.inFlight;
         form.setAttribute("aria-busy", mutation.inFlight ? "true" : "false");
+        for (const currentForm of [form, $("#module-destructive-form")]) {
+            let progress = currentForm.parentElement.querySelector(`[data-module-progress="${currentForm.id}"]`);
+            if (mutation.inFlight && !progress) {
+                progress = document.createElement("div"); progress.dataset.moduleProgress = currentForm.id;
+                progress.setAttribute("role", "status"); progress.setAttribute("aria-live", "polite");
+                progress.textContent = "Processando alteração do módulo."; currentForm.before(progress);
+            } else if (!mutation.inFlight) progress?.remove();
+        }
         if (mutation.uncertain && !observedUncertainty) { catalogLoaded = false; observedUncertainty = true; }
         if (!mutation.uncertain) observedUncertainty = false;
         for (const currentForm of [form, $("#module-destructive-form")]) {
