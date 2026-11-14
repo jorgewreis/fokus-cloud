@@ -41,3 +41,25 @@ for (const width of [320, 375]) {
         expect(header.y + header.height).toBeGreaterThanOrEqual(afterScroll.y + afterScroll.height);
     });
 }
+
+for (const width of [320, 375]) {
+    for (const [route, inputId] of [['empresas', 'company-query'], ['produtos', 'product-search'], ['modulos', 'module-query']]) {
+        test(`a pesquisa de ${route} cabe no filtro em ${width}px`, async ({ page }) => {
+            await page.setViewportSize({ width, height: 812 });
+            await page.mouse.move(width - 10, 800);
+            await page.goto(`/backoffice/${route}`);
+            const input = page.locator(`#${inputId}`);
+            await expect(input).toBeVisible();
+            const boxes = await input.evaluate((element) => {
+                const rect = (item) => { const r = item.getBoundingClientRect(); return { left: r.left, right: r.right, width: r.width }; };
+                return { input: rect(element), group: rect(element.closest('.fs-input-group')), card: rect(element.closest('.fs-card-panel')) };
+            });
+            expect(boxes.input.width).toBeGreaterThan(100);
+            expect(boxes.input.right).toBeLessThanOrEqual(boxes.group.right + 1);
+            expect(boxes.group.right).toBeLessThanOrEqual(boxes.card.right + 1);
+            expect(boxes.input.right).toBeLessThanOrEqual(width);
+            await input.fill('Filtro sintético');
+            await expect(input).toHaveValue('Filtro sintético');
+        });
+    }
+}

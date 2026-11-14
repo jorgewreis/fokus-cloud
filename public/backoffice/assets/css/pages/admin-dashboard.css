@@ -2011,3 +2011,21 @@ html[data-role="admin"] .fs-sidebar .sidebar-subnav-button {
         text-overflow: ellipsis;
     }
 }
+
+/* Keep record search inputs within their filter card on narrow screens. */
+@media (max-width: 680px) {
+    html[data-role="admin"] .backoffice-records-page .fs-filter-form :is(label[for="company-query"], label[for="product-search"], label[for="module-query"]) {
+        width: 100%;
+        min-width: 0;
+        flex: 0 1 100%;
+    }
+    html[data-role="admin"] .backoffice-records-page .fs-filter-form :is(label[for="company-query"], label[for="product-search"], label[for="module-query"]) .fs-input-group-subtle {
+        width: 100%;
+        min-width: 0;
+    }
+    html[data-role="admin"] .backoffice-records-page .fs-filter-form :is(#company-query, #product-search, #module-query) {
+        width: 100% !important;
+        min-width: 0;
+        flex: 1 1 0;
+    }
+}
