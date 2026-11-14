@@ -61,3 +61,38 @@ for (const mode of ['access', 'activity']) {
         await expect(body).toContainText(mode === 'access' ? 'Carregando acessos' : 'Carregando eventos');
     });
 }
+
+for (const mode of ['access', 'activity']) {
+    test(`${mode}: navegação mantém foco e informa carregamento, resultado e erro`, async ({ page }) => {
+        await page.setContent(`<main id="root"><div data-audit-mode="${mode}"></div>
+            <form id="access-filters"></form><button id="access-clear">Limpar</button><div id="access-message" hidden></div>
+            <div id="access-summary"></div><span id="access-page-summary"></span><table><tbody id="access-body"></tbody></table><nav id="access-pagination"></nav>
+            <div id="audit-activity-summary"></div><span id="audit-activity-page-summary"></span><table><tbody id="audit-events-body"></tbody></table><nav id="audit-activity-pagination"></nav></main>`);
+        await page.evaluate(async ({ source }) => {
+            const module = await import(`data:text/javascript;base64,${btoa(unescape(encodeURIComponent(source)))}`);
+            window.pending = [];
+            window.mounted = module.mount(document.querySelector('#root'), { api: { request: () => new Promise((resolve, reject) => window.pending.push({ resolve, reject })) } });
+        }, { source });
+        const result = (current) => ({ data: [], meta: { total: 40, current_page: current, last_page: 2, per_page: 20 } });
+        const nav = page.locator(mode === 'access' ? '#access-pagination' : '#audit-activity-pagination');
+        const summary = page.locator(mode === 'access' ? '#access-page-summary' : '#audit-activity-page-summary');
+        const selector = mode === 'access' ? 'data-access-page' : 'data-audit-page';
+        await page.evaluate((value) => window.pending[0].resolve(value), result(1));
+        await page.evaluate(async () => { await window.mounted; });
+        const next = nav.locator(`[${selector}="2"]`);
+        await next.focus();
+        await page.keyboard.press('Enter');
+        await expect(summary).toBeFocused();
+        await expect(summary).toContainText('Carregando');
+        await page.evaluate((value) => window.pending[1].resolve(value), result(2));
+        await expect(summary).toBeFocused();
+        await expect(summary).toContainText('Nenhum');
+        await expect(nav.locator('[aria-current="page"]')).toHaveCount(1);
+        const previous = nav.locator(`[${selector}="1"]`);
+        await previous.focus();
+        await page.keyboard.press('Enter');
+        await page.evaluate(() => window.pending[2].reject(new Error('Falha sintética')));
+        await expect(summary).toBeFocused();
+        await expect(summary).toContainText('Não foi possível carregar');
+    });
+}
