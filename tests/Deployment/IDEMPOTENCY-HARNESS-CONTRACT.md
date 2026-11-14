@@ -45,6 +45,10 @@ Confirmar no PHPUnit instalado a semântica de múltiplos caminhos e do bootstra
 
 Testes negativos obrigatórios, sem banco real, devem demonstrar rejeição antes de DDL para ausência de aprovação, UUID incorreto, banco não vazio, namespace incorreto, `DB_URL`/socket ou configuração de leitura/escrita não permitida. Testes do agregador devem rejeitar JUnit ausente, duplicado no mesmo perfil, identidade omitida, asserções reduzidas, skip, falha, engine incorreto e SHA divergente. Ao menos um teste deve comprovar que `artisan migrate:fresh` não é chamado após recusa.
 
+## Componente preliminar
+
+`idempotency_suite_evidence.py` valida uma seleção JUnit contra um manifesto nominal informado pelo chamador, distingue perfis e registra hash. Seus testes unitários usam XML sintético. Ele não integra o gate: o chamador ainda deve comprovar o SHA real, a configuração efetiva da conexão, o isolamento, o sucesso do processo e a origem do relatório. Aceitar uma string de perfil não demonstra qual banco executou os testes. Também falta validar a composição entre seleções e integrar os resultados ao gate, que permanece inalterado.
+
 ## Pendências e limites
 
 Esta proposta não foi implementada nem executada. A execução anterior positiva de MySQL do laboratório não comprova o harness combinado. Faltam orçamento de recursos para dois perfis em CI, prova de cleanup preservando evidência, revisão independente de segurança do namespace e credenciais sintéticas, teste ponta a ponta do gate e homologação em ambos os perfis. O gate deve continuar falhando até que essas evidências existam; não integrar nem ativar a funcionalidade com base apenas neste documento.
