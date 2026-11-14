@@ -298,14 +298,10 @@ activate a route from this partial primitive; encrypted token retention is a
 security and operational liability until those parts are implemented and
 reviewed. The caller must generate and protect the random request key.
 
-Outbox review: staging currently permits only active accounts with verified
-email for `membership_acceptance`; unverified/pending accounts fail closed until
-password-creation delivery and acceptance are designed. Repeating the same
-request key compares the encrypted recipient with the currently locked user;
-a different key is rejected while any unused unexpired membership-acceptance
-token exists for that user. This conservative temporary rule may block unrelated
-company invites and does not serialize legacy issuers; no reissue policy is
-claimed.
+Outbox staging requires an explicit issuer context and compares the encrypted
+recipient with the locked user on retries. A distinct request for the same
+invitation is blocked while its staged token remains active; unrelated company
+invites are not blocked. This does not serialize legacy issuers.
 
 A future worker must lock and revalidate company, user, token, membership,
 invitation and delivery record in a single consistent order, then compare the
@@ -320,7 +316,7 @@ its own failure and availability costs. The system must explicitly choose and
 prove a cross-flow synchronization or acceptable-delivery policy before a worker
 can be enabled; neither this code nor sequential SQLite tests resolve that race.
 
-Follow-up: the isolated staging method now follows the existing platform issuer:
+The platform issuer selects purpose according to verification status:
 verified email uses membership_acceptance; an unverified user receives a
 password_creation token. The password-creation consumer remains closed and has
 not been adapted to the exact invitation ID. A different request key cannot
@@ -330,5 +326,13 @@ Same-key retry additionally checks the current address and the original token's
 purpose, active state and hash. No old token is invalidated. Tokens issued by
 legacy paths without an outbox record cannot be mapped reliably, and a legacy
 issuer can race this check. This is not a complete reissue policy or proof that
-only one valid token exists across all issuers. The previous paragraph describing
-blanket per-user blocking is superseded by this narrower experimental behavior.
+only one valid token exists across all issuers.
+
+
+Portal issuer behavior differs: an existing account uses membership_acceptance
+regardless of verification; a newly created account uses password_creation.
+The experimental stage API now requires an explicit platform, portal_existing or
+portal_new issuer and includes it in idempotency matching. The existing-account
+classification must be derived by trusted server code inside the real issuance
+transaction, never from request input. That provenance is not yet persisted or
+connected to either real emitter; no delivery is enabled.

@@ -291,32 +291,46 @@ $db->table('company_memberships')->insert(['id' => 'member', 'user_id' => 'synth
 $db->table('law_unit_memberships')->insert(['id' => 'unit', 'company_membership_id' => 'member', 'status' => 'pendente', 'version' => 1]);
 $db->table('company_invitations')->insert(['id' => 'invite', 'membership_id' => 'member', 'company_id' => 'company', 'expires_at' => now()->addHour()]);
 $db->table('users')->insert(['id' => 'synthetic-user', 'password' => 'synthetic-hash', 'email' => 'outbox@example.test', 'email_verified_at' => now()]);
-$db->statement('CREATE TABLE invitation_delivery_outbox (id TEXT PRIMARY KEY, request_hash TEXT UNIQUE, company_id TEXT, user_id TEXT, membership_id TEXT, invitation_id TEXT, security_token_id TEXT, expires_at_epoch INTEGER, ciphertext TEXT, state TEXT, created_at TEXT, updated_at TEXT)');
+$db->statement('CREATE TABLE invitation_delivery_outbox (id TEXT PRIMARY KEY, request_hash TEXT UNIQUE, company_id TEXT, user_id TEXT, membership_id TEXT, invitation_id TEXT, security_token_id TEXT, issuer TEXT, expires_at_epoch INTEGER, ciphertext TEXT, state TEXT, created_at TEXT, updated_at TEXT)');
 $outbox = new InvitationDeliveryOutbox(new Encrypter(str_repeat('z', 32), 'AES-256-CBC'));
 $outboxExpiry = now()->addMinutes(20)->getTimestamp();
 $outboxRequest = str_repeat('c', 64);
 $db->table('users')->where('id', 'synthetic-user')->update(['email_verified_at' => null, 'status' => 'pendente']);
-$pendingOutbox = $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry);
+$pendingOutbox = $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry, 'platform');
 $check($db->table('security_tokens')->where('user_id', 'synthetic-user')->value('purpose') === 'password_creation');
 $db->table('invitation_delivery_outbox')->where('id', $pendingOutbox)->delete();
+$db->table('security_tokens')->where('user_id', 'synthetic-user')->delete();
+$portalExisting = $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry, 'portal_existing');
+$check($db->table('security_tokens')->where('user_id', 'synthetic-user')->value('purpose') === 'membership_acceptance');
+$db->table('invitation_delivery_outbox')->where('id', $portalExisting)->delete();
+$db->table('security_tokens')->where('user_id', 'synthetic-user')->delete();
+$portalNew = $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry, 'portal_new');
+$check($db->table('security_tokens')->where('user_id', 'synthetic-user')->value('purpose') === 'password_creation');
+$db->table('invitation_delivery_outbox')->where('id', $portalNew)->delete();
 $db->table('security_tokens')->where('user_id', 'synthetic-user')->delete();
 $db->table('users')->where('id', 'synthetic-user')->update(['email_verified_at' => now(), 'status' => 'ativa']);
 $db->statement("CREATE TRIGGER fail_outbox BEFORE INSERT ON invitation_delivery_outbox BEGIN SELECT RAISE(FAIL, 'outbox failure'); END");
 try {
-    $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry);
+    $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry, 'platform');
     throw new LogicException('Outbox failure was suppressed.');
 } catch (QueryException) {
     $check($db->table('security_tokens')->where('user_id', 'synthetic-user')->count() === 0);
 }
 $db->statement('DROP TRIGGER fail_outbox');
-$outboxId = $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry);
-$check($outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry) === $outboxId);
+$outboxId = $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry, 'platform');
+$check($outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry, 'platform') === $outboxId);
+try {
+    $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry, 'portal_existing');
+    throw new LogicException('Changed issuer was accepted on retry.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 409);
+}
 $check($db->table('invitation_delivery_outbox')->count() === 1);
 $check($db->table('security_tokens')->where('user_id', 'synthetic-user')->count() === 1);
 $db->table('companies')->insert(['id' => 'other-company', 'status' => 'ativa']);
 $db->table('company_memberships')->insert(['id' => 'other-member', 'user_id' => 'synthetic-user', 'company_id' => 'other-company', 'status' => 'pendente', 'version' => 1]);
 $db->table('company_invitations')->insert(['id' => 'other-invite', 'membership_id' => 'other-member', 'company_id' => 'other-company', 'expires_at' => now()->addHour()]);
-$otherOutbox = $outbox->stage('other-company', 'synthetic-user', 'other-member', 'other-invite', str_repeat('a', 64), $outboxExpiry);
+$otherOutbox = $outbox->stage('other-company', 'synthetic-user', 'other-member', 'other-invite', str_repeat('a', 64), $outboxExpiry, 'platform');
 $check($db->table('invitation_delivery_outbox')->where('id', $otherOutbox)->count() === 1);
 $otherTokenId = $db->table('invitation_delivery_outbox')->where('id', $otherOutbox)->value('security_token_id');
 $db->table('invitation_delivery_outbox')->where('id', $otherOutbox)->delete();
@@ -326,14 +340,14 @@ $db->table('company_memberships')->where('id', 'other-member')->delete();
 $db->table('companies')->where('id', 'other-company')->delete();
 $db->table('users')->where('id', 'synthetic-user')->update(['email_verified_at' => null]);
 try {
-    $outbox->stage('company', 'synthetic-user', 'member', 'invite', str_repeat('e', 64), $outboxExpiry);
+    $outbox->stage('company', 'synthetic-user', 'member', 'invite', str_repeat('e', 64), $outboxExpiry, 'platform');
     throw new LogicException('Second purpose for active invitation was issued.');
 } catch (HttpException $e) {
     $check($e->getStatusCode() === 409);
 }
 $db->table('users')->where('id', 'synthetic-user')->update(['email_verified_at' => now()]);
 try {
-    $outbox->stage('company', 'synthetic-user', 'member', 'invite', str_repeat('d', 64), $outboxExpiry);
+    $outbox->stage('company', 'synthetic-user', 'member', 'invite', str_repeat('d', 64), $outboxExpiry, 'platform');
     throw new LogicException('Second active token was issued.');
 } catch (HttpException $e) {
     $check($e->getStatusCode() === 409);
@@ -341,7 +355,7 @@ try {
 $check($db->table('security_tokens')->where('user_id', 'synthetic-user')->count() === 1);
 $db->table('users')->where('id', 'synthetic-user')->update(['email' => 'changed@example.test']);
 try {
-    $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry);
+    $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry, 'platform');
     throw new LogicException('Changed recipient was accepted on retry.');
 } catch (HttpException $e) {
     $check($e->getStatusCode() === 409);
@@ -357,21 +371,21 @@ $check(json_decode($db->table('security_tokens')->where('user_id', 'synthetic-us
 $currentTokenId = $db->table('invitation_delivery_outbox')->where('id', $outboxId)->value('security_token_id');
 $db->table('security_tokens')->where('id', $currentTokenId)->update(['used_at' => now()]);
 try {
-    $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry);
+    $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry, 'platform');
     throw new LogicException('Consumed token was returned on retry.');
 } catch (HttpException $e) {
     $check($e->getStatusCode() === 409);
 }
 $db->table('security_tokens')->where('id', $currentTokenId)->update(['used_at' => null]);
 try {
-    $outbox->stage('company', 'principal', 'member', 'invite', str_repeat('b', 64), $outboxExpiry);
+    $outbox->stage('company', 'principal', 'member', 'invite', str_repeat('b', 64), $outboxExpiry, 'platform');
     throw new LogicException('Cross-user invitation was accepted.');
 } catch (HttpException $e) {
     $check($e->getStatusCode() === 422);
 }
 $check($db->table('invitation_delivery_outbox')->count() === 1);
 try {
-    $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry + 1);
+    $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry + 1, 'platform');
     throw new LogicException('Mismatched request key was accepted.');
 } catch (HttpException $e) {
     $check($e->getStatusCode() === 409);

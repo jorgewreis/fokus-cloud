@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('membership_id', 128);
             $table->string('invitation_id', 128);
             $table->string('security_token_id', 30);
+            $table->string('issuer', 32);
             $table->unsignedBigInteger('expires_at_epoch');
             $table->text('ciphertext');
             $table->string('state', 16);
