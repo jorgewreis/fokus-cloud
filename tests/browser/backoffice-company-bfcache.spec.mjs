@@ -253,3 +253,36 @@ test('resposta antiga do dashboard não altera montagem nova nem cabeçalho', as
     await expect(page.locator('body')).not.toContainText('Pessoa Antiga');
     expect(errors).toEqual([]);
 });
+
+test('resultado incerto concluído permanece bloqueado após restauração da mesma identidade', async ({ page }) => {
+    let posts = 0;
+    let committed = 0;
+    await page.route('**/api/backoffice/companies', async (route) => {
+        if (route.request().method() !== 'POST') return route.continue();
+        posts++;
+        committed++;
+        return route.abort('failed');
+    });
+    await page.goto('/backoffice/empresas');
+    await page.locator('#company-create').click();
+    for (const [id, value] of [
+        ['company-document-number', '11222333000181'], ['company-legal-name', 'Empresa Exemplo'],
+        ['company-admin-name', 'Admin Exemplo'], ['company-admin-cpf', '52998224725'],
+        ['company-admin-email', 'exemplo@example.test'], ['company-admin-password', 'SenhaExemplo123!'],
+    ]) await page.locator(`#${id}`).fill(value);
+    await page.locator('#company-form-submit').click();
+    await expect(page.locator('#company-operation-drawer-status')).toContainText('Não foi possível confirmar');
+    expect(committed).toBe(1);
+    await page.evaluate(() => {
+        window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+        window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+    });
+    await expect(page.locator('html')).not.toHaveAttribute('inert', '');
+    await expect(page.locator('#company-operation-page-status')).toContainText('Não foi possível confirmar');
+    await expect(page.locator('#company-operation-page-status')).not.toContainText('Empresa Exemplo');
+    await page.locator('#company-create').click();
+    await page.locator('#company-form').evaluate((form) => { form.noValidate = true; });
+    await page.locator('#company-form-submit').click();
+    await expect(page.locator('#company-form-error')).toContainText('Confira a lista');
+    expect(posts).toBe(1);
+});

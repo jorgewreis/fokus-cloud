@@ -57,7 +57,11 @@ window.addEventListener("pageshow", async (event) => {
             // A matching account is not proof that the browser restored the
             // same login session. Discard prior rendered data and old notices;
             // only the opaque in-flight guard survives until its outcome.
+            // A restored login is not proof of the same session. Retain only
+            // the opaque uncertainty barrier, never details or other outcomes.
+            const unresolved = Boolean(previousOperations.get(String(original.id))?.unknown);
             previousOperations.clear();
+            if (unresolved) previousOperations.set(String(original.id), { unknown: true });
             router.admin = restoredAdmin;
             window.__backofficeAdmin = restoredAdmin;
             window.dispatchEvent(new CustomEvent("fokus:backoffice-revalidated", { detail: restoredAdmin }));
