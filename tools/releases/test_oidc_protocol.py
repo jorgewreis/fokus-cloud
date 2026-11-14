@@ -6,6 +6,8 @@ import socket
 import time
 import subprocess
 import threading
+import tempfile
+from contextlib import ExitStack
 import sys
 import unittest
 from pathlib import Path
@@ -17,6 +19,10 @@ import oidc_protocol as protocol
 class Protocol(unittest.TestCase):
     def setUp(self):
         self.request = {'operation':'challenge', 'action':'activate', 'candidate':'a'*40, 'artifact':'b'*64}
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
+        self.slot_dir=Path(self.temp.name)/'slots';self.slot_dir.mkdir(mode=0o700)
+        for index in range(protocol.protocol_slots.SLOTS):
+            (self.slot_dir/('slot-'+str(index)+'.lock')).touch(mode=0o600)
     def test_challenge_binds_values_and_state_directory_is_not_from_request(self):
         with patch.object(protocol.store, 'challenge', return_value='fixture-audience') as challenge:
             result = protocol.handle('/trusted/state', json.dumps(self.request).encode())
@@ -40,7 +46,7 @@ class Protocol(unittest.TestCase):
                 with self.assertRaises(ValueError): protocol.handle('/trusted/state',value)
     def test_complete_frame_does_not_wait_for_eof(self):
         payload=json.dumps(self.request).encode()
-        process=subprocess.Popen([sys.executable,str(Path(protocol.__file__)),'--state-dir','/synthetic'],
+        process=subprocess.Popen([sys.executable,str(Path(protocol.__file__)),'--state-dir','/synthetic','--slot-dir',str(self.slot_dir)],
                                  stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         try:
             process.stdin.write(len(payload).to_bytes(4,'big')+payload)
@@ -84,6 +90,22 @@ class Protocol(unittest.TestCase):
         finally:
             reader.close();writer.close();thread.join(timeout=2)
 
+    def test_global_deadline_interrupts_work_after_read(self):
+        with patch.object(protocol,'TOTAL_TIMEOUT_SECONDS',.15):
+            start=time.monotonic()
+            with self.assertRaisesRegex(TimeoutError,'operation_timeout'):
+                with protocol.total_deadline():
+                    time.sleep(2)
+            self.assertLess(time.monotonic()-start,1.5)
+
+    def test_slot_capacity_is_bounded_and_released(self):
+        with ExitStack() as stack:
+            for _ in range(protocol.protocol_slots.SLOTS):
+                stack.enter_context(protocol.protocol_slots.acquire(self.slot_dir))
+            with self.assertRaisesRegex(ValueError,'protocol_capacity_exhausted'):
+                with protocol.protocol_slots.acquire(self.slot_dir): pass
+        with protocol.protocol_slots.acquire(self.slot_dir): pass
+
     def test_frame_length_bounds_and_incomplete_payload(self):
         for header,payload in ((0,b''),(protocol.MAX_REQUEST+1,b''),(8,b'bad')):
             reader,writer=socket.socketpair()
@@ -96,7 +118,7 @@ class Protocol(unittest.TestCase):
 
     def test_cli_failure_does_not_echo_sensitive_input(self):
         payload = b'{"token":"CANARY_SECRET_VALUE","bad":true}'
-        result = subprocess.run([sys.executable, str(Path(protocol.__file__)), '--state-dir', '/synthetic'],
+        result = subprocess.run([sys.executable, str(Path(protocol.__file__)), '--state-dir', '/synthetic', '--slot-dir', str(self.slot_dir)],
                                 input=len(payload).to_bytes(4,'big')+payload,capture_output=True,timeout=10)
         self.assertNotEqual(result.returncode,0)
         self.assertNotIn(b'CANARY_SECRET_VALUE',result.stdout+result.stderr)

@@ -9,14 +9,35 @@ import argparse
 import json
 import os
 import select
+import signal
+from contextlib import contextmanager
 import sys
 import time
 
 import github_oidc as oidc
 import oidc_challenge_store as store
+import protocol_slots
 
 MAX_REQUEST = 32768
 REQUEST_TIMEOUT_SECONDS = 5
+TOTAL_TIMEOUT_SECONDS = 30
+
+
+@contextmanager
+def total_deadline():
+    """Bound a standalone Linux process, including work after frame reception."""
+    if signal.getitimer(signal.ITIMER_REAL)[0] != 0:
+        raise ValueError('existing_timer')
+    previous = signal.getsignal(signal.SIGALRM)
+    def expire(signum, frame):
+        raise TimeoutError('operation_timeout')
+    signal.signal(signal.SIGALRM, expire)
+    signal.setitimer(signal.ITIMER_REAL, TOTAL_TIMEOUT_SECONDS)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous)
 
 
 def read_frame(fd):
@@ -66,9 +87,13 @@ def handle(directory, raw):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--state-dir', required=True)
+    parser.add_argument('--slot-dir', required=True)
     args = parser.parse_args()
     try:
-        print(json.dumps(handle(args.state_dir, read_frame(sys.stdin.buffer.fileno())), sort_keys=True))
+        with total_deadline():
+            with protocol_slots.acquire(args.slot_dir):
+                result = handle(args.state_dir, read_frame(sys.stdin.buffer.fileno()))
+        print(json.dumps(result, sort_keys=True))
         return 0
     except Exception:
         # Never echo the request, token, server paths or exception details.

@@ -193,6 +193,15 @@ GitHub e não aciona a ativação. Na futura integração, o caminho de polític
 ser fixado por bootstrap confiável, e o token não pode ser passado em argumentos,
 logs ou variáveis de ambiente remotas.
 
+O protocolo experimental exige um diretório de slots privado com quatro locks
+pré-provisionados e usa prazo global de 30 segundos além do prazo de leitura.
+O prazo usa sinal no processo Python: chamadas de sistema não interrompíveis ou
+código nativo que não devolva controle ao interpretador podem ultrapassá-lo.
+As cotas valem apenas para processos que entram nesse protocolo e compartilham
+o mesmo diretório; não limitam conexões anteriores ao comando forçado nem outros
+nós. Um teste CI cria sshd restrito a loopback e usa chave sintética com comando
+forçado; isso não configura SSH real ou comprova aprovação do environment.
+
 ## Evidência e limites
 
 `tests/Deployment/test_legacy_publication_guard.py` verifica que a recusa não

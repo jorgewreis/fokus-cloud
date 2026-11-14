@@ -2,6 +2,7 @@
 """Disposable CI-only loopback SSH handshake and pinned host-key proof."""
 import getpass
 import hashlib
+import json
 import os
 from pathlib import Path
 import socket
@@ -19,10 +20,19 @@ class RealSSH(unittest.TestCase):
         self.assertEqual(os.environ.get('RUNNER_OS'), 'Linux', 'Linux runner required')
         with tempfile.TemporaryDirectory(prefix='fokus-ssh-proof-', dir='/tmp') as directory:
             folder = Path(directory)
-            for name in ('host', 'wrong-host', 'client'):
+            for name in ('host', 'wrong-host', 'client', 'client-forced'):
                 subprocess.run(['/usr/bin/ssh-keygen', '-q', '-t', 'ed25519', '-N', '', '-f', str(folder / name)], check=True)
             authorized = folder / 'authorized_keys'
-            authorized.write_bytes((folder / 'client.pub').read_bytes())
+            state = folder / 'oidc-state'; state.mkdir(mode=0o700)
+            (state/'authorization.lock').touch(mode=0o600)
+            (state/'policy.json').write_text(json.dumps({'repository':'example/project','repository_id':'123','workflow_sha':'b'*40}))
+            (state/'policy.json').chmod(0o600)
+            slots = folder / 'oidc-slots'; slots.mkdir(mode=0o700)
+            for index in range(4): (slots/('slot-'+str(index)+'.lock')).touch(mode=0o600)
+            protocol = Path(__file__).with_name('oidc_protocol.py').resolve()
+            forced = f'/usr/bin/python3 {protocol} --state-dir {state} --slot-dir {slots}'
+            authorized.write_bytes((folder/'client.pub').read_bytes() +
+                ('restrict,command="' + forced + '" ').encode() + (folder/'client-forced.pub').read_bytes())
             authorized.chmod(0o600)
             staging = folder / 'staging'
             staging.mkdir(mode=0o700)
@@ -88,6 +98,19 @@ class RealSSH(unittest.TestCase):
                         self.fail('synthetic SSH failure: ' + str(error) + '\n' + ''.join(diagnostics) + '\nsshd: ' + log.read_text())
                     self.assertEqual(result['state'], 'ssh_completed_unverified')
                     self.assertEqual((staging / 'received.tar').read_bytes(), data)
+                    # A key-restricted command ignores an attacker-supplied command and
+                    # handles only the framed, synthetic challenge protocol.
+                    sentinel=folder/'should-not-exist'
+                    request=json.dumps({'operation':'challenge','action':'activate','candidate':'a'*40,'artifact':'c'*64}).encode()
+                    frame=len(request).to_bytes(4,'big')+request
+                    command=['/usr/bin/ssh','-F','/dev/null','-T','-o','BatchMode=yes','-o','StrictHostKeyChecking=yes',
+                             '-o','GlobalKnownHostsFile=/dev/null','-o','UserKnownHostsFile='+str(known),
+                             '-o','IdentitiesOnly=yes','-i',str(folder/'client-forced'),'-p',str(port),
+                             getpass.getuser()+'@127.0.0.1','touch '+str(sentinel)]
+                    forced_result=subprocess.run(command,input=frame,capture_output=True,timeout=15)
+                    self.assertEqual(forced_result.returncode,0,forced_result.stderr.decode(errors='replace'))
+                    self.assertEqual(json.loads(forced_result.stdout)['state'],'challenge_issued')
+                    self.assertFalse(sentinel.exists())
                 finally:
                     if daemon.poll() is None:
                         subprocess.run(['sudo', '-n', 'kill', '-TERM', '--', '-' + str(daemon.pid)], check=False)
