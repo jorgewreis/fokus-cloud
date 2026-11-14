@@ -1315,6 +1315,27 @@ test('planos sinalizam resultado incerto e bloqueiam nova ação até atualizaç
     await expect(page.locator('#plan-list [data-plan-action="activate"]')).toBeEnabled();
 });
 
+test('plano mantém bloqueio quando atualização após sucesso falha', async ({ page }) => {
+    let planLoads = 0;
+    let requests = 0;
+    await page.route('**/api/backoffice/plans', async (route) => {
+        planLoads += 1;
+        if (planLoads > 1) return route.fulfill({ status: 500, json: { message: 'Lista indisponível.' } });
+        const response = await route.fetch();
+        const data = await response.json();
+        await route.fulfill({ response, json: data.map((plan) => ({ ...plan, status: 'inativo', publication_state: 'pausado' })) });
+    });
+    await page.route('**/api/backoffice/catalog/plans/PLN_1/activate', async (route) => {
+        requests += 1;
+        await route.fulfill({ json: { message: 'Plano ativado.' } });
+    });
+    await page.goto('/backoffice/planos');
+    await page.locator('#plan-list [data-plan-action="activate"]').click();
+    await expect(page.locator('#plans-message')).toContainText('Confira a situação do plano');
+    await expect(page.locator('#plan-list [data-plan-action="activate"]')).toBeDisabled();
+    expect(requests).toBe(1);
+});
+
 for (const result of ['success', 'network-error']) {
     test(`plano mantém bloqueio ao navegar e voltar com resposta tardia: ${result}`, async ({ page }) => {
         let release;
