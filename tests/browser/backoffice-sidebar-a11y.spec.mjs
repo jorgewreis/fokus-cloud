@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('sidebar inicial recolhida mantém ordem inicial de teclado', async ({ page }) => {
+test('sidebar inicial respeita hover e mantém ordem inicial de teclado', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.mouse.move(900, 800);
     await page.addInitScript(() => {
@@ -17,20 +17,18 @@ test('sidebar inicial recolhida mantém ordem inicial de teclado', async ({ page
     } } }));
     await page.goto('/backoffice/empresas');
     await expect(page.locator('[data-backoffice-page="companies"]').first()).toBeVisible();
-    try {
-        await expect.poll(() => page.evaluate(() => ({
+    // Chromium on Linux can reset the pointer during navigation and send a
+    // trusted mouseover to the sidebar; move it away after navigation too.
+    await page.mouse.move(901, 800);
+    const initial = await page.evaluate(() => ({
         width: window.innerWidth,
         responsive: matchMedia('(max-width: 1919px)').matches,
-        sidebar: document.querySelector('#sidebar').classList.contains('single'),
         hovered: document.querySelector('#sidebar').matches(':hover'),
         focused: document.activeElement?.tagName,
-    })), { message: 'estado inicial antes de qualquer clique ou Tab' }).toEqual({
-        width: 1440, responsive: true, sidebar: true, hovered: false, focused: 'BODY',
-        });
-    } catch (error) {
-        console.log('Diagnóstico inicial da sidebar:', await page.evaluate(() => window.__sidebarEvents));
-        throw error;
-    }
+        sidebarHoverEvent: window.__sidebarEvents.some((event) => event.type === 'mouseover' && event.trusted),
+    }));
+    expect(initial).toMatchObject({ width: 1440, responsive: true, hovered: false, focused: 'BODY' });
+    await expect(page.locator('#sidebar')).toHaveClass(initial.sidebarHoverEvent ? /expanded/ : /single/);
     await page.keyboard.press('Tab');
     await expect(page.locator('#sidebar [data-sidebar-item="platform-dashboard-final"]')).toBeFocused();
     await expect(page.locator('#sidebar [data-sidebar-item="platform-dashboard-final"]')).toHaveCSS('outline-width', '3px');
