@@ -7,10 +7,12 @@ use App\Http\Middleware\RejectUnimplementedCompanyIdempotency;
 use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
 use App\Services\CompanyIdempotencyFactory;
+use App\Services\PlatformSessionAuthority;
 use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Http\Client\Factory;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -43,6 +45,11 @@ class CompanyIdempotencyApiLabTest extends TestCase
         $this->seed();
         Http::fake(['api.pwnedpasswords.com/*' => Http::response('', 200)]);
         $this->withoutMiddleware([RejectUnimplementedCompanyIdempotency::class, RejectCompanyIdempotencyEndpoints::class]);
+        config()->set('platform_session_authority.enabled', true);
+        config()->set('session.driver', 'database');
+        config()->set('session.connection', null);
+        config()->set('session.table', 'sessions');
+        config()->set('session.lifetime', 120);
         config(['company_idempotency' => [
             'enabled' => true,
             'keyring_json' => '{"v1":"'.base64_encode(str_repeat('x', 32)).'"}',
@@ -59,7 +66,7 @@ class CompanyIdempotencyApiLabTest extends TestCase
     {
         $admin = $this->admin();
         $token = $this->issue($admin, 'company.create');
-        $this->actingAs($admin, 'platform')->withHeader('Idempotency-Key', $token);
+        $this->actingAsWithAuthority($admin)->withHeader('Idempotency-Key', $token);
         $first = $this->postJson('/api/backoffice/companies', $this->payload())->assertCreated();
         $companyId = $first->json('company_id');
         $this->postJson('/api/backoffice/companies', $this->payload())->assertCreated()->assertJsonPath('company_id', $companyId);
@@ -76,21 +83,21 @@ class CompanyIdempotencyApiLabTest extends TestCase
         $admin = $this->admin();
         $other = $this->admin();
         $token = $this->issue($admin, 'company.create');
-        $this->actingAs($admin, 'platform')->withHeader('Idempotency-Key', $token)->postJson('/api/backoffice/companies', $this->payload())->assertCreated();
+        $this->actingAsWithAuthority($admin)->withHeader('Idempotency-Key', $token)->postJson('/api/backoffice/companies', $this->payload())->assertCreated();
         $changed = array_replace($this->payload(), ['name' => 'Outro nome']);
         $this->actingAs($admin, 'platform')->withHeader('Idempotency-Key', $token)->postJson('/api/backoffice/companies', $changed)->assertStatus(409);
-        $this->actingAs($other, 'platform')->withHeader('Idempotency-Key', $token)->postJson('/api/backoffice/companies', $this->payload())->assertStatus(503)->assertDontSee($token);
+        $this->actingAsWithAuthority($other)->withHeader('Idempotency-Key', $token)->postJson('/api/backoffice/companies', $this->payload())->assertStatus(503)->assertDontSee($token);
         self::assertSame(1, DB::table('companies')->where('document_number', '11222333000181')->count());
     }
 
     public function test_update_replay_precedes_optimistic_version_check(): void
     {
         $admin = $this->admin();
-        $initial = $this->actingAs($admin, 'platform')->postJson('/api/backoffice/companies', $this->payload())->assertCreated();
+        $initial = $this->actingAsWithAuthority($admin)->postJson('/api/backoffice/companies', $this->payload())->assertCreated();
         $companyId = $initial->json('company_id');
         $token = $this->issue($admin, 'company.update');
         $payload = ['legal_name' => 'Synthetic updated', 'name' => 'Synthetic Administrator', 'cpf' => '11144477735', 'email' => 'created@example.test', 'version' => 1];
-        $this->actingAs($admin, 'platform')->withHeader('Idempotency-Key', $token)->patchJson('/api/backoffice/companies/'.$companyId, $payload)->assertOk();
+        $this->actingAsWithAuthority($admin)->withHeader('Idempotency-Key', $token)->patchJson('/api/backoffice/companies/'.$companyId, $payload)->assertOk();
         $this->patchJson('/api/backoffice/companies/'.$companyId, $payload)->assertOk();
         self::assertSame(2, (int) DB::table('companies')->where('id', $companyId)->value('version'));
         self::assertSame(1, DB::table('platform_audit_events')->where('action', 'backoffice.company_updated')->where('entity_id', $companyId)->count());
@@ -101,7 +108,7 @@ class CompanyIdempotencyApiLabTest extends TestCase
         $admin = $this->admin();
         $token = $this->issue($admin, 'company.create');
         config(['company_idempotency.enabled' => false]);
-        $this->actingAs($admin, 'platform')->withHeader('Idempotency-Key', $token)->postJson('/api/backoffice/companies', $this->payload())->assertStatus(503);
+        $this->actingAsWithAuthority($admin)->withHeader('Idempotency-Key', $token)->postJson('/api/backoffice/companies', $this->payload())->assertStatus(503);
         self::assertSame(0, DB::table('companies')->where('document_number', '11222333000181')->count());
     }
 
@@ -117,7 +124,7 @@ class CompanyIdempotencyApiLabTest extends TestCase
 
             return Http::response('', 200);
         }]);
-        $this->actingAs($admin, 'platform')->withHeader('Idempotency-Key', $token)
+        $this->actingAsWithAuthority($admin)->withHeader('Idempotency-Key', $token)
             ->postJson('/api/backoffice/companies', $this->payload())->assertForbidden();
         self::assertSame(0, DB::table('companies')->where('document_number', '11222333000181')->count());
         self::assertSame('bound', DB::table('company_idempotency_requests')->value('state'));
@@ -127,7 +134,7 @@ class CompanyIdempotencyApiLabTest extends TestCase
     {
         $admin = $this->admin();
         $other = $this->admin();
-        $this->actingAs($admin, 'platform');
+        $this->actingAsWithAuthority($admin);
         $issued = $this->postJson('/api/backoffice/company-idempotency/issue', ['operation' => 'company.create'])->assertCreated();
         $token = $issued->headers->get('Idempotency-Key');
         self::assertIsString($token);
@@ -143,7 +150,7 @@ class CompanyIdempotencyApiLabTest extends TestCase
         $events = DB::table('platform_audit_events')->where('action', 'backoffice.company_idempotency_revoked')->get();
         self::assertCount(1, $events);
         self::assertStringNotContainsString($token, json_encode($events, JSON_THROW_ON_ERROR));
-        $this->actingAs($other, 'platform')->postJson('/api/backoffice/company-idempotency/status', ['operation' => 'company.create'])
+        $this->actingAsWithAuthority($other)->postJson('/api/backoffice/company-idempotency/status', ['operation' => 'company.create'])
             ->assertStatus(422)->assertDontSee($token);
     }
 
@@ -152,6 +159,22 @@ class CompanyIdempotencyApiLabTest extends TestCase
         $settings = (new CompanyIdempotencyFactory)->build(config('company_idempotency'));
 
         return $settings['store']->issue($admin->id, $operation, $settings['lifetime_seconds']);
+    }
+
+    private function actingAsWithAuthority(PlatformAdmin $admin): static
+    {
+        $this->actingAs($admin, 'platform');
+        $session = app('session.store');
+        $session->start();
+        DB::table('sessions')->updateOrInsert(
+            ['id' => $session->getId()],
+            ['user_id' => null, 'ip_address' => '127.0.0.1', 'user_agent' => 'PHPUnit', 'payload' => '', 'last_activity' => now()->timestamp],
+        );
+        $request = Request::create('/api/backoffice/test', 'POST');
+        $request->setLaravelSession($session);
+        app(PlatformSessionAuthority::class)->activate($request, $admin);
+
+        return $this;
     }
 
     private function admin(): PlatformAdmin

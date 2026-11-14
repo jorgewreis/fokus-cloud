@@ -9,7 +9,7 @@ use App\Services\CompanyIdempotencyKeys;
 use App\Services\CompanyIdempotencyStore;
 use App\Services\PlatformSessionAuthority;
 use App\Services\PrefixedUlid;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +19,7 @@ use Tests\TestCase;
 
 class PlatformSessionAuthorityTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseMigrations;
 
     protected function setUp(): void
     {
@@ -29,6 +29,7 @@ class PlatformSessionAuthorityTest extends TestCase
         config()->set('session.driver', 'database');
         config()->set('session.connection', null);
         config()->set('session.table', 'sessions');
+        config()->set('session.lifetime', 120);
     }
 
     public function test_activation_creates_an_expiring_authority_and_revocation_increments_its_generation(): void
