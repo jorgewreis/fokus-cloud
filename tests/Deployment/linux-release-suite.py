@@ -10,11 +10,30 @@ from linux_release_common import ROOT, REPORT, guard, environment, php, run, ada
 
 # Exact candidate count includes the interest-index tests and tests added to main
 # since the original measured baseline. Exact counts never replace case evidence.
-EXPECTED_TESTS = 358
-MINIMUM_ASSERTIONS = 2753 + 23 + 58 + 36
+EXPECTED_TESTS = 375
+MINIMUM_ASSERTIONS = 2753 + 23 + 58 + 36 + 148
 MAIN_IDENTITY_TESTS = {'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_valid_snapshot_is_accepted': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_missing_identity_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_invalid_release_is_rejected_without_echoing_input': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_stale_captured_manifest_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_in_place_code_change_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_added_code_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_asset_storage_link_does_not_change_runtime_identity': 1, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_unsealed_checkout_fails_closed_without_debug_details': 4, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_invalid_or_missing_nonce_is_not_reflected': 11, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_existing_health_endpoint_is_preserved': 1}
 
 LEAD_TESTS = {'Tests\\Feature\\CompanyAdminTest::test_company_detail_exposes_separate_lead_usage_only_after_platform_authorization': 5, 'Tests\\Feature\\CompanyAdminTest::test_company_detail_permission_is_checked_before_reading_lead_usage': 2, 'Tests\\Feature\\LeadConnectionsTest::test_superuser_credentials_never_execute_application_operation': 7, 'Tests\\Feature\\LeadConnectionsTest::test_runtime_context_is_transaction_local_and_disconnects_on_application_failure': 10, 'Tests\\Feature\\LeadConnectionsTest::test_insecure_configuration_is_rejected_before_connecting': 1, 'Tests\\Feature\\LeadConnectionsTest::test_transaction_pooler_and_missing_ca_are_rejected_before_connecting': 3, 'Tests\\Feature\\LeadConnectionsTest::test_disabled_runtime_never_opens_connection': 1, 'Tests\\Feature\\LeadDatabaseTest::test_context_comes_from_server_session_and_fresh_membership': 2, 'Tests\\Feature\\LeadDatabaseTest::test_manager_role_is_resolved_from_current_membership': 2, 'Tests\\Feature\\LeadDatabaseTest::test_access_revocations_are_checked_before_any_lead_connection': 12, 'Tests\\Feature\\LeadDatabaseTest::test_support_and_cross_company_context_are_blocked': 4, 'Tests\\Feature\\LeadUsageReaderTest::test_unconfigured_metrics_are_unavailable_without_connecting': 1, 'Tests\\Feature\\LeadUsageReaderTest::test_reader_filters_company_and_distinguishes_missing_company_from_zero_usage': 5, 'Tests\\Feature\\LeadUsageReaderTest::test_outage_has_no_fabricated_counts': 3}
+BILLING_TESTS = {
+    'Tests\\Feature\\ReconciliationAndRefundTest::test_closed_or_stale_reconciliation_cannot_change_subscription': 5,
+    'Tests\\Feature\\ReconciliationAndRefundTest::test_reconciliation_rechecks_provider_before_applying': 3,
+    'Tests\\Feature\\ReconciliationAndRefundTest::test_refund_unconfirmed_response_is_not_executed_or_retried': 10,
+    'Tests\\Feature\\ReconciliationAndRefundTest::test_refund_rejects_amount_below_one_cent_or_more_than_two_decimals': 4,
+    'Tests\\Feature\\ReconciliationAndRefundTest::test_refund_timeout_remains_pending_and_cannot_be_declined_or_reexecuted': 9,
+    'Tests\\Feature\\ReconciliationAndRefundTest::test_refund_mismatched_provider_response_never_completes': 17,
+    'Tests\\Feature\\ReconciliationAndRefundTest::test_refund_execution_refuses_existing_transaction_before_provider_call': 6,
+    'Tests\\Feature\\ReconciliationAndRefundTest::test_overlapping_refund_execution_sends_only_one_provider_request': 8,
+    'Tests\\Feature\\ReconciliationAndRefundTest::test_pending_refund_with_provider_id_can_be_checked_without_another_post': 15,
+    'Tests\\Feature\\ReconciliationAndRefundTest::test_refund_without_provider_identifier_cannot_be_guessed_or_consulted': 6,
+    'Tests\\Feature\\ReconciliationAndRefundTest::test_refund_does_not_confirm_if_payment_provider_identifier_changes_in_flight': 7,
+    'Tests\\Feature\\ReconciliationAndRefundTest::test_pending_refund_cannot_be_checked_against_changed_provider_payment': 9,
+    'Tests\\Feature\\ReconciliationAndRefundTest::test_provider_refund_identifier_cannot_be_reused_between_requests': 11,
+    'Tests\\Feature\\ReconciliationAndRefundTest::test_overlapping_requests_cannot_link_the_same_provider_refund': 12,
+    'Tests\\Feature\\ReconciliationAndRefundTest::test_provider_id_unique_conflict_after_claim_is_audited_and_remains_uncertain': 9,
+    'Tests\\Feature\\ReconciliationAndRefundTest::test_other_unique_errors_are_not_mistaken_for_provider_id_collision': 6,
+    'Tests\\Feature\\ReconciliationAndRefundTest::test_refund_execution_and_lookup_fail_closed_without_the_expected_unique_index': 11,
+}
 INTEREST_TESTS = {
     'Tests\\Feature\\ProductInterestTest::test_public_interest_is_created_and_same_email_is_updated': 8,
     'Tests\\Feature\\ProductInterestTest::test_interest_product_options_respect_catalog_permission_and_keep_historical_codes': 16,
@@ -33,7 +52,7 @@ def coverage(report):
             or len(cases) != EXPECTED_TESTS or len(set(identities)) != len(cases)
             or any(case.find(kind) is not None for case in cases for kind in ('failure', 'error', 'skipped'))):
         raise RuntimeError('Incomplete or failing suite; coverage gate rejected results')
-    for name, minimum in {**MAIN_IDENTITY_TESTS, **LEAD_TESTS, **INTEREST_TESTS}.items():
+    for name, minimum in {**MAIN_IDENTITY_TESTS, **LEAD_TESTS, **INTEREST_TESTS, **BILLING_TESTS}.items():
         matches = [case for case, identity in zip(cases, identities) if identity == name]
         if len(matches) != 1 or int(matches[0].get('assertions', 0)) < minimum:
             raise RuntimeError('Missing or weakened required identity or Lead test')
