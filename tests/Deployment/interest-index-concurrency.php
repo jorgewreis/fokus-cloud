@@ -34,11 +34,12 @@ if (! mkdir($directory, 0700)) {
     throw new RuntimeException('cannot create private synchronization directory');
 }
 $pid = null;
+$ownedId = null;
 try {
     foreach (['backfill-first', 'writer-first'] as $scenario) {
         $id = 'QA_'.($scenario === 'backfill-first' ? 'B_' : 'W_').$runId;
-        DB::table('product_interests')->where('id', $id)->delete();
         DB::table('product_interests')->insert(['id' => $id, 'name' => 'QA', 'email' => $id.'@example.test', 'products' => '["legacy"]', 'profiles' => '[]', 'privacy_version' => '2.0', 'status' => 'novo', 'consented_at' => now(), 'last_submitted_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        $ownedId = $id;
         DB::transaction(fn () => $index->replace($id, ['legacy']));
         DB::purge();
         $lock = $directory.'/'.$scenario.'-locked';
@@ -126,12 +127,17 @@ try {
             throw new RuntimeException('rollback mismatch');
         }
         DB::table('product_interests')->where('id', $id)->delete();
+        $ownedId = null;
         echo $scenario." lock and rollback passed\n";
     }
 } finally {
     if ($pid !== null && $pid > 0) {
         posix_kill($pid, SIGKILL);
         pcntl_waitpid($pid, $status);
+    }
+    if ($ownedId !== null) {
+        DB::purge();
+        DB::table('product_interests')->where('id', $ownedId)->delete();
     }
     foreach (glob($directory.'/*') ?: [] as $path) {
         unlink($path);

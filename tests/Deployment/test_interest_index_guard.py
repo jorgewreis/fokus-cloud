@@ -13,6 +13,37 @@ DEADLOCK_SOURCE = Path(__file__).with_name('interest-index-deadlock.php')
 
 
 class InterestIndexGuardTest(unittest.TestCase):
+    def test_concurrency_collision_does_not_delete_existing_record(self):
+        self.assertIsNotNone(shutil.which('php'))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            target = root / 'tests' / 'Deployment' / SOURCE.name
+            target.parent.mkdir(parents=True)
+            shutil.copyfile(SOURCE, target)
+            (root / 'vendor').mkdir()
+            shutil.copyfile(Path(__file__).with_name('interest-deadlock-fake-bootstrap.fixture'), root / 'vendor' / 'autoload.php')
+            (root / 'bootstrap').mkdir()
+            (root / 'bootstrap' / 'app.php').write_text('<?php return new class { public function make($name) { return new class { public function bootstrap() {} }; } };')
+            log = root / 'operations.log'
+            log.write_text('')
+            env = {'PATH': os.environ.get('PATH', ''), 'APP_ENV': 'testing',
+                   'FOKUS_INTEREST_INDEX_DISPOSABLE': '1', 'DB_CONNECTION': 'mysql',
+                   'DB_HOST': 'mysql', 'DB_DATABASE': 'synthetic', 'DB_PORT': '3306',
+                   'FAKE_CASE': 'concurrency-collision', 'FAKE_LOG': str(log),
+                   'TMP': str(root), 'TEMP': str(root), 'TMPDIR': str(root)}
+            result = subprocess.run(['php', str(target)], env=env, capture_output=True, text=True, timeout=15)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('row occupied', result.stderr)
+            self.assertEqual(log.read_text(), '')
+            result = subprocess.run(['php', str(target)], env={**env, 'FAKE_CASE': 'concurrency-after-insert'},
+                                    capture_output=True, text=True, timeout=15)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('synthetic failure after insert', result.stderr)
+            lines = log.read_text().splitlines()
+            self.assertEqual(len(lines), 2)
+            self.assertTrue(lines[0].startswith('INSERT '))
+            self.assertEqual(lines[1], 'DELETE product_interests '+json.dumps([lines[0].removeprefix('INSERT ')], separators=(',', ':')))
+
     def test_deadlock_cleanup_only_removes_owned_objects_on_collision(self):
         self.assertIsNotNone(shutil.which('php'))
         with tempfile.TemporaryDirectory() as temporary:
