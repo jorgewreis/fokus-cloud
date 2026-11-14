@@ -179,6 +179,23 @@ relacionado, valor, status no Mercado Pago, payload de retorno e auditoria. Se
 o Mercado Pago confirmar estorno, o pagamento local deve passar para
 `estornado`.
 
+Uma execução iniciada que não recebe confirmação coerente permanece em
+`executando`: o resultado no provedor é incerto, não um estorno confirmado.
+Não repetir automaticamente, recusar ou liberar o saldo enquanto estiver nesse
+estado. A operação deve consultar o Mercado Pago e registrar a evidência para
+análise; valor e data semelhantes, por si só, não comprovam a associação ao
+pedido local. Quando a própria resposta da execução trouxer identificador,
+pagamento e valor correspondentes, a administração pode consultar esse mesmo
+identificador no provedor pela ação de consulta; ela não envia outro estorno.
+Apenas uma resposta aprovada e coerente conclui o registro. Se não houver
+identificador associado à resposta original, a resolução administrativa
+rastreável permanece pendente; não alterar registros manualmente como
+substituto desse fluxo.
+
+O endpoint oficial de criação exige chave de idempotência e exemplifica uma
+resposta aprovada com identificador, pagamento e valor:
+[Criar reembolso — Mercado Pago](https://www.mercadopago.com.br/developers/pt/reference/online-payments/checkout-pro-preferences/create-refund/post).
+
 ## Conciliacao
 
 A conciliacao compara os dados internos do Fokus Cloud com os dados do Mercado
