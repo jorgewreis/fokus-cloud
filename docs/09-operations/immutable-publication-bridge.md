@@ -127,6 +127,16 @@ do host, chave, autorização da origem do digest, instalação confiável do c�
 remoto e caminhos de ambiente precisam de provisionamento e revisão próprios.
 O workflow produtivo continua fechado até essa integração ser comprovada.
 
+`tools/releases/publication_entry.py` é uma entrada experimental para o envio:
+exige o contexto real de despacho manual para o SHA exato em main, usa o gate
+GitHub existente, gera e empacota o build íntegro e repete o mesmo gate antes
+do SSH. Verifica que a raiz candidata tenha o SHA aprovado. Seu resultado ainda
+é `ssh_completed_unverified`; não interpreta saída SSH como selo nem ativa.
+O preparo remoto depende de source, candidate e evidência provisionados para
+reconstrução independente. Esta entrada ainda não está ligada ao environment de
+produção e não substitui verificação independente de receipt, drenagem, runtime
+ou o gate supervisionado de ativação.
+
 ## Evidência e limites
 
 `tests/Deployment/test_legacy_publication_guard.py` verifica que a recusa não

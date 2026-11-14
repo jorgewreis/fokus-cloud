@@ -29,6 +29,7 @@ jobs:
           python3 tools/releases/test_runtime_evidence.py -v
           python3 tools/releases/test_artifact_receiver.py -v
           python3 tools/releases/test_artifact_ssh.py -v
+          python3 tools/releases/test_publication_entry.py -v
       - name: Disposable loopback SSH handshake
         run: |
           set -euo pipefail
