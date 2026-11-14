@@ -2,6 +2,7 @@
 """Real PHP/Laravel database queue/cache and sealed #59/#61/#62 composition."""
 import importlib.util,json,os,shutil,sqlite3,subprocess,sys,tempfile,time,pwd,socket,urllib.request,urllib.parse,runpy,re,hashlib
 import generation_activation as gate
+import publisher
 from pathlib import Path
 
 def module(name,path):
@@ -23,7 +24,12 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     for name in ('activation.lock','scheduler.lock'):
         fd=os.open(base/name,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600);os.close(fd)
         with c.lock(base/name):pass
-    c.unpack(artifact,pack['artifact_sha256'],root,transport);receipt=temp/'receipt.json';d.seal(clone,candidate,evidence,root,receipt,transport)
+    c.unpack(artifact,pack['artifact_sha256'],root,transport)
+    shared=temp/'shared-storage';shared.mkdir();configuration=temp/'synthetic.env';configuration.write_text('# synthetic, no credentials\n')
+    for name in ('logs','framework/cache','framework/views','framework/sessions'):(shared/name).mkdir(parents=True,exist_ok=True)
+    links=c.shared_links(root,shared,configuration)
+    receipt=temp/'receipt.json';d.seal(clone,candidate,evidence,root,receipt,transport,links=links)
+    assert c.verify(root,receipt)['links']==links
     (base/'current').symlink_to(root);db=temp/'database.sqlite';db.touch();marker=temp/'marker'
     # Exercise normal Artisan lifecycle: APP_ENV=testing disables CommandFinished in Laravel.
     # Isolation is supplied by this disposable tree/SQLite/queue, not the environment name.
@@ -56,7 +62,7 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
                 time.sleep(.002)
             else:raise AssertionError('scheduler lock not observed')
             dummy_policy=temp/'dummy-policy.json';dummy_policy.write_text('{}')
-            try:gate.activate(c,base,base/'releases'/('b'*40),receipt,dummy_policy,root,receipt,scope)
+            try:publisher.switch(clone,base,base/'releases'/('b'*40),receipt,dummy_policy,root,receipt,scope)
             except BlockingIOError:pass
             else:raise AssertionError('activation entered while scheduler active')
         finally:
@@ -105,7 +111,9 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     built=temp/'next-build';nextproof=d.build(clone,built);nextproofpath=temp/'next-proof.json';nextproofpath.write_bytes(d.encoded(nextproof))
     nextartifact=temp/'next.tar';nextpack=d.package(clone,built,nextproofpath,nextartifact)
     newroot=base/'releases'/nextproof['source_sha'];nexttransport=temp/'next-transport.json';c.unpack(nextartifact,nextpack['artifact_sha256'],newroot,nexttransport)
-    newreceipt=temp/'next-receipt.json';d.seal(clone,built,nextproofpath,newroot,newreceipt,nexttransport)
+    nextlinks=c.shared_links(newroot,shared,configuration)
+    newreceipt=temp/'next-receipt.json';d.seal(clone,built,nextproofpath,newroot,newreceipt,nexttransport,links=nextlinks)
+    assert c.verify(newroot,newreceipt)['links']==nextlinks
     verifier=temp/'verifier.py';verifier.write_bytes(subprocess.check_output(['git','show','a8cc9729181471c9f46ccb15d51383e1aceb61ab:tools/ci/verify-deployment.py'],cwd=source))
     vp=runpy.run_path(str(verifier))
     serve_old=[True]
@@ -181,7 +189,7 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     # Validate exact #61 policy before asserting any post-switch failure scenario.
     c.policy(policy,newroot,base,newreceipt)
     run('success',8,0)
-    try:gate.activate(c,base,newroot,newreceipt,policy,old,oldreceipt,temp/'scope.json')
+    try:publisher.switch(clone,base,newroot,newreceipt,policy,old,oldreceipt,temp/'scope.json')
     except vp['VerificationError'] as error:
         assert str(error)=='active_release_mismatch', ('unexpected verifier reason',str(error))
         print('post_switch_failure=active_release_mismatch')
@@ -195,10 +203,10 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     root=newroot;receipt=newreceipt;run('success',9,0)
     p.update(release=old.name,root=str(old),receipt_sha256=c.digest(oldreceipt.read_bytes()),rollback_code_compatible=True,data_restore_required=False,expires_at_epoch=time.time()+120)
     policy.write_text(json.dumps(p))
-    result=gate.activate(c,base,old,oldreceipt,policy,newroot,newreceipt,temp/'scope.json',rollback=True)
+    result=publisher.switch(clone,base,old,oldreceipt,policy,newroot,newreceipt,temp/'scope.json',rollback=True)
     assert result['state']=='verified' and (base/'current').resolve()==old
     assert not (base/'scheduler-ready.json').exists()
-    try:gate.activate(c,base,old,oldreceipt,policy,newroot,newreceipt,temp/'scope.json',rollback=True)
+    try:publisher.switch(clone,base,old,oldreceipt,policy,newroot,newreceipt,temp/'scope.json',rollback=True)
     except Exception:pass
     else:raise AssertionError('duplicate activation allowed')
     # Successful candidate activation and a fresh supervised code-only rollback.
@@ -206,15 +214,17 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     root=old;receipt=oldreceipt;run('success',10,0)
     p.update(release=newroot.name,root=str(newroot),receipt_sha256=c.digest(newreceipt.read_bytes()),expires_at_epoch=time.time()+120)
     policy.write_text(json.dumps(p))
-    result=gate.activate(c,base,newroot,newreceipt,policy,old,oldreceipt,temp/'scope.json')
+    result=publisher.switch(clone,base,newroot,newreceipt,policy,old,oldreceipt,temp/'scope.json')
     assert result['state']=='verified' and (base/'current').resolve()==newroot
     c.verify(old,oldreceipt);c.verify(newroot,newreceipt)
     root=newroot;receipt=newreceipt;run('success',11,0)
     p.update(release=old.name,root=str(old),receipt_sha256=c.digest(oldreceipt.read_bytes()),rollback_code_compatible=True,data_restore_required=False,expires_at_epoch=time.time()+120)
     policy.write_text(json.dumps(p))
-    result=gate.activate(c,base,old,oldreceipt,policy,newroot,newreceipt,temp/'scope.json',rollback=True)
+    result=publisher.switch(clone,base,old,oldreceipt,policy,newroot,newreceipt,temp/'scope.json',rollback=True)
     assert result['state']=='verified' and (base/'current').resolve()==old
-    c.verify(old,oldreceipt);c.verify(newroot,newreceipt)
+    assert c.verify(old,oldreceipt)['links']==links and c.verify(newroot,newreceipt)['links']==nextlinks
+    assert (old/'storage').resolve()==shared and (newroot/'storage').resolve()==shared
+    assert (old/'.env').resolve()==configuration and (newroot/'.env').resolve()==configuration
     print('synthetic_successful_activation_and_explicit_rollback_verified')
     print(json.dumps({'gate':'real_artifact_laravel_activation_verified','previous':old.name,'candidate':newroot.name,'candidate_artifact_sha256':nextpack['artifact_sha256'],'previous_artifact_sha256':pack['artifact_sha256'],'http_transport':'loopback injection, no TLS/FPM claim'}))
     for item in newroot.rglob('*'):

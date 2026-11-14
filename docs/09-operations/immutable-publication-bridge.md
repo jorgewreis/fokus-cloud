@@ -37,6 +37,32 @@ não é um mecanismo de ativação.
    ao workflow, revisada e demonstrada no runtime apropriado; manter a aprovação
    do environment e validação Linux do SHA exato.
 
+## Progresso na preparação do artefato
+
+O selador de assets derivados aceita `--links-json` com os vínculos externos
+previamente criados pelo contrato imutável. Valida a lista permitida, o destino
+canônico e o link efetivo antes do selo; o receipt conserva os caminhos e a
+integridade é novamente verificada após a proteção da raiz. A opção é explícita:
+sem ela, links continuam recusados. Conteúdos de `.env` e `storage` não são
+copiados ao pacote nem incluídos no manifesto do código. O operador deve
+fornecer destinos próprios e verificáveis; não há configuração produtiva padrão.
+
+`tools/releases/publisher.py prepare` encadeia `unpack`, vínculos aprovados e
+selo, com digest explícito, destino novo sob `base/releases` e registros fora
+da árvore de releases/storage. Uma falha pode deixar diretório inativo parcial
+para inspeção e nunca altera o ponteiro `current`; não faz limpeza automática.
+Os comandos `activate` e `rollback` delegam ao gate de geração supervisionada e
+exigem explicitamente candidato, receipts, política, geração anterior e prova
+de fronteira; não há modo de forçar ou de reverter dados. A ferramenta opera em
+filesystem local e não inclui SSH, migrações, criação de políticas ou valores
+produtivos. O workflow legado permanece bloqueado até integração apropriada.
+
+A composição sintética prepara dois releases com o mesmo storage/configuração
+descartáveis e verifica os receipts em ativação e rollback. Ela não comprova
+compatibilidade de dados, ACLs ou comportamento dos drivers em produção. A
+integração desse preparo ao workflow de publicação e ao transporte seguro
+continua pendente.
+
 ## Evidência e limites
 
 `tests/Deployment/test_legacy_publication_guard.py` verifica que a recusa não

@@ -28,6 +28,10 @@ jobs:
           git config user.name 'Synthetic composition'
           git config user.email 'synthetic@example.invalid'
           git merge --no-ff --no-edit b271260d1e9cf4778bf3304e961db73751a297f1
+      - name: Reject invalid shared-link declarations before sealing
+        run: |
+          python3 tools/releases/test_derived_shared_links.py -v
+          python3 tools/releases/test_publisher.py -v
       - name: Real builds and tamper regressions
         run: python3 tools/releases/test_derived_assets.py -v
       - name: Real PHP artifact and identity composition

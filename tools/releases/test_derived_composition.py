@@ -2,16 +2,22 @@
 """Real build -> package -> #61 unpack -> derived seal -> #61 verify -> #59 HTTP."""
 import importlib.util, json, os, shutil, socket, subprocess, sys, tempfile, time, urllib.request
 from pathlib import Path
+import publisher
 spec=importlib.util.spec_from_file_location('d',Path(__file__).with_name('derived_assets.py'));d=importlib.util.module_from_spec(spec);spec.loader.exec_module(d)
 source=Path(__file__).resolve().parents[2]
 with tempfile.TemporaryDirectory(prefix='rei25-composition-') as temp:
     temp=Path(temp);candidate=temp/'candidate';proof=d.build(source,candidate);evidence=temp/'proof.json';evidence.write_bytes(d.encoded(proof))
     artifact=temp/'release.tar';packed=d.package(source,candidate,evidence,artifact)
-    c=d.contract(source);releases=temp/'releases';releases.mkdir();root=releases/proof['source_sha'];transport=temp/'transport.json'
-    c.unpack(artifact,packed['artifact_sha256'],root,transport)
-    # Empty Laravel runtime directories are not mutable code and carry no real data.
-    for name in ('storage/logs','storage/framework/cache','storage/framework/views','storage/framework/sessions'):(root/name).mkdir(parents=True,exist_ok=True)
-    receipt=temp/'receipt.json';d.seal(source,candidate,evidence,root,receipt,transport);c.verify(root,receipt)
+    c=d.contract(source);base=temp/'control';base.mkdir();releases=base/'releases';releases.mkdir();root=releases/proof['source_sha'];transport=temp/'transport.json'
+    # Shared targets are synthetic, outside the immutable code root.
+    storage=temp/'shared-storage';storage.mkdir();configuration=temp/'synthetic.env';configuration.write_text('# synthetic, no credentials\n')
+    for name in ('logs','framework/cache','framework/views','framework/sessions'):(storage/name).mkdir(parents=True,exist_ok=True)
+    receipt=temp/'receipt.json'
+    prepared=publisher.prepare(source,candidate,evidence,artifact,packed['artifact_sha256'],base,root,storage,configuration,receipt,transport)
+    assert prepared=={'state':'sealed_not_active','source_sha':proof['source_sha']}
+    assert not (base/'current').exists()
+    links={'storage':str(storage),'.env':str(configuration)}
+    assert c.verify(root,receipt)['links']==links
     assert (root/'app/Support/Deployment/ReleaseIdentity.php').exists(), 'compose PR59 before running'
     env={k:v for k,v in os.environ.items() if k in ('PATH','HOME')}
     env.update(APP_ENV='testing',APP_KEY='base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',DB_CONNECTION='sqlite',DB_DATABASE=':memory:',CACHE_STORE='array',SESSION_DRIVER='array',QUEUE_CONNECTION='sync',LOG_CHANNEL='stderr')
@@ -31,6 +37,18 @@ with tempfile.TemporaryDirectory(prefix='rei25-composition-') as temp:
             c.verify(root,receipt)
             print(json.dumps({'state':'real_runtime_artifact_verified','source_sha':proof['source_sha'],'artifact_sha256':packed['artifact_sha256'],'files':packed['files'],'endpoint':body}))
         finally:proc.terminate();proc.wait(timeout=10)
+    # Replacing a shared link must fail the receipt and may not alter its target.
+    original_mode=root.stat().st_mode & 0o777
+    root.chmod(original_mode | 0o200)
+    (root/'.env').unlink();(root/'.env').symlink_to(storage)
+    root.chmod(original_mode)
+    try:c.verify(root,receipt)
+    except Exception:pass
+    else:raise AssertionError('tampered shared configuration link accepted')
+    root.chmod(original_mode | 0o200)
+    (root/'.env').unlink();(root/'.env').symlink_to(configuration)
+    root.chmod(original_mode)
+    c.verify(root,receipt)
     # Prove static mutation is rejected by full receipt (#59 HTTP covers runtime tree only).
     target=root/'public/build/manifest.json';target.chmod(0o600);target.write_text('{}')
     try:c.verify(root,receipt)
