@@ -1,6 +1,7 @@
 import { createRecordsDrawer } from "./records-drawer.js";
 
 const planActionStates = new Map();
+let planSaveState = null;
 const planActionListeners = new Set();
 const notifyPlanActions = () => planActionListeners.forEach((listener) => listener());
 
@@ -26,7 +27,7 @@ export async function mount(root, context = {}) {
     const badge = (value) => { const normalized = String(value || "").toLowerCase(); const tone = ["ativo", "publicado"].includes(normalized) ? "success" : ["pausado", "rascunho"].includes(normalized) ? "warning" : ["arquivado"].includes(normalized) ? "danger" : "secondary"; return `<span class="fs-badge fs-badge-width-100 fs-badge-soft-${tone}">${escapeHtml(labels[normalized] || value || "-")}</span>`; };
     const planVersion = (plan) => plan.release_version || (Number(plan.published_version) > 0 ? `v${Number(plan.published_version)}.0` : "—");
     const icon = { view: "Folder-File--Streamline-Ultimate.png", edit: "Common-File-Edit--Streamline-Ultimate.png", activate: "Common-File-Check--Streamline-Ultimate.png", publish: "File-Code-2--Streamline-Ultimate.png", pause: "Common-File-Subtract--Streamline-Ultimate.png", archive: "File-Code-Remove--Streamline-Ultimate.png", delete: "Common-File-Remove--Streamline-Ultimate.png" };
-    const action = (type, plan, label, danger = false) => `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action${danger ? " fs-btn-danger" : ""}" type="button" data-plan-action="${type}" data-plan-id="${escapeHtml(plan.id)}" ${type !== "view" && planActionStates.has(String(plan.id)) ? "disabled" : ""} ${type !== "view" && planActionStates.get(String(plan.id)) === "pending" ? 'aria-busy="true"' : ""} aria-label="${label}" title="${label}"><img src="/backoffice/assets/icons/${icon[type]}" alt="" /></button>`;
+    const action = (type, plan, label, danger = false) => `<button class="fs-btn fs-btn-icon fs-btn-icon-plain fs-table-action${danger ? " fs-btn-danger" : ""}" type="button" data-plan-action="${type}" data-plan-id="${escapeHtml(plan.id)}" ${type !== "view" && (planSaveState || planActionStates.has(String(plan.id))) ? "disabled" : ""} ${type !== "view" && (planSaveState === "pending" || planActionStates.get(String(plan.id)) === "pending") ? 'aria-busy="true"' : ""} aria-label="${label}" title="${label}"><img src="/backoffice/assets/icons/${icon[type]}" alt="" /></button>`;
     const product = (id) => state.catalog.products.find((item) => String(item.id) === String(id));
     const allModules = () => state.catalog.products.flatMap((item) => (item.modules || []).map((module) => ({ ...module, product_name: item.name, product_code: item.code })));
     const selectedModuleIds = () => state.modules.map((module) => String(module.id));
@@ -76,17 +77,54 @@ export async function mount(root, context = {}) {
     const openComposition = () => { renderComposition(); drawer.close(); compositionDrawer.setState({ mode: "composition", record: { planId: state.planId } }); compositionDrawer.show(); };
     const applyComposition = () => { const checked = [...document.querySelectorAll(".plan-module-checkbox:checked")].map((input) => String(input.value)); state.modules = selectedProductModules().filter((module) => checked.includes(String(module.id))); state.defaults = Object.fromEntries([...document.querySelectorAll(".plan-default-tier")].filter((select) => select.value).map((select) => [select.dataset.personalizationId, select.value])); renderSummary(); compositionDrawer.close(); drawer.show(); };
     const load = async () => { try { const [catalog, plans] = await Promise.all([api.request("/backoffice/catalog"), api.request("/backoffice/plans")]); if (!live()) return; state.catalog = catalog || { products: [], options: {} }; state.plans = Array.isArray(plans) ? plans : plans.data || []; renderProducts(); render(); showMessage(""); return true; } catch (error) { if (live()) showMessage(error.message || "Não foi possível carregar os planos."); return false; } };
-    const save = async (event) => { event.preventDefault(); if (state.saving) return; const editing = state.mode === "edit"; const editId = editing ? String(state.planId || "") : ""; if (editing && !editId) { showMessage("Não foi possível identificar o plano que será atualizado."); return; } if (window.FokusForm && !window.FokusForm.validate(form)) return; state.saving = true; $("#plan-form-submit").disabled = true; const data = Object.fromEntries(new FormData(form)); data.display_order = Number(data.display_order || 0); data.featured = data.featured === "1"; data.module_ids = selectedModuleIds(); data.personalization_defaults = selectedDefaults(); if (data.monthly_amount) data.monthly_amount = parseMoney(data.monthly_amount); else delete data.monthly_amount; try { await api.request(editing ? `/backoffice/catalog/plans/${editId}` : "/backoffice/catalog/plans", { method: editing ? "PATCH" : "POST", body: data }); closeDrawer(); await load(); showMessage("Plano salvo. Ative, publique o plano e republique o catálogo em Produtos.", "success"); } catch (error) { window.FokusForm?.mapServerErrors(form, error.errors); showMessage(error.message || "Não foi possível salvar o plano."); } finally { state.saving = false; $("#plan-form-submit").disabled = false; } };
+    const save = async (event) => {
+        event.preventDefault();
+        if (state.saving || planSaveState || planActionStates.size) return;
+        const editing = state.mode === "edit";
+        const editId = editing ? String(state.planId || "") : "";
+        if (editing && !editId) { showMessage("Não foi possível identificar o plano que será atualizado."); return; }
+        if (window.FokusForm && !window.FokusForm.validate(form)) return;
+        const data = Object.fromEntries(new FormData(form));
+        data.display_order = Number(data.display_order || 0);
+        data.featured = data.featured === "1";
+        data.module_ids = selectedModuleIds();
+        data.personalization_defaults = selectedDefaults();
+        if (data.monthly_amount) data.monthly_amount = parseMoney(data.monthly_amount); else delete data.monthly_amount;
+        state.saving = true;
+        planSaveState = "pending";
+        notifyPlanActions();
+        try {
+            await api.request(editing ? `/backoffice/catalog/plans/${editId}` : "/backoffice/catalog/plans", { method: editing ? "PATCH" : "POST", body: data });
+            if (!live()) { planSaveState = "uncertain"; return; }
+            closeDrawer();
+            const refreshed = await load();
+            if (!live() || !refreshed) { planSaveState = "uncertain"; return; }
+            planSaveState = null;
+            showMessage("Plano salvo. Ative, publique o plano e republique o catálogo em Produtos.", "success");
+        } catch (error) {
+            if (!error.status || error.status >= 500) planSaveState = "uncertain";
+            else {
+                planSaveState = null;
+                if (live()) { window.FokusForm?.mapServerErrors(form, error.errors); showMessage(error.message || "Não foi possível salvar o plano."); }
+            }
+        } finally {
+            state.saving = false;
+            notifyPlanActions();
+        }
+    };
     const syncPlanActions = () => {
         if (!live()) return;
         render();
-        if ([...planActionStates.values()].includes("uncertain")) showMessage("Confira a situação do plano após atualizar a página antes de tentar novamente.");
-        else if (planActionStates.size) showMessage("Há uma ação de plano em andamento. Aguarde o resultado.");
+        const submit = $("#plan-form-submit");
+        submit.disabled = Boolean(planSaveState || planActionStates.size);
+        if (planSaveState === "pending") submit.setAttribute("aria-busy", "true"); else submit.removeAttribute("aria-busy");
+        if (planSaveState === "uncertain" || [...planActionStates.values()].includes("uncertain")) showMessage("Confira a situação do plano após atualizar a página antes de tentar novamente.");
+        else if (planSaveState || planActionStates.size) showMessage("Há uma ação de plano em andamento. Aguarde o resultado.");
     };
     planActionListeners.add(syncPlanActions);
     const runAction = async (plan, type, reason = "", releaseType = "minor", trigger = null) => {
         const id = String(plan.id);
-        if (state.actionRunning || planActionStates.has(id)) return;
+        if (state.actionRunning || planSaveState || planActionStates.has(id)) return;
         state.actionRunning = true;
         planActionStates.set(id, "pending");
         if (trigger) { trigger.disabled = true; trigger.setAttribute("aria-busy", "true"); }
@@ -111,8 +149,8 @@ export async function mount(root, context = {}) {
     };
     const confirmAction = (plan, type) => { state.pendingAction = { plan, type }; const reasonField = $("#plan-dialog-reason"); const reasonLabel = reasonField.closest("label").querySelector("span"); const needsReason = ["archive", "delete"].includes(type); $("#plan-dialog-title").textContent = type === "delete" ? "Excluir plano" : type === "pause" ? "Pausar plano" : type === "publish" ? "Publicar plano" : "Arquivar plano"; $("#plan-dialog-description").textContent = type === "delete" ? "A exclusão só será concluída se não houver dependências comerciais." : type === "pause" ? "O catálogo do produto ficará indisponível para novas contratações até a republicação." : type === "publish" ? "Depois de publicar o plano, publique uma nova versão do catálogo em Produtos para liberar novas contratações." : "O arquivamento preserva o histórico comercial do plano."; $("#plan-release-choice").hidden = type !== "publish"; $("#plan-destructive-form").querySelector('[name="release_type"][value="minor"]').checked = true; reasonField.required = needsReason; reasonField.closest("label").hidden = !needsReason; reasonLabel.textContent = "Motivo obrigatório"; $("#plan-destructive-form").querySelector('[type="submit"]').textContent = type === "pause" ? "Confirmar pausa" : type === "publish" ? "Publicar plano" : "Confirmar"; reasonField.value = ""; destructiveModal?.show(); };
 
-    $("#plan-new").addEventListener("click", openCreate); $("#plan-drawer-close").addEventListener("click", closeDrawer); $("#plan-form-cancel").addEventListener("click", closeDrawer); form.addEventListener("submit", save); $("#plan-composition-open").addEventListener("click", openComposition); $("#plan-composition-close").addEventListener("click", () => { compositionDrawer.close(); drawer.show(); }); $("#plan-composition-cancel").addEventListener("click", () => { compositionDrawer.close(); drawer.show(); }); $("#plan-composition-save").addEventListener("click", applyComposition); $("#plan-monthly").addEventListener("input", updatePrices); $("#plan-product").addEventListener("change", () => { renderPlanSegments(); state.modules = []; state.defaults = {}; renderComposition(); renderSummary(); }); $("#plan-filter-form").addEventListener("submit", (event) => { event.preventDefault(); state.page = 1; render(); }); $("#plan-search").addEventListener("input", () => { state.page = 1; render(); }); ["#plan-status-filter", "#plan-segment-filter"].forEach((selector) => $(selector).addEventListener("change", () => { state.page = 1; render(); })); $("#plan-pagination").addEventListener("click", (event) => { const button = event.target.closest("[data-plan-page]"); if (!button || button.disabled) return; state.page = Number(button.dataset.planPage); render(); }); list.addEventListener("click", async (event) => { const button = event.target.closest("[data-plan-action]"); if (!button || button.disabled || state.actionRunning) return; const plan = state.plans.find((item) => String(item.id) === button.dataset.planId); if (!plan) return; const type = button.dataset.planAction; if (type !== "view" && planActionStates.has(String(plan.id))) return; if (type === "view") openView(plan); else if (type === "edit" && ["pausado", "inativo"].includes(plan.status)) openEdit(plan); else if (["archive", "delete", "pause", "publish"].includes(type)) confirmAction(plan, type); else await runAction(plan, type, "", "minor", button); }); $("#plan-destructive-form").addEventListener("submit", async (event) => { event.preventDefault(); const reason = $("#plan-dialog-reason").value.trim(); if (!state.pendingAction || (["archive", "delete"].includes(state.pendingAction.type) && !reason)) return; const { plan, type } = state.pendingAction; const releaseType = new FormData(event.currentTarget).get("release_type") || "minor"; state.pendingAction = null; destructiveModal?.hide(); await runAction(plan, type, reason, releaseType); });
+    $("#plan-new").addEventListener("click", openCreate); $("#plan-drawer-close").addEventListener("click", closeDrawer); $("#plan-form-cancel").addEventListener("click", closeDrawer); form.addEventListener("submit", save); $("#plan-composition-open").addEventListener("click", openComposition); $("#plan-composition-close").addEventListener("click", () => { compositionDrawer.close(); drawer.show(); }); $("#plan-composition-cancel").addEventListener("click", () => { compositionDrawer.close(); drawer.show(); }); $("#plan-composition-save").addEventListener("click", applyComposition); $("#plan-monthly").addEventListener("input", updatePrices); $("#plan-product").addEventListener("change", () => { renderPlanSegments(); state.modules = []; state.defaults = {}; renderComposition(); renderSummary(); }); $("#plan-filter-form").addEventListener("submit", (event) => { event.preventDefault(); state.page = 1; render(); }); $("#plan-search").addEventListener("input", () => { state.page = 1; render(); }); ["#plan-status-filter", "#plan-segment-filter"].forEach((selector) => $(selector).addEventListener("change", () => { state.page = 1; render(); })); $("#plan-pagination").addEventListener("click", (event) => { const button = event.target.closest("[data-plan-page]"); if (!button || button.disabled) return; state.page = Number(button.dataset.planPage); render(); }); list.addEventListener("click", async (event) => { const button = event.target.closest("[data-plan-action]"); if (!button || button.disabled || state.actionRunning) return; const plan = state.plans.find((item) => String(item.id) === button.dataset.planId); if (!plan) return; const type = button.dataset.planAction; if (type !== "view" && (planSaveState || planActionStates.has(String(plan.id)))) return; if (type === "view") openView(plan); else if (type === "edit" && ["pausado", "inativo"].includes(plan.status)) openEdit(plan); else if (["archive", "delete", "pause", "publish"].includes(type)) confirmAction(plan, type); else await runAction(plan, type, "", "minor", button); }); $("#plan-destructive-form").addEventListener("submit", async (event) => { event.preventDefault(); const reason = $("#plan-dialog-reason").value.trim(); if (!state.pendingAction || (["archive", "delete"].includes(state.pendingAction.type) && !reason)) return; const { plan, type } = state.pendingAction; const releaseType = new FormData(event.currentTarget).get("release_type") || "minor"; state.pendingAction = null; destructiveModal?.hide(); await runAction(plan, type, reason, releaseType); });
     await load();
-    if (planActionStates.size) syncPlanActions();
+    if (planSaveState || planActionStates.size) syncPlanActions();
     return () => { disposed = true; planActionListeners.delete(syncPlanActions); drawer.dispose(); compositionDrawer.dispose(); destructiveModal?.dispose?.(); window.disposeBackofficeRecordsPage?.(root); };
 }
