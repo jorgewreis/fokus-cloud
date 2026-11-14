@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Contracts\Console\Kernel;
+
 /** Validate inputs before opening a database connection or bootstrapping Laravel. */
 function dashboardProofPreflight(string $root): array
 {
@@ -36,6 +38,7 @@ function dashboardProofPreflight(string $root): array
         || getenv('DB_USERNAME') !== $user || getenv('DB_PASSWORD') !== $password) {
         throw new RuntimeException('Missing or mismatched synthetic identity and credentials');
     }
+
     return [$user, $password, $uuid, $marker];
 }
 
@@ -64,7 +67,7 @@ function dashboardProofBootstrap(): array
     [$pdo, $verifyTarget, $user, $password, $root] = dashboardProofTarget();
     require_once "{$root}/vendor/autoload.php";
     $app = require "{$root}/bootstrap/app.php";
-    $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+    $app->make(Kernel::class)->bootstrap();
     $config = $app['config']->get('database.connections.mysql');
     if ($app->environment() !== 'testing' || $app['config']->get('database.default') !== 'mysql'
         || ! is_array($config) || ($config['driver'] ?? null) !== 'mysql'

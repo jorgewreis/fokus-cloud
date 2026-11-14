@@ -163,3 +163,16 @@ Os testes negativos usam apenas diretório temporário próprio, com nomes
 aleatórios e criação exclusiva; eles não criam nem removem `.env` ou cache no
 checkout. `laravel-guard-collision.php` inicia dois processos concorrentes para
 tentar criar o mesmo arquivo e verifica exatamente um vencedor, sem sobrescrita.
+
+## Identidade no gate de homologação
+
+O teste HTTP `SubscriptionAdminTest::test_dashboard_aggregates_active_subscriptions_in_one_snapshot`
+registrou em JUnit **1 teste e 6 asserções** em SQLite sintético com PHP 8.5.2;
+essa medição define o mínimo por identidade e eleva o inventário desta branch
+para 373 testes e 3.036 asserções mínimas. A verificação MySQL inclui também a
+asserção específica de restauração do buffer. Os controles negativos exigem
+a identidade e rejeitam sua ausência, renomeação, duplicação e redução de
+asserções, além de rejeitar totais anteriores ou insuficientes. Esta é uma
+medição direcionada, não uma execução completa do gate Linux. O PR #90 altera
+o mesmo inventário: se integrado, os acréscimos de ambas as entregas devem ser
+compostos e medidos novamente sobre o candidato resultante.
