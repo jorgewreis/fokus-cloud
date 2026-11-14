@@ -22,6 +22,8 @@ jobs:
           extensions: mbstring, intl, pdo_sqlite, dom, xml, curl, zip, fileinfo, pcntl
           tools: composer:v2
           coverage: none
+      - name: Install pinned OIDC test dependency
+        run: python3 -m pip install --disable-pip-version-check cryptography==46.0.5
       - name: Real Linux process regressions
         run: |
           python3 tools/releases/test_generation_supervisor.py -v
@@ -30,6 +32,7 @@ jobs:
           python3 tools/releases/test_artifact_receiver.py -v
           python3 tools/releases/test_artifact_ssh.py -v
           python3 tools/releases/test_publication_entry.py -v
+          python3 tools/releases/test_github_oidc.py -v
       - name: Disposable loopback SSH handshake
         run: |
           set -euo pipefail

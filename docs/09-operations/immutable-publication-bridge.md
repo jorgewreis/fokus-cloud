@@ -158,6 +158,17 @@ há transporte autenticado desses dados para o host remoto neste protótipo.
 A guarda produtiva permanece fechada até esses pontos serem implementados e
 revisados, sem inferir aprovação a partir de variáveis controladas pelo operador.
 
+Há um verificador OIDC experimental em `tools/releases/github_oidc.py`, testado
+somente com chaves RSA sintéticas. Ele compara assinatura RS256 e claims de
+issuer, audience com desafio, repositório, workflow, SHA, environment e execução.
+O chamador precisa obter chaves exclusivamente do JWKS oficial, autenticar um
+desafio novo e consumir `jti` uma única vez sob lock. O módulo isolado não faz
+essas etapas, não foi integrado à ativação e não atesta que as regras do
+environment estejam configuradas ou aprovadas. O runner usa `cryptography`
+fixado apenas para os testes; disponibilidade e instalação no host remoto não
+foram verificadas. Fontes do contrato: [referência OIDC do GitHub](https://docs.github.com/en/actions/reference/security/oidc)
+e [descoberta oficial do issuer](https://token.actions.githubusercontent.com/.well-known/openid-configuration).
+
 ## Evidência e limites
 
 `tests/Deployment/test_legacy_publication_guard.py` verifica que a recusa não
