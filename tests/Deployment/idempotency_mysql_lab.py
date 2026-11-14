@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[2]
 VOLUME = re.compile(r"fokus-law-linux-[0-9a-f]{12}-files\Z")
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 UUID = re.compile(r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\Z")
+CONTAINER_ID = re.compile(r"[0-9a-f]{64}\Z")
 PASSWORD = "security-test-only"
 
 # These are independent evidence, not additional main-suite cases. Minimums
@@ -98,6 +99,13 @@ def docker(*args: str, input_data: bytes | None = None, check: bool = True) -> s
                           stderr=subprocess.PIPE, check=check)
 
 
+def created_id(result: subprocess.CompletedProcess) -> str:
+    value = result.stdout.decode("ascii").strip()
+    if not CONTAINER_ID.fullmatch(value):
+        raise RuntimeError("Docker did not return a full container ID")
+    return value
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--volume", required=True)
@@ -106,6 +114,7 @@ def main() -> None:
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--dependency-receipt", type=Path, required=True)
     parser.add_argument("--dependency-receipt-sha256", required=True)
+    parser.add_argument("--runtime-image-id", required=True)
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
     profiles = json.loads((ROOT / "tests/Deployment/linux-runtime/profiles.json").read_text(encoding="utf-8"))
@@ -115,6 +124,8 @@ def main() -> None:
                                            profile=args.profile, profiles=profiles)
     if not args.execute:
         raise RuntimeError("Explicit --execute required")
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", args.runtime_image_id):
+        raise RuntimeError("An immutable runtime image ID is required")
     # The receipt must be supplied by the release orchestrator that recorded
     # the locked install. A digest alone does not attest the receipt's origin.
     if args.dependency_receipt.is_symlink() or not args.dependency_receipt.is_file():
@@ -136,14 +147,17 @@ def main() -> None:
     args.report.mkdir(parents=False, exist_ok=False)
     volume = json.loads(docker("volume", "inspect", args.volume).stdout)[0]
     validate_volume(volume)
+    runtime = json.loads(docker("image", "inspect", args.runtime_image_id).stdout)[0]
+    if runtime.get("Id") != args.runtime_image_id:
+        raise RuntimeError("Runtime image identity changed")
     tag = "fokus-idempotency-" + uuid.uuid4().hex[:12]
-    mysql, runner = tag + "-mysql", tag + "-runner"
+    mysql_name, runner_name = tag + "-mysql", tag + "-runner"
     created: list[str] = []
     try:
-        docker("run", "-d", "--pull=never", "--name", mysql, "--restart=no",
-               "--network", "none", "--label", "fokus.release.disposable=true",
-               "--tmpfs", "/var/lib/mysql", "-e", "MYSQL_ROOT_PASSWORD=" + PASSWORD,
-               "-e", "MYSQL_DATABASE=fokus_idempotency_api_test", mysql_image)
+        mysql = created_id(docker("run", "-d", "--pull=never", "--name", mysql_name, "--restart=no",
+                                  "--network", "none", "--label", "fokus.release.disposable=true",
+                                  "--tmpfs", "/var/lib/mysql", "-e", "MYSQL_ROOT_PASSWORD=" + PASSWORD,
+                                  "-e", "MYSQL_DATABASE=fokus_idempotency_api_test", mysql_image))
         created.append(mysql)
         for _ in range(90):
             if docker("exec", mysql, "mysqladmin", "ping", "-h127.0.0.1", "-uroot",
@@ -156,11 +170,11 @@ def main() -> None:
                          "--batch", "--skip-column-names", "-e", "SELECT @@server_uuid").stdout.decode().strip()
         if not UUID.fullmatch(db_uuid):
             raise RuntimeError("Invalid laboratory server identity")
-        docker("run", "-d", "--pull=never", "--name", runner, "--restart=no",
-               "--network", "container:" + mysql, "--label", "fokus.release.disposable=true",
-               "--mount", "type=volume,src=" + args.volume + ",dst=/input,readonly",
-               "--tmpfs", "/workspace:rw,exec,size=2g", runtime_image,
-               "sleep", "infinity")
+        runner = created_id(docker("run", "-d", "--pull=never", "--name", runner_name, "--restart=no",
+                                   "--network", "container:" + mysql, "--label", "fokus.release.disposable=true",
+                                   "--mount", "type=volume,src=" + args.volume + ",dst=/input,readonly",
+                                   "--tmpfs", "/workspace:rw,exec,size=2g", args.runtime_image_id,
+                                   "sleep", "infinity"))
         created.append(runner)
         docker("exec", "--user", "0", runner, "sh", "-ec",
                "test -d /input/release && test ! -e /input/release/.env && "
@@ -217,6 +231,8 @@ def main() -> None:
                          "source_manifest_sha256": digest(source_data),
                          "dependency_receipt_sha256": args.dependency_receipt_sha256,
                          "vendor_tree_sha256": receipt["vendor_tree_sha256"],
+                         "runtime_image_id": args.runtime_image_id,
+                         "reviewed_runtime_tag": runtime_image,
                          "receipt_origin_requires_orchestrator_attestation": True})
         (args.report / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
     finally:
