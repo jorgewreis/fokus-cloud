@@ -148,7 +148,7 @@ class Protocol(unittest.TestCase):
             self.assertTrue(released,'child retained a protocol slot after parent death')
             status=Path('/proc')/str(child_pid)/'status'
             try: child_status=status.read_text()
-            except FileNotFoundError: child_status=None
+            except (FileNotFoundError, ProcessLookupError): child_status=None
             if child_status is not None:
                 self.assertIn('State:\tZ',child_status)
         finally:
