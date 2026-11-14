@@ -195,9 +195,10 @@ logs ou variáveis de ambiente remotas.
 
 O protocolo experimental exige um diretório de slots privado com quatro locks
 pré-provisionados e usa prazo global de 30 segundos além do prazo de leitura.
-O supervisor usa sinal para encerrar um processo filho ao atingir o prazo;
-chamadas de sistema em estado não interrompível podem impedir seu encerramento
-imediato. Os slots permanecem ocupados enquanto o filho não for recolhido.
+O filho instala `PR_SET_PDEATHSIG` e um temporizador fatal próprio, além do
+prazo do supervisor. Chamadas de sistema em estado não interrompível podem
+impedir encerramento imediato; os slots permanecem ocupados até o processo
+ser encerrado. A instalação e a corrida de morte do pai exigem prova Linux.
 As cotas valem apenas para processos que entram nesse protocolo e compartilham
 o mesmo diretório; não limitam conexões anteriores ao comando forçado nem outros
 nós. Um teste CI cria sshd restrito a loopback e usa chave sintética com comando

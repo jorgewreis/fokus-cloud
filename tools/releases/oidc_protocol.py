@@ -6,6 +6,7 @@ real deployment must additionally enforce a fixed trusted forced command, SSH
 peer identity, GitHub environment protections and independent artifact binding.
 """
 import argparse
+import ctypes
 import json
 import os
 import select
@@ -62,9 +63,26 @@ def read_frame(fd):
     return read_exact(length)
 
 
+def arm_child_guard(expected_parent):
+    """Linux-only child lifetime binding and independent fatal timer."""
+    if sys.platform != 'linux':
+        raise ValueError('linux_required')
+    libc=ctypes.CDLL(None,use_errno=True)
+    # PR_SET_PDEATHSIG is reset by fork, so it must be armed in this child.
+    if libc.prctl(1,signal.SIGKILL,0,0,0) != 0:
+        raise ValueError('parent_death_guard_failed')
+    # Close the race where the parent died before prctl was installed.
+    if os.getppid() != expected_parent:
+        raise ValueError('parent_already_dead')
+    signal.signal(signal.SIGALRM,signal.SIG_DFL)
+    signal.pthread_sigmask(signal.SIG_UNBLOCK,{signal.SIGALRM})
+    signal.setitimer(signal.ITIMER_REAL,TOTAL_TIMEOUT_SECONDS)
+
+
 def run_supervised(operation):
     """Run one request in a child killed and reaped on the parent's deadline."""
     read_fd, write_fd = os.pipe()
+    expected_parent = os.getpid()
     try:
         pid = os.fork()
     except BaseException:
@@ -73,6 +91,7 @@ def run_supervised(operation):
     if pid == 0:
         os.close(read_fd)
         try:
+            arm_child_guard(expected_parent)
             payload=json.dumps(operation(),sort_keys=True).encode()
             if len(payload)>4096: raise ValueError('oversized_response')
             if os.write(write_fd,payload)!=len(payload): raise ValueError('incomplete_response')

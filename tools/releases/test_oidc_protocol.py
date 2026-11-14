@@ -3,6 +3,7 @@
 import json
 import os
 import socket
+import signal
 import time
 import subprocess
 import threading
@@ -105,6 +106,48 @@ class Protocol(unittest.TestCase):
                 with protocol.total_deadline():
                     protocol.run_supervised(lambda:time.sleep(2))
             self.assertLess(time.monotonic()-start,1.5)
+
+    def test_child_own_timer_fires_without_supervisor_timer(self):
+        with patch.object(protocol,'TOTAL_TIMEOUT_SECONDS',.15):
+            start=time.monotonic()
+            with self.assertRaisesRegex(ValueError,'worker_failed'):
+                protocol.run_supervised(lambda:time.sleep(2))
+            self.assertLess(time.monotonic()-start,1.5)
+
+    def test_parent_sigkill_terminates_child_and_releases_all_slots(self):
+        process=subprocess.Popen([sys.executable,str(Path(protocol.__file__)),'--state-dir','/synthetic',
+                                  '--slot-dir',str(self.slot_dir)],
+                                 stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        child_pid=None
+        try:
+            deadline=time.monotonic()+4
+            children=Path('/proc')/str(process.pid)/'task'/str(process.pid)/'children'
+            while time.monotonic()<deadline and process.poll() is None:
+                try: found=children.read_text().split()
+                except FileNotFoundError: found=[]
+                if found:
+                    child_pid=int(found[0]);break
+                time.sleep(.01)
+            self.assertIsNotNone(child_pid,'fixture child did not start')
+            process.send_signal(signal.SIGKILL);process.wait(timeout=3)
+            released=False
+            deadline=time.monotonic()+4
+            while time.monotonic()<deadline:
+                try:
+                    with ExitStack() as stack:
+                        for _ in range(protocol.protocol_slots.SLOTS):
+                            stack.enter_context(protocol.protocol_slots.acquire(self.slot_dir))
+                    released=True;break
+                except (ValueError,BlockingIOError):time.sleep(.02)
+            self.assertTrue(released,'child retained a protocol slot after parent death')
+            status=Path('/proc')/str(child_pid)/'status'
+            try: child_status=status.read_text()
+            except FileNotFoundError: child_status=None
+            if child_status is not None:
+                self.assertIn('State:\tZ',child_status)
+        finally:
+            if process.poll() is None:process.kill();process.wait()
+            process.stdin.close();process.stdout.close();process.stderr.close()
 
     def test_supervisor_never_returns_worker_exception_text(self):
         def fail(): raise ValueError('CANARY_SECRET_VALUE')
