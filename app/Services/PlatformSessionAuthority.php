@@ -25,7 +25,7 @@ final class PlatformSessionAuthority
 
     public function activate(Request $request, PlatformAdmin $admin, ?User $webUser = null): void
     {
-        if (! $this->enabled()) {
+        if (!$this->enabled()) {
             return;
         }
 
@@ -55,7 +55,7 @@ final class PlatformSessionAuthority
 
     public function invalidate(Request $request): void
     {
-        if (! $this->enabled() || ! $request->hasSession()) {
+        if (!$this->enabled() || !$request->hasSession()) {
             return;
         }
 
@@ -65,7 +65,7 @@ final class PlatformSessionAuthority
     /** @return list<string> session ids that must be removed with the revocation */
     public function revokeForAdmin(string $adminId): array
     {
-        if (! $this->enabled()) {
+        if (!$this->enabled()) {
             return [];
         }
 
@@ -97,7 +97,7 @@ final class PlatformSessionAuthority
      */
     public function withinMutation(Request $request, string $permission, callable $writer, ?string $companyId = null): mixed
     {
-        if (! $this->enabled()) {
+        if (!$this->enabled()) {
             throw new LogicException('Platform session authority is not enabled.');
         }
         $this->assertCompatibleSessionStore();

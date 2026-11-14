@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\PlatformAudit;
 use App\Services\PlatformSessionAuthority;
 use App\Services\PrefixedUlid;
+use App\Services\AuditSanitizer;
 use App\Services\SupportSessionSecurity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -76,8 +77,8 @@ class PlatformSupportController extends Controller
         DB::table('platform_support_sessions')->insert([
             'id' => $id, 'platform_admin_id' => Auth::guard('platform')->id(), 'company_id' => $target->company_id,
             'subscription_id' => $target->subscription_id, 'membership_id' => $target->membership_id,
-            'target_user_id' => $target->user_id, 'reason' => app(\App\Services\AuditSanitizer::class)->sanitizeText((string) $data['reason']), 'started_at' => now(),
-            'start_ip' => $request->ip(), 'start_user_agent' => app(\App\Services\AuditSanitizer::class)->sanitizeText((string) $request->userAgent()), 'created_at' => now(), 'updated_at' => now(),
+            'target_user_id' => $target->user_id, 'reason' => app(AuditSanitizer::class)->sanitizeText((string) $data['reason']), 'started_at' => now(),
+            'start_ip' => $request->ip(), 'start_user_agent' => app(AuditSanitizer::class)->sanitizeText((string) $request->userAgent()), 'created_at' => now(), 'updated_at' => now(),
         ]);
         $request->session()->put(['support_session_id' => $id, 'active_company_id' => $target->company_id]);
         Auth::guard('web')->login(User::findOrFail($target->user_id));

@@ -9,6 +9,7 @@ use App\Services\PlatformAudit;
 use App\Services\PlatformSecurity;
 use App\Services\PlatformSessionAuthority;
 use App\Services\PrefixedUlid;
+use App\Services\SupportSessionSecurity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -116,7 +117,7 @@ class PlatformAuthController extends Controller
         return response()->json(['admin' => $this->adminPayload($admin)]);
     }
 
-    public function logout(Request $request, PlatformAudit $audit, \App\Services\SupportSessionSecurity $supportSecurity, PlatformSessionAuthority $authority)
+    public function logout(Request $request, PlatformAudit $audit, SupportSessionSecurity $supportSecurity, PlatformSessionAuthority $authority)
     {
         $adminId = Auth::guard('platform')->id();
         $supportSecurity->end($request, 'Sessão encerrada ao sair do Backoffice.');
