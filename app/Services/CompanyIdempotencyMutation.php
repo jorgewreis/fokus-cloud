@@ -27,17 +27,28 @@ final class CompanyIdempotencyMutation
 
         try {
             $preflight();
-        } catch (Throwable $failure) {
-            // Another matching request may have committed during preflight.
-            // Recheck under lock; an unavailable store must never be treated as
-            // proof that the mutation did not happen.
-            $replay = $this->store->bind($token, $actor, $operation, $target, $payload, now()->getTimestamp());
-            if ($replay !== null) {
-                return $replay;
-            }
-            throw $failure;
+        } catch (Throwable) {
+            return $this->resolveOrUncertain($token, $actor, $operation, $target, $payload);
         }
 
-        return $this->store->complete($token, $actor, $operation, $target, $payload, $writer);
+        try {
+            return $this->store->complete($token, $actor, $operation, $target, $payload, $writer);
+        } catch (Throwable) {
+            // A writer's rolled-back error also cannot rule out a matching
+            // request that is waiting and could succeed after the lock releases.
+            return $this->resolveOrUncertain($token, $actor, $operation, $target, $payload);
+        }
+    }
+
+    private function resolveOrUncertain(string $token, string $actor, string $operation, ?string $target, array $payload): array
+    {
+        // Recheck under lock; an unavailable store must never be treated as
+        // proof that the mutation did not happen. Another matching request may
+        // still commit later, even when this attempt has failed.
+        $replay = $this->store->bind($token, $actor, $operation, $target, $payload, now()->getTimestamp());
+        if ($replay !== null) {
+            return $replay;
+        }
+        abort(503, 'Não foi possível confirmar o resultado. Consulte a situação antes de tentar novamente.');
     }
 }
