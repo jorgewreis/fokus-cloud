@@ -73,7 +73,16 @@ class RealSSH(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, 'transport_failed'):
                         artifact_ssh.send(**options, known_hosts=wrong)
                     self.assertFalse((staging / 'received.tar').exists())
-                    result = artifact_ssh.send(**options, known_hosts=known)
+                    diagnostics = []
+                    def diagnostic_run(command, **kwargs):
+                        kwargs['stderr'] = subprocess.PIPE
+                        result = subprocess.run([command[0], '-v', *command[1:]], **kwargs)
+                        diagnostics.append(result.stderr.decode(errors='replace'))
+                        return result
+                    try:
+                        result = artifact_ssh.send(**options, known_hosts=known, run=diagnostic_run)
+                    except ValueError as error:
+                        self.fail('synthetic SSH failure: ' + str(error) + '\n' + ''.join(diagnostics) + '\nsshd: ' + log.read_text())
                     self.assertEqual(result['state'], 'ssh_completed_unverified')
                     self.assertEqual((staging / 'received.tar').read_bytes(), data)
                 finally:
