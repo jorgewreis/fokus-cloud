@@ -6,7 +6,7 @@
  * portalled overlays and release listeners before the next page is mounted.
  */
 (() => {
-    const ASSET_VERSION = "20261114-company-detail-v1";
+    const ASSET_VERSION = "20261114-company-detail-readiness-v1";
 
     const pages = {
         "platform-dashboard-final": { route: "painel", fragment: "platform-dashboard-final" },
@@ -127,6 +127,10 @@
         }
 
         async mount(pageId, page, markup, signal) {
+            // Keep the loading state visible until the module is available: a
+            // rendered button must never be offered before its handlers exist.
+            const module = page.module ? await import(`${page.module}?v=${ASSET_VERSION}`) : null;
+            if (signal.aborted) throw createAbortError();
             const template = document.createElement("template");
             template.innerHTML = markup;
             const styles = [...template.content.querySelectorAll("link[data-page-css]")];
@@ -143,27 +147,49 @@
                 document.head.append(link);
             });
 
-            this.root.replaceChildren(template.content.cloneNode(true));
+            const owner = `${pageId}-${this.navigationId}`;
+            const pageRoot = document.createElement("div");
+            pageRoot.dataset.backofficeMount = "";
+            pageRoot.dataset.backofficeOwner = owner;
+            pageRoot.style.display = "contents";
+            pageRoot.inert = true;
+            pageRoot.setAttribute("aria-busy", "true");
+            pageRoot.append(template.content.cloneNode(true));
+            const status = document.createElement("div");
+            status.className = "fs-alert fs-alert-info";
+            status.setAttribute("role", "status");
+            status.setAttribute("aria-live", "polite");
+            status.textContent = "Carregando página…";
+            this.root.replaceChildren(status, pageRoot);
             this.root.dataset.backofficePage = pageId;
+            this.root.dataset.backofficeOwner = owner;
             this.currentPage = pageId;
-            window.FokusForm?.enhance(this.root);
-            this.onComponentsReady?.(this.root);
-            window.initBackofficeRecordsPage?.(this.root);
+            this.currentRoot = pageRoot;
+            window.FokusForm?.enhance(pageRoot);
+            this.onComponentsReady?.(pageRoot);
+            window.initBackofficeRecordsPage?.(pageRoot);
 
             const context = {
                 admin: this.admin,
                 api: window.FokusApi,
                 permissions: window.__backofficePermissions || new Set(),
                 router: this,
-                root: this.root,
+                root: pageRoot,
                 signal,
                 version: ASSET_VERSION,
             };
 
-            if (page.module) {
-                const module = await import(`${page.module}?v=${ASSET_VERSION}`);
-                const disposer = await module.mount?.(this.root, context);
+            if (module) {
+                const disposer = await module.mount?.(pageRoot, context);
+                if (signal.aborted) {
+                    if (typeof disposer === "function") disposer();
+                    else module.unmount?.();
+                    throw createAbortError();
+                }
                 this.disposeCurrent = typeof disposer === "function" ? disposer : module.unmount;
+                pageRoot.inert = false;
+                pageRoot.removeAttribute("aria-busy");
+                status.remove();
                 return;
             }
 
@@ -171,11 +197,15 @@
             // module; this bridge keeps established API flows operational while
             // they are moved out of their historical inline fragments.
             await this.runLegacyScripts(scripts);
+            if (signal.aborted) throw createAbortError();
             // Some legacy initializers create an overlay after their first
             // mount. Run the owner-aware cleanup once more so duplicate IDs
             // cannot survive a route transition.
-            window.initBackofficeRecordsPage?.(this.root);
+            window.initBackofficeRecordsPage?.(pageRoot);
             this.disposeCurrent = () => {};
+            pageRoot.inert = false;
+            pageRoot.removeAttribute("aria-busy");
+            status.remove();
         }
 
         async runLegacyScripts(scripts) {
@@ -203,11 +233,13 @@
             try {
                 this.disposeCurrent?.();
             } finally {
-                window.disposeBackofficeRecordsPage?.(this.root);
+                window.disposeBackofficeRecordsPage?.(this.currentRoot || this.root);
                 document.querySelectorAll("link[data-page-css]").forEach((style) => style.remove());
                 this.root.replaceChildren();
                 delete this.root.dataset.backofficePage;
+                delete this.root.dataset.backofficeOwner;
                 this.currentPage = null;
+                this.currentRoot = null;
                 this.disposeCurrent = null;
             }
         }
@@ -223,10 +255,14 @@
         }
 
         showLoading() {
+            this.root.inert = false;
+            this.root.removeAttribute("aria-busy");
             this.root.innerHTML = '<div class="fs-alert fs-alert-info" role="status" aria-live="polite" aria-busy="true">Carregando página…</div>';
         }
 
         showError(pageId, error) {
+            this.root.inert = false;
+            this.root.removeAttribute("aria-busy");
             this.root.innerHTML = '<div class="fs-alert fs-alert-danger" role="alert"><p>Não foi possível abrir esta página.</p><button class="fs-btn fs-btn-outline-primary" type="button">Tentar novamente</button></div>';
             this.root.querySelector("button")?.addEventListener("click", () => this.navigate(pageId, { history: false }), { once: true });
             console.error(error);
