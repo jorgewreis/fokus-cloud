@@ -51,6 +51,16 @@ class CompanyIdempotencyDisabledTest extends TestCase
             ->postJson('/api/backoffice/companies', [])->assertForbidden();
     }
 
+    public function test_management_endpoints_remain_closed_even_if_configuration_is_enabled(): void
+    {
+        config(['company_idempotency.enabled' => true]);
+        $this->actingAs($this->admin(), 'platform');
+        foreach (['issue', 'status', 'revoke'] as $action) {
+            $this->postJson('/api/backoffice/company-idempotency/'.$action, ['operation' => 'company.create'])->assertStatus(503);
+        }
+        self::assertSame(0, DB::table('company_idempotency_requests')->count());
+    }
+
     private function admin(): PlatformAdmin
     {
         return PlatformAdmin::create([

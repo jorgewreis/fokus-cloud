@@ -1,9 +1,10 @@
 # Company idempotency: isolated core checkpoint
 
-This code is an unconnected laboratory candidate. It does not expose endpoints,
-enable a client, provision keys, establish production key custody, or guarantee
-that existing requests are idempotent. Do not enable or deploy it as a complete
-feature without the integration and operational proofs below.
+This code is a laboratory candidate. Preparatory management routes are present
+but an unconditional middleware blocks them; the company-write guard also
+rejects keyed writes. It does not enable a client, provision keys, establish
+production key custody, or guarantee that existing requests are idempotent. Do
+not enable or deploy it as a complete feature without the proofs below.
 
 As a fail-closed transition guard, company create and update reject every
 request carrying an `Idempotency-Key` header with HTTP 503, after existing
@@ -52,12 +53,14 @@ timeout/recovery and browser handling, explicit key custody and rotation,
 release coexistence, plus security review. The isolated MySQL test exercises
 row-lock ordering and a synthetic quota window, not those end-to-end contracts.
 
-The unregistered mutation orchestrator binds the normalized payload and checks
+The mutation orchestrator binds the normalized payload and checks
 for a completed replay before running external preflight, then enters the store's
 transaction for local writes. If preflight fails, it rechecks under lock for a
-matching completion before propagating failure. Its callbacks are not yet wired
-to `createCompany` or `updateCompany`: business uniqueness and optimistic-version
-checks must execute inside the writer after the record lock, password security
-checks must remain outside long-held locks, and audit must use the same database
-transaction. Callback purity and correct normalization require integration tests;
-the type signature alone cannot enforce them.
+matching completion before propagating failure. Laboratory-only calls to
+`createCompany` and `updateCompany` use that path with the public guards bypassed:
+business uniqueness and optimistic-version checks run inside the writer, password
+security checks outside the long-held lock, and audit on the same transaction.
+The tests use fake password verification and synthetic data. Real HTTP CSRF,
+cross-node rollout, credential custody and provider behavior are not established.
+Callback purity and normalization require independent review; type signatures
+alone cannot enforce them.
