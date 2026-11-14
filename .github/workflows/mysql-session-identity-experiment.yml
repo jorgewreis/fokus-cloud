@@ -10,6 +10,7 @@ on:
       - 'tests/Deployment/probe_laravel_mysql.py'
       - 'tests/Deployment/probe_laravel_mysql.php'
       - 'tests/Deployment/probe_upgrade_mysql_consumer.py'
+      - 'tests/Deployment/probe_listener_swap.py'
 
 permissions:
   contents: read
@@ -75,3 +76,66 @@ jobs:
           docker exec --user 1000:1000 -w /tmp "$qa" python3 probe_upgrade_mysql_consumer.py
           docker exec --user 1000:1000 -w /tmp "$qa" python3 probe_laravel_mysql.py /tmp/fokus-probe-app
           docker exec --user 1000:1000 -w /tmp "$qa" python3 probe_laravel_mysql.py /tmp/fokus-probe-baseline
+      - name: Switch a real loopback listener between isolated servers
+        shell: bash
+        run: |
+          set -euo pipefail
+          prefix="mysql-swap-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          net="$prefix-net"; a="$prefix-a"; b="$prefix-b"; qa="$prefix-qa"
+          password="$(openssl rand -hex 24)"
+          echo "::add-mask::$password"
+          image='percona/percona-server@sha256:d24391a363426239220c35b9707d6b26ce7522ac27abe55689baebfb48bd9fb3'
+          trap 'docker rm -f "$qa" "$a" "$b" >/dev/null 2>&1 || true; docker network rm "$net" >/dev/null 2>&1 || true' EXIT
+          uid="$(docker run --rm --network none --entrypoint id "$image" -u mysql)"
+          gid="$(docker run --rm --network none --entrypoint id "$image" -g mysql)"
+          [[ "$uid" =~ ^[0-9]+$ && "$gid" =~ ^[0-9]+$ ]]
+          docker network create --internal "$net" >/dev/null
+          test "$(docker network inspect --format '{{.Internal}}' "$net")" = true
+          for db in "$a" "$b"; do
+            docker run -d --name "$db" --network "$net" --tmpfs "/var/lib/mysql:rw,size=1g,uid=$uid,gid=$gid,mode=0700" -e MYSQL_ROOT_PASSWORD="$password" -e MYSQL_ROOT_HOST='%' -e MYSQL_DATABASE=fokus_upgrade_0123456789abcdef "$image" >/dev/null
+            for attempt in $(seq 1 90); do
+              if docker exec -e MYSQL_PWD="$password" "$db" mysqladmin --no-defaults ping -uroot --silent >/dev/null 2>&1; then break; fi
+              if [ "$attempt" = 90 ] || [ "$(docker inspect --format '{{.State.Running}}' "$db")" != true ]; then echo 'Disposable server did not start' >&2; exit 1; fi
+              sleep 2
+            done
+          done
+          uuid_a="$(docker exec -e MYSQL_PWD="$password" "$a" mysql --no-defaults -uroot -Nse 'SELECT @@server_uuid')"
+          uuid_b="$(docker exec -e MYSQL_PWD="$password" "$b" mysql --no-defaults -uroot -Nse 'SELECT @@server_uuid')"
+          [[ "$uuid_a" =~ ^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$ && "$uuid_b" =~ ^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$ && "$uuid_a" != "$uuid_b" ]]
+          ip_a="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$a")"
+          ip_b="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$b")"
+          [[ "$ip_a" =~ ^[0-9.]+$ && "$ip_b" =~ ^[0-9.]+$ && "$ip_a" != "$ip_b" ]]
+          docker run -d --name "$qa" --network "$net" -e APP_ENV=testing -e DB_HOST=127.0.0.1 -e DB_PORT=3306 -e DB_DATABASE=fokus_upgrade_0123456789abcdef -e DB_USERNAME=root -e DB_PASSWORD="$password" mysql-session-probe sleep infinity >/dev/null
+          ns="$(docker exec "$qa" readlink /proc/self/ns/net)"
+          docker exec --user 0 "$qa" sh -ec 'umask 022; printf "%s\n%s\n" "$1" "$2" > /run/fokus-release-mysql.identity; chmod 0444 /run/fokus-release-mysql.identity; printf "%s" "$3" > /run/fokus-proxy-target' identity "$uuid_a" "$ns" "$ip_a"
+          docker cp tests/Deployment/linux_disposable_mysql.py "$qa":/tmp/
+          docker cp tests/Deployment/probe_listener_swap.py "$qa":/tmp/
+          docker exec --user 1000:1000 "$qa" mkdir /tmp/fokus-probe-app /tmp/fokus-probe-baseline
+          git archive HEAD | docker exec -i --user 1000:1000 "$qa" tar -x -C /tmp/fokus-probe-app
+          docker cp vendor "$qa":/tmp/fokus-probe-app/
+          tar -C "$RUNNER_TEMP/fokus-probe-baseline" --exclude=vendor -cf - . | docker exec -i --user 1000:1000 "$qa" tar -x -C /tmp/fokus-probe-baseline
+          docker cp "$RUNNER_TEMP/fokus-probe-baseline/vendor" "$qa":/tmp/fokus-probe-baseline/
+          docker exec -d "$qa" python3 /tmp/probe_listener_swap.py proxy "$ip_a" "$ip_b"
+          ready=false
+          for attempt in $(seq 1 50); do
+            if docker exec "$qa" python3 -c 'import socket; s=socket.socket(); s.settimeout(1); s.connect(("127.0.0.1",3306)); s.close()' >/dev/null 2>&1; then ready=true; break; fi
+            sleep .2
+          done
+          test "$ready" = true
+          for case in ddl restore pdo dump candidate baseline; do
+            docker exec --user 0 "$qa" sh -ec 'rm -f /tmp/fokus-preflight-ready /run/fokus-proxy-switched; printf "%s" "$1" > /run/fokus-proxy-target' switch "$ip_a"
+            docker exec --user 1000:1000 -w /tmp "$qa" python3 probe_listener_swap.py "$case" > "$RUNNER_TEMP/swap-$case.log" 2>&1 &
+            client=$!
+            ready=false
+            for attempt in $(seq 1 100); do
+              if docker exec "$qa" test -f /tmp/fokus-preflight-ready; then ready=true; break; fi
+              if ! kill -0 "$client" 2>/dev/null; then break; fi
+              sleep .2
+            done
+            if [ "$ready" != true ]; then cat "$RUNNER_TEMP/swap-$case.log"; wait "$client" || true; exit 1; fi
+            docker exec --user 0 "$qa" sh -ec 'printf "%s" "$1" > /run/fokus-proxy-target; touch /run/fokus-proxy-switched' switch "$ip_b"
+            if ! wait "$client"; then cat "$RUNNER_TEMP/swap-$case.log"; exit 1; fi
+            cat "$RUNNER_TEMP/swap-$case.log"
+          done
+          check="$(docker exec -e MYSQL_PWD="$password" "$b" mysql --no-defaults -uroot -Nse "SELECT (SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name='fokus_swap_must_not_exist')+(SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='fokus_upgrade_0123456789abcdef' AND table_name IN ('fokus_swap_restore','fokus_swap_pdo'))")"
+          test "$check" = 0
