@@ -1265,6 +1265,33 @@ test('ativar módulo não dispara a ação nem o toast mais de uma vez', async (
     await expect.poll(() => page.locator('#backoffice-toast-container .fs-toast').count()).toBe(1);
 });
 
+test('planos impedem ações repetidas enquanto a ativação está em andamento', async ({ page }) => {
+    let requests = 0;
+    let release;
+    await page.route('**/api/backoffice/plans', async (route) => {
+        const response = await route.fetch();
+        const data = await response.json();
+        await route.fulfill({ response, json: data.map((plan) => ({ ...plan, status: 'inativo', publication_state: 'pausado' })) });
+    });
+    await page.route('**/api/backoffice/catalog/plans/PLN_1/activate', async (route) => {
+        requests += 1;
+        await new Promise((resolve) => { release = resolve; });
+        await route.fulfill({ status: 422, json: { message: 'Não foi possível ativar.' } });
+    });
+    await page.goto('/backoffice/planos');
+    const activate = page.locator('#plan-list [data-plan-action="activate"]');
+    await expect(activate).toHaveCount(1);
+    await activate.evaluate((button) => { button.click(); button.click(); });
+    await expect.poll(() => requests).toBe(1);
+    await page.waitForTimeout(200);
+    expect(requests).toBe(1);
+    release();
+    await expect(activate).toBeEnabled();
+    await activate.click();
+    await expect.poll(() => requests).toBe(2);
+    release();
+});
+
 test('planos replica o contrato visual, composição e estados do drawer', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/backoffice/planos');
