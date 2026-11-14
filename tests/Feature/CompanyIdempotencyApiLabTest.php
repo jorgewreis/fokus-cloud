@@ -173,6 +173,7 @@ class CompanyIdempotencyApiLabTest extends TestCase
         $request = Request::create('/api/backoffice/test', 'POST');
         $request->setLaravelSession($session);
         app(PlatformSessionAuthority::class)->activate($request, $admin);
+        $this->withCookie((string) config('session.cookie'), $session->getId())->withCredentials();
 
         return $this;
     }

@@ -9,21 +9,26 @@ use App\Services\CompanyIdempotencyKeys;
 use App\Services\CompanyIdempotencyStore;
 use App\Services\PlatformSessionAuthority;
 use App\Services\PrefixedUlid;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Tests\Isolated\CompanyIdempotencyMySqlLabGuard;
 use Tests\TestCase;
 
 class PlatformSessionAuthorityTest extends TestCase
 {
-    use DatabaseMigrations;
-
     protected function setUp(): void
     {
         parent::setUp();
+        require_once dirname(__DIR__).'/Isolated/CompanyIdempotencyMySqlLabGuard.php';
+        if (config('database.default') === 'sqlite') {
+            CompanyIdempotencyMySqlLabGuard::checkInMemorySqlite(config('app.env'), config('database.default'), config('database.connections.sqlite'));
+        } else {
+            CompanyIdempotencyMySqlLabGuard::assertBeforeFresh();
+        }
+        $this->artisan('migrate:fresh')->assertSuccessful();
         $this->seed();
         config()->set('platform_session_authority.enabled', true);
         config()->set('session.driver', 'database');
@@ -62,7 +67,8 @@ class PlatformSessionAuthorityTest extends TestCase
         $request = $this->request('authority-session-b');
         $this->sessionRow($request->session()->getId());
         app(PlatformSessionAuthority::class)->activate($request, $admin);
-        Auth::guard('platform')->login($admin);
+        $this->actingAs($admin, 'platform');
+        $this->assertActiveAuthority($request, $admin);
 
         $result = app(PlatformSessionAuthority::class)->withinMutation($request, 'platform.access', fn (): string => 'written');
 
@@ -76,7 +82,7 @@ class PlatformSessionAuthorityTest extends TestCase
         $this->sessionRow($request->session()->getId());
         app(PlatformSessionAuthority::class)->activate($request, $admin);
         app(PlatformSessionAuthority::class)->invalidate($request);
-        Auth::guard('platform')->login($admin);
+        $this->actingAs($admin, 'platform');
 
         $this->expectException(HttpException::class);
         app(PlatformSessionAuthority::class)->withinMutation($request, 'platform.access', fn (): string => 'must-not-write');
@@ -97,7 +103,8 @@ class PlatformSessionAuthorityTest extends TestCase
         $request = $this->request('authority-session-idempotency');
         $this->sessionRow($request->session()->getId());
         app(PlatformSessionAuthority::class)->activate($request, $admin);
-        Auth::guard('platform')->login($admin);
+        $this->actingAs($admin, 'platform');
+        $this->assertActiveAuthority($request, $admin);
         $store = new CompanyIdempotencyStore(
             new CompanyIdempotencyKeys(['synthetic' => base64_encode(str_repeat('k', 32))], 'synthetic', []),
             new CompanyIdempotencyAuthorization,
@@ -137,6 +144,12 @@ class PlatformSessionAuthorityTest extends TestCase
             'payload' => '',
             'last_activity' => now()->timestamp,
         ]);
+    }
+
+    private function assertActiveAuthority(Request $request, PlatformAdmin $admin): void
+    {
+        self::assertSame($admin->id, Auth::guard('platform')->id());
+        self::assertSame($admin->id, DB::table('platform_session_authorities')->where('session_id', $request->session()->getId())->value('platform_admin_id'));
     }
 
     private function admin(): PlatformAdmin
