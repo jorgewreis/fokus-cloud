@@ -200,3 +200,11 @@ so a capture denial cannot itself end support first. Neither change proves all
 login or support races; the default flag is still false. HTTP tests for these
 pre-effect gates use synthetic tokens and must run only against an isolated test
 database. Never infer production readiness from the temporary 503 responses.
+
+The separate `PrincipalSecurityToken` prototype serializes on the user before
+locking and consuming the token. Its membership mutation groups token,
+membership, unit memberships and invitation; its email mutation groups token,
+user, company and a same-connection audit callback. Neither path is wired to
+controllers. Their SQLite rollback tests do not cover real HTTP, MySQL, audit
+side effects, Eloquent model events, email uniqueness races or session persistence.
+Do not remove the token gates on the strength of these primitives.

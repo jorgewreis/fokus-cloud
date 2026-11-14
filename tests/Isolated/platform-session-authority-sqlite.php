@@ -14,6 +14,7 @@ require __DIR__.'/../../app/Services/CompanyIdempotencyFactory.php';
 require __DIR__.'/../../app/Services/PlatformSessionBinding.php';
 require __DIR__.'/../../app/Services/PlatformSessionLifecycle.php';
 require __DIR__.'/../../app/Services/WebPrincipalGeneration.php';
+require __DIR__.'/../../app/Services/PrincipalSecurityToken.php';
 require __DIR__.'/../../app/Http/Controllers/Api/AuthController.php';
 
 use App\Http\Controllers\Api\AuthController;
@@ -25,6 +26,7 @@ use App\Services\CompanyIdempotencyStore;
 use App\Services\PlatformSessionAuthority;
 use App\Services\PlatformSessionBinding;
 use App\Services\PlatformSessionLifecycle;
+use App\Services\PrincipalSecurityToken;
 use App\Services\WebPrincipalGeneration;
 use Illuminate\Config\Repository;
 use Illuminate\Database\Capsule\Manager as Capsule;
@@ -104,9 +106,42 @@ foreach ([
 }
 $check(! $unknownConsumed);
 $fixturePlatformOnly($markerA);
-$db->statement('CREATE TABLE users (id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT \'ativa\', locked_until TEXT, password TEXT)');
+$db->statement('CREATE TABLE users (id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT \'ativa\', locked_until TEXT, password TEXT, email TEXT, email_verified_at TEXT)');
 $db->statement('CREATE TABLE web_principal_generations (user_id TEXT PRIMARY KEY, generation INTEGER NOT NULL, updated_at TEXT NOT NULL)');
 $db->table('users')->insert(['id' => 'principal', 'password' => 'synthetic-hash']);
+$db->statement('CREATE TABLE security_tokens (id TEXT PRIMARY KEY, user_id TEXT, purpose TEXT, token_hash TEXT UNIQUE, payload TEXT, expires_at TEXT, used_at TEXT, updated_at TEXT)');
+$db->table('security_tokens')->insert(['id' => 'test-token', 'user_id' => 'principal', 'purpose' => 'membership_acceptance', 'token_hash' => hash('sha256', 'synthetic-plain'), 'expires_at' => now()->addHour()]);
+$tokenPrimitive = new PrincipalSecurityToken;
+$db->table('security_tokens')->insert(['id' => 'email-token', 'user_id' => 'principal', 'purpose' => 'email_verification', 'token_hash' => hash('sha256', 'email-plain'), 'payload' => json_encode(['new_email' => 'synthetic@example.test']), 'expires_at' => now()->addHour()]);
+try {
+    $tokenPrimitive->verifyEmail('email-plain', function (): void {
+        throw new RuntimeException('audit failure');
+    });
+    throw new LogicException('Email audit failure was suppressed.');
+} catch (RuntimeException $e) {
+    $check($e->getMessage() === 'audit failure');
+}
+$check($db->table('security_tokens')->where('id', 'email-token')->value('used_at') === null);
+$check($db->table('users')->where('id', 'principal')->value('email') === null);
+$check($tokenPrimitive->verifyEmail('email-plain', fn () => null)['user_id'] === 'principal');
+try {
+    $tokenPrimitive->consume('synthetic-plain', 'membership_acceptance', function () use ($db): void {
+        $db->table('synthetic_passwords')->where('id', 'synthetic-user')->update(['password' => 'after']);
+        throw new RuntimeException('synthetic mutation failure');
+    });
+    throw new LogicException('Token mutation failure was suppressed.');
+} catch (RuntimeException $e) {
+    $check($e->getMessage() === 'synthetic mutation failure');
+}
+$check($db->table('security_tokens')->where('id', 'test-token')->value('used_at') === null);
+$check($db->table('synthetic_passwords')->where('id', 'synthetic-user')->value('password') === 'before');
+$check($tokenPrimitive->consume('synthetic-plain', 'membership_acceptance', fn () => 'accepted') === 'accepted');
+try {
+    $tokenPrimitive->consume('synthetic-plain', 'membership_acceptance', fn () => null);
+    throw new LogicException('Consumed token was accepted again.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 422);
+}
 $generations = new WebPrincipalGeneration;
 $loginUser = (new User)->newFromBuilder(['id' => 'principal', 'status' => 'ativa', 'password' => 'synthetic-hash']);
 $check($generations->snapshotForLogin($loginUser) === ['user_id' => 'principal', 'generation' => 0]);
@@ -233,12 +268,28 @@ try {
 } catch (LogicException) {
     $check(true);
 }
-$db->statement('CREATE TABLE company_memberships (id TEXT PRIMARY KEY, user_id TEXT, status TEXT, version INTEGER, updated_at TEXT)');
+$db->statement('CREATE TABLE company_memberships (id TEXT PRIMARY KEY, user_id TEXT, company_id TEXT, status TEXT, version INTEGER, updated_at TEXT)');
 $db->statement('CREATE TABLE law_unit_memberships (id TEXT PRIMARY KEY, company_membership_id TEXT, status TEXT, version INTEGER, updated_at TEXT)');
 $db->statement('CREATE TABLE company_invitations (id TEXT PRIMARY KEY, membership_id TEXT, accepted_at TEXT, updated_at TEXT)');
-$db->table('company_memberships')->insert(['id' => 'member', 'user_id' => 'synthetic-user', 'status' => 'pendente', 'version' => 1]);
+$db->table('company_memberships')->insert(['id' => 'member', 'user_id' => 'synthetic-user', 'company_id' => 'company', 'status' => 'pendente', 'version' => 1]);
 $db->table('law_unit_memberships')->insert(['id' => 'unit', 'company_membership_id' => 'member', 'status' => 'pendente', 'version' => 1]);
 $db->table('company_invitations')->insert(['id' => 'invite', 'membership_id' => 'member']);
+$db->table('users')->insert(['id' => 'synthetic-user', 'password' => 'synthetic-hash']);
+$db->table('security_tokens')->insert(['id' => 'membership-token', 'user_id' => 'synthetic-user', 'purpose' => 'membership_acceptance', 'token_hash' => hash('sha256', 'membership-plain'), 'payload' => json_encode(['membership_id' => 'member']), 'expires_at' => now()->addHour()]);
+$db->statement("CREATE TRIGGER fail_atomic_invite BEFORE UPDATE ON company_invitations BEGIN SELECT RAISE(FAIL, 'synthetic invite failure'); END");
+try {
+    $tokenPrimitive->acceptMembership('membership-plain');
+    throw new LogicException('Invitation update failure was suppressed.');
+} catch (QueryException) {
+    $check($db->table('security_tokens')->where('id', 'membership-token')->value('used_at') === null);
+}
+$check($db->table('company_memberships')->where('id', 'member')->value('status') === 'pendente');
+$check($db->table('law_unit_memberships')->where('id', 'unit')->value('status') === 'pendente');
+$db->statement('DROP TRIGGER fail_atomic_invite');
+$check($tokenPrimitive->acceptMembership('membership-plain') === ['user_id' => 'synthetic-user', 'company_id' => 'company']);
+$db->table('company_memberships')->where('id', 'member')->update(['status' => 'pendente', 'version' => 1]);
+$db->table('law_unit_memberships')->where('id', 'unit')->update(['status' => 'pendente', 'version' => 1]);
+$db->table('company_invitations')->where('id', 'invite')->update(['accepted_at' => null]);
 $controller = (new ReflectionClass(AuthController::class))->newInstanceWithoutConstructor();
 $activate = new ReflectionMethod($controller, 'activatePasswordMembership');
 $user = new User;
