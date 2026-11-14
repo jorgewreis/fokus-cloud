@@ -1,16 +1,9 @@
 import { test, expect } from '@playwright/test';
 
-test('sidebar inicial respeita hover e mantém ordem inicial de teclado', async ({ page }) => {
+test('sidebar recolhida após saída do ponteiro mantém ordem inicial de teclado', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
+    await page.clock.install();
     await page.mouse.move(900, 800);
-    await page.addInitScript(() => {
-        window.__sidebarEvents = [];
-        for (const type of ['mouseover', 'focusin', 'pointerdown']) {
-            document.addEventListener(type, (event) => {
-                if (event.target.closest?.('#sidebar')) window.__sidebarEvents.push({ type, target: event.target.id || event.target.className, trusted: event.isTrusted });
-            }, true);
-        }
-    });
     await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ json: { admin: {
         id: 'PAD_TEST', name: 'Admin Teste', role: 'superadministrador',
         permissions: ['platform.security.manage', 'platform.catalog.manage', 'platform.catalog.publish', 'platform.users.view', 'platform.subscriptions.manage', 'platform.payments.view'],
@@ -20,20 +13,35 @@ test('sidebar inicial respeita hover e mantém ordem inicial de teclado', async 
     // Chromium on Linux can reset the pointer during navigation and send a
     // trusted mouseover to the sidebar; move it away after navigation too.
     await page.mouse.move(901, 800);
-    const initial = await page.evaluate(() => ({
-        width: window.innerWidth,
-        responsive: matchMedia('(max-width: 1919px)').matches,
-        hovered: document.querySelector('#sidebar').matches(':hover'),
-        focused: document.activeElement?.tagName,
-        sidebarHoverEvent: window.__sidebarEvents.some((event) => event.type === 'mouseover' && event.trusted),
-    }));
-    expect(initial).toMatchObject({ width: 1440, responsive: true, hovered: false, focused: 'BODY' });
-    await expect(page.locator('#sidebar')).toHaveClass(initial.sidebarHoverEvent ? /expanded/ : /single/);
+    await expect(page.locator('#sidebar')).not.toHaveCSS('display', 'none');
+    // Advance the existing 60-second idle timer and its collapse transition;
+    // this exercises the real mouseleave handler without altering its classes.
+    await page.clock.fastForward(60_000);
+    await page.clock.fastForward(600);
+    await expect(page.locator('#sidebar')).toHaveClass(/single/);
+    await expect(page.locator('#sidebar')).not.toHaveClass(/expanded/);
+    expect(await page.locator('#sidebar').evaluate((element) => element.matches(':hover'))).toBe(false);
     await page.keyboard.press('Tab');
     await expect(page.locator('#sidebar [data-sidebar-item="platform-dashboard-final"]')).toBeFocused();
     await expect(page.locator('#sidebar [data-sidebar-item="platform-dashboard-final"]')).toHaveCSS('outline-width', '3px');
     await page.keyboard.press('Tab');
     await expect(page.locator('#sidebar [data-sidebar-item="companies"]')).toBeFocused();
+});
+
+test('sidebar expande no hover e recolhe após saída do ponteiro', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.clock.install();
+    await page.mouse.move(900, 800);
+    await page.goto('/backoffice/empresas');
+    await expect(page.locator('[data-backoffice-page="companies"]').first()).toBeVisible();
+    await page.mouse.move(900, 800);
+    await page.locator('#sidebar [data-sidebar-item="companies"]').hover();
+    await expect(page.locator('#sidebar')).toHaveClass(/expanded/);
+    await page.mouse.move(900, 800);
+    await page.clock.fastForward(60_000);
+    await page.clock.fastForward(600);
+    await expect(page.locator('#sidebar')).toHaveClass(/single/);
+    await expect(page.locator('#sidebar')).not.toHaveClass(/expanded/);
 });
 
 test('sidebar mantém nomes e foco visível ao navegar por teclado', async ({ page }) => {
