@@ -72,6 +72,35 @@ class ProductInterestTest extends TestCase
         $this->assertDatabaseHas('product_interests', ['id' => $id, 'status' => 'qualificado']);
     }
 
+    public function test_interest_product_options_respect_catalog_permission_and_keep_historical_codes(): void
+    {
+        $admin = PlatformAdmin::where('email', 'admin@example.test')->firstOrFail();
+        DB::table('products')->insert([
+            'id' => PrefixedUlid::make('PRD'), 'code' => 'future', 'name' => 'Produto Futuro', 'active' => false,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('product_interests')->insert([
+            'id' => PrefixedUlid::make('INT'), 'name' => 'Pessoa', 'email' => 'history@example.test',
+            'products' => json_encode(['legacy']), 'profiles' => '[]', 'privacy_version' => '2.0',
+            'status' => 'novo', 'consented_at' => now(), 'last_submitted_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/product-interests-options')
+            ->assertOk()->assertJsonFragment(['code' => 'future', 'name' => 'Produto Futuro'])
+            ->assertJsonFragment(['code' => 'legacy', 'name' => 'legacy']);
+
+        DB::table('platform_role_permissions')->where('platform_role_id', $admin->platform_role_id)
+            ->where('platform_permission_id', DB::table('platform_permissions')->where('code', 'platform.catalog.manage')->value('id'))->delete();
+        $admin->unsetRelation('role');
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/product-interests-options')
+            ->assertOk()->assertJsonMissing(['code' => 'future'])->assertJsonFragment(['code' => 'legacy', 'name' => 'legacy']);
+
+        DB::table('platform_role_permissions')->where('platform_role_id', $admin->platform_role_id)
+            ->where('platform_permission_id', DB::table('platform_permissions')->where('code', 'platform.product_interests.manage')->value('id'))->delete();
+        $admin->unsetRelation('role');
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/product-interests-options')->assertForbidden();
+    }
+
     public function test_interest_rejects_a_stale_privacy_notice_without_persisting_data(): void
     {
         $this->postJson('/api/product-interests', [
