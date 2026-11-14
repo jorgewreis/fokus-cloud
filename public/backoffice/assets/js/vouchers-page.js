@@ -56,6 +56,11 @@ const snapshotObject = (value) => {
     try { return JSON.parse(value); } catch { return {}; }
 };
 
+let voucherMutation = null;
+const voucherMutationListeners = new Set();
+const notifyVoucherMutation = () => voucherMutationListeners.forEach((listener) => listener());
+const uncertainVoucherResult = (error) => !error.status || error.status === 408 || error.status >= 500;
+
 export async function mount(root, context = {}) {
     const $ = (selector) => root.querySelector(selector) || document.querySelector(selector);
     const api = context.api || window.FokusApi;
@@ -71,6 +76,8 @@ export async function mount(root, context = {}) {
     const actionTrigger = $("#voucher-action-trigger");
     const actionModal = window.FokusStyles?.Modal?.getOrCreateInstance(actionTrigger);
     const pageSignal = context.signal;
+    let disposed = false;
+    const live = () => !disposed && !pageSignal?.aborted && root.isConnected;
     const state = {
         vouchers: [],
         meta: { total: 0, last_page: 1 },
@@ -243,7 +250,7 @@ export async function mount(root, context = {}) {
         $("#voucher-detail-reservations").innerHTML = reservations.length ? reservations.map(reservationCard).join("") : '<p class="fs-u-m-0 fs-u-color-secondary">Nenhuma reserva de checkout registrada.</p>';
         const editable = canPublish || permissions.has?.("platform.vouchers.manage");
         $("#voucher-view-edit").hidden = !editable || Number(redemptions.length) > 0 || voucher.status === "encerrada";
-        $("#voucher-view-edit").disabled = !editable || Number(redemptions.length) > 0 || voucher.status === "encerrada";
+        $("#voucher-view-edit").disabled = Boolean(voucherMutation) || !editable || Number(redemptions.length) > 0 || voucher.status === "encerrada";
         $("#voucher-drawer-content")?.setAttribute("aria-busy", "false");
     };
 
@@ -411,13 +418,13 @@ export async function mount(root, context = {}) {
             const lastPage = Math.max(1, Number(response.meta?.last_page) || 1);
             if (state.page > lastPage) {
                 state.page = lastPage;
-                await loadVouchers();
-                return;
+                return await loadVouchers();
             }
             state.vouchers = response.data || [];
             state.meta = response.meta || { total: 0, last_page: 1 };
             render();
-            showMessage("");
+            if (voucherMutation) syncVoucherMutation(); else showMessage("");
+            return true;
         } catch (error) {
             if (error.name === "AbortError" || pageSignal?.aborted || requestId !== state.requestId) return;
             list.innerHTML = '<tr><td colspan="8">Não foi possível carregar os vouchers.</td></tr>';
@@ -427,7 +434,8 @@ export async function mount(root, context = {}) {
             $("[data-fs-datatable-error-message]").textContent = error.message || "Não foi possível carregar os vouchers.";
             $("[data-fs-datatable-error]").hidden = false;
             table.setAttribute("aria-busy", "false");
-            showMessage(error.message || "Não foi possível carregar os vouchers.");
+            if (voucherMutation) syncVoucherMutation(); else showMessage(error.message || "Não foi possível carregar os vouchers.");
+            return false;
         }
     };
 
@@ -553,37 +561,61 @@ export async function mount(root, context = {}) {
         state.actionTrigger = null;
     };
 
+    const syncVoucherMutation = () => {
+        if (!live()) return;
+        createTrigger.disabled = Boolean(voucherMutation);
+        $("#voucher-form-submit").disabled = Boolean(voucherMutation);
+        $("#voucher-action-submit").disabled = Boolean(voucherMutation);
+        $("#voucher-view-edit").disabled = Boolean(voucherMutation) || $("#voucher-view-edit").hidden;
+        list.querySelectorAll('[data-voucher-action]:not([data-voucher-action="view"])').forEach((button) => { button.disabled = Boolean(voucherMutation); });
+        const progress = $("#voucher-mutation-progress");
+        progress.textContent = voucherMutation === "pending" ? "Há uma alteração de voucher em andamento. Aguarde o resultado." : "";
+        progress.hidden = voucherMutation !== "pending";
+        if (voucherMutation === "uncertain") showMessage("Atualize a página e confira a situação do voucher antes de tentar novamente.");
+    };
+    voucherMutationListeners.add(syncVoucherMutation);
+    const beginVoucherMutation = () => {
+        if (voucherMutation) return false;
+        voucherMutation = "pending";
+        notifyVoucherMutation();
+        return true;
+    };
+    const finishVoucherMutation = async () => {
+        if (!live()) { voucherMutation = "uncertain"; return false; }
+        const refreshed = await loadVouchers();
+        if (!live() || !refreshed) { voucherMutation = "uncertain"; return false; }
+        voucherMutation = null;
+        return true;
+    };
+    const failVoucherMutation = (error) => {
+        voucherMutation = uncertainVoucherResult(error) ? "uncertain" : null;
+    };
     const submitAction = async (event) => {
         event.preventDefault();
-        if (!state.pendingAction) return;
+        if (voucherMutation || !state.pendingAction) return;
         const actionForm = $("#voucher-action-form");
         if (!window.FokusForm?.validate(actionForm) && window.FokusForm) return;
         if (!actionForm.reportValidity()) return;
         const { action, voucher } = state.pendingAction;
         const reason = new FormData(actionForm).get("reason");
-        window.FokusForm?.setLoading(actionForm, true);
+        if (!beginVoucherMutation()) return;
         $("#voucher-action-error").hidden = true;
-        $("#voucher-action-submit").disabled = true;
         try {
             const response = action === "delete"
-                ? await api.request(`/backoffice/vouchers/${encodeURIComponent(voucher.id)}`, { method: "DELETE", body: { reason }, signal: pageSignal })
-                : await api.request(`/backoffice/vouchers/${encodeURIComponent(voucher.id)}/archive`, { method: "POST", body: { reason }, signal: pageSignal });
-            await window.FokusForm?.setLoading(actionForm, false);
-            actionModal?.hide();
-            await loadVouchers();
-            showMessage(response?.message || (action === "delete" ? "Voucher excluído." : "Voucher arquivado."), "success");
+                ? await api.request(`/backoffice/vouchers/${encodeURIComponent(voucher.id)}`, { method: "DELETE", body: { reason } })
+                : await api.request(`/backoffice/vouchers/${encodeURIComponent(voucher.id)}/archive`, { method: "POST", body: { reason } });
+            if (live()) actionModal?.hide();
+            if (await finishVoucherMutation()) showMessage(response?.message || (action === "delete" ? "Voucher excluído." : "Voucher arquivado."), "success");
         } catch (error) {
-            $("#voucher-action-error").textContent = error.message || "Não foi possível concluir a ação.";
-            $("#voucher-action-error").hidden = false;
-        } finally {
-            await window.FokusForm?.setLoading(actionForm, false);
-        }
+            failVoucherMutation(error);
+            if (live() && !voucherMutation) { $("#voucher-action-error").textContent = error.message || "Não foi possível concluir a ação."; $("#voucher-action-error").hidden = false; }
+        } finally { notifyVoucherMutation(); }
     };
 
     const submitVoucher = async (event) => {
         event.preventDefault();
         const drawerState = drawer.getState();
-        if (drawerState.mode === "view") return;
+        if (voucherMutation || drawerState.mode === "view") return;
         const editId = drawerState.mode === "edit" ? String(state.currentVoucher?.id || drawerState.record?.id || form.dataset.recordId || "") : "";
         if (drawerState.mode === "edit" && !editId) {
             await setStatus(false, "Não foi possível identificar o voucher que será atualizado.");
@@ -617,29 +649,18 @@ export async function mount(root, context = {}) {
             $("#voucher-discount-amount").focus();
             return;
         }
-        await setStatus(true);
+        if (!beginVoucherMutation()) return;
         try {
             const editing = Boolean(editId);
             await api.request(editing ? `/backoffice/vouchers/${encodeURIComponent(editId)}` : "/backoffice/vouchers", {
-                method: editing ? "PATCH" : "POST",
-                body: payload,
-                signal: pageSignal,
+                method: editing ? "PATCH" : "POST", body: payload,
             });
-            await window.FokusForm?.setLoading(form, false);
-            $("#voucher-form-submit").disabled = false;
-            closeDrawer();
-            await loadVouchers();
-            showMessage(editing ? "Voucher atualizado." : "Voucher cadastrado.", "success");
+            if (live()) closeDrawer();
+            if (await finishVoucherMutation()) showMessage(editing ? "Voucher atualizado." : "Voucher cadastrado.", "success");
         } catch (error) {
-            if (error.name === "AbortError") return;
-            window.FokusForm?.mapServerErrors(form, error.errors);
-            await setStatus(false, error.message || "Não foi possível salvar o voucher.");
-        } finally {
-            if (!pageSignal?.aborted) {
-                await window.FokusForm?.setLoading(form, false);
-                $("#voucher-form-submit").disabled = false;
-            }
-        }
+            failVoucherMutation(error);
+            if (live() && !voucherMutation) { window.FokusForm?.mapServerErrors(form, error.errors); await setStatus(false, error.message || "Não foi possível salvar o voucher."); }
+        } finally { notifyVoucherMutation(); }
     };
 
     listen(createTrigger, "click", openCreate);
@@ -708,7 +729,7 @@ export async function mount(root, context = {}) {
     });
     listen(list, "click", (event) => {
         const button = event.target.closest("[data-voucher-action]");
-        if (!button) return;
+        if (!button || (voucherMutation && button.dataset.voucherAction !== "view")) return;
         const voucher = state.vouchers.find((item) => String(item.id) === button.dataset.voucherId);
         if (!voucher) return;
         const action = button.dataset.voucherAction;
@@ -718,7 +739,7 @@ export async function mount(root, context = {}) {
         else if (action === "pause" || action === "reactivate") updateVoucherStatus(voucher, action, button);
     });
     listen($("#voucher-view-edit"), "click", () => {
-        if (!state.currentVoucher) return;
+        if (voucherMutation || !state.currentVoucher) return;
         openEdit(state.currentVoucher, $("#voucher-view-edit"));
     });
     listen($("#voucher-action-form"), "submit", submitAction);
@@ -729,15 +750,18 @@ export async function mount(root, context = {}) {
     });
 
     async function updateVoucherStatus(voucher, action, trigger) {
+        if (!beginVoucherMutation()) return;
         const status = action === "pause" ? "suspensa" : "ativa";
         try {
-            await api.request(`/backoffice/vouchers/${encodeURIComponent(voucher.id)}`, { method: "PATCH", body: { status }, signal: pageSignal });
-            await loadVouchers();
-            showMessage(action === "pause" ? "Voucher pausado." : "Voucher reativado.", "success");
-            trigger.focus();
+            await api.request(`/backoffice/vouchers/${encodeURIComponent(voucher.id)}`, { method: "PATCH", body: { status } });
+            if (await finishVoucherMutation()) {
+                showMessage(action === "pause" ? "Voucher pausado." : "Voucher reativado.", "success");
+                if (trigger.isConnected) trigger.focus();
+            }
         } catch (error) {
-            if (error.name !== "AbortError") showMessage(error.message || "Não foi possível atualizar o voucher.");
-        }
+            failVoucherMutation(error);
+            if (live() && !voucherMutation) showMessage(error.message || "Não foi possível atualizar o voucher.");
+        } finally { notifyVoucherMutation(); }
     }
 
     listen($("#voucher-action-form"), "reset", () => { $("#voucher-action-error").hidden = true; });
@@ -750,7 +774,10 @@ export async function mount(root, context = {}) {
 
     window.FokusCurrency?.bind(root);
     await Promise.all([loadCatalog(), loadVouchers()]);
+    if (voucherMutation) syncVoucherMutation();
     return () => {
+        disposed = true;
+        voucherMutationListeners.delete(syncVoucherMutation);
         clearTimeout(searchTimer);
         state.detailController?.abort();
         drawer.dispose();
