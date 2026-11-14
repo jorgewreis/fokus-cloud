@@ -1,14 +1,7 @@
 <?php
 
-if (getenv('DASHBOARD_PROOF_ACK') !== 'synthetic-only') {
-    throw new RuntimeException('Use only a disposable synthetic MySQL instance; set DASHBOARD_PROOF_ACK=synthetic-only');
-}
-$proofUser = getenv('DASHBOARD_PROOF_USER');
-$proofPassword = getenv('DASHBOARD_PROOF_PASSWORD');
-if ($proofUser === false || $proofPassword === false) {
-    throw new RuntimeException('Set disposable MySQL credentials in DASHBOARD_PROOF_USER and DASHBOARD_PROOF_PASSWORD');
-}
-$p=new PDO('mysql:host=127.0.0.1;dbname=dashboard_bench;charset=utf8mb4',$proofUser,$proofPassword,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
+require __DIR__.'/laravel-synthetic-bootstrap.php';
+[$p] = dashboardProofTarget();
 if (($argv[1]??'')==='seed') {
   $digits='(SELECT 0 AS n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9)';
   $p->exec("INSERT INTO voucher_redemptions(subscription_id,snapshot,benefit_ends_at) SELECT '00000',JSON_OBJECT('discount_type','trial_free'),NOW()+INTERVAL 1 DAY FROM $digits a CROSS JOIN $digits b CROSS JOIN $digits c"); echo "seeded\n"; exit;

@@ -1,25 +1,12 @@
 <?php
 
-if (getenv('DASHBOARD_PROOF_ACK') !== 'synthetic-only') {
-    throw new RuntimeException('Use only a disposable synthetic MySQL instance; set DASHBOARD_PROOF_ACK=synthetic-only');
-}
-if (getenv('DB_DATABASE') !== 'dashboard_bench' || getenv('DB_HOST') !== '127.0.0.1') {
-    throw new RuntimeException('Set DB_HOST=127.0.0.1 and DB_DATABASE=dashboard_bench for the disposable instance');
-}
-$proofUser = getenv('DASHBOARD_PROOF_USER');
-$proofPassword = getenv('DASHBOARD_PROOF_PASSWORD');
-if ($proofUser === false || $proofPassword === false) {
-    throw new RuntimeException('Set disposable MySQL credentials in DASHBOARD_PROOF_USER and DASHBOARD_PROOF_PASSWORD');
-}
-require '/workspace/vendor/autoload.php';
-$app = require '/workspace/bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+require __DIR__.'/laravel-synthetic-bootstrap.php';
+[$c, $b] = dashboardProofBootstrap();
 use Illuminate\Support\Facades\DB;
-$c=DB::connection();
 $c->statement('SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED');
 $c->beginTransaction();
 $c->table('subscriptions')->where('id','09999')->update(['commercial_snapshot'=>json_encode(['monthly_amount'=>7777])]);
-$b=new PDO('mysql:host=127.0.0.1;dbname=dashboard_bench;charset=utf8mb4',$proofUser,$proofPassword,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
+
 $rows=DB::table('subscriptions as subscription')
   ->leftJoin('voucher_redemptions as redemption','redemption.subscription_id','=','subscription.id')
   ->where('subscription.status','ativa')->orderBy('subscription.id')

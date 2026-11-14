@@ -1,20 +1,9 @@
 <?php
 
-if (getenv('DASHBOARD_PROOF_ACK') !== 'synthetic-only') {
-    throw new RuntimeException('Use only a disposable synthetic MySQL instance; set DASHBOARD_PROOF_ACK=synthetic-only');
-}
-$proofUser = getenv('DASHBOARD_PROOF_USER');
-$proofPassword = getenv('DASHBOARD_PROOF_PASSWORD');
-if ($proofUser === false || $proofPassword === false) {
-    throw new RuntimeException('Set disposable MySQL credentials in DASHBOARD_PROOF_USER and DASHBOARD_PROOF_PASSWORD');
-}
-$dsn = 'mysql:host=127.0.0.1;charset=utf8mb4';
-$options = [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION];
-$a = new PDO($dsn, $proofUser, $proofPassword, $options);
-$b = new PDO($dsn, $proofUser, $proofPassword, $options);
-$a->exec('CREATE DATABASE IF NOT EXISTS dashboard_bench');
-$a->exec('USE dashboard_bench');
-$b->exec('USE dashboard_bench');
+require __DIR__.'/laravel-synthetic-bootstrap.php';
+[$a, $verifyTarget, $proofUser, $proofPassword] = dashboardProofTarget();
+$b = new PDO('mysql:host=127.0.0.1;port=3306;dbname=dashboard_bench;charset=utf8mb4', $proofUser, $proofPassword, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+$verifyTarget($b);
 $a->exec('CREATE TABLE IF NOT EXISTS subscriptions (id CHAR(5) PRIMARY KEY, status VARCHAR(20), created_at DATETIME, commercial_snapshot JSON) ENGINE=InnoDB');
 $a->exec('CREATE TABLE IF NOT EXISTS voucher_redemptions (id INT PRIMARY KEY AUTO_INCREMENT, subscription_id CHAR(5), snapshot JSON, benefit_ends_at DATETIME, INDEX(subscription_id)) ENGINE=InnoDB');
 $existing = (int)$a->query('SELECT COUNT(*) FROM subscriptions')->fetchColumn();

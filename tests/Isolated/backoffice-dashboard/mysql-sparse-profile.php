@@ -1,8 +1,8 @@
 <?php
-if(getenv('DASHBOARD_PROOF_ACK')!=='synthetic-only') throw new RuntimeException('Synthetic only');
-$user=getenv('DASHBOARD_PROOF_USER');$pass=getenv('DASHBOARD_PROOF_PASSWORD');
-if($user===false||$pass===false)throw new RuntimeException('Set disposable credentials');
-$p=new PDO('mysql:host=127.0.0.1;dbname=dashboard_bench;charset=utf8mb4',$user,$pass,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::MYSQL_ATTR_USE_BUFFERED_QUERY=>false]);
+
+require __DIR__.'/laravel-synthetic-bootstrap.php';
+[$p] = dashboardProofTarget();
+$p->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
 $get=function()use($p){$s=$p->query("SHOW SESSION STATUS WHERE Variable_name IN ('Created_tmp_tables','Created_tmp_disk_tables','Sort_rows','Sort_merge_passes')");$v=$s->fetchAll(PDO::FETCH_KEY_PAIR);$s->closeCursor();return $v;};
 $mode=$argv[1]??'';
 if ($mode === 'correlated') {

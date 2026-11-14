@@ -1,12 +1,7 @@
 <?php
-if (getenv('DASHBOARD_PROOF_ACK') !== 'synthetic-only' || getenv('DB_DATABASE') !== 'dashboard_bench' || getenv('DB_HOST') !== '127.0.0.1') {
-    throw new RuntimeException('Use only the disposable dashboard_bench MySQL instance');
-}
-require '/workspace/vendor/autoload.php';
-$app = require '/workspace/bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+require __DIR__.'/laravel-synthetic-bootstrap.php';
+[$c] = dashboardProofBootstrap();
 use Illuminate\Support\Facades\DB;
-$c=DB::connection();
 $c->beginTransaction();
 $rows=DB::table('subscriptions as subscription')
     ->leftJoin('voucher_redemptions as redemption','redemption.subscription_id','=','subscription.id')

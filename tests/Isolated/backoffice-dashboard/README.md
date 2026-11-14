@@ -3,18 +3,29 @@
 Estes scripts são um laboratório sintético para o protótipo do PR #78, não são
 provas do endpoint HTTP completo nem autorização para operar em produção. Use
 somente uma instância MySQL descartável, sem dados reais. `mysql-snapshot.php`
-cria o banco `dashboard_bench` e exige que a tabela de assinaturas esteja vazia;
+exige o banco `dashboard_bench` previamente criado e que a tabela de assinaturas esteja vazia;
 `mysql-benchmark.php seed` acrescenta resgates e não é idempotente. Não execute
 mais de uma geração no mesmo banco. `laravel-snapshot.php` altera linhas e grava
 um resgate no banco sintético, portanto é executado apenas após a primeira prova.
 
-Defina em ambiente local `DASHBOARD_PROOF_ACK=synthetic-only`,
-`DASHBOARD_PROOF_USER` e `DASHBOARD_PROOF_PASSWORD` com credenciais descartáveis.
-Os scripts usam `127.0.0.1` e o banco fixo `dashboard_bench`. A prova Laravel
-exige também `DB_CONNECTION=mysql`, `DB_HOST=127.0.0.1`,
-`DB_DATABASE=dashboard_bench` e credenciais de teste em `DB_USERNAME` e
-`DB_PASSWORD`. O script Laravel supõe aplicação montada em `/workspace` e
-`vendor` instalado. Execute, nessa ordem:
+Antes de executar qualquer script, crie em uma instância MySQL comprovadamente
+isolada e descartável o banco `dashboard_bench` e uma tabela
+`dashboard_proof_marker` com `id` inteiro primário e `marker` CHAR(32). Insira
+apenas `id=1` e um marcador hexadecimal aleatório de 32 caracteres gerado para
+essa instância. Obtenha o `@@server_uuid` da própria instância descartável.
+Este preparo é manual; nunca o execute em servidor ou dados reais.
+
+Defina `DASHBOARD_PROOF_ACK=synthetic-only`, `APP_ENV=testing`,
+`DB_CONNECTION=mysql`, `DB_HOST=127.0.0.1`, `DB_PORT=3306`,
+`DB_DATABASE=dashboard_bench`, credenciais descartáveis iguais em
+`DB_USERNAME`/`DASHBOARD_PROOF_USER` e `DB_PASSWORD`/`DASHBOARD_PROOF_PASSWORD`,
+`DASHBOARD_PROOF_SERVER_UUID` com o UUID verificado e `DASHBOARD_PROOF_MARKER`
+com o marcador criado. `DB_URL`, `DB_SOCKET` e `APP_CONFIG_CACHE` devem estar
+vazios; o checkout não pode conter `.env`, `.env.testing` nem
+`bootstrap/cache/config.php`. Os scripts confirmam UUID, banco e marcador antes
+de qualquer DDL ou escrita; os que usam Laravel também verificam configuração
+resolvida e conexões de leitura e escrita antes de alterar dados. O bootstrap
+Laravel exige aplicação montada em `/workspace` e `vendor` instalado. Execute, nessa ordem:
 
 1. `php tests/Isolated/backoffice-dashboard/mysql-snapshot.php`
 2. `php tests/Isolated/backoffice-dashboard/mysql-benchmark.php seed`
@@ -132,3 +143,18 @@ não do lockfile original deste protótipo. O bootstrap e a configuração PHPUn
 utilizados estão nos arquivos temporários locais `phpunit.dashboard-reuse-bootstrap.php`
 e `phpunit.dashboard-reuse.xml`; não contêm credenciais. O resultado não prova
 a suíte completa, concorrência por HTTP ou validação de produção.
+
+## Proteção do laboratório
+
+`laravel-guard-negative.php` exercita quatorze configurações proibidas sem acesso
+a banco: URL, socket, caminho de cache, host, porta, driver, banco, ambiente,
+credencial, UUID e marcador inválidos e arquivos `.env`, `.env.testing` e cache de configuração.
+A proteção exige confirmação explícita e não transforma um servidor real em
+ambiente descartável; a escolha e preparação da instância continuam a cargo de
+quem executa.
+
+Na revisão desta proteção, as quatorze rejeições foram exercitadas localmente
+antes da conexão; cada um dos nove scripts também recusou uma `DB_URL` hostil.
+A prova positiva da nova proteção contra MySQL permanece pendente: a instância
+descartável não ficou disponível e o Docker deixou de responder durante a
+tentativa. Os ensaios registrados acima são anteriores a esta alteração.
