@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-for (const width of [320, 375]) {
+for (const width of [320, 375, 700]) {
     test(`o menu móvel não cobre o cabeçalho ou o conteúdo em ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 812 });
         await page.mouse.move(width - 10, 800);

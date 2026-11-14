@@ -1,4 +1,4 @@
-"""Exercise origin-shaped history, five migrations, reversal and synthetic restore."""
+"""Exercise origin-shaped history, six migrations, reversal and synthetic restore."""
 import argparse
 import hashlib
 import importlib.util
@@ -29,12 +29,13 @@ EXPECTED_NEW_MIGRATIONS = [
     '2026_11_06_160000_create_law_contact_import_batches_table.php',
     '2026_11_06_170000_create_law_tasks.php',
     REPAIR_MIGRATION,
+    '2026_11_14_000100_create_interest_product_index.php',
 ]
 
 
 def require_new_migrations(names):
     if names != EXPECTED_NEW_MIGRATIONS:
-        raise RuntimeError('Expected exactly five named candidate migrations including the additive checkout repair')
+        raise RuntimeError('Expected exactly six named candidate migrations including the additive checkout repair')
 
 
 def require_origin_shape(result):
@@ -213,13 +214,14 @@ def main():
             execute([str(fixture), str(base), 'versions'], 'versions', base)
             execute(['artisan', 'migrate', '--seed', '--force', '--no-interaction'], 'baseline-migrate-seed', base)
             execute([str(fixture), str(base), 'seed'], 'populate-baseline', base)
+            execute([str(fixture), str(candidate), 'verify-pre-interest-index'], 'interest-index-pre-migration-compat')
             execute([str(origin_fixture), str(candidate), 'fresh-noop'], 'repair-fresh-noop')
             execute([str(origin_fixture), str(candidate), 'prepare-origin'], 'prepare-origin-shape')
             if args.driver == 'mysql':
                 evidence['origin_metadata_comparison'] = capture_baseline_metadata(base, env, sandbox, prefix)
                 evidence['origin_shape_gate'] = require_origin_shape(evidence['origin_metadata_comparison'])
             execute([str(origin_fixture), str(candidate), 'billing-before'], 'repair-billing-before')
-            execute(['artisan', 'migrate', '--force', '--no-interaction'], 'five-migrations')
+            execute(['artisan', 'migrate', '--force', '--no-interaction'], 'six-migrations')
             execute([str(fixture), str(candidate), 'verify-up'], 'verify-up')
             execute([str(origin_fixture), str(candidate), 'billing-after'], 'repair-billing-after')
             execute([str(origin_fixture), str(candidate), 'verify-up'], 'repair-origin-verify')
@@ -234,6 +236,14 @@ def main():
                 shutil.copyfile(db, backup)
             evidence['backup_sha256'] = sha(backup)
             evidence['backup_bytes'] = backup.stat().st_size
+            execute([str(fixture), str(candidate), 'verify-interest-index-backfill'], 'interest-index-backfill')
+            if args.driver == 'mysql':
+                env['FOKUS_INTEREST_INDEX_DISPOSABLE'] = '1'
+                try:
+                    execute([str(candidate / 'tests/Deployment/interest-index-concurrency.php')], 'interest-index-concurrency-rollback')
+                    execute([str(candidate / 'tests/Deployment/interest-index-deadlock.php')], 'interest-index-deadlock-retry')
+                finally:
+                    del env['FOKUS_INTEREST_INDEX_DISPOSABLE']
             execute([str(fixture), str(candidate), 'verify-recovery'], 'roll-forward')
             execute([str(reversal), str(candidate)], 'reversal')
             if (sandbox / 'origin-reversal-delta.json').exists():

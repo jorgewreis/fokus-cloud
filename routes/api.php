@@ -275,6 +275,7 @@ Route::middleware(EnsurePlatformAdmin::class)->prefix('backoffice')->group(funct
     Route::get('/audit', [BackofficeController::class, 'audit'])->middleware(EnsurePlatformPermission::class.':platform.audit.view_commercial');
     Route::get('/audit/access-control', [BackofficeController::class, 'accessControl'])->middleware(EnsurePlatformSuperadmin::class);
     Route::get('/product-interests', [ProductInterestBackofficeController::class, 'index'])->middleware(EnsurePlatformPermission::class.':platform.product_interests.manage');
+    Route::get('/product-interests-options', [ProductInterestBackofficeController::class, 'options'])->middleware(EnsurePlatformPermission::class.':platform.product_interests.manage');
     Route::get('/product-interests/{interest}', [ProductInterestBackofficeController::class, 'show'])->middleware(EnsurePlatformPermission::class.':platform.product_interests.manage');
     Route::patch('/product-interests/{interest}', [ProductInterestBackofficeController::class, 'update'])->middleware(EnsurePlatformPermission::class.':platform.product_interests.manage');
 });

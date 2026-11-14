@@ -39,6 +39,12 @@ function originAllowedColumns(): array
         ['law_cases', 'last_official_movement_at', 'timestamp', 'YES'],
     ];
     $tables = [
+        'interest_product_index' => [
+            'interest_id' => ['char(30)', 'NO'], 'product_code' => ['varchar(120)', 'NO'],
+        ],
+        'interest_product_index_state' => [
+            'id' => ['tinyint unsigned', 'NO'], 'ready' => ['tinyint(1)', 'NO'], 'running' => ['tinyint(1)', 'NO'],
+        ],
         'law_case_publication_reviews' => [
             'id' => ['char(30)', 'NO'], 'company_id' => ['char(30)', 'NO'], 'law_case_id' => ['char(30)', 'NO'],
             'publication_key' => ['varchar(64)', 'NO'], 'status' => ['varchar(20)', 'NO'], 'next_action' => ['text', 'YES'],
@@ -79,7 +85,7 @@ function originAssertSchemaDelta(array $before, array $after, bool $reversed = f
     if (($before['driver'] ?? null) !== 'mysql') {
         return ['scope' => 'Exact origin metadata contract requires MySQL; SQLite exercises functional compatibility only'];
     }
-    $newTables = $reversed ? [] : ['law_case_publication_reviews', 'law_contact_import_batches', 'law_task_events', 'law_tasks'];
+    $newTables = $reversed ? [] : ['interest_product_index', 'interest_product_index_state', 'law_case_publication_reviews', 'law_contact_import_batches', 'law_task_events', 'law_tasks'];
     $added = [];
     foreach ($after['columns'] as $row) {
         if (! in_array($row, $before['columns'], true)) {
@@ -104,6 +110,18 @@ function originAssertSchemaDelta(array $before, array $after, bool $reversed = f
         originRequire($tables === $newTables, 'new table allowlist changed');
         $index = array_values(array_filter($after['indexes'], fn ($row) => $row[0] === 'law_cases' && $row[1] === 'law_cases_last_official_movement_at_index'));
         originRequire(count($index) === 1 && $index[0][2] === 1 && $index[0][3] === 1 && $index[0][4] === 'last_official_movement_at', 'projection index definition changed');
+        $productIndex = array_values(array_filter($after['indexes'], fn ($row) => $row[0] === 'interest_product_index' && $row[1] === 'interest_product_index_product_code_interest_id_index'));
+        originRequire(count($productIndex) === 2 && $productIndex[0][2] === 1 && $productIndex[0][3] === 1 && $productIndex[0][4] === 'product_code' && $productIndex[1][2] === 1 && $productIndex[1][3] === 2 && $productIndex[1][4] === 'interest_id', 'interest code index definition changed');
+        $interestPrimary = array_values(array_filter($after['indexes'], fn ($row) => $row[0] === 'interest_product_index' && $row[1] === 'PRIMARY'));
+        originRequire(count($interestPrimary) === 2 && $interestPrimary[0][2] === 0 && $interestPrimary[0][3] === 1 && $interestPrimary[0][4] === 'interest_id' && $interestPrimary[1][2] === 0 && $interestPrimary[1][3] === 2 && $interestPrimary[1][4] === 'product_code', 'interest unique key changed');
+        $statePrimary = array_values(array_filter($after['indexes'], fn ($row) => $row[0] === 'interest_product_index_state' && $row[1] === 'PRIMARY'));
+        originRequire(count($statePrimary) === 1 && $statePrimary[0][2] === 0 && $statePrimary[0][3] === 1 && $statePrimary[0][4] === 'id', 'interest state primary key changed');
+        $interestForeignKey = array_values(array_filter($after['foreign_keys'], fn ($row) => $row[0] === 'interest_product_index' && $row[2] === 'interest_id'));
+        originRequire(count($interestForeignKey) === 1 && $interestForeignKey[0][4] === 'product_interests' && $interestForeignKey[0][5] === 'id' && $interestForeignKey[0][7] === 'CASCADE', 'interest index foreign key or cascade changed');
+        $interestId = array_values(array_filter($after['columns'], fn ($row) => $row[0] === 'interest_product_index' && $row[1] === 'interest_id'));
+        $productCode = array_values(array_filter($after['columns'], fn ($row) => $row[0] === 'interest_product_index' && $row[1] === 'product_code'));
+        originRequire(count($interestId) === 1 && $interestId[0][6] === 'ascii' && $interestId[0][7] === 'ascii_bin', 'interest identifier collation changed');
+        originRequire(count($productCode) === 1 && $productCode[0][6] === 'utf8mb4' && $productCode[0][7] === 'utf8mb4_bin', 'interest product code collation changed');
     }
 
     return ['status' => 'passed', 'added_columns' => $added, 'new_tables' => $newTables,

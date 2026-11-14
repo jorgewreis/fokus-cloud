@@ -624,7 +624,11 @@ test('checkout assistido segue o drawer de registros em desktop e mobile', async
         await page.route('**/api/backoffice/subscriptions/checkout-options?**', (route) => route.fulfill({
             contentType: 'application/json', body: JSON.stringify({ companies: [{ id: 'COM_ALPHA', legal_name: 'Empresa Alpha' }], products: [{ code: 'law', name: 'Fokus Law', plans: [{ code: 'law-advocacia', name: 'Advocacia', monthly_amount: 64.7, annual_amount: 647 }] }] }),
         }));
+        await page.mouse.move(viewport.width - 10, viewport.height - 10);
         await page.goto('/backoffice/assinaturas');
+        await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'subscriptions');
+        await page.mouse.click(viewport.width - 10, viewport.height - 10);
+        await expect(page.locator('#sidebar')).toHaveClass(/single/);
         await page.getByRole('button', { name: 'Nova assinatura' }).click();
         await expect(page.locator('#subscription-create-drawer')).toBeVisible();
         await expect(page.locator('#subscription-create-company option')).toHaveCount(2);
@@ -1645,4 +1649,36 @@ test('Busca digitada invalida resposta anterior antes do debounce', async ({ pag
     await page.clock.runFor(200);
     await expect(page.locator('#voucher-list')).toContainText('novo termo');
     expect(requests.filter(r => r.search === 'novo termo')).toEqual([{ search: 'novo termo', page: 1 }]);
+});
+
+test('checkout continua acessível pelo teclado depois de abrir a barra lateral', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.route('**/api/backoffice/subscriptions/checkout-options?**', route => route.fulfill({ json: { companies: [], products: [] } }));
+    await page.mouse.move(1270, 790);
+    await page.goto('/backoffice/assinaturas');
+    await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'subscriptions');
+    await page.mouse.click(1270, 790);
+    const sidebar = page.locator('#sidebar');
+    await expect(sidebar).toHaveClass(/single/);
+    const sidebarItem = page.locator('#sidebar [data-sidebar-item="platform-dashboard-final"]');
+    await sidebarItem.focus();
+    await expect(sidebarItem).toBeFocused();
+    await expect(sidebar).toHaveClass(/expanded/);
+    const open = page.getByRole('button', { name: 'Nova assinatura' });
+    let reached = false;
+    for (let step = 0; step < 80; step++) {
+        await page.keyboard.press('Tab');
+        if (await open.evaluate(element => document.activeElement === element)) { reached = true; break; }
+    }
+    expect(reached).toBe(true);
+    await expect(open).toBeFocused();
+    await expect(sidebar).toHaveClass(/expanded/);
+    await page.keyboard.press('Enter');
+    const drawer = page.locator('#subscription-create-drawer');
+    await expect(drawer).toBeVisible();
+    await expect(sidebar).toHaveClass(/expanded/);
+    await expect.poll(async () => { const box = await drawer.boundingBox(); return box.x >= 0 && box.x + box.width <= 1281; }).toBe(true);
+    await expect.poll(() => drawer.evaluate(element => element.contains(document.activeElement))).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(open).toBeFocused();
 });
