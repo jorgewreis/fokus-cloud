@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -14,19 +15,20 @@ final class CompanyIdempotencyStore
         private readonly int $maxOutstanding,
         private readonly int $maxIssuesPerWindow,
         private readonly int $issuanceWindowSeconds,
+        private readonly ?PlatformSessionAuthority $sessionAuthority = null,
     ) {
         if ($maxOutstanding < 1 || $maxOutstanding > 1000 || $maxIssuesPerWindow < 1 || $issuanceWindowSeconds < 1) {
             throw new InvalidArgumentException('Invalid issuance quota.');
         }
     }
 
-    public function issue(string $actor, string $operation, int $lifetimeSeconds): string
+    public function issue(string $actor, string $operation, int $lifetimeSeconds, ?Request $request = null): string
     {
         $this->requireTopLevel();
         $now = now()->getTimestamp();
         $token = $this->keys->issue($actor, $operation, $now, $lifetimeSeconds);
         $claims = $this->keys->verify($token, $actor, $operation, $now);
-        DB::transaction(function () use ($token, $actor, $operation, $claims): void {
+        $this->transaction($request, $actor, null, function () use ($token, $actor, $operation, $claims): void {
             $this->authorization->lockAuthorizedActor($actor);
             $decisionNow = now()->getTimestamp();
             $this->keys->verify($token, $actor, $operation, $decisionNow);
@@ -57,13 +59,13 @@ final class CompanyIdempotencyStore
     }
 
     /** Returns a replay if already completed, otherwise binds the normalized payload. */
-    public function bind(string $token, string $actor, string $operation, ?string $target, array $payload, int $now): ?array
+    public function bind(string $token, string $actor, string $operation, ?string $target, array $payload, int $now, ?Request $request = null): ?array
     {
         $this->requireTopLevel();
         $claims = $this->keys->verify($token, $actor, $operation, $now);
         $digest = $this->keys->payloadDigest($claims['kid'], $operation, $target, $payload);
 
-        return DB::transaction(function () use ($token, $actor, $operation, $target, $claims, $digest): ?array {
+        return $this->transaction($request, $actor, $target, function () use ($token, $actor, $operation, $target, $claims, $digest): ?array {
             $row = $this->lockedRecord($token, $actor, $operation, $claims);
             $this->keys->verify($token, $actor, $operation, now()->getTimestamp());
             $this->authorization->lockAuthorizedActor($actor);
@@ -90,11 +92,11 @@ final class CompanyIdempotencyStore
      * @param  callable(): array{id:string,status:int}  $writer
      * @return array{id:string,status:int}
      */
-    public function complete(string $token, string $actor, string $operation, ?string $target, array $payload, callable $writer): array
+    public function complete(string $token, string $actor, string $operation, ?string $target, array $payload, callable $writer, ?Request $request = null): array
     {
         $this->requireTopLevel();
 
-        return DB::transaction(function () use ($token, $actor, $operation, $target, $payload, $writer): array {
+        return $this->transaction($request, $actor, $target, function () use ($token, $actor, $operation, $target, $payload, $writer): array {
             $claims = $this->keys->verify($token, $actor, $operation, now()->getTimestamp());
             $digest = $this->keys->payloadDigest($claims['kid'], $operation, $target, $payload);
             $row = $this->lockedRecord($token, $actor, $operation, $claims);
@@ -121,12 +123,12 @@ final class CompanyIdempotencyStore
     }
 
     /** Status never proves an absent or uncompleted request will not later commit. */
-    public function status(string $token, string $actor, string $operation, int $now): array
+    public function status(string $token, string $actor, string $operation, int $now, ?Request $request = null): array
     {
         $this->requireTopLevel();
         $claims = $this->keys->verifyForStatus($token, $actor, $operation, $now);
 
-        return DB::transaction(function () use ($token, $actor, $operation, $claims): array {
+        return $this->transaction($request, $actor, null, function () use ($token, $actor, $operation, $claims): array {
             $row = DB::table('company_idempotency_requests')->where('token_hash', hash('sha256', $token))->lockForUpdate()->first();
             $this->keys->verifyForStatus($token, $actor, $operation, now()->getTimestamp());
             $this->authorization->lockAuthorizedActor($actor);
@@ -145,12 +147,12 @@ final class CompanyIdempotencyStore
     }
 
     /** Revoke an individual token under its lock. The callback records audit in this transaction. */
-    public function revoke(string $token, string $actor, string $operation, int $now, callable $audit): array
+    public function revoke(string $token, string $actor, string $operation, int $now, callable $audit, ?Request $request = null): array
     {
         $this->requireTopLevel();
         $claims = $this->keys->verifyForStatus($token, $actor, $operation, $now);
 
-        return DB::transaction(function () use ($token, $actor, $operation, $claims, $audit): array {
+        return $this->transaction($request, $actor, null, function () use ($token, $actor, $operation, $claims, $audit): array {
             $row = $this->lockedRecord($token, $actor, $operation, $claims);
             $this->keys->verifyForStatus($token, $actor, $operation, now()->getTimestamp());
             $this->authorization->lockAuthorizedActor($actor);
@@ -193,5 +195,26 @@ final class CompanyIdempotencyStore
         if (DB::connection()->transactionLevel() !== 0) {
             throw new \LogicException('Company idempotency requires a top-level transaction.');
         }
+    }
+
+    /**
+     * The authority is deliberately optional for isolated service tests. In a
+     * request path that supplies it, every idempotency state transition runs
+     * inside the same durable-session transaction as the eventual writer.
+     */
+    private function transaction(?Request $request, string $actor, ?string $companyId, callable $callback): mixed
+    {
+        if ($request === null || $this->sessionAuthority === null) {
+            return DB::transaction($callback);
+        }
+        abort_unless($this->sessionAuthority->enabled(), 503, 'A autoridade da sessão ainda não está disponível.');
+
+        return $this->sessionAuthority->withinMutation(
+            $request,
+            'platform.companies.manage',
+            $callback,
+            $companyId,
+            $actor,
+        );
     }
 }

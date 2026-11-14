@@ -4,6 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
+use App\Services\CompanyIdempotencyAuthorization;
+use App\Services\CompanyIdempotencyKeys;
+use App\Services\CompanyIdempotencyStore;
 use App\Services\PlatformSessionAuthority;
 use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -85,6 +88,31 @@ class PlatformSessionAuthorityTest extends TestCase
 
         $this->expectException(HttpException::class);
         app(PlatformSessionAuthority::class)->activate($request, $this->admin());
+    }
+
+    public function test_idempotency_transitions_share_the_durable_session_authority_transaction(): void
+    {
+        $admin = $this->admin();
+        $request = $this->request('authority-session-idempotency');
+        $this->sessionRow($request->session()->getId());
+        app(PlatformSessionAuthority::class)->activate($request, $admin);
+        Auth::guard('platform')->login($admin);
+        $store = new CompanyIdempotencyStore(
+            new CompanyIdempotencyKeys(['synthetic' => base64_encode(str_repeat('k', 32))], 'synthetic', []),
+            new CompanyIdempotencyAuthorization,
+            5,
+            50,
+            3600,
+            app(PlatformSessionAuthority::class),
+        );
+
+        $token = $store->issue($admin->id, 'company.create', 600, $request);
+        self::assertNull($store->bind($token, $admin->id, 'company.create', null, [], now()->getTimestamp(), $request));
+        self::assertSame(
+            ['id' => 'EMP-authority', 'status' => 201],
+            $store->complete($token, $admin->id, 'company.create', null, [], fn (): array => ['id' => 'EMP-authority', 'status' => 201], $request),
+        );
+        $this->assertDatabaseHas('company_idempotency_requests', ['state' => 'completed', 'result_id' => 'EMP-authority']);
     }
 
     private function request(string $id): Request

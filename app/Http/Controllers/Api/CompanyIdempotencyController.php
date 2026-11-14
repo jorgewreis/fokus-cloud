@@ -17,7 +17,7 @@ final class CompanyIdempotencyController extends Controller
     {
         $data = $this->operation($request);
         $settings = $this->settings();
-        $token = $settings['store']->issue((string) $request->user()->id, $data, $settings['lifetime_seconds']);
+        $token = $settings['store']->issue((string) $request->user()->id, $data, $settings['lifetime_seconds'], $request);
 
         return response()->json(['message' => 'Chave emitida.'], 201)
             ->header('Idempotency-Key', $token)->header('Cache-Control', 'private, no-store');
@@ -29,7 +29,7 @@ final class CompanyIdempotencyController extends Controller
         $token = $this->token($request);
         $settings = $this->settings();
         try {
-            $result = $settings['store']->status($token, (string) $request->user()->id, $operation, now()->getTimestamp());
+            $result = $settings['store']->status($token, (string) $request->user()->id, $operation, now()->getTimestamp(), $request);
         } catch (InvalidArgumentException) {
             abort(422, 'Chave de idempotência inválida.');
         }
@@ -46,7 +46,7 @@ final class CompanyIdempotencyController extends Controller
         try {
             $result = $settings['store']->revoke($token, $actor, $operation, now()->getTimestamp(), function () use ($audit, $actor, $operation, $request): void {
                 $audit->record($actor, 'backoffice.company_idempotency_revoked', 'company_idempotency', metadata: ['operation' => $operation], request: $request);
-            });
+            }, $request);
         } catch (InvalidArgumentException) {
             abort(422, 'Chave de idempotência inválida.');
         }

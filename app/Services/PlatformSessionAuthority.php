@@ -25,7 +25,7 @@ final class PlatformSessionAuthority
 
     public function activate(Request $request, PlatformAdmin $admin, ?User $webUser = null): void
     {
-        if (!$this->enabled()) {
+        if (! $this->enabled()) {
             return;
         }
 
@@ -55,7 +55,7 @@ final class PlatformSessionAuthority
 
     public function invalidate(Request $request): void
     {
-        if (!$this->enabled() || !$request->hasSession()) {
+        if (! $this->enabled() || ! $request->hasSession()) {
             return;
         }
 
@@ -65,7 +65,7 @@ final class PlatformSessionAuthority
     /** @return list<string> session ids that must be removed with the revocation */
     public function revokeForAdmin(string $adminId): array
     {
-        if (!$this->enabled()) {
+        if (! $this->enabled()) {
             return [];
         }
 
@@ -95,15 +95,16 @@ final class PlatformSessionAuthority
      * @param callable():T $writer
      * @return T
      */
-    public function withinMutation(Request $request, string $permission, callable $writer, ?string $companyId = null): mixed
+    public function withinMutation(Request $request, string $permission, callable $writer, ?string $companyId = null, ?string $expectedAdminId = null): mixed
     {
-        if (!$this->enabled()) {
+        if (! $this->enabled()) {
             throw new LogicException('Platform session authority is not enabled.');
         }
         $this->assertCompatibleSessionStore();
         $sessionId = $this->sessionId($request);
         $platformAdminId = Auth::guard('platform')->id();
         abort_unless(is_string($platformAdminId) && $platformAdminId !== '', 401, 'Acesso interno não autenticado.');
+        abort_if($expectedAdminId !== null && ! hash_equals($expectedAdminId, $platformAdminId), 403, 'Permissão interna insuficiente.');
 
         return DB::transaction(function () use ($sessionId, $platformAdminId, $permission, $writer, $companyId): mixed {
             if ($companyId !== null) {

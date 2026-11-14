@@ -39,7 +39,14 @@ final class CompanyIdempotencyFactory
                 throw new InvalidArgumentException;
             }
             $keys = new CompanyIdempotencyKeys(get_object_vars($ring), $config['active_kid'], $revoked);
-            $store = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, $outstanding, $issues, $window);
+            $store = new CompanyIdempotencyStore(
+                $keys,
+                new CompanyIdempotencyAuthorization,
+                $outstanding,
+                $issues,
+                $window,
+                app(PlatformSessionAuthority::class),
+            );
 
             return ['store' => $store, 'lifetime_seconds' => $lifetime];
         } catch (InvalidArgumentException|JsonException) {

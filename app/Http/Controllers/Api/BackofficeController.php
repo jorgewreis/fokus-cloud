@@ -570,6 +570,7 @@ class BackofficeController extends Controller
 
                         return ['id' => $persist(), 'status' => 201];
                     },
+                    $request,
                 );
             } catch (InvalidArgumentException) {
                 abort(503, 'Solicitação indisponível.');
@@ -628,6 +629,7 @@ class BackofficeController extends Controller
 
                         return ['id' => $company, 'status' => 200];
                     },
+                    $request,
                 );
             } catch (InvalidArgumentException) {
                 abort(503, 'Solicitação indisponível.');
