@@ -106,3 +106,47 @@ test('restauração antiga não interfere após uma segunda suspensão', async (
     await finished;
     await expect(page.locator('#interest-list')).toBeVisible();
 });
+
+for (const outcome of ['nova-suspensao', 'falha-apos-desmontar']) {
+    test(`restauração falha fechada após desmontagem: ${outcome}`, async ({ page }) => {
+        await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: initialAdmin } }));
+        await page.route('**/api/backoffice/product-interests-options?*', route => route.fulfill({ json: { products: [], meta: { current_page: 1, has_more: false }, historical_index_ready: true } }));
+        await page.route('**/api/backoffice/product-interests?*', route => route.fulfill({ json: { data: [], meta: { total: 0, current_page: 1, last_page: 1 } } }));
+        await page.goto('/backoffice/interesses');
+        await expect(page.locator('#interest-list')).toBeVisible();
+        let reloads = 0;
+        await page.route('**/backoffice/interesses', route => { reloads++; return route.abort(); });
+        await page.evaluate((mode) => {
+            const router = window.__backofficeRouter;
+            const original = router.navigate.bind(router);
+            window.__restoreNavEntered = new Promise(resolve => { window.__restoreNavStarted = resolve; });
+            window.__restoreNavGate = new Promise(resolve => { window.__restoreNavRelease = resolve; });
+            window.__restoreNavFinished = new Promise(resolve => { window.__restoreNavFinish = resolve; });
+            router.navigate = async (...args) => {
+                const result = await original(...args);
+                window.__restoreNavStarted();
+                await window.__restoreNavGate;
+                if (mode === 'falha-apos-desmontar') throw new Error('falha sintética após desmontagem');
+                window.__restoreNavFinish();
+                return result;
+            };
+            window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+            window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+        }, outcome);
+        await page.evaluate(() => window.__restoreNavEntered);
+        await expect(page.locator('html')).toHaveCSS('visibility', 'hidden');
+        await expect(page.locator('html')).toHaveAttribute('inert', '');
+        if (outcome === 'nova-suspensao') {
+            await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })));
+            await page.evaluate(() => window.__restoreNavRelease());
+            await page.evaluate(() => window.__restoreNavFinished);
+            await expect(page.locator('html')).toHaveCSS('visibility', 'hidden');
+            await expect(page.locator('html')).toHaveAttribute('inert', '');
+            expect(reloads).toBe(0);
+            await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+        } else {
+            await page.evaluate(() => window.__restoreNavRelease());
+        }
+        await expect.poll(() => reloads).toBe(1);
+    });
+}
