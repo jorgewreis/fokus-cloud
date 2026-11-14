@@ -147,35 +147,49 @@
                 document.head.append(link);
             });
 
-            this.root.inert = true;
-            this.root.setAttribute("aria-busy", "true");
-            this.root.replaceChildren(template.content.cloneNode(true));
+            const owner = `${pageId}-${this.navigationId}`;
+            const pageRoot = document.createElement("div");
+            pageRoot.dataset.backofficeMount = "";
+            pageRoot.dataset.backofficeOwner = owner;
+            pageRoot.style.display = "contents";
+            pageRoot.inert = true;
+            pageRoot.setAttribute("aria-busy", "true");
+            pageRoot.append(template.content.cloneNode(true));
+            const status = document.createElement("div");
+            status.className = "fs-alert fs-alert-info";
+            status.setAttribute("role", "status");
+            status.setAttribute("aria-live", "polite");
+            status.textContent = "Carregando página…";
+            this.root.replaceChildren(status, pageRoot);
             this.root.dataset.backofficePage = pageId;
+            this.root.dataset.backofficeOwner = owner;
             this.currentPage = pageId;
-            window.FokusForm?.enhance(this.root);
-            this.onComponentsReady?.(this.root);
-            window.initBackofficeRecordsPage?.(this.root);
+            this.currentRoot = pageRoot;
+            window.FokusForm?.enhance(pageRoot);
+            this.onComponentsReady?.(pageRoot);
+            window.initBackofficeRecordsPage?.(pageRoot);
 
             const context = {
                 admin: this.admin,
                 api: window.FokusApi,
                 permissions: window.__backofficePermissions || new Set(),
                 router: this,
-                root: this.root,
+                root: pageRoot,
                 signal,
                 version: ASSET_VERSION,
             };
 
             if (module) {
-                const disposer = await module.mount?.(this.root, context);
+                const disposer = await module.mount?.(pageRoot, context);
                 if (signal.aborted) {
                     if (typeof disposer === "function") disposer();
                     else module.unmount?.();
                     throw createAbortError();
                 }
                 this.disposeCurrent = typeof disposer === "function" ? disposer : module.unmount;
-                this.root.inert = false;
-                this.root.removeAttribute("aria-busy");
+                pageRoot.inert = false;
+                pageRoot.removeAttribute("aria-busy");
+                status.remove();
                 return;
             }
 
@@ -187,10 +201,11 @@
             // Some legacy initializers create an overlay after their first
             // mount. Run the owner-aware cleanup once more so duplicate IDs
             // cannot survive a route transition.
-            window.initBackofficeRecordsPage?.(this.root);
+            window.initBackofficeRecordsPage?.(pageRoot);
             this.disposeCurrent = () => {};
-            this.root.inert = false;
-            this.root.removeAttribute("aria-busy");
+            pageRoot.inert = false;
+            pageRoot.removeAttribute("aria-busy");
+            status.remove();
         }
 
         async runLegacyScripts(scripts) {
@@ -218,11 +233,13 @@
             try {
                 this.disposeCurrent?.();
             } finally {
-                window.disposeBackofficeRecordsPage?.(this.root);
+                window.disposeBackofficeRecordsPage?.(this.currentRoot || this.root);
                 document.querySelectorAll("link[data-page-css]").forEach((style) => style.remove());
                 this.root.replaceChildren();
                 delete this.root.dataset.backofficePage;
+                delete this.root.dataset.backofficeOwner;
                 this.currentPage = null;
+                this.currentRoot = null;
                 this.disposeCurrent = null;
             }
         }

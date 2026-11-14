@@ -529,6 +529,45 @@ test('descarta módulo atrasado após mudar de página', async ({ page }) => {
     await expect(page.getByRole('button', { name: 'Nova assinatura' })).toHaveCount(0);
 });
 
+test('mount atrasado mantém status acessível e conteúdo inerte', async ({ page }) => {
+    let releasePlans;
+    let plansRequested;
+    const requested = new Promise((resolve) => { plansRequested = resolve; });
+    const released = new Promise((resolve) => { releasePlans = resolve; });
+    await page.route('**/api/backoffice/plans', async (route) => {
+        plansRequested();
+        await released;
+        await route.fulfill({ contentType: 'application/json', body: '[]' });
+    });
+    await page.goto('/backoffice/planos');
+    await requested;
+    await expect(page.getByRole('status')).toContainText('Carregando página');
+    await expect(page.locator('[data-backoffice-mount]')).toHaveAttribute('inert', '');
+    releasePlans();
+    await expect(page.locator('[data-backoffice-mount]')).not.toHaveAttribute('inert', '');
+});
+
+test('descarte de mount atrasado preserva drawer da página seguinte', async ({ page }) => {
+    let releasePlans;
+    let plansRequested;
+    const requested = new Promise((resolve) => { plansRequested = resolve; });
+    const released = new Promise((resolve) => { releasePlans = resolve; });
+    await page.route('**/api/backoffice/plans', async (route) => {
+        plansRequested();
+        await released;
+        await route.fulfill({ contentType: 'application/json', body: '[]' });
+    });
+    await page.goto('/backoffice/planos');
+    await requested;
+    await page.locator('[data-sidebar-item="companies"]').click();
+    await page.getByRole('button', { name: 'Nova empresa' }).click();
+    await expect(page.locator('#company-drawer')).toBeVisible();
+    releasePlans();
+    await page.waitForTimeout(500);
+    await expect(page.locator('#company-drawer')).toBeVisible();
+    await expect(page.locator('[data-backoffice-page="companies"]').first()).toBeVisible();
+});
+
 test('Backoffice gera checkout assistido e atualiza a listagem', async ({ page }) => {
     await useSubscriptionCatalog(page);
     await page.route('**/api/backoffice/subscriptions/checkout-options?**', (route) => route.fulfill({
