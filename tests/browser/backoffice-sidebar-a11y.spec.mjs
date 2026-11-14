@@ -2,6 +2,9 @@ import { test, expect } from '@playwright/test';
 
 test('sidebar mantém nomes e foco visível ao navegar por teclado', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
+    // The sidebar expands on hover; keep the initial pointer outside it so the
+    // collapsed state is exercised consistently in Chromium and Edge.
+    await page.mouse.move(900, 800);
     await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ json: { admin: {
         id: 'PAD_TEST', name: 'Admin Teste', role: 'superadministrador',
         permissions: ['platform.security.manage', 'platform.catalog.manage', 'platform.catalog.publish', 'platform.users.view', 'platform.subscriptions.manage', 'platform.payments.view'],
