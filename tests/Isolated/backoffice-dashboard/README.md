@@ -46,3 +46,29 @@ continuava aplicando migrations neste checkpoint. Acompanhar o processo existent
 `hopeful_germain` e o arquivo local `%TEMP%/fokus-dashboard-consistent-mysql-test.log`;
 não considerá-lo aprovado até haver resultado terminal. A prova de endpoint,
 a revisão independente e a avaliação dos demais drivers seguem pendentes.
+
+## Continuação: exceção e alternativa sem repetição
+
+`laravel-cursor-exception.php` lança uma exceção sintética na primeira linha de
+um cursor sem buffer, restaura o atributo e testa outra consulta e rollback na
+mesma conexão. No MySQL 8.4 e Laravel do laboratório, a exceção foi observada,
+o buffer restaurado e a consulta seguinte retornou 10.000 assinaturas. Esse
+ensaio cobre uma exceção durante a iteração; não cobre toda falha possível do
+driver ou interrupção do processo.
+
+Para explorar o custo do JOIN, `mysql-amplify-seed.php` acrescenta 10.000
+resgates sintéticos à assinatura `00000`; não é idempotente. Após essa carga,
+`mysql-benchmark.php unbuffered` mede a consulta do protótipo, e
+`mysql-union-benchmark.php` mede uma alternativa SQL independente com UNION
+ALL, que transmite o snapshot da assinatura uma só vez. Não execute fora do
+banco descartável. Os dois scripts devem usar os mesmos dados e ambiente.
+
+Na execução local, com 10.000 assinaturas e cerca de 12.000 resgates, JOIN
+transmitiu 40.695.237 bytes de snapshots em 0,226 s; UNION transmitiu
+19.366.174 bytes em 0,155 s. Ambos tiveram 2 MiB de pico PHP e soma 99.970.
+Na carga anterior, de cerca de 2.000 resgates, uma execução de UNION levou
+0,543 s contra 0,061 s para JOIN, com menor diferença de bytes. São medições
+isoladas, com cargas e aquecimento diferentes; não estabelecem qual estratégia
+é melhor em produção. UNION pode exigir materialização e ordenação no servidor,
+e sua equivalência em todos os drivers e no endpoint ainda não foi validada.
+A alternativa permanece experimental; o controlador não foi alterado com ela.
