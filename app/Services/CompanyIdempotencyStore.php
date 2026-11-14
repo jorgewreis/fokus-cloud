@@ -63,7 +63,7 @@ final class CompanyIdempotencyStore
         $claims = $this->keys->verify($token, $actor, $operation, $now);
         $digest = $this->keys->payloadDigest($claims['kid'], $operation, $target, $payload);
 
-        return DB::transaction(function () use ($token, $actor, $operation, $claims, $digest): ?array {
+        return DB::transaction(function () use ($token, $actor, $operation, $target, $claims, $digest): ?array {
             $row = $this->lockedRecord($token, $actor, $operation, $claims);
             $this->keys->verify($token, $actor, $operation, now()->getTimestamp());
             $this->authorization->lockAuthorizedActor($actor);
@@ -72,7 +72,7 @@ final class CompanyIdempotencyStore
                 abort(409, 'A chave já está vinculada a outra solicitação.');
             }
             if ($row->state === 'completed') {
-                return $this->result($row);
+                return $this->result($row, $target);
             }
             abort_unless(in_array($row->state, ['issued', 'bound'], true), 503, 'Solicitação indisponível.');
             DB::table('company_idempotency_requests')->where('token_hash', $row->token_hash)->update([
@@ -103,11 +103,13 @@ final class CompanyIdempotencyStore
             abort_if($row->revoked, 409, 'A chave foi revogada.');
             abort_unless($row->payload_digest !== null && hash_equals($row->payload_digest, $digest), 409, 'A chave está vinculada a outra solicitação.');
             if ($row->state === 'completed') {
-                return $this->result($row);
+                return $this->result($row, $target);
             }
             abort_unless($row->state === 'bound', 503, 'Solicitação indisponível.');
             $result = $writer();
-            if (! is_array($result) || ! isset($result['id'], $result['status']) || ! is_string($result['id']) || $result['id'] === '' || strlen($result['id']) > 128 || ! in_array($result['status'], [200, 201], true)) {
+            if (! is_array($result) || ! isset($result['id'], $result['status']) || ! is_string($result['id']) || $result['id'] === '' || strlen($result['id']) > 128
+                || ($operation === 'company.create' && $result['status'] !== 201)
+                || ($operation === 'company.update' && ($result['status'] !== 200 || $result['id'] !== $target))) {
                 throw new InvalidArgumentException('Invalid result.');
             }
             DB::table('company_idempotency_requests')->where('token_hash', $row->token_hash)->update([
@@ -177,9 +179,11 @@ final class CompanyIdempotencyStore
             && (int) $row->issued_at_epoch === $claims['issued_at'] && (int) $row->expires_at_epoch === $claims['expires_at'], 503, 'Solicitação indisponível.');
     }
 
-    private function result(object $row): array
+    private function result(object $row, ?string $target = null): array
     {
-        abort_unless(is_string($row->result_id) && $row->result_id !== '' && in_array((int) $row->result_status, [200, 201], true), 503, 'Solicitação indisponível.');
+        abort_unless(is_string($row->result_id) && $row->result_id !== ''
+            && (($row->operation === 'company.create' && (int) $row->result_status === 201)
+                || ($row->operation === 'company.update' && (int) $row->result_status === 200 && ($target === null || $row->result_id === $target))), 503, 'Solicitação indisponível.');
 
         return ['id' => $row->result_id, 'status' => (int) $row->result_status];
     }
