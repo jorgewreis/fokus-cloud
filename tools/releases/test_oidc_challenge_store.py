@@ -67,6 +67,34 @@ class ChallengeStore(unittest.TestCase):
         for thread in threads: thread.start()
         for thread in threads: thread.join()
         self.assertCountEqual(outcomes,['verified','blocked'])
+    def test_quota_expiry_pruning_and_clock_rollback_refusal(self):
+        with patch.object(store, 'MAX_CHALLENGES', 2):
+            first = self.new(); self.new()
+            with self.assertRaisesRegex(ValueError, 'challenge_quota'): self.new()
+            with patch.object(store.time, 'time', return_value=self.fake.now + 421):
+                self.new()
+                self.assertEqual(len(list(self.base.glob('challenge-*.json'))), 1)
+            with self.assertRaisesRegex(ValueError, 'clock_moved_backwards'): self.new()
+
+    def test_expired_jti_marker_is_pruned_only_after_retention(self):
+        aud=self.new(); self.consume(aud,self.token(aud))
+        self.assertEqual(len(list(self.base.glob('jti-*.json'))),1)
+        with patch.object(store.time,'time',return_value=self.fake.now+421):
+            self.new()
+            self.assertEqual(len(list(self.base.glob('jti-*.json'))),0)
+
+    def test_network_fetch_is_unlocked_and_changed_policy_is_rejected(self):
+        aud=self.new(); token=self.token(aud)
+        def fetch():
+            # This would fail if consume held the same nonblocking flock.
+            self.new()
+            (self.base/'policy.json').write_text(json.dumps({'repository':'example/project','repository_id':'999','workflow_sha':self.sha}))
+            return self.jwks
+        with patch.object(oidc,'fetch_jwks',side_effect=fetch):
+            with self.assertRaisesRegex(ValueError,'authorization_changed'):
+                self.consume(aud,token)
+        self.assertFalse(list(self.base.glob('jti-*.json')))
+
     def test_unsafe_directory_refused(self):
         self.base.chmod(0o777)
         with self.assertRaises(ValueError): self.new()

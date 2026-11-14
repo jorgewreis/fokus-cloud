@@ -175,8 +175,11 @@ candidato e digest. Sob lock, a prova consulta JWKS no endereço fixo usando o
 bundle de CA do SO e sem proxy herdado, confere assinatura/claims e registra
 marcadores exclusivos de desafio e `jti`. O relógio, bundle de CA, operador e
 root são fronteiras de confiança; a disponibilidade desses recursos no servidor
-real não foi comprovada. Marcadores persistentes exigem política operacional de
-retenção. A API não está exposta, não autentica o emissor do desafio nem foi
+real não foi comprovada. O armazenamento experimental limita desafios e JTIs,
+retém marcadores por 300 segundos após o vencimento e recusa retrocesso do relógio
+usando registro persistente. A busca de JWKS ocorre fora do lock; a política e o
+desafio são reconferidos antes do consumo. Um relógio adiantado indevidamente
+pode bloquear o serviço; o controle é local e não evita replay entre nós. A API não está exposta, não autentica o emissor do desafio nem foi
 integrada à ativação. Transmissão autenticada, permissão do environment, replay
 entre múltiplos nós e bootstrap remoto continuam pendentes.
 

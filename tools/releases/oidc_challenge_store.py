@@ -100,12 +100,83 @@ def valid_binding(action, candidate, artifact):
     require(isinstance(artifact, str) and re.fullmatch(r'[a-f0-9]{64}', artifact), 'invalid_artifact')
 
 
+MAX_CHALLENGES = 128
+MAX_JTIS = 4096
+RETENTION_GRACE = 300
+
+
+def trusted_time(directory, dfd):
+    """Durably reject a backward host clock before any expiry-based deletion."""
+    now = int(time.time())
+    try:
+        fd = os.open('clock.json', os.O_RDWR | os.O_NOFOLLOW, dir_fd=dfd)
+    except FileNotFoundError:
+        fd = os.open('clock.json', os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=dfd)
+        previous = now
+    else:
+        try:
+            info = regular(fd, Path(directory) / 'clock.json')
+            value = json.loads(os.read(fd, info.st_size + 1), object_pairs_hook=oidc.unique)
+            require(isinstance(value, dict) and set(value) == {'time'} and type(value['time']) is int, 'invalid_clock')
+            previous = value['time']
+        except BaseException:
+            os.close(fd)
+            raise
+    try:
+        require(now >= previous, 'clock_moved_backwards')
+        os.lseek(fd, 0, os.SEEK_SET)
+        os.ftruncate(fd, 0)
+        os.write(fd, data({'time': now}))
+        os.fsync(fd); os.fsync(dfd)
+        return now
+    finally:
+        os.close(fd)
+
+
+def prune(directory, dfd, now):
+    """Delete only validated, expired control records inside the private store."""
+    entries = os.listdir(dfd)
+    require(len(entries) <= MAX_CHALLENGES * 2 + MAX_JTIS + 8, 'store_entry_limit')
+    challenge_names = [name for name in entries if re.fullmatch(r'challenge-[a-f0-9]{64}\.json', name)]
+    consumed_names = [name for name in entries if re.fullmatch(r'consumed-[a-f0-9]{64}\.json', name)]
+    jti_names = [name for name in entries if re.fullmatch(r'jti-[a-f0-9]{64}\.json', name)]
+    allowed = set(challenge_names + consumed_names + jti_names + ['policy.json', 'authorization.lock', 'clock.json'])
+    require(set(entries) <= allowed, 'unexpected_store_entry')
+    for name in challenge_names:
+        record, _ = read_record(directory, dfd, name)
+        require(type(record.get('expires')) is int, 'invalid_challenge')
+        if record['expires'] + RETENTION_GRACE <= now:
+            os.unlink(name, dir_fd=dfd)
+    remaining = set(os.listdir(dfd))
+    for name in consumed_names + jti_names:
+        record, _ = read_record(directory, dfd, name)
+        require(set(record) == {'state', 'retain_until'} and record['state'] == 'consumed'
+                and type(record['retain_until']) is int, 'invalid_consumption_marker')
+        challenge_name = 'challenge-' + name.removeprefix('consumed-')
+        if record['retain_until'] <= now and (name.startswith('jti-') or challenge_name not in remaining):
+            os.unlink(name, dir_fd=dfd)
+    os.fsync(dfd)
+    remaining = os.listdir(dfd)
+    return (sum(name.startswith('challenge-') for name in remaining),
+            sum(name.startswith('jti-') for name in remaining))
+
+
+def validate_record(record, settings, policy_digest, now, action, candidate, artifact):
+    require(set(record) == {'action', 'candidate', 'artifact', 'workflow_sha', 'policy_digest', 'created', 'expires'}, 'invalid_challenge')
+    require(record['action'] == action and record['candidate'] == candidate and record['artifact'] == artifact
+            and record['workflow_sha'] == settings['workflow_sha'] and record['policy_digest'] == policy_digest, 'challenge_binding')
+    require(type(record['created']) is int and type(record['expires']) is int
+            and record['created'] <= now < record['expires'] and record['expires'] - record['created'] == 120, 'challenge_expired')
+
+
 def challenge(directory, action, candidate, artifact):
     valid_binding(action, candidate, artifact)
     with locked(directory) as (dfd, checkpoint):
         settings, policy_digest = policy(directory, dfd)
+        now = trusted_time(directory, dfd)
+        challenge_count, _ = prune(directory, dfd, now)
+        require(challenge_count < MAX_CHALLENGES, 'challenge_quota')
         nonce = secrets.token_hex(32)
-        now = int(time.time())
         record = {'action': action, 'candidate': candidate, 'artifact': artifact,
                   'workflow_sha': settings['workflow_sha'], 'policy_digest': policy_digest,
                   'created': now, 'expires': now + 120}
@@ -121,26 +192,35 @@ def consume(directory, audience, token, action, candidate, artifact):
     with locked(directory) as (dfd, checkpoint):
         settings, policy_digest = policy(directory, dfd)
         record, record_digest = read_record(directory, dfd, 'challenge-' + nonce + '.json')
-        now = int(time.time())
-        require(set(record) == {'action', 'candidate', 'artifact', 'workflow_sha', 'policy_digest', 'created', 'expires'}, 'invalid_challenge')
-        require(record['action'] == action and record['candidate'] == candidate and record['artifact'] == artifact
-                and record['workflow_sha'] == settings['workflow_sha'] and record['policy_digest'] == policy_digest, 'challenge_binding')
-        require(type(record['created']) is int and type(record['expires']) is int
-                and record['created'] <= now < record['expires'] and record['expires'] - record['created'] == 120, 'challenge_expired')
-        keys = oidc.fetch_jwks()
-        now = int(time.time())
-        require(record['created'] <= now < record['expires'], 'challenge_expired')
-        result = oidc.verify(token, keys, audience=audience, repository=settings['repository'],
-                             repository_id=settings['repository_id'], sha=settings['workflow_sha'], now=now)
+        now = trusted_time(directory, dfd)
+        validate_record(record, settings, policy_digest, now, action, candidate, artifact)
         checkpoint()
-        _, policy_after = policy(directory, dfd)
-        _, record_after = read_record(directory, dfd, 'challenge-' + nonce + '.json')
+    # Never hold the server lock while consulting the network or verifying a signature.
+    keys = oidc.fetch_jwks()
+    now = int(time.time())
+    result = oidc.verify(token, keys, audience=audience, repository=settings['repository'],
+                         repository_id=settings['repository_id'], sha=settings['workflow_sha'], now=now)
+    with locked(directory) as (dfd, checkpoint):
+        now = trusted_time(directory, dfd)
+        current_settings, policy_after = policy(directory, dfd)
+        current_record, record_after = read_record(directory, dfd, 'challenge-' + nonce + '.json')
         require(policy_after == policy_digest and record_after == record_digest, 'authorization_changed')
+        validate_record(current_record, current_settings, policy_after, now, action, candidate, artifact)
+        require(now < result['expires'], 'authorization_expired')
+        _, jti_count = prune(directory, dfd, now)
+        require(jti_count < MAX_JTIS, 'jti_quota')
+        checkpoint()
+        try:
+            os.stat('consumed-' + nonce + '.json', dir_fd=dfd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            raise FileExistsError('challenge_already_consumed')
         jti_hash = hashlib.sha256(result['jti'].encode()).hexdigest()
-        create_file(dfd, 'jti-' + jti_hash + '.json', {'state':'consumed'})
+        create_file(dfd, 'jti-' + jti_hash + '.json', {'state':'consumed','retain_until':result['expires'] + RETENTION_GRACE})
         # A pre-existing marker fails closed even if a previous operation crashed.
-        create_file(dfd, 'consumed-' + nonce + '.json', {'state':'consumed'})
-        final_time = int(time.time())
+        create_file(dfd, 'consumed-' + nonce + '.json', {'state':'consumed','retain_until':record['expires'] + RETENTION_GRACE})
+        final_time = trusted_time(directory, dfd)
         require(record['created'] <= final_time < record['expires'] and final_time < result['expires'], 'authorization_expired')
         return {'state':'verified_once', 'action':action, 'candidate':candidate, 'artifact':artifact,
                 'run_id':result['run_id'], 'run_attempt':result['run_attempt']}
