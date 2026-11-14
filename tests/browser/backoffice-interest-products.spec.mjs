@@ -161,7 +161,7 @@ test('filtro e paginação permanecem visíveis em larguras estreitas', async ({
     }
 });
 
-for (const width of [768, 1280, 1440]) test(`controles acessíveis com a barra lateral aberta em ${width}px`, async ({ page }) => {
+for (const width of [701, 768, 1280, 1440, 1919, 1920]) test(`controles acessíveis com a barra lateral aberta em ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 720 });
     await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { role: 'superadministrador', name: 'Teste', permissions: ['platform.product_interests.manage'] } } }));
     await page.route('**/api/backoffice/product-interests-options?*', route => {
@@ -179,6 +179,14 @@ for (const width of [768, 1280, 1440]) test(`controles acessíveis com a barra l
     const button = page.getByRole('button', { name: 'Mais produtos' });
     await expect(button).toBeVisible();
     await page.screenshot({ path: `test-results/sidebar-open-${width}.png` });
+    await button.focus();
+    await expect(button).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#interest-product-options option')).toHaveAttribute('value', 'p2');
+    await page.getByRole('button', { name: 'Produtos anteriores' }).click();
+    await expect(page.locator('#interest-product-options option')).toHaveAttribute('value', 'p1');
+    await page.locator('#sidebar [data-sidebar-item="companies"]').hover();
+    await expect(page.locator('#sidebar')).toHaveClass(/expanded/);
     await button.click({ timeout: 5000 });
     await expect(page.locator('#interest-product-options option')).toHaveAttribute('value', 'p2');
 });

@@ -624,7 +624,9 @@ test('checkout assistido segue o drawer de registros em desktop e mobile', async
         await page.route('**/api/backoffice/subscriptions/checkout-options?**', (route) => route.fulfill({
             contentType: 'application/json', body: JSON.stringify({ companies: [{ id: 'COM_ALPHA', legal_name: 'Empresa Alpha' }], products: [{ code: 'law', name: 'Fokus Law', plans: [{ code: 'law-advocacia', name: 'Advocacia', monthly_amount: 64.7, annual_amount: 647 }] }] }),
         }));
+        await page.mouse.move(viewport.width - 10, viewport.height - 10);
         await page.goto('/backoffice/assinaturas');
+        await expect(page.locator('#sidebar')).toHaveClass(/single/);
         await page.getByRole('button', { name: 'Nova assinatura' }).click();
         await expect(page.locator('#subscription-create-drawer')).toBeVisible();
         await expect(page.locator('#subscription-create-company option')).toHaveCount(2);
