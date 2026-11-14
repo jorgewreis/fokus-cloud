@@ -567,8 +567,9 @@ class AuthController extends Controller
     public function setPassword(Request $request, PasswordSecurity $passwordSecurity)
     {
         $data = $request->validate(['token' => ['required', 'string'], 'password' => ['required', 'string', 'min:12', 'confirmed']]);
-        $passwordSecurity->validate($data['password']);
         $lifecycle = app(PlatformSessionLifecycle::class);
+        $lifecycle->ensurePasswordResetReady();
+        $passwordSecurity->validate($data['password']);
         $currentWebId = Auth::guard('web')->id();
         if ($lifecycle->enabledForSecurityMutation()) {
             $table = $lifecycle->transactionalSessionTable();

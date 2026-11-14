@@ -231,6 +231,16 @@ try {
 }
 $app['config']->set('session.driver', 'database');
 $lifecycle = new PlatformSessionLifecycle($authority);
+try {
+    $lifecycle->ensurePasswordResetReady();
+    throw new RuntimeException('Experimental password reset was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 503);
+}
+$app['config']->set('company_idempotency.session_authority_lifecycle', false);
+$lifecycle->ensurePasswordResetReady();
+$check(true);
+$app['config']->set('company_idempotency.session_authority_lifecycle', true);
 $app['config']->set('company_idempotency.session_authority_max_age_seconds', null);
 try {
     $lifecycle->ensureConfigurationReady();

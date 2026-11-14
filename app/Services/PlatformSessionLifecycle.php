@@ -77,6 +77,13 @@ final class PlatformSessionLifecycle
         return $this->enabled();
     }
 
+    public function ensurePasswordResetReady(): void
+    {
+        // The database session's user_id is derived from the default guard and
+        // cannot identify all web principals in mixed or support sessions.
+        abort_if($this->enabled(), 503, 'Recuperação de senha temporariamente indisponível.');
+    }
+
     public function transactionalSessionTable(): string
     {
         abort_unless($this->enabled(), 503, 'Sessão indisponível.');

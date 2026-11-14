@@ -44,10 +44,15 @@ This proposal is fail-closed but not a finished user experience or a proven
 sliding-idle policy. Configuration is checked before consuming a valid MFA
 challenge. In the enabled prototype, the conditional MFA challenge update and
 registry replacement share one DB transaction. In the enabled prototype,
-password-reset token consumption, password update and deletion of the target
-user's database-session rows share one DB transaction; a current platform
-binding is retired in that transaction as well. A different session connection
-or non-database session driver is rejected before consuming the reset token.
+password-reset implementation is now explicitly unavailable (HTTP 503 before
+password validation or token consumption) while the lifecycle flag is enabled.
+The existing experimental transaction is retained for review but is unreachable:
+deleting rows by `sessions.user_id` cannot identify all web identities because
+Laravel populates it using the default guard, including in mixed/support sessions.
+Additionally, membership and invitation updates occur after the reset transaction.
+The default-false flag preserves the legacy reset path; it does not fix its
+existing limitations. Do not remove this gate until durable principal association,
+atomic membership/invitation updates and concurrency are proven.
 Cookie/session persistence
 follows the DB commit; failure there can require reauthentication and must not be
 confused with an atomic cross-system commit. Other token, session and
@@ -75,3 +80,9 @@ request concurrency or a container-provided guard. It does not execute migration
 concurrent transactions or MySQL and cannot demonstrate lock ordering across
 processes. Syntax and smoke checks are not evidence of concurrency correctness
 or release readiness.
+
+Concurrent reset and writers also require an independent MySQL deadlock and
+rollback test: the candidate reset locks a user and can then delete session rows
+while a different writer holds another session row. No safe universal lock
+order or successful concurrent reset has been established. A deadlock victim must
+roll back the token, password, memberships, invitations and authority together.
