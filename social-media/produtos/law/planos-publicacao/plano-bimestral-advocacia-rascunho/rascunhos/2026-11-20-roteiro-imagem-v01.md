@@ -1,7 +1,8 @@
 # Imagem de 20/11 — antes de atualizar um cliente
 
-**Estado:** proposta para revisão. Instagram @fokus.cloud, 20/11/2026 às 10h,
-America/Bahia. Não aprovada nem agendada.
+**Estado:** imagem e legenda aprovadas. Agendamento confirmado no Metricool
+para Instagram @fokus.cloud em 20/11/2026 às 10h, America/Bahia; publicação
+automática pendente, ID `428403785`.
 
 **Objetivo:** orientar uma pausa breve antes de registrar atualização: separar
 o que mudou, o que requer confirmação e o próximo passo do atendimento.
@@ -18,8 +19,8 @@ o que mudou, o que requer confirmação e o próximo passo do atendimento.
 
 ## Direção de arte
 
-Imagem vertical 3:4, com roxo, creme e verde-menta; Bebas Neue na marca e DM
-Sans nos demais textos. Mostrar uma mesa de escritório jurídico e um documento
+Imagem vertical 3:4, com roxo, creme e verde-menta; Bebas Neue na marca,
+Montserrat nos títulos e Source Sans 3 nos demais textos. Mostrar uma mesa de escritório jurídico e um documento
 cenográfico, sem nomes, números de processo, documentos reais ou tela de
 produto. A composição deve priorizar espaço em branco, contraste e leitura em
 tela pequena.
@@ -32,13 +33,13 @@ passo. Há uma mesa de trabalho com documento cenográfico.
 
 ## Sugestão de legenda
 
-Antes de registrar uma atualização, sua equipe consegue diferenciar o que já
-mudou do que ainda precisa ser confirmado?
+Antes de atualizar um cliente, sua equipe consegue diferenciar o que já mudou
+do que ainda precisa ser confirmado?
 
 
-Uma conversa, uma movimentação ou um documento novo podem mudar o contexto do
-atendimento. Registrar só uma frase solta deixa margem para que a próxima
-pessoa tenha de reconstruir o que aconteceu.
+Uma conversa, uma movimentação ou um documento novo podem alterar o contexto
+do atendimento. Quando o registro fica reduzido a uma frase solta, a próxima
+pessoa precisa reconstruir o que aconteceu antes de seguir.
 
 
 Uma revisão curta ajuda a dar sentido ao registro:
@@ -54,19 +55,17 @@ as regras de sigilo do escritório. Ele ajuda a tornar o próximo atendimento
 mais claro para quem retomar a conversa.
 
 
-Use as perguntas como um modelo e adapte responsabilidades, campos e acessos à
-rotina da sua equipe.
+Use essas perguntas como referência e adapte responsabilidades, campos e
+acessos à rotina da sua equipe.
 
 
-Qual dessas três partes costuma exigir mais cuidado na sua rotina? Comente sem
-citar nomes, números de processos ou detalhes de casos.
+Qual desses três pontos costuma exigir mais atenção antes de uma atualização?
+Comente sem citar nomes, números de processos ou detalhes de casos.
 
 
 #FokusLaw #FokusCloud #Advocacia #GestãoJurídica #RotinaJurídica #EscritórioDeAdvocacia
 
-## Pendências
+## Acompanhamento
 
-- Revisar e aprovar texto da arte, legenda, descrição acessível e direção
-  visual.
-- Produzir uma imagem a partir do briefing e verificar leitura em tela pequena.
-- Consultar o Metricool novamente antes de qualquer agendamento.
+- Monitorar no Metricool o estado da publicação automática pendente. O
+  agendamento foi autorizado expressamente nesta conversa.
