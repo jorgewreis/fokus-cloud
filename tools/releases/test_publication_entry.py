@@ -12,6 +12,7 @@ MODULE = Path(__file__).with_name('publication_entry.py')
 sys.path.insert(0, str(MODULE.parent))
 derived = types.ModuleType('derived_assets')
 derived.build = Mock()
+derived.source_snapshot = Mock()
 derived.package = Mock()
 derived.encoded = lambda value: b'{}'
 ssh = types.ModuleType('artifact_ssh')
@@ -31,7 +32,8 @@ class Entrypoint(unittest.TestCase):
                     'EXPECTED_CANDIDATE': self.sha, 'GITHUB_SHA': self.sha, 'GITHUB_WORKFLOW_SHA': self.sha,
                     'GITHUB_REPOSITORY': 'example/project', 'GITHUB_REPOSITORY_ID': '42', 'GH_TOKEN': 'synthetic'}
         self.prepare = {'root': '/synthetic/releases/' + self.sha}
-        self.patchers = [patch.object(entry.subprocess, 'check_output', return_value=self.sha),
+        derived.source_snapshot.return_value = (self.sha, b'', {})
+        self.patchers = [patch.object(entry, 'EXECUTOR_ROOT', Path(self.temp.name)),
                          patch.object(entry.publication_gate, 'GitHub', return_value=object()),
                          patch.object(entry.publication_gate, 'verify', return_value=(123, 1))]
         self.mocks = [item.start() for item in self.patchers]
@@ -52,6 +54,21 @@ class Entrypoint(unittest.TestCase):
         self.assertEqual(result['state'], 'ssh_completed_unverified')
         self.assertEqual(result['candidate_sha'], self.sha)
         self.assertEqual(ssh.send.call_args.kwargs['expected_digest'], 'b' * 64)
+
+    def test_different_executor_source_refuses_before_gate_or_build(self):
+        with patch.object(entry, 'EXECUTOR_ROOT', Path(self.temp.name) / 'different'):
+            with self.assertRaisesRegex(ValueError, 'executor_source_mismatch'):
+                self.invoke()
+        derived.build.assert_not_called()
+        self.mocks[2].assert_not_called()
+        ssh.send.assert_not_called()
+
+    def test_dirty_executor_refuses_before_gate_or_build(self):
+        derived.source_snapshot.side_effect = ValueError('dirty_source')
+        self.addCleanup(lambda: setattr(derived.source_snapshot, 'side_effect', None))
+        with self.assertRaisesRegex(ValueError, 'dirty_source'): self.invoke()
+        derived.build.assert_not_called()
+        ssh.send.assert_not_called()
 
     def test_untrusted_event_is_rejected_before_build(self):
         self.env['GITHUB_EVENT_NAME'] = 'push'

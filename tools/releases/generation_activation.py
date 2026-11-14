@@ -106,6 +106,23 @@ def runtime_gate_policy(c,policy,candidate,receipt):
     bounded=dict(policy);bounded['expires_at_epoch']=min(policy['expires_at_epoch'],expiry)
     return bounded
 
+def publication_gate_policy(candidate, previous, rollback):
+    """Revalidate exact main and GitHub history while activation locks are held.
+
+    This requires an authenticated GitHub workflow context on the host; missing
+    context is a hard refusal. The operator remains in the trust boundary.
+    """
+    import sys
+    import derived_assets
+    source=Path(__file__).resolve().parents[2]
+    sys.path.insert(0,str(source/'deploy'))
+    import publication_gate
+    revision,_,_=derived_assets.source_snapshot(source)
+    context=publication_gate.context(os.environ,revision)
+    g.require(context.sha==(previous.name if rollback else candidate.name),'publication_release_mismatch')
+    api=publication_gate.GitHub(context,os.environ.get('GH_TOKEN',''))
+    publication_gate.verify(context,api)
+
 def activate(c,base,candidate,receipt,policy_file,expected_previous,previous_receipt,boundary_file,rollback=False):
     protected(base,True)
     for value in (receipt,policy_file,previous_receipt,boundary_file):protected(value)
@@ -119,6 +136,7 @@ def activate(c,base,candidate,receipt,policy_file,expected_previous,previous_rec
         c.verify(candidate,receipt)
         proof=check(c,base,expected_previous,previous_receipt,boundary_file)
         p=runtime_gate_policy(c,p,candidate,receipt)
+        publication_gate_policy(candidate,expected_previous,rollback)
         g.require(candidate.stat().st_dev==base.stat().st_dev,'cross_device_activation')
         run=uuid.uuid4().hex;journal=base/('activation-'+run+'.json');latch=base/'activation-blocked.json'
         state={'schema':SCHEMA,'run':run,'state':'switch_intent','candidate':str(candidate),'previous':str(expected_previous),'handoff_run':proof['run'],'handoff_sha256':digest(base/'scheduler-ready.json'),'node_sha256':c.node_fingerprint(),'boot':boot()}

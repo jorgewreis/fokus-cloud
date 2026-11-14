@@ -18,11 +18,14 @@ import publication_gate
 import derived_assets
 import artifact_ssh
 
+EXECUTOR_ROOT = Path(__file__).resolve().parents[2]
+
 
 def run(source, ssh_options, prepare, environment):
     source = Path(source).resolve(strict=True)
-    revision = subprocess.check_output(['git', '-C', str(source), 'rev-parse', '--verify', 'HEAD'],
-                                       text=True, stderr=subprocess.DEVNULL).strip()
+    if source != EXECUTOR_ROOT:
+        raise ValueError('executor_source_mismatch')
+    revision, _, _ = derived_assets.source_snapshot(source)
     context = publication_gate.context(environment, revision)
     api = publication_gate.GitHub(context, environment.get('GH_TOKEN', ''))
     validation = publication_gate.verify(context, api)

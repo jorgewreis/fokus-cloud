@@ -217,6 +217,8 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     assert (base/'current').resolve()==old and not (base/'activation-blocked.json').exists()
     assert (base/'scheduler-ready.json').read_bytes()==ready_before
     print('direct_activation_without_runtime_evidence_blocked')
+    # External GitHub authorization is simulated; this fixture does not prove it.
+    gate.publication_gate_policy=lambda candidate,previous,rollback:None
     try:publisher.switch(clone,base,newroot,newreceipt,policy,old,oldreceipt,temp/'scope.json')
     except vp['VerificationError'] as error:
         assert str(error)=='active_release_mismatch', ('unexpected verifier reason',str(error))

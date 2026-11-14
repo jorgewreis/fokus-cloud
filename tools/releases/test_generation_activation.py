@@ -28,6 +28,28 @@ class ContractEntrypoints(unittest.TestCase):
                         with self.assertRaisesRegex(g.Blocked, '^contract_mismatch$'):
                             cli()
 
+class PublicationPolicy(unittest.TestCase):
+    def test_missing_context_wrong_release_and_failed_github_verification_refuse(self):
+        import derived_assets
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'deploy'))
+        import publication_gate
+        sha='b'*40
+        candidate=Path('/synthetic/releases')/sha
+        previous=Path('/synthetic/releases')/('a'*40)
+        with patch.object(derived_assets,'source_snapshot',return_value=(sha,b'',{})):
+            with patch.dict(os.environ,{},clear=True):
+                with self.assertRaises(publication_gate.GateError):a.publication_gate_policy(candidate,previous,False)
+            with patch.object(publication_gate,'context',return_value=SimpleNamespace(sha='c'*40)):
+                with self.assertRaisesRegex(g.Blocked,'publication_release_mismatch'):
+                    a.publication_gate_policy(candidate,previous,False)
+            with patch.object(publication_gate,'context',return_value=SimpleNamespace(sha=sha)), \
+                 patch.object(publication_gate,'GitHub',return_value=object()), \
+                 patch.object(publication_gate,'verify',side_effect=publication_gate.GateError('stale')):
+                with self.assertRaisesRegex(publication_gate.GateError,'stale'):
+                    a.publication_gate_policy(candidate,previous,False)
+
 class Contract:
     canonical=staticmethod(lambda p:Path(p).resolve())
     lock=staticmethod(g.lock)
@@ -46,6 +68,7 @@ class Gate(unittest.TestCase):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.base=Path(self.tmp.name)
         # Unit fixtures stub only runtime inspection; dedicated tests exercise the real gate.
         runtime=patch.object(a,'runtime_gate_policy',side_effect=lambda _c,p,_root,_receipt:p);runtime.start();self.addCleanup(runtime.stop)
+        publication=patch.object(a,'publication_gate_policy');publication.start();self.addCleanup(publication.stop)
         self.root=self.base/'releases'/('a'*40);self.root.mkdir(parents=True);self.new=self.base/'releases'/('b'*40);self.new.mkdir()
         (self.base/'current').symlink_to(self.root);self.receipt=self.base/'old.json';self.receipt.write_text(json.dumps({'root':str(self.root)}));self.newreceipt=self.base/'new.json';self.newreceipt.write_text(json.dumps({'root':str(self.new)}))
         self.scope=self.base/'scope.json';self.scope.write_text(json.dumps(dict(schema=a.SCHEMA,base=str(self.base),root=str(self.root),receipt_sha256=a.digest(self.receipt),node_sha256=Contract.node_fingerprint(),boot=a.boot(),operator_uid=os.geteuid(),verified_at=time.time(),expires_at=time.time()+240,evidence_reference='synthetic isolated process namespace only',**{k:True for k in a.BOUNDARIES})))
@@ -94,6 +117,19 @@ class Gate(unittest.TestCase):
         self.ready()
         with patch.object(a,'runtime_gate_policy',side_effect=ValueError('runtime_evidence_required')):
             with self.assertRaisesRegex(ValueError,'runtime_evidence_required'):self.activate()
+        self.assertEqual((self.base/'current').resolve(),self.root)
+        self.assertFalse((self.base/'activation-blocked.json').exists())
+        self.assertTrue((self.base/'scheduler-ready.json').exists())
+
+    def test_stale_publication_gate_blocks_with_both_locks_before_latch(self):
+        self.ready()
+        def reject(candidate, previous, rollback):
+            for lock in ('activation.lock','scheduler.lock'):
+                with self.assertRaises(BlockingIOError):
+                    with g.lock(self.base/lock):pass
+            raise ValueError('publication_changed')
+        with patch.object(a,'publication_gate_policy',side_effect=reject):
+            with self.assertRaisesRegex(ValueError,'publication_changed'):self.activate()
         self.assertEqual((self.base/'current').resolve(),self.root)
         self.assertFalse((self.base/'activation-blocked.json').exists())
         self.assertTrue((self.base/'scheduler-ready.json').exists())

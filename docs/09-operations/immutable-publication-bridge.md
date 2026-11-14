@@ -137,6 +137,16 @@ reconstrução independente. Esta entrada ainda não está ligada ao environment
 produção e não substitui verificação independente de receipt, drenagem, runtime
 ou o gate supervisionado de ativação.
 
+A entrada exige que `--source` seja o próprio checkout do executor e confere
+se os bytes versionados correspondem ao SHA. O núcleo de ativação repete o gate
+GitHub dentro dos locks e antes de alterar latch ou ponteiro. Em rollback, o
+SHA validado deve corresponder à geração atual e a política de compatibilidade
+de rollback continua obrigatória. Contexto GitHub ou token ausente bloqueia a
+ativação; ainda não existe transporte validado desse contexto ao host remoto.
+Uma alteração posterior ao último exame do GitHub não pode ser descartada apenas
+por locks locais. A prova Laravel simula o gate GitHub e não comprova sua operação
+remota nem a autorização do environment de produção.
+
 ## Evidência e limites
 
 `tests/Deployment/test_legacy_publication_guard.py` verifica que a recusa não
