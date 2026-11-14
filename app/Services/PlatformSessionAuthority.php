@@ -111,20 +111,28 @@ final class PlatformSessionAuthority
             if ($companyId !== null) {
                 DB::table('companies')->where('id', $companyId)->lockForUpdate()->firstOrFail();
             }
+            // Read only the authority identity first so a known web principal can
+            // be locked before the platform admin. Its full state is re-read
+            // under lock below, before any request record can be modified.
+            $authoritySnapshot = DB::table('platform_session_authorities')->where('session_id', $sessionId)->first();
+            abort_unless($authoritySnapshot && $authoritySnapshot->platform_admin_id === $platformAdminId, 401, 'A autoridade da sessão expirou. Entre novamente.');
+            if ($authoritySnapshot->web_principal_state === 'known') {
+                $web = DB::table('users')->where('id', $authoritySnapshot->web_user_id)->lockForUpdate()->first();
+                abort_unless($web && $web->status === 'ativa' && Auth::guard('web')->id() === $authoritySnapshot->web_user_id, 401, 'O contexto da sessão mudou. Entre novamente.');
+            }
+            abort_if($authoritySnapshot->web_principal_state === 'unknown', 401, 'O contexto da sessão exige nova autenticação.');
             $admin = DB::table('platform_admins')->where('id', $platformAdminId)->lockForUpdate()->first();
             abort_unless($admin && $admin->status === 'ativo' && $admin->manual_blocked_at === null && $admin->deactivated_at === null
                 && ($admin->locked_until === null || Carbon::parse($admin->locked_until)->isPast()), 403, 'Permissão interna insuficiente.');
             $authority = DB::table('platform_session_authorities')->where('session_id', $sessionId)->lockForUpdate()->first();
-            $session = DB::table(config('session.table', 'sessions'))->where('id', $sessionId)->lockForUpdate()->first();
-            abort_unless($authority && $session && $authority->state === 'active' && $authority->platform_admin_id === $platformAdminId
+            abort_unless($authority && $authority->state === 'active' && $authority->platform_admin_id === $platformAdminId
+                && $authority->web_principal_state === $authoritySnapshot->web_principal_state
+                && $authority->web_user_id === $authoritySnapshot->web_user_id
                 && Carbon::parse($authority->expires_at)->isFuture(), 401, 'A autoridade da sessão expirou. Entre novamente.');
+            $session = DB::table(config('session.table', 'sessions'))->where('id', $sessionId)->lockForUpdate()->first();
+            abort_unless($session, 401, 'A autoridade da sessão expirou. Entre novamente.');
             $idleDeadline = now()->subMinutes((int) config('session.lifetime', 120))->timestamp;
             abort_if((int) $session->last_activity <= $idleDeadline, 401, 'A sessão expirou. Entre novamente.');
-            if ($authority->web_principal_state === 'known') {
-                $web = DB::table('users')->where('id', $authority->web_user_id)->lockForUpdate()->first();
-                abort_unless($web && $web->status === 'ativa' && Auth::guard('web')->id() === $authority->web_user_id, 401, 'O contexto da sessão mudou. Entre novamente.');
-            }
-            abort_if($authority->web_principal_state === 'unknown', 401, 'O contexto da sessão exige nova autenticação.');
             $grant = DB::table('platform_role_permissions as grant')
                 ->join('platform_permissions as permission', 'permission.id', '=', 'grant.platform_permission_id')
                 ->where('grant.platform_role_id', $admin->platform_role_id)->where('permission.code', $permission)->sharedLock()->exists();

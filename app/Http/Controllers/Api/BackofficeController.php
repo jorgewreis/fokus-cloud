@@ -488,8 +488,8 @@ class BackofficeController extends Controller
             abort_if(User::where('cpf', $cpf)->exists(), 409, 'Este CPF já possui uma conta.');
             abort_if(User::where('email', $email)->exists(), 409, 'Este e-mail já está vinculado a outra conta.');
         };
-        $persist = function () use ($data, $document, $cpf, $email, $audit, $request): string {
-            return DB::transaction(function () use ($data, $document, $cpf, $email, $audit, $request) {
+        $persist = function (bool $withinIdempotency = false) use ($data, $document, $cpf, $email, $audit, $request): string {
+            $write = function () use ($data, $document, $cpf, $email, $audit, $request): string {
                 $adminId = PrefixedUlid::make('USR');
                 $companyId = PrefixedUlid::make('EMP');
                 $now = now();
@@ -544,7 +544,9 @@ class BackofficeController extends Controller
                 $audit->record($request->user()->id, 'backoffice.company_created', 'company', $companyId, $companyId, 'Empresa criada no sistema.', metadata: ['admin_id' => $user->id], after: ['id' => $companyId, 'legal_name' => $data['legal_name'], 'status' => 'ativa'], request: $request);
 
                 return $companyId;
-            });
+            };
+
+            return $withinIdempotency ? $write() : DB::transaction($write);
         };
 
         if ($idempotency === null) {
@@ -568,7 +570,7 @@ class BackofficeController extends Controller
                     function () use ($checkDuplicates, $persist): array {
                         $checkDuplicates();
 
-                        return ['id' => $persist(), 'status' => 201];
+                        return ['id' => $persist(true), 'status' => 201];
                     },
                     $request,
                 );
@@ -597,8 +599,8 @@ class BackofficeController extends Controller
             abort_unless(BrazilianDocuments::cpf($cpf), 422, 'CPF inválido.');
         };
 
-        $persist = function () use ($data, $company, $cpf, $email, $audit, $request): void {
-            DB::transaction(function () use ($data, $company, $cpf, $email, $audit, $request) {
+        $persist = function (bool $withinIdempotency = false) use ($data, $company, $cpf, $email, $audit, $request): void {
+            $write = function () use ($data, $company, $cpf, $email, $audit, $request): void {
                 $current = DB::table('companies')->where('id', $company)->whereNull('deleted_at')->lockForUpdate()->first();
                 abort_unless($current, 404, 'Empresa não encontrada.');
                 abort_if((int) $current->version !== (int) $data['version'], 409, 'A empresa foi alterada por outro administrador. Atualize a página e tente novamente.');
@@ -612,7 +614,13 @@ class BackofficeController extends Controller
                 abort_unless($updated, 409, 'A empresa foi alterada por outro administrador. Atualize a página e tente novamente.');
                 $audit->record($request->user()->id, 'backoffice.company_updated', 'company', $company, $company, before: ['legal_name' => $current->legal_name, 'admin_id' => $membership->user_id, 'admin_email' => $membership->email], after: ['legal_name' => $data['legal_name'], 'admin_id' => $membership->user_id, 'admin_email' => $email], request: $request);
 
-            });
+            };
+            if ($withinIdempotency) {
+                $write();
+
+                return;
+            }
+            DB::transaction($write);
         };
 
         if ($idempotency === null) {
@@ -625,7 +633,7 @@ class BackofficeController extends Controller
                     $idempotency['token'], (string) $request->user()->id, 'company.update', $company, $payload,
                     $validateCpf,
                     function () use ($persist, $company): array {
-                        $persist();
+                        $persist(true);
 
                         return ['id' => $company, 'status' => 200];
                     },

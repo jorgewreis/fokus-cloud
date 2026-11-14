@@ -28,8 +28,8 @@ final class CompanyIdempotencyStore
         $now = now()->getTimestamp();
         $token = $this->keys->issue($actor, $operation, $now, $lifetimeSeconds);
         $claims = $this->keys->verify($token, $actor, $operation, $now);
-        $this->transaction($request, $actor, null, function () use ($token, $actor, $operation, $claims): void {
-            $this->authorization->lockAuthorizedActor($actor);
+        $this->transaction($request, $actor, null, function () use ($token, $actor, $operation, $claims, $request): void {
+            $this->authorize($actor, $request);
             $decisionNow = now()->getTimestamp();
             $this->keys->verify($token, $actor, $operation, $decisionNow);
             $windowStart = max(0, $decisionNow - $this->issuanceWindowSeconds);
@@ -65,10 +65,10 @@ final class CompanyIdempotencyStore
         $claims = $this->keys->verify($token, $actor, $operation, $now);
         $digest = $this->keys->payloadDigest($claims['kid'], $operation, $target, $payload);
 
-        return $this->transaction($request, $actor, $target, function () use ($token, $actor, $operation, $target, $claims, $digest): ?array {
+        return $this->transaction($request, $actor, $target, function () use ($token, $actor, $operation, $target, $claims, $digest, $request): ?array {
             $row = $this->lockedRecord($token, $actor, $operation, $claims);
             $this->keys->verify($token, $actor, $operation, now()->getTimestamp());
-            $this->authorization->lockAuthorizedActor($actor);
+            $this->authorize($actor, $request);
             abort_if($row->revoked, 409, 'A chave foi revogada.');
             if ($row->payload_digest !== null && ! hash_equals($row->payload_digest, $digest)) {
                 abort(409, 'A chave já está vinculada a outra solicitação.');
@@ -96,12 +96,12 @@ final class CompanyIdempotencyStore
     {
         $this->requireTopLevel();
 
-        return $this->transaction($request, $actor, $target, function () use ($token, $actor, $operation, $target, $payload, $writer): array {
+        return $this->transaction($request, $actor, $target, function () use ($token, $actor, $operation, $target, $payload, $writer, $request): array {
             $claims = $this->keys->verify($token, $actor, $operation, now()->getTimestamp());
             $digest = $this->keys->payloadDigest($claims['kid'], $operation, $target, $payload);
             $row = $this->lockedRecord($token, $actor, $operation, $claims);
             $this->keys->verify($token, $actor, $operation, now()->getTimestamp());
-            $this->authorization->lockAuthorizedActor($actor);
+            $this->authorize($actor, $request);
             abort_if($row->revoked, 409, 'A chave foi revogada.');
             abort_unless($row->payload_digest !== null && hash_equals($row->payload_digest, $digest), 409, 'A chave está vinculada a outra solicitação.');
             if ($row->state === 'completed') {
@@ -128,10 +128,10 @@ final class CompanyIdempotencyStore
         $this->requireTopLevel();
         $claims = $this->keys->verifyForStatus($token, $actor, $operation, $now);
 
-        return $this->transaction($request, $actor, null, function () use ($token, $actor, $operation, $claims): array {
+        return $this->transaction($request, $actor, null, function () use ($token, $actor, $operation, $claims, $request): array {
             $row = DB::table('company_idempotency_requests')->where('token_hash', hash('sha256', $token))->lockForUpdate()->first();
             $this->keys->verifyForStatus($token, $actor, $operation, now()->getTimestamp());
-            $this->authorization->lockAuthorizedActor($actor);
+            $this->authorize($actor, $request);
             if (! $row) {
                 return ['state' => 'absent', 'revoked' => null];
             }
@@ -152,10 +152,10 @@ final class CompanyIdempotencyStore
         $this->requireTopLevel();
         $claims = $this->keys->verifyForStatus($token, $actor, $operation, $now);
 
-        return $this->transaction($request, $actor, null, function () use ($token, $actor, $operation, $claims, $audit): array {
+        return $this->transaction($request, $actor, null, function () use ($token, $actor, $operation, $claims, $audit, $request): array {
             $row = $this->lockedRecord($token, $actor, $operation, $claims);
             $this->keys->verifyForStatus($token, $actor, $operation, now()->getTimestamp());
-            $this->authorization->lockAuthorizedActor($actor);
+            $this->authorize($actor, $request);
             abort_unless(in_array($row->state, ['issued', 'bound', 'completed'], true), 503, 'Solicitação indisponível.');
             if (! $row->revoked) {
                 DB::table('company_idempotency_requests')->where('token_hash', $row->token_hash)->update(['revoked' => true, 'updated_at' => now()]);
@@ -216,5 +216,12 @@ final class CompanyIdempotencyStore
             $companyId,
             $actor,
         );
+    }
+
+    private function authorize(string $actor, ?Request $request): void
+    {
+        if ($request === null || $this->sessionAuthority === null) {
+            $this->authorization->lockAuthorizedActor($actor);
+        }
     }
 }
