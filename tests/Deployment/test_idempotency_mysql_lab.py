@@ -11,7 +11,8 @@ import tempfile
 
 import idempotency_mysql_lab as laboratory
 from idempotency_mysql_lab import (BLOCKED_FUNCTIONS, FILES, METHODS, REQUIRED, created_id,
-                                   junit_config, php_prefix, preflight, validate_volume)
+                                   junit_config, mysql_tmpfs, numeric_identity, php_prefix,
+                                   preflight, summarize_mysql_startup, validate_volume)
 
 
 class LaboratoryPreflightTest(unittest.TestCase):
@@ -55,6 +56,31 @@ class LaboratoryPreflightTest(unittest.TestCase):
         for output in (b"", b"a" * 12, b"friendly-container", b"a" * 63 + b"z"):
             with self.subTest(output=output), self.assertRaises(RuntimeError):
                 created_id(subprocess.CompletedProcess([], 0, output))
+
+    def test_mysql_tmpfs_owner_is_image_identity_and_mode_is_private(self):
+        uid = numeric_identity(subprocess.CompletedProcess([], 0, b"1001\n"))
+        gid = numeric_identity(subprocess.CompletedProcess([], 0, b"1001\n"))
+        self.assertEqual(mysql_tmpfs(uid, gid), "/var/lib/mysql:rw,uid=1001,gid=1001,mode=0700")
+        self.assertEqual(mysql_tmpfs(0, 0), "/var/lib/mysql:rw,uid=0,gid=0,mode=0700")
+        for output in (b"", b"-1", b"1,mode=0777", b"2147483648"):
+            with self.subTest(output=output), self.assertRaises(RuntimeError):
+                numeric_identity(subprocess.CompletedProcess([], 0, output))
+        for uid in (-1, True, 2**31):
+            with self.subTest(uid=uid), self.assertRaises(ValueError):
+                mysql_tmpfs(uid, 1001)
+
+    def test_mysql_diagnostics_never_retains_log_or_state_values(self):
+        marker = "do-not-copy-sensitive-marker"
+        result = summarize_mysql_startup({"Running": False, "OOMKilled": True, "ExitCode": 1,
+                                          "Error": marker},
+                                         ("permission denied " + marker).encode())
+        self.assertEqual(result["exit_code"], 1)
+        self.assertTrue(result["oom_killed"])
+        self.assertTrue(result["indicators"]["permission_denied"])
+        self.assertNotIn(marker, json.dumps(result))
+        malformed = summarize_mysql_startup({"ExitCode": marker}, marker.encode())
+        self.assertIsNone(malformed["exit_code"])
+        self.assertNotIn(marker, json.dumps(malformed))
 
     def test_php_prefix_requires_fail_closed_prepend(self):
         flags = php_prefix()

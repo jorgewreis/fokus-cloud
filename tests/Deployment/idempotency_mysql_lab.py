@@ -116,6 +116,50 @@ def created_id(result: subprocess.CompletedProcess) -> str:
     return value
 
 
+def numeric_identity(result: subprocess.CompletedProcess) -> int:
+    value = result.stdout.decode("ascii").strip()
+    if not value.isascii() or not value.isdigit() or int(value) > 2**31 - 1:
+        raise RuntimeError("Invalid image user or group identity")
+    return int(value)
+
+
+def mysql_tmpfs(uid: int, gid: int) -> str:
+    if any(type(value) is not int or value < 0 or value > 2**31 - 1 for value in (uid, gid)):
+        raise ValueError("Invalid MySQL tmpfs identity")
+    return f"/var/lib/mysql:rw,uid={uid},gid={gid},mode=0700"
+
+
+def summarize_mysql_startup(state: object, log: bytes) -> dict:
+    """Keep only allowlisted indicators; never retain raw container log data."""
+    if not isinstance(state, dict):
+        state = {}
+    output = log.decode("utf-8", errors="replace").lower()
+    indicators = {
+        "permission_denied": "permission denied" in output,
+        "read_only_filesystem": "read-only file system" in output,
+        "no_space": "no space left on device" in output,
+        "aio_resource_limit": "io_setup() failed with eagain" in output or "resource temporarily unavailable" in output,
+        "authentication_denied": "access denied for user" in output,
+    }
+    exit_code = state.get("ExitCode")
+    return {"running": state.get("Running") is True,
+            "oom_killed": state.get("OOMKilled") is True,
+            "exit_code": exit_code if type(exit_code) is int and 0 <= exit_code <= 255 else None,
+            "indicators": indicators,
+            "scope": "allowlisted synthetic startup indicators only; raw output excluded"}
+
+
+def save_mysql_diagnostics(container: str, report: Path) -> None:
+    state_result = docker("inspect", "--format", "{{json .State}}", container, check=False)
+    logs_result = docker("logs", "--tail", "150", container, check=False)
+    try:
+        state = json.loads(state_result.stdout) if state_result.returncode == 0 else {}
+    except (ValueError, UnicodeDecodeError):
+        state = {}
+    sanitized = summarize_mysql_startup(state, logs_result.stdout + logs_result.stderr)
+    (report / "mysql-startup-diagnostics.json").write_text(json.dumps(sanitized, indent=2) + "\n", encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--volume", required=True)
@@ -164,9 +208,16 @@ def main() -> None:
     mysql_name, runner_name = tag + "-mysql", tag + "-runner"
     created: list[str] = []
     try:
+        # The reviewed target image runs as non-root while the compatibility
+        # image may initialize as root. Resolve the image's configured UID/GID
+        # in a separate networkless, read-only container rather than assuming.
+        id_flags = ("run", "--rm", "--pull=never", "--network", "none", "--read-only",
+                    "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--entrypoint", "id", mysql_image)
+        uid = numeric_identity(docker(*id_flags, "-u"))
+        gid = numeric_identity(docker(*id_flags, "-g"))
         mysql = created_id(docker("run", "-d", "--pull=never", "--name", mysql_name, "--restart=no",
                                   "--network", "none", "--label", "fokus.release.disposable=true",
-                                  "--tmpfs", "/var/lib/mysql", "-e", "MYSQL_ROOT_PASSWORD=" + PASSWORD,
+                                  "--tmpfs", mysql_tmpfs(uid, gid), "-e", "MYSQL_ROOT_PASSWORD=" + PASSWORD,
                                   "-e", "MYSQL_DATABASE=fokus_idempotency_api_test", mysql_image))
         created.append(mysql)
         for _ in range(90):
@@ -175,6 +226,7 @@ def main() -> None:
                 break
             time.sleep(2)
         else:
+            save_mysql_diagnostics(mysql, args.report)
             raise RuntimeError("Disposable MySQL did not become ready")
         db_uuid = docker("exec", mysql, "mysql", "-h127.0.0.1", "-uroot", "--password=" + PASSWORD,
                          "--batch", "--skip-column-names", "-e", "SELECT @@server_uuid").stdout.decode().strip()
