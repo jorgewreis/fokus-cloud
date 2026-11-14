@@ -129,6 +129,9 @@ class ProductInterestTest extends TestCase
         }
         $this->assertDatabaseHas('product_interests', ['id' => $id, 'products' => 'invalid']);
         $this->assertDatabaseMissing('interest_product_index', ['interest_id' => $id, 'product_code' => 'law']);
+        DB::table('interest_product_index_state')->where('id', 1)->update(['running' => true]);
+        $this->artisan('fokus:backfill-interest-products --confirm-drained')->assertFailed();
+        $this->assertDatabaseHas('interest_product_index_state', ['id' => 1, 'ready' => false, 'running' => true]);
     }
 
     public function test_indexed_suggestions_are_paginated_and_allow_prefix_search(): void

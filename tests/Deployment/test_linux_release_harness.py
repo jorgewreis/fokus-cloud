@@ -35,7 +35,7 @@ class CoverageComposition(unittest.TestCase):
 
     def test_measured_composition_preserves_all_law_and_main_tests(self):
         self.assertEqual(suite.EXPECTED_TESTS, 358)
-        self.assertEqual(suite.MINIMUM_ASSERTIONS, 2868)
+        self.assertEqual(suite.MINIMUM_ASSERTIONS, 2870)
         self.assertEqual(len(suite.MAIN_IDENTITY_TESTS), 10)
         self.assertEqual(sum(suite.MAIN_IDENTITY_TESTS.values()), 23)
         self.assertEqual(suite.coverage(self.report())['tests'], 358)
@@ -75,7 +75,7 @@ class CoverageComposition(unittest.TestCase):
                     with self.assertRaises(RuntimeError): suite.coverage(report)
 
     def test_old_or_incomplete_totals_failures_errors_skips_and_hidden_failures_are_rejected(self):
-        for key, value in [('tests','327'),('tests','351'),('tests','357'),('tests','359'),('assertions','2867'),
+        for key, value in [('tests','327'),('tests','351'),('tests','357'),('tests','359'),('assertions','2869'),
                            ('failures','1'),('errors','1'),('skipped','1')]:
             with self.subTest(key=key):
                 report = self.report(); report[0].set(key,value)
