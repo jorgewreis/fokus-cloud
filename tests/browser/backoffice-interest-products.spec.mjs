@@ -190,3 +190,21 @@ for (const width of [701, 768, 1280, 1440, 1919, 1920]) test(`controles acessív
     await button.click({ timeout: 5000 });
     await expect(page.locator('#interest-product-options option')).toHaveAttribute('value', 'p2');
 });
+
+test('falha do novo filtro limpa resultado anterior e permite repetir', async ({ page }) => {
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { id: 'TEST', role: 'superadministrador', permissions: ['platform.product_interests.manage'] } } }));
+    await page.route('**/api/backoffice/product-interests-options?*', route => route.fulfill({ json: { products: [], meta: { current_page: 1, has_more: false }, historical_index_ready: true } }));
+    let attempts = 0;
+    await page.route('**/api/backoffice/product-interests?*', route => {
+        const product = new URL(route.request().url()).searchParams.get('product');
+        if (product === 'novo' && ++attempts === 1) return route.fulfill({ status: 503, json: { message: 'Falha de consulta' } });
+        return route.fulfill({ json: { data: [{ id: 1, name: product || 'Resultado anterior', email: 'teste@example.test', products: [], profiles: [], status: 'novo', last_submitted_at: '2026-01-01T00:00:00Z' }], meta: { total: 1, current_page: 1, last_page: 1 } } });
+    });
+    await page.goto('/backoffice/interesses');
+    await expect(page.locator('#interest-list')).toContainText('Resultado anterior');
+    await page.locator('#interest-product-filter').fill('novo');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page.locator('#interest-list')).not.toContainText('Resultado anterior');
+    await page.getByRole('button', { name: 'Tentar novamente' }).click();
+    await expect(page.locator('#interest-list')).toContainText('novo');
+});
