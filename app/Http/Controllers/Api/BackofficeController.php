@@ -1363,21 +1363,59 @@ class BackofficeController extends Controller
 
     public function vouchers(Request $request)
     {
-        $rows = DB::table('vouchers as voucher')
+        $perPage = min(max((int) $request->input('per_page', 20), 1), 100);
+        $query = DB::table('vouchers as voucher')
             ->leftJoin('products as product', 'product.id', '=', 'voucher.product_id')
             ->leftJoin('plans as plan', 'plan.id', '=', 'voucher.plan_id')
-            ->leftJoin('voucher_redemptions as redemption', 'redemption.voucher_id', '=', 'voucher.id')
-            ->groupBy('voucher.id', 'voucher.code', 'voucher.name', 'voucher.discount_type', 'voucher.discount_value', 'voucher.product_id', 'voucher.plan_id', 'voucher.base_amount', 'voucher.benefit_duration', 'voucher.module_codes', 'voucher.redemption_limit', 'voucher.redemption_limit_per_company', 'voucher.starts_at', 'voucher.ends_at', 'voucher.status', 'voucher.origin', 'voucher.notes', 'voucher.created_by_platform_admin_id', 'voucher.created_at', 'voucher.updated_at', 'product.name', 'plan.name')
-            ->select('voucher.*', 'product.name as product_name', 'plan.name as plan_name', DB::raw('count(redemption.id) as redemptions_count'))
-            ->orderByDesc('voucher.created_at')
-            ->limit(100)
-            ->get();
+            ->select('voucher.*', 'product.name as product_name', 'plan.name as plan_name')
+            ->selectSub(DB::table('voucher_redemptions')->selectRaw('count(*)')->whereColumn('voucher_id', 'voucher.id'), 'redemptions_count');
+        if ($request->filled('search')) {
+            $term = '%'.mb_strtolower(trim((string) $request->input('search'))).'%';
+            $query->where(function ($q) use ($term): void {
+                foreach (['voucher.code', 'voucher.name', 'voucher.origin', 'product.name', 'plan.name'] as $column) {
+                    $q->orWhereRaw("LOWER($column) LIKE ?", [$term]);
+                }
+            });
+        }
+        foreach (['product_id', 'discount_type'] as $filter) {
+            if ($request->filled($filter)) {
+                $query->where('voucher.'.$filter, $request->input($filter));
+            }
+        }
+        if ($request->filled('status')) {
+            $status = $request->input('status');
+            $query->where(function ($q) use ($status): void {
+                if ($status === 'expirada') {
+                    $q->whereNotNull('voucher.ends_at')->where('voucher.ends_at', '<', now());
+                } else {
+                    $q->where('voucher.status', $status)->where(function ($q): void {
+                        $q->whereNull('voucher.ends_at')->orWhere('voucher.ends_at', '>=', now());
+                    });
+                }
+            });
+        }
+        // Keep the original bounded array contract for older cached clients.
+        if (! $request->boolean('paginate')) {
+            $legacy = $query->orderByDesc('voucher.created_at')->orderByDesc('voucher.id')->limit(100)->get();
+            $legacy->transform(function ($voucher) {
+                $voucher->computed_status = $voucher->ends_at && now()->gt(\Illuminate\Support\Carbon::parse($voucher->ends_at)) ? 'expirada' : $voucher->status;
 
-        return response()->json($rows->map(function ($voucher) {
+                return $voucher;
+            });
+
+            return response()->json($legacy)->header('Deprecation', 'true');
+        }
+        $vouchers = $query->orderByDesc('voucher.created_at')->orderByDesc('voucher.id')->paginate($perPage);
+        $vouchers->getCollection()->transform(function ($voucher) {
             $voucher->computed_status = $voucher->ends_at && now()->gt(\Illuminate\Support\Carbon::parse($voucher->ends_at)) ? 'expirada' : $voucher->status;
 
             return $voucher;
-        }));
+        });
+
+        return response()->json(['data' => $vouchers->items(), 'meta' => [
+            'total' => $vouchers->total(), 'per_page' => $vouchers->perPage(),
+            'current_page' => $vouchers->currentPage(), 'last_page' => $vouchers->lastPage(),
+        ]]);
     }
 
     private function companyListPayload(object $row): array
@@ -2039,7 +2077,26 @@ class BackofficeController extends Controller
             $query->whereDate('event.created_at', '<=', $request->input('to'));
         }
 
-        $rows = $query->limit(2000)->get()->map(function (object $event): array {
+        if ($request->filled('status')) {
+            $status = (string) $request->input('status');
+            $query->where(function ($q) use ($status): void {
+                $q->where('event.metadata->status', $status)
+                    ->orWhere(function ($fallback) use ($status): void {
+                        $fallback->whereNull('event.metadata->status');
+                        if ($status === 'failed') {
+                            $fallback->where(function ($actions): void {
+                                $actions->where('event.action', 'like', '%failed%')->orWhere('event.action', 'like', '%locked%');
+                            });
+                        } elseif ($status === 'success') {
+                            $fallback->where('event.action', 'not like', '%failed%')->where('event.action', 'not like', '%locked%');
+                        } else {
+                            $fallback->whereRaw('1 = 0');
+                        }
+                    });
+            });
+        }
+        $events = $query->orderByDesc('event.id')->paginate($perPage, ['*'], 'page', $page);
+        $items = $events->getCollection()->map(function (object $event): array {
             $metadata = json_decode((string) $event->metadata, true) ?: [];
             $isCustomer = $event->actor_type === 'customer';
 
@@ -2047,23 +2104,15 @@ class BackofficeController extends Controller
                 'id' => $event->id,
                 'user' => $isCustomer ? ($event->customer_name ?: $metadata['user_name'] ?? 'Usuário não identificado') : ($event->admin_name ?: $metadata['user_name'] ?? 'Administrador não identificado'),
                 'email' => $isCustomer ? ($event->customer_email ?: $metadata['user_email'] ?? null) : ($event->admin_email ?: $metadata['user_email'] ?? null),
-                'user_type' => $isCustomer ? 'cliente' : 'interno',
-                'company' => $event->company_name,
-                'product' => $metadata['product_name'] ?? null,
-                'subscription_id' => $metadata['subscription_id'] ?? null,
+                'user_type' => $isCustomer ? 'cliente' : 'interno', 'company' => $event->company_name,
+                'product' => $metadata['product_name'] ?? null, 'subscription_id' => $metadata['subscription_id'] ?? null,
                 'event' => $event->action,
                 'status' => $metadata['status'] ?? (str_contains($event->action, 'failed') || str_contains($event->action, 'locked') ? 'failed' : 'success'),
-                'ip_address' => $event->ip_address,
-                'user_agent' => $event->user_agent,
+                'ip_address' => $event->ip_address, 'user_agent' => $event->user_agent,
                 'created_at' => Carbon::parse((string) $event->created_at, 'UTC')->setTimezone('America/Bahia')->toIso8601String(),
             ];
         });
-        if ($request->filled('status')) {
-            $rows = $rows->filter(fn (array $row): bool => $row['status'] === $request->input('status'))->values();
-        }
-        $total = $rows->count();
-        $items = $rows->forPage($page, $perPage)->values();
 
-        return response()->json(['data' => $items, 'meta' => ['total' => $total, 'per_page' => $perPage, 'current_page' => $page, 'last_page' => max((int) ceil($total / $perPage), 1), 'retention_days' => 30]]);
+        return response()->json(['data' => $items, 'meta' => ['total' => $events->total(), 'per_page' => $perPage, 'current_page' => $page, 'last_page' => $events->lastPage(), 'retention_days' => 30]]);
     }
 }
