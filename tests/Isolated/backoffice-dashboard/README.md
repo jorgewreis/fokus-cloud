@@ -52,11 +52,10 @@ buffer e 24 MiB com buffer. Ensaios individuais levaram 0,156 s e 0,084 s,
 respectivamente; não representam produção nem uma comparação estatística. O
 JOIN repete snapshots e seu custo com volumes extremos continua uma limitação.
 
-O teste HTTP de `SubscriptionAdminTest` com MySQL iniciou em banco separado e
-continuava aplicando migrations neste checkpoint. Acompanhar o processo existente
-`hopeful_germain` e o arquivo local `%TEMP%/fokus-dashboard-consistent-mysql-test.log`;
-não considerá-lo aprovado até haver resultado terminal. A prova de endpoint,
-a revisão independente e a avaliação dos demais drivers seguem pendentes.
+No checkpoint inicial, o teste HTTP MySQL ainda aplicava migrations no processo
+`hopeful_germain`. Esse processo terminou sem saída final recuperável; a prova
+posterior em esquema sintético reutilizado está descrita em “Resultado HTTP MySQL
+após retomada”. A avaliação dos demais drivers e de produção segue pendente.
 
 ## Continuação: exceção e alternativa sem repetição
 
@@ -155,9 +154,25 @@ quem executa.
 
 Na revisão desta proteção, as quatorze rejeições foram exercitadas localmente
 antes da conexão; cada um dos nove scripts também recusou uma `DB_URL` hostil.
-A prova positiva da nova proteção contra MySQL permanece pendente: a instância
-descartável não ficou disponível e o Docker deixou de responder durante a
-tentativa. Os ensaios registrados acima são anteriores a esta alteração.
+Na tentativa inicial, a prova positiva local não pôde ser concluída porque a
+instância descartável não ficou disponível e o Docker deixou de responder.
+
+Posteriormente, o job `disposable-mysql` do [run 43575896188](https://github.com/jorgewreis/fokus-cloud/actions/runs/43575896188)
+passou com PHP 8.4.27 e Percona isolado sem rede externa. O checkout testado foi
+o merge sintético `3ae4152ebe8952eef0ce0afada2ee965e3fc805e`, com pais main
+`d4f6d33c6eea61d3b56b4a77f57449766a44611b` e head
+`6cd433beff9f052ba3cf62e8387dd2a3feef1e72`. O script confirmou rejeição de
+marcador divergente e identificação das conexões PDO e Laravel de leitura e
+escrita. Essa prova não executou todos os nove scripts nem o endpoint HTTP.
+
+Uma prova mais ampla no [run 43575582035](https://github.com/jorgewreis/fokus-cloud/actions/runs/43575582035),
+candidato `843ab67896b80e74bde4069d8cb42b94090c3edd`, também passou com MySQL
+sintético: executou leitura, escrita, encerramento excepcional do cursor e
+rejeição de UUID e marcador incorretos sem mudança na contagem de resgates.
+Os arquivos de aplicação e scripts exercitados são idênticos aos do head
+`6cd433be`; o candidato inclui workflow adicional e tem SHA diferente. Essas
+provas não substituem a validação exata do commit de integração nem demonstram
+funcionamento em produção.
 
 Os testes negativos usam apenas diretório temporário próprio, com nomes
 aleatórios e criação exclusiva; eles não criam nem removem `.env` ou cache no
