@@ -43,6 +43,8 @@
     </section>
 
     <div id="company-message" class="fs-alert" role="status" aria-live="polite" hidden></div>
+    <div id="company-refresh-page-status" class="fs-alert fs-alert-warning" role="status" aria-live="polite" hidden></div>
+    <div id="company-operation-page-status" class="fs-alert fs-alert-warning" hidden><span data-company-operation-text role="status" aria-live="polite"></span> <button type="button" class="fs-btn fs-btn-outline-primary" data-company-operation-ack>Entendi</button></div>
 
     <section class="fs-card fs-card-panel" aria-labelledby="company-filter-title">
         <div class="fs-card-header">
@@ -107,10 +109,13 @@
                 <span class="fs-u-fs-xs fs-u-color-secondary" id="company-drawer-kicker">EMPRESAS</span>
                 <h2 class="fs-offcanvas-title" id="company-drawer-title">Nova empresa</h2>
                 <p class="fs-u-m-0 fs-u-fs-sm fs-u-color-secondary" id="company-drawer-description">Cadastre os dados da empresa e do administrador responsável.</p>
+                <p id="company-refresh-status" class="fs-u-m-0 fs-u-fs-sm" role="status" aria-live="polite" hidden></p>
+                <div id="company-operation-drawer-status" class="fs-u-m-0 fs-u-fs-sm" hidden><span data-company-operation-text role="status" aria-live="polite"></span> <button type="button" class="fs-btn fs-btn-outline-primary" data-company-operation-ack>Entendi</button></div>
             </div>
             <button class="fs-btn-close" id="company-drawer-close" type="button" data-fs-dismiss="offcanvas" aria-label="Fechar painel"></button>
         </div>
         <form id="company-form" class="fs-offcanvas-body fs-form" novalidate>
+            <div id="company-form-error" class="fs-alert fs-alert-danger" role="alert" tabindex="-1" hidden></div>
             <input type="hidden" id="company-version" name="version" />
             <section class="fs-card fs-card-panel" aria-labelledby="company-legal-title">
                 <div class="fs-card-header"><div class="fs-card-header-title"><h3 class="fs-card-title" id="company-legal-title">Dados da empresa</h3><p class="fs-card-subtitle">Identificação legal do cadastro.</p></div></div>
