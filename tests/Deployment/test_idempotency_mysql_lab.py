@@ -1,7 +1,12 @@
 import unittest
+from unittest.mock import patch
 import xml.etree.ElementTree as ET
+from pathlib import Path
+import re
+import tempfile
 
-from idempotency_mysql_lab import FILES, REQUIRED, junit_config, preflight, validate_volume
+import idempotency_mysql_lab as laboratory
+from idempotency_mysql_lab import FILES, METHODS, REQUIRED, junit_config, preflight, validate_volume
 
 
 class LaboratoryPreflightTest(unittest.TestCase):
@@ -39,6 +44,33 @@ class LaboratoryPreflightTest(unittest.TestCase):
                        dict(good, Options={"type": "none", "device": "/real", "o": "bind"})):
             with self.subTest(volume=volume), self.assertRaises(ValueError):
                 validate_volume(volume)
+
+    def test_manifest_names_match_checked_in_test_methods(self):
+        root = Path(__file__).resolve().parents[2]
+        for cls, methods in METHODS.items():
+            name = cls.rsplit("\\", 1)[-1] + ".php"
+            directory = "Feature" if "\\Feature\\" in cls else "Isolated"
+            source = (root / "tests" / directory / name).read_text(encoding="utf-8")
+            discovered = re.findall(r"public\s+function\s+(test_[a-zA-Z0-9_]+)\s*\(", source)
+            with self.subTest(cls=cls):
+                self.assertEqual(sorted(discovered), sorted(methods))
+                self.assertEqual(len(discovered), len(set(discovered)))
+
+    def test_missing_execute_flag_never_calls_docker(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            profiles_dir = root / "tests" / "Deployment" / "linux-runtime"
+            profiles_dir.mkdir(parents=True)
+            (profiles_dir / "profiles.json").write_text('{}', encoding="utf-8")
+            arguments = ["runner", "--volume", self.args["volume"], "--candidate-sha",
+                         self.args["source_sha"], "--profile", "target", "--report", str(root / "out")]
+            with patch.object(laboratory, "ROOT", root), patch("sys.argv", arguments), \
+                    patch.object(laboratory, "preflight", return_value=("mysql", "runtime")), \
+                    patch.object(laboratory, "docker") as mocked_docker:
+                with self.assertRaisesRegex(RuntimeError, "--execute"):
+                    laboratory.main()
+                mocked_docker.assert_not_called()
+                self.assertFalse((root / "out").exists())
 
 
 if __name__ == "__main__":
