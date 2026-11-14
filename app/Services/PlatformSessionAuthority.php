@@ -1,0 +1,135 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+use LogicException;
+
+/**
+ * Experimental primitive; no route may use this until all session invalidators
+ * and the company writer participate in the same transaction and lock order.
+ */
+final class PlatformSessionAuthority
+{
+    /**
+     * The caller must hold an authenticated platform session and have completed
+     * MFA. Marker and lifetime come from trusted server code, never from input.
+     */
+    public function registerAfterMfa(string $actor, string $marker, int $expiresAt): void
+    {
+        $hash = $this->bindingHash($marker);
+        $this->requireTopLevel();
+
+        DB::transaction(function () use ($actor, $hash, $expiresAt): void {
+            $this->lockActor($actor);
+            if ($expiresAt <= now()->getTimestamp()) {
+                throw new InvalidArgumentException('Invalid session authorization expiry.');
+            }
+            DB::table('platform_session_authorizations')->insert([
+                'binding_hash' => $hash, 'actor_id' => $actor,
+                'expires_at_epoch' => $expiresAt, 'revoked' => false,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        });
+    }
+
+    /** Revoke exactly the presented session; never revoke a newer login. */
+    public function revoke(string $actor, string $marker): void
+    {
+        $hash = $this->bindingHash($marker);
+        $this->requireTopLevel();
+
+        DB::transaction(function () use ($actor, $hash): void {
+            $this->lockActor($actor);
+            DB::table('platform_session_authorizations')->where('actor_id', $actor)
+                ->where('binding_hash', $hash)->update(['revoked' => true, 'updated_at' => now()]);
+        });
+    }
+
+    /** Revoke all bindings for one administrator under the same actor lock. */
+    public function revokeAll(string $actor): void
+    {
+        $this->requireTopLevel();
+
+        DB::transaction(function () use ($actor): void {
+            $this->lockActor($actor);
+            DB::table('platform_session_authorizations')->where('actor_id', $actor)
+                ->where('revoked', false)->update(['revoked' => true, 'updated_at' => now()]);
+        });
+    }
+
+    /** Rotate only a still-active binding; a stale request cannot renew one. */
+    public function rotate(string $actor, string $oldMarker, string $newMarker, int $expiresAt): void
+    {
+        $oldHash = $this->bindingHash($oldMarker);
+        $newHash = $this->bindingHash($newMarker);
+        if (hash_equals($oldHash, $newHash)) {
+            throw new InvalidArgumentException('Session authorization must rotate.');
+        }
+        $this->requireTopLevel();
+
+        DB::transaction(function () use ($actor, $oldHash, $newHash, $expiresAt): void {
+            $this->lockActor($actor);
+            $current = DB::table('platform_session_authorizations')->where('binding_hash', $oldHash)
+                ->where('actor_id', $actor)->lockForUpdate()->first();
+            $now = now();
+            abort_unless($current && ! $current->revoked && (int) $current->expires_at_epoch > $now->getTimestamp(), 401, 'Sessão indisponível.');
+            if ($expiresAt <= $now->getTimestamp()) {
+                throw new InvalidArgumentException('Invalid session authorization expiry.');
+            }
+            DB::table('platform_session_authorizations')->where('binding_hash', $oldHash)
+                ->where('actor_id', $actor)->update(['revoked' => true, 'updated_at' => $now]);
+            DB::table('platform_session_authorizations')->insert([
+                'binding_hash' => $newHash, 'actor_id' => $actor,
+                'expires_at_epoch' => $expiresAt, 'revoked' => false,
+                'created_at' => $now, 'updated_at' => $now,
+            ]);
+        });
+    }
+
+    /**
+     * The callback must perform only local writes on this same DB connection.
+     * Permission and token checks remain mandatory inside that transaction.
+     * Expiry is evaluated at lock acquisition; a winner may commit afterwards.
+     */
+    public function withActiveSession(string $actor, string $marker, callable $callback): mixed
+    {
+        $hash = $this->bindingHash($marker);
+        $this->requireTopLevel();
+
+        return DB::transaction(function () use ($actor, $hash, $callback): mixed {
+            $this->lockActor($actor);
+            $binding = DB::table('platform_session_authorizations')->where('binding_hash', $hash)
+                ->where('actor_id', $actor)->lockForUpdate()->first();
+            abort_unless($binding && ! $binding->revoked && (int) $binding->expires_at_epoch > now()->getTimestamp(), 401, 'Sessão indisponível.');
+
+            return $callback();
+        });
+    }
+
+    private function lockActor(string $actor): void
+    {
+        if ($actor === '' || strlen($actor) > 128) {
+            throw new InvalidArgumentException('Invalid session authorization actor.');
+        }
+        $admin = DB::table('platform_admins')->where('id', $actor)->lockForUpdate()->first(['id']);
+        abort_unless($admin, 401, 'Sessão indisponível.');
+    }
+
+    private function bindingHash(string $marker): string
+    {
+        if (preg_match('/\A[0-9a-f]{64}\z/D', $marker) !== 1) {
+            throw new InvalidArgumentException('Invalid session authorization marker.');
+        }
+
+        return hash('sha256', $marker);
+    }
+
+    private function requireTopLevel(): void
+    {
+        if (DB::connection()->transactionLevel() !== 0) {
+            throw new LogicException('Session authorization requires a top-level transaction.');
+        }
+    }
+}
