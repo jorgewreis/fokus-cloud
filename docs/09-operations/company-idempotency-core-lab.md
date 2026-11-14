@@ -5,6 +5,13 @@ enable a client, provision keys, establish production key custody, or guarantee
 that existing requests are idempotent. Do not enable or deploy it as a complete
 feature without the integration and operational proofs below.
 
+As a fail-closed transition guard, company create and update reject every
+request carrying an `Idempotency-Key` header with HTTP 503, after existing
+platform authentication and permission checks. Header contents are not
+reflected in the response. Requests without the header retain the previous
+contract; they do not acquire an idempotency guarantee. This guard must only be
+replaced when all serving nodes enforce the complete contract consistently.
+
 Issuance requires three explicit integer limits supplied to the store: maximum
 uncompleted and unrevoked records, maximum issues in a rolling window, and the
 window duration in seconds. No production values or retention policy are set.
