@@ -4,10 +4,14 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 import re
 import subprocess
+import os
+import shutil
+import json
 import tempfile
 
 import idempotency_mysql_lab as laboratory
-from idempotency_mysql_lab import FILES, METHODS, REQUIRED, created_id, junit_config, preflight, validate_volume
+from idempotency_mysql_lab import (BLOCKED_FUNCTIONS, FILES, METHODS, REQUIRED, created_id,
+                                   junit_config, php_prefix, preflight, validate_volume)
 
 
 class LaboratoryPreflightTest(unittest.TestCase):
@@ -51,6 +55,33 @@ class LaboratoryPreflightTest(unittest.TestCase):
         for output in (b"", b"a" * 12, b"friendly-container", b"a" * 63 + b"z"):
             with self.subTest(output=output), self.assertRaises(RuntimeError):
                 created_id(subprocess.CompletedProcess([], 0, output))
+
+    def test_php_prefix_requires_fail_closed_prepend(self):
+        flags = php_prefix()
+        self.assertIn("allow_url_fopen=1", flags)
+        self.assertIn("disable_functions=" + BLOCKED_FUNCTIONS, flags)
+        self.assertIn("auto_prepend_file=/workspace/tests/Deployment/idempotency-http-guard.php", flags)
+
+    @unittest.skipUnless(shutil.which("php"), "PHP CLI is required")
+    def test_transport_guard_removes_wrappers_and_refuses_unsafe_configuration(self):
+        root = Path(__file__).resolve().parents[2]
+        guard = root / "tests/Deployment/idempotency-http-guard.php"
+        env = dict(os.environ, APP_ENV="testing", FOKUS_COMPANY_IDEMPOTENCY_LAB="1",
+                   DB_CONNECTION="mysql", DB_HOST="127.0.0.1", DB_DATABASE="fokus_idempotency_api_test",
+                   MAIL_MAILER="array")
+        with tempfile.TemporaryDirectory() as directory:
+            proof = Path(directory) / "proof.php"
+            proof.write_text('<?php echo json_encode(stream_get_wrappers());', encoding="utf-8")
+            def run(*, disabled=BLOCKED_FUNCTIONS, fopen="1", environment=env):
+                return subprocess.run(["php", "-d", "allow_url_fopen=" + fopen, "-d",
+                                       "disable_functions=" + disabled, "-d", "auto_prepend_file=" + str(guard),
+                                       str(proof)], env=environment, capture_output=True, text=True)
+            accepted = run()
+            self.assertEqual(accepted.returncode, 0, accepted.stderr)
+            self.assertFalse({"http", "https", "ftp", "ftps"} & set(json.loads(accepted.stdout)))
+            self.assertNotEqual(run(disabled="").returncode, 0)
+            self.assertNotEqual(run(fopen="0").returncode, 0)
+            self.assertNotEqual(run(environment=dict(env, DB_DATABASE="unsafe")).returncode, 0)
 
     def test_manifest_names_match_checked_in_test_methods(self):
         root = Path(__file__).resolve().parents[2]
