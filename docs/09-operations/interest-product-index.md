@@ -16,3 +16,35 @@ Antes de voltar a um release que não sincronize o índice, marcar `ready=false`
 O endpoint retorna páginas de até 20 códigos históricos e até 20 produtos do catálogo por requisição, sem `COUNT` e sem percorrer o JSON da tabela de interesses. A paginação usa offset e custo crescente em páginas profundas; os dois conjuntos são paginados separadamente e um código pode aparecer em mais de uma página. Pesquisa por prefixo e digitação manual permitem restringir a navegação. Códigos sem item de catálogo são apresentados pelo próprio código.
 
 Para comprovar concorrência e rollback, usar apenas ambiente descartável com MySQL em rede interna isolada, banco `synthetic`, `APP_ENV=testing`, `FOKUS_INTEREST_INDEX_DISPOSABLE=1`, dependências locais e sem `.env` ou cache de configuração herdado; executar `php tests/Deployment/interest-index-concurrency.php` após migrar o banco sintético. As flags não estabelecem isolamento por si. O script valida as duas ordens de bloqueio entre reconstrução e escritor e o rollback do vínculo; não certifica importadores externos nem o processo de drenagem da produção.
+
+### Prova sintética de BFCache real para Interesses
+
+O roteiro `tests/Deployment/interest-real-bfcache.mjs` inicia um servidor estático
+local descartável e um proxy restrito a `127.0.0.1`. Ele substitui `no-store`
+**somente no documento servido pelo fixture**, para permitir ao navegador usar
+BFCache, e simula as respostas de autenticação e interesses. Ele não acessa a
+aplicação real, credenciais, dados reais ou o provedor, e não altera cabeçalhos
+de produção. Ele falha se uma porta necessária já estiver ocupada e bloqueia
+requisições do navegador para outros endereços. As dependências do projeto e o
+navegador Playwright devem estar instalados; opcionalmente `FOKUS_TEST_BROWSER`
+aponta para um executável Chromium/Edge local.
+
+Em PowerShell, a partir da raiz isolada do projeto:
+
+```powershell
+$env:FOKUS_INTEREST_BFCACHE_DISPOSABLE = '1'
+foreach ($mode in @('same', 'changed', 'denied', 'double', 'double-navigation')) {
+    node tests/Deployment/interest-real-bfcache.mjs $mode
+    if ($LASTEXITCODE -ne 0) { break }
+}
+```
+
+O ensaio exige `pageshow.persisted=true`. Ele verifica identidade mantida,
+identidade alterada, resposta 401, duas restaurações com autenticações pendentes
+e nova suspensão durante a remontagem. Nos cenários de recarga, o teste verifica
+a solicitação de reload; o comportamento real após essa navegação depende da
+autenticação do ambiente. Caso o navegador não aceite BFCache, o roteiro falha:
+isso não comprova sucesso nem falha funcional da restauração. O fixture não
+representa a política real de cache, a infraestrutura ou o navegador do cliente.
+As portas de fixture e proxy podem ser alteradas com
+`FOKUS_BFCACHE_FIXTURE_PORT` e `FOKUS_BFCACHE_PROXY_PORT`.
