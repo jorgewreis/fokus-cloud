@@ -14,9 +14,14 @@ final class CompanyIdempotencyStore
         private readonly int $maxOutstanding,
         private readonly int $maxIssuesPerWindow,
         private readonly int $issuanceWindowSeconds,
+        private readonly ?PlatformSessionAuthority $sessionAuthority = null,
+        private readonly ?string $sessionMarker = null,
     ) {
         if ($maxOutstanding < 1 || $maxOutstanding > 1000 || $maxIssuesPerWindow < 1 || $issuanceWindowSeconds < 1) {
             throw new InvalidArgumentException('Invalid issuance quota.');
+        }
+        if (($sessionAuthority === null) !== ($sessionMarker === null)) {
+            throw new InvalidArgumentException('Session authority and marker must be supplied together.');
         }
     }
 
@@ -26,7 +31,7 @@ final class CompanyIdempotencyStore
         $now = now()->getTimestamp();
         $token = $this->keys->issue($actor, $operation, $now, $lifetimeSeconds);
         $claims = $this->keys->verify($token, $actor, $operation, $now);
-        DB::transaction(function () use ($token, $actor, $operation, $claims): void {
+        $this->transactionForActor($actor, function () use ($token, $actor, $operation, $claims): void {
             $this->authorization->lockAuthorizedActor($actor);
             $decisionNow = now()->getTimestamp();
             $this->keys->verify($token, $actor, $operation, $decisionNow);
@@ -63,10 +68,10 @@ final class CompanyIdempotencyStore
         $claims = $this->keys->verify($token, $actor, $operation, $now);
         $digest = $this->keys->payloadDigest($claims['kid'], $operation, $target, $payload);
 
-        return DB::transaction(function () use ($token, $actor, $operation, $target, $claims, $digest): ?array {
+        return $this->transactionForActor($actor, function () use ($token, $actor, $operation, $target, $claims, $digest): ?array {
+            $this->authorization->lockAuthorizedActor($actor);
             $row = $this->lockedRecord($token, $actor, $operation, $claims);
             $this->keys->verify($token, $actor, $operation, now()->getTimestamp());
-            $this->authorization->lockAuthorizedActor($actor);
             abort_if($row->revoked, 409, 'A chave foi revogada.');
             if ($row->payload_digest !== null && ! hash_equals($row->payload_digest, $digest)) {
                 abort(409, 'A chave já está vinculada a outra solicitação.');
@@ -94,12 +99,12 @@ final class CompanyIdempotencyStore
     {
         $this->requireTopLevel();
 
-        return DB::transaction(function () use ($token, $actor, $operation, $target, $payload, $writer): array {
+        return $this->transactionForActor($actor, function () use ($token, $actor, $operation, $target, $payload, $writer): array {
             $claims = $this->keys->verify($token, $actor, $operation, now()->getTimestamp());
             $digest = $this->keys->payloadDigest($claims['kid'], $operation, $target, $payload);
+            $this->authorization->lockAuthorizedActor($actor);
             $row = $this->lockedRecord($token, $actor, $operation, $claims);
             $this->keys->verify($token, $actor, $operation, now()->getTimestamp());
-            $this->authorization->lockAuthorizedActor($actor);
             abort_if($row->revoked, 409, 'A chave foi revogada.');
             abort_unless($row->payload_digest !== null && hash_equals($row->payload_digest, $digest), 409, 'A chave está vinculada a outra solicitação.');
             if ($row->state === 'completed') {
@@ -126,10 +131,10 @@ final class CompanyIdempotencyStore
         $this->requireTopLevel();
         $claims = $this->keys->verifyForStatus($token, $actor, $operation, $now);
 
-        return DB::transaction(function () use ($token, $actor, $operation, $claims): array {
+        return $this->transactionForActor($actor, function () use ($token, $actor, $operation, $claims): array {
+            $this->authorization->lockAuthorizedActor($actor);
             $row = DB::table('company_idempotency_requests')->where('token_hash', hash('sha256', $token))->lockForUpdate()->first();
             $this->keys->verifyForStatus($token, $actor, $operation, now()->getTimestamp());
-            $this->authorization->lockAuthorizedActor($actor);
             if (! $row) {
                 return ['state' => 'absent', 'revoked' => null];
             }
@@ -150,10 +155,10 @@ final class CompanyIdempotencyStore
         $this->requireTopLevel();
         $claims = $this->keys->verifyForStatus($token, $actor, $operation, $now);
 
-        return DB::transaction(function () use ($token, $actor, $operation, $claims, $audit): array {
+        return $this->transactionForActor($actor, function () use ($token, $actor, $operation, $claims, $audit): array {
+            $this->authorization->lockAuthorizedActor($actor);
             $row = $this->lockedRecord($token, $actor, $operation, $claims);
             $this->keys->verifyForStatus($token, $actor, $operation, now()->getTimestamp());
-            $this->authorization->lockAuthorizedActor($actor);
             abort_unless(in_array($row->state, ['issued', 'bound', 'completed'], true), 503, 'Solicitação indisponível.');
             if (! $row->revoked) {
                 DB::table('company_idempotency_requests')->where('token_hash', $row->token_hash)->update(['revoked' => true, 'updated_at' => now()]);
@@ -193,5 +198,15 @@ final class CompanyIdempotencyStore
         if (DB::connection()->transactionLevel() !== 0) {
             throw new \LogicException('Company idempotency requires a top-level transaction.');
         }
+    }
+
+    /** Experimental composed path; routes remain blocked pending full rollout. */
+    private function transactionForActor(string $actor, callable $callback): mixed
+    {
+        if ($this->sessionAuthority !== null) {
+            return $this->sessionAuthority->withActiveSession($actor, $this->sessionMarker, $callback);
+        }
+
+        return DB::transaction($callback);
     }
 }
