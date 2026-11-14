@@ -91,3 +91,22 @@ tabela temporária em disco mostra risco operacional relevante para volumes e
 concorrência maiores; por ora, mantém-se o JOIN no protótipo principal. A
 repetição de snapshots na rede continua uma limitação explícita. A prova HTTP
 MySQL ainda é necessária para qualquer integração.
+
+## Continuação: variantes com envio seletivo de snapshot
+
+`mysql-sparse-profile.php correlated`, `grouped` e `forced` medem outras
+consultas sintéticas, sob as mesmas variáveis de proteção. A opção `forced`
+é específica do MySQL e força o índice primário. `mysql-inactive-seed.php`
+acrescenta 50 mil assinaturas inativas ao banco descartável; não é idempotente.
+
+Com aproximadamente 12 mil resgates e 10 mil assinaturas ativas, a subconsulta
+correlacionada transferiu 19,4 MB, mas levou 14,9 s. O agrupamento prévio
+levou 0,166 s e exigiu uma tabela temporária e 13 mesclagens; ao forçar índice
+primário, levou 0,065 s, com tabela temporária em memória e sem ordenação no
+ensaio. Após acrescentar 50 mil inativas, JOIN levou 0,126 s e transferiu
+40,7 MB; agrupamento forçado levou 0,097 s e transferiu 19,4 MB. Em ambos, o
+pico PHP foi 2 MiB e a soma coincidiu. São medições individuais, sem modelo de
+produção e sem comprovação da equivalência do endpoint ou de outros drivers.
+O agrupamento cobre todos os resgates, inclusive históricos; forçar plano por
+um único experimento pode degradar outras distribuições. Mantém-se o JOIN até
+que a decisão seja fundamentada em cargas, índices e drivers representativos.
