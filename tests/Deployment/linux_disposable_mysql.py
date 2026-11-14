@@ -69,7 +69,11 @@ def execute_disposable_sql(statement, env):
 
 
 def dump_disposable_mysql(name, env, target, errors):
-    """Publish a synthetic backup only after the guarded dump succeeds."""
+    """Publish only on success without replacing any concurrently created path.
+
+    A hard kill can leave the private temporary file for sandbox cleanup; the
+    final backup path is never published before successful completion.
+    """
     identity = assert_disposable_mysql(env)
     command = mysqldump84_command(identity, name)
     target = pathlib.Path(target)
@@ -80,6 +84,8 @@ def dump_disposable_mysql(name, env, target, errors):
     try:
         with os.fdopen(fd, 'wb') as stream:
             subprocess.run(command, env=env, stdout=stream, stderr=errors, check=True)
-        temporary.replace(target)
+        # Both paths share a directory/filesystem. link is atomic and fails
+        # with EEXIST rather than replacing a concurrently created target.
+        os.link(temporary, target, follow_symlinks=False)
     finally:
         temporary.unlink(missing_ok=True)

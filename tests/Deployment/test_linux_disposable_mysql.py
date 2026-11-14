@@ -59,6 +59,19 @@ class DisposableMysqlGuardTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             guard.mysqldump84_command('01234567-89ab-cdef-0123-456789abcdef', 'production')
 
+    def test_concurrent_target_creation_is_not_overwritten(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = pathlib.Path(directory) / 'backup.sql'
+            def concurrent_creation(*args, **kwargs):
+                kwargs['stdout'].write(b'synthetic dump')
+                target.write_bytes(b'created concurrently')
+            with patch.object(guard, 'assert_disposable_mysql', return_value='01234567-89ab-cdef-0123-456789abcdef'), \
+                 patch.object(guard.subprocess, 'run', side_effect=concurrent_creation):
+                with self.assertRaises(FileExistsError):
+                    guard.dump_disposable_mysql('fokus_upgrade_0123456789abcdef', {}, target, subprocess.DEVNULL)
+            self.assertEqual(target.read_bytes(), b'created concurrently')
+            self.assertEqual(list(pathlib.Path(directory).iterdir()), [target])
+
     def test_missing_identity_never_invokes_mysql(self):
         with patch.object(guard.os, 'name', 'posix'), patch.object(guard.os, 'geteuid', return_value=1000, create=True), \
              patch.object(guard.IDENTITY.__class__, 'lstat', side_effect=FileNotFoundError), \
