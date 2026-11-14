@@ -1,5 +1,7 @@
 import { createRecordsDrawer } from "./records-drawer.js";
 
+const mutationStates = new Map();
+
 /**
  * Produtos: lista, filtros e estados create/edit/view do drawer compartilhado.
  */
@@ -14,6 +16,41 @@ export async function mount(root, context = {}) {
     const drawer = createRecordsDrawer({ trigger: createTrigger, drawer: drawerElement });
     const actionModal = window.FokusStyles?.Modal?.getOrCreateInstance($("#product-action-trigger"));
     const state = { products: [], page: 1, mode: "create", productId: null, pendingAction: null };
+    let disposed = false;
+    let drawerGeneration = 0;
+    let catalogLoaded = false;
+    const adminKey = context.admin?.id ? String(context.admin.id) : "__unknown_admin__";
+    if (!mutationStates.has(adminKey)) mutationStates.set(adminKey, { inFlight: false, uncertain: false, epoch: 0, listeners: new Set() });
+    const mutation = mutationStates.get(adminKey);
+    const alive = () => !disposed && !context.signal?.aborted;
+    const notify = () => mutation.listeners.forEach((listener) => listener());
+    const syncMutation = () => {
+        if (!alive()) return;
+        $("#product-form-submit").disabled = mutation.inFlight || mutation.uncertain;
+        form.inert = mutation.inFlight;
+        form.setAttribute("aria-busy", mutation.inFlight ? "true" : "false");
+        let status = root.querySelector('[data-product-mutation-status]');
+        if (mutation.inFlight || mutation.uncertain) {
+            if (!status) {
+                status = document.createElement("div");
+                status.dataset.productMutationStatus = "true";
+                status.className = "fs-alert";
+                status.setAttribute("role", "status");
+                $("#products-message").after(status);
+            }
+            status.replaceChildren(document.createTextNode(mutation.inFlight ? "Salvando produto. Aguarde. " : "O resultado do salvamento ainda é desconhecido e a operação pode continuar em andamento, mesmo após atualizar o catálogo. Confira o catálogo e considere o risco de duplicidade antes de tentar novamente. "));
+            if (mutation.uncertain && !mutation.inFlight) {
+                const reload = document.createElement("button");
+                reload.type = "button"; reload.className = "fs-btn fs-btn-outline-primary"; reload.textContent = "Recarregar catálogo";
+                reload.addEventListener("click", () => load()); status.append(reload);
+                const confirm = document.createElement("button");
+                confirm.type = "button"; confirm.className = "fs-btn fs-btn-outline-primary"; confirm.textContent = "Entendo o risco e quero liberar novo envio";
+                confirm.disabled = !catalogLoaded;
+                confirm.addEventListener("click", () => { mutation.uncertain = false; notify(); }); status.append(confirm);
+            }
+        } else status?.remove();
+    };
+    mutation.listeners.add(syncMutation);
     const pageSize = 15;
     const iconsPath = "/backoffice/assets/icons/";
     const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[character]));
@@ -56,6 +93,7 @@ export async function mount(root, context = {}) {
     };
     const setDescription = (selector, value, emptyText) => { $(selector).textContent = String(value || "").trim() || emptyText; };
     const resetDrawerState = () => {
+        drawerGeneration++;
         state.mode = "create";
         state.productId = null;
         drawer.setState({ mode: "create" });
@@ -119,14 +157,20 @@ export async function mount(root, context = {}) {
     };
     const closeDrawer = () => { drawer.close(); resetDrawerState(); };
     const load = async () => {
+        const reconciliationEpoch = mutation.uncertain && !mutation.inFlight ? mutation.epoch : null;
         try {
             const response = await api.request("/backoffice/catalog/products");
             if (context.signal?.aborted) return;
             state.products = response.products || [];
             render();
+            if (reconciliationEpoch !== null && reconciliationEpoch === mutation.epoch && mutation.uncertain && !mutation.inFlight) catalogLoaded = true;
+            syncMutation();
             showMessage("");
+            return true;
         } catch (error) {
-            if (!context.signal?.aborted) showMessage(error.message || "Não foi possível carregar os produtos.");
+            catalogLoaded = false;
+            if (alive()) { syncMutation(); showMessage(error.message || "Não foi possível carregar os produtos."); }
+            return false;
         }
     };
     const runAction = async (product, type, releaseType = "minor") => {
@@ -141,6 +185,7 @@ export async function mount(root, context = {}) {
     };
     const submit = async (event) => {
         event.preventDefault();
+        if (!alive() || mutation.inFlight || mutation.uncertain) return;
         if (window.FokusForm && !window.FokusForm.validate(form)) return;
         const drawerState = drawer.getState();
         if (drawerState.mode === "view") return;
@@ -150,14 +195,29 @@ export async function mount(root, context = {}) {
         const payload = Object.fromEntries(new FormData(form));
         if (editing) payload.display_order = Number(payload.display_order);
         else delete payload.display_order;
+        const generation = drawerGeneration;
+        mutation.epoch++;
+        mutation.inFlight = true;
+        notify();
         try {
             await api.request(editing ? `/backoffice/catalog/products/${editId}` : "/backoffice/catalog/products", { method: editing ? "PATCH" : "POST", body: payload });
+            if (!alive() || generation !== drawerGeneration) {
+                catalogLoaded = false; mutation.uncertain = true; notify(); return;
+            }
             closeDrawer();
-            await load();
-            showMessage("Produto salvo. Ative e publique a nova versão do catálogo.", "success");
+            if (!await load()) { catalogLoaded = false; mutation.uncertain = true; notify(); return; }
+            if (alive()) showMessage("Produto salvo. Ative e publique a nova versão do catálogo.", "success");
         } catch (error) {
-            window.FokusForm?.mapServerErrors(form, error.errors);
-            showMessage(error.message || "Não foi possível salvar o produto.");
+            if ([409, 422].includes(error.status)) {
+                if (alive() && generation === drawerGeneration) {
+                    window.FokusForm?.mapServerErrors(form, error.errors);
+                    showMessage(error.message || "Não foi possível salvar o produto.");
+                }
+            } else {
+                catalogLoaded = false; mutation.uncertain = true; notify();
+            }
+        } finally {
+            mutation.inFlight = false; notify();
         }
     };
 
@@ -198,8 +258,11 @@ export async function mount(root, context = {}) {
         await runAction(product, type, releaseType);
     });
 
+    syncMutation();
     await load();
     return () => {
+        disposed = true;
+        mutation.listeners.delete(syncMutation);
         drawer.dispose();
         actionModal?.dispose?.();
         window.disposeBackofficeRecordsPage?.(root);
