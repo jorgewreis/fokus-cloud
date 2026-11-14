@@ -14,7 +14,7 @@ RELEASE_DISPOSABLE_TESTS=1 python3 tests/Deployment/linux-release-suite.py --dri
 RELEASE_DISPOSABLE_TESTS=1 python3 tests/Deployment/linux-release-suite.py --driver mysql
 ```
 
-Evidence defaults to `test-results/linux-release`; `RELEASE_REPORT_DIR` selects another writable evidence directory. Each subprocess records exit code, duration and SHA-256 of its log. PHPUnit JUnit files must contain exactly 310 tests, at least 2,689 assertions, no failures/errors/skips. A test count change requires explicit review rather than silently relaxing this gate.
+Evidence defaults to `test-results/linux-release`; `RELEASE_REPORT_DIR` selects another writable evidence directory. Each subprocess records exit code, duration and SHA-256 of its log. PHPUnit JUnit files must contain exactly 373 tests, at least 3,036 assertions, no failures/errors/skips. A test count change requires explicit review rather than silently relaxing this gate.
 
 ## Portability adapters, not skipped assertions
 

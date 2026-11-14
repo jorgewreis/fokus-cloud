@@ -5,7 +5,10 @@ namespace Tests\Feature;
 use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
 use App\Models\User;
+use App\Services\CatalogManager;
+use App\Services\PendingSubscriptionVoucher;
 use App\Services\PrefixedUlid;
+use App\Services\SubscriptionBillingManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -22,6 +25,69 @@ class SubscriptionAdminTest extends TestCase
         $this->seed();
     }
 
+    public function test_dashboard_aggregates_active_subscriptions_in_one_snapshot(): void
+    {
+        $admin = $this->platformAdmin();
+        $fixture = $this->subscriptionFixture();
+        $original = (array) DB::table('subscriptions')->where('id', $fixture['subscription_id'])->first();
+        $expiredSubscriptionId = null;
+        for ($i = 0; $i < 251; $i++) {
+            $copy = $original;
+            $copy['id'] = PrefixedUlid::make('ASS');
+            $copy['open_company_product'] = null;
+            $copy['commercial_snapshot'] = json_encode(['monthly_amount' => 10]);
+            $expiredSubscriptionId ??= $copy['id'];
+            DB::table('subscriptions')->insert($copy);
+        }
+
+        $this->actingAs($admin, 'platform')->postJson('/api/backoffice/vouchers', [
+            'code' => 'DASHBOARDFREE', 'discount_type' => 'percentage', 'discount_value' => 10,
+        ])->assertCreated();
+        $redemption = [
+            'id' => PrefixedUlid::make('VRE'),
+            'voucher_id' => DB::table('vouchers')->where('code', 'DASHBOARDFREE')->value('id'),
+            'company_id' => $fixture['company_id'],
+            'subscription_id' => $fixture['subscription_id'],
+            'discount_amount' => 0,
+            'snapshot' => json_encode(['discount_type' => 'trial_free']),
+            'benefit_ends_at' => now()->addDay(),
+            'created_at' => now(),
+        ];
+        DB::table('voucher_redemptions')->insert($redemption);
+        $redemption['id'] = PrefixedUlid::make('VRE');
+        DB::table('voucher_redemptions')->insert($redemption);
+        $redemption['id'] = PrefixedUlid::make('VRE');
+        $redemption['subscription_id'] = $expiredSubscriptionId;
+        $redemption['benefit_ends_at'] = now()->subDay();
+        DB::table('voucher_redemptions')->insert($redemption);
+        $redemption['id'] = PrefixedUlid::make('VRE');
+        $redemption['benefit_ends_at'] = now()->addDay();
+        $redemption['snapshot'] = json_encode(['discount_type' => 'TRIAL_FREE']);
+        DB::table('voucher_redemptions')->insert($redemption);
+        $redemption['id'] = PrefixedUlid::make('VRE');
+        $redemption['snapshot'] = json_encode(['discount_type' => 123]);
+        DB::table('voucher_redemptions')->insert($redemption);
+
+        $pdo = in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)
+            ? DB::connection()->getReadPdo()
+            : null;
+        $bufferedBefore = $pdo?->getAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY);
+        $redemptionQueries = [];
+        DB::listen(function ($query) use (&$redemptionQueries): void {
+            if (str_contains(strtolower($query->sql), 'voucher_redemptions')) {
+                $redemptionQueries[] = $query->sql;
+            }
+        });
+        $response = $this->actingAs($admin, 'platform')->getJson('/api/backoffice/dashboard')->assertOk();
+        $response->assertJsonPath('metrics.active_subscriptions', 252)
+            ->assertJsonPath('metrics.mrr', 2510)
+            ->assertJsonPath('subscription_registrations_6m.5.value', 252);
+        $this->assertCount(1, $redemptionQueries);
+        if ($pdo !== null) {
+            $this->assertSame($bufferedBefore, $pdo->getAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY));
+        }
+    }
+
     public function test_assisted_checkout_and_free_voucher_activate_pending_subscription_until_expiry(): void
     {
         config(['services.mercado_pago.access_token' => 'test-token', 'services.mercado_pago.test_payer_email' => 'test_user_123@testuser.com']);
@@ -33,8 +99,13 @@ class SubscriptionAdminTest extends TestCase
         $plan = DB::table('plans')->where('product_id', $product->id)->where('code', 'law-advocacia')->first();
         Http::fake(function ($request) {
             static $created = 0;
-            if ($request->method() === 'POST') return Http::response(['id' => ++$created === 1 ? 'pre-assisted' : 'pre-assisted-2', 'init_point' => 'https://mercadopago.test/checkout'], 201);
-            if ($request->method() === 'GET') return Http::response(['status' => 'pending'], 200);
+            if ($request->method() === 'POST') {
+                return Http::response(['id' => ++$created === 1 ? 'pre-assisted' : 'pre-assisted-2', 'init_point' => 'https://mercadopago.test/checkout'], 201);
+            }
+            if ($request->method() === 'GET') {
+                return Http::response(['status' => 'pending'], 200);
+            }
+
             return Http::response(['status' => 'cancelled'], 200);
         });
 
@@ -88,7 +159,7 @@ class SubscriptionAdminTest extends TestCase
         $listedCompany = $this->actingAs($admin, 'platform')->getJson('/api/backoffice/companies?q=Alpha')->assertOk();
         $this->assertSame(1, $listedCompany->json('data.0.active_subscriptions'));
         $this->assertSame($plan->name, $listedCompany->json('data.0.plan_name'));
-        $catalogPlan = app(\App\Services\CatalogManager::class)->managementPlans()->firstWhere('id', $plan->id);
+        $catalogPlan = app(CatalogManager::class)->managementPlans()->firstWhere('id', $plan->id);
         $this->assertSame(2, $catalogPlan['subscription_count']);
         $this->assertSame(1, $catalogPlan['active_subscription_count']);
         $this->postJson('/api/auth/law-context', ['email' => User::find($fixture['user_id'])->email])
@@ -104,7 +175,7 @@ class SubscriptionAdminTest extends TestCase
             ->assertOk()->assertJsonPath('meta.total', 1)
             ->assertJsonPath('data.0.id', $paymentId)
             ->assertJsonPath('data.0.status', 'cancelado');
-        app(\App\Services\SubscriptionBillingManager::class)->applyPayment($paymentId, ['id' => 'late-payment', 'preapproval_id' => 'pre-assisted'], 'cancelado');
+        app(SubscriptionBillingManager::class)->applyPayment($paymentId, ['id' => 'late-payment', 'preapproval_id' => 'pre-assisted'], 'cancelado');
         $this->assertDatabaseHas('subscriptions', ['id' => $subscriptionId, 'status' => 'ativa']);
 
         $this->travel(8)->days();
@@ -427,7 +498,7 @@ class SubscriptionAdminTest extends TestCase
         $this->assertDatabaseCount('voucher_redemptions', 2);
         $this->assertDatabaseCount('payments', 1);
         $this->travel(8)->days();
-        $this->assertSame(0, app(\App\Services\PendingSubscriptionVoucher::class)->suspendExpired());
+        $this->assertSame(0, app(PendingSubscriptionVoucher::class)->suspendExpired());
         $this->assertDatabaseHas('subscriptions', ['id' => $fixture['subscription_id'], 'status' => 'ativa']);
         Http::assertNothingSent();
     }
@@ -460,6 +531,7 @@ class SubscriptionAdminTest extends TestCase
             ...$snapshot, 'plan_id' => null, 'plan_code' => null, 'plan_name' => 'Personalizada', 'base_amount' => 34.9, 'base_monthly_amount' => 34.9,
             'amount' => 0, 'monthly_amount' => 0, 'current_period_ends_at' => $expiry,
         ])]);
+
         return [...$fixture, 'expiry' => $expiry, 'product_id' => $subscription->product_id];
     }
 
