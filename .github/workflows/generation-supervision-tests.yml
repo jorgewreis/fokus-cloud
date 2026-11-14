@@ -34,6 +34,7 @@ jobs:
           python3 tools/releases/test_publication_entry.py -v
           python3 tools/releases/test_github_oidc.py -v
           python3 tools/releases/test_environment_evidence.py -v
+          python3 tools/releases/test_oidc_activation_evidence.py -v
           python3 tools/releases/test_oidc_challenge_store.py -v
           python3 tools/releases/test_oidc_protocol.py -v
       - name: Disposable loopback SSH handshake

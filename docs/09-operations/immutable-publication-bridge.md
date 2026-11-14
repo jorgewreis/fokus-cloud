@@ -226,6 +226,16 @@ Falhas após consumo queimam o desafio; nova tentativa requer novo desafio. O fl
 não está conectado ao protocolo público ou à ativação, e a identidade do job,
 o artefato independente e a autorização produtiva continuam sem prova completa.
 
+`oidc_activation_evidence.py` exercita, sem ativar, o encadeamento sob locks:
+verifica receipt e ponteiro, extrai do receipt o digest do artefato, confere o
+handoff/runtime e passa esses valores ao fluxo OIDC e de environment. Após as
+consultas, repete as verificações do ponteiro, receipt, política e handoff/runtime.
+O digest continua dependente da integridade e proveniência do receipt e do
+operador confiável; o ensaio não comprova uma origem independente. Seu único
+resultado positivo é `evidence_consistent_not_authorized`, sem latch ou switch.
+Não há endpoint produtivo nem integração ao ativador; não demonstra aprovação
+histórica atômica nem elimina a necessidade de transporte autenticado.
+
 ## Evidência e limites
 
 `tests/Deployment/test_legacy_publication_guard.py` verifica que a recusa não
