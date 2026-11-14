@@ -18,6 +18,10 @@ for (const width of [320, 375]) {
         expect(userBox).not.toBeNull();
         expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(titleBox.y);
         expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(userBox.x);
+        const avatarBox = await page.locator('.admin-user-avatar').boundingBox();
+        expect(avatarBox.width).toBe(36);
+        expect(avatarBox.height).toBe(36);
+        expect(userBox.x + userBox.width).toBeLessThanOrEqual(width);
         await toggle.focus();
         await expect(toggle).toBeFocused();
         await expect(toggle).toHaveAttribute('aria-expanded', 'true');

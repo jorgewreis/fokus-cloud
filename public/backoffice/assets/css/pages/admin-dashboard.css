@@ -2002,4 +2002,12 @@ html[data-role="admin"] .fs-sidebar .sidebar-subnav-button {
         padding-left: 72px !important;
         grid-template-columns: minmax(0, 1fr) auto !important;
     }
+    .admin-final-dashboard .admin-header-user { gap: 6px; }
+    .admin-final-dashboard .admin-user-avatar { flex: 0 0 36px; }
+    .admin-final-dashboard .admin-user-details { min-width: 0; }
+    .admin-final-dashboard .admin-user-details strong,
+    .admin-final-dashboard .admin-user-details span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 }
