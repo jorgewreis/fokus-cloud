@@ -183,7 +183,7 @@ def package(source, candidate, evidence, output):
     return {'source_sha':proof['source_sha'],'artifact_sha256':sha(output.read_bytes()),'provenance_sha256':sha(encoded(provenance)),'files':len(payload)}
 
 
-def seal(source, candidate, evidence, root, receipt, transport):
+def seal(source, candidate, evidence, root, receipt, transport, links=None):
     """Explicit extension of #59: independently rebuild before trusting derived bytes."""
     proof=verified_build(source,candidate,evidence)
     source, candidate, root, receipt=map(lambda x:Path(x).absolute(),(source,candidate,root,receipt))
@@ -191,8 +191,12 @@ def seal(source, candidate, evidence, root, receipt, transport):
     require(not receipt.exists() and not receipt.is_relative_to(root),'new_external_receipt')
     require(proof['mode']=='complete-runtime','runtime_build_required')
     c=contract(source); provenance=proof; expected=dict(proof['outputs'])
+    links = {} if links is None else links
+    c.validate_links(root, links)
+    for name, target in links.items():
+        require((root/name).is_symlink() and os.readlink(root/name) == target and Path(target).exists(), 'shared_link_mismatch')
     pbytes=encoded(provenance);expected['bootstrap/cache/derived-provenance.json']={'sha256':sha(pbytes),'size':len(pbytes),'executable':False}
-    actual=c.files(root)
+    actual=c.files(root,links)
     transport=c.read_json(c.canonical(transport))
     require(transport.get('source_sha') == root.name and c.DIGEST.fullmatch(transport.get('artifact_sha256','')) and transport.get('files') == expected,'transport_binding')
     require(actual==expected,'release_inventory_mismatch')
@@ -208,23 +212,28 @@ def seal(source, candidate, evidence, root, receipt, transport):
     identity_bytes=('<?php\n\nreturn ['+literals+'];\n').encode()
     (staging/'identity.php').write_bytes(identity_bytes);staging.rename(root/'.release')
     c.protect(root)
-    final=c.files(root)
+    c.validate_links(root,links)
+    final=c.files(root,links)
     expected_final={**expected,**{'.release/'+n:{'sha256':sha(b),'size':len(b),'executable':False} for n,b in {'verify.lock':b'','manifest.json':manifest,'identity.php':identity_bytes}.items()}}
     require(final==expected_final,'release_changed_during_seal')
     require(source_snapshot(source)[0]==proof['source_sha'],'source_changed_during_seal')
-    receipt.write_bytes(encoded({'schema':c.SCHEMA,'root':str(root),'source_sha':root.name,'artifact_sha256':transport['artifact_sha256'],'files':final,'links':{}}));receipt.chmod(0o400)
+    receipt.write_bytes(encoded({'schema':c.SCHEMA,'root':str(root),'source_sha':root.name,'artifact_sha256':transport['artifact_sha256'],'files':final,'links':links}));receipt.chmod(0o400)
     c.verify(root,receipt)
     return {'state':'sealed_offline_not_active','source_sha':root.name,'provenance_sha256':sha(pbytes)}
 
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('command',choices=('build','verify','package','seal'));p.add_argument('--source',required=True,type=Path);p.add_argument('--frontend-only',action='store_true');p.add_argument('--output',type=Path);p.add_argument('--candidate',type=Path);p.add_argument('--evidence',required=True,type=Path);p.add_argument('--root',type=Path);p.add_argument('--receipt',type=Path);p.add_argument('--transport',type=Path);a=p.parse_args()
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('command',choices=('build','verify','package','seal'));p.add_argument('--source',required=True,type=Path);p.add_argument('--frontend-only',action='store_true');p.add_argument('--output',type=Path);p.add_argument('--candidate',type=Path);p.add_argument('--evidence',required=True,type=Path);p.add_argument('--root',type=Path);p.add_argument('--receipt',type=Path);p.add_argument('--transport',type=Path);p.add_argument('--links-json',type=Path);a=p.parse_args()
     try:
+        require(a.command == 'seal' or a.links_json is None, 'links_only_for_seal')
         if a.command=='build':
             require(not a.evidence.exists(),'new_evidence');r=build(a.source,a.output,a.frontend_only);a.evidence.write_bytes(encoded(r))
         elif a.command=='verify':r=verified_build(a.source,a.candidate,a.evidence)
         elif a.command=='package':r=package(a.source,a.candidate,a.evidence,a.output)
-        else:r=seal(a.source,a.candidate,a.evidence,a.root,a.receipt,a.transport)
+        else:
+            c=contract(a.source) if a.links_json else None
+            links=c.read_json(c.canonical(a.links_json)) if c else None
+            r=seal(a.source,a.candidate,a.evidence,a.root,a.receipt,a.transport,links=links)
         print(json.dumps({'status':'ok','source_sha':r['source_sha'],'result_digest':sha(encoded(r))}))
     except Exception as e:
         print(json.dumps({'status':'blocked','reason':str(e) if isinstance(e,ValueError) else type(e).__name__}),file=sys.stderr);return 1

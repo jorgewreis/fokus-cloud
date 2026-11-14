@@ -456,6 +456,11 @@ class SafeParser(argparse.ArgumentParser):
 
 
 def main():
+    # The historical primitives remain available for pinned contract checks,
+    # but their standalone CLI cannot activate without the supervised runtime gate.
+    if len(sys.argv) > 1 and sys.argv[1] in ('activate', 'rollback'):
+        print(json.dumps({'state': 'blocked', 'reason': 'legacy_activation_disabled'}))
+        return 1
     ap = SafeParser(description=__doc__)
     sp = ap.add_subparsers(dest='command', required=True)
     p = sp.add_parser('package'); p.add_argument('--source', required=True); p.add_argument('--output', required=True); p.add_argument('--extras', required=True)

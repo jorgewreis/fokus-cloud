@@ -391,6 +391,16 @@ class AdoptionLifecycle(unittest.TestCase):
 
 
 class WorkflowContract(unittest.TestCase):
+    def add_legacy_block(self, workflow):
+        anchor = '      - name: Configure SSH\n'
+        addition = ("      # The remaining legacy steps mutate DEPLOY_PATH in place and do not prepare,\n"
+                    "      # seal or activate a new immutable release. Never open SSH for that path.\n"
+                    "      - name: Block legacy in-place publication\n"
+                    "        id: immutable_guard\n"
+                    "        run: python3 deploy/legacy_publication_guard.py\n\n")
+        self.assertEqual(workflow.count(anchor), 1)
+        return workflow.replace(anchor, addition + anchor, 1)
+
     def expected_workflow(self):
         import hashlib
         import json
@@ -404,7 +414,8 @@ class WorkflowContract(unittest.TestCase):
             self.assertEqual(composed.count(delta['before']), 1)
             self.assertNotEqual(delta['before'], delta['after'])
             composed = composed.replace(delta['before'], delta['after'], 1)
-        return composed
+        # Preserve all baseline/delta bytes and add the exact block before SSH.
+        return self.add_legacy_block(composed)
 
     def assert_workflow_preserved(self, current):
         self.assertEqual(current, self.expected_workflow(),
@@ -419,16 +430,18 @@ class WorkflowContract(unittest.TestCase):
         import json
         fixtures = ROOT / 'tests/Deployment/fixtures'
         baseline = (fixtures / 'deploy-main-operational.yml').read_text()
-        composed = self.expected_workflow()
+        composed = baseline
+        for delta in json.loads((fixtures / 'deploy-law-operational-deltas.json').read_text())['deltas']:
+            composed = composed.replace(delta['before'], delta['after'], 1)
         with self.assertRaises(AssertionError): self.assert_workflow_preserved(baseline)
         for index, delta in enumerate(json.loads((fixtures / 'deploy-law-operational-deltas.json').read_text())['deltas']):
             with self.subTest(delta=index):
                 self.assertEqual(baseline.count(delta['before']), 1)
                 self.assertEqual(composed.count(delta['after']), 1)
                 with self.assertRaises(AssertionError):
-                    self.assert_workflow_preserved(baseline.replace(delta['before'], delta['after'], 1))
+                    self.assert_workflow_preserved(self.add_legacy_block(baseline.replace(delta['before'], delta['after'], 1)))
                 with self.assertRaises(AssertionError):
-                    self.assert_workflow_preserved(composed.replace(delta['after'], delta['before'], 1))
+                    self.assert_workflow_preserved(self.add_legacy_block(composed.replace(delta['after'], delta['before'], 1)))
 
     def test_rejects_every_step_removed_skipped_weakened_or_extended(self):
         import re

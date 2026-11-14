@@ -415,6 +415,22 @@ class ImmutableTests(unittest.TestCase):
         self.assertEqual(secret.stat().st_mode & 0o777, 0o400)
         self.assertEqual(self.root.stat().st_mode & 0o777, 0o500)
 
+    def test_legacy_cli_activation_and_rollback_refuse_before_any_mutation(self):
+        sentinel = self.base / 'synthetic-sealed-marker'
+        sentinel.write_bytes(b'unchanged')
+        for command in ('activate', 'rollback'):
+            with self.subTest(command=command):
+                result = subprocess.run([sys.executable, str(Path(__file__).with_name('immutable.py')), command,
+                                         '--base', str(self.base), '--candidate', str(self.root),
+                                         '--receipt', str(self.base / 'receipt'), '--policy-file', str(self.base / 'policy'),
+                                         '--expected-previous', str(self.base / 'previous')],
+                                        env=dict(os.environ, ALLOW_INPLACE='1', FOKUS_DEPLOY_FORCE='1'),
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(json.loads(result.stdout), {'state': 'blocked', 'reason': 'legacy_activation_disabled'})
+                self.assertEqual(sentinel.read_bytes(), b'unchanged')
+                self.assertFalse((self.base / 'activation-blocked.json').exists())
+
     def test_cli_argument_error_does_not_echo_sensitive_argument(self):
         p = subprocess.run([sys.executable, str(Path(__file__).with_name('immutable.py')), 'CANARY_SECRET_ARGUMENT'], capture_output=True, text=True)
         self.assertNotEqual(p.returncode, 0); self.assertNotIn('CANARY', p.stdout+p.stderr)

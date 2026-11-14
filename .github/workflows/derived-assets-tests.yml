@@ -28,7 +28,26 @@ jobs:
           git config user.name 'Synthetic composition'
           git config user.email 'synthetic@example.invalid'
           git merge --no-ff --no-edit b271260d1e9cf4778bf3304e961db73751a297f1
+      - name: Reject invalid shared-link declarations before sealing
+        run: |
+          python3 tools/releases/test_derived_shared_links.py -v
+          python3 tools/releases/test_publisher.py -v
+          python3 tools/releases/test_artifact_provenance.py -v
+          python3 tools/releases/test_preparation_guard.py -v
+      - name: Verify read-only access under an actual distinct synthetic UID
+        run: sudo -n env FOKUS_REQUIRE_ROOT_RUNTIME_TEST=1 python3 tools/releases/test_runtime_access.py -v
       - name: Real builds and tamper regressions
         run: python3 tools/releases/test_derived_assets.py -v
+      - name: Provision disposable runtime identity with explicit group
+        run: |
+          set -euo pipefail
+          gid="$(id -g)"
+          test "$gid" -gt 0
+          for uid in $(seq 25000 25999); do
+            if ! getent passwd "$uid" >/dev/null; then break; fi
+          done
+          ! getent passwd "$uid" >/dev/null
+          sudo -n useradd --uid "$uid" --gid "$gid" --no-create-home --shell /usr/sbin/nologin fokus-synthetic-runtime
+          printf 'FOKUS_SYNTHETIC_RUNTIME_UID=%s\nFOKUS_SYNTHETIC_RUNTIME_GID=%s\n' "$uid" "$gid" >> "$GITHUB_ENV"
       - name: Real PHP artifact and identity composition
         run: python3 tools/releases/test_derived_composition.py

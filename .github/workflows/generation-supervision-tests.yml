@@ -22,16 +22,46 @@ jobs:
           extensions: mbstring, intl, pdo_sqlite, dom, xml, curl, zip, fileinfo, pcntl
           tools: composer:v2
           coverage: none
+      - name: Install pinned OIDC test dependency
+        run: python3 -m pip install --disable-pip-version-check cryptography==46.0.5
       - name: Real Linux process regressions
         run: |
           python3 tools/releases/test_generation_supervisor.py -v
           python3 tools/releases/test_generation_activation.py -v
+          python3 tools/releases/test_runtime_evidence.py -v
+          python3 tools/releases/test_artifact_receiver.py -v
+          python3 tools/releases/test_artifact_ssh.py -v
+          python3 tools/releases/test_publication_entry.py -v
+          python3 tools/releases/test_github_oidc.py -v
+          python3 tools/releases/test_environment_evidence.py -v
+          python3 tools/releases/test_oidc_activation_evidence.py -v
+          python3 tools/releases/test_oidc_challenge_store.py -v
+          python3 tools/releases/test_oidc_protocol.py -v
+      - name: Disposable loopback SSH handshake
+        run: |
+          set -euo pipefail
+          if [ ! -x /usr/sbin/sshd ]; then
+            sudo -n apt-get update
+            sudo -n apt-get install -y openssh-server
+          fi
+          python3 tools/releases/test_artifact_ssh_real.py -v
       - name: Compose exact reviewed contracts in disposable checkout
         run: |
           git fetch --no-tags origin b271260d1e9cf4778bf3304e961db73751a297f1 a4fab9f4a4bca022acaf60809f28c7af7a164f5d 29df5490f29760fbb60d99862dbcbafb54c90051
           git config user.name 'Synthetic composition'
           git config user.email 'synthetic@example.invalid'
           git merge --no-ff --no-edit b271260d1e9cf4778bf3304e961db73751a297f1 a4fab9f4a4bca022acaf60809f28c7af7a164f5d 29df5490f29760fbb60d99862dbcbafb54c90051
+      - name: Provision disposable runtime identity with explicit group
+        run: |
+          set -euo pipefail
+          gid="$(id -g)"
+          test "$gid" -gt 0
+          for uid in $(seq 25000 25999); do
+            if ! getent passwd "$uid" >/dev/null; then break; fi
+          done
+          ! getent passwd "$uid" >/dev/null
+          sudo -n useradd --uid "$uid" --gid "$gid" --no-create-home --shell /usr/sbin/nologin fokus-synthetic-runtime
+          printf 'FOKUS_SYNTHETIC_RUNTIME_UID=%s\nFOKUS_SYNTHETIC_RUNTIME_GID=%s\n' "$uid" "$gid" >> "$GITHUB_ENV"
       - name: Real Laravel background queue/cache and immutable artifact
         run: |
           python3 tools/releases/test_generation_laravel.py

@@ -232,13 +232,14 @@ class WorkflowExecution(unittest.TestCase):
         self.assertNotIn('restart', production)
         steps = deployment_steps()
         names = [step[0] for step in steps]
-        self.assertEqual(names[:6], ['Generate immutable assets and one-shot deploy payload',
+        self.assertEqual(names[:7], ['Generate immutable assets and one-shot deploy payload',
                                    'Require exact main revision and latest successful Linux validation',
                                    'Require verifiable deployment prerequisites',
-                                   'Configure SSH', PREFLIGHT,
+                                   'Block legacy in-place publication', 'Configure SSH', PREFLIGHT,
                                    'Verify Law schema before publishing application code'])
         self.assertEqual(names[-4:], [ACTIVATE, 'Purge Cloudflare cache', VERIFY, REPORT])
-        self.assertEqual(steps[4][1], 'python3 deploy/fpm_guard_cli.py preflight\n')
+        self.assertEqual(steps[3][1], 'python3 deploy/legacy_publication_guard.py\n')
+        self.assertEqual(steps[5][1], 'python3 deploy/fpm_guard_cli.py preflight\n')
         self.assertEqual(steps[-4][1], 'python3 deploy/fpm_guard_cli.py activate\n')
         for name, _, body in steps:
             if name != REPORT:
@@ -248,7 +249,7 @@ class WorkflowExecution(unittest.TestCase):
         self.assertLess(purge.index('exit 0'), purge.index('curl --fail-with-body'))
         # Setup performs only a remote no-op before preflight; the exact body is
         # separately pinned to the preserved main source by WorkflowContract.
-        self.assertIn('"$DEPLOY_USER@$DEPLOY_HOST" exit', steps[3][1])
+        self.assertIn('"$DEPLOY_USER@$DEPLOY_HOST" exit', steps[4][1])
         self.assertIn("run: python3 -m unittest discover -s tests/Deployment -p 'test_fpm*.py' -v", workflow)
 
 

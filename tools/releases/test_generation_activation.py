@@ -6,6 +6,63 @@ from unittest.mock import patch
 import generation_supervisor as g
 import generation_activation as a
 
+class ContractEntrypoints(unittest.TestCase):
+    def test_current_contract_is_pinned_and_both_clis_reject_modification(self):
+        import hashlib
+        contract = Path(__file__).with_name('immutable.py')
+        self.assertEqual(hashlib.sha256(contract.read_bytes()).hexdigest(), g.CONTRACT_DIGEST)
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            altered = base / 'altered.py'
+            altered.write_bytes(contract.read_bytes() + b'\n# altered\n')
+            common = ['--base', str(base / 'missing'), '--receipt', str(base / 'receipt'),
+                      '--policy', str(base / 'policy')]
+            commands = [(g.cli, common + ['--root', str(base / 'root'), '--events', str(base / 'events')]),
+                        (a.cli, ['activate'] + common)]
+            for cli, args in commands:
+                with self.subTest(cli=cli.__module__):
+                    with patch.object(sys, 'argv', ['entrypoint'] + args + ['--immutable-contract', str(contract)]):
+                        with self.assertRaises(FileNotFoundError):
+                            cli()  # Correct digest passes contract load and reaches missing fixture input.
+                    with patch.object(sys, 'argv', ['entrypoint'] + args + ['--immutable-contract', str(altered)]):
+                        with self.assertRaisesRegex(g.Blocked, '^contract_mismatch$'):
+                            cli()
+
+class PublicationPolicy(unittest.TestCase):
+    def test_missing_context_wrong_release_and_failed_github_verification_refuse(self):
+        import derived_assets
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'deploy'))
+        import publication_gate
+        sha='b'*40
+        candidate=Path('/synthetic/releases')/sha
+        previous=Path('/synthetic/releases')/('a'*40)
+        with patch.object(derived_assets,'source_snapshot',return_value=(sha,b'',{})):
+            with patch.dict(os.environ,{},clear=True):
+                with self.assertRaises(publication_gate.GateError):a.publication_gate_policy(candidate,previous,False)
+            with patch.object(publication_gate,'context',return_value=SimpleNamespace(sha='c'*40)):
+                with self.assertRaisesRegex(g.Blocked,'publication_release_mismatch'):
+                    a.publication_gate_policy(candidate,previous,False)
+            with patch.object(publication_gate,'context',return_value=SimpleNamespace(sha=sha)), \
+                 patch.object(publication_gate,'GitHub',return_value=object()), \
+                 patch.object(publication_gate,'verify',side_effect=publication_gate.GateError('stale')):
+                with self.assertRaisesRegex(publication_gate.GateError,'stale'):
+                    a.publication_gate_policy(candidate,previous,False)
+
+    def test_rollback_allows_current_main_after_release_changes(self):
+        import derived_assets
+        from types import SimpleNamespace
+        sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'deploy'))
+        import publication_gate
+        approved='c'*40
+        with patch.object(derived_assets,'source_snapshot',return_value=(approved,b'',{})), \
+             patch.object(publication_gate,'context',return_value=SimpleNamespace(sha=approved)), \
+             patch.object(publication_gate,'GitHub',return_value=object()), \
+             patch.object(publication_gate,'verify',return_value=(123,1)) as verify:
+            a.publication_gate_policy(Path('/synthetic/releases')/('a'*40),Path('/synthetic/releases')/('b'*40),True)
+            verify.assert_called_once()
+
 class Contract:
     canonical=staticmethod(lambda p:Path(p).resolve())
     lock=staticmethod(g.lock)
@@ -22,6 +79,9 @@ class Contract:
 class Gate(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.base=Path(self.tmp.name)
+        # Unit fixtures stub only runtime inspection; dedicated tests exercise the real gate.
+        runtime=patch.object(a,'runtime_gate_policy',side_effect=lambda _c,p,_root,_receipt:p);runtime.start();self.addCleanup(runtime.stop)
+        publication=patch.object(a,'publication_gate_policy');publication.start();self.addCleanup(publication.stop)
         self.root=self.base/'releases'/('a'*40);self.root.mkdir(parents=True);self.new=self.base/'releases'/('b'*40);self.new.mkdir()
         (self.base/'current').symlink_to(self.root);self.receipt=self.base/'old.json';self.receipt.write_text(json.dumps({'root':str(self.root)}));self.newreceipt=self.base/'new.json';self.newreceipt.write_text(json.dumps({'root':str(self.new)}))
         self.scope=self.base/'scope.json';self.scope.write_text(json.dumps(dict(schema=a.SCHEMA,base=str(self.base),root=str(self.root),receipt_sha256=a.digest(self.receipt),node_sha256=Contract.node_fingerprint(),boot=a.boot(),operator_uid=os.geteuid(),verified_at=time.time(),expires_at=time.time()+240,evidence_reference='synthetic isolated process namespace only',**{k:True for k in a.BOUNDARIES})))
@@ -66,6 +126,27 @@ class Gate(unittest.TestCase):
             if (self.base/'activation-blocked.json').exists():break
             time.sleep(.002)
         self.rejected();self.assertEqual(os.waitstatus_to_exitcode(os.waitpid(pid,0)[1]),0)
+    def test_direct_activation_stops_before_switch_when_runtime_evidence_is_rejected(self):
+        self.ready()
+        with patch.object(a,'runtime_gate_policy',side_effect=ValueError('runtime_evidence_required')):
+            with self.assertRaisesRegex(ValueError,'runtime_evidence_required'):self.activate()
+        self.assertEqual((self.base/'current').resolve(),self.root)
+        self.assertFalse((self.base/'activation-blocked.json').exists())
+        self.assertTrue((self.base/'scheduler-ready.json').exists())
+
+    def test_stale_publication_gate_blocks_with_both_locks_before_latch(self):
+        self.ready()
+        def reject(candidate, previous, rollback):
+            for lock in ('activation.lock','scheduler.lock'):
+                with self.assertRaises(BlockingIOError):
+                    with g.lock(self.base/lock):pass
+            raise ValueError('publication_changed')
+        with patch.object(a,'publication_gate_policy',side_effect=reject):
+            with self.assertRaisesRegex(ValueError,'publication_changed'):self.activate()
+        self.assertEqual((self.base/'current').resolve(),self.root)
+        self.assertFalse((self.base/'activation-blocked.json').exists())
+        self.assertTrue((self.base/'scheduler-ready.json').exists())
+
     def test_double_fork_then_accept(self):
         pid=self.runjob("if os.fork()==0:\n os.setsid()\n if os.fork()==0:\n  time.sleep(.1);os._exit(0)\n os._exit(0)\nos._exit(0)")
         self.assertEqual(os.waitstatus_to_exitcode(os.waitpid(pid,0)[1]),0);self.activate()
