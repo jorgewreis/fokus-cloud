@@ -559,11 +559,20 @@ test('descarte de mount atrasado preserva drawer da página seguinte', async ({ 
     });
     await page.goto('/backoffice/planos');
     await requested;
+    await page.evaluate(() => {
+        const dispose = window.disposeBackofficeRecordsPage;
+        window.__recordsDisposeCount = 0;
+        window.disposeBackofficeRecordsPage = (...args) => {
+            window.__recordsDisposeCount += 1;
+            return dispose(...args);
+        };
+    });
     await page.locator('[data-sidebar-item="companies"]').click();
     await page.getByRole('button', { name: 'Nova empresa' }).click();
     await expect(page.locator('#company-drawer')).toBeVisible();
+    const countBeforeRelease = await page.evaluate(() => window.__recordsDisposeCount);
     releasePlans();
-    await page.waitForTimeout(500);
+    await expect.poll(() => page.evaluate(() => window.__recordsDisposeCount)).toBeGreaterThan(countBeforeRelease);
     await expect(page.locator('#company-drawer')).toBeVisible();
     await expect(page.locator('[data-backoffice-page="companies"]').first()).toBeVisible();
 });
