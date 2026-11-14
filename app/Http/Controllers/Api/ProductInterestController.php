@@ -83,7 +83,7 @@ class ProductInterestController extends Controller
             app(InterestProductIndex::class)->replace($interest->id, $products);
 
             return $interest;
-        });
+        }, 5);
 
         $adminRecipients = PlatformAdmin::query()
             ->where('status', 'ativo')

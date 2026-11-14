@@ -31,10 +31,10 @@ class BackfillInterestProductIndex extends Command
         try {
             DB::table('product_interests')->select('id')->orderBy('id')->chunkById(250, function ($batch) use ($index, &$count): void {
                 foreach ($batch as $item) {
-                    DB::transaction(function () use ($item, $index, &$count): void {
+                    if (DB::transaction(function () use ($item, $index): bool {
                         $row = DB::table('product_interests')->where('id', $item->id)->lockForUpdate()->first(['id', 'products']);
                         if (! $row) {
-                            return;
+                            return false;
                         }
                         try {
                             $codes = json_decode((string) $row->products, true, 512, JSON_THROW_ON_ERROR);
@@ -42,8 +42,11 @@ class BackfillInterestProductIndex extends Command
                             throw new \RuntimeException("Invalid product JSON for interest {$row->id}.", previous: $error);
                         }
                         $index->replace($row->id, $codes);
+
+                        return true;
+                    }, 5)) {
                         $count++;
-                    });
+                    }
                 }
             }, 'id');
             DB::table('interest_product_index_state')->where('id', 1)->update(['ready' => true]);
