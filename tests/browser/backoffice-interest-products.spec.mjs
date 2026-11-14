@@ -239,3 +239,32 @@ test('atualização mantém confirmação durante recarga da lista', async ({ pa
     await expect(page.locator('#interest-list')).toContainText('Cliente');
     await expect(page.locator('#interest-message')).toContainText('Status atualizado.');
 });
+
+test('consulta pendente respeita mudança de foco e página única mantém destino', async ({ page }) => {
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { id: 'TEST', role: 'superadministrador', permissions: ['platform.product_interests.manage'] } } }));
+    await page.route('**/api/backoffice/product-interests-options?*', route => route.fulfill({ json: { products: [], meta: { current_page: 1, has_more: false }, historical_index_ready: true } }));
+    let release, started; const pending = new Promise(resolve => { release = resolve; }); const begun = new Promise(resolve => { started = resolve; }); let count = 0;
+    await page.route('**/api/backoffice/product-interests?*', async route => {
+        const current = Number(new URL(route.request().url()).searchParams.get('page') || 1);
+        if (current === 2 && count++ === 0) { started(); await pending; }
+        await route.fulfill({ json: { data: [], meta: { total: 1, current_page: current, last_page: current === 2 ? 1 : 2 } } });
+    });
+    await page.goto('/backoffice/interesses');
+    await page.getByRole('button', { name: 'Próxima' }).focus(); await page.keyboard.press('Enter'); await begun;
+    await page.locator('#interest-product-filter').focus(); release();
+    await expect(page.locator('#interest-pagination')).toContainText('1 interesses');
+    await expect(page.locator('#interest-product-filter')).toBeFocused();
+});
+
+test('página única devolve foco ao resumo após paginação', async ({ page }) => {
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { id: 'TEST', role: 'superadministrador', permissions: ['platform.product_interests.manage'] } } }));
+    await page.route('**/api/backoffice/product-interests-options?*', route => route.fulfill({ json: { products: [], meta: { current_page: 1, has_more: false }, historical_index_ready: true } }));
+    await page.route('**/api/backoffice/product-interests?*', route => {
+        const current = Number(new URL(route.request().url()).searchParams.get('page') || 1);
+        return route.fulfill({ json: { data: [], meta: { total: 1, current_page: current, last_page: current === 2 ? 1 : 2 } } });
+    });
+    await page.goto('/backoffice/interesses');
+    await page.getByRole('button', { name: 'Próxima' }).focus(); await page.keyboard.press('Enter');
+    await expect(page.locator('#interest-pagination')).toContainText('1 interesses');
+    await expect(page.locator('#interest-pagination')).toBeFocused();
+});
