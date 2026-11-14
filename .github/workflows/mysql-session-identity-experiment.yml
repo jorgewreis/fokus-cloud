@@ -94,7 +94,7 @@ jobs:
           for db in "$a" "$b"; do
             docker run -d --name "$db" --network "$net" --tmpfs "/var/lib/mysql:rw,size=1g,uid=$uid,gid=$gid,mode=0700" -e MYSQL_ROOT_PASSWORD="$password" -e MYSQL_ROOT_HOST='%' -e MYSQL_DATABASE=fokus_upgrade_0123456789abcdef "$image" >/dev/null
             for attempt in $(seq 1 90); do
-              if docker exec -e MYSQL_PWD="$password" "$db" mysqladmin --no-defaults ping -uroot --silent >/dev/null 2>&1; then break; fi
+              if docker exec -e MYSQL_PWD="$password" "$db" mysqladmin --no-defaults --protocol=TCP -h127.0.0.1 ping -uroot --silent >/dev/null 2>&1; then break; fi
               if [ "$attempt" = 90 ] || [ "$(docker inspect --format '{{.State.Running}}' "$db")" != true ]; then echo 'Disposable server did not start' >&2; exit 1; fi
               sleep 2
             done
