@@ -44,14 +44,10 @@ class BackofficeController extends Controller
             ->chunkById(250, function ($subscriptions) use (&$activeSubscriptionCount, &$trendCounts, &$mrr): void {
                 $freeIds = DB::table('voucher_redemptions')
                     ->whereIn('subscription_id', $subscriptions->pluck('id'))
-                    ->get(['subscription_id', 'snapshot', 'benefit_ends_at'])
-                    ->filter(function (object $redemption): bool {
-                        $snapshot = json_decode((string) $redemption->snapshot, true) ?: [];
-
-                        return ($snapshot['discount_type'] ?? null) === 'trial_free'
-                            && $redemption->benefit_ends_at
-                            && now()->lt($redemption->benefit_ends_at);
-                    })->pluck('subscription_id')->flip();
+                    ->where('snapshot->discount_type', 'trial_free')
+                    ->where('benefit_ends_at', '>', now())
+                    ->distinct()
+                    ->pluck('subscription_id')->flip();
 
                 foreach ($subscriptions as $subscription) {
                     $activeSubscriptionCount++;

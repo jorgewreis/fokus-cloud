@@ -27,18 +27,20 @@ class SubscriptionAdminTest extends TestCase
         $admin = $this->platformAdmin();
         $fixture = $this->subscriptionFixture();
         $original = (array) DB::table('subscriptions')->where('id', $fixture['subscription_id'])->first();
+        $expiredSubscriptionId = null;
         for ($i = 0; $i < 251; $i++) {
             $copy = $original;
             $copy['id'] = PrefixedUlid::make('ASS');
             $copy['open_company_product'] = null;
             $copy['commercial_snapshot'] = json_encode(['monthly_amount' => 10]);
+            $expiredSubscriptionId ??= $copy['id'];
             DB::table('subscriptions')->insert($copy);
         }
 
         $this->actingAs($admin, 'platform')->postJson('/api/backoffice/vouchers', [
             'code' => 'DASHBOARDFREE', 'discount_type' => 'percentage', 'discount_value' => 10,
         ])->assertCreated();
-        DB::table('voucher_redemptions')->insert([
+        $redemption = [
             'id' => PrefixedUlid::make('VRE'),
             'voucher_id' => DB::table('vouchers')->where('code', 'DASHBOARDFREE')->value('id'),
             'company_id' => $fixture['company_id'],
@@ -47,7 +49,14 @@ class SubscriptionAdminTest extends TestCase
             'snapshot' => json_encode(['discount_type' => 'trial_free']),
             'benefit_ends_at' => now()->addDay(),
             'created_at' => now(),
-        ]);
+        ];
+        DB::table('voucher_redemptions')->insert($redemption);
+        $redemption['id'] = PrefixedUlid::make('VRE');
+        DB::table('voucher_redemptions')->insert($redemption);
+        $redemption['id'] = PrefixedUlid::make('VRE');
+        $redemption['subscription_id'] = $expiredSubscriptionId;
+        $redemption['benefit_ends_at'] = now()->subDay();
+        DB::table('voucher_redemptions')->insert($redemption);
 
         $redemptionBindingCounts = [];
         DB::listen(function ($query) use (&$redemptionBindingCounts): void {
@@ -60,7 +69,7 @@ class SubscriptionAdminTest extends TestCase
             ->assertJsonPath('metrics.mrr', 2510)
             ->assertJsonPath('subscription_registrations_6m.5.value', 252);
         $this->assertCount(2, $redemptionBindingCounts);
-        $this->assertLessThanOrEqual(250, max($redemptionBindingCounts));
+        $this->assertLessThanOrEqual(252, max($redemptionBindingCounts));
     }
 
     public function test_assisted_checkout_and_free_voucher_activate_pending_subscription_until_expiry(): void
