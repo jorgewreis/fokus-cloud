@@ -8,12 +8,14 @@ separate mandatory controls. No network, token output or mutation here.
 import base64
 import json
 import re
+import ssl
 import urllib.error
 import urllib.request
 
 ISSUER = 'https://token.actions.githubusercontent.com'
 JWKS_URL = ISSUER + '/.well-known/jwks'
 MAX_TOKEN = 16384
+CA_BUNDLE = '/etc/ssl/certs/ca-certificates.crt'
 
 
 def require(condition, reason):
@@ -48,11 +50,20 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+def issuer_tls_context():
+    # Ignore SSL_CERT_FILE/SSL_CERT_DIR and other environment-selected CAs.
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.load_verify_locations(cafile=CA_BUNDLE)
+    return context
+
+
 def fetch_jwks():
     """Fetch only the issuer's fixed HTTPS JWKS; reject redirects and oversized data."""
-    opener = urllib.request.build_opener(NoRedirect())
-    request = urllib.request.Request(JWKS_URL, headers={'Accept': 'application/json'}, method='GET')
     try:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}),
+                                             urllib.request.HTTPSHandler(context=issuer_tls_context()), NoRedirect())
+        request = urllib.request.Request(JWKS_URL, headers={'Accept': 'application/json'}, method='GET')
         with opener.open(request, timeout=20) as response:
             require(response.status == 200 and response.headers.get_content_type() == 'application/json', 'invalid_jwks_response')
             body = response.read(65537)
@@ -104,4 +115,4 @@ def verify(token, jwks, *, audience, repository, repository_id, sha, now):
     require(type(now) is int and claims['iat'] <= now and claims['nbf'] <= now < claims['exp']
             and claims['exp'] - claims['iat'] <= 300 and claims['iat'] >= now - 300, 'expired_or_future_token')
     return {'jti': claims['jti'], 'run_id': claims['run_id'], 'run_attempt': claims['run_attempt'],
-            'check_run_id': claims['check_run_id'], 'sha': sha}
+            'check_run_id': claims['check_run_id'], 'sha': sha, 'expires': claims['exp']}

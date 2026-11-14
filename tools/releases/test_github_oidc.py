@@ -54,10 +54,19 @@ class OIDC(unittest.TestCase):
                 self_url = request.full_url
                 assert self_url == oidc.JWKS_URL and timeout == 20 and request.method == 'GET'
                 return Response(self.body)
-        with patch.object(oidc.urllib.request, 'build_opener', return_value=Opener(b'{"keys":[]}')):
+        with patch.object(oidc, 'issuer_tls_context', return_value=None), patch.object(oidc.urllib.request, 'build_opener', return_value=Opener(b'{"keys":[]}')):
             self.assertEqual(oidc.fetch_jwks(), {'keys': []})
-        with patch.object(oidc.urllib.request, 'build_opener', return_value=Opener(b'x'*65537)):
+        with patch.object(oidc, 'issuer_tls_context', return_value=None), patch.object(oidc.urllib.request, 'build_opener', return_value=Opener(b'x'*65537)):
             with self.assertRaisesRegex(ValueError, 'jwks_fetch_failed'): oidc.fetch_jwks()
+
+    def test_tls_uses_fixed_os_ca_not_environment(self):
+        from unittest.mock import Mock
+        context = Mock()
+        with patch.object(oidc.ssl, 'SSLContext', return_value=context), \
+             patch.dict('os.environ', {'SSL_CERT_FILE':'/attacker/cert', 'HTTPS_PROXY':'http://attacker.invalid'}):
+            self.assertIs(oidc.issuer_tls_context(), context)
+        context.load_verify_locations.assert_called_once_with(cafile=oidc.CA_BUNDLE)
+        self.assertEqual(context.minimum_version, oidc.ssl.TLSVersion.TLSv1_2)
 
     def test_valid_signature_and_exact_claims(self):
         self.assertEqual(self.verify(self.token())['run_id'], '12')

@@ -168,6 +168,18 @@ fixado apenas para os testes; disponibilidade e instalação no host remoto não
 foram verificadas. Fontes do contrato: [referência OIDC do GitHub](https://docs.github.com/en/actions/reference/security/oidc)
 e [descoberta oficial do issuer](https://token.actions.githubusercontent.com/.well-known/openid-configuration).
 
+`oidc_challenge_store.py` é uma prova isolada, não uma entrada operacional.
+Seu diretório e política devem ser escolhidos por bootstrap confiável: a política
+prende repositório, ID e SHA do workflow; desafios de curta duração vinculam ação,
+candidato e digest. Sob lock, a prova consulta JWKS no endereço fixo usando o
+bundle de CA do SO e sem proxy herdado, confere assinatura/claims e registra
+marcadores exclusivos de desafio e `jti`. O relógio, bundle de CA, operador e
+root são fronteiras de confiança; a disponibilidade desses recursos no servidor
+real não foi comprovada. Marcadores persistentes exigem política operacional de
+retenção. A API não está exposta, não autentica o emissor do desafio nem foi
+integrada à ativação. Transmissão autenticada, permissão do environment, replay
+entre múltiplos nós e bootstrap remoto continuam pendentes.
+
 ## Evidência e limites
 
 `tests/Deployment/test_legacy_publication_guard.py` verifica que a recusa não

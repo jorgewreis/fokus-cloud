@@ -33,6 +33,7 @@ jobs:
           python3 tools/releases/test_artifact_ssh.py -v
           python3 tools/releases/test_publication_entry.py -v
           python3 tools/releases/test_github_oidc.py -v
+          python3 tools/releases/test_oidc_challenge_store.py -v
       - name: Disposable loopback SSH handshake
         run: |
           set -euo pipefail
