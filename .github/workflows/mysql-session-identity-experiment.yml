@@ -9,6 +9,7 @@ on:
       - 'tests/Deployment/test_probe_mysql_init_identity.py'
       - 'tests/Deployment/probe_laravel_mysql.py'
       - 'tests/Deployment/probe_laravel_mysql.php'
+      - 'tests/Deployment/probe_upgrade_mysql_consumer.py'
 
 permissions:
   contents: read
@@ -63,6 +64,7 @@ jobs:
           docker cp tests/Deployment/probe_mysql_init_identity.py "$qa":/tmp/
           docker cp tests/Deployment/probe_laravel_mysql.py "$qa":/tmp/
           docker cp tests/Deployment/probe_laravel_mysql.php "$qa":/tmp/
+          docker cp tests/Deployment/probe_upgrade_mysql_consumer.py "$qa":/tmp/
           docker exec --user 1000:1000 "$qa" mkdir /tmp/fokus-probe-app
           git archive HEAD | docker exec -i --user 1000:1000 "$qa" tar -x -C /tmp/fokus-probe-app
           docker cp vendor "$qa":/tmp/fokus-probe-app/
@@ -70,5 +72,6 @@ jobs:
           tar -C "$RUNNER_TEMP/fokus-probe-baseline" --exclude=vendor -cf - . | docker exec -i --user 1000:1000 "$qa" tar -x -C /tmp/fokus-probe-baseline
           docker cp "$RUNNER_TEMP/fokus-probe-baseline/vendor" "$qa":/tmp/fokus-probe-baseline/
           docker exec --user 1000:1000 -w /tmp "$qa" sh -ec 'php --version; mysql --version; mysql84-mysqldump --version; python3 probe_mysql_init_identity.py'
+          docker exec --user 1000:1000 -w /tmp "$qa" python3 probe_upgrade_mysql_consumer.py
           docker exec --user 1000:1000 -w /tmp "$qa" python3 probe_laravel_mysql.py /tmp/fokus-probe-app
           docker exec --user 1000:1000 -w /tmp "$qa" python3 probe_laravel_mysql.py /tmp/fokus-probe-baseline

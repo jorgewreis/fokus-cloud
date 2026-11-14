@@ -1,5 +1,8 @@
 """Fail-closed checks for the synthetic server guard; no database is used."""
 import os
+import pathlib
+import subprocess
+import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -29,10 +32,32 @@ class DisposableMysqlGuardTest(unittest.TestCase):
             run.assert_not_called()
 
     def test_sql_client_disables_option_files(self):
-        with patch.object(guard, 'assert_disposable_mysql') as identity, patch.object(guard.subprocess, 'run') as run:
+        with patch.object(guard, 'assert_disposable_mysql', return_value='01234567-89ab-cdef-0123-456789abcdef') as identity, patch.object(guard.subprocess, 'run') as run:
             guard.execute_disposable_sql('CREATE DATABASE synthetic', {})
             identity.assert_called_once()
-            self.assertEqual(run.call_args.args[0][:2], ['mysql', '--no-defaults'])
+            command = run.call_args.args[0]
+            self.assertEqual(command[:2], ['mysql84', '--no-defaults'])
+            self.assertIn('--skip-reconnect', command)
+            self.assertTrue(any(arg.startswith('--init-command=') and '01234567-89ab-cdef-0123-456789abcdef' in arg for arg in command))
+
+    def test_failed_dump_does_not_publish_partial_backup(self):
+        def fail_after_partial(*args, **kwargs):
+            kwargs['stdout'].write(b'partial synthetic dump')
+            raise subprocess.CalledProcessError(1, args[0])
+        with tempfile.TemporaryDirectory() as directory:
+            target = pathlib.Path(directory) / 'backup.sql'
+            with patch.object(guard, 'assert_disposable_mysql', return_value='01234567-89ab-cdef-0123-456789abcdef'), \
+                 patch.object(guard.subprocess, 'run', side_effect=fail_after_partial):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    guard.dump_disposable_mysql('fokus_upgrade_0123456789abcdef', {}, target, subprocess.DEVNULL)
+            self.assertFalse(target.exists())
+            self.assertEqual(list(pathlib.Path(directory).iterdir()), [])
+
+    def test_commands_reject_invalid_identity_and_database(self):
+        with self.assertRaises(ValueError):
+            guard.mysql84_command("invalid' OR 1=1")
+        with self.assertRaises(ValueError):
+            guard.mysqldump84_command('01234567-89ab-cdef-0123-456789abcdef', 'production')
 
     def test_missing_identity_never_invokes_mysql(self):
         with patch.object(guard.os, 'name', 'posix'), patch.object(guard.os, 'geteuid', return_value=1000, create=True), \
