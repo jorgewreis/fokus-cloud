@@ -210,7 +210,9 @@ test('consulta somente o identificador de reembolso recebido sem novo estorno', 
     await page.getByRole('button', { name: 'Consultar reembolso no Mercado Pago' }).click();
     await page.locator('#billing-action-reason').fill('Verificar confirmação.');
     await page.getByRole('button', { name: 'Confirmar', exact: true }).click();
+    await expect.poll(() => calls.length).toBe(1);
     await expect(page.locator('#billing-detail-sections')).toContainText('Executado');
+    await expect(page.getByRole('button', { name: 'Consultar reembolso no Mercado Pago' })).toHaveCount(0);
     expect(calls).toHaveLength(1);
     expect(calls[0].action).toBe('consultar');
 });
