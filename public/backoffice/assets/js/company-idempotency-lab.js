@@ -62,17 +62,18 @@ export function createCompanyIdempotencyLab({ storage, transport, sessionBinding
                 return id;
             } finally { active.delete(key); }
         },
-        async status(id) {
+        async status(id, expectedTarget) {
             return run(id, async (record) => {
-                try { return companyIdempotencyOutcome(await transport.status(record.operation, record.token)); }
+                try { return companyIdempotencyOutcome(await transport.status(record.operation, record.token), record.operation, expectedTarget); }
                 catch (_) { return "indeterminate"; }
             });
         },
-        async submit(id, body) {
+        async submit(id, body, expectedTarget) {
             return run(id, async (record) => {
+                if (record.operation === "company.update" && (typeof expectedTarget !== "string" || !expectedTarget.trim())) return "indeterminate";
                 try {
-                    const result = await transport.submit(record.operation, record.token, body);
-                    return companyIdempotencyOutcome(result);
+                    const result = await transport.submit(record.operation, record.token, body, expectedTarget);
+                    return companyIdempotencyOutcome(result, record.operation, expectedTarget);
                 } catch (_) { return "indeterminate"; }
             });
         },

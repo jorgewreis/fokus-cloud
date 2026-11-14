@@ -43,3 +43,27 @@ test("logout during issue prevents storage and repeated issue cannot overwrite",
     await assert.rejects(pending, /Sessão não verificada/);
     assert.equal(storage.length, 0);
 });
+
+test("update needs an explicit target and accepts only its matching result", async () => {
+    const storage = makeStorage();
+    let calls = 0;
+    let resultId = "other";
+    const transport = {
+        issue: async () => "synthetic-token",
+        submit: async (_operation, _token, _body, target) => {
+            calls++;
+            assert.equal(target, "company-one");
+            return { state: "completed", result: { id: resultId, status: 200 } };
+        },
+        status: async () => ({ state: "completed", result: { id: resultId, status: 200 } }),
+    };
+    const client = createCompanyIdempotencyLab({ storage, transport, sessionBinding: async () => "a".repeat(64), newId: () => "synthetic-id-00002" });
+    const id = await client.issue("company.update");
+    assert.equal(await client.submit(id, {}), "indeterminate");
+    assert.equal(calls, 0);
+    assert.equal(await client.submit(id, {}, "company-one"), "indeterminate");
+    assert.equal(await client.status(id, "company-one"), "indeterminate");
+    resultId = "company-one";
+    assert.equal(await client.submit(id, {}, "company-one"), "completed");
+    assert.equal(await client.status(id, "company-one"), "completed");
+});

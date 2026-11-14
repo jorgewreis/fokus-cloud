@@ -30,3 +30,8 @@ ausência de resposta conclusiva nunca prova que a operação não será confirm
 `clear()` afeta somente o storage fornecido e não demonstra propagação de
 logout entre abas. Não se deve conectar o protótipo antes de resolver esses
 contratos e validar o fluxo completo em navegador e servidor isolados.
+Na atualização, o chamador deve fornecer o alvo e o protótipo exige resultado
+com esse mesmo ID e status 200; criação exige status 201 e ID não vazio. Como
+o alvo não é persistido nem associado pelo cliente ao token, após reload não há
+prova de que o alvo informado seja o original. Resolver isso antes da conexão;
+uma comparação com um valor fornecido pelo chamador não constitui essa prova.
