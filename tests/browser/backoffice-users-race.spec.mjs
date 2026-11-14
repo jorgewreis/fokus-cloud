@@ -11,6 +11,8 @@ test('usuários: consultas e detalhes antigos não substituem o estado atual ou 
     await page.evaluate(async (source) => {
         const module = await import(`data:text/javascript;base64,${btoa(unescape(encodeURIComponent(source)))}`);
         window.pending = [];
+        window.__backofficePermissions = new Set(["platform.security.manage"]);
+        window.FokusStyles = { Modal: { getOrCreateInstance: () => ({ show() {}, hide() {}, dispose() {} }) } };
         window.abortController = new AbortController();
         window.disposeUsers = await module.mount(document.querySelector('main'), { signal: window.abortController.signal, admin: { role: 'superadministrador' }, api: { request: (url) => new Promise((resolve, reject) => window.pending.push({ url, resolve, reject })) } });
     }, source);
@@ -41,7 +43,44 @@ test('usuários: consultas e detalhes antigos não substituem o estado atual ou 
     await page.evaluate((value) => window.pending[6].resolve(value), result('Recuperado'));
     await expect(row).toContainText('Recuperado');
     await row.locator('[data-user-action="details"]').click();
-    await page.evaluate(() => { window.abortController.abort(); window.disposeUsers(); window.pending[7].resolve({ name: 'Após sair', type: 'plataforma' }); });
+    await page.keyboard.press('Escape');
+    await page.evaluate(() => window.pending[7].resolve({ name: 'Fechado por Escape', type: 'plataforma' }));
+    await expect(page.locator('#user-drawer-title')).not.toHaveText('Fechado por Escape');
+    await row.locator('[data-user-action="details"]').click();
+    await page.locator('#user-drawer-trigger').dispatchEvent('fs:hide');
+    await page.evaluate(() => window.pending[8].resolve({ name: 'Fechado pelo backdrop', type: 'plataforma' }));
+    await expect(page.locator('#user-drawer-title')).not.toHaveText('Fechado pelo backdrop');
+    await row.locator('[data-user-action="block"]').click();
+    await page.locator('#user-action-reason').fill('Motivo sintético');
+    await page.locator('#user-action-form').evaluate((form) => form.requestSubmit());
+    await page.evaluate(() => window.pending[9].resolve({}));
+    await expect(page.locator('#users-message')).toHaveText('Ação de segurança concluída.');
+    await page.evaluate((value) => window.pending[10].resolve(value), result('Recuperado'));
+    await expect(page.locator('#users-message')).toHaveText('Ação de segurança concluída.');
+    await row.locator('[data-user-action="details"]').click();
+    await page.evaluate(() => { window.abortController.abort(); window.disposeUsers(); window.pending[11].resolve({ name: 'Após sair', type: 'plataforma' }); });
     await expect(page.locator('#user-drawer-title')).not.toHaveText('Após sair');
     expect(await page.evaluate(() => window.drawerShown)).toBe(1);
+});
+
+test('usuários: respostas de empresas e ações não alteram tela após desmontagem', async ({ page }) => {
+    await page.setContent(html);
+    await page.evaluate(async (source) => {
+        const module = await import(`data:text/javascript;base64,${btoa(unescape(encodeURIComponent(source)))}`);
+        window.pending = [];
+        window.__backofficePermissions = new Set(['platform.security.manage']);
+        window.FokusStyles = { Modal: { getOrCreateInstance: () => ({ show() {}, hide() {}, dispose() {} }) } };
+        window.abortController = new AbortController();
+        window.disposeUsers = await module.mount(document.querySelector('main'), { signal: window.abortController.signal, admin: { role: 'superadministrador' }, api: { request: (url) => new Promise((resolve, reject) => window.pending.push({ url, resolve, reject })) } });
+    }, source);
+    await page.evaluate((value) => window.pending[0].resolve(value), result('Inicial'));
+    await page.locator('#users-list [data-user-action="block"]').click();
+    await page.locator('#user-action-reason').fill('Motivo sintético');
+    await page.locator('#user-action-form').evaluate((form) => form.requestSubmit());
+    await page.locator('#user-invite').click();
+    await page.locator('#user-account-type').selectOption('empresa');
+    await page.evaluate(() => { window.abortController.abort(); window.disposeUsers(); window.pending[1].resolve({}); window.pending[2].resolve({ data: [{ id: 1, label: 'Empresa tardia' }] }); });
+    await expect(page.locator('#user-company')).not.toContainText('Empresa tardia');
+    await expect(page.locator('#users-message')).not.toHaveText('Ação de segurança concluída.');
+    expect(await page.evaluate(() => window.pending.length)).toBe(3);
 });
