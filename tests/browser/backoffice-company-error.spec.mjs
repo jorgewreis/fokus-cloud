@@ -105,8 +105,8 @@ const fakeCompany = {
     data_volume: {},
 };
 
-for (const status of [200, 422]) {
-    test(`PATCH tardio ${status} não altera drawer reaberto nem página remontada`, async ({ page }) => {
+for (const [status, reopen] of [[200, false], [200, true], [422, true]]) {
+    test(`PATCH tardio ${status} após fechamento, reabrir=${reopen}`, async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 900 });
         await page.route('**/*', (route) => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
         let release;
@@ -115,6 +115,7 @@ for (const status of [200, 422]) {
         const requested = new Promise((resolve) => { markRequested = resolve; });
         let listRequests = 0;
         let patchBody;
+        let saved = false;
         await page.route('**/api/backoffice/companies**', async (route) => {
             const request = route.request();
             const url = new URL(request.url());
@@ -122,11 +123,12 @@ for (const status of [200, 422]) {
                 patchBody = request.postDataJSON();
                 markRequested();
                 await gate;
+                saved = status === 200;
                 return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(status === 200 ? {} : { message: 'Erro obsoleto' }) });
             }
             if (url.pathname.endsWith('/CMP_TEST')) return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ company: fakeCompany }) });
             listRequests++;
-            return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: [fakeCompany], meta: { total: 1, current_page: 1, per_page: 15, last_page: 1 }, summary: {} }) });
+            return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: [{ ...fakeCompany, legal_name: saved ? 'Alteração sintética' : fakeCompany.legal_name }], meta: { total: 1, current_page: 1, per_page: 15, last_page: 1 }, summary: {} }) });
         });
         await page.goto('/backoffice/empresas');
         await page.getByRole('button', { name: 'Editar empresa' }).click();
@@ -138,18 +140,31 @@ for (const status of [200, 422]) {
         await expect(page.locator('#company-form-submit')).toBeDisabled();
         await page.locator('#company-form-cancel').click();
         await expect(page.locator('#company-drawer')).toBeHidden();
-        await page.locator('#company-create').click();
-        await expect(page.locator('#company-drawer')).toBeVisible();
-        await expect(page.locator('#company-form-submit')).toBeDisabled();
+        if (reopen) {
+            await page.locator('#company-create').click();
+            await expect(page.locator('#company-drawer')).toBeVisible();
+            await expect(page.locator('#company-form-submit')).toBeDisabled();
+            await page.locator('#company-legal-name').click();
+            await expect(page.locator('#company-legal-name')).toBeFocused();
+        }
+        const focusBefore = await page.evaluate(() => document.activeElement?.id);
         const before = listRequests;
         const response = page.waitForResponse((item) => item.request().method() === 'PATCH' && item.url().includes('/CMP_TEST'));
         release();
         await response;
         await expect(page.locator('#company-form-submit')).toBeEnabled();
-        await expect(page.locator('#company-drawer')).toBeVisible();
-        await expect(page.locator('#company-drawer-title')).toHaveText('Nova empresa');
-        await expect(page.locator('#company-form-error')).toBeHidden();
-        expect(listRequests).toBe(before);
+        if (status === 200) {
+            await expect.poll(() => listRequests).toBe(before + 1);
+            await expect(page.locator('#company-list')).toContainText('Alteração sintética');
+        } else expect(listRequests).toBe(before);
+        if (reopen) {
+            await expect(page.locator('#company-drawer')).toBeVisible();
+            await expect(page.locator('#company-drawer-title')).toHaveText('Nova empresa');
+            await expect(page.locator('#company-form-error')).toBeHidden();
+        } else {
+            await expect(page.locator('#company-drawer')).toBeHidden();
+        }
+        expect(await page.evaluate(() => document.activeElement?.id)).toBe(focusBefore);
         await expect(page.locator('.fs-backoffice-toast')).toHaveCount(0);
     });
 }
@@ -196,4 +211,103 @@ test('POST tardio após navegação SPA não afeta nova montagem de empresas', a
     await expect(page.locator('#company-form-error')).toBeHidden();
     await expect(page.locator('.fs-backoffice-toast')).toHaveCount(0);
     expect(listRequests).toBe(before);
+});
+
+
+for (const reopen of [false, true]) {
+    test(`POST tardio atualiza listagem após fechamento, reabrir=${reopen}`, async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.route('**/*', (route) => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+        let release;
+        let markRequested;
+        const gate = new Promise((resolve) => { release = resolve; });
+        const requested = new Promise((resolve) => { markRequested = resolve; });
+        let listRequests = 0;
+        await page.route('**/api/backoffice/companies**', async (route) => {
+            if (route.request().method() === 'POST') {
+                markRequested();
+                await gate;
+                return route.fulfill({ status: 201, contentType: 'application/json', body: '{}' });
+            }
+            listRequests++;
+            return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: listRequests > 1 ? [fakeCompany] : [], meta: { total: listRequests > 1 ? 1 : 0, current_page: 1, per_page: 15, last_page: 1 }, summary: {} }) });
+        });
+        await page.goto('/backoffice/empresas');
+        await page.locator('#company-create').click();
+        await page.locator('#company-document-number').fill('11222333000181');
+        await page.locator('#company-legal-name').fill('Empresa Exemplo');
+        await page.locator('#company-admin-name').fill('Admin Exemplo');
+        await page.locator('#company-admin-cpf').fill('52998224725');
+        await page.locator('#company-admin-email').fill('exemplo@example.test');
+        await page.locator('#company-admin-password').fill('SenhaExemplo123!');
+        await page.locator('#company-form-submit').click();
+        await requested;
+        await page.locator('#company-form-cancel').click();
+        await expect(page.locator('#company-drawer')).toBeHidden();
+        if (reopen) {
+            await page.locator('#company-create').click();
+            await expect(page.locator('#company-form-submit')).toBeDisabled();
+            await page.locator('#company-legal-name').click();
+            await expect(page.locator('#company-legal-name')).toBeFocused();
+        }
+        const focusBefore = await page.evaluate(() => document.activeElement?.id);
+        const before = listRequests;
+        release();
+        await expect.poll(() => listRequests).toBe(before + 1);
+        await expect(page.locator('#company-list')).toContainText('Empresa Exemplo');
+        await expect(page.locator('#company-form-submit')).toBeEnabled();
+        if (reopen) await expect(page.locator('#company-drawer')).toBeVisible();
+        else await expect(page.locator('#company-drawer')).toBeHidden();
+        expect(await page.evaluate(() => document.activeElement?.id)).toBe(focusBefore);
+        await expect(page.locator('.fs-backoffice-toast')).toHaveCount(0);
+    });
+}
+
+test('atualização tardia da lista não altera nova montagem após navegação', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.route('**/*', (route) => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+    let releasePost;
+    let releaseOldList;
+    let postStarted;
+    let oldListStarted;
+    const postGate = new Promise((resolve) => { releasePost = resolve; });
+    const listGate = new Promise((resolve) => { releaseOldList = resolve; });
+    const postRequest = new Promise((resolve) => { postStarted = resolve; });
+    const oldListRequest = new Promise((resolve) => { oldListStarted = resolve; });
+    let listRequests = 0;
+    await page.route('**/api/backoffice/companies**', async (route) => {
+        if (route.request().method() === 'POST') {
+            postStarted();
+            await postGate;
+            return route.fulfill({ status: 201, contentType: 'application/json', body: '{}' });
+        }
+        listRequests++;
+        const sequence = listRequests;
+        if (sequence === 2) { oldListStarted(); await listGate; }
+        const name = sequence === 2 ? 'Resposta obsoleta' : 'Nova montagem';
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: [{ ...fakeCompany, legal_name: name }], meta: { total: 1, current_page: 1, per_page: 15, last_page: 1 }, summary: {} }) });
+    });
+    await page.goto('/backoffice/empresas');
+    await page.locator('#company-create').click();
+    await page.locator('#company-document-number').fill('11222333000181');
+    await page.locator('#company-legal-name').fill('Empresa Exemplo');
+    await page.locator('#company-admin-name').fill('Admin Exemplo');
+    await page.locator('#company-admin-cpf').fill('52998224725');
+    await page.locator('#company-admin-email').fill('exemplo@example.test');
+    await page.locator('#company-admin-password').fill('SenhaExemplo123!');
+    await page.locator('#company-form-submit').click();
+    await postRequest;
+    await page.locator('#company-form-cancel').click();
+    releasePost();
+    await oldListRequest;
+    await page.evaluate(() => window.__backofficeRouter.navigate('platform-dashboard-final'));
+    await expect(page.locator('[data-backoffice-page="platform-dashboard-final"]')).toBeVisible();
+    await page.evaluate(() => window.__backofficeRouter.navigate('companies'));
+    await expect(page.locator('#company-list')).toContainText('Nova montagem');
+    const oldResponse = page.waitForResponse((item) => item.request().method() === 'GET' && item.url().includes('/companies?') && item.status() === 200 && item.request() !== null && listRequests === 3);
+    releaseOldList();
+    await oldResponse;
+    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    await expect(page.locator('#company-list')).toContainText('Nova montagem');
+    await expect(page.locator('#company-list')).not.toContainText('Resposta obsoleta');
 });
