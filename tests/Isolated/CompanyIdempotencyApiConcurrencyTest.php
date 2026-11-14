@@ -6,6 +6,7 @@ use App\Http\Middleware\RejectUnimplementedCompanyIdempotency;
 use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
 use App\Services\CompanyIdempotencyFactory;
+use App\Services\PlatformSessionAuthority;
 use App\Services\PlatformSessionBinding;
 use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
@@ -53,7 +54,8 @@ class CompanyIdempotencyApiConcurrencyTest extends TestCase
             'status' => 'ativo', 'platform_role_id' => PlatformRole::where('code', 'superadministrador')->value('id'),
             'email_verified_at' => now(),
         ]);
-        $settings = (new CompanyIdempotencyFactory)->build(config('company_idempotency'));
+        (new PlatformSessionAuthority)->registerAfterMfa($admin->id, str_repeat('a', 64), now()->addMinutes(10)->timestamp);
+        $settings = (new CompanyIdempotencyFactory)->build(config('company_idempotency'), str_repeat('a', 64));
         $token = $settings['session_keys']->bindSession($settings['store']->issue($admin->id, 'company.create', 600), str_repeat('a', 64));
         $this->withSession([PlatformSessionBinding::SESSION_KEY => str_repeat('a', 64)]);
         $payload = [

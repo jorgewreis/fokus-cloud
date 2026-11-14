@@ -10,8 +10,10 @@ require __DIR__.'/../../app/Services/PlatformSessionAuthority.php';
 require __DIR__.'/../../app/Services/CompanyIdempotencyKeys.php';
 require __DIR__.'/../../app/Services/CompanyIdempotencyAuthorization.php';
 require __DIR__.'/../../app/Services/CompanyIdempotencyStore.php';
+require __DIR__.'/../../app/Services/CompanyIdempotencyFactory.php';
 
 use App\Services\CompanyIdempotencyAuthorization;
+use App\Services\CompanyIdempotencyFactory;
 use App\Services\CompanyIdempotencyKeys;
 use App\Services\CompanyIdempotencyStore;
 use App\Services\PlatformSessionAuthority;
@@ -161,6 +163,24 @@ $checkOrder = function () use (&$statements, $check): void {
 };
 $orderedToken = $orderedStore->issue('actor-a', 'company.create', 60);
 $checkOrder();
+$factoryConfig = [
+    'enabled' => true, 'keyring_json' => '{"a":"'.base64_encode(str_repeat('k', 32)).'"}',
+    'active_kid' => 'a', 'revoked_kids_json' => '[]', 'max_outstanding' => 10,
+    'max_issues_per_window' => 10, 'issuance_window_seconds' => 60, 'token_lifetime_seconds' => 60,
+];
+$factory = new CompanyIdempotencyFactory;
+try {
+    $factory->build($factoryConfig);
+    throw new RuntimeException('Factory accepted an absent session marker.');
+} catch (InvalidArgumentException $e) {
+    $check($e->getMessage() === 'Company idempotency is unavailable.');
+}
+$unknown = $factory->build($factoryConfig, str_repeat('f', 64))['store'];
+$denied(fn () => $unknown->issue('actor-a', 'company.create', 60));
+$factoryStore = $factory->build($factoryConfig, $markerE)['store'];
+$factoryToken = $factoryStore->issue('actor-a', 'company.create', 60);
+$check($factoryStore->status($factoryToken, 'actor-a', 'company.create', time())['state'] === 'issued');
+$statements = [];
 $orderedStore->bind($orderedToken, 'actor-a', 'company.create', null, ['name' => 'Ordered'], time());
 $checkOrder();
 $orderedStore->complete($orderedToken, 'actor-a', 'company.create', null, ['name' => 'Ordered'], fn () => ['id' => 'ordered', 'status' => 201]);

@@ -18,7 +18,7 @@ final class CompanyIdempotencyController extends Controller
     {
         $data = $this->operation($request);
         $binding = $this->binding($request);
-        $settings = $this->settings();
+        $settings = $this->settings($binding);
         $token = $settings['store']->issue((string) $request->user()->id, $data, $settings['lifetime_seconds']);
         $token = $settings['session_keys']->bindSession($token, $binding);
 
@@ -31,7 +31,7 @@ final class CompanyIdempotencyController extends Controller
         $operation = $this->operation($request);
         $token = $this->token($request);
         $binding = $this->binding($request);
-        $settings = $this->settings();
+        $settings = $this->settings($binding);
         try {
             $token = $settings['session_keys']->unbindSession($token, $binding);
             $result = $settings['store']->status($token, (string) $request->user()->id, $operation, now()->getTimestamp());
@@ -48,7 +48,7 @@ final class CompanyIdempotencyController extends Controller
         $token = $this->token($request);
         $binding = $this->binding($request);
         $actor = (string) $request->user()->id;
-        $settings = $this->settings();
+        $settings = $this->settings($binding);
         try {
             $token = $settings['session_keys']->unbindSession($token, $binding);
             $result = $settings['store']->revoke($token, $actor, $operation, now()->getTimestamp(), function () use ($audit, $actor, $operation, $request): void {
@@ -76,10 +76,10 @@ final class CompanyIdempotencyController extends Controller
         return $values[0];
     }
 
-    private function settings(): array
+    private function settings(string $binding): array
     {
         try {
-            return (new CompanyIdempotencyFactory)->build((array) config('company_idempotency', []));
+            return (new CompanyIdempotencyFactory)->build((array) config('company_idempotency', []), $binding);
         } catch (InvalidArgumentException) {
             abort(503, 'Solicitação indisponível.');
         }

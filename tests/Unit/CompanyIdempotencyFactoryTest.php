@@ -11,7 +11,7 @@ class CompanyIdempotencyFactoryTest extends TestCase
 {
     public function test_explicit_synthetic_configuration_builds_a_store(): void
     {
-        $result = (new CompanyIdempotencyFactory)->build($this->validConfig());
+        $result = (new CompanyIdempotencyFactory)->build($this->validConfig(), str_repeat('a', 64));
         self::assertInstanceOf(CompanyIdempotencyStore::class, $result['store']);
         self::assertSame(600, $result['lifetime_seconds']);
     }
@@ -41,11 +41,23 @@ class CompanyIdempotencyFactoryTest extends TestCase
         ];
         foreach ($cases as $case) {
             try {
-                (new CompanyIdempotencyFactory)->build(array_replace($base, $case));
+                (new CompanyIdempotencyFactory)->build(array_replace($base, $case), str_repeat('a', 64));
                 self::fail('Invalid configuration was accepted.');
             } catch (InvalidArgumentException $e) {
                 self::assertSame('Company idempotency is unavailable.', $e->getMessage());
                 self::assertStringNotContainsString($secret, $e->getMessage());
+            }
+        }
+    }
+
+    public function test_missing_or_invalid_session_marker_cannot_build_a_store(): void
+    {
+        foreach ([null, '', str_repeat('A', 64), str_repeat('a', 63)] as $marker) {
+            try {
+                (new CompanyIdempotencyFactory)->build($this->validConfig(), $marker);
+                self::fail('Invalid session marker was accepted.');
+            } catch (InvalidArgumentException $e) {
+                self::assertSame('Company idempotency is unavailable.', $e->getMessage());
             }
         }
     }

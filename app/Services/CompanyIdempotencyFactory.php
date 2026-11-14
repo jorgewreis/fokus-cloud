@@ -10,9 +10,10 @@ use stdClass;
 final class CompanyIdempotencyFactory
 {
     /** @return array{store:CompanyIdempotencyStore,lifetime_seconds:int} */
-    public function build(array $config): array
+    public function build(array $config, ?string $sessionMarker = null): array
     {
-        if (($config['enabled'] ?? false) !== true) {
+        if (($config['enabled'] ?? false) !== true || ! is_string($sessionMarker)
+            || preg_match('/\A[0-9a-f]{64}\z/D', $sessionMarker) !== 1) {
             throw new InvalidArgumentException('Company idempotency is unavailable.');
         }
 
@@ -39,7 +40,7 @@ final class CompanyIdempotencyFactory
                 throw new InvalidArgumentException;
             }
             $keys = new CompanyIdempotencyKeys(get_object_vars($ring), $config['active_kid'], $revoked);
-            $store = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, $outstanding, $issues, $window);
+            $store = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, $outstanding, $issues, $window, new PlatformSessionAuthority, $sessionMarker);
 
             return ['store' => $store, 'session_keys' => $keys, 'lifetime_seconds' => $lifetime];
         } catch (InvalidArgumentException|JsonException) {

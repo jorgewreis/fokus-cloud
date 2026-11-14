@@ -16,8 +16,10 @@ The store now has an experimental constructor path that composes session
 authority and idempotency within one top-level transaction. Its five operations
 acquire actor, session, authorization and token rows in that order; the legacy
 constructor remains available and must never be exposed as a session-protected
-path. No route or factory selects the composed path yet. Integration must make
-the session authority mandatory before removing the public route guards. Writer,
+path. The factory used by the guarded controllers now requires a valid marker
+and always selects the composed path. A marker with no active durable record
+fails closed. Routes remain unconditionally blocked, and invalidation paths are
+not yet connected. Writer,
 audit and completion must remain on the same connection; callbacks cannot enforce
 their own connection or purity.
 Integrate and prove every effective invalidation path, including both platform
@@ -41,8 +43,9 @@ atomic. Repeat the two orders for each supported invalidator and session driver.
 An isolated smoke script constructs its own SQLite `:memory:` connection and
 checks registration, actor isolation, stale binding rejection, rotation,
 specific and bulk revocation, hash storage, expired registration, composed store
-operations, rollback, revoked permissions, nested transaction rejection and
-sequential query order. It does not execute migrations, real HTTP paths,
+operations, factory rejection of an absent marker or record, rollback, revoked
+permissions, nested transaction rejection and sequential query order. It does
+not execute migrations, real HTTP paths,
 concurrent transactions or MySQL and cannot demonstrate lock ordering across
 processes. Syntax and smoke checks are not evidence of concurrency correctness
 or release readiness.

@@ -7,6 +7,7 @@ use App\Http\Middleware\RejectUnimplementedCompanyIdempotency;
 use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
 use App\Services\CompanyIdempotencyFactory;
+use App\Services\PlatformSessionAuthority;
 use App\Services\PlatformSessionBinding;
 use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
@@ -129,6 +130,7 @@ class CompanyIdempotencyApiLabTest extends TestCase
     {
         $admin = $this->admin();
         $other = $this->admin();
+        $this->authorizeSession($admin);
         $this->actingAs($admin, 'platform');
         $issued = $this->postJson('/api/backoffice/company-idempotency/issue', ['operation' => 'company.create'])->assertCreated();
         $token = $issued->headers->get('Idempotency-Key');
@@ -151,11 +153,27 @@ class CompanyIdempotencyApiLabTest extends TestCase
 
     private function issue(PlatformAdmin $admin, string $operation): string
     {
-        $settings = (new CompanyIdempotencyFactory)->build(config('company_idempotency'));
+        $this->authorizeSession($admin);
+        $settings = (new CompanyIdempotencyFactory)->build(config('company_idempotency'), str_repeat('a', 64));
 
         $token = $settings['store']->issue($admin->id, $operation, $settings['lifetime_seconds']);
 
         return $settings['session_keys']->bindSession($token, str_repeat('a', 64));
+    }
+
+    public function test_missing_durable_authorization_rejects_issue_without_writing(): void
+    {
+        $admin = $this->admin();
+        $this->actingAs($admin, 'platform')->postJson('/api/backoffice/company-idempotency/issue', ['operation' => 'company.create'])->assertUnauthorized();
+        self::assertSame(0, DB::table('company_idempotency_requests')->count());
+    }
+
+    private function authorizeSession(PlatformAdmin $admin): void
+    {
+        $marker = str_repeat('a', 64);
+        if (! DB::table('platform_session_authorizations')->where('binding_hash', hash('sha256', $marker))->exists()) {
+            (new PlatformSessionAuthority)->registerAfterMfa($admin->id, $marker, now()->addMinutes(10)->timestamp);
+        }
     }
 
     public function test_another_session_of_same_actor_cannot_status_revoke_or_mutate(): void

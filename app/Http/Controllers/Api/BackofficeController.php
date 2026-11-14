@@ -614,14 +614,13 @@ class BackofficeController extends Controller
         }
         $values = $request->headers->all('Idempotency-Key');
         abort_unless(count($values) === 1 && is_string($values[0]) && $values[0] !== '' && strlen($values[0]) <= 256, 422, 'Chave de idempotência inválida.');
+        $binding = (new PlatformSessionBinding)->current($request->session());
+        abort_unless($binding !== null, 503, 'Sessão indisponível.');
         try {
-            $settings = (new CompanyIdempotencyFactory)->build((array) config('company_idempotency', []));
+            $settings = (new CompanyIdempotencyFactory)->build((array) config('company_idempotency', []), $binding);
         } catch (InvalidArgumentException) {
             abort(503, 'Solicitação indisponível.');
         }
-
-        $binding = (new PlatformSessionBinding)->current($request->session());
-        abort_unless($binding !== null, 503, 'Sessão indisponível.');
         try {
             $token = $settings['session_keys']->unbindSession($values[0], $binding);
         } catch (InvalidArgumentException) {
