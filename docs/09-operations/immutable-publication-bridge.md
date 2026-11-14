@@ -139,13 +139,24 @@ ou o gate supervisionado de ativação.
 
 A entrada exige que `--source` seja o próprio checkout do executor e confere
 se os bytes versionados correspondem ao SHA. O núcleo de ativação repete o gate
-GitHub dentro dos locks e antes de alterar latch ou ponteiro. Em rollback, o
-SHA validado deve corresponder à geração atual e a política de compatibilidade
-de rollback continua obrigatória. Contexto GitHub ou token ausente bloqueia a
+GitHub dentro dos locks e antes de alterar latch ou ponteiro. Em rollback, o executor e a validação seguem vinculados à main atual,
+mesmo que esta tenha avançado após a geração ativa; os receipts, o ponteiro e
+a política explícita de compatibilidade continuam obrigatórios. Contexto GitHub ou token ausente bloqueia a
 ativação; ainda não existe transporte validado desse contexto ao host remoto.
 Uma alteração posterior ao último exame do GitHub não pode ser descartada apenas
 por locks locais. A prova Laravel simula o gate GitHub e não comprova sua operação
 remota nem a autorização do environment de produção.
+
+A entrada experimental deve ser chamada com `python3 -I`: antes de executar
+imports do projeto, compara o próprio arquivo e seus quatro módulos diretos com
+os blobs do SHA de `GITHUB_SHA`. Esse controle pressupõe launcher, interpretador,
+Git e filesystem de execução confiáveis; não é uma raiz de confiança contra
+substituição prévia do próprio launcher. O CLI de ativação também ainda precisa
+de um bootstrap independente antes de seus imports. Variáveis `GITHUB_*` e um
+token de leitura não provam identidade do job nem aprovação do environment; não
+há transporte autenticado desses dados para o host remoto neste protótipo.
+A guarda produtiva permanece fechada até esses pontos serem implementados e
+revisados, sem inferir aprovação a partir de variáveis controladas pelo operador.
 
 ## Evidência e limites
 

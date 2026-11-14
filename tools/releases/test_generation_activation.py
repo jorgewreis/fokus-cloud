@@ -50,6 +50,19 @@ class PublicationPolicy(unittest.TestCase):
                 with self.assertRaisesRegex(publication_gate.GateError,'stale'):
                     a.publication_gate_policy(candidate,previous,False)
 
+    def test_rollback_allows_current_main_after_release_changes(self):
+        import derived_assets
+        from types import SimpleNamespace
+        sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'deploy'))
+        import publication_gate
+        approved='c'*40
+        with patch.object(derived_assets,'source_snapshot',return_value=(approved,b'',{})), \
+             patch.object(publication_gate,'context',return_value=SimpleNamespace(sha=approved)), \
+             patch.object(publication_gate,'GitHub',return_value=object()), \
+             patch.object(publication_gate,'verify',return_value=(123,1)) as verify:
+            a.publication_gate_policy(Path('/synthetic/releases')/('a'*40),Path('/synthetic/releases')/('b'*40),True)
+            verify.assert_called_once()
+
 class Contract:
     canonical=staticmethod(lambda p:Path(p).resolve())
     lock=staticmethod(g.lock)

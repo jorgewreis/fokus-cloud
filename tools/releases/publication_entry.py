@@ -12,19 +12,57 @@ import re
 import subprocess
 import sys
 import tempfile
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'deploy'))
-import publication_gate
-import derived_assets
-import artifact_ssh
+import types
 
 EXECUTOR_ROOT = Path(__file__).resolve().parents[2]
+
+
+def load_dependencies(source, environment):
+    """Check local project code against the exact SHA before executing imports.
+
+    The launcher itself and the Git executable remain in the trust boundary.
+    """
+    if not sys.flags.isolated:
+        raise ValueError('isolated_python_required')
+    expected = environment.get('GITHUB_SHA', '')
+    if not re.fullmatch(r'[0-9a-f]{40}', expected):
+        raise ValueError('missing_executor_sha')
+    head = subprocess.check_output(['/usr/bin/git', '-C', str(source), 'rev-parse', '--verify', 'HEAD'],
+                                   text=True, stderr=subprocess.DEVNULL).strip()
+    if head != expected:
+        raise ValueError('executor_sha_mismatch')
+    names = (('preparation_guard', 'tools/releases/preparation_guard.py'),
+             ('publication_gate', 'deploy/publication_gate.py'),
+             ('derived_assets', 'tools/releases/derived_assets.py'),
+             ('artifact_ssh', 'tools/releases/artifact_ssh.py'))
+    verified = []
+    for name, relative in (('_launcher', 'tools/releases/publication_entry.py'), *names):
+        path = source / relative
+        if path != path.resolve(strict=True):
+            raise ValueError('executor_symlink')
+        committed = subprocess.check_output(['/usr/bin/git', '-C', str(source), 'show', head + ':' + relative],
+                                            stderr=subprocess.DEVNULL)
+        if path.read_bytes() != committed:
+            raise ValueError('executor_import_mismatch')
+        if name != '_launcher':
+            verified.append((name, path, committed))
+    modules = {}
+    for name, path, code in verified:
+        if name in sys.modules:
+            raise ValueError('executor_module_already_loaded')
+        module = types.ModuleType(name)
+        module.__file__ = str(path)
+        sys.modules[name] = module
+        exec(compile(code, str(path), 'exec'), module.__dict__)
+        modules[name] = module
+    return modules['publication_gate'], modules['derived_assets'], modules['artifact_ssh']
 
 
 def run(source, ssh_options, prepare, environment):
     source = Path(source).resolve(strict=True)
     if source != EXECUTOR_ROOT:
         raise ValueError('executor_source_mismatch')
+    publication_gate, derived_assets, artifact_ssh = load_dependencies(source, environment)
     revision, _, _ = derived_assets.source_snapshot(source)
     context = publication_gate.context(environment, revision)
     api = publication_gate.GitHub(context, environment.get('GH_TOKEN', ''))

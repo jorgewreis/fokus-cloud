@@ -119,7 +119,10 @@ def publication_gate_policy(candidate, previous, rollback):
     import publication_gate
     revision,_,_=derived_assets.source_snapshot(source)
     context=publication_gate.context(os.environ,revision)
-    g.require(context.sha==(previous.name if rollback else candidate.name),'publication_release_mismatch')
+    # A rollback may be needed after main advances: executor and validation
+    # still bind to current main, while previous/candidate are bound separately
+    # by receipts, current pointer, runtime policy and explicit rollback evidence.
+    if not rollback:g.require(context.sha==candidate.name,'publication_release_mismatch')
     api=publication_gate.GitHub(context,os.environ.get('GH_TOKEN',''))
     publication_gate.verify(context,api)
 

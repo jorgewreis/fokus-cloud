@@ -21,7 +21,33 @@ with patch.dict(sys.modules, {'derived_assets': derived, 'artifact_ssh': ssh}):
     spec = importlib.util.spec_from_file_location('publication_entry_test', MODULE)
     entry = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(entry)
+    sys.path.insert(0, str(MODULE.resolve().parents[2] / 'deploy'))
+    import publication_gate
+    entry.publication_gate = publication_gate
 
+
+class Bootstrap(unittest.TestCase):
+    def test_modified_import_is_rejected_before_any_project_code_runs(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = Path(temp)
+            paths = ('tools/releases/publication_entry.py', 'tools/releases/preparation_guard.py', 'deploy/publication_gate.py',
+                     'tools/releases/derived_assets.py', 'tools/releases/artifact_ssh.py')
+            for name in paths:
+                path = source / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b'raise RuntimeError("import executed")\n')
+            sha = 'a' * 40
+            def git(command, **kwargs):
+                return sha if 'rev-parse' in command else b'expected reviewed code\n'
+            with patch.object(entry.sys, 'flags', types.SimpleNamespace(isolated=1)), \
+                 patch.object(entry.subprocess, 'check_output', side_effect=git):
+                with self.assertRaisesRegex(ValueError, 'executor_import_mismatch'):
+                    entry.load_dependencies(source, {'GITHUB_SHA': sha})
+
+    def test_nonisolated_python_is_rejected(self):
+        with patch.object(entry.sys, 'flags', types.SimpleNamespace(isolated=0)):
+            with self.assertRaisesRegex(ValueError, 'isolated_python_required'):
+                entry.load_dependencies(Path('.'), {})
 
 class Entrypoint(unittest.TestCase):
     def setUp(self):
@@ -37,6 +63,9 @@ class Entrypoint(unittest.TestCase):
                          patch.object(entry.publication_gate, 'GitHub', return_value=object()),
                          patch.object(entry.publication_gate, 'verify', return_value=(123, 1))]
         self.mocks = [item.start() for item in self.patchers]
+        dependency_patch = patch.object(entry, 'load_dependencies', return_value=(publication_gate, derived, ssh))
+        dependency_patch.start()
+        self.addCleanup(dependency_patch.stop)
         for item in self.patchers: self.addCleanup(item.stop)
         derived.build.reset_mock(return_value=True, side_effect=True)
         derived.package.reset_mock(return_value=True, side_effect=True)
