@@ -168,6 +168,35 @@ class CompanyAdminTest extends TestCase
         $this->actingAs($admin, 'platform')->getJson('/api/backoffice/companies/'.$company)->assertForbidden();
     }
 
+    public function test_global_search_respects_permissions_for_each_result_group(): void
+    {
+        $admin = $this->platformAdmin();
+        $admin->update(['name' => 'Equipe Beta']);
+        $companyId = $this->companyFixture('Empresa Beta', '98765432000100', 'beta@example.test');
+        $productId = DB::table('products')->value('id');
+        DB::table('subscriptions')->insert([
+            'id' => PrefixedUlid::make('SUB'), 'company_id' => $companyId, 'product_id' => $productId, 'status' => 'ativa', 'open_company_product' => $companyId.'-'.$productId,
+            'version' => 1, 'billing_cycle' => 'monthly', 'created_by' => $admin->id, 'updated_by' => $admin->id, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/search?q=Beta')
+            ->assertOk()->assertJsonCount(1, 'groups.0.items')->assertJsonCount(2, 'groups.1.items')->assertJsonCount(1, 'groups.2.items');
+
+        foreach (['platform.companies.view', 'platform.users.view', 'platform.subscriptions.manage'] as $index => $permission) {
+            DB::table('platform_role_permissions')->where('platform_role_id', $admin->platform_role_id)
+                ->where('platform_permission_id', DB::table('platform_permissions')->where('code', $permission)->value('id'))->delete();
+            $response = $this->actingAs($admin, 'platform')->getJson('/api/backoffice/search?q=Beta')->assertOk();
+            foreach ([1, 2, 1] as $group => $count) {
+                $response->assertJsonCount($group <= $index ? 0 : $count, "groups.{$group}.items");
+            }
+        }
+
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/search?q=Beta')
+            ->assertOk()->assertJsonCount(0, 'groups.0.items')->assertJsonCount(0, 'groups.1.items')->assertJsonCount(0, 'groups.2.items')
+            ->assertJsonMissing(['title' => 'Empresa Beta'])->assertJsonMissing(['title' => 'Equipe Beta']);
+        $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.global_search']);
+    }
+
     private function platformAdmin(string $role = 'superadministrador'): PlatformAdmin
     {
         return PlatformAdmin::create([
