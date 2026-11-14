@@ -21,12 +21,20 @@ export async function mount(root, context = {}) {
     let loadSequence = 0;
     const refreshStatus = $("#company-refresh-status");
     const refreshPageStatus = $("#company-refresh-page-status");
+    const operationDrawerStatus = $("#company-operation-drawer-status");
+    const operationPageStatus = $("#company-operation-page-status");
     let refreshError = "";
+    let operationUnconfirmed = false;
     const syncRefreshStatus = (drawerOpen) => {
         refreshStatus.textContent = refreshError;
         refreshPageStatus.textContent = refreshError;
         refreshStatus.hidden = !refreshError || !drawerOpen;
         refreshPageStatus.hidden = !refreshError || drawerOpen;
+        const operationText = operationUnconfirmed ? "Não foi possível confirmar o resultado da operação anterior. Confira a lista antes de tentar novamente." : "";
+        operationDrawerStatus.textContent = operationText;
+        operationPageStatus.textContent = operationText;
+        operationDrawerStatus.hidden = !operationUnconfirmed || !drawerOpen;
+        operationPageStatus.hidden = !operationUnconfirmed || drawerOpen;
     };
     const drawerShown = () => syncRefreshStatus(true);
     const drawerHidden = () => syncRefreshStatus(false);
@@ -128,6 +136,10 @@ export async function mount(root, context = {}) {
         } catch (error) {
             const text = error.message || "Não foi possível salvar a empresa.";
             if (isPageActive() && session === drawerSession && drawerController.getState().mode && drawer.isConnected) showFormError(text);
+            else if (isPageActive()) {
+                operationUnconfirmed = true;
+                syncRefreshStatus(drawer.getAttribute("aria-hidden") === "false");
+            }
         } finally {
             submitting = false;
             submitButton.disabled = false;

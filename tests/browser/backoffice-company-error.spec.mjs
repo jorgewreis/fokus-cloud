@@ -105,6 +105,70 @@ const fakeCompany = {
     data_volume: {},
 };
 
+for (const method of ['POST', 'PATCH']) for (const reopen of [false, true]) {
+    test(`${method} falho após fechar mantém aviso seguro sem roubar foco, reabrir=${reopen}`, async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.route('**/*', (route) => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+        let release, markRequested;
+        const gate = new Promise((resolve) => { release = resolve; });
+        const requested = new Promise((resolve) => { markRequested = resolve; });
+        await page.route('**/api/backoffice/companies**', async (route) => {
+            const request = route.request();
+            if (request.method() === method) {
+                markRequested();
+                await gate;
+                return route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ message: 'DADO SENSÍVEL DA SESSÃO ANTERIOR' }) });
+            }
+            if (new URL(request.url()).pathname.endsWith('/CMP_TEST')) return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ company: fakeCompany }) });
+            return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: [fakeCompany], meta: { total: 1, current_page: 1, per_page: 15, last_page: 1 }, summary: {} }) });
+        });
+        await page.goto('/backoffice/empresas');
+        if (method === 'PATCH') {
+            await page.getByRole('button', { name: 'Editar empresa' }).click();
+            await page.locator('#company-legal-name').fill('Alteração sintética');
+        } else {
+            await page.locator('#company-create').click();
+            await page.locator('#company-document-number').fill('11222333000181');
+            await page.locator('#company-legal-name').fill('Empresa Exemplo');
+            await page.locator('#company-admin-name').fill('Admin Exemplo');
+            await page.locator('#company-admin-cpf').fill('52998224725');
+            await page.locator('#company-admin-email').fill('exemplo@example.test');
+            await page.locator('#company-admin-password').fill('SenhaExemplo123!');
+        }
+        await page.locator('#company-form-submit').click();
+        await requested;
+        await page.locator('#company-form-cancel').click();
+        await expect(page.locator('#company-drawer')).toBeHidden();
+        if (reopen) {
+            await page.locator('#company-create').click();
+            await page.locator('#company-legal-name').fill('Nova sessão');
+            await page.locator('#company-legal-name').focus();
+        } else {
+            await page.locator('#company-query').focus();
+        }
+        const focus = await page.evaluate(() => document.activeElement.id);
+        const response = page.waitForResponse((item) => item.request().method() === method && item.url().includes('/api/backoffice/companies'));
+        release();
+        await response;
+        const notice = page.locator(reopen ? '#company-operation-drawer-status' : '#company-operation-page-status');
+        await expect(notice).toBeVisible();
+        await expect(notice).toContainText('operação anterior');
+        await expect(notice).not.toContainText('DADO SENSÍVEL');
+        expect(await page.evaluate(() => document.activeElement.id)).toBe(focus);
+        await expect(page.locator('#company-form-error')).toBeHidden();
+        if (reopen) {
+            await expect(page.locator('#company-legal-name')).toHaveValue('Nova sessão');
+            await page.locator('#company-form-cancel').click();
+            await expect(page.locator('#company-operation-page-status')).toBeVisible();
+        }
+        await page.locator('#company-filter-form button[type=submit]').click();
+        await expect(page.locator('#company-operation-page-status')).toBeVisible();
+        await page.locator('#company-create').click();
+        await expect(page.locator('#company-operation-drawer-status')).toBeVisible();
+        await expect(page.locator('#company-form-error')).toBeHidden();
+    });
+}
+
 for (const [status, reopen] of [[200, false], [200, true], [422, true]]) {
     test(`PATCH tardio ${status} após fechamento, reabrir=${reopen}`, async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 900 });
