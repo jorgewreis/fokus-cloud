@@ -1,0 +1,29 @@
+<?php
+namespace App\Http\Controllers\Api { class ProductInterestController { const PRIVACY_VERSION = 'test'; } }
+namespace Illuminate\Contracts\Console { interface Kernel {} }
+namespace Illuminate\Support\Facades {
+    class DB {
+        public static function table($name) { return new FakeQuery($name); }
+        public static function statement($sql) {
+            file_put_contents(getenv('FAKE_LOG'), $sql."\n", FILE_APPEND);
+            if (str_starts_with($sql, 'CREATE TABLE') && getenv('FAKE_CASE') === 'table') throw new \RuntimeException('table occupied');
+        }
+        public static function purge() {}
+    }
+    class FakeQuery {
+        private $name;
+        private $ids = [];
+        public function __construct($name) { $this->name = $name; }
+        public function where(...$args) { return $this; }
+        public function whereIn($column, $ids) { $this->ids = $ids; return $this; }
+        public function exists() { return getenv('FAKE_CASE') === 'range'; }
+        public function delete() { file_put_contents(getenv('FAKE_LOG'), 'DELETE '.$this->name.' '.json_encode($this->ids)."\n", FILE_APPEND); }
+        public function insert($row) {
+            if ($this->name !== 'product_interests') return;
+            static $count = 0;
+            if (++$count === 2) throw new \RuntimeException('row occupied');
+            file_put_contents(getenv('FAKE_LOG'), 'INSERT '.$row['id']."\n", FILE_APPEND);
+        }
+    }
+}
+namespace { function now() { return 'synthetic'; } }

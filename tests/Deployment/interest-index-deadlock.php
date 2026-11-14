@@ -37,17 +37,24 @@ if (! mkdir($dir, 0700)) {
 $ballast = 'qa_interest_deadlock_'.$run;
 $ids = ['!'.$run, '"'.$run];
 $children = [];
+$ownsBallast = false;
+$ownedIds = [];
 try {
     if (DB::table('product_interests')->where('id', '<', $ids[1])->exists()) {
         throw new RuntimeException('fixture range is occupied');
     }
     DB::statement("CREATE TABLE `$ballast` (id INT PRIMARY KEY) ENGINE=InnoDB");
+    $ownsBallast = true;
     foreach (['backfill', 'writer'] as $victim) {
-        DB::table('product_interests')->whereIn('id', $ids)->delete();
+        if ($ownedIds) {
+            DB::table('product_interests')->whereIn('id', $ownedIds)->delete();
+            $ownedIds = [];
+        }
         DB::table($ballast)->delete();
         DB::table($ballast)->insert([['id' => 1000], ['id' => 1001]]);
         foreach ($ids as $i => $id) {
             DB::table('product_interests')->insert(['id' => $id, 'name' => 'Synthetic', 'email' => "qa-deadlock-$i-$run@example.test", 'products' => '["legacy"]', 'profiles' => '[]', 'privacy_version' => ProductInterestController::PRIVACY_VERSION, 'status' => 'novo', 'consented_at' => now(), 'last_submitted_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+            $ownedIds[] = $id;
         }
         $expectedCount = DB::table('product_interests')->count();
         DB::purge();
@@ -156,8 +163,12 @@ try {
         pcntl_waitpid($pid, $status);
     }
     DB::purge();
-    DB::table('product_interests')->whereIn('id', $ids)->delete();
-    DB::statement("DROP TABLE IF EXISTS `$ballast`");
+    if ($ownedIds) {
+        DB::table('product_interests')->whereIn('id', $ownedIds)->delete();
+    }
+    if ($ownsBallast) {
+        DB::statement("DROP TABLE `$ballast`");
+    }
     foreach (glob($dir.'/*') ?: [] as $path) {
         unlink($path);
     }
