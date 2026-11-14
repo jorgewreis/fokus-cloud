@@ -210,6 +210,7 @@ export async function mount(root, context = {}) {
         const { userAction, userId } = button.dataset;
         if (userAction === "details" || userAction === "edit") { await openUser(userId, button.closest("tr").dataset.accountType, userAction === "edit" ? "edit" : "view"); return; }
         if (!actionLabels[userAction]) return;
+        ++detailVersion;
         pendingAction = { action: userAction, id: userId };
         $("#user-action-title").textContent = actionLabels[userAction][0]; $("#user-action-description").textContent = actionLabels[userAction][1]; $("#user-action-reason").value = ""; modal?.show?.(); $("#user-action-reason").focus();
     });
