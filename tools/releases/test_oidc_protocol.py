@@ -129,6 +129,12 @@ class Protocol(unittest.TestCase):
                     child_pid=int(found[0]);break
                 time.sleep(.01)
             self.assertIsNotNone(child_pid,'fixture child did not start')
+            # The protocol parent and its forked child share one held slot.
+            with ExitStack() as stack:
+                for _ in range(protocol.protocol_slots.SLOTS-1):
+                    stack.enter_context(protocol.protocol_slots.acquire(self.slot_dir))
+                with self.assertRaisesRegex(ValueError,'protocol_capacity_exhausted'):
+                    with protocol.protocol_slots.acquire(self.slot_dir): pass
             process.send_signal(signal.SIGKILL);process.wait(timeout=3)
             released=False
             deadline=time.monotonic()+4
