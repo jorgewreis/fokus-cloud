@@ -2056,3 +2056,23 @@ html[data-role="admin"] .fs-sidebar .sidebar-button:focus-visible {
         flex: 1 1 0;
     }
 }
+
+/* Keep desktop content interactive while the hover/focus sidebar is open. */
+@media (min-width: 701px) and (max-width: 1919px) {
+    html[data-role="admin"] .container-page .fs-sidebar.expanded ~ .container-content {
+        left: 248px !important;
+        width: calc(100% - 248px) !important;
+    }
+    html[data-role="admin"] .container-page .fs-sidebar.expanded ~ .container-content .admin-final-header {
+        grid-template-columns: minmax(0, 1fr) auto !important;
+    }
+    html[data-role="admin"] .container-page .fs-sidebar.expanded ~ .container-content .admin-global-search {
+        min-width: 0;
+    }
+}
+
+/* Financial sections must shrink when desktop navigation is expanded. */
+html[data-role="admin"] .backoffice-records-page :is(#billing-payments-panel, #billing-reconciliation-panel, #billing-refunds-panel) {
+    min-width: 0;
+    max-width: 100%;
+}

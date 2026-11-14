@@ -160,3 +160,25 @@ test('filtro e paginação permanecem visíveis em larguras estreitas', async ({
         if (width === 320 || width === 1440) await page.screenshot({ path: `test-results/interest-${width}.png`, fullPage: true });
     }
 });
+
+for (const width of [768, 1280, 1440]) test(`controles acessíveis com a barra lateral aberta em ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 720 });
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { role: 'superadministrador', name: 'Teste', permissions: ['platform.product_interests.manage'] } } }));
+    await page.route('**/api/backoffice/product-interests-options?*', route => {
+        const current = Number(new URL(route.request().url()).searchParams.get('page'));
+        return route.fulfill({ json: { products: [{ code: `p${current}`, name: `Produto ${current}` }], meta: { current_page: current, has_more: current === 1 }, historical_index_ready: true } });
+    });
+    await page.route('**/api/backoffice/product-interests?*', route => route.fulfill({ json: { data: [], meta: { total: 0, current_page: 1, last_page: 1 } } }));
+    await page.goto('/backoffice/interesses');
+    await page.locator('#sidebar [data-sidebar-item="companies"]').hover();
+    await expect(page.locator('#sidebar')).toHaveClass(/expanded/);
+    const search = await page.locator('.admin-global-search').boundingBox();
+    const account = await page.locator('.admin-header-user').boundingBox();
+    expect(search.x + search.width).toBeLessThanOrEqual(account.x + 1);
+    expect(account.x + account.width).toBeLessThanOrEqual(width + 1);
+    const button = page.getByRole('button', { name: 'Mais produtos' });
+    await expect(button).toBeVisible();
+    await page.screenshot({ path: `test-results/sidebar-open-${width}.png` });
+    await button.click({ timeout: 5000 });
+    await expect(page.locator('#interest-product-options option')).toHaveAttribute('value', 'p2');
+});
