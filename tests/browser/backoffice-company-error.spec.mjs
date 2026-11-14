@@ -311,3 +311,140 @@ test('atualização tardia da lista não altera nova montagem após navegação'
     await expect(page.locator('#company-list')).toContainText('Nova montagem');
     await expect(page.locator('#company-list')).not.toContainText('Resposta obsoleta');
 });
+
+test('resposta antiga da atualização não substitui resultado de filtro mais recente', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.route('**/*', (route) => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+    let releasePost;
+    let releaseOldList;
+    let postStarted;
+    let oldListStarted;
+    const postGate = new Promise((resolve) => { releasePost = resolve; });
+    const listGate = new Promise((resolve) => { releaseOldList = resolve; });
+    const postRequest = new Promise((resolve) => { postStarted = resolve; });
+    const oldListRequest = new Promise((resolve) => { oldListStarted = resolve; });
+    let listRequests = 0;
+    await page.route('**/api/backoffice/companies**', async (route) => {
+        if (route.request().method() === 'POST') {
+            postStarted();
+            await postGate;
+            return route.fulfill({ status: 201, contentType: 'application/json', body: '{}' });
+        }
+        listRequests++;
+        const sequence = listRequests;
+        if (sequence === 2) { oldListStarted(); await listGate; }
+        const name = sequence === 2 ? 'Resultado antigo' : sequence === 3 ? 'Resultado novo' : 'Inicial';
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: [{ ...fakeCompany, legal_name: name }], meta: { total: 1, current_page: 1, per_page: 15, last_page: 1 }, summary: {} }) });
+    });
+    await page.goto('/backoffice/empresas');
+    await page.locator('#company-create').click();
+    await page.locator('#company-document-number').fill('11222333000181');
+    await page.locator('#company-legal-name').fill('Empresa Exemplo');
+    await page.locator('#company-admin-name').fill('Admin Exemplo');
+    await page.locator('#company-admin-cpf').fill('52998224725');
+    await page.locator('#company-admin-email').fill('exemplo@example.test');
+    await page.locator('#company-admin-password').fill('SenhaExemplo123!');
+    await page.locator('#company-form-submit').click();
+    await postRequest;
+    await page.locator('#company-form-cancel').click();
+    await expect(page.locator('#company-drawer')).toBeHidden();
+    releasePost();
+    await oldListRequest;
+    await page.locator('#company-query').fill('novo');
+    await page.locator('#company-filter-form').getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page.locator('#company-list')).toContainText('Resultado novo');
+    const oldResponse = page.waitForResponse((response) => response.request().method() === 'GET' && response.url().includes('/companies?') && !response.url().includes('q='));
+    releaseOldList();
+    await oldResponse;
+    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    await expect(page.locator('#company-list')).toContainText('Resultado novo');
+    await expect(page.locator('#company-list')).not.toContainText('Resultado antigo');
+});
+
+test('falha de atualização informa no drawer sem roubar foco e limpa após nova consulta', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 900 });
+    await page.route('**/*', (route) => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+    let releasePost;
+    let postStarted;
+    const postGate = new Promise((resolve) => { releasePost = resolve; });
+    const postRequest = new Promise((resolve) => { postStarted = resolve; });
+    let listRequests = 0;
+    await page.route('**/api/backoffice/companies**', async (route) => {
+        if (route.request().method() === 'POST') {
+            postStarted();
+            await postGate;
+            return route.fulfill({ status: 201, contentType: 'application/json', body: '{}' });
+        }
+        listRequests++;
+        if (listRequests === 2) return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Falha sintética' }) });
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: [], meta: { total: 0, current_page: 1, per_page: 15, last_page: 1 }, summary: {} }) });
+    });
+    await page.goto('/backoffice/empresas');
+    await page.locator('#company-create').click();
+    await page.locator('#company-document-number').fill('11222333000181');
+    await page.locator('#company-legal-name').fill('Empresa Exemplo');
+    await page.locator('#company-admin-name').fill('Admin Exemplo');
+    await page.locator('#company-admin-cpf').fill('52998224725');
+    await page.locator('#company-admin-email').fill('exemplo@example.test');
+    await page.locator('#company-admin-password').fill('SenhaExemplo123!');
+    await page.locator('#company-form-submit').click();
+    await postRequest;
+    await page.locator('#company-form-cancel').click();
+    await expect(page.locator('#company-drawer')).toBeHidden();
+    await page.evaluate(() => {
+        window.__companyDrawerShown = false;
+        document.querySelector('#company-create').addEventListener('fs:shown', () => { window.__companyDrawerShown = true; }, { once: true });
+    });
+    await page.locator('#company-create').click();
+    await page.waitForFunction(() => window.__companyDrawerShown === true);
+    await page.locator('#company-legal-name').click();
+    await expect(page.locator('#company-legal-name')).toBeFocused();
+    releasePost();
+    const status = page.locator('#company-refresh-status');
+    await expect(status).toBeVisible();
+    await expect(status).toHaveAttribute('role', 'status');
+    await expect(status).toContainText('Não foi possível atualizar a lista');
+    await expect(page.locator('#company-legal-name')).toBeFocused();
+    await expect(page.locator('.fs-backoffice-toast')).toHaveCount(0);
+    await expect(page.locator('#company-form-submit')).toBeEnabled();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#company-drawer')).toBeHidden();
+    await page.locator('#company-filter-form').getByRole('button', { name: 'Filtrar' }).click();
+    await expect(status).toBeHidden();
+});
+
+test('falha de atualização com drawer fechado mostra aviso sem alterar o foco', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.route('**/*', (route) => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+    let releasePost;
+    let postStarted;
+    const postGate = new Promise((resolve) => { releasePost = resolve; });
+    const postRequest = new Promise((resolve) => { postStarted = resolve; });
+    let listRequests = 0;
+    await page.route('**/api/backoffice/companies**', async (route) => {
+        if (route.request().method() === 'POST') {
+            postStarted();
+            await postGate;
+            return route.fulfill({ status: 201, contentType: 'application/json', body: '{}' });
+        }
+        listRequests++;
+        if (listRequests === 2) return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Falha sintética' }) });
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: [], meta: { total: 0, current_page: 1, per_page: 15, last_page: 1 }, summary: {} }) });
+    });
+    await page.goto('/backoffice/empresas');
+    await page.locator('#company-create').click();
+    await page.locator('#company-document-number').fill('11222333000181');
+    await page.locator('#company-legal-name').fill('Empresa Exemplo');
+    await page.locator('#company-admin-name').fill('Admin Exemplo');
+    await page.locator('#company-admin-cpf').fill('52998224725');
+    await page.locator('#company-admin-email').fill('exemplo@example.test');
+    await page.locator('#company-admin-password').fill('SenhaExemplo123!');
+    await page.locator('#company-form-submit').click();
+    await postRequest;
+    await page.locator('#company-form-cancel').click();
+    await expect(page.locator('#company-drawer')).toBeHidden();
+    await expect(page.locator('#company-create')).toBeFocused();
+    releasePost();
+    await expect(page.locator('.fs-backoffice-toast')).toContainText('Não foi possível atualizar a lista');
+    await expect(page.locator('#company-create')).toBeFocused();
+});
