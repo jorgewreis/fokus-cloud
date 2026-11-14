@@ -4,11 +4,13 @@ namespace Tests\Feature;
 
 use App\Services\CompanyIdempotencyAuthorization;
 use App\Services\CompanyIdempotencyKeys;
+use App\Services\CompanyIdempotencyMutation;
 use App\Services\CompanyIdempotencyStore;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
@@ -234,6 +236,82 @@ class CompanyIdempotencyStoreTest extends TestCase
             self::assertStringContainsString('Automatic rollback', $e->getMessage());
         }
         self::assertTrue(Schema::hasTable('company_idempotency_requests'));
+    }
+
+    public function test_update_rejects_a_result_for_a_different_company_and_rolls_back(): void
+    {
+        $store = $this->store();
+        $token = $store->issue('admin-a', 'company.update', 600);
+        $store->bind($token, 'admin-a', 'company.update', 'EMP-target', ['version' => 1], now()->getTimestamp());
+        try {
+            $store->complete($token, 'admin-a', 'company.update', 'EMP-target', ['version' => 1], function (): array {
+                DB::table('synthetic_effects')->insert(['id' => 'wrong-target']);
+
+                return ['id' => 'EMP-other', 'status' => 200];
+            });
+            self::fail('A result belonging to another target must be rejected.');
+        } catch (InvalidArgumentException) {
+            self::assertSame(0, DB::table('synthetic_effects')->count());
+            self::assertSame('bound', DB::table('company_idempotency_requests')->value('state'));
+        }
+    }
+
+    public function test_completed_record_with_inconsistent_status_is_not_replayed(): void
+    {
+        $store = $this->store();
+        $token = $store->issue('admin-a', 'company.create', 600);
+        $store->bind($token, 'admin-a', 'company.create', null, [], now()->getTimestamp());
+        $store->complete($token, 'admin-a', 'company.create', null, [], fn () => ['id' => 'EMP-synthetic', 'status' => 201]);
+        DB::table('company_idempotency_requests')->update(['result_status' => 200]);
+        try {
+            $store->bind($token, 'admin-a', 'company.create', null, [], now()->getTimestamp());
+            self::fail('Inconsistent success must not be replayed.');
+        } catch (HttpException $e) {
+            self::assertSame(503, $e->getStatusCode());
+        }
+    }
+
+    public function test_completed_replay_does_not_repeat_preflight_or_writer(): void
+    {
+        $store = $this->store();
+        $token = $store->issue('admin-a', 'company.create', 600);
+        $store->bind($token, 'admin-a', 'company.create', null, [], now()->getTimestamp());
+        $store->complete($token, 'admin-a', 'company.create', null, [], fn () => ['id' => 'EMP-synthetic', 'status' => 201]);
+        $never = fn () => throw new RuntimeException('Unexpected repeated work');
+        $result = (new CompanyIdempotencyMutation($store))->run($token, 'admin-a', 'company.create', null, [], $never, $never);
+        self::assertSame(['id' => 'EMP-synthetic', 'status' => 201], $result);
+    }
+
+    public function test_preflight_failure_rechecks_completion_from_another_request(): void
+    {
+        $store = $this->store();
+        $token = $store->issue('admin-a', 'company.create', 600);
+        $preflight = function () use ($store, $token): void {
+            $store->complete($token, 'admin-a', 'company.create', null, [], function (): array {
+                DB::table('synthetic_effects')->insert(['id' => 'EMP-synthetic']);
+
+                return ['id' => 'EMP-synthetic', 'status' => 201];
+            });
+            throw new RuntimeException('Synthetic preflight failure');
+        };
+        $writer = fn () => throw new RuntimeException('Writer must not repeat');
+        $result = (new CompanyIdempotencyMutation($store))->run($token, 'admin-a', 'company.create', null, [], $preflight, $writer);
+        self::assertSame(['id' => 'EMP-synthetic', 'status' => 201], $result);
+        self::assertSame(1, DB::table('synthetic_effects')->count());
+    }
+
+    public function test_preflight_failure_without_completion_never_claims_success(): void
+    {
+        $store = $this->store();
+        $token = $store->issue('admin-a', 'company.create', 600);
+        try {
+            (new CompanyIdempotencyMutation($store))->run($token, 'admin-a', 'company.create', null, [], fn () => throw new RuntimeException('Synthetic failure'), fn () => ['id' => 'EMP-synthetic', 'status' => 201]);
+            self::fail('Preflight failure must not be treated as success.');
+        } catch (RuntimeException $e) {
+            self::assertSame('Synthetic failure', $e->getMessage());
+        }
+        self::assertSame('bound', DB::table('company_idempotency_requests')->value('state'));
+        self::assertSame(0, DB::table('synthetic_effects')->count());
     }
 
     private function store(): CompanyIdempotencyStore
