@@ -57,12 +57,24 @@ def validate_selection(path: Path, *, profile: str, source_sha: str,
     if set(observed) != set(required):
         raise ValueError("Missing nominal case")
 
-    # Suites without testcase children can still signal process-level failure.
-    for suite in root.iter("testsuite"):
-        for attribute in ("failures", "errors", "skipped"):
+    # Both JUnit container types may report failures without a testcase, and
+    # nested suites can disagree with their children. Never trust only the
+    # leaf cases or the top-level summary.
+    for suite in root.iter():
+        if suite.tag not in {"testsuites", "testsuite"}:
+            continue
+        for attribute in ("failures", "errors", "skipped", "disabled"):
             value = suite.get(attribute, "0")
             if not value.isascii() or not value.isdigit() or int(value) != 0:
                 raise ValueError("Suite reports a failure, error or skip")
+        if any(suite.find(kind) is not None for kind in ("failure", "error", "skipped")):
+            raise ValueError("Suite contains a failure, error or skip")
+        descendants = suite.findall(".//testcase")
+        for attribute, expected in (("tests", len(descendants)),
+                                    ("assertions", sum(int(case.get("assertions")) for case in descendants))):
+            value = suite.get(attribute)
+            if value is not None and (not value.isascii() or not value.isdigit() or int(value) != expected):
+                raise ValueError("Suite total does not match its cases")
     return {"profile": profile, "source_sha": source_sha,
             "junit_sha256": hashlib.sha256(data).hexdigest(),
             "cases": len(observed), "assertions": sum(observed.values()),
