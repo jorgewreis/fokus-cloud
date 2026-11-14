@@ -27,10 +27,33 @@ COMPOSER = ["composer", "install", "--no-interaction", "--no-plugins", "--no-scr
 
 
 def validate_context(*, ci: str | None, opt_in: str | None, platform: str,
-                     github_sha: str | None, candidate_sha: str) -> None:
+                     github_sha: str | None, candidate_sha: str,
+                     event_name: str = "workflow_dispatch", event: object = None,
+                     repository: str | None = None, github_ref: str | None = None) -> None:
     if (ci != "true" or opt_in != "1" or platform != "posix"
-            or not re.fullmatch(r"[0-9a-f]{40}", candidate_sha) or github_sha != candidate_sha):
+            or not re.fullmatch(r"[0-9a-f]{40}", candidate_sha)
+            or not isinstance(github_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", github_sha)
+            or repository != "jorgewreis/fokus-cloud"):
         raise ValueError("Exact candidate and disposable Linux CI required")
+    if event_name == "workflow_dispatch":
+        if github_sha != candidate_sha:
+            raise ValueError("Dispatch commit differs from candidate")
+        return
+    if event_name != "pull_request" or github_ref != "refs/pull/99/merge":
+        raise ValueError("Unapproved PR execution context")
+    if not isinstance(event, dict) or event.get("action") != "labeled":
+        raise ValueError("Explicit PR label event required")
+    pr, label = event.get("pull_request"), event.get("label")
+    if not isinstance(pr, dict) or not isinstance(label, dict) or type(pr.get("number")) is not int or pr["number"] != 99:
+        raise ValueError("Unexpected PR or label")
+    head, base = pr.get("head"), pr.get("base")
+    if (not isinstance(head, dict) or not isinstance(base, dict)
+            or not isinstance(head.get("repo"), dict) or not isinstance(base.get("repo"), dict)
+            or head["repo"].get("full_name") != repository or base["repo"].get("full_name") != repository
+            or head.get("ref") != "codex/idempotency-harness-20261114"
+            or base.get("ref") != "codex/company-idempotency-core-20261114"
+            or head.get("sha") != candidate_sha or label.get("name") != "lab-" + candidate_sha):
+        raise ValueError("PR source, base, label or exact head not approved")
 
 
 def validate_runtime(image_id: str, inspected: object) -> None:
@@ -88,8 +111,17 @@ def main() -> None:
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
+    event_name = os.environ.get("GITHUB_EVENT_NAME", "")
+    event = None
+    if event_name == "pull_request":
+        event_path = Path(os.environ.get("GITHUB_EVENT_PATH", ""))
+        if event_path.is_symlink() or not event_path.is_file():
+            raise RuntimeError("GitHub PR event file required")
+        event = json.loads(event_path.read_bytes())
     validate_context(ci=os.environ.get("CI"), opt_in=os.environ.get("RELEASE_DISPOSABLE_TESTS"),
-                     platform=os.name, github_sha=os.environ.get("GITHUB_SHA"), candidate_sha=args.candidate_sha)
+                     platform=os.name, github_sha=os.environ.get("GITHUB_SHA"), candidate_sha=args.candidate_sha,
+                     event_name=event_name, event=event, repository=os.environ.get("GITHUB_REPOSITORY"),
+                     github_ref=os.environ.get("GITHUB_REF"))
     if not args.execute:
         raise RuntimeError("Explicit --execute required")
     source, profiles = checked_source(args.candidate_sha)
