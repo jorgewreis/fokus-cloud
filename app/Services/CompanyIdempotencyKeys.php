@@ -49,6 +49,18 @@ final class CompanyIdempotencyKeys
     /** @return array{kid:string,issued_at:int,expires_at:int} */
     public function verify(string $token, string $actor, string $operation, int $now, int $allowedClockSkewSeconds = 0): array
     {
+        return $this->verifyToken($token, $actor, $operation, $now, $allowedClockSkewSeconds, 0);
+    }
+
+    /** Verify a token for status only, within seven days following its expiry. */
+    public function verifyForStatus(string $token, string $actor, string $operation, int $now, int $allowedClockSkewSeconds = 0): array
+    {
+        return $this->verifyToken($token, $actor, $operation, $now, $allowedClockSkewSeconds, 604800);
+    }
+
+    /** @return array{kid:string,issued_at:int,expires_at:int} */
+    private function verifyToken(string $token, string $actor, string $operation, int $now, int $allowedClockSkewSeconds, int $statusGraceSeconds): array
+    {
         $this->validateContext($actor, $operation);
         if (strlen($token) > 256 || $now < 0 || $allowedClockSkewSeconds < 0 || $allowedClockSkewSeconds > 300) {
             throw new InvalidArgumentException('Invalid token.');
@@ -62,7 +74,7 @@ final class CompanyIdempotencyKeys
         $iat = (int) $issued;
         $exp = (int) $expires;
         if (! isset($this->keys[$kid]) || in_array($kid, $this->revokedKids, true) || $iat > $now + $allowedClockSkewSeconds
-            || $exp <= $iat || $exp - $iat > 86400 || $now >= $exp || strlen(self::decode($nonce)) !== 16 || strlen(self::decode($signature)) !== 32) {
+            || $exp <= $iat || $exp - $iat > 86400 || $now >= $exp + $statusGraceSeconds || strlen(self::decode($nonce)) !== 16 || strlen(self::decode($signature)) !== 32) {
             throw new InvalidArgumentException('Invalid token.');
         }
         $prefix = implode('.', array_slice($parts, 0, 5));
