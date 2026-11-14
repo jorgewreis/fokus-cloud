@@ -1,7 +1,8 @@
 # Imagem de 25/11 — confirmação de contato atualizado
 
-**Estado:** proposta para revisão. Instagram @fokus.cloud, 25/11/2026 às 10h,
-America/Bahia. Não aprovada nem agendada.
+**Estado:** imagem e legenda aprovadas. Agendamento confirmado no Metricool
+para Instagram @fokus.cloud em 25/11/2026 às 10h, America/Bahia; publicação
+automática pendente, ID `428437808`.
 
 **Objetivo:** oferecer um lembrete prático para confirmar uma mudança de
 contato antes de usá-la no próximo atendimento. **Público:** profissionais e
@@ -34,13 +35,14 @@ ao lado de uma ficha cenográfica em uma mesa de trabalho.
 
 ## Sugestão de legenda
 
-O cliente informou um novo telefone. Antes de registrar a mudança, como sua
-equipe confirma que aquele será o contato usado no próximo atendimento?
+O cliente informou um novo telefone. Antes de registrar a mudança, sua equipe
+confirma que aquele será o contato usado no próximo atendimento?
 
 
-Atualizar uma informação sem conferir a origem pode criar ruído quando outra
-pessoa precisa retomar a conversa. Uma pausa breve ajuda a manter a referência
-do escritório coerente com o que foi combinado.
+Uma informação nova pode chegar por conversa, mensagem ou retorno posterior.
+Antes de atualizar a referência do escritório, vale parar um instante para
+conferir a origem e evitar que a próxima pessoa da equipe trabalhe com um
+contato incorreto.
 
 
 Use este lembrete:
@@ -64,9 +66,7 @@ Salve este lembrete para a próxima atualização de contato.
 
 #FokusLaw #FokusCloud #Advocacia #GestãoJurídica #RotinaJurídica
 
-## Pendências
+## Acompanhamento
 
-- Revisar e aprovar texto da arte, legenda, descrição acessível e direção
-  visual.
-- Produzir uma imagem a partir do briefing e verificar leitura em tela pequena.
-- Consultar o Metricool novamente antes de qualquer agendamento.
+- Monitorar no Metricool o estado da publicação automática pendente. O
+  agendamento foi autorizado expressamente nesta conversa.
