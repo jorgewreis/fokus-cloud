@@ -1279,6 +1279,31 @@ for (const result of ['success', 'network-error']) {
     });
 }
 
+for (const operation of ['save', 'activate']) {
+    test(`plano mantém bloqueio após HTTP 408 em ${operation}`, async ({ page }) => {
+        let requests = 0;
+        await page.route('**/api/backoffice/plans', async (route) => {
+            const response = await route.fetch();
+            const data = await response.json();
+            await route.fulfill({ response, json: data.map((plan) => ({ ...plan, status: 'inativo', publication_state: 'pausado' })) });
+        });
+        const url = operation === 'save' ? '**/api/backoffice/catalog/plans/PLN_1' : '**/api/backoffice/catalog/plans/PLN_1/activate';
+        await page.route(url, async (route) => { requests += 1; await route.fulfill({ status: 408, json: { message: 'Tempo esgotado.' } }); });
+        await page.goto('/backoffice/planos');
+        if (operation === 'save') {
+            await page.getByRole('button', { name: 'Editar plano' }).click();
+            await page.locator('#plan-form-submit').click();
+            await expect(page.locator('#plan-form-submit')).toBeDisabled();
+            await page.locator('#plan-form').evaluate((form) => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+        } else {
+            await page.locator('#plan-list [data-plan-action="activate"]').click();
+            await expect(page.locator('#plan-list [data-plan-action="activate"]')).toBeDisabled();
+        }
+        await expect(page.locator('#plans-message')).toContainText('Confira a situação do plano');
+        expect(requests).toBe(1);
+    });
+}
+
 test('salvar plano permite corrigir e reenviar após rejeição HTTP', async ({ page }) => {
     let requests = 0;
     await page.route('**/api/backoffice/plans', async (route) => {

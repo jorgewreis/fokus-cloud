@@ -1,5 +1,6 @@
 import { createRecordsDrawer } from "./records-drawer.js";
 
+const isUncertainResult = (error) => !error.status || error.status === 408 || error.status >= 500;
 const planActionStates = new Map();
 let planSaveState = null;
 const planActionListeners = new Set();
@@ -102,7 +103,7 @@ export async function mount(root, context = {}) {
             planSaveState = null;
             showMessage("Plano salvo. Ative, publique o plano e republique o catálogo em Produtos.", "success");
         } catch (error) {
-            if (!error.status || error.status >= 500) planSaveState = "uncertain";
+            if (isUncertainResult(error)) planSaveState = "uncertain";
             else {
                 planSaveState = null;
                 if (live()) { window.FokusForm?.mapServerErrors(form, error.errors); showMessage(error.message || "Não foi possível salvar o plano."); }
@@ -138,9 +139,9 @@ export async function mount(root, context = {}) {
             planActionStates.delete(id);
             if (live()) showMessage(type === "activate" ? "Plano ativado. Publique o plano e o catálogo." : type === "publish" ? `Plano publicado na versão ${response.release_version || `v${Number(response.published_version)}.0`}. Publique também o catálogo em Produtos.` : type === "pause" ? "Plano pausado. O catálogo está pendente de republicação." : type === "archive" ? "Plano arquivado." : "Plano excluído.", "success");
         } catch (error) {
-            if (!error.status || error.status >= 500) planActionStates.set(id, "uncertain");
+            if (isUncertainResult(error)) planActionStates.set(id, "uncertain");
             else planActionStates.delete(id);
-            if (live() && error.status && error.status < 500) showMessage(error.message || "Não foi possível concluir a ação.");
+            if (live() && !isUncertainResult(error)) showMessage(error.message || "Não foi possível concluir a ação.");
         } finally {
             state.actionRunning = false;
             if (trigger) { trigger.disabled = planActionStates.has(id); trigger.removeAttribute("aria-busy"); }
