@@ -26,6 +26,8 @@ SHA = re.compile(r"[0-9a-f]{40}\Z")
 UUID = re.compile(r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\Z")
 CONTAINER_ID = re.compile(r"[0-9a-f]{64}\Z")
 PASSWORD = "security-test-only"
+BLOCKED_FUNCTIONS = ("curl_exec,curl_multi_exec,fsockopen,pfsockopen,stream_socket_client,"
+                     "socket_connect,exec,shell_exec,system,passthru,popen,proc_open,pcntl_exec")
 
 # These are independent evidence, not additional main-suite cases. Minimums
 # are provisional; the release gate must adopt measured individual minima.
@@ -83,6 +85,13 @@ def junit_config() -> bytes:
     for file in FILES:
         ET.SubElement(suite, "file").text = file
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+
+def php_prefix() -> list[str]:
+    # Stream handler construction is needed for Laravel Http::fake. The
+    # auto-prepend guard removes network wrappers and verifies all functions.
+    return ["php", "-d", "allow_url_fopen=1", "-d", "disable_functions=" + BLOCKED_FUNCTIONS,
+            "-d", "auto_prepend_file=/workspace/tests/Deployment/idempotency-http-guard.php"]
 
 
 def validate_volume(volume: object) -> None:
@@ -214,9 +223,14 @@ def main() -> None:
         # Discard inherited container environment, including alternate config
         # and database URL variables, before bootstrapping Laravel.
         flags = [key + "=" + value for key, value in env.items()]
+        transport = docker("exec", "--user", "1000:1000", "-w", "/workspace", runner,
+                           "env", "-i", *flags, *php_prefix(),
+                           "/workspace/tests/Deployment/idempotency-http-preflight.php", check=False)
+        (args.report / "http-preflight.log").write_bytes(transport.stdout + transport.stderr)
+        if transport.returncode != 0:
+            raise RuntimeError("Fake transport or unmocked HTTP preflight failed")
         result = docker("exec", "--user", "1000:1000", "-w", "/workspace", runner,
-                        "env", "-i", *flags, "php", "-d", "allow_url_fopen=0", "-d",
-                        "disable_functions=curl_exec,curl_multi_exec,fsockopen,pfsockopen,stream_socket_client,socket_connect,exec,shell_exec,system,passthru,popen,proc_open",
+                        "env", "-i", *flags, *php_prefix(),
                         "/workspace/vendor/phpunit/phpunit/phpunit", "--configuration", "/tmp/idempotency-phpunit.xml",
                         "--log-junit", "/tmp/idempotency-junit.xml", "--colors=never", "--do-not-cache-result", check=False)
         (args.report / "phpunit.log").write_bytes(result.stdout + result.stderr)
