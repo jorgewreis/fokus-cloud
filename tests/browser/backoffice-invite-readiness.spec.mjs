@@ -2,15 +2,20 @@ import { test, expect } from '@playwright/test';
 
 test('convite aguarda o handler com import pendente e funciona após remontar a página', async ({ page }) => {
     let releaseImport;
+    let markImportRequested;
     const importGate = new Promise((resolve) => { releaseImport = resolve; });
+    const importRequested = new Promise((resolve) => { markImportRequested = resolve; });
     await page.route('**/backoffice/assets/js/users-page.js*', async (route) => {
+        markImportRequested();
         await importGate;
         await route.continue();
     });
     try {
         await page.goto('/backoffice/usuarios');
-        await expect(page.locator('#user-invite')).toBeVisible();
-        await expect(page.locator('#user-invite')).toBeDisabled();
+        await importRequested;
+        await expect(page.getByRole('status')).toContainText('Carregando página');
+        await expect(page.locator('#user-invite')).toHaveCount(0);
+        await expect(page.locator('#user-drawer')).toHaveCount(0);
     } finally {
         releaseImport();
     }
