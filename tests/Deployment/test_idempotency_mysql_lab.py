@@ -71,17 +71,44 @@ class LaboratoryPreflightTest(unittest.TestCase):
                    MAIL_MAILER="array")
         with tempfile.TemporaryDirectory() as directory:
             proof = Path(directory) / "proof.php"
-            proof.write_text('<?php echo json_encode(stream_get_wrappers());', encoding="utf-8")
+            proof.write_text('<?php echo json_encode(["wrappers" => stream_get_wrappers(), '
+                             '"restore" => function_exists("stream_wrapper_restore"), '
+                             '"register" => function_exists("stream_wrapper_register")]);', encoding="utf-8")
             def run(*, disabled=BLOCKED_FUNCTIONS, fopen="1", environment=env):
                 return subprocess.run(["php", "-d", "allow_url_fopen=" + fopen, "-d",
                                        "disable_functions=" + disabled, "-d", "auto_prepend_file=" + str(guard),
                                        str(proof)], env=environment, capture_output=True, text=True)
             accepted = run()
             self.assertEqual(accepted.returncode, 0, accepted.stderr)
-            self.assertFalse({"http", "https", "ftp", "ftps"} & set(json.loads(accepted.stdout)))
+            state = json.loads(accepted.stdout)
+            self.assertFalse({"http", "https", "ftp", "ftps"} & set(state["wrappers"]))
+            self.assertFalse(state["restore"])
+            self.assertFalse(state["register"])
             self.assertNotEqual(run(disabled="").returncode, 0)
+            self.assertNotEqual(run(disabled=BLOCKED_FUNCTIONS.replace("stream_wrapper_restore,", "")).returncode, 0)
+            self.assertNotEqual(run(disabled=BLOCKED_FUNCTIONS.replace("stream_wrapper_register,", "")).returncode, 0)
             self.assertNotEqual(run(fopen="0").returncode, 0)
             self.assertNotEqual(run(environment=dict(env, DB_DATABASE="unsafe")).returncode, 0)
+
+    @unittest.skipUnless(shutil.which("php"), "PHP CLI is required")
+    def test_unmocked_http_cannot_connect_to_listening_loopback_sentinel(self):
+        root = Path(__file__).resolve().parents[2]
+        guard = root / "tests/Deployment/idempotency-http-guard.php"
+        env = dict(os.environ, APP_ENV="testing", FOKUS_COMPANY_IDEMPOTENCY_LAB="1",
+                   DB_CONNECTION="mysql", DB_HOST="127.0.0.1", DB_DATABASE="fokus_idempotency_api_test",
+                   MAIL_MAILER="array")
+        with tempfile.TemporaryDirectory() as directory:
+            proof = Path(directory) / "sentinel.php"
+            proof.write_text('<?php $s=stream_socket_server("tcp://127.0.0.1:0"); '
+                             'if ($s===false) exit(2); $a=stream_socket_get_name($s,false); '
+                             'stream_set_blocking($s,false); $response=@file_get_contents("http://".$a."/"); '
+                             '$connection=@stream_socket_accept($s,0); fclose($s); '
+                             'echo json_encode(["response"=>$response,"connected"=>$connection!==false]);', encoding="utf-8")
+            result = subprocess.run(["php", "-d", "allow_url_fopen=1", "-d",
+                                     "disable_functions=" + BLOCKED_FUNCTIONS, "-d", "auto_prepend_file=" + str(guard),
+                                     str(proof)], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout), {"response": False, "connected": False})
 
     def test_manifest_names_match_checked_in_test_methods(self):
         root = Path(__file__).resolve().parents[2]

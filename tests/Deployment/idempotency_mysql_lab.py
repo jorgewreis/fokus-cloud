@@ -27,7 +27,8 @@ UUID = re.compile(r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\Z")
 CONTAINER_ID = re.compile(r"[0-9a-f]{64}\Z")
 PASSWORD = "security-test-only"
 BLOCKED_FUNCTIONS = ("curl_exec,curl_multi_exec,fsockopen,pfsockopen,stream_socket_client,"
-                     "socket_connect,exec,shell_exec,system,passthru,popen,proc_open,pcntl_exec")
+                     "socket_connect,stream_wrapper_register,stream_wrapper_restore,"
+                     "exec,shell_exec,system,passthru,popen,proc_open,pcntl_exec")
 
 # These are independent evidence, not additional main-suite cases. Minimums
 # are provisional; the release gate must adopt measured individual minima.
