@@ -3,9 +3,31 @@ import { createRecordsDrawer } from "./records-drawer.js";
 // Only an outcome code is retained across SPA mounts; no form data or server
 // message is shared. Scope notices to the authenticated platform admin.
 const previousOperations = new Map();
+const pendingOperations = new Map();
 const operationListeners = new Map();
-function publishPreviousOperation(adminId, outcome) {
-    if (!adminId) return;
+let operationEpoch = 0;
+let fingerprintKey;
+function resetOperationState() {
+    operationEpoch++;
+    previousOperations.clear();
+    pendingOperations.clear();
+    fingerprintKey = undefined;
+    operationListeners.forEach((listeners) => listeners.forEach((listener) => listener({}, null)));
+}
+window.addEventListener("fokus:platform-logout", resetOperationState);
+window.addEventListener("pagehide", resetOperationState);
+
+async function fingerprintOperation(adminId, method, endpoint, body) {
+    if (!globalThis.crypto?.subtle) throw new Error("Não foi possível verificar a solicitação. Recarregue a página e tente novamente.");
+    fingerprintKey ||= crypto.subtle.generateKey({ name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const key = await fingerprintKey;
+    const bytes = new TextEncoder().encode(JSON.stringify([adminId, method, endpoint, body]));
+    const signature = await crypto.subtle.sign("HMAC", key, bytes);
+    return Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function publishPreviousOperation(adminId, outcome, epoch) {
+    if (!adminId || epoch !== operationEpoch) return;
     const outcomes = { ...previousOperations.get(adminId), [outcome]: true };
     previousOperations.set(adminId, outcomes);
     operationListeners.get(adminId)?.forEach((listener) => listener(outcomes, outcome));
@@ -42,14 +64,15 @@ export async function mount(root, context = {}) {
         refreshPageStatus.textContent = refreshError;
         refreshStatus.hidden = !refreshError || !drawerOpen;
         refreshPageStatus.hidden = !refreshError || drawerOpen;
-        const operationText = operationOutcome?.unknown && operationOutcome?.completed
-            ? "Uma operação anterior foi concluída. Não foi possível confirmar o resultado de outra operação anterior. Confira a lista antes de tentar novamente."
-            : operationOutcome?.unknown ? "Não foi possível confirmar o resultado da operação anterior. Confira a lista antes de tentar novamente."
-            : operationOutcome?.completed ? "Uma operação anterior foi concluída. Confira a lista de empresas." : "";
-        operationDrawerStatus.textContent = operationText;
-        operationPageStatus.textContent = operationText;
-        operationDrawerStatus.hidden = !operationOutcome || !drawerOpen;
-        operationPageStatus.hidden = !operationOutcome || drawerOpen;
+        const messages = [];
+        if (operationOutcome?.completed) messages.push("Uma operação anterior foi concluída.");
+        if (operationOutcome?.rejected) messages.push("Uma operação anterior foi rejeitada.");
+        if (operationOutcome?.unknown) messages.push("Não foi possível confirmar o resultado de uma operação anterior.");
+        const operationText = messages.length ? `${messages.join(" ")} Confira a lista antes de tentar novamente.` : "";
+        operationDrawerStatus.querySelector("[data-company-operation-text]").textContent = operationText;
+        operationPageStatus.querySelector("[data-company-operation-text]").textContent = operationText;
+        operationDrawerStatus.hidden = !messages.length || !drawerOpen;
+        operationPageStatus.hidden = !messages.length || drawerOpen;
     };
     const drawerShown = () => syncRefreshStatus(true);
     const drawerHidden = () => syncRefreshStatus(false);
@@ -119,6 +142,20 @@ export async function mount(root, context = {}) {
         if (!listeners?.size) operationListeners.delete(adminId);
     };
     context.signal?.addEventListener("abort", removeOperationListener, { once: true });
+    const acknowledgeOperation = () => {
+        const drawerOpen = drawer.getAttribute("aria-hidden") === "false";
+        const focusedNotice = operationDrawerStatus.contains(document.activeElement) || operationPageStatus.contains(document.activeElement);
+        if (adminId) {
+            previousOperations.delete(adminId);
+            operationListeners.get(adminId)?.forEach((listener) => listener({}, null));
+        } else {
+            operationOutcome = null;
+            syncRefreshStatus(drawerOpen);
+        }
+        if (focusedNotice) (drawerOpen ? $("#company-drawer-close") : createTrigger).focus({ preventScroll: true });
+    };
+    operationDrawerStatus.querySelector("[data-company-operation-ack]").addEventListener("click", acknowledgeOperation);
+    operationPageStatus.querySelector("[data-company-operation-ack]").addEventListener("click", acknowledgeOperation);
     syncRefreshStatus(false);
     const resetForm = () => { form.reset(); form.hidden = false; $("#company-view-panel").hidden = true; form.querySelectorAll("input, select").forEach((field) => { field.disabled = false; }); $("#company-document-type").value = "cnpj"; $("#company-version").value = ""; $("#company-document-number").readOnly = false; $("#company-password-field").hidden = false; $("#company-admin-password").required = true; $("#company-form-submit").hidden = false; $("#company-form-submit").disabled = submitting; $("#company-form-cancel").textContent = "Cancelar"; $("#company-form-submit").textContent = "Cadastrar empresa"; $("#company-drawer-kicker").textContent = "EMPRESAS"; $("#company-drawer-title").textContent = "Nova empresa"; $("#company-drawer-description").textContent = "Cadastre os dados da empresa e do administrador responsável."; $("#company-name-label").textContent = "Razão social"; currentCompany = null; };
     const renderLeadUsage = (usage) => {
@@ -153,13 +190,31 @@ export async function mount(root, context = {}) {
         const endpoint = editing ? `/backoffice/companies/${editId}` : "/backoffice/companies";
         const body = editing ? { legal_name: values.legal_name, name: values.name, cpf: values.cpf, email: values.email, version: Number(values.version) } : values;
         const session = drawerSession;
+        const epoch = operationEpoch;
         const submitButton = $("#company-form-submit");
         submitting = true;
         submitButton.disabled = true;
+        let signature;
+        let pending;
+        let registered = false;
+        let requestStarted = false;
         try {
+            signature = await fingerprintOperation(adminId, editing ? "PATCH" : "POST", endpoint, body);
+            if (epoch !== operationEpoch) return;
+            const pendingKey = adminId || "anonymous";
+            if (!pendingOperations.has(pendingKey)) pendingOperations.set(pendingKey, new Set());
+            pending = pendingOperations.get(pendingKey);
+            if (pending.has(signature)) {
+                if (isPageActive() && session === drawerSession && drawerController.getState().mode) showFormError("Já existe uma solicitação idêntica em andamento. Aguarde a confirmação.");
+                return;
+            }
+            pending.add(signature);
+            registered = true;
+            requestStarted = true;
             await api.request(endpoint, { method: editing ? "PATCH" : "POST", body });
+            if (epoch !== operationEpoch) return;
             if (!isPageActive() || session !== drawerSession || !drawerController.getState().mode) {
-                if (adminId) publishPreviousOperation(adminId, "completed");
+                if (adminId) publishPreviousOperation(adminId, "completed", epoch);
                 else if (isPageActive()) onPreviousOperation({ ...operationOutcome, completed: true }, "completed");
                 return;
             }
@@ -167,11 +222,19 @@ export async function mount(root, context = {}) {
             showMessage(editing ? "Dados da empresa atualizados." : "Empresa criada com acesso imediato.", "success");
             await load();
         } catch (error) {
+            if (epoch !== operationEpoch) return;
             const text = error.message || "Não foi possível salvar a empresa.";
             if (isPageActive() && session === drawerSession && drawerController.getState().mode && drawer.isConnected) showFormError(text);
-            else if (adminId) publishPreviousOperation(adminId, "unknown");
-            else if (isPageActive()) onPreviousOperation({ ...operationOutcome, unknown: true }, "unknown");
+            else if (requestStarted) {
+                // The controller rejects 409/422 before commit or rolls back its transaction.
+                // Timeouts, transport failures and other responses do not establish the outcome.
+                const outcome = [409, 422].includes(error.status) ? "rejected" : "unknown";
+                if (adminId) publishPreviousOperation(adminId, outcome, epoch);
+                else if (isPageActive()) onPreviousOperation({ ...operationOutcome, [outcome]: true }, outcome);
+            }
         } finally {
+            if (registered) pending?.delete(signature);
+            if (pending && !pending.size && pendingOperations.get(adminId || "anonymous") === pending) pendingOperations.delete(adminId || "anonymous");
             submitting = false;
             submitButton.disabled = false;
         }
@@ -205,6 +268,8 @@ export async function mount(root, context = {}) {
     normalizeSummary();
     context.signal?.addEventListener('abort', () => summaryObserver?.disconnect(), { once: true });
     return () => {
+        operationDrawerStatus.querySelector("[data-company-operation-ack]").removeEventListener("click", acknowledgeOperation);
+        operationPageStatus.querySelector("[data-company-operation-ack]").removeEventListener("click", acknowledgeOperation);
         removeOperationListener();
         createTrigger.removeEventListener("fs:shown", drawerShown);
         createTrigger.removeEventListener("fs:hidden", drawerHidden);
