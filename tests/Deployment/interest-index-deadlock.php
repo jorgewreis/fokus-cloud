@@ -6,6 +6,8 @@ use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Database\Events\TransactionBeginning;
 use Illuminate\Support\Facades\Mail;
 
 $root = dirname(__DIR__, 2);
@@ -51,6 +53,7 @@ try {
         $expectedCount = DB::table('product_interests')->count();
         DB::purge();
         foreach (['backfill', 'writer'] as $actor) {
+            file_put_contents("$dir/$actor-begins", '');
             $pid = pcntl_fork();
             if ($pid < 0) {
                 throw new RuntimeException('fork failed');
@@ -60,6 +63,9 @@ try {
                     DB::purge();
                     Mail::fake();
                     $attempts = 0;
+                    Event::listen(TransactionBeginning::class, function () use ($actor, $dir): void {
+                        file_put_contents("$dir/$actor-begins", "begin\n", FILE_APPEND);
+                    });
                     DB::listen(function ($query) use ($actor, $victim, $dir, $ids, $ballast, &$attempts): void {
                         if (! str_starts_with(strtolower($query->sql), 'delete from `interest_product_index`') || ($query->bindings[0] ?? null) !== $ids[$actor === 'backfill' ? 0 : 1]) {
                             return;
@@ -124,6 +130,11 @@ try {
         }
         DB::purge();
         $attempts = count(file("$dir/$victim-attempts", FILE_IGNORE_NEW_LINES));
+        foreach (['backfill', 'writer'] as $actor) {
+            $begins = count(file("$dir/$actor-begins", FILE_IGNORE_NEW_LINES));
+            $deletes = count(file("$dir/$actor-attempts", FILE_IGNORE_NEW_LINES));
+            fwrite(STDERR, "DIAGNOSTIC victim=$victim actor=$actor begins=$begins deletes=$deletes\n");
+        }
         if ($attempts < 2) {
             throw new RuntimeException("expected $victim to retry after collision");
         }
