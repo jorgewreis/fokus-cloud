@@ -21,6 +21,10 @@ export async function mount(root, context = {}) {
     };
     const drawerController = createRecordsDrawer({ trigger, drawer });
     const modal = window.FokusStyles?.Modal?.getOrCreateInstance($("#user-action-trigger"));
+    let active = true;
+    let listVersion = 0;
+    let detailVersion = 0;
+    const current = (version, latest) => active && !context.signal?.aborted && version === latest;
     let selected = null;
     let pendingAction = null;
     const esc = (value) => String(value ?? "").replace(/[&<>\x27"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\x27": "&#039;", "\"": "&quot;" })[c]);
@@ -51,13 +55,27 @@ export async function mount(root, context = {}) {
         $("#users-pagination").innerHTML = `<ul class="fs-pagination fs-pagination-compact"><li class="fs-page-item"><button class="fs-page-link" type="button" data-users-page="${page - 1}" aria-label="Página anterior" ${page === 1 ? "disabled" : ""}>‹</button></li><li class="fs-page-item is-active" aria-current="page"><button class="fs-page-link" type="button" data-users-page="${page}" aria-label="Página ${page}" aria-current="page">${page}</button></li><li class="fs-page-item"><button class="fs-page-link" type="button" data-users-page="${page + 1}" aria-label="Próxima página" ${page === last ? "disabled" : ""}>›</button></li></ul>`;
         window.refreshFokusDataTables?.();
     };
-    const load = async () => {
+    const load = async ({ preserveMessage = false } = {}) => {
+        if (!active || context.signal?.aborted) return;
+        const version = ++listVersion;
+        ++detailVersion;
+        list.innerHTML = '<tr><td colspan="5">Carregando usuários...</td></tr>';
+        $("#users-table-summary").textContent = "";
+        $("#users-table-footer-summary").textContent = "";
+        $("#users-pagination").innerHTML = "";
+        if (!preserveMessage) showMessage("");
         try {
             const params = new URLSearchParams({ page: String(state.page), per_page: "15" });
             if (state.query) params.set("q", state.query);
-            render(await api.request(`/backoffice/directory/users?${params}`));
-            showMessage("");
-        } catch (error) { showMessage(error.message || "Não foi possível carregar os usuários."); }
+            const response = await api.request(`/backoffice/directory/users?${params}`, { signal: context.signal });
+            if (!current(version, listVersion)) return;
+            render(response);
+        } catch (error) {
+            if (!current(version, listVersion) || error?.name === "AbortError") return;
+            list.innerHTML = '<tr><td colspan="5"><button class="fs-btn fs-btn-outline-primary fs-btn-sm" type="button" data-users-retry>Tentar novamente</button></td></tr>';
+            list.querySelector("[data-users-retry]").addEventListener("click", load, { once: true });
+            showMessage(error.message || "Não foi possível carregar os usuários.");
+        }
     };
     let companiesLoaded = false;
     const setAccountType = (type) => {
@@ -75,7 +93,8 @@ export async function mount(root, context = {}) {
         const select = $("#user-company");
         select.innerHTML = '<option value="">Carregando empresas...</option>';
         try {
-            const response = await api.request("/backoffice/directory/companies");
+            const response = await api.request("/backoffice/directory/companies", { signal: context.signal });
+            if (!active || context.signal?.aborted) return;
             const companies = response.data || [];
             select.innerHTML = '<option value="">Selecione a empresa e o sistema</option>' + companies.map((company) => `<option value="${esc(company.id)}">${esc(company.label)}</option>`).join("");
             select.disabled = companies.length === 0;
@@ -83,6 +102,7 @@ export async function mount(root, context = {}) {
             if (!companies.length) showMessage("Não há empresas ativas com assinatura ativa do Fokus Law para receber um vínculo.");
             else { companiesLoaded = true; showMessage(""); }
         } catch (error) {
+            if (!active || context.signal?.aborted || error?.name === "AbortError") return;
             select.innerHTML = '<option value="">Não foi possível carregar as empresas</option>';
             $("#user-form-submit").disabled = $("#user-account-type").value === "empresa";
             showMessage(error.message || "Não foi possível carregar as empresas ativas.");
@@ -130,10 +150,16 @@ export async function mount(root, context = {}) {
         drawerController.show();
     };
     const openUser = async (id, type, mode) => {
+        if (!active || context.signal?.aborted) return;
+        const version = ++detailVersion;
         try {
-            const record = await api.request(`/backoffice/directory/users/${encodeURIComponent(type)}/${encodeURIComponent(id)}`);
+            const record = await api.request(`/backoffice/directory/users/${encodeURIComponent(type)}/${encodeURIComponent(id)}`, { signal: context.signal });
+            if (!current(version, detailVersion)) return;
             if (mode === "edit") openForm(mode, record); else openDetails(record);
-        } catch (error) { showMessage(error.message || "Não foi possível consultar esta conta."); }
+        } catch (error) {
+            if (!current(version, detailVersion) || error?.name === "AbortError") return;
+            showMessage(error.message || "Não foi possível consultar esta conta.");
+        }
     };
     const actionLabels = { block: ["Bloquear conta", "A conta perderá acesso ao Backoffice."], unblock: ["Desbloquear conta", "A conta poderá voltar a acessar o Backoffice."], deactivate: ["Desativar conta", "A conta interna será desativada."] };
     const submitAction = async (event) => {
@@ -142,8 +168,9 @@ export async function mount(root, context = {}) {
         const { action, id } = pendingAction;
         try {
             await api.request(`/backoffice/admins/${encodeURIComponent(id)}/${action}`, { method: "POST", body: { reason: $("#user-action-reason").value.trim() } });
-            modal?.hide?.(); showMessage("Ação de segurança concluída.", "success"); pendingAction = null; await load();
-        } catch (error) { showMessage(error.message || "Não foi possível concluir a ação."); }
+            if (!active || context.signal?.aborted) return;
+            modal?.hide?.(); showMessage("Ação de segurança concluída.", "success"); pendingAction = null; await load({ preserveMessage: true });
+        } catch (error) { if (active && !context.signal?.aborted) showMessage(error.message || "Não foi possível concluir a ação."); }
     };
     const submitForm = async (event) => {
         event.preventDefault();
@@ -160,25 +187,28 @@ export async function mount(root, context = {}) {
             if (mode === "invite") {
                 if (values.account_type === "empresa") {
                     await api.request("/backoffice/directory/users", { method: "POST", body: { name: values.name, email: values.email, cpf: values.cpf, company_id: values.company_id, role: values.role } });
+                    if (!active || context.signal?.aborted) return;
                     showMessage("Convite enviado ao usuário externo.", "success");
                 } else {
                     await api.request("/backoffice/admins/invitations", { method: "POST", body: { name: values.name, email: values.email, role: values.role } });
+                    if (!active || context.signal?.aborted) return;
                     showMessage("Convite enviado à conta interna.", "success");
                 }
             } else {
                 const result = await api.request(`/backoffice/admins/${encodeURIComponent(selected.id)}/profile`, { method: "PATCH", body: { name: values.name, email: values.email } });
+                if (!active || context.signal?.aborted) return;
                 showMessage(result.message || "Dados atualizados.", "success");
             }
-            drawerController.close(); await load();
-        } catch (error) { showMessage(error.message || "Não foi possível salvar os dados."); }
+            drawerController.close(); await load({ preserveMessage: true });
+        } catch (error) { if (active && !context.signal?.aborted) showMessage(error.message || "Não foi possível salvar os dados."); }
     };
     $("#users-query").value = state.query;
     if (!canManage) $("#user-invite").hidden = true;
     $("#users-filter-form").addEventListener("submit", (event) => { event.preventDefault(); state.query = $("#users-query").value.trim(); state.page = 1; load(); });
-    $("#user-invite").addEventListener("click", () => openForm("invite"));
+    $("#user-invite").addEventListener("click", () => { ++detailVersion; openForm("invite"); });
     $("#user-invite").disabled = !canManage;
-    $("#user-drawer-close").addEventListener("click", () => drawerController.close());
-    $("#user-form-cancel").addEventListener("click", () => drawerController.close());
+    $("#user-drawer-close").addEventListener("click", () => { ++detailVersion; drawerController.close(); });
+    $("#user-form-cancel").addEventListener("click", () => { ++detailVersion; drawerController.close(); });
     form.addEventListener("submit", submitForm);
     $("#users-pagination").addEventListener("click", (event) => { const button = event.target.closest("[data-users-page]"); if (!button || button.disabled) return; state.page = Number(button.dataset.usersPage); load(); });
     list.addEventListener("click", async (event) => {
@@ -186,11 +216,17 @@ export async function mount(root, context = {}) {
         const { userAction, userId } = button.dataset;
         if (userAction === "details" || userAction === "edit") { await openUser(userId, button.closest("tr").dataset.accountType, userAction === "edit" ? "edit" : "view"); return; }
         if (!actionLabels[userAction]) return;
+        ++detailVersion;
         pendingAction = { action: userAction, id: userId };
         $("#user-action-title").textContent = actionLabels[userAction][0]; $("#user-action-description").textContent = actionLabels[userAction][1]; $("#user-action-reason").value = ""; modal?.show?.(); $("#user-action-reason").focus();
     });
     $("#user-action-form").addEventListener("submit", submitAction);
+    const invalidateDetail = () => { ++detailVersion; };
+    const invalidateOnEscape = (event) => { if (event.key === "Escape") invalidateDetail(); };
+    trigger?.addEventListener("fs:hide", invalidateDetail);
+    document.addEventListener("keydown", invalidateOnEscape);
     load();
-    context.signal?.addEventListener("abort", () => { drawerController.dispose(); modal?.dispose?.(); }, { once: true });
-    return () => { drawerController.dispose(); modal?.dispose?.(); window.disposeBackofficeRecordsPage?.(root); };
+    const dispose = () => { if (!active) return; trigger?.removeEventListener("fs:hide", invalidateDetail); document.removeEventListener("keydown", invalidateOnEscape); active = false; ++listVersion; ++detailVersion; drawerController.dispose(); modal?.dispose?.(); window.disposeBackofficeRecordsPage?.(root); };
+    context.signal?.addEventListener("abort", dispose, { once: true });
+    return dispose;
 }
