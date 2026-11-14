@@ -21,7 +21,7 @@ class InterestIndexGuardTest(unittest.TestCase):
             target.parent.mkdir(parents=True)
             shutil.copyfile(DEADLOCK_SOURCE, target)
             (root / 'vendor').mkdir()
-            shutil.copyfile(Path(__file__).with_name('interest-deadlock-fake-bootstrap.php'), root / 'vendor' / 'autoload.php')
+            shutil.copyfile(Path(__file__).with_name('interest-deadlock-fake-bootstrap.fixture'), root / 'vendor' / 'autoload.php')
             (root / 'bootstrap').mkdir()
             (root / 'bootstrap' / 'app.php').write_text('<?php return new class { public function make($name) { return new class { public function bootstrap() {} }; } };')
             sandbox = root / 'sandbox'
