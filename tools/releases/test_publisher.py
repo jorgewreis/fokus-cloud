@@ -63,7 +63,7 @@ class PublisherPreflight(unittest.TestCase):
                          artifact=base / 'artifact', expected_digest='a'*64, base=self.control,
                          root=self.releases / ('b'*40), storage=self.storage,
                          configuration=self.configuration, receipt=base / 'receipt',
-                         transport=base / 'transport', runtime_uid=12345)
+                         transport=base / 'transport', runtime_uid=12345, runtime_gid=12345)
         self.contract = Contract()
 
     def invoke(self):
@@ -110,12 +110,28 @@ class PublisherPreflight(unittest.TestCase):
             self.invoke()
         self.contract.unpack.assert_not_called()
 
+    def test_unverified_runtime_group_is_rejected_before_unpack(self):
+        guard = types.ModuleType('preparation_guard')
+        guard.runtime_groups = Mock(side_effect=ValueError('runtime_group_membership_required'))
+        guard.grant_runtime_read = Mock()
+        guard.secure_preparation = Mock()
+        guard.verify_runtime_read = Mock()
+        with patch.dict(sys.modules, {'preparation_guard': guard}), \
+             patch.object(publisher.derived, 'contract', return_value=self.contract):
+            with self.assertRaisesRegex(ValueError, 'runtime_group_membership_required'):
+                publisher.prepare(**self.args)
+        self.contract.unpack.assert_not_called()
+        guard.grant_runtime_read.assert_not_called()
+
     def test_unpack_failure_never_links_seals_or_switches(self):
         self.contract.unpack.side_effect = ValueError('artifact_digest_mismatch')
         self.contract.shared_links = Mock()
         from contextlib import nullcontext
         guard = types.ModuleType('preparation_guard')
         guard.secure_preparation = Mock(return_value=nullcontext((lambda: None, lambda *args, **kwargs: None)))
+        guard.runtime_groups = Mock()
+        guard.grant_runtime_read = Mock()
+        guard.verify_runtime_read = Mock()
         with patch.dict(sys.modules, {'preparation_guard': guard}), \
              patch.object(publisher.derived, 'contract', return_value=self.contract), \
              patch.object(publisher.derived, 'seal') as seal, \

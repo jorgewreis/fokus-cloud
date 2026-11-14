@@ -51,8 +51,11 @@ fornecer destinos próprios e verificáveis; não há configuração produtiva p
 selo, com digest explícito, destino novo sob `base/releases` e registros fora
 da árvore de releases/storage. Uma falha pode deixar diretório inativo parcial
 para inspeção e nunca altera o ponteiro `current`; não faz limpeza automática.
-A preparação exige `--runtime-uid` explícito, distinto do operador e de root,
-e um `prepare.lock` previamente provisionado e privado. Ela rejeita diretórios
+A preparação exige `--runtime-uid` e `--runtime-gid` explícitos, usuário distinto
+do operador e de root, grupo não privilegiado e filiação local verificada, além
+de um `prepare.lock` previamente provisionado e privado. A raiz inativa recebe
+leitura/travessia para esse grupo, sem escrita; após o selo, o modo de cada
+arquivo e diretório e a travessia dos ancestrais são conferidos. Ela rejeita diretórios
 de controle com proprietário não confiável ou escrita por grupo/outros, ancestrais
 inseguros, ACLs POSIX estendidas ou não verificáveis e substituição de diretórios,
 lock, configuração, storage ou raiz durante as etapas. A árvore candidata é
@@ -85,3 +88,10 @@ loopback, falha e recuperação explícita; o cenário adicional valida ativaç�
 bem-sucedida e rollback de código mediante nova prova. O resultado do CI deve
 ser observado para o commit exato. Loopback e fixtures não demonstram TLS,
 CloudPanel, FPM, cron, filas externas nem segurança da infraestrutura real.
+
+O teste `test_runtime_access.py` roda apenas como root em runner Linux descartável
+e reduz de fato o processo filho a UID/GID sintéticos distintos: confirma que a
+raiz 0500 bloqueia leitura e que 0550 com grupo escolhido permite leitura sem
+permitir criação. Essa prova não concede privilégios na máquina de produção e
+não demonstra o UID, grupos, ACLs, capacidades ou acesso aos vínculos compartilhados
+do FPM real; esses requisitos continuam no gate de ativação.

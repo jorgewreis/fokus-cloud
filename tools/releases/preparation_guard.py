@@ -7,6 +7,7 @@ the separate activation runtime policy remains mandatory.
 """
 from contextlib import contextmanager
 import fcntl
+import grp
 import os
 from pathlib import Path
 import pwd
@@ -56,6 +57,69 @@ def check_tree(root, operator, runtime, *, sealed):
                 continue
             is_dir = path.is_dir()
             metadata(path, operator, runtime, direct=True, regular=not is_dir, sealed=sealed)
+
+
+def runtime_groups(runtime_uid, runtime_gid):
+    require(type(runtime_uid) is int and runtime_uid > 0 and runtime_uid != os.geteuid(), 'separate_runtime_principal_required')
+    require(type(runtime_gid) is int and runtime_gid > 0, 'explicit_runtime_group_required')
+    try:
+        user = pwd.getpwuid(runtime_uid)
+        grp.getgrgid(runtime_gid)
+        groups = set(os.getgrouplist(user.pw_name, user.pw_gid))
+    except KeyError as error:
+        raise UnsafePreparation('unknown_runtime_principal') from error
+    require(runtime_gid in groups, 'runtime_group_membership_required')
+    require(os.geteuid() == 0 or runtime_gid in set(os.getgroups()) | {os.getegid()}, 'operator_group_membership_required')
+    return groups
+
+
+def grant_runtime_read(root, runtime_uid, runtime_gid):
+    """Set only owner write and group read/traverse on the new inactive root."""
+    runtime_groups(runtime_uid, runtime_gid)
+    root = Path(root)
+    before = root.lstat()
+    fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        opened = os.fstat(fd)
+        require((opened.st_dev, opened.st_ino) == (before.st_dev, before.st_ino), 'candidate_root_rebound')
+        require(opened.st_uid == os.geteuid() and opened.st_uid != runtime_uid, 'runtime_owns_control')
+        if opened.st_gid != runtime_gid:
+            os.fchown(fd, -1, runtime_gid)
+        os.fchmod(fd, 0o750)
+        after = os.fstat(fd)
+        require(after.st_gid == runtime_gid and stat.S_IMODE(after.st_mode) == 0o750, 'runtime_root_permissions_failed')
+        require((root.lstat().st_dev, root.lstat().st_ino) == (after.st_dev, after.st_ino), 'candidate_root_rebound')
+    finally:
+        os.close(fd)
+
+
+def verify_runtime_read(root, runtime_uid, runtime_gid):
+    """Check POSIX mode readability; actual process/capabilities remain separate evidence."""
+    groups = runtime_groups(runtime_uid, runtime_gid)
+    for parent in Path(root).parents:
+        info = parent.lstat()
+        require(stat.S_ISDIR(info.st_mode), 'runtime_ancestor_not_directory')
+        if info.st_uid == runtime_uid:
+            granted = (info.st_mode >> 6) & 0o7
+        elif info.st_gid in groups:
+            granted = (info.st_mode >> 3) & 0o7
+        else:
+            granted = info.st_mode & 0o7
+        require(granted & 0o1, 'runtime_ancestor_traverse_denied')
+    for directory, dirs, names in os.walk(root, followlinks=False):
+        for path in [Path(directory)] + [Path(directory) / name for name in dirs + names]:
+            if path.is_symlink():
+                continue
+            info = path.lstat()
+            required = 0o5 if stat.S_ISDIR(info.st_mode) else 0o4
+            if info.st_uid == runtime_uid:
+                granted = (info.st_mode >> 6) & 0o7
+            elif info.st_gid in groups:
+                granted = (info.st_mode >> 3) & 0o7
+            else:
+                granted = info.st_mode & 0o7
+            require(granted & required == required, 'runtime_read_or_traverse_denied')
+            require(not granted & 0o2, 'runtime_write_forbidden')
 
 
 @contextmanager

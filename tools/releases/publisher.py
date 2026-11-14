@@ -10,7 +10,7 @@ import generation_activation as activation
 
 
 def prepare(source, candidate, evidence, artifact, expected_digest, base, root,
-            storage, configuration, receipt, transport, runtime_uid):
+            storage, configuration, receipt, transport, runtime_uid, runtime_gid):
     """Unpack a new candidate, attach approved shared paths and seal it.
 
     Failure can leave a partial *inactive* root for manual investigation. This
@@ -40,15 +40,19 @@ def prepare(source, candidate, evidence, artifact, expected_digest, base, root,
     # Linux-only control boundary: private owner/ACL-checked parents and a
     # pre-provisioned exclusive lock remain held through unpack, links and seal.
     # Operator and root are trusted; runtime evidence is still required to switch.
-    from preparation_guard import secure_preparation
+    from preparation_guard import grant_runtime_read, runtime_groups, secure_preparation, verify_runtime_read
+    runtime_groups(runtime_uid, runtime_gid)
     with secure_preparation(base, root.parent, receipt.parent, transport.parent,
                             configuration, storage, runtime_uid) as (checkpoint, check_tree):
         unpacked = contract.unpack(artifact, expected_digest, root, transport)
+        checkpoint(); check_tree(root, sealed=False)
+        grant_runtime_read(root, runtime_uid, runtime_gid)
         checkpoint(); check_tree(root, sealed=False)
         links = contract.shared_links(root, storage, configuration)
         checkpoint(); check_tree(root, sealed=False)
         sealed = derived.seal(source, candidate, evidence, root, receipt, transport, links=links)
         checkpoint(); check_tree(root, sealed=True)
+        verify_runtime_read(root, runtime_uid, runtime_gid)
         contract.verify(root, receipt)
         contract.require(unpacked['source_sha'] == sealed['source_sha'] == root.name, 'prepared_identity_mismatch')
     return {'state': 'sealed_not_active', 'source_sha': root.name}
@@ -69,6 +73,7 @@ def main():
                  'storage', 'configuration', 'receipt', 'transport'):
         build.add_argument('--' + name, required=True)
     build.add_argument('--runtime-uid', required=True, type=int)
+    build.add_argument('--runtime-gid', required=True, type=int)
     for command in ('activate', 'rollback'):
         command_parser = commands.add_parser(command)
         for name in ('source', 'base', 'candidate', 'receipt', 'policy', 'previous', 'previous-receipt', 'boundary'):

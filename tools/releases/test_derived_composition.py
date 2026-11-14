@@ -3,11 +3,10 @@
 import importlib.util, json, os, shutil, socket, subprocess, sys, tempfile, time, urllib.request
 from pathlib import Path
 import publisher
-import pwd
 spec=importlib.util.spec_from_file_location('d',Path(__file__).with_name('derived_assets.py'));d=importlib.util.module_from_spec(spec);spec.loader.exec_module(d)
 source=Path(__file__).resolve().parents[2]
 with tempfile.TemporaryDirectory(prefix='rei25-composition-') as temp:
-    temp=Path(temp);candidate=temp/'candidate';proof=d.build(source,candidate);evidence=temp/'proof.json';evidence.write_bytes(d.encoded(proof))
+    temp=Path(temp);temp.chmod(0o750);candidate=temp/'candidate';proof=d.build(source,candidate);evidence=temp/'proof.json';evidence.write_bytes(d.encoded(proof))
     artifact=temp/'release.tar';packed=d.package(source,candidate,evidence,artifact)
     c=d.contract(source);base=temp/'control';base.mkdir();releases=base/'releases';releases.mkdir();root=releases/proof['source_sha'];transport=temp/'transport.json'
     # Shared targets are synthetic, outside the immutable code root.
@@ -15,7 +14,8 @@ with tempfile.TemporaryDirectory(prefix='rei25-composition-') as temp:
     for name in ('logs','framework/cache','framework/views','framework/sessions'):(storage/name).mkdir(parents=True,exist_ok=True)
     receipt=temp/'receipt.json'
     fd=os.open(base/'prepare.lock',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600);os.close(fd)
-    prepared=publisher.prepare(source,candidate,evidence,artifact,packed['artifact_sha256'],base,root,storage,configuration,receipt,transport,pwd.getpwnam('nobody').pw_uid)
+    runtime_uid=int(os.environ['FOKUS_SYNTHETIC_RUNTIME_UID']);runtime_gid=int(os.environ['FOKUS_SYNTHETIC_RUNTIME_GID'])
+    prepared=publisher.prepare(source,candidate,evidence,artifact,packed['artifact_sha256'],base,root,storage,configuration,receipt,transport,runtime_uid,runtime_gid)
     assert prepared=={'state':'sealed_not_active','source_sha':proof['source_sha']}
     assert not (base/'current').exists()
     links={'storage':str(storage),'.env':str(configuration)}
