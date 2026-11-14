@@ -29,6 +29,27 @@ export async function mount(root, context = {}) {
     const destructiveModal = window.FokusStyles?.Modal?.getOrCreateInstance($("#module-destructive-trigger"));
     const state = { catalog: { products: [], options: {} }, modules: [], editing: null, pending: null, personalizations: [], page: 1 };
     const pageSize = 15;
+    let disposed = false;
+    let mutationInFlight = false;
+    let mutationUncertain = false;
+    const alive = () => !disposed && !context.signal?.aborted;
+    const mutationButtons = () => [$("#module-form-submit"), $("#module-destructive-form").querySelector('[type="submit"]')];
+    const syncMutationButtons = () => mutationButtons().forEach((button) => { if (button) button.disabled = mutationInFlight || mutationUncertain; });
+    const beginMutation = () => {
+        if (!alive() || mutationInFlight || mutationUncertain) return false;
+        mutationInFlight = true;
+        syncMutationButtons();
+        return true;
+    };
+    const finishMutation = () => { mutationInFlight = false; if (alive()) syncMutationButtons(); };
+    const mutationError = (error, fallback) => {
+        if (!alive()) return;
+        if (![409, 422].includes(error.status)) {
+            mutationUncertain = true;
+            showMessage("Não foi possível confirmar o resultado. Consulte o catálogo antes de tentar novamente.");
+        } else showMessage(error.message || fallback);
+        syncMutationButtons();
+    };
     const field = (name) => form.elements.namedItem(name);
     const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[character]));
     const money = (value) => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -166,7 +187,7 @@ export async function mount(root, context = {}) {
     const load = async () => {
         try {
             state.catalog = await api.request("/backoffice/catalog");
-            if (context.signal?.aborted) return;
+            if (!alive()) return;
             state.catalog.options = state.catalog.options || {};
             state.modules = allModules();
             $("#module-product-filter").innerHTML = '<option value="">Todos os produtos</option>' + state.catalog.products.map((product) => `<option value="${escapeHtml(product.id)}">${escapeHtml(product.name)}</option>`).join("");
@@ -174,7 +195,7 @@ export async function mount(root, context = {}) {
             render();
             showMessage("");
         } catch (error) {
-            if (!context.signal?.aborted) showMessage(error.message || "Não foi possível carregar os módulos.");
+            if (alive()) showMessage(error.message || "Não foi possível carregar os módulos.");
         }
     };
 
@@ -206,6 +227,7 @@ export async function mount(root, context = {}) {
     personalizationsList.addEventListener("change", (event) => { const index = Number(event.target.dataset.index); const item = state.personalizations[index]; if (!item) return; if (event.target.classList.contains("p-type")) item.type_code = event.target.value; if (event.target.classList.contains("p-required")) item.required = event.target.value === "1"; if (event.target.classList.contains("p-active")) item.active = event.target.value === "1"; if (event.target.classList.contains("p-value")) item.tiers[Number(event.target.dataset.tier)].value = Number(event.target.value); if (event.target.classList.contains("p-price")) item.tiers[Number(event.target.dataset.tier)].additional_monthly_amount = Number(event.target.value); });
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
+        if (mutationInFlight || mutationUncertain || !alive()) return;
         if (window.FokusForm && !window.FokusForm.validate(form)) return;
         const drawerState = drawer.getState();
         const editId = drawerState.mode === "edit" ? String(state.editing || drawerState.record?.id || "") : "";
@@ -213,11 +235,20 @@ export async function mount(root, context = {}) {
         const editing = Boolean(editId);
         const payload = { product_id: field("product_id").value, name: field("name").value, module_code: field("module_code").value, module_code_custom_name: field("module_code_custom_name").value, segments: selectedValues("#module-segments"), context_code: field("context_code").value || null, monthly_price: window.FokusCurrency?.parse(field("monthly_price").value) ?? 0, price_is_estimate: field("price_is_estimate").value === "1", technical_description: field("technical_description").value, commercial_content: field("commercial_content").value, capability_codes: selectedValues("#module-capabilities").filter((item) => item !== "outro"), dependency_ids: selectedValues("#module-dependencies"), incompatibility_ids: selectedValues("#module-incompatibilities"), personalizations: state.personalizations };
         if (editing) { payload.display_order = Number(field("display_order").value || 0); payload.featured = field("featured").value === "1"; }
-        try { await api.request(editing ? `/backoffice/catalog/modules/${editId}` : "/backoffice/catalog/modules", { method: editing ? "PATCH" : "POST", body: payload }); closeDrawer(); await load(); showMessage(editing ? "Módulo salvo. Ative, publique o módulo e republique o catálogo em Produtos." : "Módulo cadastrado como inativo.", "success"); } catch (error) { window.FokusForm?.mapServerErrors(form, error.errors); showMessage(error.message || "Não foi possível salvar o módulo."); }
+        if (!beginMutation()) return;
+        try {
+            await api.request(editing ? `/backoffice/catalog/modules/${editId}` : "/backoffice/catalog/modules", { method: editing ? "PATCH" : "POST", body: payload });
+            if (!alive()) return;
+            closeDrawer(); await load();
+            if (alive()) showMessage(editing ? "Módulo salvo. Ative, publique o módulo e republique o catálogo em Produtos." : "Módulo cadastrado como inativo.", "success");
+        } catch (error) {
+            if (alive() && [409, 422].includes(error.status)) window.FokusForm?.mapServerErrors(form, error.errors);
+            mutationError(error, "Não foi possível salvar o módulo.");
+        } finally { finishMutation(); }
     });
     $("#module-list").addEventListener("click", async (event) => {
         const control = event.target.closest("[data-module-action]");
-        if (!control) return;
+        if (!control || mutationInFlight || mutationUncertain || !alive()) return;
         const module = state.modules.find((item) => String(item.id) === control.dataset.moduleId);
         if (!module) return;
         const type = control.dataset.moduleAction;
@@ -237,13 +268,28 @@ export async function mount(root, context = {}) {
             destructiveModal?.show();
             return;
         }
-        try { await api.request(`/backoffice/catalog/modules/${module.id}/activate`, { method: "POST" }); await load(); showMessage("Módulo ativado. Publique o módulo e o catálogo em Produtos.", "success"); } catch (error) { showMessage(error.message || "Não foi possível atualizar o módulo."); }
+        if (!beginMutation()) return;
+        try { await api.request(`/backoffice/catalog/modules/${module.id}/activate`, { method: "POST" }); if (!alive()) return; await load(); if (alive()) showMessage("Módulo ativado. Publique o módulo e o catálogo em Produtos.", "success"); } catch (error) { mutationError(error, "Não foi possível atualizar o módulo."); } finally { finishMutation(); }
     });
     $("#module-pagination").addEventListener("click", (event) => { const button = event.target.closest("[data-module-page]"); if (!button || button.disabled) return; state.page = Number(button.dataset.modulePage); render(); });
-    $("#module-destructive-form").addEventListener("submit", async (event) => { event.preventDefault(); if (!state.pending) return; const { type, module } = state.pending; const formData = new FormData(event.currentTarget); const reason = formData.get("reason"); const needsReason = ["archive", "delete"].includes(type); try { const response = await api.request(type === "delete" ? `/backoffice/catalog/modules/${module.id}` : `/backoffice/catalog/modules/${module.id}/${type}`, { method: type === "delete" ? "DELETE" : "POST", body: type === "publish" ? { release_type: formData.get("release_type") } : needsReason ? { reason } : undefined }); destructiveModal?.hide(); state.pending = null; await load(); showMessage(type === "publish" ? `Módulo publicado na versão ${response.release_version || `v${Number(response.published_version)}.0`}. Publique também o catálogo em Produtos.` : type === "pause" ? "Módulo pausado. O catálogo está pendente de republicação." : "Ação concluída.", "success"); } catch (error) { showMessage(error.message || "Não foi possível concluir a ação."); } });
+    $("#module-destructive-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!state.pending || !beginMutation()) return;
+        const { type, module } = state.pending;
+        const formData = new FormData(event.currentTarget);
+        const reason = formData.get("reason");
+        const needsReason = ["archive", "delete"].includes(type);
+        try {
+            const response = await api.request(type === "delete" ? `/backoffice/catalog/modules/${module.id}` : `/backoffice/catalog/modules/${module.id}/${type}`, { method: type === "delete" ? "DELETE" : "POST", body: type === "publish" ? { release_type: formData.get("release_type") } : needsReason ? { reason } : undefined });
+            if (!alive()) return;
+            destructiveModal?.hide(); state.pending = null; await load();
+            if (alive()) showMessage(type === "publish" ? `Módulo publicado na versão ${response.release_version || `v${Number(response.published_version)}.0`}. Publique também o catálogo em Produtos.` : type === "pause" ? "Módulo pausado. O catálogo está pendente de republicação." : "Ação concluída.", "success");
+        } catch (error) { mutationError(error, "Não foi possível concluir a ação."); } finally { finishMutation(); }
+    });
 
     await load();
     return () => {
+        disposed = true;
         personalizationsDrawer?.dispose?.();
         destructiveModal?.dispose?.();
         drawer.dispose();
