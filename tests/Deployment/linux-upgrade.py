@@ -134,6 +134,10 @@ def main():
     parser.add_argument('--driver', choices=['sqlite', 'mysql'], required=True)
     parser.add_argument('--baseline-sha', default=BASELINE)
     args = parser.parse_args()
+    # Disabled until every PDO and backup/restore connection validates the
+    # server identity on the same session before its first operation.
+    if args.driver == 'mysql':
+        raise RuntimeError('MySQL upgrade blocked: per-session identity verification is incomplete')
     guard()
     spec = importlib.util.spec_from_file_location('baseline_gate', ROOT / 'tests/Deployment/baseline-gate.py')
     gate = importlib.util.module_from_spec(spec)

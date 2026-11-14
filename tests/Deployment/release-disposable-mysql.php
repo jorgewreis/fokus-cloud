@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\DB;
 /** Verify the identity planted by the host orchestrator in its disposable container. */
 function assertReleaseDisposableMysql(): void
 {
+    // Fail closed until automatic reconnections are verified on their own PDO.
+    throw new RuntimeException('refuse non-disposable mysql identity: per-session verification incomplete');
     $path = '/run/fokus-release-mysql.identity';
     $stat = @lstat($path);
     $runStat = @lstat('/run');

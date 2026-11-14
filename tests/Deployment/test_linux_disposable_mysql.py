@@ -8,6 +8,17 @@ import linux_disposable_mysql as guard
 
 
 class DisposableMysqlGuardTest(unittest.TestCase):
+    def test_mysql_upgrade_stops_before_any_database_client(self):
+        import pathlib
+        import subprocess
+        import sys
+
+        entry = pathlib.Path(__file__).with_name('linux-upgrade.py')
+        result = subprocess.run([sys.executable, str(entry), '--driver', 'mysql'],
+                                capture_output=True, text=True, timeout=15)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('per-session identity verification is incomplete', result.stderr)
+
     def test_refused_identity_never_executes_create_or_drop(self):
         with patch.object(guard, 'assert_disposable_mysql', side_effect=RuntimeError('refuse')), \
              patch.object(guard.subprocess, 'run') as run:
