@@ -82,6 +82,26 @@ concurrent requests, multiple nodes and cross-tab logout remain unverified. A
 same-actor different-marker rejection in a synthetic test is not proof of those
 races, and no public guard may be removed on that basis.
 
+The unit test `test_envelope_alone_does_not_revoke_a_previously_loaded_session_snapshot`
+demonstrates the remaining defect: after the in-memory session is invalidated,
+an earlier snapshot still verifies the envelope. It intentionally verifies the
+limitation, not a security fix. Production configuration chooses database
+sessions, but `SESSION_CONNECTION` can select a connection different from the
+business transaction. Logout invalidates the session through Laravel's session
+handler; support entry and login regenerate sessions; account blocking deletes
+session rows. A solution must identify and synchronize all effective revocation
+paths on the same durable lock as the mutation, including expiration, bulk
+revocation, login and support rotation. It must fail closed when driver, table,
+connection or session identity cannot be verified. A row-existence check or a
+lock on the in-memory marker alone is insufficient.
+
+Before removing any guard, an isolated real-MySQL integration test must hold a
+barrier after the request loads the old session and prove both orders: revocation
+commits first and the actual company writer performs no mutation, or the actual
+writer commits first and revocation observes that ordering without claiming to
+undo it. Repeat for every supported revocation path and session connection,
+and test logout, reload and multiple nodes. No such two-order proof exists here.
+
 The guarded MySQL API concurrency test was run against commit `93d52eaf`
 using a new, initially empty MySQL 8.4.13 container with networking disabled
 and temporary storage: one test and ten assertions passed. Native InnoDB AIO

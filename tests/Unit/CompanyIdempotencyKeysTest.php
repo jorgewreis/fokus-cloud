@@ -3,11 +3,31 @@
 namespace Tests\Unit;
 
 use App\Services\CompanyIdempotencyKeys;
+use App\Services\PlatformSessionBinding;
+use Illuminate\Session\ArraySessionHandler;
+use Illuminate\Session\Store;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 class CompanyIdempotencyKeysTest extends TestCase
 {
+    public function test_envelope_alone_does_not_revoke_a_previously_loaded_session_snapshot(): void
+    {
+        $session = new Store('synthetic', new ArraySessionHandler(120));
+        $session->start();
+        $binding = new PlatformSessionBinding;
+        $binding->rotate($session);
+        $oldSnapshot = $binding->current($session);
+        $keys = new CompanyIdempotencyKeys(['a' => base64_encode(str_repeat('a', 32))], 'a', []);
+        $token = $keys->issue('admin', 'company.create', 1000, 60);
+        $envelope = $keys->bindSession($token, $oldSnapshot);
+        $session->invalidate();
+        self::assertNull($binding->current($session));
+        // A concurrent request can retain this previously loaded value. The
+        // signature alone cannot determine that logout has since occurred.
+        self::assertSame($token, $keys->unbindSession($envelope, $oldSnapshot));
+    }
+
     public function test_session_envelope_rejects_other_sessions_legacy_tokens_and_revoked_keys(): void
     {
         $ring = ['a' => base64_encode(str_repeat('a', 32)), 'b' => base64_encode(str_repeat('b', 32))];
