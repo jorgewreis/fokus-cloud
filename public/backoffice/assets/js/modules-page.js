@@ -296,7 +296,7 @@ export async function mount(root, context = {}) {
         const operationDrawerGeneration = drawerGeneration;
         try {
             await api.request(editing ? `/backoffice/catalog/modules/${editId}` : "/backoffice/catalog/modules", { method: editing ? "PATCH" : "POST", body: payload });
-            if (!alive() || operationDrawerGeneration !== drawerGeneration) { mutation.uncertain = true; notifyMutation(); return; }
+            if (!alive() || operationDrawerGeneration !== drawerGeneration) { mutation.confirmedStale = true; mutation.uncertain = true; notifyMutation(); return; }
             closeDrawer(); const refreshed = await load();
             if (!refreshed) { mutation.confirmedStale = true; mutation.uncertain = true; notifyMutation(); return; }
             if (alive()) showMessage(editing ? "Módulo salvo. Ative, publique o módulo e republique o catálogo em Produtos." : "Módulo cadastrado como inativo.", "success");
@@ -332,7 +332,7 @@ export async function mount(root, context = {}) {
             return;
         }
         if (!beginMutation()) return;
-        try { await api.request(`/backoffice/catalog/modules/${module.id}/activate`, { method: "POST" }); if (!alive()) { mutation.uncertain = true; notifyMutation(); return; } const refreshed = await load(); if (!refreshed) { mutation.confirmedStale = true; mutation.uncertain = true; notifyMutation(); return; } if (alive()) showMessage("Módulo ativado. Publique o módulo e o catálogo em Produtos.", "success"); } catch (error) { mutationError(error, "Não foi possível atualizar o módulo."); } finally { finishMutation(); }
+        try { await api.request(`/backoffice/catalog/modules/${module.id}/activate`, { method: "POST" }); if (!alive()) { mutation.confirmedStale = true; mutation.uncertain = true; notifyMutation(); return; } const refreshed = await load(); if (!refreshed) { mutation.confirmedStale = true; mutation.uncertain = true; notifyMutation(); return; } if (alive()) showMessage("Módulo ativado. Publique o módulo e o catálogo em Produtos.", "success"); } catch (error) { mutationError(error, "Não foi possível atualizar o módulo."); } finally { finishMutation(); }
     });
     $("#module-pagination").addEventListener("click", (event) => { const button = event.target.closest("[data-module-page]"); if (!button || button.disabled) return; state.page = Number(button.dataset.modulePage); render(); });
     $("#module-destructive-form").addEventListener("submit", async (event) => {
@@ -344,7 +344,7 @@ export async function mount(root, context = {}) {
         const needsReason = ["archive", "delete"].includes(type);
         try {
             const response = await api.request(type === "delete" ? `/backoffice/catalog/modules/${module.id}` : `/backoffice/catalog/modules/${module.id}/${type}`, { method: type === "delete" ? "DELETE" : "POST", body: type === "publish" ? { release_type: formData.get("release_type") } : needsReason ? { reason } : undefined });
-            if (!alive()) { mutation.uncertain = true; notifyMutation(); return; }
+            if (!alive()) { mutation.confirmedStale = true; mutation.uncertain = true; notifyMutation(); return; }
             destructiveModal?.hide(); state.pending = null; const refreshed = await load();
             if (!refreshed) { mutation.confirmedStale = true; mutation.uncertain = true; notifyMutation(); return; }
             if (alive()) showMessage(type === "publish" ? `Módulo publicado na versão ${response.release_version || `v${Number(response.published_version)}.0`}. Publique também o catálogo em Produtos.` : type === "pause" ? "Módulo pausado. O catálogo está pendente de republicação." : "Ação concluída.", "success");

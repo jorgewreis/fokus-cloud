@@ -76,7 +76,7 @@ test('retorno tardio não fecha ou apaga um novo formulário', async ({ page }) 
     await expect(page.locator('#module-form')).toHaveJSProperty('inert', true);
     await page.locator('#module-name').evaluate(el => { el.value = 'Novo rascunho'; });
     await page.evaluate(()=>window.pending[0].resolve({}));
-    await expect(page.locator('#modules-message')).toContainText('Não foi possível confirmar');
+    await expect(page.locator('#modules-message')).toContainText('A alteração foi concluída');
     await expect(page.locator('#module-name')).toHaveValue('Novo rascunho');
     await expect(page.locator('#module-form-submit')).toBeDisabled();
 });
@@ -120,4 +120,17 @@ test('falha na atualização após sucesso exige consulta antes de outra altera�
     await expect(page.locator('#modules-message')).toContainText('A alteração foi concluída');
     await expect(page.locator('#module-form-submit')).toBeDisabled();
     await expect(page.getByRole('button', {name:'Já conferi o catálogo'})).toBeDisabled();
+});
+
+test('ação confirmada após sair informa resultado e exige atualização ao retornar', async ({ page }) => {
+    await setup(page);
+    await page.locator('#module-list [data-module-action="publish"]').evaluate(el=>el.click());
+    await submit(page, '#module-destructive-form');
+    await page.evaluate(() => { window.controller.abort(); window.dispose(); window.pending[0].resolve({release_version:'v1.0'}); });
+    await page.evaluate(async () => {
+        await Promise.resolve(); window.controller = new AbortController();
+        window.dispose = await window.moduleUnderTest.mount(document.querySelector('main'), { admin:{id:'admin1'}, signal:window.controller.signal, permissions:new Set(['platform.catalog.publish']), api:{request:()=>Promise.resolve(window.catalogFixture)} });
+    });
+    await expect(page.locator('#modules-message')).toContainText('A alteração foi concluída');
+    await expect(page.locator('#module-form-submit')).toBeDisabled();
 });
