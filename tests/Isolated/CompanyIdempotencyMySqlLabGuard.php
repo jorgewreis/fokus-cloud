@@ -16,6 +16,7 @@ final class CompanyIdempotencyMySqlLabGuard
     public static function checkInMemorySqlite(mixed $environment, mixed $default, mixed $connection): void
     {
         if ($environment !== 'testing' || $default !== 'sqlite' || ! is_array($connection)
+            || array_key_exists('read', $connection) || array_key_exists('write', $connection)
             || ($connection['driver'] ?? null) !== 'sqlite' || ($connection['database'] ?? null) !== ':memory:'
             || ! in_array($connection['url'] ?? null, [null, ''], true)) {
             throw new RuntimeException('An in-memory SQLite test database is required.');
@@ -43,7 +44,8 @@ final class CompanyIdempotencyMySqlLabGuard
     /** Pure validation of the effective Laravel connection, without connecting. */
     public static function checkConnection(mixed $effective, array $env): void
     {
-        if (! is_array($effective) || ($effective['driver'] ?? null) !== 'mysql'
+        if (! is_array($effective) || array_key_exists('read', $effective) || array_key_exists('write', $effective)
+            || ($effective['driver'] ?? null) !== 'mysql'
             || ($effective['host'] ?? null) !== '127.0.0.1' || (string) ($effective['port'] ?? '') !== '3306'
             || ($effective['database'] ?? null) !== 'fokus_idempotency_api_test'
             || ($effective['username'] ?? null) !== ($env['DB_USERNAME'] ?? null)
