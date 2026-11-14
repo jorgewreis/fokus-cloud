@@ -204,3 +204,52 @@ test('erro do dashboard ativo continua visível', async ({ page }) => {
     await page.goto('/backoffice/painel');
     await expect(page.locator('#dashboard-load-error')).toBeVisible();
 });
+
+test('resposta antiga do dashboard não altera montagem nova nem cabeçalho', async ({ page }) => {
+    let releaseOld, oldRequested, completedOld;
+    const gate = new Promise((resolve) => { releaseOld = resolve; });
+    const requested = new Promise((resolve) => { oldRequested = resolve; });
+    const completed = new Promise((resolve) => { completedOld = resolve; });
+    let calls = 0;
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.stack));
+    await page.addInitScript(() => {
+        const originalFetch = window.fetch;
+        window.fetch = async (...args) => {
+            const response = await originalFetch(...args);
+            if (response.url.endsWith('/api/backoffice/dashboard')) {
+                const originalJson = response.json.bind(response);
+                response.json = async () => {
+                    const data = await originalJson();
+                    if (data.user?.name === 'Pessoa Antiga') setTimeout(() => { window.__oldDashboardResponseConsumed = true; }, 0);
+                    return data;
+                };
+            }
+            return response;
+        };
+    });
+    await page.route('**/api/backoffice/dashboard', async (route) => {
+        const old = ++calls === 2;
+        if (old) { oldRequested(); await gate; }
+        await route.fulfill({ json: { user: { name: old ? 'Pessoa Antiga' : 'Pessoa Atual', role: 'Administrador' }, metrics: { active_companies: old ? 991 : 17, active_people: 2, active_subscriptions: 3, mrr: 4 }, subscription_registrations_6m: [], alerts: [], recent_activity: [] } });
+        if (old) completedOld();
+    });
+    await page.goto('/backoffice/painel');
+    await requested;
+    await page.evaluate(() => { window.__oldDashboardMount = document.querySelector('[data-backoffice-mount]'); });
+    await page.evaluate(() => window.__backofficeRouter.navigate('companies'));
+    await expect(page.locator('#company-create')).toBeVisible();
+    await page.evaluate(() => window.__backofficeRouter.navigate('platform-dashboard-final'));
+    await expect(page.locator('#metric-active-companies')).toHaveText('17');
+    expect(await page.evaluate(() => window.__oldDashboardMount !== document.querySelector('[data-backoffice-mount]') && !window.__oldDashboardMount.isConnected)).toBe(true);
+    const headerBefore = await page.locator('#dashboard-user-name').textContent();
+    const response = page.waitForResponse((r) => r.url().endsWith('/api/backoffice/dashboard') && r.status() === 200);
+    releaseOld();
+    await completed;
+    await response;
+    await page.waitForFunction(() => window.__oldDashboardResponseConsumed === true);
+    await expect(page.locator('#metric-active-companies')).toHaveText('17');
+    await expect(page.locator('#dashboard-user-name')).toHaveText(headerBefore);
+    await expect(page.locator('body')).not.toContainText('Pessoa Antiga');
+    expect(errors).toEqual([]);
+});
