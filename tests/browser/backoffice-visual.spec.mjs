@@ -627,7 +627,6 @@ test('checkout assistido segue o drawer de registros em desktop e mobile', async
         await page.mouse.move(viewport.width - 10, viewport.height - 10);
         await page.goto('/backoffice/assinaturas');
         await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'subscriptions');
-        console.info('sidebar before outside click', JSON.stringify(await page.locator('#sidebar').evaluate(el => ({ classes: el.className, hovered: el.matches(':hover'), focusWithin: el.contains(document.activeElement), active: document.activeElement?.tagName }))));
         await page.mouse.click(viewport.width - 10, viewport.height - 10);
         await expect(page.locator('#sidebar')).toHaveClass(/single/);
         await page.getByRole('button', { name: 'Nova assinatura' }).click();
