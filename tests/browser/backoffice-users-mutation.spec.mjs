@@ -125,3 +125,69 @@ test('convite mantém reserva quando listagem falha após confirmação do envio
     await expect(page.locator('#user-invite')).toBeDisabled();
     expect(count).toBe(1);
 });
+
+for (const operation of ['profile', 'block']) {
+    for (const result of ['success', 'network-error']) {
+        test(`${operation} bloqueia replay depois de navegar: ${result}`, async ({ page }) => {
+            let count = 0;
+            let release;
+            const errors = [];
+            page.on('pageerror', (error) => errors.push(error.message));
+            await page.route(`**/api/backoffice/admins/PAD_VISUAL/${operation}`, async (route) => {
+                count += 1;
+                await new Promise((resolve) => { release = resolve; });
+                if (result === 'success') await route.fulfill({ json: { message: 'Operação concluída.' } });
+                else await route.abort('failed');
+            });
+            await page.goto('/backoffice/usuarios');
+            await page.locator(`#users-list [data-user-action="${operation === 'profile' ? 'edit' : 'block'}"]`).click();
+            if (operation === 'profile') {
+                await page.locator('#user-name').fill('Conta Sintética');
+                await page.locator('#user-form').evaluate((form) => {
+                    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                });
+            } else {
+                await page.locator('#user-action-reason').fill('Teste sintético');
+                await page.locator('#user-action-form').evaluate((form) => {
+                    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                });
+            }
+            await expect.poll(() => count).toBe(1);
+            await page.evaluate(() => window.__backofficeRouter.navigate('companies'));
+            await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'companies');
+            await page.evaluate(() => window.__backofficeRouter.navigate('users'));
+            await expect(page.locator('#user-invite')).toBeDisabled();
+            await expect(page.locator(`#users-list [data-user-action="${operation === 'profile' ? 'edit' : 'block'}"]`)).toBeDisabled();
+            release();
+            await expect(page.locator('#users-message')).toContainText('Atualize a página e confira a situação da conta');
+            expect(count).toBe(1);
+            expect(errors).toEqual([]);
+        });
+    }
+}
+
+for (const operation of ['profile', 'block']) {
+    for (const status of [408, 422]) {
+        test(`${operation} trata HTTP ${status} sem reenvio automático`, async ({ page }) => {
+            let count = 0;
+            await page.route(`**/api/backoffice/admins/PAD_VISUAL/${operation}`, async (route) => {
+                count += 1;
+                await route.fulfill({ status, json: { message: 'Rejeitada.' } });
+            });
+            await page.goto('/backoffice/usuarios');
+            await page.locator(`#users-list [data-user-action="${operation === 'profile' ? 'edit' : 'block'}"]`).click();
+            if (operation === 'profile') await page.locator('#user-form-submit').click();
+            else { await page.locator('#user-action-reason').fill('Teste sintético'); await page.locator('#user-action-submit').click(); }
+            if (status === 408) {
+                await expect(page.locator('#users-message')).toContainText('Atualize a página e confira a situação da conta');
+                await expect(page.locator(operation === 'profile' ? '#user-form-submit' : '#user-action-submit')).toBeDisabled();
+            } else {
+                await expect(page.locator('#users-message')).toContainText('Rejeitada.');
+                await expect(page.locator(operation === 'profile' ? '#user-form-submit' : '#user-action-submit')).toBeEnabled();
+            }
+            expect(count).toBe(1);
+        });
+    }
+}
