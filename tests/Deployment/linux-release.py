@@ -78,7 +78,7 @@ try:
     create(mysql,MYSQL,network,['-e','MYSQL_ROOT_PASSWORD=security-test-only','-e','MYSQL_DATABASE=fokuscloud_security'])
     create(redis,REDIS,'container:'+mysql)
     for attempt in range(90):
-        p=subprocess.run(docker('exec',mysql,'mysqladmin','ping','-h127.0.0.1','-uroot','--password=security-test-only'),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        p=subprocess.run(docker('exec',mysql,'mysqladmin','--no-defaults','ping','-h127.0.0.1','-uroot','--password=security-test-only'),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         if p.returncode==0:break
         time.sleep(2)
     else:raise RuntimeError('Disposable MySQL did not start')
@@ -96,7 +96,7 @@ try:
     mysql_ns=capture('exec',mysql,'readlink','/proc/self/ns/net').strip()
     assert re.fullmatch(r'net:\[[0-9]+\]',mysql_ns), 'Invalid MySQL network namespace'
     assert capture('exec',test,'readlink','/proc/self/ns/net').strip()==mysql_ns, 'Test and MySQL namespaces differ'
-    server_uuid=capture('exec',mysql,'mysql','--protocol=TCP','-h127.0.0.1','-uroot','--password=security-test-only','-Nse','SELECT @@server_uuid').strip().lower()
+    server_uuid=capture('exec',mysql,'mysql','--no-defaults','--protocol=TCP','-h127.0.0.1','-uroot','--password=security-test-only','-Nse','SELECT @@server_uuid').strip().lower()
     assert re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}',server_uuid), 'Invalid disposable MySQL UUID'
     run('plant-mysql-identity',docker('exec','--user','0',test,'sh','-ec',
         'umask 022; printf "%s\\n%s\\n" "$1" "$2" > /run/fokus-release-mysql.identity; chmod 0444 /run/fokus-release-mysql.identity',

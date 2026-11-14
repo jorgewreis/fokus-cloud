@@ -71,6 +71,7 @@ try {
     DB::statement("CREATE TABLE `$ballast` (id INT PRIMARY KEY) ENGINE=InnoDB");
     $ownsBallast = true;
     foreach (['backfill', 'writer'] as $victim) {
+        assertReleaseDisposableMysql();
         if ($ownedIds) {
             DB::table('product_interests')->whereIn('id', $ownedIds)->delete();
             $ownedIds = [];
@@ -93,6 +94,7 @@ try {
                     DB::purge();
                     DeadlockObservedConnection::$evidencePath = "$dir/$actor-deadlocks";
                     Connection::resolverFor('mysql', fn ($connection, $database, $prefix, $config) => new DeadlockObservedConnection($connection, $database, $prefix, $config));
+                    assertReleaseDisposableMysql();
                     Mail::fake();
                     $attempts = 0;
                     DB::connection()->beforeExecuting(function ($query, $bindings) use ($actor, $dir, $ids): void {
@@ -168,6 +170,7 @@ try {
             throw new RuntimeException('actors timed out');
         }
         DB::purge();
+        assertReleaseDisposableMysql();
         $attempts = count(file("$dir/$victim-attempts", FILE_IGNORE_NEW_LINES));
         $other = $victim === 'writer' ? 'backfill' : 'writer';
         $victimErrors = is_file("$dir/$victim-deadlocks") ? file("$dir/$victim-deadlocks", FILE_IGNORE_NEW_LINES) : [];
@@ -201,6 +204,7 @@ try {
         pcntl_waitpid($pid, $status);
     }
     DB::purge();
+    assertReleaseDisposableMysql();
     if ($ownedIds) {
         DB::table('product_interests')->whereIn('id', $ownedIds)->delete();
     }

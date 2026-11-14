@@ -17,6 +17,12 @@ class DisposableMysqlGuardTest(unittest.TestCase):
                     guard.execute_disposable_sql(ddl, {})
             run.assert_not_called()
 
+    def test_sql_client_disables_option_files(self):
+        with patch.object(guard, 'assert_disposable_mysql') as identity, patch.object(guard.subprocess, 'run') as run:
+            guard.execute_disposable_sql('CREATE DATABASE synthetic', {})
+            identity.assert_called_once()
+            self.assertEqual(run.call_args.args[0][:2], ['mysql', '--no-defaults'])
+
     def test_missing_identity_never_invokes_mysql(self):
         with patch.object(guard.os, 'name', 'posix'), patch.object(guard.os, 'geteuid', return_value=1000, create=True), \
              patch.object(guard.IDENTITY.__class__, 'lstat', side_effect=FileNotFoundError), \
@@ -36,6 +42,7 @@ class DisposableMysqlGuardTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'refuse non-disposable'):
                 guard.assert_disposable_mysql(env)
             self.assertEqual(run.call_count, 1)
+            self.assertEqual(run.call_args.args[0][:2], ['mysql', '--no-defaults'])
             self.assertIn('SELECT @@server_uuid', run.call_args.args[0])
             self.assertFalse(any('CREATE' in str(arg) or 'DROP' in str(arg) for arg in run.call_args.args[0]))
         with patch.object(guard.os, 'name', 'posix'), patch.object(guard.os, 'geteuid', return_value=1000, create=True), \

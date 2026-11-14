@@ -61,6 +61,7 @@ try {
                     throw new RuntimeException('parent did not acquire lock');
                 }
                 touch($attempt);
+                assertReleaseDisposableMysql();
                 DB::transaction(function () use ($id, $scenario, $index) {
                     $row = DB::table('product_interests')->where('id', $id)->lockForUpdate()->first();
                     if ($scenario === 'backfill-first') {
@@ -77,6 +78,7 @@ try {
                 exit(2);
             }
         }
+        assertReleaseDisposableMysql();
         DB::transaction(function () use ($id, $scenario, $index, $lock, $attempt, $done) {
             $row = DB::table('product_interests')->where('id', $id)->lockForUpdate()->first();
             if ($scenario === 'backfill-first') {
@@ -128,6 +130,7 @@ try {
         if (DB::table('interest_product_index')->where('interest_id', $id)->pluck('product_code')->all() !== ['new']) {
             throw new RuntimeException('rollback mismatch');
         }
+        assertReleaseDisposableMysql();
         DB::table('product_interests')->where('id', $id)->delete();
         $ownedIds = array_values(array_diff($ownedIds, [$id]));
         echo $scenario." lock and rollback passed\n";
@@ -138,6 +141,7 @@ try {
         pcntl_waitpid($pid, $status);
     }
     if ($ownedIds !== []) {
+        assertReleaseDisposableMysql();
         DB::table('product_interests')->whereIn('id', $ownedIds)->delete();
     }
     foreach (glob($directory.'/*') ?: [] as $path) {

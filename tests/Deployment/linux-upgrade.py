@@ -13,7 +13,7 @@ import tempfile
 from linux_release_common import ROOT, REPORT, BASELINE, guard, environment, php, run, adapt, write, sha, safe_extract_source_archive
 
 from linux_vendor import copy_verified_vendor
-from linux_disposable_mysql import execute_disposable_sql
+from linux_disposable_mysql import assert_disposable_mysql, execute_disposable_sql
 
 ORIGIN_METADATA = {
     'mysql_version': '8.4.10-10',
@@ -233,7 +233,8 @@ def main():
             execute([str(origin_fixture), str(candidate), 'verify-idempotent'], 'repair-origin-idempotent')
             if args.driver == 'mysql':
                 with backup.open('wb') as stream, (REPORT / (prefix + 'dump.log')).open('wb') as errors:
-                    subprocess.run(['mysqldump', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '--single-transaction', '--hex-blob', '--no-tablespaces', name], env=mysql_env, stdout=stream, stderr=errors, check=True)
+                    assert_disposable_mysql(mysql_env)
+                    subprocess.run(['mysqldump', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '--single-transaction', '--hex-blob', '--no-tablespaces', name], env=mysql_env, stdout=stream, stderr=errors, check=True)
             else:
                 # Every PHP process exited; no live SQLite writer exists at this point.
                 shutil.copyfile(db, backup)
@@ -255,7 +256,8 @@ def main():
                 raise RuntimeError('Backup bytes changed before restoration')
             if args.driver == 'mysql':
                 with backup.open('rb') as stream, (REPORT / (prefix + 'restore.log')).open('wb') as output:
-                    subprocess.run(['mysql', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', name], env=mysql_env, stdin=stream, stdout=output, stderr=subprocess.STDOUT, check=True)
+                    assert_disposable_mysql(mysql_env)
+                    subprocess.run(['mysql', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', name], env=mysql_env, stdin=stream, stdout=output, stderr=subprocess.STDOUT, check=True)
             else:
                 shutil.copyfile(backup, db)
                 if sha(db) != sha(backup):

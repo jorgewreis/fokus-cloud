@@ -32,7 +32,7 @@ def assert_disposable_mysql(env):
             raise ValueError('connection override')
         if env.get('DB_HOST') != '127.0.0.1' or env.get('DB_PORT') != '3306' or env.get('DB_USERNAME') != 'root':
             raise ValueError('connection mismatch')
-        probe = subprocess.run(['mysql', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '-Nse', 'SELECT @@server_uuid'],
+        probe = subprocess.run(['mysql', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '-Nse', 'SELECT @@server_uuid'],
                                env=env, text=True, capture_output=True, timeout=10, check=True)
         if probe.stdout.strip().lower() != lines[0]:
             raise ValueError('server identity mismatch')
@@ -42,5 +42,5 @@ def assert_disposable_mysql(env):
 
 def execute_disposable_sql(statement, env):
     assert_disposable_mysql(env)
-    subprocess.run(['mysql', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '-e', statement],
+    subprocess.run(['mysql', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '-e', statement],
                    env=env, check=True, stdout=subprocess.DEVNULL)
