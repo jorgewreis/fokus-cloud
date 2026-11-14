@@ -39,6 +39,18 @@ class PlatformSecurityTest extends TestCase
         $this->assertAuthenticatedAs($admin, 'platform');
     }
 
+    public function test_old_or_malformed_session_binding_is_unavailable_without_silent_creation(): void
+    {
+        $binding = app(PlatformSessionBinding::class);
+        session()->forget(PlatformSessionBinding::SESSION_KEY);
+        $this->assertNull($binding->current(session()->driver()));
+        $this->assertFalse(session()->has(PlatformSessionBinding::SESSION_KEY));
+        session()->put(PlatformSessionBinding::SESSION_KEY, 'invalid');
+        $this->assertNull($binding->current(session()->driver()));
+        $binding->rotateIfPresent(session()->driver());
+        $this->assertFalse(session()->has(PlatformSessionBinding::SESSION_KEY));
+    }
+
     public function test_platform_logout_ends_the_admin_session_and_blocks_backoffice_access(): void
     {
         $admin = $this->admin();
@@ -262,7 +274,11 @@ class PlatformSecurityTest extends TestCase
             ->assertJsonCount(1, 'subscriptions')
             ->assertJsonPath('subscriptions.0.status', 'suspensa')
             ->assertJsonPath('subscriptions.0.users.0.membership_id', $membershipId);
-        $this->actingAs($admin, 'platform')->postJson('/api/backoffice/support/access', ['subscription_id' => $subscriptionId, 'membership_id' => $membershipId, 'reason' => 'Investigar falha reportada'])->assertOk()->assertJsonPath('redirect_to', '/portal');
+        $priorBinding = str_repeat('a', 64);
+        $this->actingAs($admin, 'platform')->withSession([PlatformSessionBinding::SESSION_KEY => $priorBinding])->postJson('/api/backoffice/support/access', ['subscription_id' => $subscriptionId, 'membership_id' => $membershipId, 'reason' => 'Investigar falha reportada'])->assertOk()->assertJsonPath('redirect_to', '/portal');
+        $binding = app(PlatformSessionBinding::class)->current(session()->driver());
+        $this->assertNotNull($binding);
+        $this->assertNotSame($priorBinding, $binding);
         $this->assertAuthenticatedAs($customer, 'web');
         $this->assertAuthenticatedAs($admin, 'platform');
         $this->assertDatabaseHas('platform_support_sessions', ['platform_admin_id' => $admin->id, 'company_id' => $companyId, 'subscription_id' => $subscriptionId, 'target_user_id' => $customer->id, 'ended_at' => null]);
@@ -277,7 +293,10 @@ class PlatformSecurityTest extends TestCase
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.support_access_started', 'platform_admin_id' => $admin->id]);
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.support_access_ended', 'platform_admin_id' => $admin->id]);
 
+        session()->forget(PlatformSessionBinding::SESSION_KEY);
         $this->postJson('/api/backoffice/support/access', ['subscription_id' => $subscriptionId, 'membership_id' => $membershipId, 'reason' => 'Validar limite temporal do suporte'])->assertOk();
+        $this->assertNull(app(PlatformSessionBinding::class)->current(session()->driver()));
+        $this->assertFalse(session()->has(PlatformSessionBinding::SESSION_KEY));
         $this->travel(31)->minutes();
         $this->getJson('/api/auth/me')->assertUnauthorized();
         $this->assertGuest('web');
