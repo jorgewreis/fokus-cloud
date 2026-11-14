@@ -17,6 +17,7 @@ import time
 import uuid
 import xml.etree.ElementTree as ET
 
+from idempotency_attestation import digest, source_manifest, validate_receipt
 from idempotency_suite_evidence import validate_selection
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -103,6 +104,8 @@ def main() -> None:
     parser.add_argument("--candidate-sha", required=True)
     parser.add_argument("--profile", required=True)
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--dependency-receipt", type=Path, required=True)
+    parser.add_argument("--dependency-receipt-sha256", required=True)
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
     profiles = json.loads((ROOT / "tests/Deployment/linux-runtime/profiles.json").read_text(encoding="utf-8"))
@@ -112,6 +115,23 @@ def main() -> None:
                                            profile=args.profile, profiles=profiles)
     if not args.execute:
         raise RuntimeError("Explicit --execute required")
+    # The receipt must be supplied by the release orchestrator that recorded
+    # the locked install. A digest alone does not attest the receipt's origin.
+    if args.dependency_receipt.is_symlink() or not args.dependency_receipt.is_file():
+        raise RuntimeError("Dependency receipt must be a regular file")
+    source = source_manifest(ROOT, args.candidate_sha)
+    source_hash = {row["path"]: row["sha256"] for row in source["files"]}
+    for name in ("tests/Deployment/idempotency_mysql_lab.py",
+                 "tests/Deployment/idempotency_attestation.py",
+                 "tests/Deployment/idempotency_suite_evidence.py",
+                 "tests/Deployment/linux-runtime/profiles.json"):
+        if name not in source_hash or digest((ROOT / name).read_bytes()) != source_hash[name]:
+            raise RuntimeError("Executing laboratory code differs from candidate")
+    receipt_data = args.dependency_receipt.read_bytes()
+    receipt = validate_receipt(receipt_data, args.dependency_receipt_sha256, source)
+    source_data = json.dumps(source, separators=(",", ":")).encode()
+    vendor_data = json.dumps(receipt, separators=(",", ":")).encode()
+    helper_data = (ROOT / "tests/Deployment/idempotency_attestation.py").read_bytes()
     # A fresh, exclusively named output directory prevents stale evidence reuse.
     args.report.mkdir(parents=False, exist_ok=False)
     volume = json.loads(docker("volume", "inspect", args.volume).stdout)[0]
@@ -138,18 +158,32 @@ def main() -> None:
             raise RuntimeError("Invalid laboratory server identity")
         docker("run", "-d", "--pull=never", "--name", runner, "--restart=no",
                "--network", "container:" + mysql, "--label", "fokus.release.disposable=true",
-               "--mount", "type=volume,src=" + args.volume + ",dst=/work", runtime_image,
+               "--mount", "type=volume,src=" + args.volume + ",dst=/input,readonly",
+               "--tmpfs", "/workspace:rw,exec,size=2g", runtime_image,
                "sleep", "infinity")
         created.append(runner)
         docker("exec", "--user", "0", runner, "sh", "-ec",
-               "test -d /work/release && ln -s /work/release /workspace && "
-               "test ! -e /workspace/.env && test ! -e /workspace/.env.testing && "
-               "test ! -e /workspace/bootstrap/cache/config.php && "
+               "test -d /input/release && test ! -e /input/release/.env && "
+               "test ! -e /input/release/.env.testing && test ! -e /input/release/bootstrap/cache/config.php && "
                "printf '%s\\n' '<?php require \"/workspace/vendor/autoload.php\";' > /test-bootstrap.php")
-        observed = docker("exec", runner, "git", "-c", "safe.directory=/workspace", "-C", "/workspace",
-                          "rev-parse", "HEAD").stdout.decode().strip()
-        if observed != args.candidate_sha:
-            raise RuntimeError("Laboratory checkout differs from candidate")
+        for path, data in (("/tmp/idempotency-attestation.py", helper_data),
+                           ("/tmp/idempotency-source.json", source_data),
+                           ("/tmp/idempotency-vendor.json", vendor_data)):
+            # Paths are fixed literals, not user-supplied shell fragments.
+            docker("exec", "-i", "--user", "0", runner, "sh", "-ec", "umask 077; cat > " + path,
+                   input_data=data)
+        docker("exec", "--user", "0", runner, "python3", "/tmp/idempotency-attestation.py", "copy")
+        docker("exec", "--user", "0", runner, "python3", "-c",
+               "import sys;from pathlib import Path;sys.path.insert(0,'/workspace/tests/Deployment');"
+               "from linux_vendor import check_packages;check_packages(Path('/workspace'))")
+        # The PHPUnit process cannot modify code/vendor. Laravel only needs
+        # its cache and storage directories writable; source is rechecked.
+        docker("exec", "--user", "0", runner, "sh", "-ec",
+               "chmod -R a-w /workspace && mkdir -p /workspace/storage/framework/cache "
+               "/workspace/storage/framework/sessions /workspace/storage/framework/views "
+               "/workspace/storage/logs /workspace/bootstrap/cache && "
+               "chown -R 1000:1000 /workspace/storage /workspace/bootstrap/cache && "
+               "chmod -R u+rwX /workspace/storage /workspace/bootstrap/cache")
         docker("exec", "-i", "--user", "0", runner, "sh", "-ec", "cat > /tmp/idempotency-phpunit.xml",
                input_data=junit_config())
         env = {
@@ -173,12 +207,17 @@ def main() -> None:
                         "--log-junit", "/tmp/idempotency-junit.xml", "--colors=never", "--do-not-cache-result", check=False)
         (args.report / "phpunit.log").write_bytes(result.stdout + result.stderr)
         copied = docker("cp", runner + ":/tmp/idempotency-junit.xml", str(args.report / "junit.xml"), check=False)
+        docker("exec", "--user", "0", runner, "python3", "/tmp/idempotency-attestation.py", "verify")
         if result.returncode != 0 or copied.returncode != 0:
             raise RuntimeError("Laboratory tests or evidence collection failed")
         evidence = validate_selection(args.report / "junit.xml", profile="mysql", source_sha=args.candidate_sha,
-                                      observed_sha=observed, required=REQUIRED)
+                                      observed_sha=source["commit"], required=REQUIRED)
         evidence.update({"scope": "isolated MySQL laboratory only; not release approval",
-                         "release_gate_integrated": False, "server_uuid_checked_by_test_bootstrap": True})
+                         "release_gate_integrated": False, "server_uuid_checked_by_test_bootstrap": True,
+                         "source_manifest_sha256": digest(source_data),
+                         "dependency_receipt_sha256": args.dependency_receipt_sha256,
+                         "vendor_tree_sha256": receipt["vendor_tree_sha256"],
+                         "receipt_origin_requires_orchestrator_attestation": True})
         (args.report / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
     finally:
         # Only stop the containers this invocation created; do not delete them.

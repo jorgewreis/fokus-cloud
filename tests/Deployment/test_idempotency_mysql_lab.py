@@ -63,7 +63,9 @@ class LaboratoryPreflightTest(unittest.TestCase):
             profiles_dir.mkdir(parents=True)
             (profiles_dir / "profiles.json").write_text('{}', encoding="utf-8")
             arguments = ["runner", "--volume", self.args["volume"], "--candidate-sha",
-                         self.args["source_sha"], "--profile", "target", "--report", str(root / "out")]
+                         self.args["source_sha"], "--profile", "target", "--report", str(root / "out"),
+                         "--dependency-receipt", str(root / "receipt.json"),
+                         "--dependency-receipt-sha256", "a" * 64]
             with patch.object(laboratory, "ROOT", root), patch("sys.argv", arguments), \
                     patch.object(laboratory, "preflight", return_value=("mysql", "runtime")), \
                     patch.object(laboratory, "docker") as mocked_docker:
