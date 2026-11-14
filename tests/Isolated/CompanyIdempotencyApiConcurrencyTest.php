@@ -16,6 +16,8 @@ use RuntimeException;
 use Tests\TestCase;
 use Throwable;
 
+require_once __DIR__.'/CompanyIdempotencyMySqlLabGuard.php';
+
 /** Run only with the guarded, empty MySQL API laboratory bootstrap. */
 class CompanyIdempotencyApiConcurrencyTest extends TestCase
 {
@@ -23,6 +25,7 @@ class CompanyIdempotencyApiConcurrencyTest extends TestCase
 
     public function runDatabaseMigrations(): void
     {
+        CompanyIdempotencyMySqlLabGuard::assertBeforeFresh();
         $this->artisan('migrate:fresh')->assertSuccessful();
         $this->beforeApplicationDestroyed(function (): void {
             RefreshDatabaseState::$migrated = false;
