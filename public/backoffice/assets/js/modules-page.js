@@ -57,6 +57,7 @@ export async function mount(root, context = {}) {
                 currentForm.prepend(warning);
             } else if (!mutation.uncertain) warning?.remove();
         }
+        if (mutation.inFlight && !mutation.uncertain) showMessage("Processando alteração do módulo.", "info");
         if (mutation.uncertain) {
             const node = $("#modules-message");
             node.replaceChildren(document.createTextNode("Não foi possível confirmar o resultado. Consulte o catálogo antes de tentar novamente. "));
