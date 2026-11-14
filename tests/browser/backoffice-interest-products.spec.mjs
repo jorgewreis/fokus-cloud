@@ -57,3 +57,106 @@ test('sugestões históricas pendentes permitem código manual e navegação pag
     await page.locator('#interest-product-filter').fill('historico-manual');
     await page.getByRole('button', { name: 'Filtrar' }).click();
 });
+
+test('a paginação mantém controles limitados mesmo com muitas páginas', async ({ page }) => {
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { role: 'superadministrador', name: 'Teste', permissions: ['platform.product_interests.manage'] } } }));
+    await page.route('**/api/backoffice/product-interests-options?*', route => route.fulfill({ json: { products: [], meta: { current_page: 1, has_more: false }, historical_index_ready: true } }));
+    await page.route('**/api/backoffice/product-interests?*', route => {
+        const current = Number(new URL(route.request().url()).searchParams.get('page') || 1);
+        return route.fulfill({ json: { data: [], meta: { total: 1500000, current_page: current, last_page: 100000 } } });
+    });
+    await page.goto('/backoffice/interesses');
+    await expect(page.locator('#interest-pagination button')).toHaveCount(7);
+    await page.getByRole('button', { name: '100000', exact: true }).click();
+    await expect(page.locator('#interest-pagination [aria-current="page"]')).toHaveText('100000');
+    await expect(page.locator('#interest-pagination [aria-current="page"]')).toBeFocused();
+    await expect(page.locator('#interest-pagination button')).toHaveCount(7);
+    await page.getByRole('button', { name: 'Anterior', exact: true }).click();
+    await expect(page.locator('#interest-pagination [aria-current="page"]')).toHaveText('99999');
+});
+
+test('respostas atrasadas não substituem o filtro nem atravessam suspensão', async ({ page }) => {
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { role: 'superadministrador', name: 'Teste', permissions: ['platform.product_interests.manage'] } } }));
+    await page.route('**/api/backoffice/product-interests-options?*', route => route.fulfill({ json: { products: [], meta: { current_page: 1, has_more: false }, historical_index_ready: true } }));
+    let resolveOld;
+    const old = new Promise(resolve => { resolveOld = resolve; });
+    let oldFinished;
+    const oldDone = new Promise(resolve => { oldFinished = resolve; });
+    let oldStarted;
+    const started = new Promise(resolve => { oldStarted = resolve; });
+    const row = (id, name) => ({ id, name, email: 'teste@example.test', products: [], profiles: [], status: 'novo', last_submitted_at: '2026-01-01T00:00:00Z' });
+    await page.route('**/api/backoffice/product-interests?*', async route => {
+        const product = new URL(route.request().url()).searchParams.get('product');
+        if (product === 'antigo') { oldStarted(); await old; }
+        await route.fulfill({ json: { data: [row('1', product || 'Inicial')], meta: { total: 1, current_page: 1, last_page: 1 } } });
+        if (product === 'antigo') oldFinished();
+    });
+    let resolveDetail;
+    const pendingDetail = new Promise(resolve => { resolveDetail = resolve; });
+    let detailFinished;
+    const finished = new Promise(resolve => { detailFinished = resolve; });
+    let detailStarted;
+    const detailReady = new Promise(resolve => { detailStarted = resolve; });
+    await page.route('**/api/backoffice/product-interests/1', async route => {
+        detailStarted(); await pendingDetail;
+        await route.fulfill({ json: { interest: { ...row('1', 'Detalhe antigo'), consented_at: '2026-01-01T00:00:00Z' } } }); detailFinished();
+    });
+    await page.goto('/backoffice/interesses');
+    await expect(page.locator('#interest-list')).toContainText('Inicial');
+    await page.locator('#interest-product-filter').fill('antigo');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await started;
+    await page.locator('#interest-product-filter').fill('novo');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page.locator('#interest-list')).toContainText('novo');
+    resolveOld();
+    await oldDone;
+    await expect(page.locator('#interest-list')).toContainText('novo');
+    await page.getByRole('button', { name: 'Detalhes' }).click();
+    await detailReady;
+    await page.evaluate(() => { window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })); window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); });
+    resolveDetail();
+    await finished;
+    await expect(page.locator('#interest-detail')).toBeHidden();
+});
+
+test('detalhe pendente não gera erro após remoção da página', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { role: 'superadministrador', name: 'Teste', permissions: ['platform.product_interests.manage'] } } }));
+    await page.route('**/api/backoffice/product-interests-options?*', route => route.fulfill({ json: { products: [], meta: { current_page: 1, has_more: false }, historical_index_ready: true } }));
+    const row = { id: '1', name: 'Cliente fictício', email: 'teste@example.test', products: [], profiles: [], status: 'novo', last_submitted_at: '2026-01-01T00:00:00Z' };
+    await page.route('**/api/backoffice/product-interests?*', route => route.fulfill({ json: { data: [row], meta: { total: 1, current_page: 1, last_page: 1 } } }));
+    let release;
+    const pending = new Promise(resolve => { release = resolve; });
+    let finished;
+    const completed = new Promise(resolve => { finished = resolve; });
+    let begun;
+    const started = new Promise(resolve => { begun = resolve; });
+    await page.route('**/api/backoffice/product-interests/1', async route => { begun(); await pending; await route.fulfill({ json: { interest: { ...row, name: 'Resposta antiga', consented_at: '2026-01-01T00:00:00Z' } } }); finished(); });
+    await page.goto('/backoffice/interesses');
+    await page.getByRole('button', { name: 'Detalhes' }).click();
+    await started;
+    await page.evaluate(() => document.querySelector('[data-backoffice-mount]').remove());
+    release();
+    await completed;
+    await expect.poll(() => errors).toEqual([]);
+});
+
+test('filtro e paginação permanecem visíveis em larguras estreitas', async ({ page }) => {
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { role: 'superadministrador', name: 'Teste', permissions: ['platform.product_interests.manage'] } } }));
+    await page.route('**/api/backoffice/product-interests-options?*', route => route.fulfill({ json: { products: [{code: 'futuro', name: 'Produto futuro'}], meta: { current_page: 1, has_more: true }, historical_index_ready: true } }));
+    await page.route('**/api/backoffice/product-interests?*', route => route.fulfill({ json: { data: [], meta: { total: 1500, current_page: 1, last_page: 100 } } }));
+    for (const width of [320, 375, 768, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto('/backoffice/interesses');
+        const input = page.locator('#interest-product-filter');
+        await expect(input).toBeVisible();
+        const box = await input.boundingBox();
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
+        await input.fill('futuro');
+        await expect(input).toHaveValue('futuro');
+        if (width === 320 || width === 1440) await page.screenshot({ path: `test-results/interest-${width}.png`, fullPage: true });
+    }
+});
