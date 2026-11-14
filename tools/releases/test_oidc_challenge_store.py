@@ -65,7 +65,7 @@ class ChallengeStore(unittest.TestCase):
         api.assert_called_once_with('example/project','synthetic-read-token')
         self.assertEqual(result['state'],'evidence_consistent_not_authorized')
         self.assertEqual(result['check_run_id'],'34')
-        self.assertNotIn(token,json.dumps(result))
+        self.assertNotIn(token,repr(result))
 
     def test_client_cannot_choose_other_repo_or_job_in_signed_token(self):
         import oidc_evidence_flow as flow

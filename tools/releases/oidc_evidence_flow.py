@@ -39,4 +39,22 @@ def assess(directory, audience, oidc_token, read_token, action, candidate, artif
     # This proof cannot authorize a switch: activation locking, independent
     # artifact binding and current environment approval remain unproven.
     return {'state':'evidence_consistent_not_authorized','run_id':identity.run_id,
-            'check_run_id':identity.check_run_id,'candidate':candidate,'artifact':artifact}
+            'check_run_id':identity.check_run_id,'candidate':candidate,'artifact':artifact,
+            '_identity':identity,'_policy_digest':digest,'_environment_digest':env_digest}
+
+
+def recheck(directory, result):
+    """Recheck protected policy and the signed window; does not authorize."""
+    identity=result.get('_identity')
+    if type(identity) is not github_oidc.VerifiedIdentity:
+        raise ValueError('verified_identity_required')
+    with store.locked(directory) as (fd, checkpoint):
+        settings,digest=store.policy(directory,fd)
+        _,env_digest=store.environment_policy(directory,fd)
+        if digest!=result.get('_policy_digest') or env_digest!=result.get('_environment_digest'):
+            raise ValueError('authorization_changed')
+        if identity.sha!=settings['workflow_sha'] or identity.repository!=settings['repository'] or identity.repository_id!=settings['repository_id']:
+            raise ValueError('identity_policy_mismatch')
+        now=store.trusted_time(directory,fd)
+        github_oidc.validate_window(identity.issued,identity.not_before,identity.expires,now)
+        checkpoint()

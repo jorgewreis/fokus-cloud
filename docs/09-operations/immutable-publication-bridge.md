@@ -226,15 +226,16 @@ Falhas após consumo queimam o desafio; nova tentativa requer novo desafio. O fl
 não está conectado ao protocolo público ou à ativação, e a identidade do job,
 o artefato independente e a autorização produtiva continuam sem prova completa.
 
-`oidc_activation_evidence.py` exercita, sem ativar, o encadeamento sob locks:
-verifica receipt e ponteiro, extrai do receipt o digest do artefato, confere o
-handoff/runtime e passa esses valores ao fluxo OIDC e de environment. Após as
-consultas, repete as verificações do ponteiro, receipt, política e handoff/runtime.
-O digest continua dependente da integridade e proveniência do receipt e do
-operador confiável; o ensaio não comprova uma origem independente. Seu único
-resultado positivo é `evidence_consistent_not_authorized`, sem latch ou switch.
-Não há endpoint produtivo nem integração ao ativador; não demonstra aprovação
-histórica atômica nem elimina a necessidade de transporte autenticado.
+`oidc_activation_evidence.py` exercita, sem ativar, verificações locais sob
+locks antes e depois das consultas OIDC e de environment, que ocorrem fora dos
+locks. Após a rede, reconfere ponteiro, receipt, políticas, handoff, runtime e a
+janela assinada, e recusa resultados após o prazo monotônico de 30 segundos.
+O prazo verificado ao retornar não interrompe, por si só, uma rede bloqueada;
+um processo externo precisa impor o limite de execução. O digest depende do
+receipt e do operador confiável; o ensaio não comprova origem independente.
+Seu único resultado positivo é `evidence_consistent_not_authorized`, sem latch
+ou switch. Entre a última consulta e a eventual ativação, o estado do GitHub pode
+mudar; não há prova histórica atômica, endpoint produtivo ou integração ao ativador.
 
 ## Evidência e limites
 
