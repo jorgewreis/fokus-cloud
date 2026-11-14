@@ -114,6 +114,8 @@ final class PlatformSessionLifecycle
     {
         if ($this->enabled()) {
             $this->expiry();
+            // Real guard context is not yet certified by the experimental issuer.
+            abort(503, 'Acesso interno temporariamente indisponível.');
         }
     }
 

@@ -53,7 +53,7 @@ $db->statement('CREATE TABLE platform_admins (id TEXT PRIMARY KEY, status TEXT, 
 $db->statement('CREATE TABLE platform_permissions (id TEXT PRIMARY KEY, code TEXT)');
 $db->statement('CREATE TABLE platform_role_permissions (platform_role_id TEXT, platform_permission_id TEXT)');
 $db->statement('CREATE TABLE company_idempotency_requests (token_hash TEXT PRIMARY KEY, key_id TEXT, actor_id TEXT, operation TEXT, issued_at_epoch INTEGER, expires_at_epoch INTEGER, recorded_at_epoch INTEGER, state TEXT, revoked INTEGER DEFAULT 0, payload_digest TEXT, result_id TEXT, result_status INTEGER, created_at TEXT, updated_at TEXT)');
-$db->statement('CREATE TABLE platform_session_authorizations (binding_hash TEXT PRIMARY KEY, actor_id TEXT NOT NULL, web_user_id TEXT, web_generation INTEGER, expires_at_epoch INTEGER NOT NULL, revoked INTEGER NOT NULL DEFAULT 0, created_at TEXT, updated_at TEXT)');
+$db->statement('CREATE TABLE platform_session_authorizations (binding_hash TEXT PRIMARY KEY, actor_id TEXT NOT NULL, principal_known INTEGER NOT NULL DEFAULT 0, web_user_id TEXT, web_generation INTEGER, expires_at_epoch INTEGER NOT NULL, revoked INTEGER NOT NULL DEFAULT 0, created_at TEXT, updated_at TEXT)');
 $db->statement('CREATE TABLE synthetic_effects (id TEXT PRIMARY KEY)');
 $db->statement('CREATE TABLE sessions (id TEXT PRIMARY KEY, payload TEXT, last_activity INTEGER NOT NULL)');
 $db->statement('CREATE TABLE synthetic_challenges (id TEXT PRIMARY KEY, used INTEGER NOT NULL DEFAULT 0)');
@@ -76,6 +76,34 @@ $check = function (bool $condition) use (&$assertions): void {
         throw new RuntimeException('Session authority assertion failed.');
     }
 };
+// Synthetic test fixture only: no production path certifies platform-only context yet.
+$fixturePlatformOnly = function (string $marker) use ($db): void {
+    $db->table('platform_session_authorizations')->where('binding_hash', hash('sha256', $marker))->update(['principal_known' => true]);
+};
+try {
+    $authority->withActiveSession('actor-a', $markerA, $sessionId, fn () => null);
+    throw new LogicException('Unknown principal was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 503);
+}
+$unknownConsumed = false;
+foreach ([
+    fn () => $authority->rotate('actor-a', $markerA, str_repeat('4', 64), $expiry),
+    function () use ($authority, $expiry, $markerA, &$unknownConsumed): void {
+        $authority->completeMfa('actor-a', str_repeat('3', 64), $expiry, 'actor-a', $markerA, function () use (&$unknownConsumed): void {
+            $unknownConsumed = true;
+        });
+    },
+] as $unknownOperation) {
+    try {
+        $unknownOperation();
+        throw new LogicException('Unknown principal transition was accepted.');
+    } catch (HttpException $e) {
+        $check($e->getStatusCode() === 503);
+    }
+}
+$check(! $unknownConsumed);
+$fixturePlatformOnly($markerA);
 $db->statement('CREATE TABLE users (id TEXT PRIMARY KEY)');
 $db->statement('CREATE TABLE web_principal_generations (user_id TEXT PRIMARY KEY, generation INTEGER NOT NULL, updated_at TEXT NOT NULL)');
 $db->table('users')->insert(['id' => 'principal']);
@@ -209,6 +237,7 @@ $check($db->table('platform_session_authorizations')->where('binding_hash', hash
 $check($db->table('platform_session_authorizations')->where('binding_hash', $markerA)->count() === 0);
 $markerD = str_repeat('d', 64);
 $authority->registerAfterMfa('actor-a', $markerD, $expiry);
+$fixturePlatformOnly($markerD);
 $keys = new CompanyIdempotencyKeys(['a' => base64_encode(str_repeat('k', 32))], 'a', []);
 $store = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, 10, 10, 60, $authority, $markerD, $sessionId);
 $token = $store->issue('actor-a', 'company.create', 60);
@@ -266,6 +295,7 @@ $denied(fn () => $store->revoke($token, 'actor-a', 'company.create', time(), fn 
 $denied(fn () => $store->issue('actor-a', 'company.create', 60));
 $markerE = str_repeat('e', 64);
 $authority->registerAfterMfa('actor-a', $markerE, $expiry);
+$fixturePlatformOnly($markerE);
 $orderedStore = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, 10, 10, 60, $authority, $markerE, $sessionId);
 $statements = [];
 $db->beforeExecuting(function (string $query) use (&$statements): void {
@@ -358,12 +388,19 @@ try {
     $check(true);
 }
 $app['config']->set('company_idempotency.session_authority_max_age_seconds', 120);
+try {
+    $lifecycle->ensureConfigurationReady();
+    throw new LogicException('Uncertified MFA issuer was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 503);
+}
 $session = new Store('synthetic', new ArraySessionHandler(2));
 $session->start();
 $session->setId($sessionId);
 $lifecycle->authenticated($session, 'actor-b', null, fn () => null);
 $sessionBinding = (new PlatformSessionBinding)->current($session);
 $check(is_string($sessionBinding) && strlen($sessionBinding) === 64);
+$fixturePlatformOnly($sessionBinding);
 $check($authority->withActiveSession('actor-b', $sessionBinding, $sessionId, fn () => 'authenticated') === 'authenticated');
 $lifecycle->rotateIfPresent($session, 'actor-b');
 $rotatedBinding = (new PlatformSessionBinding)->current($session);
@@ -377,6 +414,7 @@ $lifecycle->rotateIfPresent($session, 'actor-b');
 $check((new PlatformSessionBinding)->current($session) === null);
 $lifecycle->authenticated($session, 'actor-b', null, fn () => null);
 $currentBinding = (new PlatformSessionBinding)->current($session);
+$fixturePlatformOnly($currentBinding);
 $app['config']->set('company_idempotency.session_authority_lifecycle', false);
 $lifecycle->rotateIfEnabled($session, null);
 $check((new PlatformSessionBinding)->current($session) === $currentBinding);
@@ -407,6 +445,7 @@ $lifecycle->authenticated($session, 'actor-b', 'actor-b', function () use ($db):
 $check((int) $db->table('synthetic_challenges')->where('id', 'challenge')->value('used') === 1);
 $newBinding = (new PlatformSessionBinding)->current($session);
 $check(is_string($newBinding) && $newBinding !== $currentBinding);
+$fixturePlatformOnly($newBinding);
 $denied(fn () => $authority->withActiveSession('actor-b', $currentBinding, $sessionId, fn () => 'after reauthentication'));
 $currentBinding = $newBinding;
 $db->table('synthetic_challenges')->where('id', 'challenge')->update(['used' => 0]);

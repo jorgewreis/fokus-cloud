@@ -140,3 +140,13 @@ A null web principal is still an unknown legacy state, not proof that the sessio
 has no web guard. Consequently these checks cannot establish that all mixed
 sessions are detected. Explicit no-user state, trusted context transitions and
 integration with the real store remain mandatory before removing the route guards.
+
+The experimental schema now distinguishes unknown context (`principal_known =
+false`) from a verified platform-only context and a principal-bound context. Old
+issuers produce unknown context; old writer, rotate and MFA replacement reject
+it. Synthetic tests directly mark selected fixtures platform-only solely to
+exercise existing primitives; no real issuer has been shown to verify and record
+that state. The real MFA controller now fails closed before consuming a challenge when the
+flag is enabled. Direct primitive calls remain experimental and are not safe
+issuance APIs. Lifecycle activation remains prohibited until issuance verifies
+trusted context and tests cover the real flows.
