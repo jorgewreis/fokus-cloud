@@ -164,14 +164,22 @@ final class PlatformSessionAuthority
     /** Expiry and cleanup must serialize with the writer on the same PDO. */
     private function lockLaravelSession(string $sessionId): void
     {
-        $table = config('session.table', 'sessions');
+        $table = $this->transactionalSessionTable();
         $lifetime = config('session.lifetime');
-        abort_unless(config('session.driver') === 'database' && DB::connection(config('session.connection')) === DB::connection()
-            && is_string($table) && preg_match('/\A[A-Za-z_][A-Za-z0-9_]*\z/D', $table) === 1
-            && is_int($lifetime) && $lifetime > 0 && preg_match('/\A[A-Za-z0-9]{40}\z/D', $sessionId) === 1,
+        abort_unless(is_int($lifetime) && $lifetime > 0 && preg_match('/\A[A-Za-z0-9]{40}\z/D', $sessionId) === 1,
             503, 'Sessão indisponível.');
         $row = DB::table($table)->where('id', $sessionId)->lockForUpdate()->first(['id', 'last_activity']);
         abort_unless($row && (int) $row->last_activity > now()->subMinutes($lifetime)->getTimestamp(), 401, 'Sessão indisponível.');
+    }
+
+    /** Reject non-atomic session topology before any security mutation. */
+    public function transactionalSessionTable(): string
+    {
+        $table = config('session.table', 'sessions');
+        abort_unless(config('session.driver') === 'database' && DB::connection(config('session.connection')) === DB::connection()
+            && is_string($table) && preg_match('/\A[A-Za-z_][A-Za-z0-9_]*\z/D', $table) === 1, 503, 'Sessão indisponível.');
+
+        return $table;
     }
 
     private function lockActor(string $actor): object

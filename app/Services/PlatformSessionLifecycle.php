@@ -72,6 +72,18 @@ final class PlatformSessionLifecycle
         return $this->enabled() && $this->binding->current($session) !== null;
     }
 
+    public function enabledForSecurityMutation(): bool
+    {
+        return $this->enabled();
+    }
+
+    public function transactionalSessionTable(): string
+    {
+        abort_unless($this->enabled(), 503, 'Sessão indisponível.');
+
+        return $this->authority->transactionalSessionTable();
+    }
+
     /** The callback may only mutate the business database on this connection. */
     public function retireAndRun(Session $session, ?string $actor, callable $callback): mixed
     {

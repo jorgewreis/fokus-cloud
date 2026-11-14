@@ -570,27 +570,29 @@ class AuthController extends Controller
         $passwordSecurity->validate($data['password']);
         $lifecycle = app(PlatformSessionLifecycle::class);
         $currentWebId = Auth::guard('web')->id();
-        $preview = $lifecycle->needsTransactionalRetirement($request->session()) && $currentWebId !== null
-            ? DB::table('security_tokens')->where('token_hash', hash('sha256', $data['token']))
-                ->whereIn('purpose', ['password_reset', 'password_creation'])->whereNull('used_at')->where('expires_at', '>', now())->first(['user_id'])
-            : null;
-        if ($preview && $preview->user_id === $currentWebId) {
-            $platformActor = Auth::guard('platform')->id();
-            [$token, $user] = $lifecycle->retireAndRun($request->session(), $platformActor === null ? null : (string) $platformActor, function () use ($data, $preview): array {
+        if ($lifecycle->enabledForSecurityMutation()) {
+            $table = $lifecycle->transactionalSessionTable();
+            $reset = function () use ($data, $table): array {
                 $token = $this->consumeTokenLocked($data['token'], ['password_reset', 'password_creation']);
-                abort_unless($token->user_id === $preview->user_id, 422, 'Link inválido ou expirado.');
                 $user = User::findOrFail($token->user_id);
                 $user->forceFill(['password' => $data['password'], 'status' => 'ativa', 'email_verified_at' => $user->email_verified_at ?: now()])->save();
+                DB::table($table)->where('user_id', $user->id)->delete();
 
                 return [$token, $user];
-            });
+            };
+            if ($lifecycle->needsTransactionalRetirement($request->session())) {
+                $platformActor = Auth::guard('platform')->id();
+                [$token, $user] = $lifecycle->retireAndRun($request->session(), $platformActor === null ? null : (string) $platformActor, $reset);
+            } else {
+                [$token, $user] = DB::transaction($reset);
+            }
         } else {
             $token = $this->consumeToken($data['token'], ['password_reset', 'password_creation']);
             $user = User::findOrFail($token->user_id);
             $user->forceFill(['password' => $data['password'], 'status' => 'ativa', 'email_verified_at' => $user->email_verified_at ?: now()])->save();
+            DB::table('sessions')->where('user_id', $user->id)->delete();
         }
         $invalidateCurrent = $currentWebId === $user->id;
-        DB::table('sessions')->where('user_id', $user->id)->delete();
         if ($invalidateCurrent) {
             Auth::guard('web')->logout();
             $request->session()->invalidate();

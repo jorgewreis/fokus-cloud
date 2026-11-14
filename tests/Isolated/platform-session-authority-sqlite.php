@@ -23,9 +23,11 @@ use App\Services\PlatformSessionBinding;
 use App\Services\PlatformSessionLifecycle;
 use Illuminate\Config\Repository;
 use Illuminate\Database\Capsule\Manager as Capsule;
+use Illuminate\Database\QueryException;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Foundation\Application;
 use Illuminate\Session\ArraySessionHandler;
+use Illuminate\Session\DatabaseSessionHandler;
 use Illuminate\Session\Store;
 use Illuminate\Support\Facades\Facade;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -48,10 +50,12 @@ $db->statement('CREATE TABLE platform_role_permissions (platform_role_id TEXT, p
 $db->statement('CREATE TABLE company_idempotency_requests (token_hash TEXT PRIMARY KEY, key_id TEXT, actor_id TEXT, operation TEXT, issued_at_epoch INTEGER, expires_at_epoch INTEGER, recorded_at_epoch INTEGER, state TEXT, revoked INTEGER DEFAULT 0, payload_digest TEXT, result_id TEXT, result_status INTEGER, created_at TEXT, updated_at TEXT)');
 $db->statement('CREATE TABLE platform_session_authorizations (binding_hash TEXT PRIMARY KEY, actor_id TEXT NOT NULL, expires_at_epoch INTEGER NOT NULL, revoked INTEGER NOT NULL DEFAULT 0, created_at TEXT, updated_at TEXT)');
 $db->statement('CREATE TABLE synthetic_effects (id TEXT PRIMARY KEY)');
-$db->statement('CREATE TABLE sessions (id TEXT PRIMARY KEY, last_activity INTEGER NOT NULL)');
+$db->statement('CREATE TABLE sessions (id TEXT PRIMARY KEY, payload TEXT, last_activity INTEGER NOT NULL)');
 $db->statement('CREATE TABLE synthetic_challenges (id TEXT PRIMARY KEY, used INTEGER NOT NULL DEFAULT 0)');
+$db->statement('CREATE TABLE synthetic_passwords (id TEXT PRIMARY KEY, password TEXT NOT NULL)');
+$db->table('synthetic_passwords')->insert(['id' => 'synthetic-user', 'password' => 'before']);
 $sessionId = str_repeat('S', 40);
-$db->table('sessions')->insert(['id' => $sessionId, 'last_activity' => time()]);
+$db->table('sessions')->insert(['id' => $sessionId, 'payload' => base64_encode('synthetic'), 'last_activity' => time()]);
 $db->table('platform_admins')->insert([['id' => 'actor-a', 'status' => 'ativo', 'platform_role_id' => 'role'], ['id' => 'actor-b', 'status' => 'ativo', 'platform_role_id' => 'role']]);
 $db->table('platform_permissions')->insert(['id' => 'permission', 'code' => 'platform.companies.manage']);
 $db->table('platform_role_permissions')->insert(['platform_role_id' => 'role', 'platform_permission_id' => 'permission']);
@@ -207,7 +211,7 @@ $orderedStore->revoke($orderedToken, 'actor-a', 'company.create', time(), fn () 
 $checkOrder();
 $db->table('sessions')->where('id', $sessionId)->delete();
 $denied(fn () => $orderedStore->issue('actor-a', 'company.create', 60));
-$db->table('sessions')->insert(['id' => $sessionId, 'last_activity' => time() - 121]);
+$db->table('sessions')->insert(['id' => $sessionId, 'payload' => base64_encode('synthetic'), 'last_activity' => time() - 121]);
 $denied(fn () => $orderedStore->issue('actor-a', 'company.create', 60));
 $db->table('sessions')->where('id', $sessionId)->update(['last_activity' => time()]);
 $app['config']->set('session.connection', 'other');
@@ -299,6 +303,31 @@ try {
 $check((int) $db->table('synthetic_challenges')->where('id', 'challenge')->value('used') === 0);
 $check((new PlatformSessionBinding)->current($session) === $currentBinding);
 $check($authority->withActiveSession('actor-b', $currentBinding, $sessionId, fn () => 'still valid') === 'still valid');
+$db->statement("CREATE TRIGGER synthetic_fail_delete BEFORE DELETE ON sessions BEGIN SELECT RAISE(FAIL, 'synthetic delete failure'); END");
+try {
+    $lifecycle->retireAndRun($session, 'actor-b', function () use ($db, $sessionId): void {
+        $db->table('synthetic_challenges')->where('id', 'challenge')->update(['used' => 1]);
+        $db->table('synthetic_passwords')->where('id', 'synthetic-user')->update(['password' => 'after']);
+        $db->table('sessions')->where('id', $sessionId)->delete();
+    });
+    throw new LogicException('Session deletion failure was not propagated.');
+} catch (QueryException) {
+    $check((int) $db->table('synthetic_challenges')->where('id', 'challenge')->value('used') === 0);
+}
+$check($db->table('synthetic_passwords')->where('id', 'synthetic-user')->value('password') === 'before');
+$check($authority->withActiveSession('actor-b', $currentBinding, $sessionId, fn () => 'rollback') === 'rollback');
+$check((new PlatformSessionBinding)->current($session) === $currentBinding);
+$db->statement('DROP TRIGGER synthetic_fail_delete');
+$app['config']->set('session.connection', 'other');
+try {
+    $lifecycle->transactionalSessionTable();
+    throw new RuntimeException('Separate reset session connection was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 503);
+}
+$check((int) $db->table('synthetic_challenges')->where('id', 'challenge')->value('used') === 0);
+$check($db->table('synthetic_passwords')->where('id', 'synthetic-user')->value('password') === 'before');
+$app['config']->set('session.connection', null);
 $lifecycle->retireAndRun($session, 'actor-b', function () use ($db): void {
     $db->table('synthetic_challenges')->where('id', 'challenge')->update(['used' => 1]);
 });
@@ -319,4 +348,15 @@ try {
 } catch (InvalidArgumentException) {
     $check($db->table('platform_session_authorizations')->where('binding_hash', hash('sha256', $expired))->count() === 0);
 }
+$handler = new DatabaseSessionHandler($db, 'sessions', 2);
+$check($handler->read($sessionId) === 'synthetic');
+$handler->destroy($sessionId);
+$handler->write($sessionId, 'stale-write');
+$check($db->table('sessions')->where('id', $sessionId)->count() === 0);
+$authority->revoke('actor-a', $markerE);
+$newSessionId = str_repeat('N', 40);
+$handler->setExists(false);
+$handler->write($newSessionId, 'regenerated-session');
+$check($db->table('sessions')->where('id', $newSessionId)->count() === 1);
+$denied(fn () => $authority->withActiveSession('actor-a', $markerE, $newSessionId, fn () => 'revived'));
 fwrite(STDOUT, "SQLite in-memory smoke: {$assertions} assertions passed.\n");

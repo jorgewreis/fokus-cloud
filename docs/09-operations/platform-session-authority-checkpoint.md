@@ -43,9 +43,12 @@ there is no default and it does not replace or change Laravel's idle setting.
 This proposal is fail-closed but not a finished user experience or a proven
 sliding-idle policy. Configuration is checked before consuming a valid MFA
 challenge. In the enabled prototype, the conditional MFA challenge update and
-registry replacement share one DB transaction. For a password-reset token
-belonging to the current web session, token consumption, password update and
-authority retirement share one DB transaction. Cookie/session persistence
+registry replacement share one DB transaction. In the enabled prototype,
+password-reset token consumption, password update and deletion of the target
+user's database-session rows share one DB transaction; a current platform
+binding is retired in that transaction as well. A different session connection
+or non-database session driver is rejected before consuming the reset token.
+Cookie/session persistence
 follows the DB commit; failure there can require reauthentication and must not be
 confused with an atomic cross-system commit. Other token, session and
 administrative flows need review. The flag is deliberately disabled by default.
@@ -65,8 +68,10 @@ checks registration, actor isolation, stale binding rejection, rotation,
 specific and bulk revocation, hash storage, expired registration, composed store
 operations, factory rejection of an absent marker or record, rollback, revoked
 permissions, nested transaction rejection, missing/expired session records,
-separate session connection rejection, synthetic MFA/password rollback and
-sequential query order. It does not execute migrations, real HTTP paths,
+separate session connection rejection, synthetic MFA/password and session-delete
+rollback, a direct Laravel database-session-handler late write, and sequential
+query order. The handler exercise does not include actual StartSession, cookies,
+request concurrency or a container-provided guard. It does not execute migrations, real HTTP paths,
 concurrent transactions or MySQL and cannot demonstrate lock ordering across
 processes. Syntax and smoke checks are not evidence of concurrency correctness
 or release readiness.
