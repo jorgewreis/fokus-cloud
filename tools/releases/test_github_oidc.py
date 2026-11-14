@@ -4,6 +4,7 @@ import base64
 import json
 import time
 import unittest
+from unittest.mock import patch
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 import github_oidc as oidc
@@ -37,6 +38,27 @@ class OIDC(unittest.TestCase):
     def verify(self, token, jwks=None):
         return oidc.verify(token, jwks or self.jwks, audience=self.audience, repository='example/project',
                            repository_id='123', sha=self.sha, now=self.now)
+    def test_jwks_fetch_pins_origin_and_rejects_large_response(self):
+        class Headers:
+            def get_content_type(self): return 'application/json'
+        class Response:
+            status = 200
+            headers = Headers()
+            def __init__(self, body): self.body = body
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def read(self, size): return self.body[:size]
+        class Opener:
+            def __init__(self, body): self.body = body
+            def open(self, request, timeout):
+                self_url = request.full_url
+                assert self_url == oidc.JWKS_URL and timeout == 20 and request.method == 'GET'
+                return Response(self.body)
+        with patch.object(oidc.urllib.request, 'build_opener', return_value=Opener(b'{"keys":[]}')):
+            self.assertEqual(oidc.fetch_jwks(), {'keys': []})
+        with patch.object(oidc.urllib.request, 'build_opener', return_value=Opener(b'x'*65537)):
+            with self.assertRaisesRegex(ValueError, 'jwks_fetch_failed'): oidc.fetch_jwks()
+
     def test_valid_signature_and_exact_claims(self):
         self.assertEqual(self.verify(self.token())['run_id'], '12')
     def test_forged_signature_and_untrusted_key_refused(self):

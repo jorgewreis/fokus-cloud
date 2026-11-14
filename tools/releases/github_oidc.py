@@ -8,8 +8,11 @@ separate mandatory controls. No network, token output or mutation here.
 import base64
 import json
 import re
+import urllib.error
+import urllib.request
 
 ISSUER = 'https://token.actions.githubusercontent.com'
+JWKS_URL = ISSUER + '/.well-known/jwks'
 MAX_TOKEN = 16384
 
 
@@ -38,6 +41,27 @@ def document(value):
         raise ValueError('invalid_token_json') from error
     require(isinstance(result, dict), 'invalid_token_json')
     return result
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, response, code, message, headers, new_url):
+        return None
+
+
+def fetch_jwks():
+    """Fetch only the issuer's fixed HTTPS JWKS; reject redirects and oversized data."""
+    opener = urllib.request.build_opener(NoRedirect())
+    request = urllib.request.Request(JWKS_URL, headers={'Accept': 'application/json'}, method='GET')
+    try:
+        with opener.open(request, timeout=20) as response:
+            require(response.status == 200 and response.headers.get_content_type() == 'application/json', 'invalid_jwks_response')
+            body = response.read(65537)
+            require(len(body) <= 65536, 'oversized_jwks')
+        result = json.loads(body, object_pairs_hook=unique)
+        require(isinstance(result, dict), 'invalid_jwks_response')
+        return result
+    except (OSError, ValueError, UnicodeError, urllib.error.URLError) as error:
+        raise ValueError('jwks_fetch_failed') from error
 
 
 def verify(token, jwks, *, audience, repository, repository_id, sha, now):
