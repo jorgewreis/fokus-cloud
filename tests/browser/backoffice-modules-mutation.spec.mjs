@@ -7,7 +7,7 @@ async function setup(page) {
     await page.setContent(html);
     await page.evaluate(async ({source, catalog}) => {
         window.pending = []; window.FokusStyles = { Modal: { getOrCreateInstance: () => ({show(){},hide(){},dispose(){}}) }, Offcanvas:{getOrCreateInstance:()=>({show(){},hide(){},dispose(){}})} };
-        window.FokusForm = { validate: () => true, mapServerErrors() {} };
+        window.FokusForm = { validate: () => true, mapServerErrors(form) { form.elements.namedItem('name').focus(); } };
         window.controller = new AbortController();
         const mod = await import(`data:text/javascript;base64,${btoa(unescape(encodeURIComponent(source)))}`);
         window.moduleUnderTest = mod; window.catalogFixture = catalog;
@@ -29,6 +29,7 @@ test('bloqueia envios duplicados e permite correção após rejeição conhecida
     await expect(page.locator('#modules-message')).toHaveText('Dados inválidos');
     await expect(page.locator('#module-form-submit')).toBeEnabled();
     await expect(page.locator('#module-form')).toHaveJSProperty('inert', false);
+    await expect(page.locator('#module-name')).toBeFocused();
     await submit(page, '#module-form');
     expect(await page.evaluate(()=>window.pending.length)).toBe(2);
     await page.evaluate(()=>window.pending[1].reject(new Error('Falha de rede')));
