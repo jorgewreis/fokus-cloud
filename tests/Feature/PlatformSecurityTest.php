@@ -246,6 +246,27 @@ class PlatformSecurityTest extends TestCase
         $this->assertDatabaseHas('security_tokens', ['user_id' => $invited->id, 'purpose' => 'password_creation']);
     }
 
+    public function test_experimental_platform_invitation_identifies_its_invitation(): void
+    {
+        config(['company_idempotency.session_authority_lifecycle' => true]);
+        $this->test_superadmin_can_invite_external_user_to_active_law_company_with_role();
+        $user = User::where('email', 'convidada@example.test')->firstOrFail();
+        $membership = DB::table('company_memberships')->where('user_id', $user->id)->first();
+        $invitation = DB::table('company_invitations')->where('membership_id', $membership->id)->first();
+        $token = DB::table('security_tokens')->where('user_id', $user->id)->where('purpose', 'password_creation')->first();
+        self::assertSame(['membership_id' => $membership->id, 'invitation_id' => $invitation->id], json_decode($token->payload, true));
+    }
+
+    public function test_legacy_platform_invitation_payload_is_preserved(): void
+    {
+        config(['company_idempotency.session_authority_lifecycle' => false]);
+        $this->test_superadmin_can_invite_external_user_to_active_law_company_with_role();
+        $user = User::where('email', 'convidada@example.test')->firstOrFail();
+        $membership = DB::table('company_memberships')->where('user_id', $user->id)->first();
+        $token = DB::table('security_tokens')->where('user_id', $user->id)->where('purpose', 'password_creation')->first();
+        self::assertSame(['membership_id' => $membership->id], json_decode($token->payload, true));
+    }
+
     public function test_only_superadmin_can_list_law_subscriptions_for_support(): void
     {
         $commercial = $this->admin('administrador_comercial');

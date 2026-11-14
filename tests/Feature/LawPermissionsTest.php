@@ -8,6 +8,7 @@ use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class LawPermissionsTest extends TestCase
@@ -148,6 +149,35 @@ class LawPermissionsTest extends TestCase
         $this->assertDatabaseMissing('law_unit_memberships', [
             'company_membership_id' => $membership->id, 'status' => 'ativo',
         ]);
+    }
+
+    public function test_experimental_invitation_token_identifies_its_invitation(): void
+    {
+        config(['company_idempotency.session_authority_lifecycle' => true]);
+        Mail::fake();
+        $this->actingAs($this->admin)->withSession(['active_company_id' => $this->companyId])->postJson('/api/portal/users', [
+            'name' => 'Pessoa convidada', 'cpf' => '52998224725', 'email' => 'invite@example.test',
+            'law_assignments' => [['unit_id' => $this->unitId, 'role_id' => $this->roles['operator']]],
+        ])->assertCreated();
+
+        $membership = DB::table('company_memberships')->where('company_id', $this->companyId)->where('status', 'pendente')->first();
+        $invitation = DB::table('company_invitations')->where('membership_id', $membership->id)->first();
+        $token = DB::table('security_tokens')->where('user_id', $membership->user_id)->where('purpose', 'password_creation')->first();
+        self::assertSame(['membership_id' => $membership->id, 'invitation_id' => $invitation->id], json_decode($token->payload, true));
+    }
+
+    public function test_legacy_invitation_token_payload_is_preserved(): void
+    {
+        config(['company_idempotency.session_authority_lifecycle' => false]);
+        Mail::fake();
+        $this->actingAs($this->admin)->withSession(['active_company_id' => $this->companyId])->postJson('/api/portal/users', [
+            'name' => 'Pessoa convidada', 'cpf' => '52998224725', 'email' => 'invite@example.test',
+            'law_assignments' => [['unit_id' => $this->unitId, 'role_id' => $this->roles['operator']]],
+        ])->assertCreated();
+
+        $membership = DB::table('company_memberships')->where('company_id', $this->companyId)->where('status', 'pendente')->first();
+        $token = DB::table('security_tokens')->where('user_id', $membership->user_id)->where('purpose', 'password_creation')->first();
+        self::assertSame(['membership_id' => $membership->id], json_decode($token->payload, true));
     }
 
     public function test_transfer_acceptance_keeps_previous_admin_as_operator_when_requested(): void

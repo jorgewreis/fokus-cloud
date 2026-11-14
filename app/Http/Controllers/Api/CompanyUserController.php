@@ -86,6 +86,10 @@ class CompanyUserController extends Controller
         }
 
         $membershipId = DB::transaction(function () use ($data, $cpf, $companyId, $actor, $auth, $assignments): string {
+            if (config('company_idempotency.session_authority_lifecycle', false) === true) {
+                $company = DB::table('companies')->where('id', $companyId)->where('status', 'ativa')->whereNull('deleted_at')->lockForUpdate()->first(['id']);
+                abort_unless($company, 422, 'A empresa selecionada não está ativa.');
+            }
             $user = User::where('cpf', $cpf)->lockForUpdate()->first();
             $existing = (bool) $user;
             if ($user) {
@@ -117,11 +121,16 @@ class CompanyUserController extends Controller
                     'version' => 1, 'created_by' => $actor->id, 'updated_by' => $actor->id, 'created_at' => now(), 'updated_at' => now(),
                 ]);
             }
+            $invitationId = PrefixedUlid::make('CNV');
             DB::table('company_invitations')->insert([
-                'id' => PrefixedUlid::make('CNV'), 'company_id' => $companyId, 'membership_id' => $id,
+                'id' => $invitationId, 'company_id' => $companyId, 'membership_id' => $id,
                 'created_by' => $actor->id, 'expires_at' => now()->addDay(), 'created_at' => now(), 'updated_at' => now(),
             ]);
-            $auth->sendToken($user, $existing ? 'membership_acceptance' : 'password_creation', $existing ? '/aceitar-vinculo' : '/criar-senha', ['membership_id' => $id]);
+            $tokenPayload = ['membership_id' => $id];
+            if (config('company_idempotency.session_authority_lifecycle', false) === true) {
+                $tokenPayload['invitation_id'] = $invitationId;
+            }
+            $auth->sendToken($user, $existing ? 'membership_acceptance' : 'password_creation', $existing ? '/aceitar-vinculo' : '/criar-senha', $tokenPayload);
             $this->audit($companyId, $actor->id, 'company_membership', $id, 'create', null, [
                 'status' => 'pendente', 'law_assignments' => array_map(fn ($assignment): array => ['unit_id' => $assignment['unit_id'], 'role_id' => $assignment['role_id']], $assignments),
             ]);

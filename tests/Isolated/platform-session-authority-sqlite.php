@@ -297,6 +297,12 @@ try {
 }
 $check($db->table('security_tokens')->where('id', 'membership-token')->value('used_at') === null);
 $db->table('security_tokens')->where('id', 'membership-token')->update(['payload' => json_encode(['membership_id' => 'member', 'invitation_id' => 'invite'])]);
+try {
+    $db->transaction(fn () => $tokenPrimitive->acceptMembership('membership-plain'));
+    throw new RuntimeException('Nested membership transaction was accepted.');
+} catch (LogicException) {
+    $check(true);
+}
 $db->table('companies')->where('id', 'company')->update(['status' => 'suspensa']);
 try {
     $tokenPrimitive->acceptMembership('membership-plain');
@@ -341,6 +347,20 @@ try {
 }
 $check($db->table('security_tokens')->where('id', 'membership-token')->value('used_at') === null);
 $db->table('security_tokens')->where('id', 'membership-token')->update(['payload' => json_encode(['membership_id' => 'member', 'invitation_id' => 'invite'])]);
+$alterHint = true;
+$db->beforeExecuting(function (string $query) use (&$alterHint, $db): void {
+    if ($alterHint && str_contains(strtolower($query), 'from "companies"')) {
+        $alterHint = false;
+        $db->table('security_tokens')->where('id', 'membership-token')->update(['payload' => json_encode(['membership_id' => 'member', 'invitation_id' => 'duplicate-invite'])]);
+    }
+});
+try {
+    $tokenPrimitive->acceptMembership('membership-plain');
+    throw new LogicException('Changed token hint was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 422);
+}
+$check($db->table('security_tokens')->where('id', 'membership-token')->value('used_at') === null);
 $db->statement("CREATE TRIGGER fail_atomic_invite BEFORE UPDATE ON company_invitations BEGIN SELECT RAISE(FAIL, 'synthetic invite failure'); END");
 try {
     $tokenPrimitive->acceptMembership('membership-plain');
@@ -359,14 +379,17 @@ $check($tokenPrimitive->acceptMembership('membership-plain') === ['user_id' => '
 $positions = [];
 foreach ($invitationQueries as $index => $query) {
     foreach (['users', 'company_memberships', 'companies', 'company_invitations'] as $table) {
+        if ($table === 'company_memberships' && ! isset($positions['users'])) {
+            continue; // Preliminary company hint is not a locked row.
+        }
         if (! isset($positions[$table]) && str_contains($query, 'from "'.$table.'"')) {
             $positions[$table] = $index;
         }
     }
 }
 $check(isset($positions['users'], $positions['company_memberships'], $positions['companies'], $positions['company_invitations'])
-    && $positions['users'] < $positions['company_memberships'] && $positions['company_memberships'] < $positions['companies']
-    && $positions['companies'] < $positions['company_invitations']);
+    && $positions['companies'] < $positions['users'] && $positions['users'] < $positions['company_memberships']
+    && $positions['company_memberships'] < $positions['company_invitations']);
 $check($db->table('company_invitations')->where('id', 'duplicate-invite')->value('accepted_at') === null);
 $db->table('company_memberships')->where('id', 'member')->update(['status' => 'pendente', 'version' => 1]);
 $db->table('law_unit_memberships')->where('id', 'unit')->update(['status' => 'pendente', 'version' => 1]);

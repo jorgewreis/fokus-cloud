@@ -245,3 +245,16 @@ sequence only; it cannot prove MySQL locking, gap-lock behavior, deadlock freedo
 or safe cross-product integration. The existing sendToken also expires all
 unused tokens of the same user/purpose, potentially affecting another company's
 invite; preserve this as a documented legacy risk pending an explicit design.
+
+The two identified invitation emitters now include the exact invitation ID in
+token payload only when the experimental lifecycle flag is true; the flag-off
+payload and existing tokens are unchanged. The company-user emitter acquires the
+company row before the user in that experiment, as the platform emitter already
+does. The isolated acceptance candidate now reads company/user/token hints
+without locks, then locks company -> user -> token -> membership -> invitation
+and revalidates every hint before writes. Other writers and session flows are
+not harmonized, and the legacy global token expiry in sendToken is unchanged.
+This code has not been activated or tested via real issuer HTTP flows. Its
+SQLite query-order test does not prove actual MySQL lock behavior or safety
+against all other transactions. Tokens without invitation ID cannot use the
+candidate; the legacy route remains guarded from the experimental path.

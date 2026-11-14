@@ -82,20 +82,25 @@ class PlatformUserDirectoryController extends Controller
                 'created_by' => $admin->id, 'updated_by' => $admin->id,
                 'created_at' => now(), 'updated_at' => now(),
             ]);
+            $invitationId = PrefixedUlid::make('CNV');
             DB::table('company_invitations')->insert([
-                'id' => PrefixedUlid::make('CNV'), 'company_id' => $company->id,
+                'id' => $invitationId, 'company_id' => $company->id,
                 'membership_id' => $membershipId, 'created_by' => $admin->id,
                 'expires_at' => now()->addDay(), 'created_at' => now(), 'updated_at' => now(),
             ]);
 
-            return ['user' => $user, 'membership_id' => $membershipId, 'company' => $company, 'role' => $data['role'], 'needs_password' => ! $user->email_verified_at];
+            return ['user' => $user, 'membership_id' => $membershipId, 'invitation_id' => $invitationId, 'company' => $company, 'role' => $data['role'], 'needs_password' => ! $user->email_verified_at];
         });
 
+        $tokenPayload = ['membership_id' => $created['membership_id']];
+        if (config('company_idempotency.session_authority_lifecycle', false) === true) {
+            $tokenPayload['invitation_id'] = $created['invitation_id'];
+        }
         $auth->sendToken(
             $created['user'],
             $created['needs_password'] ? 'password_creation' : 'membership_acceptance',
             $created['needs_password'] ? '/criar-senha' : '/aceitar-vinculo',
-            ['membership_id' => $created['membership_id']],
+            $tokenPayload,
         );
         $audit->record($admin->id, 'backoffice.external_user_invited', 'company_membership', $created['membership_id'], companyId: $created['company']->id, after: [
             'user_id' => $created['user']->id, 'company_id' => $created['company']->id,
