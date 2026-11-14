@@ -26,19 +26,19 @@ class CoverageComposition(unittest.TestCase):
         report = ET.Element('testsuites')
         group = ET.SubElement(report, 'testsuite', tests=str(suite.EXPECTED_TESTS),
                               assertions=str(suite.MINIMUM_ASSERTIONS), failures='0', errors='0', skipped='0')
-        for identity, assertions in {**suite.MAIN_IDENTITY_TESTS, **suite.LEAD_TESTS}.items():
+        for identity, assertions in {**suite.MAIN_IDENTITY_TESTS, **suite.LEAD_TESTS, **suite.INTEREST_TESTS}.items():
             klass, name = identity.split('::')
             ET.SubElement(group, 'testcase', {'class': klass, 'name': name, 'assertions': str(assertions)})
-        for number in range(327):
+        for number in range(330):
             ET.SubElement(group, 'testcase', {'class': 'SyntheticLawCoverage', 'name': str(number), 'assertions': '1'})
         return report
 
     def test_measured_composition_preserves_all_law_and_main_tests(self):
-        self.assertEqual(suite.EXPECTED_TESTS, 351)
-        self.assertEqual(suite.MINIMUM_ASSERTIONS, 2834)
+        self.assertEqual(suite.EXPECTED_TESTS, 358)
+        self.assertEqual(suite.MINIMUM_ASSERTIONS, 2868)
         self.assertEqual(len(suite.MAIN_IDENTITY_TESTS), 10)
         self.assertEqual(sum(suite.MAIN_IDENTITY_TESTS.values()), 23)
-        self.assertEqual(suite.coverage(self.report())['tests'], 351)
+        self.assertEqual(suite.coverage(self.report())['tests'], 358)
 
     def test_omission_duplicate_or_weakened_identity_is_rejected_even_with_green_totals(self):
         for mutation in ('omit', 'duplicate', 'rename', 'assertions'):
@@ -63,8 +63,19 @@ class CoverageComposition(unittest.TestCase):
                     else: case.set('assertions', '0')
                     with self.assertRaises(RuntimeError): suite.coverage(report)
 
+    def test_every_interest_index_case_is_required_with_its_assertions(self):
+        for name in suite.INTEREST_TESTS:
+            for mutation in ('omit', 'rename', 'assertions'):
+                with self.subTest(name=name, mutation=mutation):
+                    report = self.report(); group = report[0]
+                    case = next(c for c in group if c.get('class') + '::' + c.get('name') == name)
+                    if mutation == 'omit': group.remove(case)
+                    elif mutation == 'rename': case.set('name', 'unrelated_passing_case')
+                    else: case.set('assertions', '0')
+                    with self.assertRaises(RuntimeError): suite.coverage(report)
+
     def test_old_or_incomplete_totals_failures_errors_skips_and_hidden_failures_are_rejected(self):
-        for key, value in [('tests','327'),('tests','336'),('tests','350'),('tests','352'),('assertions','2833'),
+        for key, value in [('tests','327'),('tests','351'),('tests','357'),('tests','359'),('assertions','2867'),
                            ('failures','1'),('errors','1'),('skipped','1')]:
             with self.subTest(key=key):
                 report = self.report(); report[0].set(key,value)
@@ -345,14 +356,15 @@ class HarnessContracts(unittest.TestCase):
 
     def test_origin_rehearsal_orders_failure_repair_idempotence_and_restore(self):
         source = (common.ROOT / 'tests/Deployment/linux-upgrade.py').read_text(encoding='utf-8')
-        labels = ['repair-fresh-noop', 'prepare-origin-shape', 'repair-billing-before', 'five-migrations',
-                  'repair-billing-after', 'repair-origin-verify', 'repair-origin-idempotent', 'restored-backup-repair-verify']
+        labels = ['interest-index-pre-migration-compat', 'repair-fresh-noop', 'prepare-origin-shape', 'repair-billing-before', 'six-migrations',
+                  'repair-billing-after', 'repair-origin-verify', 'repair-origin-idempotent', 'interest-index-backfill',
+                  'interest-index-concurrency-rollback', 'restored-backup-repair-verify']
         positions = [source.index("'" + label + "'") for label in labels]
         self.assertEqual(positions, sorted(positions))
         self.assertIn('require_new_migrations(new)', source)
         self.assertIn("evidence['reversal_authorized_delta']", source)
 
-    def test_upgrade_requires_exact_five_names_not_just_count(self):
+    def test_upgrade_requires_exact_six_names_not_just_count(self):
         upgrade.require_new_migrations(upgrade.EXPECTED_NEW_MIGRATIONS)
         for names in (upgrade.EXPECTED_NEW_MIGRATIONS[:-1], list(reversed(upgrade.EXPECTED_NEW_MIGRATIONS)),
                       ['2026_11_06_000200_unreviewed.php', *upgrade.EXPECTED_NEW_MIGRATIONS[1:]]):
@@ -387,7 +399,7 @@ class HarnessContracts(unittest.TestCase):
 
     def test_origin_reversal_records_retained_column_instead_of_baseline_equality(self):
         source = (common.ROOT / 'tests/Deployment/reversal-harness.php').read_text(encoding='utf-8')
-        self.assertRegex(source, r"\['--step'\s*=>\s*5,\s*'--force'\s*=>\s*true\]")
+        self.assertRegex(source, r"\['--step'\s*=>\s*6,\s*'--force'\s*=>\s*true\]")
         self.assertRegex(source, r"Schema::hasColumn\('payments',\s*'provider_checkout_url'\)")
         self.assertIn("$delta['repair_ledger_absent'] = true", source)
         self.assertIn("$delta['payments_and_urls_unchanged'] = true", source)

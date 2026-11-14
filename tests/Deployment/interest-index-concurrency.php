@@ -8,7 +8,12 @@ $root = dirname(__DIR__, 2);
 if (is_file($root.'/.env') || is_file($root.'/.env.testing') || is_file($root.'/bootstrap/cache/config.php')) {
     throw new RuntimeException('refuse inherited environment');
 }
-if (getenv('FOKUS_INTEREST_INDEX_DISPOSABLE') !== '1' || getenv('APP_ENV') !== 'testing' || getenv('DB_HOST') !== 'mysql' || getenv('DB_DATABASE') !== 'synthetic') {
+$sandbox = getenv('UPGRADE_SANDBOX');
+$local = getenv('DB_HOST') === 'mysql' && getenv('DB_DATABASE') === 'synthetic';
+$harness = getenv('RELEASE_DISPOSABLE_TESTS') === '1' && is_string($sandbox)
+    && is_file($sandbox.'/.disposable-upgrade') && getenv('DB_HOST') === '127.0.0.1'
+    && preg_match('/^fokus_upgrade_[a-f0-9]{16}$/D', (string) getenv('DB_DATABASE')) === 1;
+if (getenv('FOKUS_INTEREST_INDEX_DISPOSABLE') !== '1' || getenv('APP_ENV') !== 'testing' || (! $local && ! $harness)) {
     throw new RuntimeException('refuse non-disposable context');
 }
 require $root.'/vendor/autoload.php';

@@ -7,6 +7,7 @@ use App\Models\ProductInterest;
 use App\Services\PlatformAudit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class ProductInterestBackofficeController extends Controller
@@ -14,7 +15,8 @@ class ProductInterestBackofficeController extends Controller
     public function options(Request $request)
     {
         $request->validate(['q' => ['nullable', 'string', 'max:120'], 'page' => ['nullable', 'integer', 'min:1']]);
-        $ready = (bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready');
+        $ready = Schema::hasTable('interest_product_index') && Schema::hasTable('interest_product_index_state')
+            && (bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready');
         $catalogAccess = $request->user()->hasPermission('platform.catalog.manage');
         $prefix = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], trim((string) $request->query('q', ''))).'%';
         $pageNumber = (int) $request->query('page', 1);

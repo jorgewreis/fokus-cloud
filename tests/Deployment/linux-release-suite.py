@@ -8,13 +8,19 @@ from linux_release_common import ROOT, REPORT, guard, environment, php, run, ada
 
 
 
-# Measured JUnit composition: Law (327 / 2753), main identity (10 / 23),
-# and Lead (14 / 58). Exact counts never replace individual test results.
-EXPECTED_TESTS = 327 + 10 + 14
-MINIMUM_ASSERTIONS = 2753 + 23 + 58
+# Exact candidate count includes the interest-index tests and tests added to main
+# since the original measured baseline. Exact counts never replace case evidence.
+EXPECTED_TESTS = 358
+MINIMUM_ASSERTIONS = 2753 + 23 + 58 + 34
 MAIN_IDENTITY_TESTS = {'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_valid_snapshot_is_accepted': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_missing_identity_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_invalid_release_is_rejected_without_echoing_input': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_stale_captured_manifest_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_in_place_code_change_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_added_code_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_asset_storage_link_does_not_change_runtime_identity': 1, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_unsealed_checkout_fails_closed_without_debug_details': 4, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_invalid_or_missing_nonce_is_not_reflected': 11, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_existing_health_endpoint_is_preserved': 1}
 
 LEAD_TESTS = {'Tests\\Feature\\CompanyAdminTest::test_company_detail_exposes_separate_lead_usage_only_after_platform_authorization': 5, 'Tests\\Feature\\CompanyAdminTest::test_company_detail_permission_is_checked_before_reading_lead_usage': 2, 'Tests\\Feature\\LeadConnectionsTest::test_superuser_credentials_never_execute_application_operation': 7, 'Tests\\Feature\\LeadConnectionsTest::test_runtime_context_is_transaction_local_and_disconnects_on_application_failure': 10, 'Tests\\Feature\\LeadConnectionsTest::test_insecure_configuration_is_rejected_before_connecting': 1, 'Tests\\Feature\\LeadConnectionsTest::test_transaction_pooler_and_missing_ca_are_rejected_before_connecting': 3, 'Tests\\Feature\\LeadConnectionsTest::test_disabled_runtime_never_opens_connection': 1, 'Tests\\Feature\\LeadDatabaseTest::test_context_comes_from_server_session_and_fresh_membership': 2, 'Tests\\Feature\\LeadDatabaseTest::test_manager_role_is_resolved_from_current_membership': 2, 'Tests\\Feature\\LeadDatabaseTest::test_access_revocations_are_checked_before_any_lead_connection': 12, 'Tests\\Feature\\LeadDatabaseTest::test_support_and_cross_company_context_are_blocked': 4, 'Tests\\Feature\\LeadUsageReaderTest::test_unconfigured_metrics_are_unavailable_without_connecting': 1, 'Tests\\Feature\\LeadUsageReaderTest::test_reader_filters_company_and_distinguishes_missing_company_from_zero_usage': 5, 'Tests\\Feature\\LeadUsageReaderTest::test_outage_has_no_fabricated_counts': 3}
+INTEREST_TESTS = {
+    'Tests\\Feature\\ProductInterestTest::test_public_interest_is_created_and_same_email_is_updated': 8,
+    'Tests\\Feature\\ProductInterestTest::test_interest_product_options_respect_catalog_permission_and_keep_historical_codes': 16,
+    'Tests\\Feature\\ProductInterestTest::test_index_rebuild_fails_closed_for_invalid_history_and_writer_rolls_back': 5,
+    'Tests\\Feature\\ProductInterestTest::test_indexed_suggestions_are_paginated_and_allow_prefix_search': 12,
+}
 
 def coverage(report):
     suites = list(report) if report.tag == 'testsuites' else [report]
@@ -27,7 +33,7 @@ def coverage(report):
             or len(cases) != EXPECTED_TESTS or len(set(identities)) != len(cases)
             or any(case.find(kind) is not None for case in cases for kind in ('failure', 'error', 'skipped'))):
         raise RuntimeError('Incomplete or failing suite; coverage gate rejected results')
-    for name, minimum in {**MAIN_IDENTITY_TESTS, **LEAD_TESTS}.items():
+    for name, minimum in {**MAIN_IDENTITY_TESTS, **LEAD_TESTS, **INTEREST_TESTS}.items():
         matches = [case for case, identity in zip(cases, identities) if identity == name]
         if len(matches) != 1 or int(matches[0].get('assertions', 0)) < minimum:
             raise RuntimeError('Missing or weakened required identity or Lead test')

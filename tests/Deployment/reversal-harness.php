@@ -110,7 +110,7 @@ try {
 }
 ensure((array) DB::table('migrations')->where('migration', $name)->first() === $ledger, 'preflight preserves ledger');
 echo "REVERSAL TESTS PASSED; down discards review decisions and is not production recovery.\n";
-// Full five-migration cycle. The additive repair deliberately retains its column.
+// Full six-migration cycle. The additive repair deliberately retains its column.
 $f = json_decode(file_get_contents($sandbox.'/upgrade-fixture.json'), true);
 $stamp = '2026-11-06 14:00:00';
 $task = PrefixedUlid::make('LTA');
@@ -127,8 +127,13 @@ $beforeCases = DB::table('law_cases')->orderBy('id')->get()->map(fn ($row) => (a
 $beforeContacts = DB::table('law_contacts')->orderBy('id')->get()->toJson();
 $beforeAccess = DB::table('law_confidential_case_accesses')->orderBy('id')->get()->toJson();
 $beforePayments = DB::table('payments')->orderBy('id')->get()->toJson();
-ensure(Artisan::call('migrate:rollback', ['--step' => 5, '--force' => true]) === 0, 'all five candidate migration ledger entries reverse');
+$beforeInterests = DB::table('product_interests')->orderBy('id')->get()->toJson();
+ensure(DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'backfilled interest index is ready before rollback');
+ensure(DB::table('interest_product_index')->count() > 0, 'historical links exist before rollback');
+ensure(Artisan::call('migrate:rollback', ['--step' => 6, '--force' => true]) === 0, 'all six candidate migration ledger entries reverse');
 ensure(DB::table('migrations')->count() === $f['migration_count'], 'ledger returns exactly to baseline');
+ensure(! Schema::hasTable('interest_product_index') && ! Schema::hasTable('interest_product_index_state'), 'derived interest index tables removed by rollback');
+ensure(DB::table('product_interests')->orderBy('id')->get()->toJson() === $beforeInterests, 'rollback preserves source interest records');
 ensure(! DB::table('migrations')->where('migration', '2026_11_07_000100_repair_payments_provider_checkout_url')->exists(), 'repair ledger is removed by normal laboratory rollback');
 ensure(Schema::hasColumn('payments', 'provider_checkout_url'), 'authorized forward-only delta: checkout column intentionally retained');
 ensure(DB::table('payments')->orderBy('id')->get()->toJson() === $beforePayments, 'repair down preserves every payment field and checkout URL');
@@ -155,8 +160,12 @@ foreach ($beforeCases as $old) {
 ensure(DB::table('law_contacts')->orderBy('id')->get()->toJson() === $beforeContacts, 'ciphertext and legacy contacts preserved after five downs');
 ensure(DB::table('law_confidential_case_accesses')->orderBy('id')->get()->toJson() === $beforeAccess, 'revocations and grants preserved after five downs');
 ensure(DB::table('customer_permissions')->where('resource', 'tasks')->where('product_code', 'law')->count() === 0, 'task permissions removed by down');
-ensure(Artisan::call('migrate', ['--force' => true]) === 0, 'all five migrations advance again');
-ensure(DB::table('migrations')->count() === $f['migration_count'] + 5, 'ledger restored to candidate');
+ensure(Artisan::call('migrate', ['--force' => true]) === 0, 'all six migrations advance again');
+ensure(DB::table('migrations')->count() === $f['migration_count'] + 6, 'ledger restored to candidate');
+ensure(Schema::hasTable('interest_product_index') && Schema::hasTable('interest_product_index_state'), 'interest index recreated');
+ensure(! (bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'recreated interest index remains unready');
+ensure(DB::table('interest_product_index')->count() === 0, 'rollback destroys derived links but not source data');
+ensure(DB::table('product_interests')->orderBy('id')->get()->toJson() === $beforeInterests, 're-up preserves source interest records');
 ensure(DB::table('payments')->orderBy('id')->get()->toJson() === $beforePayments, 're-applying repair preserves retained payment values');
 foreach (['law_tasks', 'law_task_events', 'law_contact_import_batches'] as $table) {
     ensure(DB::table($table)->count() === 0, 're-up cannot recover destroyed data: '.$table);
@@ -166,5 +175,5 @@ ensure(DB::table('law_contacts')->orderBy('id')->get()->toJson() === $beforeCont
 foreach ($beforeCases as $old) {
     ensure(DB::table('law_cases')->where('id', $old['id'])->value('confidentiality_level') === $old['confidentiality_level'], 'effective confidentiality survives full cycle');
 }
-ensure(Artisan::call('migrate', ['--force' => true]) === 0 && DB::table('migrations')->count() === $f['migration_count'] + 5, 'repeated up leaves ledger unchanged');
-echo "FULL FIVE-MIGRATION CYCLE PASSED; Law data loss confirmed; checkout column and values deliberately retained. Production is forward-fix-only.\n";
+ensure(Artisan::call('migrate', ['--force' => true]) === 0 && DB::table('migrations')->count() === $f['migration_count'] + 6, 'repeated up leaves ledger unchanged');
+echo "FULL SIX-MIGRATION CYCLE PASSED; derived interest index and Law data loss confirmed; checkout column and values deliberately retained. Production is forward-fix-only.\n";

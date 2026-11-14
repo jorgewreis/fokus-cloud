@@ -3,10 +3,20 @@
 use App\Services\LawCaseManagementService;
 use App\Services\LawDatajudClient;
 use App\Services\PrefixedUlid as ID;
+use App\Http\Controllers\Api\ProductInterestBackofficeController;
+use App\Http\Controllers\Api\ProductInterestController;
+use App\Models\PlatformAdmin;
+use App\Models\PlatformRole;
+use App\Support\LegalDocuments;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Artisan;
 
 // Synthetic fixtures/assertions for disposable SQLite or loopback CI MySQL only.
 $root = $argv[1];
@@ -58,12 +68,50 @@ if ($mode === 'seed') {
     echo 'Seeded 8 cases covering public/CNJ1-5/legacy, 24 synthetic publications, 1 encrypted contact. Baseline migrations='.$data['migration_count']."\n";
     exit;
 }
+if ($mode === 'verify-pre-interest-index') {
+    check(! Schema::hasTable('interest_product_index') && ! Schema::hasTable('interest_product_index_state'), 'old schema has no product index tables');
+    Mail::fake();
+    $admin = PlatformAdmin::create([
+        'id' => ID::make('PAD'), 'name' => 'Synthetic admin', 'email' => 'qa-interest-admin@example.test',
+        'password' => Hash::make('synthetic-only'), 'status' => 'ativo',
+        'platform_role_id' => PlatformRole::where('code', 'administrador_comercial')->value('id'), 'email_verified_at' => now(),
+    ]);
+    $payload = ['name' => 'Synthetic interest', 'email' => 'qa-old-index@example.test', 'products' => ['law'],
+        'profiles' => ['Advocacia'], 'main_difficulties' => 'Synthetic', 'privacy_accepted' => true,
+        'privacy_version' => LegalDocuments::PRIVACY_VERSION];
+    $controller = app(ProductInterestController::class);
+    check($controller->store(Request::create('/api/product-interests', 'POST', $payload))->getStatusCode() === 201, 'new writer succeeds on old schema');
+    $options = Request::create('/api/backoffice/product-interests-options');
+    $options->setUserResolver(fn () => $admin);
+    check(app(ProductInterestBackofficeController::class)->options($options)->getData(true)['historical_index_ready'] === false, 'old schema reports incomplete index');
+    Schema::create('interest_product_index', fn (Blueprint $table) => $table->string('placeholder'));
+    try {
+        $payload['email'] = 'qa-partial-index@example.test';
+        check($controller->store(Request::create('/api/product-interests', 'POST', $payload))->getStatusCode() === 201, 'new writer succeeds on partial schema');
+        check(app(ProductInterestBackofficeController::class)->options($options)->getData(true)['historical_index_ready'] === false, 'partial schema reports incomplete index');
+    } finally {
+        Schema::dropIfExists('interest_product_index');
+    }
+    $interests = DB::table('product_interests')->whereIn('email', ['qa-old-index@example.test', 'qa-partial-index@example.test'])->orderBy('email')->get()->toJson();
+    check(json_decode($interests, true) && count(json_decode($interests, true)) === 2, 'both old-schema writes persist');
+    file_put_contents($qa.'/pre-index-interests.json', $interests);
+    exit;
+}
 $f = json_decode(file_get_contents($qa.'/upgrade-fixture.json'), true);
 if ($mode === 'verify-up') {
     if (getenv('UPGRADE_INJECT_ASSERTION_FAILURE') === '1') {
         throw new RuntimeException('controlled fixture failure');
     }
-    check(DB::table('migrations')->count() === $f['migration_count'] + 5, 'exactly five candidate migrations applied');
+    check(DB::table('migrations')->count() === $f['migration_count'] + 6, 'exactly six candidate migrations applied');
+    foreach (['2026_11_06_000200_separate_law_case_confidentiality', '2026_11_06_140000_create_law_case_publication_reviews',
+        '2026_11_06_160000_create_law_contact_import_batches_table', '2026_11_06_170000_create_law_tasks',
+        '2026_11_07_000100_repair_payments_provider_checkout_url', '2026_11_14_000100_create_interest_product_index'] as $migration) {
+        check(DB::table('migrations')->where('migration', $migration)->count() === 1, 'exact candidate migration present '.$migration);
+    }
+    check(Schema::hasTable('interest_product_index') && Schema::hasTable('interest_product_index_state'), 'interest index tables created');
+    check(! (bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'interest index fails closed before backfill');
+    check(DB::table('interest_product_index')->count() === 0, 'interest index does not claim historical completeness');
+    check(DB::table('product_interests')->whereIn('email', ['qa-old-index@example.test', 'qa-partial-index@example.test'])->orderBy('email')->get()->toJson() === file_get_contents($qa.'/pre-index-interests.json'), 'old-schema interest records preserved');
     foreach ($f['cases'] as $old) {
         $new = (array) DB::table('law_cases')->where('id', $old['id'])->first();
         check($new['internal_confidentiality_level'] === $old['confidentiality_level'] && $new['source_confidentiality_level'] === null, 'historical confidentiality preserved '.$old['confidentiality_level']);
@@ -85,6 +133,20 @@ if ($mode === 'verify-up') {
         file_put_contents($qa.'/post-upgrade.json', $snapshot);
     }
     echo "UPGRADE ASSERTIONS PASSED\n";
+    exit;
+}
+if ($mode === 'verify-interest-index-backfill') {
+    $row = DB::table('product_interests')->where('email', 'qa-old-index@example.test')->first();
+    $original = $row->products;
+    DB::table('product_interests')->where('id', $row->id)->update(['products' => 'invalid']);
+    check(Artisan::call('fokus:backfill-interest-products', ['--confirm-drained' => true]) !== 0, 'invalid historical JSON rejects backfill');
+    check(! (bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'failed backfill stays not ready');
+    DB::table('product_interests')->where('id', $row->id)->update(['products' => $original]);
+    check(Artisan::call('fokus:backfill-interest-products', ['--confirm-drained' => true]) === 0, 'backfill succeeds after reconciliation');
+    check((bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'successful backfill marks index ready');
+    check(DB::table('interest_product_index')->where('interest_id', $row->id)->where('product_code', 'law')->exists(), 'historical code indexed');
+    check(Artisan::call('fokus:backfill-interest-products', ['--confirm-drained' => true]) === 0, 'backfill can be repeated');
+    check(DB::table('interest_product_index')->where('interest_id', $row->id)->where('product_code', 'law')->count() === 1, 'backfill remains idempotent');
     exit;
 }
 if ($mode === 'verify-recovery') {
