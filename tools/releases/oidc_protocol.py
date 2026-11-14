@@ -7,12 +7,38 @@ peer identity, GitHub environment protections and independent artifact binding.
 """
 import argparse
 import json
+import os
+import select
 import sys
+import time
 
 import github_oidc as oidc
 import oidc_challenge_store as store
 
 MAX_REQUEST = 32768
+REQUEST_TIMEOUT_SECONDS = 5
+
+
+def read_frame(fd):
+    """Read one big-endian length-prefixed frame within one absolute deadline."""
+    deadline = time.monotonic() + REQUEST_TIMEOUT_SECONDS
+    def read_exact(size):
+        chunks = []
+        remaining = size
+        while remaining:
+            timeout = deadline - time.monotonic()
+            if timeout <= 0 or not select.select([fd], [], [], timeout)[0]:
+                raise ValueError('request_timeout')
+            chunk = os.read(fd, remaining)
+            if not chunk:
+                raise ValueError('incomplete_request')
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        return b''.join(chunks)
+    length = int.from_bytes(read_exact(4), 'big')
+    if not 0 < length <= MAX_REQUEST:
+        raise ValueError('invalid_request_length')
+    return read_exact(length)
 
 
 def handle(directory, raw):
@@ -42,7 +68,7 @@ def main():
     parser.add_argument('--state-dir', required=True)
     args = parser.parse_args()
     try:
-        print(json.dumps(handle(args.state_dir, sys.stdin.buffer.read(MAX_REQUEST + 1)), sort_keys=True))
+        print(json.dumps(handle(args.state_dir, read_frame(sys.stdin.buffer.fileno())), sort_keys=True))
         return 0
     except Exception:
         # Never echo the request, token, server paths or exception details.

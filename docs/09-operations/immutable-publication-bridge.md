@@ -184,8 +184,9 @@ integrada à ativação. Transmissão autenticada, permissão do environment, re
 entre múltiplos nós e bootstrap remoto continuam pendentes.
 
 `oidc_protocol.py` fornece uma interface sintética para solicitar e consumir
-um desafio por JSON limitado em stdin, sem incluir token ou caminho de controle
-na resposta de erro. O diretório é argumento de bootstrap do servidor e não campo
+um desafio por JSON limitado em stdin, precedido de comprimento binário de 4 bytes
+em big-endian e com prazo absoluto de 5 segundos, sem esperar EOF. Erros não
+incluem token ou caminho de controle. O diretório é argumento de bootstrap do servidor e não campo
 da requisição. Não há listener produtivo nem comando SSH forçado configurado;
 o protocolo não autentica sozinho o emissor, não verifica as aprovações do
 GitHub e não aciona a ativação. Na futura integração, o caminho de política deve
