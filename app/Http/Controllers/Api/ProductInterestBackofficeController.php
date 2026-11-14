@@ -13,24 +13,26 @@ class ProductInterestBackofficeController extends Controller
 {
     public function options(Request $request)
     {
-        // Include inactive catalogue entries and codes retained in past interests,
-        // even if their catalogue entry was subsequently removed.
-        $options = $request->user()->hasPermission('platform.catalog.manage')
-            ? DB::table('products')->orderBy('name')->get(['code', 'name'])->mapWithKeys(fn ($product) => [$product->code => $product->name])->all()
-            : [];
-        foreach (DB::table('product_interests')->distinct()->orderBy('products')->cursor(['products']) as $row) {
-            $codes = json_decode((string) $row->products, true);
-            if (! is_array($codes)) {
-                continue;
-            }
-            foreach ($codes as $code) {
-                if (is_string($code) && $code !== '' && ! array_key_exists($code, $options)) {
-                    $options[$code] = $code;
-                }
-            }
+        $request->validate(['q' => ['nullable', 'string', 'max:120'], 'page' => ['nullable', 'integer', 'min:1']]);
+        $ready = (bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready');
+        $catalogAccess = $request->user()->hasPermission('platform.catalog.manage');
+        $prefix = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], trim((string) $request->query('q', ''))).'%';
+        $pageNumber = (int) $request->query('page', 1);
+        $historical = $ready ? DB::table('interest_product_index')->select('product_code as code')->distinct()
+            ->whereRaw("product_code LIKE ? ESCAPE '!'", [$prefix])->orderBy('product_code')->simplePaginate(20) : null;
+        $catalog = $catalogAccess ? DB::table('products')->select('code', 'name')
+            ->whereRaw("code LIKE ? ESCAPE '!'", [$prefix])->orderBy('code')->simplePaginate(20) : null;
+        $options = [];
+        foreach ($catalog?->items() ?? [] as $product) {
+            $options[$product->code] = ['code' => (string) $product->code, 'name' => $product->name];
+        }
+        foreach ($historical?->items() ?? [] as $product) {
+            $options[$product->code] ??= ['code' => (string) $product->code, 'name' => (string) $product->code];
         }
 
-        return response()->json(['products' => collect($options)->map(fn ($name, $code) => ['code' => (string) $code, 'name' => $name])->values()]);
+        return response()->json(['products' => array_values($options), 'meta' => [
+            'current_page' => $pageNumber, 'has_more' => ($historical?->hasMorePages() ?? false) || ($catalog?->hasMorePages() ?? false),
+        ], 'historical_index_ready' => $ready]);
     }
 
     public function index(Request $request)
