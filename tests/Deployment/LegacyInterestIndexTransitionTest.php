@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature;
+namespace Tests\Deployment;
 
 use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
