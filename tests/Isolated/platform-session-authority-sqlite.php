@@ -27,6 +27,7 @@ if ($db->getDriverName() !== 'sqlite' || $db->getDatabaseName() !== ':memory:') 
 }
 $db->statement('CREATE TABLE platform_admins (id TEXT PRIMARY KEY)');
 $db->statement('CREATE TABLE platform_session_authorizations (binding_hash TEXT PRIMARY KEY, actor_id TEXT NOT NULL, expires_at_epoch INTEGER NOT NULL, revoked INTEGER NOT NULL DEFAULT 0, created_at TEXT, updated_at TEXT)');
+$db->statement('CREATE TABLE synthetic_effects (id TEXT PRIMARY KEY)');
 $db->table('platform_admins')->insert([['id' => 'actor-a'], ['id' => 'actor-b']]);
 $authority = new PlatformSessionAuthority;
 $markerA = str_repeat('a', 64);
@@ -50,7 +51,11 @@ $denied = function (callable $call) use ($check): void {
     }
     throw new RuntimeException('Expected inactive session to be rejected.');
 };
-$check($authority->withActiveSession('actor-a', $markerA, fn () => 'writer') === 'writer');
+$check($authority->withActiveSession('actor-a', $markerA, function () use ($db): string {
+    $db->table('synthetic_effects')->insert(['id' => 'writer-before-revoke']);
+
+    return 'writer';
+}) === 'writer');
 $denied(fn () => $authority->withActiveSession('actor-b', $markerA, fn () => 'wrong actor'));
 $authority->rotate('actor-a', $markerA, $markerB, $expiry);
 $denied(fn () => $authority->withActiveSession('actor-a', $markerA, fn () => 'stale'));
@@ -58,7 +63,9 @@ $check($authority->withActiveSession('actor-a', $markerB, fn () => 'new') === 'n
 $authority->revoke('actor-a', $markerA); // stale logout cannot revoke the new binding
 $check($authority->withActiveSession('actor-a', $markerB, fn () => 'still active') === 'still active');
 $authority->revokeAll('actor-a');
-$denied(fn () => $authority->withActiveSession('actor-a', $markerB, fn () => 'revoked'));
+$denied(fn () => $authority->withActiveSession('actor-a', $markerB, fn () => $db->table('synthetic_effects')->insert(['id' => 'writer-after-revoke'])));
+$check($db->table('synthetic_effects')->where('id', 'writer-before-revoke')->count() === 1);
+$check($db->table('synthetic_effects')->where('id', 'writer-after-revoke')->count() === 0);
 $check($db->table('platform_session_authorizations')->where('binding_hash', hash('sha256', $markerA))->count() === 1);
 $check($db->table('platform_session_authorizations')->where('binding_hash', $markerA)->count() === 0);
 $expired = str_repeat('c', 64);
