@@ -113,10 +113,10 @@ def verify(token, jwks, *, audience, repository, repository_id, sha, now):
                 'environment': 'production', 'workflow_ref': repository + '/.github/workflows/deploy.yml@refs/heads/main',
                 'sub': 'repo:' + repository + ':environment:production'}
     require(all(claims.get(key) == value for key, value in expected.items()), 'claim_mismatch')
-    for key in ('run_id', 'run_attempt', 'check_run_id'):
+    for key in ('run_id', 'run_attempt', 'check_run_id', 'actor_id'):
         require(isinstance(claims.get(key), str) and re.fullmatch(r'[1-9][0-9]*', claims[key]), 'invalid_run_identity')
     require(isinstance(claims.get('jti'), str) and re.fullmatch(r'[A-Za-z0-9_-]{16,128}', claims['jti']), 'invalid_jti')
     validate_window(claims.get('iat'), claims.get('nbf'), claims.get('exp'), now)
     return {'jti': claims['jti'], 'run_id': claims['run_id'], 'run_attempt': claims['run_attempt'],
-            'check_run_id': claims['check_run_id'], 'sha': sha, 'issued': claims['iat'],
+            'check_run_id': claims['check_run_id'], 'actor_id': claims['actor_id'], 'sha': sha, 'issued': claims['iat'],
             'not_before': claims['nbf'], 'expires': claims['exp']}

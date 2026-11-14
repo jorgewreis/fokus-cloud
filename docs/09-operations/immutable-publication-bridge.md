@@ -202,6 +202,17 @@ o mesmo diretório; não limitam conexões anteriores ao comando forçado nem ou
 nós. Um teste CI cria sshd restrito a loopback e usa chave sintética com comando
 forçado; isso não configura SSH real ou comprova aprovação do environment.
 
+`environment_evidence.py` é uma verificação experimental de leitura apenas:
+confere duas vezes main, workflow, run, check run, proteção do environment e
+histórico de aprovação contra uma política do servidor. Recusa tentativa de
+rerun, pois a [API de histórico](https://docs.github.com/en/rest/actions/workflow-runs#get-the-review-history-for-a-workflow-run)
+não vincula os registros documentados à tentativa; também recusa ausência de
+proteção, autorrevisão e respostas ambíguas. Só admite revisores individuais
+previamente autorizados e exige evidência de que o bypass administrativo está
+desabilitado. Esses valores e a forma real da resposta não foram consultados nem
+inventados. O módulo não autentica sozinho os claims recebidos e não está ligado
+à ativação; suas verificações são testes sintéticos, não prova de aprovação real.
+
 ## Evidência e limites
 
 `tests/Deployment/test_legacy_publication_guard.py` verifica que a recusa não
