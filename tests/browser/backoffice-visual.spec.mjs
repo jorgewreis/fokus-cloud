@@ -1305,7 +1305,7 @@ test('planos sinalizam resultado incerto e bloqueiam nova ação até atualizaç
     });
     await page.goto('/backoffice/planos');
     await page.locator('#plan-list [data-plan-action="activate"]').click();
-    await expect(page.locator('#plans-message')).toContainText('Não foi possível confirmar o resultado');
+    await expect(page.locator('#plans-message')).toContainText('Confira a situação do plano');
     await expect(page.locator('#plan-list [data-plan-action="activate"]')).toBeDisabled();
     await page.locator('#plan-search').fill('Essencial');
     await expect(page.locator('#plan-list [data-plan-action="activate"]')).toBeDisabled();
@@ -1315,28 +1315,39 @@ test('planos sinalizam resultado incerto e bloqueiam nova ação até atualizaç
     await expect(page.locator('#plan-list [data-plan-action="activate"]')).toBeEnabled();
 });
 
-test('resposta tardia de plano não troca a tela após navegação', async ({ page }) => {
-    let release;
-    let requested = false;
-    await page.route('**/api/backoffice/plans', async (route) => {
-        const response = await route.fetch();
-        const data = await response.json();
-        await route.fulfill({ response, json: data.map((plan) => ({ ...plan, status: 'inativo', publication_state: 'pausado' })) });
+for (const result of ['success', 'network-error']) {
+    test(`plano mantém bloqueio ao navegar e voltar com resposta tardia: ${result}`, async ({ page }) => {
+        let release;
+        let requests = 0;
+        const pageErrors = [];
+        page.on('pageerror', (error) => pageErrors.push(error.message));
+        await page.route('**/api/backoffice/plans', async (route) => {
+            const response = await route.fetch();
+            const data = await response.json();
+            await route.fulfill({ response, json: data.map((plan) => ({ ...plan, status: 'inativo', publication_state: 'pausado' })) });
+        });
+        await page.route('**/api/backoffice/catalog/plans/PLN_1/activate', async (route) => {
+            requests += 1;
+            await new Promise((resolve) => { release = resolve; });
+            if (result === 'success') await route.fulfill({ json: { message: 'Plano ativado.' } });
+            else await route.abort('failed');
+        });
+        await page.goto('/backoffice/planos');
+        await page.locator('#plan-list [data-plan-action="activate"]').click();
+        await expect.poll(() => requests).toBe(1);
+        await page.evaluate(() => window.__backofficeRouter.navigate('companies'));
+        await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'companies');
+        await page.evaluate(() => window.__backofficeRouter.navigate('subscription-plans'));
+        await expect(page.locator('#plan-list [data-plan-action="activate"]')).toBeDisabled();
+        await page.locator('#plan-list [data-plan-action="activate"]').evaluate((button) => button.click());
+        expect(requests).toBe(1);
+        release();
+        await expect(page.locator('#plans-message')).toContainText('Confira a situação do plano');
+        await expect(page.locator('#plan-list [data-plan-action="activate"]')).toBeDisabled();
+        expect(requests).toBe(1);
+        expect(pageErrors).toEqual([]);
     });
-    await page.route('**/api/backoffice/catalog/plans/PLN_1/activate', async (route) => {
-        requested = true;
-        await new Promise((resolve) => { release = resolve; });
-        await route.fulfill({ json: { message: 'Plano ativado.' } });
-    });
-    await page.goto('/backoffice/planos');
-    await page.locator('#plan-list [data-plan-action="activate"]').click();
-    await expect.poll(() => requested).toBe(true);
-    await page.evaluate(() => window.__backofficeRouter.navigate('companies'));
-    await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'companies');
-    release();
-    await page.waitForTimeout(200);
-    await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'companies');
-});
+}
 
 test('planos replica o contrato visual, composição e estados do drawer', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
