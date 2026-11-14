@@ -60,6 +60,3 @@ finally:
  if created:
   p=run(['docker','rm','-f',name],timeout=20)
   if p.returncode:print('CLEANUP_FAILED '+name+' '+p.stderr,file=sys.stderr)
-
-
-
