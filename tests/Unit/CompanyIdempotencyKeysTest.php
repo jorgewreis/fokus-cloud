@@ -75,4 +75,19 @@ class CompanyIdempotencyKeysTest extends TestCase
         $keys = new CompanyIdempotencyKeys(['a' => base64_encode(str_repeat('a', 32))], 'a', []);
         self::assertNotSame($keys->issue('admin', 'company.create', 1000, 60), $keys->issue('admin', 'company.create', 1000, 60));
     }
+
+    public function test_expired_token_can_be_used_only_for_status_during_grace_period(): void
+    {
+        $keys = new CompanyIdempotencyKeys(['a' => base64_encode(str_repeat('a', 32))], 'a', []);
+        $token = $keys->issue('admin', 'company.create', 1000, 60);
+        self::assertSame('a', $keys->verifyForStatus($token, 'admin', 'company.create', 1060)['kid']);
+        try {
+            $keys->verify($token, 'admin', 'company.create', 1060);
+            self::fail('Expired token allowed mutation.');
+        } catch (InvalidArgumentException) {
+            self::assertTrue(true);
+        }
+        $this->expectException(InvalidArgumentException::class);
+        $keys->verifyForStatus($token, 'admin', 'company.create', 1060 + 604800);
+    }
 }
