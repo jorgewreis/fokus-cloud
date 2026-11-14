@@ -245,6 +245,12 @@ mudar; não há prova histórica atômica, endpoint produtivo ou integração ao
 exige checkout do executor igual ao SHA validado e repositório/ID explícitos de
 política confiável, executa o gate GitHub antes e depois de reconstruir e
 empacotar novamente, e compara os SHA-256 dos arquivos.
+A comparação é deliberadamente Linux/POSIX-only: a workflow de evidência roda
+em `ubuntu-latest`; em Windows ela falha fechada porque não há um mecanismo
+equivalente de `fork` e encerramento supervisionado para uma leitura bloqueada.
+A supervisão e sua limpeza usam sempre janelas limitadas; um processo em estado
+de kernel não interrompível pode sobreviver como filho daemon, mas não prende o
+processo que rejeita o artefato.
 A fonte e o arquivo são reconferidos; alteração de conteúdo ou substituição do
 caminho falha. O resultado `independent_rebuild_match_not_authorized` vincula a
 comparação ao mesmo run de homologação, mas esse run **não atesta o digest do

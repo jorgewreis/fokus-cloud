@@ -2,6 +2,7 @@
 """Synthetic artifact provenance tests: actual bytes, fake rebuild and API."""
 from pathlib import Path
 import os
+import signal
 import tempfile
 import threading
 import time
@@ -38,7 +39,18 @@ class Evidence(unittest.TestCase):
         value=b'synthetic deterministic archive'
         output.write_bytes(value)
         return {'source_sha':self.sha,'artifact_sha256':hashlib.sha256(value).hexdigest()}
-    def compare(self):return provenance.compare(self.source,self.artifact,self.environment,expected_repository='example/project',expected_repository_id='123')
+    def compare(self):
+        if os.name == 'nt':
+            self.skipTest('artifact provenance comparison requires the Linux CI runtime')
+        return provenance.compare(self.source,self.artifact,self.environment,expected_repository='example/project',expected_repository_id='123')
+
+    @unittest.skipUnless(os.name == 'nt', 'exercises the explicit non-production Windows refusal')
+    def test_windows_refuses_unsupervised_hash(self):
+        fd=os.open(self.artifact,os.O_RDONLY)
+        try:
+            with self.assertRaisesRegex(ValueError,'artifact_hash_linux_required'):
+                provenance.stable_hash(fd)
+        finally:os.close(fd)
     def test_exact_bytes_and_validation_are_checked_twice(self):
         result=self.compare()
         self.assertEqual(result['state'],'independent_rebuild_match_not_authorized')
@@ -133,6 +145,22 @@ class Evidence(unittest.TestCase):
         try:
             with patch.object(provenance,'HASH_TIMEOUT_SECONDS',0.2), \
                  patch.object(provenance.os,'read',side_effect=blocked_read):
+                with self.assertRaisesRegex(ValueError,'artifact_hash_timeout'):
+                    provenance.stable_hash(fd)
+            self.assertLess(time.monotonic()-started,1)
+        finally:os.close(fd)
+
+    @unittest.skipIf(os.name == 'nt' or not hasattr(signal, 'SIGTERM'), 'requires POSIX signal handling')
+    def test_hash_supervisor_kills_worker_that_ignores_terminate(self):
+        fd=os.open(self.artifact,os.O_RDONLY);started=time.monotonic()
+        def ignores_terminate(_fd,_count):
+            signal.signal(signal.SIGTERM, signal.SIG_IGN)
+            time.sleep(10)
+            return b''
+        try:
+            with patch.object(provenance,'HASH_TIMEOUT_SECONDS',0.05), \
+                 patch.object(provenance,'HASH_WORKER_CLEANUP_SECONDS',0.1), \
+                 patch.object(provenance.os,'read',side_effect=ignores_terminate):
                 with self.assertRaisesRegex(ValueError,'artifact_hash_timeout'):
                     provenance.stable_hash(fd)
             self.assertLess(time.monotonic()-started,1)

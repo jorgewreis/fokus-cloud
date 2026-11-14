@@ -21,6 +21,11 @@ import derived_assets
 EXECUTOR_ROOT = Path(__file__).resolve().parents[2]
 MAX_ARTIFACT_BYTES = 576 * 1024 * 1024
 HASH_TIMEOUT_SECONDS = 30
+# Cleanup is deliberately bounded too.  A process in uninterruptible kernel I/O
+# (for example a wedged NFS/FUSE mount) may not process SIGTERM or SIGKILL until
+# the kernel returns.  We fail closed rather than letting that condition pin the
+# caller forever; a daemon child is left for the OS/runtime to reap once it can.
+HASH_WORKER_CLEANUP_SECONDS = 0.2
 
 
 def require(condition, reason):
@@ -61,18 +66,43 @@ def _hash_worker(fd, result):
         result.close()
 
 
+def _stop_hash_worker(worker):
+    """Best-effort, bounded cleanup for a timed-out hash worker.
+
+    No userspace signal can forcibly release a process in D state.  In that
+    exceptional case this deliberately returns without an unbounded ``join``;
+    the caller has already rejected the artifact and remains available.
+    """
+    if not worker.is_alive():
+        worker.join(HASH_WORKER_CLEANUP_SECONDS)
+        return
+    worker.terminate()
+    worker.join(HASH_WORKER_CLEANUP_SECONDS)
+    if worker.is_alive() and hasattr(worker, 'kill'):
+        worker.kill()
+        worker.join(HASH_WORKER_CLEANUP_SECONDS)
+
+
 def stable_hash(fd):
-    """Hash in a killable POSIX worker so a blocked read cannot outlive its deadline."""
+    """Hash in a killable POSIX worker so a blocked read cannot outlive its deadline.
+
+    This evidence path is intentionally Linux/POSIX-only.  The CI contract runs
+    on Ubuntu; Windows has no equivalent fork/kill supervision here and must
+    fail closed instead of silently using the unsupervised primitive.
+    """
     if os.name == 'nt':
-        return _stable_hash(fd)
+        raise ValueError('artifact_hash_linux_required')
     context=multiprocessing.get_context('fork')
     received,sent=context.Pipe(duplex=False)
     worker=context.Process(target=_hash_worker,args=(fd,sent))
+    # If a kernel-level I/O wait cannot be interrupted, do not make Python's
+    # process-exit cleanup wait indefinitely for this evidence-only worker.
+    worker.daemon=True
     worker.start();sent.close()
     try:
         worker.join(HASH_TIMEOUT_SECONDS)
         if worker.is_alive():
-            worker.terminate();worker.join()
+            _stop_hash_worker(worker)
             raise ValueError('artifact_hash_timeout')
         require(received.poll(),'artifact_hash_failed')
         state,payload=received.recv()
@@ -81,7 +111,7 @@ def stable_hash(fd):
     finally:
         received.close()
         if worker.is_alive():
-            worker.terminate();worker.join()
+            _stop_hash_worker(worker)
 
 
 def compare(source, artifact, environment, *, expected_repository, expected_repository_id):
