@@ -1,6 +1,6 @@
 # Carrossel de 18/11 — cadastro que ajuda a equipe
 
-**Estado:** roteiro e capas em proposta. Instagram @fokus.cloud, 18/11/2026 às 10h, America/Bahia. Nada está aprovado ou agendado. Conferir o Metricool antes de criar qualquer post.
+**Estado:** as seis lâminas estão aprovadas; a legenda continua em proposta. Instagram @fokus.cloud, 18/11/2026 às 10h, America/Bahia. Nada está agendado. Conferir o Metricool antes de criar qualquer post.
 
 **Objetivo:** oferecer um checklist útil para organizar o contexto inicial de atendimento. **Público:** profissionais e equipes de escritórios de Advocacia. **Pilar:** rotina útil. **Métrica sugerida:** salvamentos por alcance quando disponíveis.
 
@@ -21,20 +21,35 @@ Usar a paleta 2 e a tipografia 2 registradas em social-media/identidade-visual.m
 
 ## Sugestão de legenda
 
-Quando outra pessoa da equipe precisa retomar um atendimento, o cadastro do cliente oferece informações suficientes para entender por onde começar?
+Quando um cliente volta a falar com o escritório, a equipe consegue entender rapidamente quem é, o que precisa e qual foi o último contexto do atendimento?
 
-Um registro claro pode reunir os dados necessários para identificar a pessoa ou empresa, entrar em contato e reconhecer quem participa daquele atendimento. Quando há um representante, também é útil entender qual é a relação dele com o cliente.
 
-Mais do que preencher campos, a ideia é organizar as informações pertinentes para que a equipe consiga consultar o contexto e conferir o próximo passo.
+Muitas vezes, a conversa não se perde por falta de boa vontade. Ela se perde porque os dados essenciais ficaram espalhados: um telefone em uma mensagem antiga, um representante citado de passagem, uma observação que não entrou no cadastro.
 
-Preparei este checklist para ajudar nessa revisão. Adapte cada ponto às necessidades e às regras do seu escritório.
 
-Salve o carrossel para consultar no próximo cadastro e acompanhe o @fokus.cloud para mais conteúdos sobre a rotina na Advocacia.
+Um bom cadastro não precisa ser burocrático. Ele precisa permitir que outra pessoa da equipe encontre um ponto de partida seguro.
+
+
+Neste carrossel, reunimos quatro pontos para revisar:
+
+
+• identificação clara da pessoa ou empresa;
+• contatos atualizados;
+• referência sobre quem representa ou participa do atendimento;
+• contexto suficiente para compreender o próximo passo.
+
+
+Essas informações não substituem a análise jurídica, os documentos do caso nem os cuidados de sigilo do escritório. Elas ajudam a organizar o início da conversa e evitam que o cliente precise repetir dados básicos sempre que o atendimento for retomado.
+
+
+Use o checklist como referência e adapte os campos, responsabilidades e regras de acesso à realidade do seu escritório.
+
+
+Salve para revisar o próximo cadastro da equipe.
 
 #FokusLaw #FokusCloud #Advocacia #GestãoJurídica #RotinaJurídica #EscritórioDeAdvocacia
 
 ## Pendências
 
-- Escolher e aprovar a capa; produzir e revisar as demais lâminas.
 - Revisar e aprovar a legenda, direitos de ativos, dados e acessibilidade.
 - Reconsultar a agenda de 18/11 para evitar duplicidade. Um eventual agendamento próximo dependerá de autorização específica, pois a antecedência geral registrada é de 30 dias.
