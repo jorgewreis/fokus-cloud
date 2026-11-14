@@ -2,9 +2,6 @@ name: Dashboard synthetic guard proof
 
 on:
   pull_request:
-    paths:
-      - '.github/workflows/dashboard-guard-proof.yml'
-      - 'tests/Isolated/backoffice-dashboard/**'
 
 permissions:
   contents: read
@@ -17,6 +14,12 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
+      - name: Record tested source
+        env:
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          printf 'Tested checkout: %s\n' "$(git rev-parse HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
+          printf 'Pull request head: %s\n' "$PR_HEAD" >> "$GITHUB_STEP_SUMMARY"
       - name: Build isolated PHP runtime
         run: docker build -t dashboard-guard-ci -f tests/Deployment/linux-runtime/Dockerfile .
       - name: Install locked dependencies without application scripts
@@ -36,6 +39,7 @@ jobs:
           docker run -d --name "$name" --network none --tmpfs /var/lib/mysql:rw,size=1g \
             -e MYSQL_ROOT_PASSWORD="$password" -e MYSQL_DATABASE=dashboard_bench \
             percona/percona-server@sha256:d24391a363426239220c35b9707d6b26ce7522ac27abe55689baebfb48bd9fb3 >/dev/null
+          test "$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$name")" = none
           for attempt in $(seq 1 90); do
             if docker exec "$name" mysqladmin ping -uroot -p"$password" --silent >/dev/null 2>&1; then break; fi
             if [ "$attempt" = 90 ]; then echo 'Disposable MySQL did not become ready' >&2; exit 1; fi
