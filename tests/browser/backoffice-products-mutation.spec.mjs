@@ -33,3 +33,28 @@ test('retorno tardio preserva o novo formulário',async({page})=>{
  await page.locator('#product-name').evaluate(el=>el.value='Rascunho novo'); await page.evaluate(()=>window.pending[0].resolve({}));
  await expect(page.locator('#product-name')).toHaveValue('Rascunho novo'); await expect(page.locator('#product-form-submit')).toBeDisabled();
 });
+
+test('leitura iniciada antes do resultado não libera reconhecimento',async({page})=>{
+ await setup(page); await page.locator('#product-new').evaluate(el=>el.click()); await submit(page);
+ await page.evaluate(()=>{ window.controller.abort(); window.dispose(); window.controller=new AbortController(); window.remount=window.mod.mount(document.querySelector('main'),{admin:{id:'a'},signal:window.controller.signal,api:{request:(url,options)=>options?new Promise((resolve,reject)=>window.pending.push({resolve,reject})):new Promise(resolve=>window.resolveOldRead=resolve)}}); });
+ await page.evaluate(()=>window.pending[0].reject(new Error('rede')));
+ await page.evaluate(async()=>{await Promise.resolve();window.resolveOldRead({products:[]});window.dispose=await window.remount;});
+ await expect(page.getByRole('button',{name:'Já conferi o catálogo'})).toBeDisabled();
+});
+
+test('roteador importa o módulo e drawer reais',async({page})=>{
+ const files={
+  '/backoffice/assets/js/backoffice-router.js':readFileSync(new URL('../../public/backoffice/assets/js/backoffice-router.js',import.meta.url),'utf8'),
+  '/backoffice/assets/js/products-page.js':readFileSync(new URL('../../public/backoffice/assets/js/products-page.js',import.meta.url),'utf8'),
+  '/backoffice/assets/js/records-drawer.js':readFileSync(new URL('../../public/backoffice/assets/js/records-drawer.js',import.meta.url),'utf8'),
+  '/backoffice/pages/products.html':html,
+ };
+ const fetched=[];
+ await page.route('http://fokus.test/**',async route=>{const path=new URL(route.request().url()).pathname;fetched.push(path);if(path==='/')return route.fulfill({contentType:'text/html',body:'<div id="app"></div>'});const body=files[path];return body?route.fulfill({contentType:path.endsWith('.js')?'text/javascript':'text/html',body}):route.fulfill({status:404,body:'missing'});});
+ await page.goto('http://fokus.test/');
+ await page.evaluate(()=>{window.FokusApi={request:()=>Promise.resolve({products:[]})};window.FokusStyles={Modal:{getOrCreateInstance:()=>({dispose(){}})},Offcanvas:{getOrCreateInstance:()=>({show(){},hide(){},dispose(){}})}};});
+ await page.addScriptTag({url:'http://fokus.test/backoffice/assets/js/backoffice-router.js'});
+ await page.evaluate(async()=>{window.router=window.BackofficeRouter.create({root:document.querySelector('#app'),sidebarButtons:[],admin:{id:'a',role:'superadministrador'}});await window.router.navigate('products',{history:false});});
+ await expect(page.locator('#product-new')).toBeAttached();
+ expect(fetched).toContain('/backoffice/assets/js/products-page.js');expect(fetched).toContain('/backoffice/assets/js/records-drawer.js');
+});
