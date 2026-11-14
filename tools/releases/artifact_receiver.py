@@ -15,11 +15,14 @@ import sys
 
 from preparation_guard import metadata, require
 
+# Mirrors the reviewed immutable unpack ceiling: 512 MiB payload plus 64 MiB tar overhead.
+MAX_ARTIFACT_BYTES = 576 * 1024 * 1024
+
 
 def receive(stream, directory, name, expected_sha256, expected_size):
     require(re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}', name) is not None, 'invalid_artifact_name')
     require(re.fullmatch(r'[0-9a-f]{64}', expected_sha256) is not None, 'invalid_artifact_digest')
-    require(type(expected_size) is int and expected_size > 0, 'invalid_artifact_size')
+    require(type(expected_size) is int and 0 < expected_size <= MAX_ARTIFACT_BYTES, 'invalid_artifact_size')
     directory = Path(directory).absolute()
     require(directory == directory.resolve(), 'staging_symlink')
     operator = os.geteuid()

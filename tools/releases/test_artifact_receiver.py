@@ -21,6 +21,47 @@ class Receiver(unittest.TestCase):
         self.data = b'synthetic release artifact' * 4096
         self.digest = hashlib.sha256(self.data).hexdigest()
 
+    def test_budget_matches_unpack_and_rejects_before_read_or_creation(self):
+        import immutable
+        self.assertEqual(receiver.MAX_ARTIFACT_BYTES, immutable.MAX_BYTES + 64 * 1024 * 1024)
+        class Unreadable:
+            def read(self, count):
+                raise AssertionError('must not read oversized stream')
+        with self.assertRaisesRegex(ValueError, 'invalid_artifact_size'):
+            receiver.receive(Unreadable(), self.folder, 'release.tar', self.digest, receiver.MAX_ARTIFACT_BYTES + 1)
+        self.assertEqual(list(self.folder.iterdir()), [])
+    def test_budget_boundary_is_allowed_to_reach_read(self):
+        class Unreadable:
+            def read(self, count):
+                raise AssertionError('read reached')
+        with self.assertRaisesRegex(AssertionError, 'read reached'):
+            receiver.receive(Unreadable(), self.folder, 'release.tar', self.digest, receiver.MAX_ARTIFACT_BYTES)
+        self.assertEqual(list(self.folder.iterdir()), [])
+
+    def test_receiver_and_publisher_cli_refuse_oversize_without_waiting_for_stdin(self):
+        too_large = str(receiver.MAX_ARTIFACT_BYTES + 1)
+        receiver_command = [sys.executable, str(Path(receiver.__file__)), '--directory', str(self.folder),
+                            '--name', 'release.tar', '--sha256', self.digest, '--size', too_large]
+        publisher_command = [sys.executable, str(Path(receiver.__file__).with_name('publisher.py')), 'receive-prepare',
+                             '--staging-directory', str(self.folder), '--artifact-name', 'release.tar',
+                             '--artifact-size', too_large, '--expected-digest', self.digest,
+                             '--runtime-uid', '12345', '--runtime-gid', '12345']
+        for name in ('source', 'candidate', 'evidence', 'base', 'root', 'storage', 'configuration', 'receipt', 'transport'):
+            publisher_command.extend(['--' + name, str(self.folder / name)])
+        for command in (receiver_command, publisher_command):
+            with self.subTest(entrypoint=command[1]):
+                process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                try:
+                    self.assertNotEqual(process.wait(timeout=10), 0)
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                        process.wait()
+                    process.stdin.close()
+                    process.stdout.close()
+                    process.stderr.close()
+                self.assertEqual(list(self.folder.iterdir()), [])
+
     def test_cli_receives_and_rejects_existing_target(self):
         command = [sys.executable, str(Path(receiver.__file__)), '--directory', str(self.folder),
                    '--name', 'release.tar', '--sha256', self.digest, '--size', str(len(self.data))]
