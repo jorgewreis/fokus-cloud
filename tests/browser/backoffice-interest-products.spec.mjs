@@ -268,3 +268,18 @@ test('página única devolve foco ao resumo após paginação', async ({ page })
     await expect(page.locator('#interest-pagination')).toContainText('1 interesses');
     await expect(page.locator('#interest-pagination')).toBeFocused();
 });
+
+test('carregamento acessível acompanha somente consulta mais recente', async ({ page }) => {
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { id: 'TEST', role: 'superadministrador', permissions: ['platform.product_interests.manage'] } } }));
+    await page.route('**/api/backoffice/product-interests-options?*', route => route.fulfill({ json: { products: [], meta: { current_page: 1, has_more: false }, historical_index_ready: true } }));
+    let release, started; const pending = new Promise(resolve => { release = resolve; }); const begun = new Promise(resolve => { started = resolve; });
+    await page.route('**/api/backoffice/product-interests?*', async route => {
+        if (new URL(route.request().url()).searchParams.get('product') === 'espera') { started(); await pending; }
+        await route.fulfill({ json: { data: [], meta: { total: 0, current_page: 1, last_page: 1 } } });
+    });
+    await page.goto('/backoffice/interesses'); await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'false');
+    await page.locator('#interest-product-filter').fill('espera'); await page.getByRole('button', { name: 'Filtrar' }).click(); await begun;
+    await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'true');
+    await expect(page.locator('#interest-list [role="status"]')).toHaveText('Carregando interesses...');
+    release(); await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'false');
+});
