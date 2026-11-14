@@ -389,7 +389,12 @@ export async function mount(root, context = {}) {
         }
     };
 
+    let searchTimer;
+    let requestedSearch = "";
     const loadVouchers = async () => {
+        clearTimeout(searchTimer);
+        searchTimer = undefined;
+        requestedSearch = $("#voucher-search").value.trim();
         table.setAttribute("aria-busy", "true");
         $("[data-fs-datatable-loading]").hidden = false;
         $("[data-fs-datatable-empty]").hidden = true;
@@ -680,14 +685,22 @@ export async function mount(root, context = {}) {
         state.page = 1;
         loadVouchers();
     });
-    let searchTimer;
     pageSignal?.addEventListener("abort", () => clearTimeout(searchTimer), { once: true });
-    listen($("#voucher-search"), "input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { state.page = 1; loadVouchers(); }, 250); });
+    listen($("#voucher-search"), "input", () => {
+        clearTimeout(searchTimer);
+        searchTimer = undefined;
+        if ($("#voucher-search").value.trim() === requestedSearch) return;
+        searchTimer = setTimeout(() => { state.page = 1; loadVouchers(); }, 250);
+    });
     ["#voucher-product-filter", "#voucher-type-filter", "#voucher-status-filter"].forEach((selector) => listen($(selector), "change", () => { state.page = 1; loadVouchers(); }));
     listen(pagination, "click", (event) => {
         const button = event.target.closest("[data-voucher-page]");
         if (!button || button.disabled) return;
-        state.page = Number(button.dataset.voucherPage);
+        if (searchTimer !== undefined) {
+            state.page = 1;
+        } else {
+            state.page = Number(button.dataset.voucherPage);
+        }
         loadVouchers();
     });
     listen(list, "click", (event) => {

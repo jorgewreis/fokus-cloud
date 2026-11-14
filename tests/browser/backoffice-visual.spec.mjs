@@ -1349,6 +1349,9 @@ test('Vouchers filtra, pagina e consulta regras, resgates e reservas em drawer r
         await page.getByRole('button', { name: 'Próxima página' }).click();
         await expect(page.locator('#voucher-list tr')).toHaveCount(2);
         await expect(page.locator('#voucher-table-footer-summary')).toContainText('página 2 de 2');
+        // A queued search must not reset pagination after a newer filter request.
+        await page.waitForTimeout(400);
+        await expect(page.locator('#voucher-table-footer-summary')).toContainText('página 2 de 2');
         await page.getByRole('button', { name: 'Página anterior' }).click();
         await expect(page.locator('#voucher-list tr')).toHaveCount(15);
 
