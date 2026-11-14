@@ -1,5 +1,9 @@
 import { createRecordsDrawer } from "./records-drawer.js";
 
+let inviteState = null;
+const inviteListeners = new Set();
+const notifyInvite = () => inviteListeners.forEach((listener) => listener());
+
 export async function mount(root, context = {}) {
     const $ = (selector) => root.querySelector(selector) || document.querySelector(selector);
     const api = context.api || window.FokusApi;
@@ -70,11 +74,15 @@ export async function mount(root, context = {}) {
             const response = await api.request(`/backoffice/directory/users?${params}`, { signal: context.signal });
             if (!current(version, listVersion)) return;
             render(response);
+            if (inviteState) syncInvite();
+            return true;
         } catch (error) {
             if (!current(version, listVersion) || error?.name === "AbortError") return;
             list.innerHTML = '<tr><td colspan="5"><button class="fs-btn fs-btn-outline-primary fs-btn-sm" type="button" data-users-retry>Tentar novamente</button></td></tr>';
             list.querySelector("[data-users-retry]").addEventListener("click", load, { once: true });
             showMessage(error.message || "Não foi possível carregar os usuários.");
+            if (inviteState) syncInvite();
+            return false;
         }
     };
     let companiesLoaded = false;
@@ -84,7 +92,7 @@ export async function mount(root, context = {}) {
         $("#user-internal-role-field").hidden = isExternal;
         $("#user-role").disabled = isExternal;
         [$("#user-cpf"), $("#user-company"), $("#user-external-role")].forEach((field) => { field.disabled = !isExternal; field.required = isExternal; });
-        $("#user-form-submit").disabled = isExternal && !companiesLoaded;
+        $("#user-form-submit").disabled = Boolean(inviteState) || (isExternal && !companiesLoaded);
         $("#user-form-data-title").textContent = isExternal ? "Vínculo com empresa" : "Dados da conta interna";
         $("#user-form-submit").textContent = isExternal ? "Enviar convite externo" : "Enviar convite interno";
         if (isExternal && !companiesLoaded) loadCompanies();
@@ -98,13 +106,13 @@ export async function mount(root, context = {}) {
             const companies = response.data || [];
             select.innerHTML = '<option value="">Selecione a empresa e o sistema</option>' + companies.map((company) => `<option value="${esc(company.id)}">${esc(company.label)}</option>`).join("");
             select.disabled = companies.length === 0;
-            $("#user-form-submit").disabled = companies.length === 0 && $("#user-account-type").value === "empresa";
+            $("#user-form-submit").disabled = Boolean(inviteState) || (companies.length === 0 && $("#user-account-type").value === "empresa");
             if (!companies.length) showMessage("Não há empresas ativas com assinatura ativa do Fokus Law para receber um vínculo.");
-            else { companiesLoaded = true; showMessage(""); }
+            else { companiesLoaded = true; if (!inviteState) showMessage(""); }
         } catch (error) {
             if (!active || context.signal?.aborted || error?.name === "AbortError") return;
             select.innerHTML = '<option value="">Não foi possível carregar as empresas</option>';
-            $("#user-form-submit").disabled = $("#user-account-type").value === "empresa";
+            $("#user-form-submit").disabled = Boolean(inviteState) || $("#user-account-type").value === "empresa";
             showMessage(error.message || "Não foi possível carregar as empresas ativas.");
         }
     };
@@ -172,41 +180,63 @@ export async function mount(root, context = {}) {
             modal?.hide?.(); showMessage("Ação de segurança concluída.", "success"); pendingAction = null; await load({ preserveMessage: true });
         } catch (error) { if (active && !context.signal?.aborted) showMessage(error.message || "Não foi possível concluir a ação."); }
     };
+    const syncInvite = () => {
+        if (!active || context.signal?.aborted) return;
+        $("#user-invite").disabled = !canManage || Boolean(inviteState);
+        const submit = $("#user-form-submit");
+        submit.disabled = Boolean(inviteState) || ($("#user-account-type").value === "empresa" && !companiesLoaded);
+        if (inviteState === "pending") submit.setAttribute("aria-busy", "true"); else submit.removeAttribute("aria-busy");
+        const progress = $("#user-invite-progress");
+        progress.textContent = inviteState === "pending" ? "Há um convite em andamento. Aguarde o resultado." : "";
+        progress.hidden = inviteState !== "pending";
+        if (inviteState === "uncertain") showMessage("Atualize a página e confira a situação da conta antes de tentar novamente.");
+    };
+    inviteListeners.add(syncInvite);
     const submitForm = async (event) => {
         event.preventDefault();
-        if (!form.reportValidity()) return;
-        const values = Object.fromEntries(new FormData(form));
         const mode = drawerController.getState().mode;
+        if (inviteState || !form.reportValidity()) return;
+        const values = Object.fromEntries(new FormData(form));
         if (mode === "invite" && values.account_type === "empresa") {
             const cpfInput = $("#user-cpf");
             const cpf = window.FokusDocuments?.normalize(cpfInput.value, "cpf") || cpfInput.value.replace(/\D/g, "");
             if (!window.FokusDocuments?.cpf(cpf)) { showMessage("Informe um CPF válido, com os dígitos verificadores corretos."); cpfInput.focus(); return; }
             values.cpf = cpf;
         }
+        if (mode === "invite") { inviteState = "pending"; notifyInvite(); }
         try {
             if (mode === "invite") {
                 if (values.account_type === "empresa") {
                     await api.request("/backoffice/directory/users", { method: "POST", body: { name: values.name, email: values.email, cpf: values.cpf, company_id: values.company_id, role: values.role } });
-                    if (!active || context.signal?.aborted) return;
-                    showMessage("Convite enviado ao usuário externo.", "success");
                 } else {
                     await api.request("/backoffice/admins/invitations", { method: "POST", body: { name: values.name, email: values.email, role: values.role } });
-                    if (!active || context.signal?.aborted) return;
-                    showMessage("Convite enviado à conta interna.", "success");
                 }
+                if (!active || context.signal?.aborted) { inviteState = "uncertain"; return; }
+                drawerController.close();
+                const refreshed = await load({ preserveMessage: true });
+                if (!active || context.signal?.aborted || !refreshed) { inviteState = "uncertain"; return; }
+                inviteState = null;
+                showMessage(values.account_type === "empresa" ? "Convite enviado ao usuário externo." : "Convite enviado à conta interna.", "success");
             } else {
                 const result = await api.request(`/backoffice/admins/${encodeURIComponent(selected.id)}/profile`, { method: "PATCH", body: { name: values.name, email: values.email } });
                 if (!active || context.signal?.aborted) return;
                 showMessage(result.message || "Dados atualizados.", "success");
+                drawerController.close(); await load({ preserveMessage: true });
             }
-            drawerController.close(); await load({ preserveMessage: true });
-        } catch (error) { if (active && !context.signal?.aborted) showMessage(error.message || "Não foi possível salvar os dados."); }
+        } catch (error) {
+            if (mode === "invite") {
+                if (!error.status || error.status === 408 || error.status >= 500) inviteState = "uncertain";
+                else { inviteState = null; if (active && !context.signal?.aborted) showMessage(error.message || "Não foi possível enviar o convite."); }
+            } else if (active && !context.signal?.aborted) showMessage(error.message || "Não foi possível salvar os dados.");
+        } finally {
+            if (mode === "invite") notifyInvite();
+        }
     };
     $("#users-query").value = state.query;
     if (!canManage) $("#user-invite").hidden = true;
     $("#users-filter-form").addEventListener("submit", (event) => { event.preventDefault(); state.query = $("#users-query").value.trim(); state.page = 1; load(); });
     $("#user-invite").addEventListener("click", () => { ++detailVersion; openForm("invite"); });
-    $("#user-invite").disabled = !canManage;
+    $("#user-invite").disabled = !canManage || Boolean(inviteState);
     $("#user-drawer-close").addEventListener("click", () => { ++detailVersion; drawerController.close(); });
     $("#user-form-cancel").addEventListener("click", () => { ++detailVersion; drawerController.close(); });
     form.addEventListener("submit", submitForm);
@@ -225,8 +255,9 @@ export async function mount(root, context = {}) {
     const invalidateOnEscape = (event) => { if (event.key === "Escape") invalidateDetail(); };
     trigger?.addEventListener("fs:hide", invalidateDetail);
     document.addEventListener("keydown", invalidateOnEscape);
+    if (inviteState) syncInvite();
     load();
-    const dispose = () => { if (!active) return; trigger?.removeEventListener("fs:hide", invalidateDetail); document.removeEventListener("keydown", invalidateOnEscape); active = false; ++listVersion; ++detailVersion; drawerController.dispose(); modal?.dispose?.(); window.disposeBackofficeRecordsPage?.(root); };
+    const dispose = () => { if (!active) return; inviteListeners.delete(syncInvite); trigger?.removeEventListener("fs:hide", invalidateDetail); document.removeEventListener("keydown", invalidateOnEscape); active = false; ++listVersion; ++detailVersion; drawerController.dispose(); modal?.dispose?.(); window.disposeBackofficeRecordsPage?.(root); };
     context.signal?.addEventListener("abort", dispose, { once: true });
     return dispose;
 }
