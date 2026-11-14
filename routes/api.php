@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BackofficeController;
+use App\Http\Controllers\Api\CompanyIdempotencyController;
 use App\Http\Controllers\Api\CompanyUserController;
 use App\Http\Controllers\Api\LawAccessController;
 use App\Http\Controllers\Api\LawAdministrativeProcessController;
@@ -30,6 +31,7 @@ use App\Http\Middleware\EnsurePlatformAdmin;
 use App\Http\Middleware\EnsurePlatformPermission;
 use App\Http\Middleware\EnsurePlatformSuperadmin;
 use App\Http\Middleware\LawCaseTransaction;
+use App\Http\Middleware\RejectCompanyIdempotencyEndpoints;
 use App\Http\Middleware\RejectUnimplementedCompanyIdempotency;
 use Illuminate\Support\Facades\Route;
 
@@ -230,6 +232,9 @@ Route::middleware(EnsurePlatformAdmin::class)->prefix('backoffice')->group(funct
     Route::patch('/plans/{plan}', [BackofficeController::class, 'updatePlan'])->middleware(EnsurePlatformPermission::class.':platform.catalog.manage');
     Route::delete('/plans/{plan}', [BackofficeController::class, 'deletePlan'])->middleware(EnsurePlatformPermission::class.':platform.catalog.publish');
     Route::get('/companies', [BackofficeController::class, 'companies'])->middleware(EnsurePlatformPermission::class.':platform.companies.view');
+    Route::post('/company-idempotency/issue', [CompanyIdempotencyController::class, 'issue'])->middleware([EnsurePlatformPermission::class.':platform.companies.manage', RejectCompanyIdempotencyEndpoints::class, 'throttle:5,1,company-idempotency-issue']);
+    Route::post('/company-idempotency/status', [CompanyIdempotencyController::class, 'status'])->middleware([EnsurePlatformPermission::class.':platform.companies.manage', RejectCompanyIdempotencyEndpoints::class]);
+    Route::post('/company-idempotency/revoke', [CompanyIdempotencyController::class, 'revoke'])->middleware([EnsurePlatformPermission::class.':platform.companies.manage', RejectCompanyIdempotencyEndpoints::class]);
     Route::get('/companies/{company}', [BackofficeController::class, 'company'])->middleware(EnsurePlatformPermission::class.':platform.companies.view');
     Route::post('/companies', [BackofficeController::class, 'createCompany'])->middleware([EnsurePlatformPermission::class.':platform.companies.manage', RejectUnimplementedCompanyIdempotency::class]);
     Route::patch('/companies/{company}', [BackofficeController::class, 'updateCompany'])->middleware([EnsurePlatformPermission::class.':platform.companies.manage', RejectUnimplementedCompanyIdempotency::class]);
