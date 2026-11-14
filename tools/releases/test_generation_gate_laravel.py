@@ -201,6 +201,21 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     try:gate.activate(c,base,old,oldreceipt,policy,newroot,newreceipt,temp/'scope.json',rollback=True)
     except Exception:pass
     else:raise AssertionError('duplicate activation allowed')
+    # Successful candidate activation and a fresh supervised code-only rollback.
+    # Both verifications hit the real sealed release endpoint over loopback.
+    root=old;receipt=oldreceipt;run('success',10,0)
+    p.update(release=newroot.name,root=str(newroot),receipt_sha256=c.digest(newreceipt.read_bytes()),expires_at_epoch=time.time()+120)
+    policy.write_text(json.dumps(p))
+    result=gate.activate(c,base,newroot,newreceipt,policy,old,oldreceipt,temp/'scope.json')
+    assert result['state']=='verified' and (base/'current').resolve()==newroot
+    c.verify(old,oldreceipt);c.verify(newroot,newreceipt)
+    root=newroot;receipt=newreceipt;run('success',11,0)
+    p.update(release=old.name,root=str(old),receipt_sha256=c.digest(oldreceipt.read_bytes()),rollback_code_compatible=True,data_restore_required=False,expires_at_epoch=time.time()+120)
+    policy.write_text(json.dumps(p))
+    result=gate.activate(c,base,old,oldreceipt,policy,newroot,newreceipt,temp/'scope.json',rollback=True)
+    assert result['state']=='verified' and (base/'current').resolve()==old
+    c.verify(old,oldreceipt);c.verify(newroot,newreceipt)
+    print('synthetic_successful_activation_and_explicit_rollback_verified')
     print(json.dumps({'gate':'real_artifact_laravel_activation_verified','previous':old.name,'candidate':newroot.name,'candidate_artifact_sha256':nextpack['artifact_sha256'],'previous_artifact_sha256':pack['artifact_sha256'],'http_transport':'loopback injection, no TLS/FPM claim'}))
     for item in newroot.rglob('*'):
         if not item.is_symlink():item.chmod(0o700 if item.is_dir() else 0o600)
