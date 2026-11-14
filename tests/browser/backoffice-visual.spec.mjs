@@ -1292,7 +1292,18 @@ test('Vouchers filtra, pagina e consulta regras, resgates e reservas em drawer r
     await page.route('**/api/backoffice/catalog', (route) => route.fulfill({
         contentType: 'application/json', body: JSON.stringify({ products, options: { segments: {}, module_codes: [], personalization_types: [] } }),
     }));
-    await page.route('**/api/backoffice/vouchers', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(vouchers) }));
+    await page.route(/\/api\/backoffice\/vouchers(?:\?.*)?$/, (route) => {
+        const params = new URL(route.request().url()).searchParams;
+        const search = (params.get('search') || '').toLowerCase();
+        const filtered = vouchers.filter((voucher) =>
+            (!search || `${voucher.code} ${voucher.name} ${voucher.origin} ${voucher.product_name} ${voucher.plan_name}`.toLowerCase().includes(search)) &&
+            (!params.get('product_id') || voucher.product_id === params.get('product_id')) &&
+            (!params.get('discount_type') || voucher.discount_type === params.get('discount_type')) &&
+            (!params.get('status') || voucher.computed_status === params.get('status')));
+        const pageNumber = Number(params.get('page') || 1);
+        const perPage = Number(params.get('per_page') || 15);
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: filtered.slice((pageNumber - 1) * perPage, pageNumber * perPage), meta: { total: filtered.length, last_page: Math.max(1, Math.ceil(filtered.length / perPage)) } }) });
+    });
     await page.route('**/api/backoffice/vouchers/VCH_VISUAL_01', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({
         voucher: vouchers[0],
         redemptions: Array.from({ length: 24 }, (_, index) => ({
@@ -1377,7 +1388,7 @@ test('Vouchers cria campanha e limita ações comerciais às permissões documen
         admin: { role: 'administrador_comercial', name: 'Admin Comercial Teste', email: 'comercial@example.test', permissions: ['platform.vouchers.manage'] },
     }) }));
     await page.route('**/api/backoffice/catalog', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ products }) }));
-    await page.route('**/api/backoffice/vouchers', async (route) => {
+    await page.route(/\/api\/backoffice\/vouchers(?:\?.*)?$/, async (route) => {
         if (route.request().method() === 'POST') {
             const payload = route.request().postDataJSON();
             expect(payload.code).toMatch(/^[A-Z0-9]+$/);
@@ -1385,7 +1396,7 @@ test('Vouchers cria campanha e limita ações comerciais às permissões documen
             vouchers.unshift({ id: 'VCH_CREATED_01', ...payload, product_name: 'Fokus Law', plan_name: 'Essencial', redemptions_count: 0, status: 'ativa', computed_status: 'ativa' });
             return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'VCH_CREATED_01', code: payload.code, message: 'Voucher criado.' }) });
         }
-        return route.fulfill({ contentType: 'application/json', body: JSON.stringify(vouchers) });
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: vouchers, meta: { total: vouchers.length, last_page: 1 } }) });
     });
     await page.route('**/api/backoffice/vouchers/VCH_CREATED_01', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ voucher: vouchers[0], redemptions: [], reservations: [] }) }));
 
@@ -1437,7 +1448,7 @@ test('voucher de assinatura gratuita envia uma duração ao cadastro', async ({ 
         admin: { role: 'superadministrador', name: 'Superadmin Teste', permissions: ['platform.vouchers.manage', 'platform.catalog.publish'] },
     }) }));
     await page.route('**/api/backoffice/catalog', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ products }) }));
-    await page.route('**/api/backoffice/vouchers', async (route) => {
+    await page.route(/\/api\/backoffice\/vouchers(?:\?.*)?$/, async (route) => {
         if (route.request().method() === 'POST') {
             expect(route.request().postDataJSON()).toMatchObject({
                 product_id: 'PRD_VOUCHER_LAW', plan_id: 'PLN_VOUCHER_01',
@@ -1445,7 +1456,7 @@ test('voucher de assinatura gratuita envia uma duração ao cadastro', async ({ 
             });
             return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'VCH_FREE_01', code: 'GRATUITO1', message: 'Voucher criado.' }) });
         }
-        return route.fulfill({ contentType: 'application/json', body: JSON.stringify([]) });
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: [], meta: { total: 0, last_page: 1 } }) });
     });
 
     await page.goto('/backoffice/vouchers');

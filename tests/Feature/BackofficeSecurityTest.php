@@ -192,6 +192,43 @@ class BackofficeSecurityTest extends TestCase
         $this->actingAs($commercial, 'platform')->deleteJson("/api/backoffice/vouchers/{$voucherId}", ['reason' => 'Não permitido.'])->assertForbidden();
     }
 
+    public function test_vouchers_paginate_and_filter_beyond_the_first_hundred(): void
+    {
+        $admin = $this->admin();
+        for ($i = 0; $i < 105; $i++) {
+            DB::table('vouchers')->insert([
+                'id' => PrefixedUlid::make('VCH'), 'code' => sprintf('TEST%03d', $i),
+                'discount_type' => 'percentage', 'discount_value' => 10, 'status' => 'ativa',
+                'created_by_platform_admin_id' => $admin->id, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/vouchers?per_page=20&page=6')
+            ->assertOk()->assertJsonPath('meta.total', 105)->assertJsonCount(5, 'data');
+        $this->getJson('/api/backoffice/vouchers?search=TEST000')
+            ->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.code', 'TEST000');
+    }
+
+    public function test_access_audit_filters_before_paginating_all_events(): void
+    {
+        $admin = $this->admin();
+        $oldId = PrefixedUlid::make('PAE');
+        DB::table('platform_audit_events')->insert([
+            'id' => $oldId, 'action' => 'backoffice.login_failed', 'actor_type' => 'platform_admin', 'reason' => 'Teste sintético',
+            'metadata' => json_encode(['status' => 'failed']), 'created_at' => now()->subDay(), 'expires_at' => now()->addDay(),
+        ]);
+        $rows = [];
+        for ($i = 0; $i < 2001; $i++) {
+            $rows[] = ['id' => PrefixedUlid::make('PAE'), 'action' => 'backoffice.login_succeeded',
+                'actor_type' => 'platform_admin', 'reason' => 'Teste sintético', 'metadata' => json_encode(['status' => 'success']),
+                'created_at' => now(), 'expires_at' => now()->addDay()];
+        }
+        foreach (array_chunk($rows, 100) as $chunk) {
+            DB::table('platform_audit_events')->insert($chunk);
+        }
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/audit/access-control?status=failed')
+            ->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.id', $oldId);
+    }
+
     private function admin(): PlatformAdmin
     {
         return PlatformAdmin::create(['id' => PrefixedUlid::make('PAD'), 'name' => 'Equipe Fokus', 'email' => 'interno@example.test', 'password' => Hash::make('SenhaInterna!2026'), 'status' => 'ativo', 'platform_role_id' => PlatformRole::where('code', 'superadministrador')->value('id'), 'email_verified_at' => now()]);
