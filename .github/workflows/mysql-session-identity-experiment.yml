@@ -1,0 +1,53 @@
+name: Disposable MySQL session identity experiment
+
+on:
+  pull_request:
+    branches: [codex/interest-final-integration-20261114]
+    paths:
+      - '.github/workflows/mysql-session-identity-experiment.yml'
+      - 'tests/Deployment/probe_mysql_init_identity.py'
+      - 'tests/Deployment/test_probe_mysql_init_identity.py'
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-probe:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'codex/mysql-connection-identity-20261114'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Build the existing target-profile test runtime
+        run: docker build -t mysql-session-probe -f tests/Deployment/linux-runtime/php85/Dockerfile .
+      - name: Verify correct and incorrect identities in disposable sessions
+        shell: bash
+        run: |
+          set -euo pipefail
+          db="mysql-session-db-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          qa="mysql-session-qa-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          password="$(openssl rand -hex 24)"
+          echo "::add-mask::$password"
+          image='percona/percona-server@sha256:d24391a363426239220c35b9707d6b26ce7522ac27abe55689baebfb48bd9fb3'
+          trap 'docker rm -f "$qa" "$db" >/dev/null 2>&1 || true' EXIT
+          uid="$(docker run --rm --network none --entrypoint id "$image" -u mysql)"
+          gid="$(docker run --rm --network none --entrypoint id "$image" -g mysql)"
+          [[ "$uid" =~ ^[0-9]+$ && "$gid" =~ ^[0-9]+$ ]]
+          docker run -d --name "$db" --network none --tmpfs "/var/lib/mysql:rw,size=1g,uid=$uid,gid=$gid,mode=0700" -e MYSQL_ROOT_PASSWORD="$password" -e MYSQL_DATABASE=fokuscloud_security "$image" >/dev/null
+          test "$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$db")" = none
+          for attempt in $(seq 1 90); do
+            if docker exec -e MYSQL_PWD="$password" "$db" mysqladmin --no-defaults ping -uroot --silent >/dev/null 2>&1; then break; fi
+            if [ "$attempt" = 90 ] || [ "$(docker inspect --format '{{.State.Running}}' "$db")" != true ]; then echo 'Disposable server did not start' >&2; exit 1; fi
+            sleep 2
+          done
+          uuid="$(docker exec -e MYSQL_PWD="$password" "$db" mysql --no-defaults -uroot -Nse 'SELECT @@server_uuid')"
+          ns="$(docker exec "$db" readlink /proc/self/ns/net)"
+          [[ "$uuid" =~ ^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$ && "$ns" =~ ^net:\[[0-9]+\]$ ]]
+          docker run -d --name "$qa" --network "container:$db" --cap-drop ALL --security-opt no-new-privileges -e APP_ENV=testing -e DB_HOST=127.0.0.1 -e DB_PORT=3306 -e DB_DATABASE=fokuscloud_security -e DB_USERNAME=root -e DB_PASSWORD="$password" mysql-session-probe sleep infinity >/dev/null
+          test "$(docker exec "$qa" readlink /proc/self/ns/net)" = "$ns"
+          docker exec --user 0 "$qa" sh -ec 'umask 022; printf "%s\n%s\n" "$1" "$2" > /run/fokus-release-mysql.identity; chmod 0444 /run/fokus-release-mysql.identity' identity "$uuid" "$ns"
+          docker cp tests/Deployment/linux_disposable_mysql.py "$qa":/tmp/
+          docker cp tests/Deployment/probe_mysql_init_identity.py "$qa":/tmp/
+          docker exec --user 1000:1000 -w /tmp "$qa" sh -ec 'php --version; mysql --version; mysqldump --version; python3 probe_mysql_init_identity.py'

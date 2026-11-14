@@ -37,6 +37,20 @@ try {$pdo=new PDO('mysql:host=127.0.0.1;port=3306;dbname=fokuscloud_security',ge
                 raise RuntimeError(label + ' identity experiment did not meet expected outcome')
             print(label, 'matching' if expected else 'mismatch', 'ok')
 
+    # Kill only a session created by this very process in the synthetic server.
+    # PDO must not silently resume work after that connection is lost. A newly
+    # constructed connection must re-run its own initialization command.
+    reconnect = r'''$dsn='mysql:host=127.0.0.1;port=3306;dbname=fokuscloud_security';
+$connect=fn($init)=>new PDO($dsn,getenv('DB_USERNAME'),getenv('DB_PASSWORD'),[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,Pdo\Mysql::ATTR_INIT_COMMAND=>$init]);
+$first=$connect($argv[1]); $admin=$connect($argv[1]); $id=$first->query('SELECT CONNECTION_ID()')->fetchColumn();
+if (!ctype_digit((string)$id)) exit(2); $admin->exec('KILL CONNECTION '.(int)$id);
+try {$first->query('SELECT 1'); exit(3);} catch (PDOException $e) {}
+$new=$connect($argv[1]); $new->query('SELECT 1');
+try {$unexpected=$connect($argv[2]); exit(4);} catch (PDOException $e) {}'''
+    subprocess.run(['php', '-r', reconnect, init_statement(identity), init_statement(other)],
+                   env=env, timeout=30, check=True)
+    print('pdo killed session and new connections ok')
+
 
 if __name__ == '__main__':
     main()
