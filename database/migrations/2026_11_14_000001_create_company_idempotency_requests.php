@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -28,9 +27,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        if (Schema::hasTable('company_idempotency_requests') && DB::table('company_idempotency_requests')->exists()) {
-            throw new RuntimeException('Cannot remove company idempotency records.');
-        }
-        Schema::dropIfExists('company_idempotency_requests');
+        throw new RuntimeException('Automatic rollback would remove company idempotency records; use an approved recovery procedure.');
     }
 };

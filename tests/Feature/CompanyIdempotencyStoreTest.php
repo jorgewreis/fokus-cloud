@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\CompanyIdempotencyAuthorization;
 use App\Services\CompanyIdempotencyKeys;
 use App\Services\CompanyIdempotencyStore;
 use Illuminate\Database\Schema\Blueprint;
@@ -16,6 +17,26 @@ class CompanyIdempotencyStoreTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        Schema::create('platform_admins', function (Blueprint $table): void {
+            $table->string('id')->primary();
+            $table->string('status');
+            $table->string('platform_role_id')->nullable();
+            $table->timestamp('manual_blocked_at')->nullable();
+            $table->timestamp('deactivated_at')->nullable();
+            $table->timestamp('locked_until')->nullable();
+        });
+        Schema::create('platform_permissions', function (Blueprint $table): void {
+            $table->string('id')->primary();
+            $table->string('code')->unique();
+        });
+        Schema::create('platform_role_permissions', function (Blueprint $table): void {
+            $table->string('platform_role_id');
+            $table->string('platform_permission_id');
+            $table->primary(['platform_role_id', 'platform_permission_id']);
+        });
+        DB::table('platform_admins')->insert(['id' => 'admin-a', 'status' => 'ativo', 'platform_role_id' => 'role-a']);
+        DB::table('platform_permissions')->insert(['id' => 'perm-a', 'code' => 'platform.companies.manage']);
+        DB::table('platform_role_permissions')->insert(['platform_role_id' => 'role-a', 'platform_permission_id' => 'perm-a']);
         $migration = require database_path('migrations/2026_11_14_000001_create_company_idempotency_requests.php');
         $migration->up();
         Schema::create('synthetic_effects', function (Blueprint $table): void {
@@ -28,15 +49,15 @@ class CompanyIdempotencyStoreTest extends TestCase
         $store = $this->store();
         $token = $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
         $payload = ['legal_name' => 'Synthetic'];
-        self::assertNull($store->bind($token, 'admin-a', 'company.create', null, $payload, now()->getTimestamp(), fn () => true));
+        self::assertNull($store->bind($token, 'admin-a', 'company.create', null, $payload, now()->getTimestamp()));
         $writer = function (): array {
             DB::table('synthetic_effects')->insert(['id' => 'EMP-synthetic']);
 
             return ['id' => 'EMP-synthetic', 'status' => 201];
         };
-        self::assertSame(['id' => 'EMP-synthetic', 'status' => 201], $store->complete($token, 'admin-a', 'company.create', null, $payload, fn () => true, $writer));
-        self::assertSame(['id' => 'EMP-synthetic', 'status' => 201], $store->bind($token, 'admin-a', 'company.create', null, $payload, now()->getTimestamp(), fn () => true));
-        self::assertSame(['id' => 'EMP-synthetic', 'status' => 201], $store->complete($token, 'admin-a', 'company.create', null, $payload, fn () => true, $writer));
+        self::assertSame(['id' => 'EMP-synthetic', 'status' => 201], $store->complete($token, 'admin-a', 'company.create', null, $payload, $writer));
+        self::assertSame(['id' => 'EMP-synthetic', 'status' => 201], $store->bind($token, 'admin-a', 'company.create', null, $payload, now()->getTimestamp()));
+        self::assertSame(['id' => 'EMP-synthetic', 'status' => 201], $store->complete($token, 'admin-a', 'company.create', null, $payload, $writer));
         self::assertSame(1, DB::table('synthetic_effects')->count());
         $row = DB::table('company_idempotency_requests')->first();
         self::assertNotSame($token, $row->token_hash);
@@ -47,9 +68,9 @@ class CompanyIdempotencyStoreTest extends TestCase
     {
         $store = $this->store();
         $token = $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
-        $store->bind($token, 'admin-a', 'company.create', null, ['name' => 'A'], now()->getTimestamp(), fn () => true);
+        $store->bind($token, 'admin-a', 'company.create', null, ['name' => 'A'], now()->getTimestamp());
         try {
-            $store->bind($token, 'admin-a', 'company.create', null, ['name' => 'B'], now()->getTimestamp(), fn () => true);
+            $store->bind($token, 'admin-a', 'company.create', null, ['name' => 'B'], now()->getTimestamp());
             self::fail('Changed payload was accepted.');
         } catch (HttpException $e) {
             self::assertSame(409, $e->getStatusCode());
@@ -61,9 +82,9 @@ class CompanyIdempotencyStoreTest extends TestCase
     {
         $store = $this->store();
         $token = $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
-        $store->bind($token, 'admin-a', 'company.create', null, [], now()->getTimestamp(), fn () => true);
+        $store->bind($token, 'admin-a', 'company.create', null, [], now()->getTimestamp());
         try {
-            $store->complete($token, 'admin-a', 'company.create', null, [], fn () => true, function (): array {
+            $store->complete($token, 'admin-a', 'company.create', null, [], function (): array {
                 DB::table('synthetic_effects')->insert(['id' => 'EMP-synthetic']);
                 throw new RuntimeException('Synthetic failure');
             });
@@ -79,18 +100,18 @@ class CompanyIdempotencyStoreTest extends TestCase
     {
         $store = $this->store();
         $token = $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
-        self::assertSame(['state' => 'issued', 'revoked' => false], $store->status($token, 'admin-a', 'company.create', now()->getTimestamp(), fn () => true));
-        $store->bind($token, 'admin-a', 'company.create', null, [], now()->getTimestamp(), fn () => true);
-        self::assertSame(['state' => 'observed', 'revoked' => false], $store->status($token, 'admin-a', 'company.create', now()->getTimestamp(), fn () => true));
+        self::assertSame(['state' => 'issued', 'revoked' => false], $store->status($token, 'admin-a', 'company.create', now()->getTimestamp()));
+        $store->bind($token, 'admin-a', 'company.create', null, [], now()->getTimestamp());
+        self::assertSame(['state' => 'observed', 'revoked' => false], $store->status($token, 'admin-a', 'company.create', now()->getTimestamp()));
         $audit = function (): void {
             DB::table('synthetic_effects')->insert(['id' => 'audit']);
         };
-        self::assertSame(['state' => 'observed', 'revoked' => true], $store->revoke($token, 'admin-a', 'company.create', now()->getTimestamp(), fn () => true, $audit));
-        $store->revoke($token, 'admin-a', 'company.create', now()->getTimestamp(), fn () => true, $audit);
+        self::assertSame(['state' => 'observed', 'revoked' => true], $store->revoke($token, 'admin-a', 'company.create', now()->getTimestamp(), $audit));
+        $store->revoke($token, 'admin-a', 'company.create', now()->getTimestamp(), $audit);
         self::assertSame(1, DB::table('synthetic_effects')->count());
-        self::assertSame(['state' => 'observed', 'revoked' => true], $store->status($token, 'admin-a', 'company.create', now()->getTimestamp(), fn () => true));
+        self::assertSame(['state' => 'observed', 'revoked' => true], $store->status($token, 'admin-a', 'company.create', now()->getTimestamp()));
         try {
-            $store->complete($token, 'admin-a', 'company.create', null, [], fn () => true, fn () => ['id' => 'EMP-synthetic', 'status' => 201]);
+            $store->complete($token, 'admin-a', 'company.create', null, [], fn () => ['id' => 'EMP-synthetic', 'status' => 201]);
             self::fail('Revoked token accepted.');
         } catch (HttpException $e) {
             self::assertSame(409, $e->getStatusCode());
@@ -101,10 +122,11 @@ class CompanyIdempotencyStoreTest extends TestCase
     {
         $store = $this->store();
         $token = $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
-        $store->bind($token, 'admin-a', 'company.create', null, [], now()->getTimestamp(), fn () => true);
-        $store->complete($token, 'admin-a', 'company.create', null, [], fn () => true, fn () => ['id' => 'EMP-synthetic', 'status' => 201]);
+        $store->bind($token, 'admin-a', 'company.create', null, [], now()->getTimestamp());
+        $store->complete($token, 'admin-a', 'company.create', null, [], fn () => ['id' => 'EMP-synthetic', 'status' => 201]);
+        DB::table('platform_role_permissions')->delete();
         try {
-            $store->bind($token, 'admin-a', 'company.create', null, [], now()->getTimestamp(), fn () => false);
+            $store->bind($token, 'admin-a', 'company.create', null, [], now()->getTimestamp());
             self::fail('Replay was allowed without permission.');
         } catch (HttpException $e) {
             self::assertSame(403, $e->getStatusCode());
@@ -116,14 +138,14 @@ class CompanyIdempotencyStoreTest extends TestCase
         $store = $this->store();
         $token = $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
         try {
-            $store->revoke($token, 'admin-a', 'company.create', now()->getTimestamp(), fn () => true, function (): void {
+            $store->revoke($token, 'admin-a', 'company.create', now()->getTimestamp(), function (): void {
                 throw new RuntimeException('Synthetic audit failure');
             });
             self::fail('Audit failure was not propagated.');
         } catch (RuntimeException $e) {
             self::assertSame('Synthetic audit failure', $e->getMessage());
         }
-        self::assertSame(['state' => 'issued', 'revoked' => false], $store->status($token, 'admin-a', 'company.create', now()->getTimestamp(), fn () => true));
+        self::assertSame(['state' => 'issued', 'revoked' => false], $store->status($token, 'admin-a', 'company.create', now()->getTimestamp()));
     }
 
     public function test_lost_record_is_reported_absent_without_inferring_outcome(): void
@@ -131,17 +153,50 @@ class CompanyIdempotencyStoreTest extends TestCase
         $store = $this->store();
         $token = $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
         DB::table('company_idempotency_requests')->delete();
-        self::assertSame(['state' => 'absent', 'revoked' => null], $store->status($token, 'admin-a', 'company.create', now()->getTimestamp(), fn () => true));
+        self::assertSame(['state' => 'absent', 'revoked' => null], $store->status($token, 'admin-a', 'company.create', now()->getTimestamp()));
         try {
-            $store->bind($token, 'admin-a', 'company.create', null, [], now()->getTimestamp(), fn () => true);
+            $store->bind($token, 'admin-a', 'company.create', null, [], now()->getTimestamp());
             self::fail('A missing issuance record must not allow mutation.');
         } catch (HttpException $e) {
             self::assertSame(503, $e->getStatusCode());
         }
     }
 
+    public function test_issue_rechecks_permission_and_enforces_outstanding_quota(): void
+    {
+        $keys = new CompanyIdempotencyKeys(['synthetic' => base64_encode(str_repeat('x', 32))], 'synthetic', []);
+        $store = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, 1);
+        $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
+        try {
+            $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
+            self::fail('Quota must reject a second outstanding issuance.');
+        } catch (HttpException $e) {
+            self::assertSame(429, $e->getStatusCode());
+        }
+        DB::table('platform_role_permissions')->delete();
+        try {
+            $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
+            self::fail('Issue must recheck permission.');
+        } catch (HttpException $e) {
+            self::assertSame(403, $e->getStatusCode());
+        }
+        self::assertSame(1, DB::table('company_idempotency_requests')->count());
+    }
+
+    public function test_migration_down_fails_closed_even_when_table_is_empty(): void
+    {
+        $migration = require database_path('migrations/2026_11_14_000001_create_company_idempotency_requests.php');
+        try {
+            $migration->down();
+            self::fail('Automatic rollback must not drop the table.');
+        } catch (RuntimeException $e) {
+            self::assertStringContainsString('Automatic rollback', $e->getMessage());
+        }
+        self::assertTrue(Schema::hasTable('company_idempotency_requests'));
+    }
+
     private function store(): CompanyIdempotencyStore
     {
-        return new CompanyIdempotencyStore(new CompanyIdempotencyKeys(['synthetic' => base64_encode(str_repeat('x', 32))], 'synthetic', []));
+        return new CompanyIdempotencyStore(new CompanyIdempotencyKeys(['synthetic' => base64_encode(str_repeat('x', 32))], 'synthetic', []), new CompanyIdempotencyAuthorization, 5);
     }
 }

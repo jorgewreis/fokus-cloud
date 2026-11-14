@@ -5,10 +5,18 @@ namespace App\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
-/** Server-side request records; callers must authorize before invoking. */
+/** Server-side records; endpoint authentication and CSRF remain caller responsibilities. */
 final class CompanyIdempotencyStore
 {
-    public function __construct(private readonly CompanyIdempotencyKeys $keys) {}
+    public function __construct(
+        private readonly CompanyIdempotencyKeys $keys,
+        private readonly CompanyIdempotencyAuthorization $authorization,
+        private readonly int $maxOutstanding,
+    ) {
+        if ($maxOutstanding < 1 || $maxOutstanding > 1000) {
+            throw new InvalidArgumentException('Invalid issuance quota.');
+        }
+    }
 
     public function issue(string $actor, string $operation, int $now, int $lifetimeSeconds): string
     {
@@ -16,6 +24,12 @@ final class CompanyIdempotencyStore
         $token = $this->keys->issue($actor, $operation, $now, $lifetimeSeconds);
         $claims = $this->keys->verify($token, $actor, $operation, $now);
         DB::transaction(function () use ($token, $actor, $operation, $claims): void {
+            $this->authorization->lockAuthorizedActor($actor);
+            $this->keys->verify($token, $actor, $operation, now()->getTimestamp());
+            $active = DB::table('company_idempotency_requests')->where('actor_id', $actor)
+                ->whereIn('state', ['issued', 'bound'])->where('revoked', false)
+                ->where('expires_at_epoch', '>', now()->getTimestamp())->count();
+            abort_if($active >= $this->maxOutstanding, 429, 'Limite de solicitações pendentes atingido.');
             DB::table('company_idempotency_requests')->insert([
                 'token_hash' => hash('sha256', $token),
                 'key_id' => $claims['kid'],
@@ -34,16 +48,16 @@ final class CompanyIdempotencyStore
     }
 
     /** Returns a replay if already completed, otherwise binds the normalized payload. */
-    public function bind(string $token, string $actor, string $operation, ?string $target, array $payload, int $now, callable $authorize): ?array
+    public function bind(string $token, string $actor, string $operation, ?string $target, array $payload, int $now): ?array
     {
         $this->requireTopLevel();
         $claims = $this->keys->verify($token, $actor, $operation, $now);
         $digest = $this->keys->payloadDigest($claims['kid'], $operation, $target, $payload);
 
-        return DB::transaction(function () use ($token, $actor, $operation, $claims, $digest, $authorize): ?array {
+        return DB::transaction(function () use ($token, $actor, $operation, $claims, $digest): ?array {
             $row = $this->lockedRecord($token, $actor, $operation, $claims);
             $this->keys->verify($token, $actor, $operation, now()->getTimestamp());
-            abort_unless($authorize() === true, 403, 'Permissão interna insuficiente.');
+            $this->authorization->lockAuthorizedActor($actor);
             abort_if($row->revoked, 409, 'A chave foi revogada.');
             if ($row->payload_digest !== null && ! hash_equals($row->payload_digest, $digest)) {
                 abort(409, 'A chave já está vinculada a outra solicitação.');
@@ -67,16 +81,16 @@ final class CompanyIdempotencyStore
      * @param  callable(): array{id:string,status:int}  $writer
      * @return array{id:string,status:int}
      */
-    public function complete(string $token, string $actor, string $operation, ?string $target, array $payload, callable $authorize, callable $writer): array
+    public function complete(string $token, string $actor, string $operation, ?string $target, array $payload, callable $writer): array
     {
         $this->requireTopLevel();
 
-        return DB::transaction(function () use ($token, $actor, $operation, $target, $payload, $authorize, $writer): array {
+        return DB::transaction(function () use ($token, $actor, $operation, $target, $payload, $writer): array {
             $claims = $this->keys->verify($token, $actor, $operation, now()->getTimestamp());
             $digest = $this->keys->payloadDigest($claims['kid'], $operation, $target, $payload);
             $row = $this->lockedRecord($token, $actor, $operation, $claims);
             $this->keys->verify($token, $actor, $operation, now()->getTimestamp());
-            abort_unless($authorize() === true, 403, 'Permissão interna insuficiente.');
+            $this->authorization->lockAuthorizedActor($actor);
             abort_if($row->revoked, 409, 'A chave foi revogada.');
             abort_unless($row->payload_digest !== null && hash_equals($row->payload_digest, $digest), 409, 'A chave está vinculada a outra solicitação.');
             if ($row->state === 'completed') {
@@ -96,15 +110,15 @@ final class CompanyIdempotencyStore
     }
 
     /** Status never proves an absent or uncompleted request will not later commit. */
-    public function status(string $token, string $actor, string $operation, int $now, callable $authorize): array
+    public function status(string $token, string $actor, string $operation, int $now): array
     {
         $this->requireTopLevel();
         $claims = $this->keys->verifyForStatus($token, $actor, $operation, $now);
 
-        return DB::transaction(function () use ($token, $actor, $operation, $claims, $authorize): array {
+        return DB::transaction(function () use ($token, $actor, $operation, $claims): array {
             $row = DB::table('company_idempotency_requests')->where('token_hash', hash('sha256', $token))->lockForUpdate()->first();
             $this->keys->verifyForStatus($token, $actor, $operation, now()->getTimestamp());
-            abort_unless($authorize() === true, 403, 'Permissão interna insuficiente.');
+            $this->authorization->lockAuthorizedActor($actor);
             if (! $row) {
                 return ['state' => 'absent', 'revoked' => null];
             }
@@ -120,15 +134,15 @@ final class CompanyIdempotencyStore
     }
 
     /** Revoke an individual token under its lock. The callback records audit in this transaction. */
-    public function revoke(string $token, string $actor, string $operation, int $now, callable $authorize, callable $audit): array
+    public function revoke(string $token, string $actor, string $operation, int $now, callable $audit): array
     {
         $this->requireTopLevel();
         $claims = $this->keys->verifyForStatus($token, $actor, $operation, $now);
 
-        return DB::transaction(function () use ($token, $actor, $operation, $claims, $authorize, $audit): array {
+        return DB::transaction(function () use ($token, $actor, $operation, $claims, $audit): array {
             $row = $this->lockedRecord($token, $actor, $operation, $claims);
             $this->keys->verifyForStatus($token, $actor, $operation, now()->getTimestamp());
-            abort_unless($authorize() === true, 403, 'Permissão interna insuficiente.');
+            $this->authorization->lockAuthorizedActor($actor);
             abort_unless(in_array($row->state, ['issued', 'bound', 'completed'], true), 503, 'Solicitação indisponível.');
             if (! $row->revoked) {
                 DB::table('company_idempotency_requests')->where('token_hash', $row->token_hash)->update(['revoked' => true, 'updated_at' => now()]);
