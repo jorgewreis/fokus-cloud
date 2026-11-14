@@ -15,6 +15,7 @@ return new class extends Migration
             $table->string('operation', 32);
             $table->unsignedBigInteger('issued_at_epoch');
             $table->unsignedBigInteger('expires_at_epoch');
+            $table->unsignedBigInteger('recorded_at_epoch');
             $table->string('state', 16)->default('issued');
             $table->char('payload_digest', 64)->nullable();
             $table->boolean('revoked')->default(false);
@@ -22,6 +23,7 @@ return new class extends Migration
             $table->unsignedSmallInteger('result_status')->nullable();
             $table->timestamps();
             $table->index(['actor_id', 'expires_at_epoch']);
+            $table->index(['actor_id', 'recorded_at_epoch']);
         });
     }
 

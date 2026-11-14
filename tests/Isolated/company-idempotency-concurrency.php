@@ -85,8 +85,8 @@ DB::table('platform_admins')->insert(['id' => 'admin-lab', 'name' => 'Synthetic'
 DB::table('platform_permissions')->insert(['id' => 'perm-lab', 'code' => 'platform.companies.manage']);
 DB::table('platform_role_permissions')->insert(['platform_role_id' => 'role-lab', 'platform_permission_id' => 'perm-lab']);
 $keys = new CompanyIdempotencyKeys(['lab' => base64_encode(str_repeat('x', 32))], 'lab', []);
-$store = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, 10);
-$token = $store->issue('admin-lab', 'company.create', now()->getTimestamp(), 600);
+$store = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, 10, 50, 3600);
+$token = $store->issue('admin-lab', 'company.create', 600);
 $payload = ['name' => 'synthetic'];
 $store->bind($token, 'admin-lab', 'company.create', null, $payload, now()->getTimestamp());
 DB::disconnect(); // No inherited live PDO connection across fork.
@@ -205,7 +205,7 @@ function compete(callable $parent, callable $child): array
     }
 }
 
-$token2 = $store->issue('admin-lab', 'company.create', now()->getTimestamp(), 600);
+$token2 = $store->issue('admin-lab', 'company.create', 600);
 $store->bind($token2, 'admin-lab', 'company.create', null, $payload, now()->getTimestamp());
 [$first, $second] = compete(
     fn ($barrier) => $store->complete($token2, 'admin-lab', 'company.create', null, $payload, function () use ($barrier): array {
@@ -220,7 +220,7 @@ if ($first !== ['id' => 'mutation-before-revocation', 'status' => 201] || $secon
     throw new RuntimeException('Mutation-before-revocation invariant failed.');
 }
 
-$token3 = $store->issue('admin-lab', 'company.create', now()->getTimestamp(), 600);
+$token3 = $store->issue('admin-lab', 'company.create', 600);
 $store->bind($token3, 'admin-lab', 'company.create', null, $payload, now()->getTimestamp());
 [$first, $second] = compete(
     fn ($barrier) => $store->revoke($token3, 'admin-lab', 'company.create', now()->getTimestamp(), function () use ($barrier): void {
@@ -259,7 +259,7 @@ function blockUsingActualController(): array
     return ['status' => $response->getStatusCode()];
 }
 
-$token4 = $store->issue('admin-lab', 'company.create', now()->getTimestamp(), 600);
+$token4 = $store->issue('admin-lab', 'company.create', 600);
 $store->bind($token4, 'admin-lab', 'company.create', null, $payload, now()->getTimestamp());
 [$first, $second] = compete(
     fn ($barrier) => $store->complete($token4, 'admin-lab', 'company.create', null, $payload, function () use ($barrier): array {
@@ -276,7 +276,7 @@ if ($first !== ['id' => 'authorized-before-block', 'status' => 201] || $second !
 }
 DB::table('platform_admins')->where('id', 'admin-lab')->update(['manual_blocked_at' => null, 'manual_blocked_by' => null, 'blocked_reason' => null]);
 
-$token5 = $store->issue('admin-lab', 'company.create', now()->getTimestamp(), 600);
+$token5 = $store->issue('admin-lab', 'company.create', 600);
 $store->bind($token5, 'admin-lab', 'company.create', null, $payload, now()->getTimestamp());
 [$first, $second] = compete(
     fn ($barrier) => DB::transaction(function () use ($barrier): array {
@@ -306,7 +306,7 @@ if ($first !== ['status' => 200] || $second !== ['status' => 403]
 DB::table('platform_admins')->where('id', 'admin-lab')->update(['manual_blocked_at' => null, 'manual_blocked_by' => null, 'blocked_reason' => null]);
 
 // Grant deletion must also wait for the permission record shared lock.
-$token6 = $store->issue('admin-lab', 'company.create', now()->getTimestamp(), 600);
+$token6 = $store->issue('admin-lab', 'company.create', 600);
 $store->bind($token6, 'admin-lab', 'company.create', null, $payload, now()->getTimestamp());
 [$first, $second] = compete(
     fn ($barrier) => $store->complete($token6, 'admin-lab', 'company.create', null, $payload, function () use ($barrier): array {
@@ -329,7 +329,7 @@ try {
     }
 }
 DB::table('platform_role_permissions')->insert(['platform_role_id' => 'role-lab', 'platform_permission_id' => 'perm-lab']);
-$token7 = $store->issue('admin-lab', 'company.create', now()->getTimestamp(), 600);
+$token7 = $store->issue('admin-lab', 'company.create', 600);
 $store->bind($token7, 'admin-lab', 'company.create', null, $payload, now()->getTimestamp());
 [$first, $second] = compete(
     fn ($barrier) => DB::transaction(function () use ($barrier): array {
@@ -417,7 +417,7 @@ try {
 
 // An administrator-row lock serializes the quota check across two issuers.
 DB::table('platform_admins')->insert(['id' => 'quota-lab', 'name' => 'Synthetic', 'email' => 'quota@example.test', 'status' => 'ativo', 'platform_role_id' => 'role-lab']);
-$quotaStore = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, 1);
+$quotaStore = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, 10, 1, 600);
 DB::disconnect();
 $quotaPairs = [stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP), stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP)];
 if ($quotaPairs[0] === false || $quotaPairs[1] === false) {
@@ -443,11 +443,11 @@ for ($i = 0; $i < 2; $i++) {
         }
         fwrite($socket, "started\n");
         try {
-            $quotaStore->issue('quota-lab', 'company.create', now()->getTimestamp(), 600);
-            fwrite($socket, "200\n");
+            $issuedToken = $quotaStore->issue('quota-lab', 'company.create', 600);
+            fwrite($socket, json_encode(['status' => 200, 'token' => $issuedToken], JSON_THROW_ON_ERROR)."\n");
             exit(0);
         } catch (HttpException $e) {
-            fwrite($socket, $e->getStatusCode()."\n");
+            fwrite($socket, json_encode(['status' => $e->getStatusCode()], JSON_THROW_ON_ERROR)."\n");
             exit(0);
         } catch (Throwable) {
             fwrite($socket, "error\n");
@@ -481,18 +481,32 @@ try {
         } while (microtime(true) < $deadline);
         throw new RuntimeException('Two separate quota lock waits were not observed.');
     });
-    $outcomes = array_map(fn ($pair) => trim((string) fgets($pair[0])), $quotaPairs);
-    sort($outcomes);
+    $outcomes = array_map(fn ($pair) => json_decode((string) fgets($pair[0]), true, 512, JSON_THROW_ON_ERROR), $quotaPairs);
+    $statuses = array_column($outcomes, 'status');
+    sort($statuses);
     foreach ($quotaPids as $pid) {
         pcntl_waitpid($pid, $status);
         if (! pcntl_wifexited($status) || pcntl_wexitstatus($status) !== 0) {
             throw new RuntimeException('Quota process failed.');
         }
     }
-    if ($outcomes !== ['200', '429'] || DB::table('company_idempotency_requests')->where('actor_id', 'quota-lab')->count() !== 1) {
+    if ($statuses !== [200, 429] || DB::table('company_idempotency_requests')->where('actor_id', 'quota-lab')->count() !== 1) {
         throw new RuntimeException('Concurrent issuance quota invariant failed.');
     }
-    echo "PASS: two waiting issuers respect the shared administrator quota.\n";
+    $winner = array_values(array_filter($outcomes, fn ($outcome) => $outcome['status'] === 200))[0];
+    $quotaStore->revoke($winner['token'], 'quota-lab', 'company.create', now()->getTimestamp(), fn () => null);
+    try {
+        $quotaStore->issue('quota-lab', 'company.create', 600);
+        throw new RuntimeException('Revocation must not reset issuance window.');
+    } catch (HttpException $e) {
+        if ($e->getStatusCode() !== 429) {
+            throw $e;
+        }
+    }
+    if (DB::table('company_idempotency_requests')->where('actor_id', 'quota-lab')->count() !== 1) {
+        throw new RuntimeException('Issuance window removed a token record.');
+    }
+    echo "PASS: two waiting issuers respect the rolling quota even after revocation.\n";
 } finally {
     foreach ($quotaPairs as $pair) {
         fclose($pair[0]);

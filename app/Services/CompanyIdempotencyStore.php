@@ -12,23 +12,31 @@ final class CompanyIdempotencyStore
         private readonly CompanyIdempotencyKeys $keys,
         private readonly CompanyIdempotencyAuthorization $authorization,
         private readonly int $maxOutstanding,
+        private readonly int $maxIssuesPerWindow,
+        private readonly int $issuanceWindowSeconds,
     ) {
-        if ($maxOutstanding < 1 || $maxOutstanding > 1000) {
+        if ($maxOutstanding < 1 || $maxOutstanding > 1000 || $maxIssuesPerWindow < 1 || $issuanceWindowSeconds < 1) {
             throw new InvalidArgumentException('Invalid issuance quota.');
         }
     }
 
-    public function issue(string $actor, string $operation, int $now, int $lifetimeSeconds): string
+    public function issue(string $actor, string $operation, int $lifetimeSeconds): string
     {
         $this->requireTopLevel();
+        $now = now()->getTimestamp();
         $token = $this->keys->issue($actor, $operation, $now, $lifetimeSeconds);
         $claims = $this->keys->verify($token, $actor, $operation, $now);
         DB::transaction(function () use ($token, $actor, $operation, $claims): void {
             $this->authorization->lockAuthorizedActor($actor);
-            $this->keys->verify($token, $actor, $operation, now()->getTimestamp());
+            $decisionNow = now()->getTimestamp();
+            $this->keys->verify($token, $actor, $operation, $decisionNow);
+            $windowStart = max(0, $decisionNow - $this->issuanceWindowSeconds);
+            $issuedInWindow = DB::table('company_idempotency_requests')->where('actor_id', $actor)
+                ->where('recorded_at_epoch', '>=', $windowStart)->count();
+            abort_if($issuedInWindow >= $this->maxIssuesPerWindow, 429, 'Limite de emissão temporário atingido.');
             $active = DB::table('company_idempotency_requests')->where('actor_id', $actor)
                 ->whereIn('state', ['issued', 'bound'])->where('revoked', false)
-                ->where('expires_at_epoch', '>', now()->getTimestamp())->count();
+                ->where('expires_at_epoch', '>', $decisionNow)->count();
             abort_if($active >= $this->maxOutstanding, 429, 'Limite de solicitações pendentes atingido.');
             DB::table('company_idempotency_requests')->insert([
                 'token_hash' => hash('sha256', $token),
@@ -37,6 +45,7 @@ final class CompanyIdempotencyStore
                 'operation' => $operation,
                 'issued_at_epoch' => $claims['issued_at'],
                 'expires_at_epoch' => $claims['expires_at'],
+                'recorded_at_epoch' => $decisionNow,
                 'state' => 'issued',
                 'revoked' => false,
                 'created_at' => now(),
