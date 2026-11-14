@@ -1,22 +1,22 @@
 <?php
 
-use App\Services\LawCaseManagementService;
-use App\Services\LawDatajudClient;
-use App\Services\PrefixedUlid as ID;
 use App\Http\Controllers\Api\ProductInterestBackofficeController;
 use App\Http\Controllers\Api\ProductInterestController;
 use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
+use App\Services\LawCaseManagementService;
+use App\Services\LawDatajudClient;
+use App\Services\PrefixedUlid as ID;
 use App\Support\LegalDocuments;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Artisan;
 
 // Synthetic fixtures/assertions for disposable SQLite or loopback CI MySQL only.
 $root = $argv[1];
@@ -110,6 +110,7 @@ if ($mode === 'verify-up') {
     }
     check(Schema::hasTable('interest_product_index') && Schema::hasTable('interest_product_index_state'), 'interest index tables created');
     check(! (bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'interest index fails closed before backfill');
+    check(DB::table('interest_product_index_state')->count() === 1 && ! (bool) DB::table('interest_product_index_state')->where('id', 1)->value('running'), 'interest index has one idle state');
     check(DB::table('interest_product_index')->count() === 0, 'interest index does not claim historical completeness');
     check(DB::table('product_interests')->whereIn('email', ['qa-old-index@example.test', 'qa-partial-index@example.test'])->orderBy('email')->get()->toJson() === file_get_contents($qa.'/pre-index-interests.json'), 'old-schema interest records preserved');
     foreach ($f['cases'] as $old) {
@@ -141,9 +142,11 @@ if ($mode === 'verify-interest-index-backfill') {
     DB::table('product_interests')->where('id', $row->id)->update(['products' => 'invalid']);
     check(Artisan::call('fokus:backfill-interest-products', ['--confirm-drained' => true]) !== 0, 'invalid historical JSON rejects backfill');
     check(! (bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'failed backfill stays not ready');
+    check(! (bool) DB::table('interest_product_index_state')->where('id', 1)->value('running'), 'failed backfill releases running state');
     DB::table('product_interests')->where('id', $row->id)->update(['products' => $original]);
     check(Artisan::call('fokus:backfill-interest-products', ['--confirm-drained' => true]) === 0, 'backfill succeeds after reconciliation');
     check((bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'successful backfill marks index ready');
+    check(! (bool) DB::table('interest_product_index_state')->where('id', 1)->value('running'), 'successful backfill releases running state');
     check(DB::table('interest_product_index')->where('interest_id', $row->id)->where('product_code', 'law')->exists(), 'historical code indexed');
     check(Artisan::call('fokus:backfill-interest-products', ['--confirm-drained' => true]) === 0, 'backfill can be repeated');
     check(DB::table('interest_product_index')->where('interest_id', $row->id)->where('product_code', 'law')->count() === 1, 'backfill remains idempotent');

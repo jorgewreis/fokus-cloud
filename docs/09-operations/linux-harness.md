@@ -14,7 +14,7 @@ RELEASE_DISPOSABLE_TESTS=1 python3 tests/Deployment/linux-release-suite.py --dri
 RELEASE_DISPOSABLE_TESTS=1 python3 tests/Deployment/linux-release-suite.py --driver mysql
 ```
 
-Evidence defaults to `test-results/linux-release`; `RELEASE_REPORT_DIR` selects another writable evidence directory. Each subprocess records exit code, duration and SHA-256 of its log. PHPUnit JUnit files must contain exactly 310 tests, at least 2,689 assertions, no failures/errors/skips. A test count change requires explicit review rather than silently relaxing this gate.
+Evidence defaults to `test-results/linux-release`; `RELEASE_REPORT_DIR` selects another writable evidence directory. Each subprocess records exit code, duration and SHA-256 of its log. The current candidate gate requires exactly 358 tests and at least 2,868 assertions, no failures/errors/skips, including individually named identity, Lead, and interest-index cases. A test count change requires explicit review rather than silently relaxing this gate. These configured thresholds are not a claim that this candidate has passed.
 
 ## Portability adapters, not skipped assertions
 
@@ -26,7 +26,7 @@ The suite keeps every Unit/Feature test. For MySQL/Redis only, two temporary PHP
 
 ## Upgrade and synthetic restoration
 
-The historical baseline is fixed at `26daac7c27d246eaef64bb3f0e59499376993f8f`. Existing baseline-gate logic verifies commit existence, ancestry and the reviewed release plan. The harness archives that exact commit and copies current candidate source into separate temporary runtimes. Installed vendor is copied only after both lockfiles match. It requires exactly four additional migrations and uses the unchanged synthetic fixture and unchanged reversal assertions, aside from the documented MySQL injection spelling adapter.
+The historical baseline is fixed at `26daac7c27d246eaef64bb3f0e59499376993f8f`. Existing baseline-gate logic verifies commit existence, ancestry and the reviewed release plan. The harness archives that exact commit and copies current candidate source into separate temporary runtimes. Installed vendor is copied only after both lockfiles match. The current candidate requires exactly six named additional migrations, including the interest product index. In addition to the retained repair and Law invariants, the fixture checks old/partial-schema compatibility, fail-closed backfill, source-data preservation and index reconstruction/rollback. The MySQL run exercises concurrent writer/backfill locking and rollback. The documented MySQL injection spelling adapter remains explicit.
 
 Each driver executes historical migrations/seeding, synthetic fixture population, upgrade, data invariants, idempotence, backup, roll-forward recovery, destructive reversal in the disposable database, restore and all post-upgrade invariants. SQLite is copied only between exited PHP processes and is byte-verified before reopening. MySQL uses real `mysqldump --single-transaction --hex-blob --no-tablespaces` and `mysql` restore, then the full fixture. MySQL database names are generated as `fokus_upgrade_<16 hex>` and removed in `finally`. Credentials pass through environment variables, not command arguments. The dump itself stays temporary and is deleted with the sandbox; only its hash/size enter evidence.
 

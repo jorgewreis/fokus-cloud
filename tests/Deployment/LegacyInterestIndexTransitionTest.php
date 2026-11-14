@@ -18,6 +18,9 @@ class LegacyInterestIndexTransitionTest extends TestCase
 
     public function test_new_code_preserves_public_writes_and_manual_filter_before_or_during_migration(): void
     {
+        // MySQL transition is exercised in the disposable upgrade fixture;
+        // DDL here must remain inside SQLite's rollbackable test transaction.
+        $this->assertSame('sqlite', DB::getDriverName());
         $this->seed();
         Mail::fake();
         $admin = PlatformAdmin::create([

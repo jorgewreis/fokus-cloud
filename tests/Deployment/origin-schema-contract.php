@@ -111,7 +111,11 @@ function originAssertSchemaDelta(array $before, array $after, bool $reversed = f
         $index = array_values(array_filter($after['indexes'], fn ($row) => $row[0] === 'law_cases' && $row[1] === 'law_cases_last_official_movement_at_index'));
         originRequire(count($index) === 1 && $index[0][2] === 1 && $index[0][3] === 1 && $index[0][4] === 'last_official_movement_at', 'projection index definition changed');
         $productIndex = array_values(array_filter($after['indexes'], fn ($row) => $row[0] === 'interest_product_index' && $row[1] === 'interest_product_index_product_code_interest_id_index'));
-        originRequire(count($productIndex) === 2 && $productIndex[0][4] === 'product_code' && $productIndex[1][4] === 'interest_id', 'interest code index definition changed');
+        originRequire(count($productIndex) === 2 && $productIndex[0][2] === 1 && $productIndex[0][3] === 1 && $productIndex[0][4] === 'product_code' && $productIndex[1][2] === 1 && $productIndex[1][3] === 2 && $productIndex[1][4] === 'interest_id', 'interest code index definition changed');
+        $interestPrimary = array_values(array_filter($after['indexes'], fn ($row) => $row[0] === 'interest_product_index' && $row[1] === 'PRIMARY'));
+        originRequire(count($interestPrimary) === 2 && $interestPrimary[0][2] === 0 && $interestPrimary[0][3] === 1 && $interestPrimary[0][4] === 'interest_id' && $interestPrimary[1][2] === 0 && $interestPrimary[1][3] === 2 && $interestPrimary[1][4] === 'product_code', 'interest unique key changed');
+        $statePrimary = array_values(array_filter($after['indexes'], fn ($row) => $row[0] === 'interest_product_index_state' && $row[1] === 'PRIMARY'));
+        originRequire(count($statePrimary) === 1 && $statePrimary[0][2] === 0 && $statePrimary[0][3] === 1 && $statePrimary[0][4] === 'id', 'interest state primary key changed');
         $interestForeignKey = array_values(array_filter($after['foreign_keys'], fn ($row) => $row[0] === 'interest_product_index' && $row[2] === 'interest_id'));
         originRequire(count($interestForeignKey) === 1 && $interestForeignKey[0][4] === 'product_interests' && $interestForeignKey[0][5] === 'id' && $interestForeignKey[0][7] === 'CASCADE', 'interest index foreign key or cascade changed');
         $interestId = array_values(array_filter($after['columns'], fn ($row) => $row[0] === 'interest_product_index' && $row[1] === 'interest_id'));
