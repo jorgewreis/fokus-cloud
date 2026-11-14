@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\FokusLawSystemMail;
 use App\Models\User;
 use App\Services\LawAuthorizationService;
+use App\Services\PlatformSessionLifecycle;
 use App\Services\PrefixedUlid;
 use App\Support\BrazilianDocuments;
 use Illuminate\Http\Request;
@@ -65,6 +66,7 @@ class CompanyUserController extends Controller
 
     public function store(Request $request, AuthController $auth, LawAuthorizationService $authorization)
     {
+        app(PlatformSessionLifecycle::class)->ensureInvitationIssuanceReady();
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'], 'cpf' => ['required', 'string'],
             'email' => ['required', 'email:rfc', 'max:255'],

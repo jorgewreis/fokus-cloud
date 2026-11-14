@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PlatformAdmin;
 use App\Models\User;
 use App\Services\PlatformAudit;
+use App\Services\PlatformSessionLifecycle;
 use App\Services\PrefixedUlid;
 use App\Support\BrazilianDocuments;
 use Illuminate\Http\Request;
@@ -36,6 +37,7 @@ class PlatformUserDirectoryController extends Controller
 
     public function createExternal(Request $request, AuthController $auth, PlatformAudit $audit)
     {
+        app(PlatformSessionLifecycle::class)->ensureInvitationIssuanceReady();
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email:rfc', 'max:255'],

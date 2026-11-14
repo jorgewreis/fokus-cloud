@@ -124,6 +124,12 @@ final class PlatformSessionLifecycle
         abort_if($this->enabled(), 503, 'Acesso temporariamente indisponível.');
     }
 
+    /** Invitation delivery is closed until an atomic delivery protocol exists. */
+    public function ensureInvitationIssuanceReady(): void
+    {
+        abort_if($this->enabled(), 503, 'Convites temporariamente indisponíveis.');
+    }
+
     public function transactionalSessionTable(): string
     {
         abort_unless($this->enabled(), 503, 'Sessão indisponível.');

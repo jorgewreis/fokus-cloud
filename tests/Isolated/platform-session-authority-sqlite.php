@@ -579,6 +579,12 @@ try {
 $app['config']->set('session.driver', 'database');
 $lifecycle = new PlatformSessionLifecycle($authority);
 try {
+    $lifecycle->ensureInvitationIssuanceReady();
+    throw new LogicException('Experimental invitation issuance was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 503);
+}
+try {
     $lifecycle->ensureTokenLoginReady();
     throw new LogicException('Experimental token login was accepted.');
 } catch (HttpException $e) {

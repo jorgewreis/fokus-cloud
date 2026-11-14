@@ -151,19 +151,22 @@ class LawPermissionsTest extends TestCase
         ]);
     }
 
-    public function test_experimental_invitation_token_identifies_its_invitation(): void
+    public function test_experimental_invitation_is_blocked_before_writes_and_email(): void
     {
         config(['company_idempotency.session_authority_lifecycle' => true]);
         Mail::fake();
+        $userCount = DB::table('users')->count();
+        $membershipCount = DB::table('company_memberships')->count();
+        $tokenCount = DB::table('security_tokens')->count();
         $this->actingAs($this->admin)->withSession(['active_company_id' => $this->companyId])->postJson('/api/portal/users', [
             'name' => 'Pessoa convidada', 'cpf' => '52998224725', 'email' => 'invite@example.test',
             'law_assignments' => [['unit_id' => $this->unitId, 'role_id' => $this->roles['operator']]],
-        ])->assertCreated();
-
-        $membership = DB::table('company_memberships')->where('company_id', $this->companyId)->where('status', 'pendente')->first();
-        $invitation = DB::table('company_invitations')->where('membership_id', $membership->id)->first();
-        $token = DB::table('security_tokens')->where('user_id', $membership->user_id)->where('purpose', 'password_creation')->first();
-        self::assertSame(['membership_id' => $membership->id, 'invitation_id' => $invitation->id], json_decode($token->payload, true));
+        ])->assertStatus(503);
+        self::assertSame($userCount, DB::table('users')->count());
+        self::assertSame($membershipCount, DB::table('company_memberships')->count());
+        self::assertSame($tokenCount, DB::table('security_tokens')->count());
+        self::assertSame(0, DB::table('company_invitations')->count());
+        Mail::assertNothingSent();
     }
 
     public function test_legacy_invitation_token_payload_is_preserved(): void

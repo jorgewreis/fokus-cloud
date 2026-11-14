@@ -258,3 +258,21 @@ This code has not been activated or tested via real issuer HTTP flows. Its
 SQLite query-order test does not prove actual MySQL lock behavior or safety
 against all other transactions. Tokens without invitation ID cannot use the
 candidate; the legacy route remains guarded from the experimental path.
+
+Both experimental invitation issuers are now blocked before validation and
+writes while the consuming paths are unavailable. The existing flag-off portal
+issuer still calls SMTP within its database transaction; the existing platform
+issuer commits before calling sendToken. Neither has transactional email, and
+this checkpoint does not fix those legacy behaviors.
+
+A future outbox needs a single DB transaction for invitation, exact token binding
+and delivery intent, plus a worker with durable claims, retry/backoff, expiry,
+monitoring and recovery. Because the link must be delivered but tokens are
+stored hashed, the design must decide how to protect and eventually purge any
+recoverable token material, including key rotation and access. SMTP outcomes
+can be unknown after a timeout; DB and SMTP cannot provide exactly-once delivery
+by themselves, so retry semantics and duplicate emails need an explicit product
+and operational policy. Reissue must target one specific invitation and avoid
+invalidating unrelated companies' tokens, while preserving existing links until
+a compatible migration policy is settled. No outbox, scheduler, queue, key or
+commercial-expiry policy is configured or implemented by this checkpoint.

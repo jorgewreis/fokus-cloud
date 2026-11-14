@@ -246,15 +246,24 @@ class PlatformSecurityTest extends TestCase
         $this->assertDatabaseHas('security_tokens', ['user_id' => $invited->id, 'purpose' => 'password_creation']);
     }
 
-    public function test_experimental_platform_invitation_identifies_its_invitation(): void
+    public function test_experimental_platform_invitation_is_blocked_before_writes_and_email(): void
     {
         config(['company_idempotency.session_authority_lifecycle' => true]);
-        $this->test_superadmin_can_invite_external_user_to_active_law_company_with_role();
-        $user = User::where('email', 'convidada@example.test')->firstOrFail();
-        $membership = DB::table('company_memberships')->where('user_id', $user->id)->first();
-        $invitation = DB::table('company_invitations')->where('membership_id', $membership->id)->first();
-        $token = DB::table('security_tokens')->where('user_id', $user->id)->where('purpose', 'password_creation')->first();
-        self::assertSame(['membership_id' => $membership->id, 'invitation_id' => $invitation->id], json_decode($token->payload, true));
+        $admin = $this->admin();
+        $owner = User::create(['id' => PrefixedUlid::make('USR'), 'name' => 'Responsável', 'cpf' => '11144477735', 'email' => 'responsavel@example.test', 'password' => 'SenhaResponsavel!2026', 'status' => 'ativa']);
+        $companyId = PrefixedUlid::make('COM');
+        $product = DB::table('products')->where('code', 'law')->firstOrFail();
+        DB::table('companies')->insert(['id' => $companyId, 'document_type' => 'cnpj', 'document_number' => '12345678000100', 'legal_name' => 'Empresa Externa', 'status' => 'ativa', 'version' => 1, 'created_by' => $owner->id, 'updated_by' => $owner->id, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('subscriptions')->insert(['id' => PrefixedUlid::make('ASS'), 'company_id' => $companyId, 'product_id' => $product->id, 'status' => 'ativa', 'open_company_product' => $companyId.'-'.$product->id, 'version' => 1, 'billing_cycle' => 'monthly', 'current_period_starts_at' => now(), 'current_period_ends_at' => now()->addMonth(), 'commercial_snapshot' => '{}', 'created_by' => $owner->id, 'updated_by' => $owner->id, 'created_at' => now(), 'updated_at' => now()]);
+        $this->actingAs($admin, 'platform')->postJson('/api/backoffice/directory/users', [
+            'name' => 'Pessoa Convidada', 'email' => 'convidada@example.test', 'cpf' => '52998224725',
+            'company_id' => $companyId, 'role' => 'gestor',
+        ])->assertStatus(503);
+        self::assertSame(1, DB::table('users')->count());
+        self::assertSame(0, DB::table('company_memberships')->count());
+        self::assertSame(0, DB::table('company_invitations')->count());
+        self::assertSame(0, DB::table('security_tokens')->count());
+        Mail::assertNothingSent();
     }
 
     public function test_legacy_platform_invitation_payload_is_preserved(): void
