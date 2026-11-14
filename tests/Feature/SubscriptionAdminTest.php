@@ -5,7 +5,10 @@ namespace Tests\Feature;
 use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
 use App\Models\User;
+use App\Services\CatalogManager;
+use App\Services\PendingSubscriptionVoucher;
 use App\Services\PrefixedUlid;
+use App\Services\SubscriptionBillingManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -90,8 +93,13 @@ class SubscriptionAdminTest extends TestCase
         $plan = DB::table('plans')->where('product_id', $product->id)->where('code', 'law-advocacia')->first();
         Http::fake(function ($request) {
             static $created = 0;
-            if ($request->method() === 'POST') return Http::response(['id' => ++$created === 1 ? 'pre-assisted' : 'pre-assisted-2', 'init_point' => 'https://mercadopago.test/checkout'], 201);
-            if ($request->method() === 'GET') return Http::response(['status' => 'pending'], 200);
+            if ($request->method() === 'POST') {
+                return Http::response(['id' => ++$created === 1 ? 'pre-assisted' : 'pre-assisted-2', 'init_point' => 'https://mercadopago.test/checkout'], 201);
+            }
+            if ($request->method() === 'GET') {
+                return Http::response(['status' => 'pending'], 200);
+            }
+
             return Http::response(['status' => 'cancelled'], 200);
         });
 
@@ -145,7 +153,7 @@ class SubscriptionAdminTest extends TestCase
         $listedCompany = $this->actingAs($admin, 'platform')->getJson('/api/backoffice/companies?q=Alpha')->assertOk();
         $this->assertSame(1, $listedCompany->json('data.0.active_subscriptions'));
         $this->assertSame($plan->name, $listedCompany->json('data.0.plan_name'));
-        $catalogPlan = app(\App\Services\CatalogManager::class)->managementPlans()->firstWhere('id', $plan->id);
+        $catalogPlan = app(CatalogManager::class)->managementPlans()->firstWhere('id', $plan->id);
         $this->assertSame(2, $catalogPlan['subscription_count']);
         $this->assertSame(1, $catalogPlan['active_subscription_count']);
         $this->postJson('/api/auth/law-context', ['email' => User::find($fixture['user_id'])->email])
@@ -161,7 +169,7 @@ class SubscriptionAdminTest extends TestCase
             ->assertOk()->assertJsonPath('meta.total', 1)
             ->assertJsonPath('data.0.id', $paymentId)
             ->assertJsonPath('data.0.status', 'cancelado');
-        app(\App\Services\SubscriptionBillingManager::class)->applyPayment($paymentId, ['id' => 'late-payment', 'preapproval_id' => 'pre-assisted'], 'cancelado');
+        app(SubscriptionBillingManager::class)->applyPayment($paymentId, ['id' => 'late-payment', 'preapproval_id' => 'pre-assisted'], 'cancelado');
         $this->assertDatabaseHas('subscriptions', ['id' => $subscriptionId, 'status' => 'ativa']);
 
         $this->travel(8)->days();
@@ -484,7 +492,7 @@ class SubscriptionAdminTest extends TestCase
         $this->assertDatabaseCount('voucher_redemptions', 2);
         $this->assertDatabaseCount('payments', 1);
         $this->travel(8)->days();
-        $this->assertSame(0, app(\App\Services\PendingSubscriptionVoucher::class)->suspendExpired());
+        $this->assertSame(0, app(PendingSubscriptionVoucher::class)->suspendExpired());
         $this->assertDatabaseHas('subscriptions', ['id' => $fixture['subscription_id'], 'status' => 'ativa']);
         Http::assertNothingSent();
     }
@@ -517,6 +525,7 @@ class SubscriptionAdminTest extends TestCase
             ...$snapshot, 'plan_id' => null, 'plan_code' => null, 'plan_name' => 'Personalizada', 'base_amount' => 34.9, 'base_monthly_amount' => 34.9,
             'amount' => 0, 'monthly_amount' => 0, 'current_period_ends_at' => $expiry,
         ])]);
+
         return [...$fixture, 'expiry' => $expiry, 'product_id' => $subscription->product_id];
     }
 
