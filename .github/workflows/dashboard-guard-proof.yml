@@ -1,0 +1,55 @@
+name: Dashboard synthetic guard proof
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/dashboard-guard-proof.yml'
+      - 'tests/Isolated/backoffice-dashboard/**'
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-mysql:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Build isolated PHP runtime
+        run: docker build -t dashboard-guard-ci -f tests/Deployment/linux-runtime/Dockerfile .
+      - name: Install locked dependencies without application scripts
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -e COMPOSER_HOME=/tmp/composer -e COMPOSER_CACHE_DIR=/tmp/composer-cache \
+            -v "$PWD:/workspace" -w /workspace dashboard-guard-ci \
+            composer install --no-interaction --prefer-dist --no-scripts --no-progress
+      - name: Verify guards against disposable MySQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="dashboard-guard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          password="$(openssl rand -hex 24)"
+          marker="$(openssl rand -hex 16)"
+          trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+          docker run -d --name "$name" --network none --tmpfs /var/lib/mysql:rw,size=1g \
+            -e MYSQL_ROOT_PASSWORD="$password" -e MYSQL_DATABASE=dashboard_bench \
+            percona/percona-server@sha256:d24391a363426239220c35b9707d6b26ce7522ac27abe55689baebfb48bd9fb3 >/dev/null
+          for attempt in $(seq 1 90); do
+            if docker exec "$name" mysqladmin ping -uroot -p"$password" --silent >/dev/null 2>&1; then break; fi
+            if [ "$attempt" = 90 ]; then echo 'Disposable MySQL did not become ready' >&2; exit 1; fi
+            sleep 2
+          done
+          docker exec "$name" mysql -uroot -p"$password" dashboard_bench -e \
+            "CREATE TABLE dashboard_proof_marker (id INT PRIMARY KEY, marker CHAR(32) NOT NULL); INSERT INTO dashboard_proof_marker VALUES (1, '$marker');"
+          uuid="$(docker exec "$name" mysql -uroot -p"$password" -Nse 'SELECT @@server_uuid')"
+          docker run --rm --network "container:$name" --read-only --tmpfs /tmp:rw,size=128m \
+            -v "$PWD:/workspace" -w /workspace \
+            -e DASHBOARD_PROOF_ACK=synthetic-only -e APP_ENV=testing -e DB_CONNECTION=mysql \
+            -e DB_HOST=127.0.0.1 -e DB_PORT=3306 -e DB_DATABASE=dashboard_bench \
+            -e DB_USERNAME=root -e DB_PASSWORD="$password" \
+            -e DASHBOARD_PROOF_USER=root -e DASHBOARD_PROOF_PASSWORD="$password" \
+            -e DASHBOARD_PROOF_SERVER_UUID="$uuid" -e DASHBOARD_PROOF_MARKER="$marker" \
+            -e CACHE_STORE=array -e SESSION_DRIVER=array -e LOG_CHANNEL=stderr \
+            dashboard-guard-ci php tests/Isolated/backoffice-dashboard/guard-positive-ci.php
