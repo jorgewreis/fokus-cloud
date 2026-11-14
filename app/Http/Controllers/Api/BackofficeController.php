@@ -590,7 +590,7 @@ class BackofficeController extends Controller
         }
 
         $term = "%{$query}%";
-        $companies = DB::table('companies')
+        $companies = $request->user()->hasPermission('platform.companies.view') ? DB::table('companies')
             ->whereNull('deleted_at')
             ->where(fn ($builder) => $builder->where('legal_name', 'like', $term)->orWhere('document_number', 'like', $term))
             ->orderBy('legal_name')
@@ -600,9 +600,9 @@ class BackofficeController extends Controller
                 'title' => $company->legal_name,
                 'subtitle' => 'Empresa · '.strtoupper($company->status),
                 'href' => '/backoffice/empresas?q='.rawurlencode($company->legal_name),
-            ])->values();
+            ])->values() : collect();
 
-        $users = DB::table('users as user')
+        $users = $request->user()->hasPermission('platform.users.view') ? DB::table('users as user')
             ->leftJoin('company_memberships as membership', function ($join): void {
                 $join->on('membership.user_id', '=', 'user.id')->whereNull('membership.deleted_at')->whereIn('membership.status', ['ativo', 'pendente']);
             })
@@ -618,18 +618,18 @@ class BackofficeController extends Controller
                 'title' => $user->name,
                 'subtitle' => 'Usuário de empresa · '.$user->email,
                 'href' => '/backoffice/usuarios?q='.rawurlencode($user->name),
-            ])->values();
+            ])->values() : collect();
 
-        $internalUsers = DB::table('platform_admins as admin')
+        $internalUsers = $request->user()->hasPermission('platform.users.view') ? DB::table('platform_admins as admin')
             ->where(fn ($builder) => $builder->where('admin.name', 'like', $term)->orWhere('admin.email', 'like', $term))
             ->orderBy('admin.name')->limit(6)->get(['admin.id', 'admin.name', 'admin.email'])
             ->map(fn (object $user): array => [
                 'title' => $user->name,
                 'subtitle' => 'Conta interna Fokus Cloud · '.$user->email,
                 'href' => '/backoffice/usuarios?q='.rawurlencode($user->name),
-            ])->values();
+            ])->values() : collect();
 
-        $subscriptions = DB::table('subscriptions as subscription')
+        $subscriptions = $request->user()->hasPermission('platform.subscriptions.manage') ? DB::table('subscriptions as subscription')
             ->join('companies as company', 'company.id', '=', 'subscription.company_id')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->whereNull('company.deleted_at')
@@ -641,7 +641,7 @@ class BackofficeController extends Controller
                 'title' => $subscription->company_name,
                 'subtitle' => 'Assinatura · '.($subscription->product_name ?: 'Produto').' · '.$subscription->status,
                 'href' => '/backoffice/assinaturas?q='.rawurlencode($subscription->company_name),
-            ])->values();
+            ])->values() : collect();
 
         $audit->record($request->user()->id, 'backoffice.global_search', request: $request);
 
