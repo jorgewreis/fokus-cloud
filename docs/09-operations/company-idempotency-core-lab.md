@@ -55,8 +55,9 @@ row-lock ordering and a synthetic quota window, not those end-to-end contracts.
 
 The mutation orchestrator binds the normalized payload and checks
 for a completed replay before running external preflight, then enters the store's
-transaction for local writes. If preflight fails, it rechecks under lock for a
-matching completion before propagating failure. Laboratory-only calls to
+transaction for local writes. If preflight or the writer fails, it rechecks under
+lock for a matching completion; otherwise it reports an indeterminate HTTP 503,
+because another matching request may still commit. Laboratory-only calls to
 `createCompany` and `updateCompany` use that path with the public guards bypassed:
 business uniqueness and optimistic-version checks run inside the writer, password
 security checks outside the long-held lock, and audit on the same transaction.

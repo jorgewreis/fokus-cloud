@@ -307,11 +307,30 @@ class CompanyIdempotencyStoreTest extends TestCase
         try {
             (new CompanyIdempotencyMutation($store))->run($token, 'admin-a', 'company.create', null, [], fn () => throw new RuntimeException('Synthetic failure'), fn () => ['id' => 'EMP-synthetic', 'status' => 201]);
             self::fail('Preflight failure must not be treated as success.');
-        } catch (RuntimeException $e) {
-            self::assertSame('Synthetic failure', $e->getMessage());
+        } catch (HttpException $e) {
+            self::assertSame(503, $e->getStatusCode());
+            self::assertStringContainsString('confirmar', $e->getMessage());
         }
         self::assertSame('bound', DB::table('company_idempotency_requests')->value('state'));
         self::assertSame(0, DB::table('synthetic_effects')->count());
+    }
+
+    public function test_writer_rejection_after_binding_is_not_reported_as_definitive(): void
+    {
+        $store = $this->store();
+        $token = $store->issue('admin-a', 'company.create', 600);
+        try {
+            (new CompanyIdempotencyMutation($store))->run($token, 'admin-a', 'company.create', null, [], fn () => null, function (): array {
+                DB::table('synthetic_effects')->insert(['id' => 'rolled-back']);
+                abort(409, 'Synthetic duplicate');
+            });
+            self::fail('A writer rejection must not be treated as a definitive result.');
+        } catch (HttpException $e) {
+            self::assertSame(503, $e->getStatusCode());
+            self::assertStringContainsString('confirmar', $e->getMessage());
+        }
+        self::assertSame(0, DB::table('synthetic_effects')->count());
+        self::assertSame('bound', DB::table('company_idempotency_requests')->value('state'));
     }
 
     private function store(): CompanyIdempotencyStore
