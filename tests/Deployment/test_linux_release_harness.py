@@ -34,11 +34,11 @@ class CoverageComposition(unittest.TestCase):
         return report
 
     def test_measured_composition_preserves_all_law_and_main_tests(self):
-        self.assertEqual(suite.EXPECTED_TESTS, 375)
-        self.assertEqual(suite.MINIMUM_ASSERTIONS, 3066)
+        self.assertEqual(suite.EXPECTED_TESTS, 376)
+        self.assertEqual(suite.MINIMUM_ASSERTIONS, 3072)
         self.assertEqual(len(suite.MAIN_IDENTITY_TESTS), 10)
         self.assertEqual(sum(suite.MAIN_IDENTITY_TESTS.values()), 23)
-        self.assertEqual(suite.coverage(self.report())['tests'], 375)
+        self.assertEqual(suite.coverage(self.report())['tests'], 376)
 
     def test_omission_duplicate_or_weakened_identity_is_rejected_even_with_green_totals(self):
         for mutation in ('omit', 'duplicate', 'rename', 'assertions'):
@@ -66,21 +66,22 @@ class CoverageComposition(unittest.TestCase):
     def test_every_required_backoffice_and_interest_case_keeps_assertions(self):
         self.assertEqual(len(suite.BILLING_TESTS), 17)
         self.assertEqual(sum(suite.BILLING_TESTS.values()), 148)
-        self.assertEqual(len(suite.BACKOFFICE_TESTS), 21)
-        self.assertEqual(sum(suite.BACKOFFICE_TESTS.values()), 196)
+        self.assertEqual(len(suite.BACKOFFICE_TESTS), 22)
+        self.assertEqual(sum(suite.BACKOFFICE_TESTS.values()), 202)
         self.assertEqual(len(suite.INTEREST_TESTS), 4)
         for name in set(suite.BILLING_TESTS) | set(suite.BACKOFFICE_TESTS) | set(suite.INTEREST_TESTS):
-            for mutation in ('omit', 'rename', 'assertions'):
+            for mutation in ('omit', 'duplicate', 'rename', 'assertions'):
                 with self.subTest(name=name, mutation=mutation):
                     report = self.report(); group = report[0]
                     case = next(c for c in group if c.get('class') + '::' + c.get('name') == name)
                     if mutation == 'omit': group.remove(case)
+                    elif mutation == 'duplicate': ET.SubElement(group, 'testcase', dict(case.attrib))
                     elif mutation == 'rename': case.set('name', 'unrelated_passing_case')
                     else: case.set('assertions', '0')
                     with self.assertRaises(RuntimeError): suite.coverage(report)
 
     def test_old_or_incomplete_totals_failures_errors_skips_and_hidden_failures_are_rejected(self):
-        for key, value in [('tests','327'),('tests','336'),('tests','351'),('tests','357'),('tests','358'),('tests','359'),('tests','371'),('tests','372'),('tests','373'),('tests','374'),('tests','376'),('assertions','3065'),
+        for key, value in [('tests','327'),('tests','336'),('tests','351'),('tests','357'),('tests','358'),('tests','359'),('tests','371'),('tests','372'),('tests','373'),('tests','374'),('tests','375'),('tests','377'),('assertions','3029'),('assertions','3035'),('assertions','3065'),('assertions','3071'),
                            ('failures','1'),('errors','1'),('skipped','1')]:
             with self.subTest(key=key):
                 report = self.report(); report[0].set(key,value)

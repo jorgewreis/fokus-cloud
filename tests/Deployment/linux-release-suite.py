@@ -8,10 +8,9 @@ from linux_release_common import ROOT, REPORT, guard, environment, php, run, ada
 
 
 
-# Exact composition: 372 reviewed tests plus three additional interest cases.
-# Preserve the 3030 minimum from PR89 and at least 36 additional assertions.
-EXPECTED_TESTS = 372 + 3
-MINIMUM_ASSERTIONS = 2753 + 23 + 58 + 196 + 36
+# Measured main composition plus three interest cases.
+EXPECTED_TESTS = 373 + 3
+MINIMUM_ASSERTIONS = 2753 + 23 + 58 + 202 + 36
 MAIN_IDENTITY_TESTS = {'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_valid_snapshot_is_accepted': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_missing_identity_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_invalid_release_is_rejected_without_echoing_input': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_stale_captured_manifest_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_in_place_code_change_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_added_code_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_asset_storage_link_does_not_change_runtime_identity': 1, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_unsealed_checkout_fails_closed_without_debug_details': 4, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_invalid_or_missing_nonce_is_not_reflected': 11, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_existing_health_endpoint_is_preserved': 1}
 
 LEAD_TESTS = {'Tests\\Feature\\CompanyAdminTest::test_company_detail_exposes_separate_lead_usage_only_after_platform_authorization': 5, 'Tests\\Feature\\CompanyAdminTest::test_company_detail_permission_is_checked_before_reading_lead_usage': 2, 'Tests\\Feature\\LeadConnectionsTest::test_superuser_credentials_never_execute_application_operation': 7, 'Tests\\Feature\\LeadConnectionsTest::test_runtime_context_is_transaction_local_and_disconnects_on_application_failure': 10, 'Tests\\Feature\\LeadConnectionsTest::test_insecure_configuration_is_rejected_before_connecting': 1, 'Tests\\Feature\\LeadConnectionsTest::test_transaction_pooler_and_missing_ca_are_rejected_before_connecting': 3, 'Tests\\Feature\\LeadConnectionsTest::test_disabled_runtime_never_opens_connection': 1, 'Tests\\Feature\\LeadDatabaseTest::test_context_comes_from_server_session_and_fresh_membership': 2, 'Tests\\Feature\\LeadDatabaseTest::test_manager_role_is_resolved_from_current_membership': 2, 'Tests\\Feature\\LeadDatabaseTest::test_access_revocations_are_checked_before_any_lead_connection': 12, 'Tests\\Feature\\LeadDatabaseTest::test_support_and_cross_company_context_are_blocked': 4, 'Tests\\Feature\\LeadUsageReaderTest::test_unconfigured_metrics_are_unavailable_without_connecting': 1, 'Tests\\Feature\\LeadUsageReaderTest::test_reader_filters_company_and_distinguishes_missing_company_from_zero_usage': 5, 'Tests\\Feature\\LeadUsageReaderTest::test_outage_has_no_fabricated_counts': 3}
@@ -43,6 +42,7 @@ INTEREST_TESTS = {
 
 # Added since e3dee0c6; each identity remains required, not just the total.
 BACKOFFICE_TESTS = {
+    'Tests\\Feature\\SubscriptionAdminTest::test_dashboard_aggregates_active_subscriptions_in_one_snapshot': 6,
     'Tests\\Feature\\BackofficeSecurityTest::test_vouchers_paginate_and_filter_beyond_the_first_hundred': 10,
     'Tests\\Feature\\BackofficeSecurityTest::test_access_audit_filters_before_paginating_all_events': 3,
     'Tests\\Feature\\CompanyAdminTest::test_company_only_view_skips_unneeded_subscription_history_and_keeps_legacy_contract': 12,

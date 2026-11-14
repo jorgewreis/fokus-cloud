@@ -36,41 +36,73 @@ class BackofficeController extends Controller
         $audit->record($request->user()->id, 'backoffice.dashboard_viewed', request: $request);
         $admin = $request->user()->loadMissing('role');
 
-        $activeSubscriptions = DB::table('subscriptions')
-            ->where('status', 'ativa')
-            ->get(['id', 'created_at', 'commercial_snapshot']);
-        $activeFreeSubscriptionIds = DB::table('voucher_redemptions')
-            ->whereIn('subscription_id', $activeSubscriptions->pluck('id'))
-            ->get(['subscription_id', 'snapshot', 'benefit_ends_at'])
-            ->filter(function (object $redemption): bool {
-                $snapshot = json_decode((string) $redemption->snapshot, true) ?: [];
-
-                return ($snapshot['discount_type'] ?? null) === 'trial_free'
-                    && $redemption->benefit_ends_at
-                    && now()->lt($redemption->benefit_ends_at);
-            })
-            ->pluck('subscription_id')
-            ->all();
         $trendStart = now()->startOfMonth()->subMonths(5);
-        $trend = collect(range(0, 5))->map(function (int $offset) use ($activeSubscriptions, $trendStart): array {
+        $trendCounts = collect(range(0, 5))->mapWithKeys(fn (int $offset): array => [$trendStart->copy()->addMonths($offset)->format('Y-m') => 0])->all();
+        $activeSubscriptionCount = 0;
+        $mrr = 0.0;
+        // A single statement gives the subscription and its redemptions one database
+        // snapshot even when an enclosing transaction uses READ COMMITTED. Decode the
+        // original JSON in PHP so historic value types retain their prior semantics.
+        $rows = DB::table('subscriptions as subscription')
+            ->leftJoin('voucher_redemptions as redemption', 'redemption.subscription_id', '=', 'subscription.id')
+            ->where('subscription.status', 'ativa')
+            ->orderBy('subscription.id')
+            ->select([
+                'subscription.id', 'subscription.created_at', 'subscription.commercial_snapshot',
+                'redemption.snapshot as redemption_snapshot', 'redemption.benefit_ends_at',
+            ]);
+        $connection = $rows->getConnection();
+        $mysql = in_array($connection->getDriverName(), ['mysql', 'mariadb'], true);
+        $pdo = $mysql ? $connection->getReadPdo() : null;
+        $buffered = $pdo?->getAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY);
+        $current = null;
+        $isFree = false;
+        $accumulate = function () use (&$current, &$isFree, &$activeSubscriptionCount, &$trendCounts, &$mrr): void {
+            if ($current === null) {
+                return;
+            }
+            $activeSubscriptionCount++;
+            $month = Carbon::parse($current->created_at)->format('Y-m');
+            if (array_key_exists($month, $trendCounts)) {
+                $trendCounts[$month]++;
+            }
+            if (! $isFree) {
+                $snapshot = json_decode((string) $current->commercial_snapshot, true) ?: [];
+                $mrr += (float) ($snapshot['monthly_amount'] ?? 0);
+            }
+        };
+        try {
+            if ($pdo !== null) {
+                $pdo->setAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
+            }
+            foreach ($rows->cursor() as $row) {
+                if ($current === null || $current->id !== $row->id) {
+                    $accumulate();
+                    $current = $row;
+                    $isFree = false;
+                }
+                if (! $isFree) {
+                    $snapshot = json_decode((string) $row->redemption_snapshot, true) ?: [];
+                    $isFree = ($snapshot['discount_type'] ?? null) === 'trial_free'
+                        && $row->benefit_ends_at
+                        && now()->lt($row->benefit_ends_at);
+                }
+            }
+            $accumulate();
+        } finally {
+            if ($pdo !== null) {
+                $pdo->setAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $buffered);
+            }
+        }
+        $trend = collect(range(0, 5))->map(function (int $offset) use ($trendCounts, $trendStart): array {
             $month = $trendStart->copy()->addMonths($offset);
 
             return [
                 'month' => $month->format('Y-m'),
                 'label' => ucfirst($month->locale('pt_BR')->translatedFormat('M Y')),
-                'value' => $activeSubscriptions->filter(fn (object $subscription): bool => Carbon::parse($subscription->created_at)->format('Y-m') === $month->format('Y-m'))->count(),
+                'value' => $trendCounts[$month->format('Y-m')] ?? 0,
             ];
         })->values();
-        $mrr = $activeSubscriptions->sum(function (object $subscription) use ($activeFreeSubscriptionIds): float {
-            if (in_array($subscription->id, $activeFreeSubscriptionIds, true)) {
-                return 0.0;
-            }
-
-            $snapshot = json_decode((string) $subscription->commercial_snapshot, true) ?: [];
-
-            return (float) ($snapshot['monthly_amount'] ?? 0);
-        });
-
         $alerts = [
             [
                 'key' => 'declined_payments',
@@ -345,7 +377,7 @@ class BackofficeController extends Controller
             'metrics' => [
                 'active_companies' => DB::table('companies')->whereNull('deleted_at')->where('status', 'ativa')->count(),
                 'active_people' => DB::table('company_memberships as membership')->join('companies as company', 'company.id', '=', 'membership.company_id')->join('users as user', 'user.id', '=', 'membership.user_id')->whereNull('membership.deleted_at')->whereNull('company.deleted_at')->where('membership.status', 'ativo')->where('user.status', 'ativa')->distinct('user.id')->count('user.id'),
-                'active_subscriptions' => $activeSubscriptions->count(),
+                'active_subscriptions' => $activeSubscriptionCount,
                 'mrr' => $mrr,
             ],
             'subscription_registrations_6m' => $trend,

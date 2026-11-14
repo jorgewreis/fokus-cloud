@@ -14,7 +14,7 @@ RELEASE_DISPOSABLE_TESTS=1 python3 tests/Deployment/linux-release-suite.py --dri
 RELEASE_DISPOSABLE_TESTS=1 python3 tests/Deployment/linux-release-suite.py --driver mysql
 ```
 
-Evidence defaults to `test-results/linux-release`; `RELEASE_REPORT_DIR` selects another writable evidence directory. Each subprocess records exit code, duration and SHA-256 of its log. The current candidate gate requires exactly 358 tests and at least 2,870 assertions, no failures/errors/skips, including individually named identity, Lead, and interest-index cases. A test count change requires explicit review rather than silently relaxing this gate. These configured thresholds are not a claim that this candidate has passed.
+Evidence defaults to `test-results/linux-release`; `RELEASE_REPORT_DIR` selects another writable evidence directory. Each subprocess records exit code, duration and SHA-256 of its log. PHPUnit JUnit files must contain exactly 376 tests, at least 3,072 assertions, no failures/errors/skips, including individually required identity, Lead, billing, backoffice and interest cases. A test count change requires explicit review rather than silently relaxing this gate. These thresholds do not establish that this candidate has passed.
 
 ## Portability adapters, not skipped assertions
 
