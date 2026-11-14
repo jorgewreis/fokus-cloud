@@ -51,3 +51,13 @@ and audit on the same connection, replay and status semantics, revocation,
 timeout/recovery and browser handling, explicit key custody and rotation,
 release coexistence, plus security review. The isolated MySQL test exercises
 row-lock ordering and a synthetic quota window, not those end-to-end contracts.
+
+The unregistered mutation orchestrator binds the normalized payload and checks
+for a completed replay before running external preflight, then enters the store's
+transaction for local writes. If preflight fails, it rechecks under lock for a
+matching completion before propagating failure. Its callbacks are not yet wired
+to `createCompany` or `updateCompany`: business uniqueness and optimistic-version
+checks must execute inside the writer after the record lock, password security
+checks must remain outside long-held locks, and audit must use the same database
+transaction. Callback purity and correct normalization require integration tests;
+the type signature alone cannot enforce them.
