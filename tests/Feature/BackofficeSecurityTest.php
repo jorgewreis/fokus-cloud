@@ -202,9 +202,10 @@ class BackofficeSecurityTest extends TestCase
                 'created_by_platform_admin_id' => $admin->id, 'created_at' => now(), 'updated_at' => now(),
             ]);
         }
-        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/vouchers?per_page=20&page=6')
+        $this->actingAs($admin, 'platform')->getJson('/api/backoffice/vouchers')->assertOk()->assertHeader('Deprecation', 'true')->assertJsonCount(100);
+        $this->getJson('/api/backoffice/vouchers?paginate=1&per_page=20&page=6')
             ->assertOk()->assertJsonPath('meta.total', 105)->assertJsonCount(5, 'data');
-        $this->getJson('/api/backoffice/vouchers?search=TEST000')
+        $this->getJson('/api/backoffice/vouchers?paginate=1&search=TEST000')
             ->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.code', 'TEST000');
     }
 

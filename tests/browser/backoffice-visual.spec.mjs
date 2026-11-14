@@ -1473,3 +1473,38 @@ test('voucher de assinatura gratuita envia uma duração ao cadastro', async ({ 
     await page.getByRole('button', { name: 'Cadastrar voucher' }).click();
     await expect(page.locator('#voucher-message')).toContainText('Voucher cadastrado.');
 });
+
+test('Vouchers recupera última página após exclusão e cancela busca ao sair', async ({ page }) => {
+    let vouchers = Array.from({ length: 16 }, (_, i) => ({ id: `VCH_${i}`, code: `COD${i}`, name: `Voucher ${i}`, discount_type: 'percentage', discount_value: 10, redemptions_count: 0, status: 'ativa', computed_status: 'ativa' }));
+    const requests = [];
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { role: 'superadministrador', name: 'Teste', permissions: ['platform.vouchers.manage', 'platform.catalog.publish'] } } }));
+    await page.route('**/api/backoffice/catalog', route => route.fulfill({ json: { products: [] } }));
+    await page.route(/\/api\/backoffice\/vouchers(?:\?.*)?$/, route => {
+        const params = new URL(route.request().url()).searchParams;
+        const pageNumber = Number(params.get('page') || 1);
+        requests.push({ page: pageNumber, search: params.get('search') });
+        const filtered = vouchers.filter(v => !params.get('search') || v.name.includes(params.get('search')));
+        return route.fulfill({ json: { data: filtered.slice((pageNumber - 1) * 15, pageNumber * 15), meta: { total: filtered.length, last_page: Math.max(1, Math.ceil(filtered.length / 15)) } } });
+    });
+    await page.route('**/api/backoffice/vouchers/VCH_15', route => {
+        vouchers = vouchers.filter(v => v.id !== 'VCH_15');
+        return route.fulfill({ json: { message: 'Excluído' } });
+    });
+    await page.goto('/backoffice/vouchers');
+    await expect(page.locator('#voucher-list tr')).toHaveCount(15);
+    await page.getByRole('button', { name: 'Próxima página' }).click();
+    await expect(page.locator('#voucher-list')).toContainText('Voucher 15');
+    await page.getByRole('button', { name: 'Excluir voucher' }).click();
+    await page.locator('#voucher-action-reason').fill('Teste de exclusão');
+    await page.getByRole('button', { name: 'Confirmar exclusão' }).click();
+    await expect(page.locator('#voucher-table-footer-summary')).toContainText('página 1 de 1');
+    await expect(page.locator('#voucher-list tr')).toHaveCount(15);
+    expect(requests.slice(-2).map(x => x.page)).toEqual([2, 1]);
+    await page.locator('#voucher-search').fill('busca abandonada');
+    await page.goto('/backoffice/empresas');
+    await page.waitForTimeout(500);
+    expect(requests.some(x => x.search === 'busca abandonada')).toBe(false);
+    expect(errors).toEqual([]);
+});

@@ -1394,6 +1394,17 @@ class BackofficeController extends Controller
                 }
             });
         }
+        // Keep the original bounded array contract for older cached clients.
+        if (! $request->boolean('paginate')) {
+            $legacy = $query->orderByDesc('voucher.created_at')->orderByDesc('voucher.id')->limit(100)->get();
+            $legacy->transform(function ($voucher) {
+                $voucher->computed_status = $voucher->ends_at && now()->gt(\Illuminate\Support\Carbon::parse($voucher->ends_at)) ? 'expirada' : $voucher->status;
+
+                return $voucher;
+            });
+
+            return response()->json($legacy)->header('Deprecation', 'true');
+        }
         $vouchers = $query->orderByDesc('voucher.created_at')->orderByDesc('voucher.id')->paginate($perPage);
         $vouchers->getCollection()->transform(function ($voucher) {
             $voucher->computed_status = $voucher->ends_at && now()->gt(\Illuminate\Support\Carbon::parse($voucher->ends_at)) ? 'expirada' : $voucher->status;

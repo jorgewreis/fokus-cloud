@@ -396,13 +396,19 @@ export async function mount(root, context = {}) {
         $("[data-fs-datatable-error]").hidden = true;
         const requestId = ++state.requestId;
         try {
-            const params = new URLSearchParams({ page: state.page, per_page: PAGE_SIZE });
+            const params = new URLSearchParams({ paginate: "1", page: state.page, per_page: PAGE_SIZE });
             [["search", "#voucher-search"], ["product_id", "#voucher-product-filter"], ["discount_type", "#voucher-type-filter"], ["status", "#voucher-status-filter"]].forEach(([key, selector]) => {
                 const value = $(selector).value.trim();
                 if (value) params.set(key, value);
             });
             const response = await api.request(`/backoffice/vouchers?${params}`, { signal: pageSignal });
             if (pageSignal?.aborted || requestId !== state.requestId) return;
+            const lastPage = Math.max(1, Number(response.meta?.last_page) || 1);
+            if (state.page > lastPage) {
+                state.page = lastPage;
+                await loadVouchers();
+                return;
+            }
             state.vouchers = response.data || [];
             state.meta = response.meta || { total: 0, last_page: 1 };
             render();
@@ -675,6 +681,7 @@ export async function mount(root, context = {}) {
         loadVouchers();
     });
     let searchTimer;
+    pageSignal?.addEventListener("abort", () => clearTimeout(searchTimer), { once: true });
     listen($("#voucher-search"), "input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { state.page = 1; loadVouchers(); }, 250); });
     ["#voucher-product-filter", "#voucher-type-filter", "#voucher-status-filter"].forEach((selector) => listen($(selector), "change", () => { state.page = 1; loadVouchers(); }));
     listen(pagination, "click", (event) => {
@@ -728,6 +735,7 @@ export async function mount(root, context = {}) {
     window.FokusCurrency?.bind(root);
     await Promise.all([loadCatalog(), loadVouchers()]);
     return () => {
+        clearTimeout(searchTimer);
         state.detailController?.abort();
         drawer.dispose();
         actionModal?.dispose?.();
