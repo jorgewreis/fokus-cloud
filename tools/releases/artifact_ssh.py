@@ -5,6 +5,7 @@ The authenticated metadata and receiver installation are provisioned separately.
 This tool never runs activation or changes a release pointer.
 """
 import argparse
+from contextlib import ExitStack
 import hashlib
 import json
 import os
@@ -14,6 +15,8 @@ import shlex
 import stat
 import subprocess
 import sys
+
+from preparation_guard import metadata
 
 MAX_ARTIFACT_BYTES = 576 * 1024 * 1024
 
@@ -29,14 +32,21 @@ def remote_path(value):
     return value
 
 
-def private_file(value, private=False):
+def open_trusted(value, stack, private=False):
     path = Path(value).absolute()
     require(path == path.resolve() and re.fullmatch(r'/[A-Za-z0-9_./-]+', str(path)) is not None, 'invalid_local_path')
-    s = path.lstat()
-    require(stat.S_ISREG(s.st_mode) and s.st_nlink == 1 and s.st_uid == os.geteuid(), 'unsafe_input_file')
-    require(not s.st_mode & (0o077 if private else 0o022), 'unsafe_input_permissions')
-    require(s.st_size > 0, 'empty_input_file')
-    return path
+    operator = os.geteuid()
+    for parent in (path.parent, *path.parent.parents):
+        require(parent == parent.resolve(), 'input_parent_symlink')
+        metadata(parent, operator, -1, direct=parent == path.parent)
+    info = metadata(path, operator, -1, direct=True, regular=True)
+    require(not info.st_mode & (0o077 if private else 0o022), 'unsafe_input_permissions')
+    require(info.st_size > 0, 'empty_input_file')
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    stack.callback(os.close, fd)
+    opened = os.fstat(fd)
+    require((opened.st_dev, opened.st_ino) == (info.st_dev, info.st_ino), 'input_rebound')
+    return fd
 
 
 def send(*, artifact, expected_digest, host, user, port, known_hosts, identity,
@@ -47,10 +57,10 @@ def send(*, artifact, expected_digest, host, user, port, known_hosts, identity,
     require(type(port) is int and 1 <= port <= 65535, 'invalid_port')
     require(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}', remote_name) is not None, 'invalid_name')
     remote_python, remote_receiver, remote_directory = map(remote_path, (remote_python, remote_receiver, remote_directory))
-    known_hosts, identity = private_file(known_hosts), private_file(identity, private=True)
-    artifact = private_file(artifact)
-    fd = os.open(artifact, os.O_RDONLY | os.O_NOFOLLOW)
-    try:
+    with ExitStack() as stack:
+        known_fd = open_trusted(known_hosts, stack)
+        identity_fd = open_trusted(identity, stack, private=True)
+        fd = open_trusted(artifact, stack)
         info = os.fstat(fd)
         require(stat.S_ISREG(info.st_mode) and info.st_size <= MAX_ARTIFACT_BYTES and info.st_size > 0, 'artifact_budget')
         with os.fdopen(fd, 'rb', closefd=False) as stream:
@@ -76,16 +86,17 @@ def send(*, artifact, expected_digest, host, user, port, known_hosts, identity,
             remote_command = shlex.join(remote_args)
             command = ['/usr/bin/ssh', '-F', '/dev/null', '-T', '-o', 'BatchMode=yes',
                        '-o', 'StrictHostKeyChecking=yes', '-o', 'GlobalKnownHostsFile=/dev/null',
-                       '-o', 'UserKnownHostsFile=' + str(known_hosts), '-o', 'IdentitiesOnly=yes',
-                       '-o', 'IdentityFile=' + str(identity), '-o', 'ClearAllForwardings=yes',
+                       '-o', 'UserKnownHostsFile=/proc/self/fd/' + str(known_fd), '-o', 'IdentitiesOnly=yes',
+                       '-o', 'IdentityFile=/proc/self/fd/' + str(identity_fd), '-o', 'ClearAllForwardings=yes',
                        '-o', 'ConnectTimeout=20', '-o', 'ConnectionAttempts=1',
                        '-p', str(port), '--', user + '@' + host, remote_command]
             result = run(command, stdin=stream, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                         timeout=900, check=False, env={'PATH': '/usr/bin:/bin', 'LC_ALL': 'C'})
+                         timeout=900, check=False, pass_fds=(known_fd, identity_fd),
+                         env={'PATH': '/usr/bin:/bin', 'LC_ALL': 'C'})
             require(result.returncode == 0, 'transport_failed')
-    finally:
-        os.close(fd)
-    return {'state': 'sealed_not_active' if prepare is not None else 'received_not_active', 'sha256': expected_digest, 'size': info.st_size}
+    # A remote ForceCommand may return zero without running the receiver.
+    # Independent verification of the remote receipt remains required.
+    return {'state': 'ssh_completed_unverified', 'sha256': expected_digest, 'size': info.st_size}
 
 
 def main():

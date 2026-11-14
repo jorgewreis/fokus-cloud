@@ -116,9 +116,12 @@ de produção, que permanecem bloqueados.
 `tools/releases/artifact_ssh.py` fornece um adaptador explícito que valida o
 SHA e o tamanho local e usa SSH em modo não interativo, arquivo `known_hosts`
 e chave fornecidos, com verificação estrita da chave do host e sem configuração
-SSH herdada. Pode invocar o receiver ou o `publisher.py receive-prepare` remoto
-com caminhos, UID e GID explícitos. O último deixa o candidato selado e inativo;
-a ativação continua separada e sujeita a todas as provas e locks. Os testes de
+SSH herdada. Arquivos de chave e known_hosts são abertos após verificação de
+proprietário, ancestrais e ACLs e passados ao SSH por descritores fixados. Pode invocar o receiver ou o `publisher.py receive-prepare` remoto
+com caminhos, UID e GID explícitos. O resultado `ssh_completed_unverified` indica apenas saída zero do SSH:
+um ForceCommand pode ignorar a operação, portanto não comprova recebimento
+ou selo. Verificação independente do receipt e da raiz é obrigatória antes
+de qualquer ativação, que continua sujeita a todas as provas e locks. Os testes de
 transporte usam backend simulado e não comprovam handshake SSH real. A identidade
 do host, chave, autorização da origem do digest, instalação confiável do código
 remoto e caminhos de ambiente precisam de provisionamento e revisão próprios.
