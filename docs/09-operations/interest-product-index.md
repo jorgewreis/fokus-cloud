@@ -19,18 +19,18 @@ Para comprovar concorrência e rollback, usar apenas ambiente descartável com M
 
 ### Prova sintética de BFCache real para Interesses
 
-O roteiro `tests/Deployment/interest-real-bfcache.mjs` inicia um servidor estático
-local descartável e um proxy restrito a `127.0.0.1`. Ele substitui `no-store`
-**somente no documento servido pelo fixture**, para permitir ao navegador usar
-BFCache, e simula as respostas de autenticação e interesses. Ele não acessa a
-aplicação real, credenciais, dados reais ou o provedor, e não altera cabeçalhos
-de produção. Ele falha se uma porta necessária já estiver ocupada e bloqueia
-requisições do navegador para outros endereços. O proxy verifica uma prova
-efêmera fornecida somente ao servidor filho em todas as respostas e a remove
-antes de repassá-las ao navegador; a inicialização espera o próprio filho
-confirmar que ocupou a porta. As dependências do projeto e o
-navegador Playwright devem estar instalados; opcionalmente `FOKUS_TEST_BROWSER`
-aponta para um executável Chromium/Edge local.
+O roteiro `tests/Deployment/interest-real-bfcache.mjs` responde diretamente
+no processo de teste usando o handler estático sintético. Não abre nem consulta
+um socket de fixture, não transmite prova reutilizável e aborta requisições
+externas. A origem `127.0.0.1:4196` é virtual e as respostas são entregues ao
+navegador por interceptação em memória. Mesmo que outro processo ocupe ou
+substitua essa porta, ele não recebe as requisições do ensaio.
+
+O roteiro substitui `no-store` **somente no documento sintético**, para permitir
+o BFCache, e simula autenticação e interesses. Ele não acessa a aplicação real,
+credenciais, dados reais ou o provedor e não altera cabeçalhos de produção. As
+dependências do projeto e o navegador Playwright devem estar instalados;
+opcionalmente `FOKUS_TEST_BROWSER` aponta para um executável Chromium/Edge local.
 
 Em PowerShell, a partir da raiz isolada do projeto:
 
@@ -49,7 +49,5 @@ a solicitação de reload; o comportamento real após essa navegação depende d
 autenticação do ambiente. Caso o navegador não aceite BFCache, o roteiro falha:
 isso não comprova sucesso nem falha funcional da restauração. O fixture não
 representa a política real de cache, a infraestrutura ou o navegador do cliente.
-As portas de fixture e proxy podem ser alteradas com
-`FOKUS_BFCACHE_FIXTURE_PORT` e `FOKUS_BFCACHE_PROXY_PORT`; o proxy também
-aceita a porta `0` para seleção pelo sistema. O isolamento contra colisões pode
-ser verificado com `node --test tests/Deployment/interest-real-bfcache-safety.test.mjs`.
+A substituição adversarial de listener e o bloqueio de destinos externos podem
+ser verificados com `node --test tests/Deployment/interest-real-bfcache-safety.test.mjs`.

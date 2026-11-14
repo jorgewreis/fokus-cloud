@@ -2,6 +2,7 @@ import { createReadStream, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const publicRoot = resolve(import.meta.dirname, '../public');
 const port = Number(process.env.BACKOFFICE_VISUAL_PORT || 4177);
@@ -43,11 +44,7 @@ const json = (response, payload, status = 200) => {
     response.end(JSON.stringify(payload));
 };
 
-createServer(async (request, response) => {
-    // Optional per-run proof for a parent-owned local proxy. Never used by the application.
-    const fixtureProof = process.env.FOKUS_VISUAL_FIXTURE_PROOF;
-    if (fixtureProof && request.headers['x-fokus-fixture-proof'] !== fixtureProof) { response.writeHead(403); response.end(); return; }
-    if (fixtureProof) response.setHeader('x-fokus-fixture-proof', fixtureProof);
+export async function handleBackofficeVisualRequest(request, response) {
     const url = new URL(request.url, `http://${request.headers.host}`);
     if (url.pathname === '/api/csrf-token') return json(response, { token: 'visual-test-token' });
     if (url.pathname === '/api/auth/law-context') return json(response, { user: { name: 'Pessoa Teste' }, systems: [{ value: 'CMP_VISUAL', label: 'Empresa de Demonstração — Fokus Law · Advocacia', profiles: [{ value: 'usuario', label: 'Usuário comum' }] }] });
@@ -116,4 +113,8 @@ createServer(async (request, response) => {
     }
     response.writeHead(200, { 'content-type': types[extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
     createReadStream(file).pipe(response);
-}).listen(port, '127.0.0.1', () => console.log(`Backoffice visual server on ${port}`));
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+    createServer(handleBackofficeVisualRequest).listen(port, '127.0.0.1', () => console.log(`Backoffice visual server on ${port}`));
+}
