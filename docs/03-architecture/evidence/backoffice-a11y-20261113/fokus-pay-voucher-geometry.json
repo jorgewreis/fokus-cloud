@@ -1,0 +1,74 @@
+[
+  {
+    "route": "pagamentos",
+    "left": 129.046875,
+    "right": 489.046875,
+    "width": 360,
+    "viewport": 375,
+    "ancestors": [
+      {
+        "tag": "SECTION",
+        "cls": "fs-card fs-card-panel",
+        "overflowX": "hidden",
+        "scrollWidth": 1220,
+        "clientWidth": 1220,
+        "left": 16,
+        "right": 1238
+      },
+      {
+        "tag": "DIV",
+        "cls": "container-content",
+        "overflowX": "hidden",
+        "scrollWidth": 1238,
+        "clientWidth": 365,
+        "left": 0,
+        "right": 375
+      },
+      {
+        "tag": "DIV",
+        "cls": "container-page expanded",
+        "overflowX": "hidden",
+        "scrollWidth": 375,
+        "clientWidth": 375,
+        "left": 0,
+        "right": 375
+      }
+    ]
+  },
+  {
+    "route": "vouchers",
+    "left": 71,
+    "right": 371,
+    "width": 300,
+    "viewport": 375,
+    "ancestors": [
+      {
+        "tag": "SECTION",
+        "cls": "fs-card fs-card-panel",
+        "overflowX": "hidden",
+        "scrollWidth": 354,
+        "clientWidth": 331,
+        "left": 16,
+        "right": 349
+      },
+      {
+        "tag": "DIV",
+        "cls": "container-content",
+        "overflowX": "hidden",
+        "scrollWidth": 365,
+        "clientWidth": 365,
+        "left": 0,
+        "right": 375
+      },
+      {
+        "tag": "DIV",
+        "cls": "container-page expanded",
+        "overflowX": "hidden",
+        "scrollWidth": 375,
+        "clientWidth": 375,
+        "left": 0,
+        "right": 375
+      }
+    ]
+  }
+]

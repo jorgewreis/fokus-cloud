@@ -1,0 +1,79 @@
+{
+  "source": "3f1573f2ef573fe7160dc3516f1de2817b85af95",
+  "browser": "158.0.4370.16",
+  "fixture": "superadministrador sintético com platform.payments.view e platform.vouchers.manage",
+  "rows": [
+    {
+      "route": "pagamentos",
+      "width": 375,
+      "height": 900,
+      "http": 200,
+      "page": "pagamentos",
+      "docWidth": 375,
+      "viewport": 375,
+      "bodyWidth": 375,
+      "title": "Pagamentos",
+      "overflow": false,
+      "pageErrors": [],
+      "blockedExternalOrigins": [
+        "https://fonts.googleapis.com"
+      ],
+      "screenshot": "fokus-pagamentos-375-a11y.png",
+      "sha256": "85c8b807835081b6f83bade5bacad91c27f814d105f5ece307dc1925db640e5f"
+    },
+    {
+      "route": "vouchers",
+      "width": 375,
+      "height": 900,
+      "http": 200,
+      "page": "vouchers",
+      "docWidth": 375,
+      "viewport": 375,
+      "bodyWidth": 375,
+      "title": "Vouchers",
+      "overflow": false,
+      "pageErrors": [],
+      "blockedExternalOrigins": [
+        "https://fonts.googleapis.com"
+      ],
+      "screenshot": "fokus-vouchers-375-a11y.png",
+      "sha256": "e494005a08712256bbcc141a549b4bffab7a728ff4e682b9a5d5cb6ca38b9ba5"
+    },
+    {
+      "route": "pagamentos",
+      "width": 1440,
+      "height": 900,
+      "http": 200,
+      "page": "pagamentos",
+      "docWidth": 1440,
+      "viewport": 1440,
+      "bodyWidth": 1440,
+      "title": "Pagamentos",
+      "overflow": false,
+      "pageErrors": [],
+      "blockedExternalOrigins": [
+        "https://fonts.googleapis.com"
+      ],
+      "screenshot": "fokus-pagamentos-1440-a11y.png",
+      "sha256": "7c63cd694ccc552a3d5e437e2dfd5bb27328b85d405afcd81b98549744059a83"
+    },
+    {
+      "route": "vouchers",
+      "width": 1440,
+      "height": 900,
+      "http": 200,
+      "page": "vouchers",
+      "docWidth": 1440,
+      "viewport": 1440,
+      "bodyWidth": 1440,
+      "title": "Vouchers",
+      "overflow": false,
+      "pageErrors": [],
+      "blockedExternalOrigins": [
+        "https://fonts.googleapis.com"
+      ],
+      "screenshot": "fokus-vouchers-1440-a11y.png",
+      "sha256": "a9a92519bd88e59928464766eea05b7047a4d99f20a0024d85496a4d84a44138"
+    }
+  ]
+}

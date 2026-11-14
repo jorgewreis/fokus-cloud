@@ -8,7 +8,12 @@ As 18 rotas registradas foram solicitadas em 375 × 900 e 1440 × 900 px com a f
 
 ## Matriz por rota
 
-`OK` significa somente abertura no fragmento esperado, sem erro de página e sem overflow horizontal global no viewport indicado. Não é aprovação visual, funcional ou de acessibilidade. A fixture padrão não fornecia as permissões de pagamentos e vouchers, de modo que ambas foram redirecionadas para empresas em ambos os tamanhos. Uma segunda navegação em 1440 px com permissões sintéticas adicionais confirmou apenas a abertura dos fragmentos correspondentes; erros, overflow e foco não foram registrados nessa passagem, e o estado específico em 375 px permanece não verificado.
+`OK` significa somente abertura no fragmento esperado, sem erro de página e sem overflow horizontal global no viewport indicado. Não é aprovação visual, funcional ou de acessibilidade. A fixture padrão não fornecia as permissões de pagamentos e vouchers, de modo que ambas foram redirecionadas para empresas em ambos os tamanhos. Uma passagem intermediária em 1440 px com permissões adicionais confirmou apenas a abertura dos fragmentos, sem registrar erros, overflow ou foco. O reteste complementar abaixo cobre as duas larguras.
+
+**Reteste complementar:** as duas rotas foram abertas novamente nas duas larguras com uma identidade sintética incluindo `platform.payments.view` e `platform.vouchers.manage`. Em Edge 158.0.4370.16, os quatro casos retornaram HTTP 200, abriram o fragmento esperado e não apresentaram erro JavaScript não tratado nem overflow horizontal do documento. Os [resultados sanitizados](evidence/backoffice-a11y-20261113/fokus-pay-voucher-audit.json), a [medição geométrica mobile](evidence/backoffice-a11y-20261113/fokus-pay-voucher-geometry.json) e as quatro capturas abaixo foram preservados. Requisições a fontes externas foram bloqueadas; assim, a aparência das fontes não comprova fidelidade ao ambiente real. A ausência de overflow do documento não impede corte dentro de contêineres, observado nos dois casos móveis.
+
+- Pagamentos: [375 px](evidence/backoffice-a11y-20261113/fokus-pagamentos-375-a11y.png) e [1440 px](evidence/backoffice-a11y-20261113/fokus-pagamentos-1440-a11y.png).
+- Vouchers: [375 px](evidence/backoffice-a11y-20261113/fokus-vouchers-375-a11y.png) e [1440 px](evidence/backoffice-a11y-20261113/fokus-vouchers-1440-a11y.png).
 
 | Rota | Fragmento esperado | 375 px | 1440 px |
 | --- | --- | --- | --- |
@@ -19,8 +24,8 @@ As 18 rotas registradas foram solicitadas em 375 × 900 e 1440 × 900 px com a f
 | `produtos` | `products` | OK | OK |
 | `modulos` | `modules` | OK | OK |
 | `assinaturas` | `subscriptions` | OK | OK |
-| `pagamentos` | `pagamentos` | Não verificado; fixture padrão sem permissão | Apenas fragmento confirmado com permissão adicional |
-| `vouchers` | `vouchers` | Não verificado; fixture padrão sem permissão | Apenas fragmento confirmado com permissão adicional |
+| `pagamentos` | `pagamentos` | OK no reteste com permissão adicional; corte interno no filtro | OK no reteste com permissão adicional |
+| `vouchers` | `vouchers` | OK no reteste com permissão adicional; corte interno no filtro | OK no reteste com permissão adicional |
 | `usuarios` | `users` | OK | OK |
 | `interesses` | `product-interests` | OK | OK |
 | `auditoria` | `audit-overview` | OK | OK |
@@ -38,6 +43,10 @@ As 18 rotas registradas foram solicitadas em 375 × 900 e 1440 × 900 px com a f
 **Impacto:** com o menu recolhido, pessoas que navegam por teclado podem não localizar o foco, e a árvore de acessibilidade observada não oferece nomes para identificar os destinos. Isso é evidência da árvore do Edge, não um ensaio com leitor de tela. Recomenda-se manter nomes acessíveis nos botões recolhidos, prover foco visível e testar ambos os estados e larguras.
 
 A captura e o script usados nessa observação foram mantidos apenas em diretório temporário; a saída textual da árvore e dos estilos foi observada na execução, mas não foi registrada como log durável versionado. A reprodução deve ser repetida para gerar evidência anexável antes de encerrar o achado.
+
+## Achado: filtros cortados no mobile
+
+Na largura de 375 px, as capturas do reteste mostram cortes nos campos de busca de pagamentos e vouchers. A medição do campo `#billing-payments-query` encontrou limites horizontais de aproximadamente 129 a 489 px em viewport de 375 px; o contêiner da página oculta o conteúdo excedente. No campo `#voucher-search`, o limite direito foi 371 px enquanto o card que o recorta terminava em 349 px. São observações do estado inicial com dados simulados em `3f1573f2`, não uma afirmação sobre produção nem sobre todos os estados dos filtros. Investigar responsividade dos contêineres e repetir a medição e interação por teclado após a correção.
 
 ## Fluxo adicional observado
 
