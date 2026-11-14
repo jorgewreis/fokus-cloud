@@ -71,15 +71,17 @@ class RealSSH(unittest.TestCase):
                                    remote_python='/usr/bin/python3',
                                    remote_receiver=str(Path(__file__).with_name('artifact_receiver.py').resolve()),
                                    remote_directory=str(staging), remote_name='received.tar')
-                    with self.assertRaisesRegex(ValueError, 'transport_failed'):
-                        artifact_ssh.send(**options, known_hosts=wrong)
-                    self.assertFalse((staging / 'received.tar').exists())
                     diagnostics = []
                     def diagnostic_run(command, **kwargs):
                         kwargs['stderr'] = subprocess.PIPE
                         result = subprocess.run([command[0], '-v', *command[1:]], **kwargs)
                         diagnostics.append(result.stderr.decode(errors='replace'))
                         return result
+                    with self.assertRaisesRegex(ValueError, 'transport_failed'):
+                        artifact_ssh.send(**options, known_hosts=wrong, run=diagnostic_run)
+                    self.assertIn('Host key verification failed', diagnostics[-1])
+                    self.assertFalse((staging / 'received.tar').exists())
+                    diagnostics.clear()
                     try:
                         result = artifact_ssh.send(**options, known_hosts=known, run=diagnostic_run)
                     except ValueError as error:
