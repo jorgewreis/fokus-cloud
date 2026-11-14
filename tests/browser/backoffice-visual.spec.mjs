@@ -490,6 +490,45 @@ test('superadministrador salva o nome público da assinatura pelo drawer', async
     await expect(page.locator('#subscription-public-name')).toHaveValue('Empresa Alpha');
 });
 
+test('aguarda carregamento do módulo antes de disponibilizar ações', async ({ page }) => {
+    let releaseModule;
+    let moduleRequested;
+    const requested = new Promise((resolve) => { moduleRequested = resolve; });
+    const released = new Promise((resolve) => { releaseModule = resolve; });
+    await page.route('**/backoffice/assets/js/subscriptions-page.js?*', async (route) => {
+        moduleRequested();
+        await released;
+        await route.continue();
+    });
+    await page.goto('/backoffice/assinaturas');
+    await requested;
+    await expect(page.getByRole('status')).toContainText('Carregando página');
+    await expect(page.getByRole('button', { name: 'Nova assinatura' })).toHaveCount(0);
+    releaseModule();
+    const createButton = page.getByRole('button', { name: 'Nova assinatura' });
+    await createButton.click();
+    await expect(page.locator('#subscription-create-drawer')).toBeVisible();
+});
+
+test('descarta módulo atrasado após mudar de página', async ({ page }) => {
+    let releaseModule;
+    let moduleRequested;
+    const requested = new Promise((resolve) => { moduleRequested = resolve; });
+    const released = new Promise((resolve) => { releaseModule = resolve; });
+    await page.route('**/backoffice/assets/js/subscriptions-page.js?*', async (route) => {
+        moduleRequested();
+        await released;
+        await route.continue();
+    });
+    await page.goto('/backoffice/assinaturas');
+    await requested;
+    await page.locator('[data-sidebar-item="companies"]').click();
+    await expect(page.locator('[data-backoffice-page="companies"]')).toBeVisible();
+    releaseModule();
+    await expect(page.locator('[data-backoffice-page="companies"]')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Nova assinatura' })).toHaveCount(0);
+});
+
 test('Backoffice gera checkout assistido e atualiza a listagem', async ({ page }) => {
     await useSubscriptionCatalog(page);
     await page.route('**/api/backoffice/subscriptions/checkout-options?**', (route) => route.fulfill({
