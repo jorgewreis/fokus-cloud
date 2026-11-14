@@ -20,7 +20,7 @@ export async function mount(root, context = {}) {
     let drawerGeneration = 0;
     let catalogLoaded = false;
     const adminKey = context.admin?.id ? String(context.admin.id) : "__unknown_admin__";
-    if (!mutationStates.has(adminKey)) mutationStates.set(adminKey, { inFlight: false, uncertain: false, listeners: new Set() });
+    if (!mutationStates.has(adminKey)) mutationStates.set(adminKey, { inFlight: false, uncertain: false, epoch: 0, listeners: new Set() });
     const mutation = mutationStates.get(adminKey);
     const alive = () => !disposed && !context.signal?.aborted;
     const notify = () => mutation.listeners.forEach((listener) => listener());
@@ -157,12 +157,13 @@ export async function mount(root, context = {}) {
     };
     const closeDrawer = () => { drawer.close(); resetDrawerState(); };
     const load = async () => {
+        const reconciliationEpoch = mutation.uncertain && !mutation.inFlight ? mutation.epoch : null;
         try {
             const response = await api.request("/backoffice/catalog/products");
             if (context.signal?.aborted) return;
             state.products = response.products || [];
             render();
-            catalogLoaded = true;
+            if (reconciliationEpoch !== null && reconciliationEpoch === mutation.epoch && mutation.uncertain && !mutation.inFlight) catalogLoaded = true;
             syncMutation();
             showMessage("");
             return true;
@@ -195,6 +196,7 @@ export async function mount(root, context = {}) {
         if (editing) payload.display_order = Number(payload.display_order);
         else delete payload.display_order;
         const generation = drawerGeneration;
+        mutation.epoch++;
         mutation.inFlight = true;
         notify();
         try {
