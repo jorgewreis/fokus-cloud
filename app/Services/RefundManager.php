@@ -71,7 +71,11 @@ class RefundManager
             abort_unless($refund->status === 'aprovado', 409, 'O reembolso precisa estar aprovado e sem execução pendente.');
             $providerPaymentId = DB::table('payments')->where('id', $refund->payment_id)->value('provider_payment_id');
             abort_unless($providerPaymentId, 422, 'O pagamento não possui identificador no gateway.');
-            DB::table('refund_requests')->where('id', $id)->update(['status' => 'executando', 'updated_at' => now()]);
+            DB::table('refund_requests')->where('id', $id)->update([
+                'status' => 'executando',
+                'provider_payload_sanitized' => json_encode(['fokus_payment_binding_sha256' => $this->paymentBinding($refund->id, (string) $providerPaymentId)]),
+                'updated_at' => now(),
+            ]);
             $audit->record($admin->id, 'billing.refund_execution_started', 'refund_request', $id, $refund->company_id, $reason, before: ['status' => 'aprovado'], after: ['status' => 'executando']);
 
             return [$refund, (string) $providerPaymentId];
@@ -97,6 +101,7 @@ class RefundManager
         abort_unless($refund->status === 'executando' && $refund->provider_refund_id, 409, 'Não há identificador do provedor para consultar esta execução.');
         $providerPaymentId = DB::table('payments')->where('id', $refund->payment_id)->value('provider_payment_id');
         abort_unless($providerPaymentId, 409, 'Pagamento sem identificador no provedor.');
+        abort_unless($this->matchesPaymentBinding($refund, (string) $providerPaymentId), 409, 'O identificador do pagamento mudou ou não pode ser comprovado; a execução exige análise operacional.');
         try {
             $remote = $client->getRefund((string) $providerPaymentId, (string) $refund->provider_refund_id);
         } catch (\Throwable $exception) {
@@ -126,10 +131,19 @@ class RefundManager
                 && (is_string($remote['payment_id'] ?? null) || is_int($remote['payment_id'] ?? null))
                 && (string) $remote['payment_id'] === $providerPaymentId
                 && $payment && (string) $payment->provider_payment_id === $providerPaymentId
+                && $this->matchesPaymentBinding($refund, $providerPaymentId)
                 && is_numeric($remoteAmount) && is_finite((float) $remoteAmount)
                 && (float) $remoteAmount === round((float) $remoteAmount, 2)
                 && (float) $remoteAmount === round((float) $refund->amount, 2);
-            $sanitized = json_encode($client->sanitizePayload($remote));
+            if ($matches && DB::table('refund_requests')->where('provider_refund_id', (string) $providerRefundId)->where('id', '!=', $id)->exists()) {
+                $matches = false;
+            }
+            $existing = json_decode((string) $refund->provider_payload_sanitized, true) ?: [];
+            $safePayload = $client->sanitizePayload($remote) ?: [];
+            if (isset($existing['fokus_payment_binding_sha256'])) {
+                $safePayload['fokus_payment_binding_sha256'] = $existing['fokus_payment_binding_sha256'];
+            }
+            $sanitized = json_encode($safePayload);
             if (! $matches || ($remote['status'] ?? null) !== 'approved') {
                 $update = ['provider_payload_sanitized' => $sanitized, 'updated_at' => now()];
                 // Only an ID returned for this payment and amount is a candidate for a later GET.
@@ -156,6 +170,19 @@ class RefundManager
 
             return DB::table('refund_requests')->where('id', $id)->first();
         });
+    }
+
+    private function paymentBinding(string $refundId, string $providerPaymentId): string
+    {
+        return hash('sha256', $refundId."\0".$providerPaymentId);
+    }
+
+    private function matchesPaymentBinding(object $refund, string $providerPaymentId): bool
+    {
+        $payload = json_decode((string) $refund->provider_payload_sanitized, true) ?: [];
+        $binding = $payload['fokus_payment_binding_sha256'] ?? null;
+
+        return is_string($binding) && hash_equals($this->paymentBinding($refund->id, $providerPaymentId), $binding);
     }
 
     public function payload(object $refund): array

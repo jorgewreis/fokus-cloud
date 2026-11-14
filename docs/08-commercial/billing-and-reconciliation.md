@@ -192,6 +192,11 @@ identificador associado à resposta original, a resolução administrativa
 rastreável permanece pendente; não alterar registros manualmente como
 substituto desse fluxo.
 
+Antes do envio, a execução vincula o pedido ao identificador do pagamento por
+um resumo SHA-256. A consulta posterior é bloqueada se o identificador atual
+não corresponder ao vínculo original; o mesmo identificador de reembolso do
+provedor não pode ser associado a dois pedidos locais.
+
 O endpoint oficial de criação exige chave de idempotência e exemplifica uma
 resposta aprovada com identificador, pagamento e valor:
 [Criar reembolso — Mercado Pago](https://www.mercadopago.com.br/developers/pt/reference/online-payments/checkout-pro-preferences/create-refund/post).
