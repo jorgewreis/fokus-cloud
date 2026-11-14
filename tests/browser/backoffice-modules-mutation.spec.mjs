@@ -11,7 +11,7 @@ async function setup(page) {
         window.controller = new AbortController();
         const mod = await import(`data:text/javascript;base64,${btoa(unescape(encodeURIComponent(source)))}`);
         window.moduleUnderTest = mod; window.catalogFixture = catalog;
-        window.dispose = await mod.mount(document.querySelector('main'), { admin: { id: 'admin1' }, signal: window.controller.signal, permissions: new Set(['platform.catalog.publish']), api:{ request: (url, options) => options ? new Promise((resolve,reject)=>window.pending.push({url,resolve,reject})) : Promise.resolve(catalog) } });
+        window.dispose = await mod.mount(document.querySelector('main'), { admin: { id: 'admin1' }, signal: window.controller.signal, permissions: new Set(['platform.catalog.publish']), api:{ request: (url, options) => options ? new Promise((resolve,reject)=>window.pending.push({url,resolve,reject})) : window.holdCatalog ? new Promise(resolve => { window.resolveCatalog = resolve; }) : Promise.resolve(catalog) } });
     }, {source, catalog});
 }
 const submit = (page, selector) => page.locator(selector).evaluate((form) => form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
@@ -72,4 +72,31 @@ test('retorno tardio não fecha ou apaga um novo formulário', async ({ page }) 
     await expect(page.locator('#modules-message')).toContainText('Não foi possível confirmar');
     await expect(page.locator('#module-name')).toHaveValue('Novo rascunho');
     await expect(page.locator('#module-form-submit')).toBeDisabled();
+});
+
+test('catálogo lento e validação antiga não apagam ou contaminam novo formulário', async ({ page }) => {
+    await setup(page);
+    await page.evaluate(() => { window.FokusForm.mapServerErrors = () => { window.mapped = (window.mapped || 0) + 1; }; });
+    await page.locator('#module-new').evaluate(el=>el.click());
+    await submit(page, '#module-form');
+    await page.locator('#module-drawer-close').evaluate(el=>el.click());
+    await page.locator('#module-new').evaluate(el=>el.click());
+    await page.locator('#module-name').fill('Formulário B');
+    await page.evaluate(() => window.pending[0].reject(Object.assign(new Error('Rejeitado'), {status:422, errors:{name:['inválido']}})));
+    await expect(page.locator('#modules-message')).toHaveText('Rejeitado');
+    expect(await page.evaluate(()=>window.mapped || 0)).toBe(0);
+    await expect(page.locator('#module-name')).toHaveValue('Formulário B');
+});
+
+test('carregamento tardio do catálogo preserva novo formulário', async ({ page }) => {
+    await setup(page);
+    await page.locator('#module-new').evaluate(el=>el.click());
+    await submit(page, '#module-form');
+    await page.evaluate(()=>{window.holdCatalog = true; window.pending[0].resolve({});});
+    await expect.poll(()=>page.evaluate(()=>typeof window.resolveCatalog)).toBe('function');
+    await page.locator('#module-new').evaluate(el=>el.click());
+    await page.locator('#module-name').fill('Formulário novo');
+    await page.evaluate(()=>window.resolveCatalog(window.catalogFixture));
+    await expect(page.locator('#modules-message')).toContainText('Módulo cadastrado');
+    await expect(page.locator('#module-name')).toHaveValue('Formulário novo');
 });

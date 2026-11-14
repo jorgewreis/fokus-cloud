@@ -226,6 +226,7 @@ export async function mount(root, context = {}) {
     $("#module-new").addEventListener("fs:hide", invalidateDrawer);
     document.addEventListener("keydown", onEscape);
     const load = async () => {
+        const generationAtLoad = drawerGeneration;
         try {
             state.catalog = await api.request("/backoffice/catalog");
             if (!alive()) return;
@@ -233,7 +234,7 @@ export async function mount(root, context = {}) {
             state.catalog.options = state.catalog.options || {};
             state.modules = allModules();
             $("#module-product-filter").innerHTML = '<option value="">Todos os produtos</option>' + state.catalog.products.map((product) => `<option value="${escapeHtml(product.id)}">${escapeHtml(product.name)}</option>`).join("");
-            resetForm();
+            if (generationAtLoad === drawerGeneration) resetForm();
             render();
             if (mutation.uncertain) onMutationChange(); else showMessage("");
         } catch (error) {
@@ -285,7 +286,7 @@ export async function mount(root, context = {}) {
             closeDrawer(); await load();
             if (alive()) showMessage(editing ? "Módulo salvo. Ative, publique o módulo e republique o catálogo em Produtos." : "Módulo cadastrado como inativo.", "success");
         } catch (error) {
-            if (alive() && [409, 422].includes(error.status)) window.FokusForm?.mapServerErrors(form, error.errors);
+            if (alive() && operationDrawerGeneration === drawerGeneration && [409, 422].includes(error.status)) window.FokusForm?.mapServerErrors(form, error.errors);
             mutationError(error, "Não foi possível salvar o módulo.");
         } finally { finishMutation(); }
     });
