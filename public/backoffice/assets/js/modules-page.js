@@ -1,5 +1,7 @@
 import { createRecordsDrawer } from "./records-drawer.js";
 
+const mutationStates = new Map();
+
 const approvedCatalog = {
     families: {
         law: [{ code: "processos", label: "Processos" }, { code: "contatos", label: "Contatos" }, { code: "expedicoes", label: "Expedições" }, { code: "tarefas", label: "Tarefas" }, { code: "audiencias", label: "Audiências" }],
@@ -29,6 +31,98 @@ export async function mount(root, context = {}) {
     const destructiveModal = window.FokusStyles?.Modal?.getOrCreateInstance($("#module-destructive-trigger"));
     const state = { catalog: { products: [], options: {} }, modules: [], editing: null, pending: null, personalizations: [], page: 1 };
     const pageSize = 15;
+    let disposed = false;
+    let drawerGeneration = 0;
+    let catalogLoaded = false;
+    let observedUncertainty = false;
+    const adminKey = context.admin?.id ? String(context.admin.id) : "__unknown_admin__";
+    if (!mutationStates.has(adminKey)) mutationStates.set(adminKey, { inFlight: false, uncertain: false, listeners: new Set() });
+    const mutation = mutationStates.get(adminKey);
+    const alive = () => !disposed && !context.signal?.aborted;
+    const mutationButtons = () => [$("#module-form-submit"), $("#module-destructive-form").querySelector('[type="submit"]')];
+    const syncMutationButtons = () => mutationButtons().forEach((button) => { if (button) button.disabled = mutation.inFlight || mutation.uncertain; });
+    const notifyMutation = () => mutation.listeners.forEach((listener) => listener());
+    const onMutationChange = () => {
+        if (!alive()) return;
+        syncMutationButtons();
+        form.inert = mutation.inFlight;
+        form.setAttribute("aria-busy", mutation.inFlight ? "true" : "false");
+        for (const currentForm of [form, $("#module-destructive-form")]) {
+            let progress = currentForm.parentElement.querySelector(`[data-module-progress="${currentForm.id}"]`);
+            if (mutation.inFlight && !progress) {
+                progress = document.createElement("div"); progress.dataset.moduleProgress = currentForm.id;
+                progress.setAttribute("role", "status"); progress.setAttribute("aria-live", "polite");
+                progress.textContent = "Processando alteração do módulo."; currentForm.before(progress);
+            } else if (!mutation.inFlight) progress?.remove();
+        }
+        if (mutation.uncertain && !observedUncertainty) { catalogLoaded = false; observedUncertainty = true; }
+        if (!mutation.uncertain) observedUncertainty = false;
+        for (const currentForm of [form, $("#module-destructive-form")]) {
+            let warning = currentForm.querySelector('[data-mutation-warning]');
+            if (mutation.uncertain && !warning) {
+                warning = document.createElement("div"); warning.dataset.mutationWarning = "true"; warning.setAttribute("role", "alert");
+                currentForm.prepend(warning);
+            } else if (!mutation.uncertain) warning?.remove();
+            if (mutation.uncertain) warning.textContent = mutation.confirmedStale
+                ? "Alteração concluída. Feche esta janela, atualize e confira o catálogo antes de continuar."
+                : "Resultado não confirmado. Feche esta janela e confira o catálogo antes de tentar novamente.";
+        }
+        let pageProgress = root.querySelector('[data-module-page-progress]');
+        if (mutation.inFlight && !pageProgress) {
+            pageProgress = document.createElement("div"); pageProgress.dataset.modulePageProgress = "true";
+            pageProgress.setAttribute("role", "status"); pageProgress.setAttribute("aria-live", "polite");
+            pageProgress.textContent = "Processando alteração do módulo."; root.prepend(pageProgress);
+        } else if (!mutation.inFlight) pageProgress?.remove();
+        let reconciliation = root.querySelector('[data-module-reconciliation]');
+        const focusedControl = reconciliation?.contains(document.activeElement) ? document.activeElement.textContent : null;
+        if (mutation.uncertain) {
+            if (!reconciliation) {
+                reconciliation = document.createElement("div");
+                reconciliation.dataset.moduleReconciliation = "true";
+                reconciliation.className = "fs-alert";
+                reconciliation.setAttribute("role", "alert");
+                $("#modules-message").after(reconciliation);
+            }
+            const node = reconciliation;
+            node.replaceChildren(document.createTextNode(mutation.confirmedStale ? "A alteração foi concluída, mas o catálogo não pôde ser atualizado. Recarregue e confira antes de continuar. " : "Não foi possível confirmar o resultado. Consulte o catálogo antes de tentar novamente. "));
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "fs-btn fs-btn-outline-primary";
+            button.textContent = "Já conferi o catálogo";
+            button.disabled = !catalogLoaded || mutation.inFlight;
+            button.addEventListener("click", () => {
+                const restoreFocus = document.activeElement === button;
+                mutation.uncertain = false; mutation.confirmedStale = false; notifyMutation(); showMessage("");
+                if (restoreFocus && alive()) $("#module-query").focus();
+            });
+            node.append(button);
+            if (!catalogLoaded) {
+                const reload = document.createElement("button"); reload.type = "button";
+                reload.className = "fs-btn fs-btn-outline-primary"; reload.textContent = "Recarregar catálogo";
+                reload.addEventListener("click", () => load()); node.append(reload);
+            }
+            node.dataset.tone = "danger"; node.hidden = false;
+            if (focusedControl) {
+                const preferred = [...node.querySelectorAll("button")].find((control) => control.textContent === focusedControl && !control.disabled);
+                (preferred || [...node.querySelectorAll("button")].find((control) => !control.disabled))?.focus();
+            }
+        } else reconciliation?.remove();
+    };
+    mutation.listeners.add(onMutationChange);
+    const beginMutation = () => {
+        if (!alive() || mutation.inFlight || mutation.uncertain) return false;
+        mutation.inFlight = true;
+        notifyMutation();
+        return true;
+    };
+    const finishMutation = () => { mutation.inFlight = false; notifyMutation(); };
+    const mutationError = (error, fallback) => {
+        if (![409, 422].includes(error.status)) {
+            mutation.confirmedStale = false;
+            mutation.uncertain = true;
+            notifyMutation();
+        } else if (alive()) showMessage(error.message || fallback);
+    };
     const field = (name) => form.elements.namedItem(name);
     const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[character]));
     const money = (value) => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -159,22 +253,30 @@ export async function mount(root, context = {}) {
         $("#module-view-panel").hidden = false;
     };
     const setDrawerHeader = (kicker, title, description) => { $("#module-drawer-kicker").textContent = kicker; $("#module-drawer-title").textContent = title; $("#module-drawer-description").textContent = description; };
-    const openCreate = () => { fillForm(); drawer.setState({ mode: "create" }); setDrawerHeader("CATÁLOGO", "Novo módulo", "Cadastre um componente comercial e suas funcionalidades."); drawer.show(); field("name").focus(); };
-    const openEdit = (module) => { fillForm(module); state.editing = String(module.id); drawer.setState({ mode: "edit", record: module }); setDrawerHeader("EDITAR MÓDULO", "Editar dados do módulo", "Altere os dados comerciais, técnicos e as regras permitidas."); $("#module-form-submit").textContent = "Salvar alterações"; drawer.show(); field("name").focus(); };
-    const openView = (module) => { state.editing = null; showDetails(module); drawer.setState({ mode: "view", record: module }); setDrawerHeader("CONSULTA", "Detalhes do módulo", "Consulte os dados, regras, publicação e vínculos do módulo."); drawer.show(); };
-    const closeDrawer = () => drawer.close();
+    const openCreate = () => { drawerGeneration += 1; fillForm(); drawer.setState({ mode: "create" }); setDrawerHeader("CATÁLOGO", "Novo módulo", "Cadastre um componente comercial e suas funcionalidades."); drawer.show(); field("name").focus(); };
+    const openEdit = (module) => { drawerGeneration += 1; fillForm(module); state.editing = String(module.id); drawer.setState({ mode: "edit", record: module }); setDrawerHeader("EDITAR MÓDULO", "Editar dados do módulo", "Altere os dados comerciais, técnicos e as regras permitidas."); $("#module-form-submit").textContent = "Salvar alterações"; drawer.show(); field("name").focus(); };
+    const openView = (module) => { drawerGeneration += 1; state.editing = null; showDetails(module); drawer.setState({ mode: "view", record: module }); setDrawerHeader("CONSULTA", "Detalhes do módulo", "Consulte os dados, regras, publicação e vínculos do módulo."); drawer.show(); };
+    const closeDrawer = () => { drawerGeneration += 1; drawer.close(); };
+    const invalidateDrawer = () => { drawerGeneration += 1; };
+    const onEscape = (event) => { if (event.key === "Escape") invalidateDrawer(); };
+    $("#module-new").addEventListener("fs:hide", invalidateDrawer);
+    document.addEventListener("keydown", onEscape);
     const load = async () => {
+        const generationAtLoad = drawerGeneration;
         try {
             state.catalog = await api.request("/backoffice/catalog");
-            if (context.signal?.aborted) return;
+            if (!alive()) return;
+            catalogLoaded = true;
             state.catalog.options = state.catalog.options || {};
             state.modules = allModules();
             $("#module-product-filter").innerHTML = '<option value="">Todos os produtos</option>' + state.catalog.products.map((product) => `<option value="${escapeHtml(product.id)}">${escapeHtml(product.name)}</option>`).join("");
-            resetForm();
+            if (generationAtLoad === drawerGeneration) resetForm();
             render();
-            showMessage("");
+            if (mutation.uncertain) onMutationChange(); else showMessage("");
+            return true;
         } catch (error) {
-            if (!context.signal?.aborted) showMessage(error.message || "Não foi possível carregar os módulos.");
+            if (alive()) { catalogLoaded = false; if (mutation.uncertain) onMutationChange(); else showMessage(error.message || "Não foi possível carregar os módulos."); }
+            return false;
         }
     };
 
@@ -206,6 +308,7 @@ export async function mount(root, context = {}) {
     personalizationsList.addEventListener("change", (event) => { const index = Number(event.target.dataset.index); const item = state.personalizations[index]; if (!item) return; if (event.target.classList.contains("p-type")) item.type_code = event.target.value; if (event.target.classList.contains("p-required")) item.required = event.target.value === "1"; if (event.target.classList.contains("p-active")) item.active = event.target.value === "1"; if (event.target.classList.contains("p-value")) item.tiers[Number(event.target.dataset.tier)].value = Number(event.target.value); if (event.target.classList.contains("p-price")) item.tiers[Number(event.target.dataset.tier)].additional_monthly_amount = Number(event.target.value); });
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
+        if (mutation.inFlight || mutation.uncertain || !alive()) return;
         if (window.FokusForm && !window.FokusForm.validate(form)) return;
         const drawerState = drawer.getState();
         const editId = drawerState.mode === "edit" ? String(state.editing || drawerState.record?.id || "") : "";
@@ -213,11 +316,26 @@ export async function mount(root, context = {}) {
         const editing = Boolean(editId);
         const payload = { product_id: field("product_id").value, name: field("name").value, module_code: field("module_code").value, module_code_custom_name: field("module_code_custom_name").value, segments: selectedValues("#module-segments"), context_code: field("context_code").value || null, monthly_price: window.FokusCurrency?.parse(field("monthly_price").value) ?? 0, price_is_estimate: field("price_is_estimate").value === "1", technical_description: field("technical_description").value, commercial_content: field("commercial_content").value, capability_codes: selectedValues("#module-capabilities").filter((item) => item !== "outro"), dependency_ids: selectedValues("#module-dependencies"), incompatibility_ids: selectedValues("#module-incompatibilities"), personalizations: state.personalizations };
         if (editing) { payload.display_order = Number(field("display_order").value || 0); payload.featured = field("featured").value === "1"; }
-        try { await api.request(editing ? `/backoffice/catalog/modules/${editId}` : "/backoffice/catalog/modules", { method: editing ? "PATCH" : "POST", body: payload }); closeDrawer(); await load(); showMessage(editing ? "Módulo salvo. Ative, publique o módulo e republique o catálogo em Produtos." : "Módulo cadastrado como inativo.", "success"); } catch (error) { window.FokusForm?.mapServerErrors(form, error.errors); showMessage(error.message || "Não foi possível salvar o módulo."); }
+        if (!beginMutation()) return;
+        const operationDrawerGeneration = drawerGeneration;
+        try {
+            await api.request(editing ? `/backoffice/catalog/modules/${editId}` : "/backoffice/catalog/modules", { method: editing ? "PATCH" : "POST", body: payload });
+            if (!alive() || operationDrawerGeneration !== drawerGeneration) { mutation.confirmedStale = true; mutation.uncertain = true; notifyMutation(); return; }
+            closeDrawer(); const refreshed = await load();
+            if (!refreshed) { mutation.confirmedStale = true; mutation.uncertain = true; notifyMutation(); return; }
+            if (alive()) showMessage(editing ? "Módulo salvo. Ative, publique o módulo e republique o catálogo em Produtos." : "Módulo cadastrado como inativo.", "success");
+        } catch (error) {
+            if (alive() && operationDrawerGeneration === drawerGeneration && [409, 422].includes(error.status)) {
+                mutation.inFlight = false; notifyMutation();
+                window.FokusForm?.mapServerErrors(form, error.errors);
+            }
+            mutationError(error, "Não foi possível salvar o módulo.");
+        } finally { finishMutation(); }
     });
     $("#module-list").addEventListener("click", async (event) => {
         const control = event.target.closest("[data-module-action]");
-        if (!control) return;
+        if (!control || !alive()) return;
+        if ((mutation.inFlight || mutation.uncertain) && control.dataset.moduleAction !== "view") return;
         const module = state.modules.find((item) => String(item.id) === control.dataset.moduleId);
         if (!module) return;
         const type = control.dataset.moduleAction;
@@ -237,13 +355,33 @@ export async function mount(root, context = {}) {
             destructiveModal?.show();
             return;
         }
-        try { await api.request(`/backoffice/catalog/modules/${module.id}/activate`, { method: "POST" }); await load(); showMessage("Módulo ativado. Publique o módulo e o catálogo em Produtos.", "success"); } catch (error) { showMessage(error.message || "Não foi possível atualizar o módulo."); }
+        if (!beginMutation()) return;
+        try { await api.request(`/backoffice/catalog/modules/${module.id}/activate`, { method: "POST" }); if (!alive()) { mutation.confirmedStale = true; mutation.uncertain = true; notifyMutation(); return; } const refreshed = await load(); if (!refreshed) { mutation.confirmedStale = true; mutation.uncertain = true; notifyMutation(); return; } if (alive()) showMessage("Módulo ativado. Publique o módulo e o catálogo em Produtos.", "success"); } catch (error) { mutationError(error, "Não foi possível atualizar o módulo."); } finally { finishMutation(); }
     });
     $("#module-pagination").addEventListener("click", (event) => { const button = event.target.closest("[data-module-page]"); if (!button || button.disabled) return; state.page = Number(button.dataset.modulePage); render(); });
-    $("#module-destructive-form").addEventListener("submit", async (event) => { event.preventDefault(); if (!state.pending) return; const { type, module } = state.pending; const formData = new FormData(event.currentTarget); const reason = formData.get("reason"); const needsReason = ["archive", "delete"].includes(type); try { const response = await api.request(type === "delete" ? `/backoffice/catalog/modules/${module.id}` : `/backoffice/catalog/modules/${module.id}/${type}`, { method: type === "delete" ? "DELETE" : "POST", body: type === "publish" ? { release_type: formData.get("release_type") } : needsReason ? { reason } : undefined }); destructiveModal?.hide(); state.pending = null; await load(); showMessage(type === "publish" ? `Módulo publicado na versão ${response.release_version || `v${Number(response.published_version)}.0`}. Publique também o catálogo em Produtos.` : type === "pause" ? "Módulo pausado. O catálogo está pendente de republicação." : "Ação concluída.", "success"); } catch (error) { showMessage(error.message || "Não foi possível concluir a ação."); } });
+    $("#module-destructive-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!state.pending || !beginMutation()) return;
+        const { type, module } = state.pending;
+        const formData = new FormData(event.currentTarget);
+        const reason = formData.get("reason");
+        const needsReason = ["archive", "delete"].includes(type);
+        try {
+            const response = await api.request(type === "delete" ? `/backoffice/catalog/modules/${module.id}` : `/backoffice/catalog/modules/${module.id}/${type}`, { method: type === "delete" ? "DELETE" : "POST", body: type === "publish" ? { release_type: formData.get("release_type") } : needsReason ? { reason } : undefined });
+            if (!alive()) { mutation.confirmedStale = true; mutation.uncertain = true; notifyMutation(); return; }
+            destructiveModal?.hide(); state.pending = null; const refreshed = await load();
+            if (!refreshed) { mutation.confirmedStale = true; mutation.uncertain = true; notifyMutation(); return; }
+            if (alive()) showMessage(type === "publish" ? `Módulo publicado na versão ${response.release_version || `v${Number(response.published_version)}.0`}. Publique também o catálogo em Produtos.` : type === "pause" ? "Módulo pausado. O catálogo está pendente de republicação." : "Ação concluída.", "success");
+        } catch (error) { mutationError(error, "Não foi possível concluir a ação."); } finally { finishMutation(); }
+    });
 
     await load();
+    if (alive()) onMutationChange();
     return () => {
+        disposed = true;
+        document.removeEventListener("keydown", onEscape);
+        $("#module-new").removeEventListener("fs:hide", invalidateDrawer);
+        mutation.listeners.delete(onMutationChange);
         personalizationsDrawer?.dispose?.();
         destructiveModal?.dispose?.();
         drawer.dispose();
