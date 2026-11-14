@@ -3,6 +3,9 @@
 use App\Http\Controllers\Api\ProductInterestController;
 use App\Mail\ProductInterestNotification;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Database\Connection;
+use Illuminate\Database\MySqlConnection;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +26,26 @@ if (getenv('FOKUS_INTEREST_INDEX_DISPOSABLE') !== '1' || getenv('APP_ENV') !== '
     throw new RuntimeException('refuse non-disposable context');
 }
 require $root.'/vendor/autoload.php';
+// Capture the database error before Laravel's transaction retry consumes it.
+// QueryExecuted/DB::listen is not emitted for a statement that throws.
+class DeadlockObservedConnection extends MySqlConnection
+{
+    public static string $evidencePath;
+
+    protected function runQueryCallback($query, $bindings, Closure $callback)
+    {
+        try {
+            return parent::runQueryCallback($query, $bindings, $callback);
+        } catch (QueryException $error) {
+            $previous = $error->getPrevious();
+            if ($previous instanceof PDOException && ($previous->errorInfo[1] ?? null) === 1213) {
+                $kind = strtok(strtolower(ltrim($query)), ' ');
+                file_put_contents(self::$evidencePath, "mysql-deadlock-1213 $kind\n", FILE_APPEND | LOCK_EX);
+            }
+            throw $error;
+        }
+    }
+}
 $app = require $root.'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 set_exception_handler(function (Throwable $error): void {
@@ -58,13 +81,19 @@ try {
             if ($pid === 0) {
                 try {
                     DB::purge();
+                    DeadlockObservedConnection::$evidencePath = "$dir/$actor-deadlocks";
+                    Connection::resolverFor('mysql', fn ($connection, $database, $prefix, $config) => new DeadlockObservedConnection($connection, $database, $prefix, $config));
                     Mail::fake();
                     $attempts = 0;
+                    DB::connection()->beforeExecuting(function ($query, $bindings) use ($actor, $dir, $ids): void {
+                        if (str_starts_with(strtolower($query), 'delete from `interest_product_index`') && ($bindings[0] ?? null) === $ids[$actor === 'backfill' ? 0 : 1]) {
+                            file_put_contents("$dir/$actor-attempts", "attempt\n", FILE_APPEND | LOCK_EX);
+                        }
+                    });
                     DB::listen(function ($query) use ($actor, $victim, $dir, $ids, $ballast, &$attempts): void {
                         if (! str_starts_with(strtolower($query->sql), 'delete from `interest_product_index`') || ($query->bindings[0] ?? null) !== $ids[$actor === 'backfill' ? 0 : 1]) {
                             return;
                         }
-                        file_put_contents("$dir/$actor-attempts", "attempt\n", FILE_APPEND);
                         if (++$attempts !== 1) {
                             return;
                         }
@@ -124,8 +153,12 @@ try {
         }
         DB::purge();
         $attempts = count(file("$dir/$victim-attempts", FILE_IGNORE_NEW_LINES));
-        if ($attempts < 2) {
-            throw new RuntimeException("expected $victim to retry after collision");
+        $other = $victim === 'writer' ? 'backfill' : 'writer';
+        $victimErrors = is_file("$dir/$victim-deadlocks") ? file("$dir/$victim-deadlocks", FILE_IGNORE_NEW_LINES) : [];
+        $victimDeadlocks = count($victimErrors);
+        $otherDeadlocks = is_file("$dir/$other-deadlocks") ? count(file("$dir/$other-deadlocks", FILE_IGNORE_NEW_LINES)) : 0;
+        if ($attempts < 2 || $victimDeadlocks !== 1 || $otherDeadlocks !== 0) {
+            throw new RuntimeException("expected $victim deadlock 1213 and retry; victim attempts=$attempts victim deadlocks=$victimDeadlocks other deadlocks=$otherDeadlocks");
         }
         foreach ($ids as $i => $id) {
             $row = DB::table('product_interests')->where('id', $id)->first();
@@ -137,10 +170,13 @@ try {
         if (DB::table('product_interests')->where('email', "qa-deadlock-1-$run@example.test")->count() !== 1 || ! DB::table('interest_product_index_state')->where('id', 1)->where('ready', true)->where('running', false)->exists()) {
             throw new RuntimeException('duplicate record or invalid state');
         }
-        echo "$victim retry, count, notification and index passed\n";
+        echo "$victim: {$victimErrors[0]} other deadlocks=$otherDeadlocks attempts=$attempts; count, notification and index passed\n";
         foreach (['backfill', 'writer'] as $actor) {
             unlink("$dir/$actor-attempts");
             unlink("$dir/$actor-ready");
+            if (is_file("$dir/$actor-deadlocks")) {
+                unlink("$dir/$actor-deadlocks");
+            }
         }
     }
 } finally {
