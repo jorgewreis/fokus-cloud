@@ -6,6 +6,7 @@ use App\Services\CompanyIdempotencyAuthorization;
 use App\Services\CompanyIdempotencyKeys;
 use App\Services\CompanyIdempotencyStore;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use RuntimeException;
@@ -47,7 +48,7 @@ class CompanyIdempotencyStoreTest extends TestCase
     public function test_completed_request_replays_without_repeating_the_mutation(): void
     {
         $store = $this->store();
-        $token = $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
+        $token = $store->issue('admin-a', 'company.create', 600);
         $payload = ['legal_name' => 'Synthetic'];
         self::assertNull($store->bind($token, 'admin-a', 'company.create', null, $payload, now()->getTimestamp()));
         $writer = function (): array {
@@ -67,7 +68,7 @@ class CompanyIdempotencyStoreTest extends TestCase
     public function test_changed_payload_is_rejected_before_mutation(): void
     {
         $store = $this->store();
-        $token = $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
+        $token = $store->issue('admin-a', 'company.create', 600);
         $store->bind($token, 'admin-a', 'company.create', null, ['name' => 'A'], now()->getTimestamp());
         try {
             $store->bind($token, 'admin-a', 'company.create', null, ['name' => 'B'], now()->getTimestamp());
@@ -81,7 +82,7 @@ class CompanyIdempotencyStoreTest extends TestCase
     public function test_mutation_and_completion_roll_back_together(): void
     {
         $store = $this->store();
-        $token = $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
+        $token = $store->issue('admin-a', 'company.create', 600);
         $store->bind($token, 'admin-a', 'company.create', null, [], now()->getTimestamp());
         try {
             $store->complete($token, 'admin-a', 'company.create', null, [], function (): array {
@@ -99,7 +100,7 @@ class CompanyIdempotencyStoreTest extends TestCase
     public function test_revocation_and_status_are_serialized_and_audited_once(): void
     {
         $store = $this->store();
-        $token = $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
+        $token = $store->issue('admin-a', 'company.create', 600);
         self::assertSame(['state' => 'issued', 'revoked' => false], $store->status($token, 'admin-a', 'company.create', now()->getTimestamp()));
         $store->bind($token, 'admin-a', 'company.create', null, [], now()->getTimestamp());
         self::assertSame(['state' => 'observed', 'revoked' => false], $store->status($token, 'admin-a', 'company.create', now()->getTimestamp()));
@@ -121,7 +122,7 @@ class CompanyIdempotencyStoreTest extends TestCase
     public function test_fresh_authorization_is_required_even_for_replay(): void
     {
         $store = $this->store();
-        $token = $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
+        $token = $store->issue('admin-a', 'company.create', 600);
         $store->bind($token, 'admin-a', 'company.create', null, [], now()->getTimestamp());
         $store->complete($token, 'admin-a', 'company.create', null, [], fn () => ['id' => 'EMP-synthetic', 'status' => 201]);
         DB::table('platform_role_permissions')->delete();
@@ -136,7 +137,7 @@ class CompanyIdempotencyStoreTest extends TestCase
     public function test_revocation_audit_failure_rolls_back_the_revocation(): void
     {
         $store = $this->store();
-        $token = $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
+        $token = $store->issue('admin-a', 'company.create', 600);
         try {
             $store->revoke($token, 'admin-a', 'company.create', now()->getTimestamp(), function (): void {
                 throw new RuntimeException('Synthetic audit failure');
@@ -151,7 +152,7 @@ class CompanyIdempotencyStoreTest extends TestCase
     public function test_lost_record_is_reported_absent_without_inferring_outcome(): void
     {
         $store = $this->store();
-        $token = $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
+        $token = $store->issue('admin-a', 'company.create', 600);
         DB::table('company_idempotency_requests')->delete();
         self::assertSame(['state' => 'absent', 'revoked' => null], $store->status($token, 'admin-a', 'company.create', now()->getTimestamp()));
         try {
@@ -165,22 +166,62 @@ class CompanyIdempotencyStoreTest extends TestCase
     public function test_issue_rechecks_permission_and_enforces_outstanding_quota(): void
     {
         $keys = new CompanyIdempotencyKeys(['synthetic' => base64_encode(str_repeat('x', 32))], 'synthetic', []);
-        $store = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, 1);
-        $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
+        $store = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, 1, 50, 3600);
+        $store->issue('admin-a', 'company.create', 600);
         try {
-            $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
+            $store->issue('admin-a', 'company.create', 600);
             self::fail('Quota must reject a second outstanding issuance.');
         } catch (HttpException $e) {
             self::assertSame(429, $e->getStatusCode());
         }
         DB::table('platform_role_permissions')->delete();
         try {
-            $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
+            $store->issue('admin-a', 'company.create', 600);
             self::fail('Issue must recheck permission.');
         } catch (HttpException $e) {
             self::assertSame(403, $e->getStatusCode());
         }
         self::assertSame(1, DB::table('company_idempotency_requests')->count());
+    }
+
+    public function test_window_counts_completed_revoked_and_expired_issuances_without_deleting_them(): void
+    {
+        $start = Carbon::parse('2026-01-01 00:00:00', 'UTC');
+        Carbon::setTestNow($start);
+        try {
+            $keys = new CompanyIdempotencyKeys(['synthetic' => base64_encode(str_repeat('x', 32))], 'synthetic', []);
+            $store = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, 5, 3, 60);
+            $store->issue('admin-a', 'company.create', 1);
+            $completed = $store->issue('admin-a', 'company.create', 600);
+            $store->bind($completed, 'admin-a', 'company.create', null, [], now()->getTimestamp());
+            $store->complete($completed, 'admin-a', 'company.create', null, [], fn () => ['id' => 'EMP-synthetic', 'status' => 201]);
+            $revoked = $store->issue('admin-a', 'company.create', 600);
+            $store->revoke($revoked, 'admin-a', 'company.create', now()->getTimestamp(), fn () => null);
+            Carbon::setTestNow($start->copy()->addSeconds(2));
+            try {
+                $store->issue('admin-a', 'company.create', 600);
+                self::fail('Past completions, revocations and expiry must consume the window.');
+            } catch (HttpException $e) {
+                self::assertSame(429, $e->getStatusCode());
+            }
+            Carbon::setTestNow($start->copy()->addSeconds(61));
+            $store->issue('admin-a', 'company.create', 600);
+            self::assertSame(4, DB::table('company_idempotency_requests')->count());
+            self::assertSame(1, DB::table('company_idempotency_requests')->where('state', 'completed')->count());
+            self::assertSame(1, DB::table('company_idempotency_requests')->where('revoked', true)->count());
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_issuance_window_is_scoped_to_the_authenticated_actor(): void
+    {
+        DB::table('platform_admins')->insert(['id' => 'admin-b', 'status' => 'ativo', 'platform_role_id' => 'role-a']);
+        $keys = new CompanyIdempotencyKeys(['synthetic' => base64_encode(str_repeat('x', 32))], 'synthetic', []);
+        $store = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, 5, 1, 60);
+        $store->issue('admin-a', 'company.create', 600);
+        $store->issue('admin-b', 'company.create', 600);
+        self::assertSame(2, DB::table('company_idempotency_requests')->count());
     }
 
     public function test_migration_down_fails_closed_even_when_table_is_empty(): void
@@ -197,6 +238,6 @@ class CompanyIdempotencyStoreTest extends TestCase
 
     private function store(): CompanyIdempotencyStore
     {
-        return new CompanyIdempotencyStore(new CompanyIdempotencyKeys(['synthetic' => base64_encode(str_repeat('x', 32))], 'synthetic', []), new CompanyIdempotencyAuthorization, 5);
+        return new CompanyIdempotencyStore(new CompanyIdempotencyKeys(['synthetic' => base64_encode(str_repeat('x', 32))], 'synthetic', []), new CompanyIdempotencyAuthorization, 5, 50, 3600);
     }
 }
