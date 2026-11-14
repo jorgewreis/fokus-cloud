@@ -55,6 +55,25 @@ try:
  blocked2=wait_for_lock(second2);query('KILL CONNECTION '+str(cid2)+';');first2.stdin.close();second2.wait(timeout=10);out2=second2.stdout.read().strip();err2=second2.stderr.read();first2.wait(timeout=10);stored2=query("SELECT CONCAT(request_mac,':',company_id) FROM idemtest.operations WHERE admin_id='admin1' AND key_hash='"+key2+"'; SELECT COUNT(*) FROM idemtest.companies;")
  result['connection_killed']={'second_waited':blocked2,'first_rc':first2.returncode,'second_rc':second2.returncode,'second_result':out2,'stored':stored2}
  if not(blocked2 and second2.returncode==0 and out2=='RECOVERED' and stored2==mac+':company2\n2'):raise RuntimeError('recovery invariant failed: '+err2[-400:])
+ query('ALTER TABLE idemtest.operations ADD COLUMN revoked BOOLEAN NOT NULL DEFAULT 0;')
+ key3='d'*64
+ query("INSERT INTO idemtest.operations (admin_id,key_hash,request_mac) VALUES ('admin1','"+key3+"','"+mac+"');")
+ first3,_=start("START TRANSACTION; INSERT INTO idemtest.companies VALUES('company3','doc3'); UPDATE idemtest.operations SET company_id='company3' WHERE admin_id='admin1' AND key_hash='"+key3+"';")
+ revoke=contender("START TRANSACTION; UPDATE idemtest.operations SET revoked=1 WHERE admin_id='admin1' AND key_hash='"+key3+"'; COMMIT; SELECT 'REVOKED';")
+ blocked3=wait_for_lock(revoke)
+ first3.stdin.write("COMMIT; SELECT 'COMMITTED';\n");first3.stdin.flush();marker3=first3.stdout.readline().strip();first3.stdin.close();first3.wait(timeout=10);revoke.wait(timeout=10)
+ revokeout=revoke.stdout.read().strip();state3=query("SELECT CONCAT(company_id,':',revoked) FROM idemtest.operations WHERE admin_id='admin1' AND key_hash='"+key3+"'; SELECT COUNT(*) FROM idemtest.companies WHERE id='company3';")
+ result['mutation_before_revocation']={'revocation_waited':blocked3,'first_marker':marker3,'revocation_result':revokeout,'stored':state3}
+ if not(blocked3 and marker3=='COMMITTED' and revoke.returncode==0 and revokeout=='REVOKED' and state3=='company3:1\n1'):raise RuntimeError('mutation-before-revocation invariant failed')
+ key4='e'*64
+ query("INSERT INTO idemtest.operations (admin_id,key_hash,request_mac) VALUES ('admin1','"+key4+"','"+mac+"');")
+ first4,_=start("START TRANSACTION; UPDATE idemtest.operations SET revoked=1 WHERE admin_id='admin1' AND key_hash='"+key4+"';")
+ mutation=contender("START TRANSACTION; INSERT INTO idemtest.companies (id,document_ref) SELECT 'company4','doc4' FROM idemtest.operations WHERE admin_id='admin1' AND key_hash='"+key4+"' AND revoked=0; SELECT ROW_COUNT(); COMMIT;")
+ blocked4=wait_for_lock(mutation)
+ first4.stdin.write("COMMIT; SELECT 'REVOKED';\n");first4.stdin.flush();marker4=first4.stdout.readline().strip();first4.stdin.close();first4.wait(timeout=10);mutation.wait(timeout=10)
+ mutationout=mutation.stdout.read().strip();state4=query("SELECT COUNT(*) FROM idemtest.companies WHERE id='company4';")
+ result['revocation_before_mutation']={'mutation_waited':blocked4,'revocation_marker':marker4,'inserted_rows':mutationout,'company_count':state4}
+ if not(blocked4 and marker4=='REVOKED' and mutation.returncode==0 and mutationout=='0' and state4=='0'):raise RuntimeError('revocation-before-mutation invariant failed')
  print(json.dumps(result,ensure_ascii=False))
 finally:
  if created:
