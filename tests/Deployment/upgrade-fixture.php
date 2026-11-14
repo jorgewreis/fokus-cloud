@@ -19,9 +19,29 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 
 // Synthetic fixtures/assertions for disposable SQLite or loopback CI MySQL only.
-$root = $argv[1];
-$mode = $argv[2];
+$root = $argv[1] ?? '';
+$mode = $argv[2] ?? '';
 $qa = getenv('UPGRADE_SANDBOX');
+$driver = getenv('DB_CONNECTION');
+$url = getenv('DB_URL');
+$socket = getenv('DB_SOCKET');
+$port = getenv('DB_PORT');
+$database = getenv('DB_DATABASE');
+$sandboxPath = is_string($qa) ? realpath($qa) : false;
+$sqlitePath = $sandboxPath === false ? false : realpath($sandboxPath.'/upgrade.sqlite');
+$validSqlite = $driver === 'sqlite' && $sqlitePath !== false && dirname($sqlitePath) === $sandboxPath
+    && is_string($database) && realpath($database) === $sqlitePath;
+$validMysql = $driver === 'mysql' && getenv('DB_HOST') === '127.0.0.1'
+    && is_string($database) && preg_match('/^fokus_upgrade_[a-f0-9]{16}$/D', $database) === 1
+    && ($port === false || $port === '' || $port === '3306');
+if (getenv('APP_ENV') !== 'testing' || getenv('RELEASE_DISPOSABLE_TESTS') !== '1'
+    || $sandboxPath === false || ! is_file($sandboxPath.'/.disposable-upgrade')
+    || ($url !== false && $url !== '') || ($socket !== false && $socket !== '')
+    || ($port !== false && $port !== '' && $port !== '3306')
+    || (! $validSqlite && ! $validMysql) || is_file($root.'/.env')
+    || is_file($root.'/.env.testing') || is_file($root.'/bootstrap/cache/config.php')) {
+    throw new RuntimeException('refuse non-disposable upgrade fixture');
+}
 require $root.'/vendor/autoload.php';
 $app = require $root.'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
@@ -37,8 +57,15 @@ function check($condition, $label)
     }echo "PASS $label\n";
 }
 check(getenv('APP_ENV') === 'testing' && is_file($qa.'/.disposable-upgrade'), 'disposable marker');
-$driver = config('database.default');
-check(($driver === 'sqlite' && config('database.connections.sqlite.database') === $qa.'/upgrade.sqlite') || ($driver === 'mysql' && config('database.connections.mysql.host') === '127.0.0.1' && preg_match('/^fokus_upgrade_[a-f0-9]{16}$/', config('database.connections.mysql.database'))), 'guard: disposable database');
+$connection = DB::connection()->getConfig();
+$effectiveDriver = config('database.default');
+$effectiveSqlite = $effectiveDriver === 'sqlite' && ($connection['driver'] ?? null) === 'sqlite'
+    && realpath((string) ($connection['database'] ?? '')) === $sqlitePath;
+$effectiveMysql = $effectiveDriver === 'mysql' && ($connection['driver'] ?? null) === 'mysql'
+    && ($connection['host'] ?? null) === '127.0.0.1' && (string) ($connection['port'] ?? '') === '3306'
+    && ($connection['database'] ?? null) === $database && in_array($connection['unix_socket'] ?? null, [null, ''], true);
+check(in_array($connection['url'] ?? null, [null, ''], true) && empty($connection['read']) && empty($connection['write'])
+    && (($validSqlite && $effectiveSqlite) || ($validMysql && $effectiveMysql)), 'guard: disposable database');
 if ($mode === 'versions') {
     echo json_encode(['php' => PHP_VERSION, 'database' => $driver === 'sqlite' ? DB::selectOne('select sqlite_version() as version')->version : DB::selectOne('select version() as version')->version]).PHP_EOL;
     exit;
