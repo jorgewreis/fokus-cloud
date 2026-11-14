@@ -23,10 +23,13 @@ let restoreGeneration = 0;
 window.addEventListener("pagehide", (event) => {
     if (!event.persisted) { resetOperationState(); return; }
     const html = document.documentElement;
-    html.dataset.companyRestoreVisibility = html.style.visibility;
-    html.dataset.companyRestoreInert = html.inert ? "1" : "0";
+    if (!html.hasAttribute("data-company-restore-visibility")) {
+        html.dataset.companyRestoreVisibility = html.style.visibility;
+        html.dataset.companyRestoreInert = html.inert ? "1" : "0";
+    }
     html.inert = true;
     html.style.visibility = "hidden";
+    window.dispatchEvent(new Event("fokus:backoffice-suspend"));
     restoreGeneration++;
     finishRestore?.(false);
     restoreBarrier = new Promise((resolve) => { finishRestore = resolve; });
@@ -37,13 +40,33 @@ window.addEventListener("pageshow", async (event) => {
     const original = window.__backofficeAdmin;
     const snapshot = (admin) => JSON.stringify({ id: String(admin?.id || ""), role: admin?.role || "", permissions: [...(admin?.permissions || [])].sort() });
     let verified = false;
+    let restoredAdmin;
     try {
         const response = await Promise.race([
             window.FokusApi.request("/backoffice/auth/me"),
             new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 10000)),
         ]);
         verified = Boolean(original?.id && response?.admin?.id && snapshot(original) === snapshot(response.admin));
+        restoredAdmin = response?.admin;
     } catch (_) { /* Fail closed when identity cannot be verified. */ }
+    if (generation !== restoreGeneration) return;
+    if (verified) {
+        try {
+            const router = window.__backofficeRouter;
+            if (!router?.navigate || !router?.pageFromLocation) throw new Error("router indisponível");
+            // A matching account is not proof that the browser restored the
+            // same login session. Discard prior rendered data and old notices;
+            // only the opaque in-flight guard survives until its outcome.
+            previousOperations.clear();
+            router.admin = restoredAdmin;
+            window.__backofficeAdmin = restoredAdmin;
+            window.dispatchEvent(new CustomEvent("fokus:backoffice-revalidated", { detail: restoredAdmin }));
+            await Promise.race([
+                router.navigate(router.pageFromLocation(), { history: false }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 10000)),
+            ]);
+        } catch (_) { verified = false; }
+    }
     if (generation !== restoreGeneration) return;
     if (!verified) {
         resetOperationState();

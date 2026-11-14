@@ -23,12 +23,28 @@ test('resultado de envio após restauração exige conferência sem reenviar', a
     await page.locator('#company-form-submit').click();
     await started;
     await page.evaluate(() => {
+        document.querySelector('[data-backoffice-mount]').dataset.oldSessionSentinel = 'antigo';
+        document.querySelector('.admin-global-search input').value = 'registro antigo';
+        const results = document.querySelector('#admin-global-search-results');
+        results.textContent = 'resultado antigo';
+        results.hidden = false;
+        document.querySelector('#admin-header-toast-content').textContent = 'aviso antigo';
+    });
+    await page.evaluate(() => {
         window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
         window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
     });
     await expect(page.locator('html')).not.toHaveAttribute('inert', '');
+    await expect(page.locator('[data-backoffice-mount]')).not.toHaveAttribute('data-old-session-sentinel', 'antigo');
+    await expect(page.locator('#company-drawer')).toBeHidden();
+    await expect(page.locator('.admin-global-search input')).toHaveValue('');
+    await expect(page.locator('#admin-global-search-results')).toBeHidden();
+    await expect(page.locator('#admin-global-search-results')).toBeEmpty();
+    await expect(page.locator('#admin-header-toast-content')).toBeEmpty();
     releasePost();
-    await expect(page.locator('#company-operation-drawer-status')).toContainText('Não foi possível confirmar');
+    await expect(page.locator('#company-operation-page-status')).toContainText('Não foi possível confirmar');
+    await page.locator('#company-create').click();
+    await page.locator('#company-form').evaluate((form) => { form.noValidate = true; });
     await page.locator('#company-form-submit').click();
     await expect(page.locator('#company-form-error')).toContainText('Confira a lista');
     expect(posts).toBe(1);
@@ -97,4 +113,16 @@ test('falha de autenticação não revela a tela restaurada', async ({ page }) =
     await expect.poll(() => calls).toBeGreaterThanOrEqual(2);
     await expect(page.locator('#company-create')).toHaveCount(0);
     releaseReload();
+});
+
+test('suspensões sucessivas não mantêm a interface oculta após confirmação', async ({ page }) => {
+    await page.goto('/backoffice/empresas');
+    await expect(page.locator('#company-create')).toBeVisible();
+    await page.evaluate(() => {
+        window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+        window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+        window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+    });
+    await expect(page.locator('#company-create')).toBeVisible();
+    await expect(page.locator('html')).not.toHaveAttribute('inert', '');
 });

@@ -630,17 +630,20 @@
             };
             const adminHeaderSearch = document.querySelector(".admin-global-search input");
             let adminHeaderSearchTimer;
+            let adminHeaderGeneration = 0;
             const adminHeaderLoadSearch = async (value) => {
+                const generation = adminHeaderGeneration;
                 const query = value.trim();
                 const panel = document.querySelector("#admin-global-search-results");
                 if (!query) { panel.hidden = true; return; }
                 try {
                     const response = await FokusApi.request(`/backoffice/search?q=${encodeURIComponent(query)}`);
+                    if (generation !== adminHeaderGeneration) return;
                     const groups = response.groups || [];
                     const items = groups.flatMap((group) => group.items || []);
                     panel.innerHTML = items.length ? groups.filter((group) => group.items?.length).map((group) => `<section><strong>${adminHeaderEscape(group.label)}</strong>${group.items.map((item) => `<a href="${adminHeaderEscape(item.href || "#")}"><span>${adminHeaderEscape(item.title)}</span><small>${adminHeaderEscape(item.subtitle || "")}</small></a>`).join("")}</section>`).join("") : '<p class="admin-global-search-empty">Nenhum resultado encontrado.</p>';
                     panel.hidden = false;
-                } catch { panel.hidden = true; }
+                } catch { if (generation === adminHeaderGeneration) panel.hidden = true; }
             };
             adminHeaderSearch.addEventListener("input", (event) => { window.clearTimeout(adminHeaderSearchTimer); adminHeaderSearchTimer = window.setTimeout(() => adminHeaderLoadSearch(event.target.value), 220); });
             adminHeaderSearch.addEventListener("keydown", (event) => { if (event.key === "Escape") { adminHeaderSearch.value = ""; document.querySelector("#admin-global-search-results").hidden = true; } });
@@ -665,11 +668,33 @@
             });
             window.__adminHeaderReady = true;
             const loadAdminHeaderData = async () => {
+                const generation = adminHeaderGeneration;
                 const response = await FokusApi.request("/backoffice/dashboard");
+                if (generation !== adminHeaderGeneration) return;
                 adminHeaderSetUser(response.user);
                 window.__adminHeaderNotifications = response.alerts || [];
                 document.querySelector(".admin-notifications-button").classList.toggle("has-notifications", window.__adminHeaderNotifications.length > 0);
             };
+            window.addEventListener("fokus:backoffice-suspend", () => {
+                adminHeaderGeneration++;
+                window.clearTimeout(adminHeaderSearchTimer);
+                adminHeaderSearch.value = "";
+                const results = document.querySelector("#admin-global-search-results");
+                results.replaceChildren();
+                results.hidden = true;
+                window.__adminHeaderNotifications = [];
+                document.querySelector(".admin-notifications-button").classList.remove("has-notifications");
+                const toast = document.querySelector("#admin-header-toast");
+                toast.hidden = true;
+                toast.classList.remove("is-visible");
+                document.querySelector("#admin-header-toast-content").replaceChildren();
+                adminHeaderUserMenu.hidden = true;
+                adminHeaderUserDetails.setAttribute("aria-expanded", "false");
+            });
+            window.addEventListener("fokus:backoffice-revalidated", (event) => {
+                adminHeaderSetUser(event.detail);
+                loadAdminHeaderData().catch(() => {});
+            });
 
             sidebarButtons.forEach((button) => {
                 if (button.classList.contains("sidebar-group-toggle")) {
