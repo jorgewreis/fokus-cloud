@@ -2013,6 +2013,11 @@ html[data-role="admin"] .fs-sidebar .sidebar-subnav-button {
 }
 
 /* Keep record search inputs within their filter card on narrow screens. */
+html[data-role="admin"] .fs-sidebar .sidebar-button:focus-visible {
+    outline: 3px solid #f6b600 !important;
+    outline-offset: -3px !important;
+}
+
 @media (max-width: 680px) {
     html[data-role="admin"] .backoffice-records-page .fs-filter-form :is(label[for="company-query"], label[for="product-search"], label[for="module-query"]) {
         width: 100%;
