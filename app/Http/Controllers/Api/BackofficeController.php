@@ -622,7 +622,7 @@ class BackofficeController extends Controller
         }
 
         $term = "%{$query}%";
-        $companies = DB::table('companies')
+        $companies = $request->user()->hasPermission('platform.companies.view') ? DB::table('companies')
             ->whereNull('deleted_at')
             ->where(fn ($builder) => $builder->where('legal_name', 'like', $term)->orWhere('document_number', 'like', $term))
             ->orderBy('legal_name')
@@ -632,9 +632,9 @@ class BackofficeController extends Controller
                 'title' => $company->legal_name,
                 'subtitle' => 'Empresa · '.strtoupper($company->status),
                 'href' => '/backoffice/empresas?q='.rawurlencode($company->legal_name),
-            ])->values();
+            ])->values() : collect();
 
-        $users = DB::table('users as user')
+        $users = $request->user()->hasPermission('platform.users.view') ? DB::table('users as user')
             ->leftJoin('company_memberships as membership', function ($join): void {
                 $join->on('membership.user_id', '=', 'user.id')->whereNull('membership.deleted_at')->whereIn('membership.status', ['ativo', 'pendente']);
             })
@@ -650,18 +650,18 @@ class BackofficeController extends Controller
                 'title' => $user->name,
                 'subtitle' => 'Usuário de empresa · '.$user->email,
                 'href' => '/backoffice/usuarios?q='.rawurlencode($user->name),
-            ])->values();
+            ])->values() : collect();
 
-        $internalUsers = DB::table('platform_admins as admin')
+        $internalUsers = $request->user()->hasPermission('platform.users.view') ? DB::table('platform_admins as admin')
             ->where(fn ($builder) => $builder->where('admin.name', 'like', $term)->orWhere('admin.email', 'like', $term))
             ->orderBy('admin.name')->limit(6)->get(['admin.id', 'admin.name', 'admin.email'])
             ->map(fn (object $user): array => [
                 'title' => $user->name,
                 'subtitle' => 'Conta interna Fokus Cloud · '.$user->email,
                 'href' => '/backoffice/usuarios?q='.rawurlencode($user->name),
-            ])->values();
+            ])->values() : collect();
 
-        $subscriptions = DB::table('subscriptions as subscription')
+        $subscriptions = $request->user()->hasPermission('platform.subscriptions.manage') ? DB::table('subscriptions as subscription')
             ->join('companies as company', 'company.id', '=', 'subscription.company_id')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->whereNull('company.deleted_at')
@@ -673,7 +673,7 @@ class BackofficeController extends Controller
                 'title' => $subscription->company_name,
                 'subtitle' => 'Assinatura · '.($subscription->product_name ?: 'Produto').' · '.$subscription->status,
                 'href' => '/backoffice/assinaturas?q='.rawurlencode($subscription->company_name),
-            ])->values();
+            ])->values() : collect();
 
         $audit->record($request->user()->id, 'backoffice.global_search', request: $request);
 
@@ -689,6 +689,11 @@ class BackofficeController extends Controller
         $entity = DB::table('companies')->where('id', $company)->first();
         abort_unless($entity, 404, 'Empresa não encontrada.');
         $audit->record($request->user()->id, 'backoffice.company_viewed', 'company', $company, $company, request: $request);
+        // The company drawer needs only the company record. Keep the existing
+        // expanded response for older consumers that do not request this view.
+        if ($request->query('view') === 'company') {
+            return response()->json(['company' => $this->companyDetailPayload($entity, $usage)]);
+        }
         $subscriptions = DB::table('subscriptions as subscription')->join('products as product', 'product.id', '=', 'subscription.product_id')->where('subscription.company_id', $company)->select('subscription.*', 'product.code as product_code', 'product.name as product_name')->orderByDesc('subscription.created_at')->get();
 
         return response()->json([
@@ -897,7 +902,7 @@ class BackofficeController extends Controller
 
     public function createRefund(Request $request, RefundManager $manager, PlatformAudit $audit)
     {
-        $data = $request->validate(['payment_id' => ['required', 'string'], 'amount' => ['required', 'numeric', 'gt:0'], 'allowed_case' => ['required', Rule::in(RefundManager::CASES)], 'reason' => ['required', 'string', 'max:1000']]);
+        $data = $request->validate(['payment_id' => ['required', 'string'], 'amount' => ['required', 'numeric', 'min:0.01', 'decimal:0,2'], 'allowed_case' => ['required', Rule::in(RefundManager::CASES)], 'reason' => ['required', 'string', 'max:1000']]);
         $refund = $manager->request($data, $request->user());
         $audit->record($request->user()->id, 'backoffice.refund_requested', 'refund_request', $refund->id, $refund->company_id, $data['reason'], after: ['status' => 'solicitado', 'amount' => $refund->amount], request: $request);
 
@@ -906,9 +911,17 @@ class BackofficeController extends Controller
 
     public function updateRefund(Request $request, string $refund, RefundManager $manager, PlatformAudit $audit, MercadoPagoClient $client)
     {
-        $data = $request->validate(['action' => ['required', Rule::in(['aprovar', 'recusar', 'executar'])], 'reason' => ['required', 'string', 'max:1000']]);
+        $data = $request->validate(['action' => ['required', Rule::in(['aprovar', 'recusar', 'executar', 'consultar'])], 'reason' => ['required', 'string', 'max:1000']]);
 
-        return response()->json($manager->payload($manager->action($refund, $data['action'], $data['reason'], $request->user(), $client, $audit)));
+        $result = $manager->action($refund, $data['action'], $data['reason'], $request->user(), $client, $audit);
+        $payload = $manager->payload($result);
+        if ($result->status === 'executando') {
+            $payload['message'] = 'O resultado do reembolso ainda não foi confirmado. Consulte o Mercado Pago antes de qualquer nova ação.';
+
+            return response()->json($payload, 202);
+        }
+
+        return response()->json($payload);
     }
 
     public function catalog(Request $request, CatalogManager $catalog)
@@ -1395,21 +1408,59 @@ class BackofficeController extends Controller
 
     public function vouchers(Request $request)
     {
-        $rows = DB::table('vouchers as voucher')
+        $perPage = min(max((int) $request->input('per_page', 20), 1), 100);
+        $query = DB::table('vouchers as voucher')
             ->leftJoin('products as product', 'product.id', '=', 'voucher.product_id')
             ->leftJoin('plans as plan', 'plan.id', '=', 'voucher.plan_id')
-            ->leftJoin('voucher_redemptions as redemption', 'redemption.voucher_id', '=', 'voucher.id')
-            ->groupBy('voucher.id', 'voucher.code', 'voucher.name', 'voucher.discount_type', 'voucher.discount_value', 'voucher.product_id', 'voucher.plan_id', 'voucher.base_amount', 'voucher.benefit_duration', 'voucher.module_codes', 'voucher.redemption_limit', 'voucher.redemption_limit_per_company', 'voucher.starts_at', 'voucher.ends_at', 'voucher.status', 'voucher.origin', 'voucher.notes', 'voucher.created_by_platform_admin_id', 'voucher.created_at', 'voucher.updated_at', 'product.name', 'plan.name')
-            ->select('voucher.*', 'product.name as product_name', 'plan.name as plan_name', DB::raw('count(redemption.id) as redemptions_count'))
-            ->orderByDesc('voucher.created_at')
-            ->limit(100)
-            ->get();
+            ->select('voucher.*', 'product.name as product_name', 'plan.name as plan_name')
+            ->selectSub(DB::table('voucher_redemptions')->selectRaw('count(*)')->whereColumn('voucher_id', 'voucher.id'), 'redemptions_count');
+        if ($request->filled('search')) {
+            $term = '%'.mb_strtolower(trim((string) $request->input('search'))).'%';
+            $query->where(function ($q) use ($term): void {
+                foreach (['voucher.code', 'voucher.name', 'voucher.origin', 'product.name', 'plan.name'] as $column) {
+                    $q->orWhereRaw("LOWER($column) LIKE ?", [$term]);
+                }
+            });
+        }
+        foreach (['product_id', 'discount_type'] as $filter) {
+            if ($request->filled($filter)) {
+                $query->where('voucher.'.$filter, $request->input($filter));
+            }
+        }
+        if ($request->filled('status')) {
+            $status = $request->input('status');
+            $query->where(function ($q) use ($status): void {
+                if ($status === 'expirada') {
+                    $q->whereNotNull('voucher.ends_at')->where('voucher.ends_at', '<', now());
+                } else {
+                    $q->where('voucher.status', $status)->where(function ($q): void {
+                        $q->whereNull('voucher.ends_at')->orWhere('voucher.ends_at', '>=', now());
+                    });
+                }
+            });
+        }
+        // Keep the original bounded array contract for older cached clients.
+        if (! $request->boolean('paginate')) {
+            $legacy = $query->orderByDesc('voucher.created_at')->orderByDesc('voucher.id')->limit(100)->get();
+            $legacy->transform(function ($voucher) {
+                $voucher->computed_status = $voucher->ends_at && now()->gt(\Illuminate\Support\Carbon::parse($voucher->ends_at)) ? 'expirada' : $voucher->status;
 
-        return response()->json($rows->map(function ($voucher) {
+                return $voucher;
+            });
+
+            return response()->json($legacy)->header('Deprecation', 'true');
+        }
+        $vouchers = $query->orderByDesc('voucher.created_at')->orderByDesc('voucher.id')->paginate($perPage);
+        $vouchers->getCollection()->transform(function ($voucher) {
             $voucher->computed_status = $voucher->ends_at && now()->gt(\Illuminate\Support\Carbon::parse($voucher->ends_at)) ? 'expirada' : $voucher->status;
 
             return $voucher;
-        }));
+        });
+
+        return response()->json(['data' => $vouchers->items(), 'meta' => [
+            'total' => $vouchers->total(), 'per_page' => $vouchers->perPage(),
+            'current_page' => $vouchers->currentPage(), 'last_page' => $vouchers->lastPage(),
+        ]]);
     }
 
     private function companyListPayload(object $row): array
@@ -2071,7 +2122,26 @@ class BackofficeController extends Controller
             $query->whereDate('event.created_at', '<=', $request->input('to'));
         }
 
-        $rows = $query->limit(2000)->get()->map(function (object $event): array {
+        if ($request->filled('status')) {
+            $status = (string) $request->input('status');
+            $query->where(function ($q) use ($status): void {
+                $q->where('event.metadata->status', $status)
+                    ->orWhere(function ($fallback) use ($status): void {
+                        $fallback->whereNull('event.metadata->status');
+                        if ($status === 'failed') {
+                            $fallback->where(function ($actions): void {
+                                $actions->where('event.action', 'like', '%failed%')->orWhere('event.action', 'like', '%locked%');
+                            });
+                        } elseif ($status === 'success') {
+                            $fallback->where('event.action', 'not like', '%failed%')->where('event.action', 'not like', '%locked%');
+                        } else {
+                            $fallback->whereRaw('1 = 0');
+                        }
+                    });
+            });
+        }
+        $events = $query->orderByDesc('event.id')->paginate($perPage, ['*'], 'page', $page);
+        $items = $events->getCollection()->map(function (object $event): array {
             $metadata = json_decode((string) $event->metadata, true) ?: [];
             $isCustomer = $event->actor_type === 'customer';
 
@@ -2079,23 +2149,15 @@ class BackofficeController extends Controller
                 'id' => $event->id,
                 'user' => $isCustomer ? ($event->customer_name ?: $metadata['user_name'] ?? 'Usuário não identificado') : ($event->admin_name ?: $metadata['user_name'] ?? 'Administrador não identificado'),
                 'email' => $isCustomer ? ($event->customer_email ?: $metadata['user_email'] ?? null) : ($event->admin_email ?: $metadata['user_email'] ?? null),
-                'user_type' => $isCustomer ? 'cliente' : 'interno',
-                'company' => $event->company_name,
-                'product' => $metadata['product_name'] ?? null,
-                'subscription_id' => $metadata['subscription_id'] ?? null,
+                'user_type' => $isCustomer ? 'cliente' : 'interno', 'company' => $event->company_name,
+                'product' => $metadata['product_name'] ?? null, 'subscription_id' => $metadata['subscription_id'] ?? null,
                 'event' => $event->action,
                 'status' => $metadata['status'] ?? (str_contains($event->action, 'failed') || str_contains($event->action, 'locked') ? 'failed' : 'success'),
-                'ip_address' => $event->ip_address,
-                'user_agent' => $event->user_agent,
+                'ip_address' => $event->ip_address, 'user_agent' => $event->user_agent,
                 'created_at' => Carbon::parse((string) $event->created_at, 'UTC')->setTimezone('America/Bahia')->toIso8601String(),
             ];
         });
-        if ($request->filled('status')) {
-            $rows = $rows->filter(fn (array $row): bool => $row['status'] === $request->input('status'))->values();
-        }
-        $total = $rows->count();
-        $items = $rows->forPage($page, $perPage)->values();
 
-        return response()->json(['data' => $items, 'meta' => ['total' => $total, 'per_page' => $perPage, 'current_page' => $page, 'last_page' => max((int) ceil($total / $perPage), 1), 'retention_days' => 30]]);
+        return response()->json(['data' => $items, 'meta' => ['total' => $events->total(), 'per_page' => $perPage, 'current_page' => $page, 'last_page' => $events->lastPage(), 'retention_days' => 30]]);
     }
 }

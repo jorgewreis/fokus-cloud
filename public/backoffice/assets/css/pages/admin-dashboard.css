@@ -1982,3 +1982,77 @@ html[data-role="admin"] .fs-sidebar .sidebar-subnav-button {
     .admin-final-dashboard .admin-quick-actions-grid { grid-template-columns: minmax(0, 1fr); }
     .admin-final-dashboard .admin-table-footer { align-items: flex-start; flex-direction: column; padding: 12px 16px; }
 }
+
+/* Keep the mobile launcher in the header so it never covers page content. */
+@media (max-width: 700px) {
+    html[data-role="admin"] .fs-sidebar.single {
+        position: fixed !important;
+        top: 10px !important;
+        left: 8px !important;
+    }
+    html[data-role="admin"] .fs-sidebar.single .mobile-sidebar-toggle {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+    }
+    .admin-final-dashboard .admin-final-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        padding-left: 72px !important;
+        grid-template-columns: minmax(0, 1fr) auto !important;
+    }
+    .admin-final-dashboard .admin-header-user { gap: 6px; }
+    .admin-final-dashboard .admin-user-avatar { flex: 0 0 36px; }
+    .admin-final-dashboard .admin-user-details { min-width: 0; }
+    .admin-final-dashboard .admin-user-details strong,
+    .admin-final-dashboard .admin-user-details span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}
+
+/* Keep record search inputs within their filter card on narrow screens. */
+html[data-role="admin"] .fs-sidebar .sidebar-button:focus-visible {
+    outline: 3px solid #f6b600 !important;
+    outline-offset: -3px !important;
+}
+
+@media (max-width: 680px) {
+    html[data-role="admin"] .backoffice-records-page .fs-filter-form :is(label[for="company-query"], label[for="product-search"], label[for="module-query"], label[for="plan-search"], label[for="users-query"]) {
+        width: 100%;
+        min-width: 0;
+        flex: 0 1 100%;
+    }
+    html[data-role="admin"] .backoffice-records-page .fs-filter-form :is(label[for="company-query"], label[for="product-search"], label[for="module-query"], label[for="plan-search"]) .fs-input-group-subtle {
+        width: 100%;
+        min-width: 0;
+    }
+    html[data-role="admin"] .backoffice-records-page .fs-filter-form :is(#company-query, #product-search, #module-query, #plan-search, #users-query) {
+        width: 100% !important;
+        min-width: 0;
+        flex: 1 1 0;
+    }
+}
+
+/* Keep financial and voucher filters inside mobile cards. */
+@media (max-width: 680px) {
+    html[data-role="admin"] .backoffice-records-page :is(#billing-payments-panel, #billing-reconciliation-panel, #billing-refunds-panel) {
+        min-width: 0;
+        max-width: 100%;
+    }
+    html[data-role="admin"] .backoffice-records-page :is(#billing-payments-filter-form, #billing-reconciliation-filter-form, #billing-refunds-filter-form, #voucher-filter-form) .fs-form-label {
+        min-width: 0;
+        width: 100%;
+        flex: 0 1 100%;
+    }
+    html[data-role="admin"] .backoffice-records-page :is(#billing-payments-filter-form, #billing-reconciliation-filter-form, #billing-refunds-filter-form, #voucher-filter-form) :is(.fs-input-group-subtle, .fs-form-control, .fs-form-select) {
+        box-sizing: border-box;
+        min-width: 0;
+        width: 100%;
+        max-width: 100%;
+    }
+    html[data-role="admin"] .backoffice-records-page #voucher-filter-form .fs-input-group-subtle > .fs-form-control {
+        flex: 1 1 0;
+    }
+}

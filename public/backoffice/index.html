@@ -19,7 +19,7 @@
         <!-- IMPORT CSS -->
         <link
             rel="stylesheet"
-            href="/backoffice/assets/css/main.css?v=20261008-primary-outline-buttons-v1"
+            href="/backoffice/assets/css/main.css?v=20261113-page-mount-v1"
         />
         <link
             rel="stylesheet"
@@ -27,7 +27,7 @@
         />
         <link
             rel="stylesheet"
-            href="/backoffice/assets/css/pages/admin-dashboard.css?v=20261106-sidebar-button-reset-v2"
+            href="/backoffice/assets/css/pages/admin-dashboard.css?v=20261114-filter-search-v2"
         />
         <link
             rel="stylesheet"
@@ -37,12 +37,12 @@
     <body>
         <script src="/assets/js/api-client.js?v=20260828-19"></script>
         <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script>
-        <script src="/backoffice/assets/js/toast-notifications.js?v=20260922-backoffice-toast-v2"></script>
+        <script src="/backoffice/assets/js/toast-notifications.js?v=20261114-session-reset-v1"></script>
         <script src="/backoffice/assets/js/form-system.js?v=20260928-minimum-loading-state-v1"></script>
         <script src="/assets/js/brazilian-documents.js?v=20260930-document-validation-v1"></script>
         <script src="/backoffice/assets/js/currency-input.js?v=20260902-currency-prefix-fix"></script>
-        <script src="/backoffice/assets/js/records-page.js?v=20260922-records-nested-drawer-v5"></script>
-        <script src="/backoffice/assets/js/backoffice-router.js?v=20261003-custom-subscription-v2"></script>
+        <script src="/backoffice/assets/js/records-page.js?v=20261113-page-owner-v1"></script>
+        <script src="/backoffice/assets/js/backoffice-router.js?v=20261114-users-race-v1"></script>
         <template id="backoffice-app-template">
         <div class="container-page expanded">
             <div class="fs-sidebar expanded" id="sidebar">
@@ -71,7 +71,7 @@
                     <button
                         class="sidebar-button active"
                         type="button"
-                        data-sidebar-item="platform-dashboard-final"
+                        data-sidebar-item="platform-dashboard-final" aria-label="Dashboard"
                     >
                         <img
                             src="/backoffice/assets/icons/Layout-Dashboard--Streamline-Ultimate.png?v=20260915-sidebar-icons-v2"
@@ -83,7 +83,7 @@
                     <button
                         class="sidebar-button"
                         type="button"
-                        data-sidebar-item="companies"
+                        data-sidebar-item="companies" aria-label="Empresas"
                     >
                         <img
                             src="/backoffice/assets/icons/Small-Office-Tall-Building--Streamline-Ultimate.png?v=20260915-sidebar-icons-v2"
@@ -95,7 +95,7 @@
                     <button
                         class="sidebar-button"
                         type="button"
-                        data-sidebar-item="users"
+                        data-sidebar-item="users" aria-label="Usuários"
                         data-platform-permission="platform.users.view"
                     >
                         <img
@@ -110,6 +110,7 @@
                             class="sidebar-button sidebar-group-toggle"
                             type="button"
                             data-sidebar-item="products"
+                            aria-label="Catálogo"
                             aria-expanded="true"
                             aria-controls="catalog-subnav"
                         >
@@ -138,7 +139,7 @@
                     <button
                         class="sidebar-button"
                         type="button"
-                        data-sidebar-item="subscriptions"
+                        data-sidebar-item="subscriptions" aria-label="Assinaturas"
                     >
                         <img
                             src="/backoffice/assets/icons/Seo-Search--Streamline-Ultimate.png?v=20260915-sidebar-icons-v2"
@@ -150,7 +151,7 @@
                     <button
                         class="sidebar-button"
                         type="button"
-                        data-sidebar-item="pagamentos"
+                        data-sidebar-item="pagamentos" aria-label="Pagamentos"
                         data-platform-permission="platform.payments.view"
                     >
                         <img
@@ -163,7 +164,7 @@
                     <button
                         class="sidebar-button"
                         type="button"
-                        data-sidebar-item="vouchers"
+                        data-sidebar-item="vouchers" aria-label="Vouchers"
                     >
                         <img
                             src="/backoffice/assets/icons/Tickets--Streamline-Ultimate.png?v=20260915-sidebar-icons-v2"
@@ -173,7 +174,7 @@
                         >
                     </button>
                     <div class="sidebar-nav-group" data-sidebar-group="audit" data-platform-role="superadministrador">
-                        <button class="sidebar-button sidebar-group-toggle" type="button" data-sidebar-item="audit-overview" data-platform-role="superadministrador" aria-expanded="true" aria-controls="audit-subnav">
+                        <button class="sidebar-button sidebar-group-toggle" type="button" data-sidebar-item="audit-overview" aria-label="Auditoria" data-platform-role="superadministrador" aria-expanded="true" aria-controls="audit-subnav">
                             <img src="/backoffice/assets/icons/Lock-1--Streamline-Ultimate.png?v=20260930-audit" alt="" />
                             <span class="sidebar-button-label text-subtitle-sm">Auditoria</span>
                             <img class="sidebar-group-chevron" src="/backoffice/assets/icons/Arrow-Down-1--Streamline-Ultimate.png?v=20260916-catalog-arrow-v2" alt="" aria-hidden="true" />
@@ -630,17 +631,20 @@
             };
             const adminHeaderSearch = document.querySelector(".admin-global-search input");
             let adminHeaderSearchTimer;
+            let adminHeaderGeneration = 0;
             const adminHeaderLoadSearch = async (value) => {
+                const generation = adminHeaderGeneration;
                 const query = value.trim();
                 const panel = document.querySelector("#admin-global-search-results");
                 if (!query) { panel.hidden = true; return; }
                 try {
                     const response = await FokusApi.request(`/backoffice/search?q=${encodeURIComponent(query)}`);
+                    if (generation !== adminHeaderGeneration) return;
                     const groups = response.groups || [];
                     const items = groups.flatMap((group) => group.items || []);
                     panel.innerHTML = items.length ? groups.filter((group) => group.items?.length).map((group) => `<section><strong>${adminHeaderEscape(group.label)}</strong>${group.items.map((item) => `<a href="${adminHeaderEscape(item.href || "#")}"><span>${adminHeaderEscape(item.title)}</span><small>${adminHeaderEscape(item.subtitle || "")}</small></a>`).join("")}</section>`).join("") : '<p class="admin-global-search-empty">Nenhum resultado encontrado.</p>';
                     panel.hidden = false;
-                } catch { panel.hidden = true; }
+                } catch { if (generation === adminHeaderGeneration) panel.hidden = true; }
             };
             adminHeaderSearch.addEventListener("input", (event) => { window.clearTimeout(adminHeaderSearchTimer); adminHeaderSearchTimer = window.setTimeout(() => adminHeaderLoadSearch(event.target.value), 220); });
             adminHeaderSearch.addEventListener("keydown", (event) => { if (event.key === "Escape") { adminHeaderSearch.value = ""; document.querySelector("#admin-global-search-results").hidden = true; } });
@@ -656,6 +660,7 @@
                 adminLogoutButton.disabled = true;
                 try {
                     await FokusApi.request("/backoffice/auth/logout", { method: "POST" });
+                    window.dispatchEvent(new Event("fokus:platform-logout"));
                     location.assign("https://www.fokuscloud.com.br/");
                 } catch (error) {
                     adminLogoutButton.disabled = false;
@@ -664,11 +669,33 @@
             });
             window.__adminHeaderReady = true;
             const loadAdminHeaderData = async () => {
+                const generation = adminHeaderGeneration;
                 const response = await FokusApi.request("/backoffice/dashboard");
+                if (generation !== adminHeaderGeneration) return;
                 adminHeaderSetUser(response.user);
                 window.__adminHeaderNotifications = response.alerts || [];
                 document.querySelector(".admin-notifications-button").classList.toggle("has-notifications", window.__adminHeaderNotifications.length > 0);
             };
+            window.addEventListener("fokus:backoffice-suspend", () => {
+                adminHeaderGeneration++;
+                window.clearTimeout(adminHeaderSearchTimer);
+                adminHeaderSearch.value = "";
+                const results = document.querySelector("#admin-global-search-results");
+                results.replaceChildren();
+                results.hidden = true;
+                window.__adminHeaderNotifications = [];
+                document.querySelector(".admin-notifications-button").classList.remove("has-notifications");
+                const toast = document.querySelector("#admin-header-toast");
+                toast.hidden = true;
+                toast.classList.remove("is-visible");
+                document.querySelector("#admin-header-toast-content").replaceChildren();
+                adminHeaderUserMenu.hidden = true;
+                adminHeaderUserDetails.setAttribute("aria-expanded", "false");
+            });
+            window.addEventListener("fokus:backoffice-revalidated", (event) => {
+                adminHeaderSetUser(event.detail);
+                loadAdminHeaderData().catch(() => {});
+            });
 
             sidebarButtons.forEach((button) => {
                 if (button.classList.contains("sidebar-group-toggle")) {

@@ -490,6 +490,105 @@ test('superadministrador salva o nome público da assinatura pelo drawer', async
     await expect(page.locator('#subscription-public-name')).toHaveValue('Empresa Alpha');
 });
 
+test('aguarda carregamento do módulo antes de disponibilizar ações', async ({ page }) => {
+    let releaseModule;
+    let moduleRequested;
+    const requested = new Promise((resolve) => { moduleRequested = resolve; });
+    const released = new Promise((resolve) => { releaseModule = resolve; });
+    await page.route('**/backoffice/assets/js/subscriptions-page.js?*', async (route) => {
+        moduleRequested();
+        await released;
+        await route.continue();
+    });
+    await page.goto('/backoffice/assinaturas');
+    await requested;
+    await expect(page.getByRole('status')).toContainText('Carregando página');
+    await expect(page.getByRole('button', { name: 'Nova assinatura' })).toHaveCount(0);
+    releaseModule();
+    const createButton = page.getByRole('button', { name: 'Nova assinatura' });
+    await createButton.click();
+    await expect(page.locator('#subscription-create-drawer')).toBeVisible();
+});
+
+test('descarta módulo atrasado após mudar de página', async ({ page }) => {
+    let releaseModule;
+    let moduleRequested;
+    const requested = new Promise((resolve) => { moduleRequested = resolve; });
+    const released = new Promise((resolve) => { releaseModule = resolve; });
+    await page.route('**/backoffice/assets/js/subscriptions-page.js?*', async (route) => {
+        moduleRequested();
+        await released;
+        await route.continue();
+    });
+    await page.goto('/backoffice/assinaturas');
+    await requested;
+    await page.locator('[data-sidebar-item="companies"]').click();
+    await expect(page.locator('[data-backoffice-page="companies"]')).toBeVisible();
+    releaseModule();
+    await expect(page.locator('[data-backoffice-page="companies"]')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Nova assinatura' })).toHaveCount(0);
+});
+
+test('mount atrasado mantém status acessível e conteúdo inerte', async ({ page }) => {
+    let releasePlans;
+    let plansRequested;
+    const requested = new Promise((resolve) => { plansRequested = resolve; });
+    const released = new Promise((resolve) => { releasePlans = resolve; });
+    await page.route('**/api/backoffice/plans', async (route) => {
+        plansRequested();
+        await released;
+        await route.fulfill({ contentType: 'application/json', body: '[]' });
+    });
+    await page.goto('/backoffice/planos');
+    await requested;
+    await expect(page.getByRole('status')).toContainText('Carregando página');
+    await expect(page.locator('[data-backoffice-mount]')).toHaveAttribute('inert', '');
+    releasePlans();
+    await expect(page.locator('[data-backoffice-mount]')).not.toHaveAttribute('inert', '');
+});
+
+test('descarte de mount atrasado preserva drawer da página seguinte', async ({ page }) => {
+    let releasePlans;
+    let plansRequested;
+    const requested = new Promise((resolve) => { plansRequested = resolve; });
+    const released = new Promise((resolve) => { releasePlans = resolve; });
+    await page.route('**/backoffice/assets/js/subscription-plans-page.js?*', async (route) => {
+        const response = await route.fetch();
+        const source = await response.text();
+        const anchor = 'return () => { drawer.dispose();';
+        expect(source).toContain(anchor);
+        await route.fulfill({ response, body: source.replace(anchor, 'return () => { window.__oldMountDisposed = true; drawer.dispose();') });
+    });
+    await page.route('**/api/backoffice/plans', async (route) => {
+        plansRequested();
+        await released;
+        await route.fulfill({ contentType: 'application/json', body: '[]' });
+    });
+    await page.goto('/backoffice/planos');
+    await requested;
+    const oldOwner = await page.evaluate(() => {
+        const oldRoot = document.querySelector('[data-backoffice-mount]') || document.querySelector('#page-content');
+        const owner = oldRoot.dataset.backofficeOwner || oldRoot.dataset.backofficePage || 'legacy';
+        const dispose = window.disposeBackofficeRecordsPage;
+        window.__recordsDisposedOwners = [];
+        window.disposeBackofficeRecordsPage = (...args) => {
+            const root = args[0];
+            window.__recordsDisposedOwners.push(root?.dataset?.backofficeOwner || root?.dataset?.backofficePage || 'legacy');
+            return dispose(...args);
+        };
+        return owner;
+    });
+    await page.locator('[data-sidebar-item="companies"]').click();
+    await page.getByRole('button', { name: 'Nova empresa' }).click();
+    await expect(page.locator('#company-drawer')).toBeVisible();
+    const countBeforeRelease = await page.evaluate(() => window.__recordsDisposedOwners.length);
+    releasePlans();
+    await expect.poll(() => page.evaluate(() => window.__oldMountDisposed)).toBe(true);
+    await expect.poll(() => page.evaluate((count) => window.__recordsDisposedOwners.slice(count), countBeforeRelease)).toContain(oldOwner);
+    await expect(page.locator('#company-drawer')).toBeVisible();
+    await expect(page.locator('[data-backoffice-page="companies"]').first()).toBeVisible();
+});
+
 test('Backoffice gera checkout assistido e atualiza a listagem', async ({ page }) => {
     await useSubscriptionCatalog(page);
     await page.route('**/api/backoffice/subscriptions/checkout-options?**', (route) => route.fulfill({
@@ -1292,7 +1391,18 @@ test('Vouchers filtra, pagina e consulta regras, resgates e reservas em drawer r
     await page.route('**/api/backoffice/catalog', (route) => route.fulfill({
         contentType: 'application/json', body: JSON.stringify({ products, options: { segments: {}, module_codes: [], personalization_types: [] } }),
     }));
-    await page.route('**/api/backoffice/vouchers', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(vouchers) }));
+    await page.route(/\/api\/backoffice\/vouchers(?:\?.*)?$/, (route) => {
+        const params = new URL(route.request().url()).searchParams;
+        const search = (params.get('search') || '').toLowerCase();
+        const filtered = vouchers.filter((voucher) =>
+            (!search || `${voucher.code} ${voucher.name} ${voucher.origin} ${voucher.product_name} ${voucher.plan_name}`.toLowerCase().includes(search)) &&
+            (!params.get('product_id') || voucher.product_id === params.get('product_id')) &&
+            (!params.get('discount_type') || voucher.discount_type === params.get('discount_type')) &&
+            (!params.get('status') || voucher.computed_status === params.get('status')));
+        const pageNumber = Number(params.get('page') || 1);
+        const perPage = Number(params.get('per_page') || 15);
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: filtered.slice((pageNumber - 1) * perPage, pageNumber * perPage), meta: { total: filtered.length, last_page: Math.max(1, Math.ceil(filtered.length / perPage)) } }) });
+    });
     await page.route('**/api/backoffice/vouchers/VCH_VISUAL_01', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({
         voucher: vouchers[0],
         redemptions: Array.from({ length: 24 }, (_, index) => ({
@@ -1338,6 +1448,9 @@ test('Vouchers filtra, pagina e consulta regras, resgates e reservas em drawer r
         await page.getByRole('button', { name: 'Próxima página' }).click();
         await expect(page.locator('#voucher-list tr')).toHaveCount(2);
         await expect(page.locator('#voucher-table-footer-summary')).toContainText('página 2 de 2');
+        // A queued search must not reset pagination after a newer filter request.
+        await page.waitForTimeout(400);
+        await expect(page.locator('#voucher-table-footer-summary')).toContainText('página 2 de 2');
         await page.getByRole('button', { name: 'Página anterior' }).click();
         await expect(page.locator('#voucher-list tr')).toHaveCount(15);
 
@@ -1377,7 +1490,7 @@ test('Vouchers cria campanha e limita ações comerciais às permissões documen
         admin: { role: 'administrador_comercial', name: 'Admin Comercial Teste', email: 'comercial@example.test', permissions: ['platform.vouchers.manage'] },
     }) }));
     await page.route('**/api/backoffice/catalog', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ products }) }));
-    await page.route('**/api/backoffice/vouchers', async (route) => {
+    await page.route(/\/api\/backoffice\/vouchers(?:\?.*)?$/, async (route) => {
         if (route.request().method() === 'POST') {
             const payload = route.request().postDataJSON();
             expect(payload.code).toMatch(/^[A-Z0-9]+$/);
@@ -1385,7 +1498,7 @@ test('Vouchers cria campanha e limita ações comerciais às permissões documen
             vouchers.unshift({ id: 'VCH_CREATED_01', ...payload, product_name: 'Fokus Law', plan_name: 'Essencial', redemptions_count: 0, status: 'ativa', computed_status: 'ativa' });
             return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'VCH_CREATED_01', code: payload.code, message: 'Voucher criado.' }) });
         }
-        return route.fulfill({ contentType: 'application/json', body: JSON.stringify(vouchers) });
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: vouchers, meta: { total: vouchers.length, last_page: 1 } }) });
     });
     await page.route('**/api/backoffice/vouchers/VCH_CREATED_01', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ voucher: vouchers[0], redemptions: [], reservations: [] }) }));
 
@@ -1437,7 +1550,7 @@ test('voucher de assinatura gratuita envia uma duração ao cadastro', async ({ 
         admin: { role: 'superadministrador', name: 'Superadmin Teste', permissions: ['platform.vouchers.manage', 'platform.catalog.publish'] },
     }) }));
     await page.route('**/api/backoffice/catalog', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ products }) }));
-    await page.route('**/api/backoffice/vouchers', async (route) => {
+    await page.route(/\/api\/backoffice\/vouchers(?:\?.*)?$/, async (route) => {
         if (route.request().method() === 'POST') {
             expect(route.request().postDataJSON()).toMatchObject({
                 product_id: 'PRD_VOUCHER_LAW', plan_id: 'PLN_VOUCHER_01',
@@ -1445,7 +1558,7 @@ test('voucher de assinatura gratuita envia uma duração ao cadastro', async ({ 
             });
             return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'VCH_FREE_01', code: 'GRATUITO1', message: 'Voucher criado.' }) });
         }
-        return route.fulfill({ contentType: 'application/json', body: JSON.stringify([]) });
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: [], meta: { total: 0, last_page: 1 } }) });
     });
 
     await page.goto('/backoffice/vouchers');
@@ -1461,4 +1574,75 @@ test('voucher de assinatura gratuita envia uma duração ao cadastro', async ({ 
     await page.locator('#voucher-company-limit').fill('1');
     await page.getByRole('button', { name: 'Cadastrar voucher' }).click();
     await expect(page.locator('#voucher-message')).toContainText('Voucher cadastrado.');
+});
+
+test('Vouchers recupera última página após exclusão e cancela busca ao sair', async ({ page }) => {
+    let vouchers = Array.from({ length: 16 }, (_, i) => ({ id: `VCH_${i}`, code: `COD${i}`, name: `Voucher ${i}`, discount_type: 'percentage', discount_value: 10, redemptions_count: 0, status: 'ativa', computed_status: 'ativa' }));
+    const requests = [];
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { role: 'superadministrador', name: 'Teste', permissions: ['platform.vouchers.manage', 'platform.catalog.publish'] } } }));
+    await page.route('**/api/backoffice/catalog', route => route.fulfill({ json: { products: [] } }));
+    await page.route(/\/api\/backoffice\/vouchers(?:\?.*)?$/, route => {
+        const params = new URL(route.request().url()).searchParams;
+        const pageNumber = Number(params.get('page') || 1);
+        requests.push({ page: pageNumber, search: params.get('search') });
+        const filtered = vouchers.filter(v => !params.get('search') || v.name.includes(params.get('search')));
+        return route.fulfill({ json: { data: filtered.slice((pageNumber - 1) * 15, pageNumber * 15), meta: { total: filtered.length, last_page: Math.max(1, Math.ceil(filtered.length / 15)) } } });
+    });
+    await page.route('**/api/backoffice/vouchers/VCH_15', route => {
+        vouchers = vouchers.filter(v => v.id !== 'VCH_15');
+        return route.fulfill({ json: { message: 'Excluído' } });
+    });
+    await page.goto('/backoffice/vouchers');
+    await expect(page.locator('#voucher-list tr')).toHaveCount(15);
+    await page.getByRole('button', { name: 'Próxima página' }).click();
+    await expect(page.locator('#voucher-list')).toContainText('Voucher 15');
+    await page.getByRole('button', { name: 'Excluir voucher' }).click();
+    await page.locator('#voucher-action-reason').fill('Teste de exclusão');
+    await page.getByRole('button', { name: 'Confirmar exclusão' }).click();
+    await expect(page.locator('#voucher-table-footer-summary')).toContainText('página 1 de 1');
+    await expect(page.locator('#voucher-list tr')).toHaveCount(15);
+    expect(requests.slice(-2).map(x => x.page)).toEqual([2, 1]);
+    await page.evaluate(() => { window.__spaNavigationSentinel = 'preserved'; });
+    await page.locator('#voucher-search').fill('busca abandonada');
+    await page.locator('[data-sidebar-item=companies]').click();
+    await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'companies');
+    expect(await page.evaluate(() => window.__spaNavigationSentinel)).toBe('preserved');
+    await page.waitForTimeout(500);
+    expect(requests.some(x => x.search === 'busca abandonada')).toBe(false);
+    expect(errors).toEqual([]);
+});
+
+test('Busca digitada invalida resposta anterior antes do debounce', async ({ page }) => {
+    const requests = [];
+    let releaseStale;
+    const staleGate = new Promise(resolve => { releaseStale = resolve; });
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { role: 'superadministrador', name: 'Teste', permissions: ['platform.vouchers.manage', 'platform.catalog.publish'] } } }));
+    await page.route('**/api/backoffice/catalog', route => route.fulfill({ json: { products: [] } }));
+    await page.route(/\/api\/backoffice\/vouchers(?:\?.*)?$/, async route => {
+        const params = new URL(route.request().url()).searchParams;
+        const search = params.get('search') || '';
+        const pageNumber = Number(params.get('page') || 1);
+        requests.push({ search, page: pageNumber });
+        if (!search && pageNumber === 2) {
+            await staleGate;
+            return route.fulfill({ json: { data: [], meta: { total: 15, last_page: 1 } } });
+        }
+        return route.fulfill({ json: { data: [{ id: 'VCH_1', name: search || 'Original', code: 'CODE', status: 'ativa', computed_status: 'ativa' }], meta: { total: 16, last_page: 2 } } });
+    });
+    await page.goto('/backoffice/vouchers');
+    await expect(page.locator('#voucher-list')).toContainText('Original');
+    await page.getByRole('button', { name: 'Próxima página' }).click();
+    await expect.poll(() => requests.some(r => r.page === 2 && !r.search)).toBe(true);
+    await page.clock.install();
+    await page.locator('#voucher-search').fill('novo termo');
+    const staleResponse = page.waitForResponse(response => response.url().includes('/api/backoffice/vouchers?') && new URL(response.url()).searchParams.get('page') === '2');
+    releaseStale();
+    await staleResponse;
+    await page.clock.runFor(100);
+    expect(requests.filter(r => r.search === 'novo termo')).toEqual([]);
+    await page.clock.runFor(200);
+    await expect(page.locator('#voucher-list')).toContainText('novo termo');
+    expect(requests.filter(r => r.search === 'novo termo')).toEqual([{ search: 'novo termo', page: 1 }]);
 });

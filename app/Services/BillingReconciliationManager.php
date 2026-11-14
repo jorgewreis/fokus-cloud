@@ -9,7 +9,9 @@ class BillingReconciliationManager
     public function reconcile(?string $subscriptionId = null, bool $dryRun = false): int
     {
         $query = DB::table('subscriptions')->whereNotNull('provider_subscription_id');
-        if ($subscriptionId) $query->where('id', $subscriptionId);
+        if ($subscriptionId) {
+            $query->where('id', $subscriptionId);
+        }
         $created = 0;
         foreach ($query->get() as $subscription) {
             $remote = app(MercadoPagoClient::class)->getPreapproval($subscription->provider_subscription_id);
@@ -22,6 +24,7 @@ class BillingReconciliationManager
                 $created += $this->open($subscription, 'subscription_status', $localStatus, $remoteStatus, $expected === 'ativa' ? 'alto' : 'medio', $dryRun);
             }
         }
+
         return $created;
     }
 
@@ -31,8 +34,12 @@ class BillingReconciliationManager
             ->leftJoin('companies as company', 'company.id', '=', 'alert.company_id')
             ->select('alert.*', 'company.legal_name as company_name')
             ->orderByDesc('alert.opened_at');
-        if (! empty($filters['status'])) $query->where('alert.status', $filters['status']);
-        if (! empty($filters['impact'])) $query->where('alert.impact', $filters['impact']);
+        if (! empty($filters['status'])) {
+            $query->where('alert.status', $filters['status']);
+        }
+        if (! empty($filters['impact'])) {
+            $query->where('alert.impact', $filters['impact']);
+        }
         if (! empty($filters['q'])) {
             $like = '%'.trim((string) $filters['q']).'%';
             $query->where(function ($search) use ($like): void {
@@ -43,9 +50,14 @@ class BillingReconciliationManager
                     ->orWhere('alert.subscription_id', 'like', $like);
             });
         }
-        if (! empty($filters['date_from'])) $query->whereDate('alert.opened_at', '>=', $filters['date_from']);
-        if (! empty($filters['date_to'])) $query->whereDate('alert.opened_at', '<=', $filters['date_to']);
+        if (! empty($filters['date_from'])) {
+            $query->whereDate('alert.opened_at', '>=', $filters['date_from']);
+        }
+        if (! empty($filters['date_to'])) {
+            $query->whereDate('alert.opened_at', '<=', $filters['date_to']);
+        }
         $paginator = $query->paginate(min(max((int) ($filters['per_page'] ?? 15), 1), 100));
+
         return ['data' => $paginator->items(), 'meta' => ['current_page' => $paginator->currentPage(), 'per_page' => $paginator->perPage(), 'total' => $paginator->total(), 'last_page' => $paginator->lastPage()]];
     }
 
@@ -55,11 +67,28 @@ class BillingReconciliationManager
             $alert = DB::table('payment_reconciliation_alerts')->where('id', $id)->lockForUpdate()->first();
             abort_unless($alert, 404, 'Divergência não encontrada.');
             abort_unless(in_array($action, ['revisar', 'descartar', 'corrigir'], true), 422, 'Ação de conciliação inválida.');
+            abort_unless(in_array($alert->status, ['aberta', 'em_revisao'], true), 409, 'Esta divergência já foi encerrada.');
             if ($action === 'corrigir') {
                 abort_unless($admin->hasPermission('platform.reconciliation.manage'), 403, 'Somente o superadministrador pode corrigir divergências.');
+                abort_unless(in_array($alert->type, ['payment_status', 'subscription_status'], true), 422, 'Este tipo de divergência exige revisão específica.');
+                if ($alert->type === 'payment_status') {
+                    $providerId = DB::table('payments')->where('id', $alert->payment_id)->lockForUpdate()->value('provider_payment_id');
+                    abort_unless($providerId, 409, 'Pagamento sem identificador no provedor; execute nova conciliação.');
+                    $remote = app(MercadoPagoClient::class)->getPayment((string) $providerId);
+                } else {
+                    $providerId = DB::table('subscriptions')->where('id', $alert->subscription_id)->lockForUpdate()->value('provider_subscription_id');
+                    abort_unless($providerId, 409, 'Assinatura sem identificador no provedor; execute nova conciliação.');
+                    $remote = app(MercadoPagoClient::class)->getPreapproval((string) $providerId);
+                }
+                abort_unless(is_string($remote['status'] ?? null) && $remote['status'] === $alert->mercado_pago_status, 409, 'O estado no provedor mudou ou não foi confirmado; execute nova conciliação.');
                 if ($alert->payment_id) {
-                    $paymentStatus = match ($alert->mercado_pago_status) { 'approved' => 'aprovado', 'rejected' => 'recusado', 'cancelled', 'expired' => 'cancelado', 'refunded' => 'estornado', default => null };
+                    $paymentStatus = match ($alert->mercado_pago_status) {
+                        'approved' => 'aprovado', 'rejected' => 'recusado', 'cancelled', 'expired' => 'cancelado', 'refunded' => 'estornado', default => null
+                    };
                     $payment = DB::table('payments')->where('id', $alert->payment_id)->lockForUpdate()->first();
+                    if ($alert->type === 'payment_status') {
+                        abort_unless($payment && $payment->status === $alert->internal_status, 409, 'O pagamento mudou desde a divergência; execute nova conciliação.');
+                    }
                     if ($paymentStatus && $payment && $payment->status !== $paymentStatus) {
                         DB::table('payments')->where('id', $payment->id)->update(['status' => $paymentStatus, 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
                         app(AuditRecorder::class)->company($payment->company_id, $admin->id, 'payment', $payment->id, 'update', ['status' => $payment->status], ['status' => $paymentStatus], reason: $reason, actorType: 'admin');
@@ -69,10 +98,15 @@ class BillingReconciliationManager
                 if ($alert->subscription_id) {
                     abort_if(DB::table('subscriptions')->where('id', $alert->subscription_id)->whereNull('provider_subscription_id')->exists()
                         && DB::table('voucher_redemptions as redemption')->join('vouchers as voucher', 'voucher.id', '=', 'redemption.voucher_id')
-                            ->where('redemption.subscription_id', $alert->subscription_id)->where(fn ($query) => \App\Services\VoucherManager::freeBenefit($query))->exists(),
+                            ->where('redemption.subscription_id', $alert->subscription_id)->where(fn ($query) => VoucherManager::freeBenefit($query))->exists(),
                         422, 'A assinatura foi ativada por voucher gratuito; a divergência antiga não pode alterar seu estado.');
-                    $subscriptionStatus = match ($alert->mercado_pago_status) { 'authorized' => 'ativa', 'paused' => 'suspensa', 'cancelled' => 'encerrada', default => null };
+                    $subscriptionStatus = match ($alert->mercado_pago_status) {
+                        'authorized' => 'ativa', 'paused' => 'suspensa', 'cancelled' => 'encerrada', default => null
+                    };
                     $subscription = DB::table('subscriptions')->where('id', $alert->subscription_id)->lockForUpdate()->first();
+                    if ($alert->type === 'subscription_status') {
+                        abort_unless($subscription && $subscription->status === $alert->internal_status, 409, 'A assinatura mudou desde a divergência; execute nova conciliação.');
+                    }
                     if ($subscriptionStatus && $subscription && $subscription->status !== $subscriptionStatus) {
                         DB::table('subscriptions')->where('id', $subscription->id)->update(['status' => $subscriptionStatus, 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
                         app(AuditRecorder::class)->company($subscription->company_id, $admin->id, 'subscription', $subscription->id, 'update', ['status' => $subscription->status], ['status' => $subscriptionStatus], reason: $reason, actorType: 'admin');
@@ -95,6 +129,7 @@ class BillingReconciliationManager
                 'reviewed_at' => now(), 'corrected_at' => $action === 'corrigir' ? now() : $alert->corrected_at, 'discarded_at' => $action === 'descartar' ? now() : $alert->discarded_at, 'updated_at' => now(),
             ]);
             $audit->record($admin->id, $auditAction, 'payment_reconciliation_alert', $id, $alert->company_id, $reason, before: ['status' => $alert->status], after: ['status' => $status, 'mercado_pago_status' => $alert->mercado_pago_status]);
+
             return DB::table('payment_reconciliation_alerts')->where('id', $id)->first();
         });
     }
@@ -102,7 +137,9 @@ class BillingReconciliationManager
     private function open(object $subscription, string $type, string $internal, string $remote, string $impact, bool $dryRun): int
     {
         $fingerprint = hash('sha256', implode('|', [$subscription->id, $type, $internal, $remote]));
-        if ($dryRun || DB::table('payment_reconciliation_alerts')->where('fingerprint', $fingerprint)->whereIn('status', ['aberta', 'em_revisao'])->exists()) return 0;
+        if ($dryRun || DB::table('payment_reconciliation_alerts')->where('fingerprint', $fingerprint)->whereIn('status', ['aberta', 'em_revisao'])->exists()) {
+            return 0;
+        }
         $id = PrefixedUlid::make('RCA');
         DB::table('payment_reconciliation_alerts')->insert([
             'id' => $id, 'company_id' => $subscription->company_id, 'subscription_id' => $subscription->id, 'fingerprint' => $fingerprint,
@@ -111,6 +148,7 @@ class BillingReconciliationManager
         app(AuditRecorder::class)->platform(null, 'billing.reconciliation_alert_opened', 'payment_reconciliation_alert', $id, $subscription->company_id,
             'Divergência identificada na conciliação com o Mercado Pago.', after: ['type' => $type, 'internal_status' => $internal, 'mercado_pago_status' => $remote, 'impact' => $impact, 'status' => 'aberta'],
             actorType: 'system', channel: 'scheduler', originContext: 'fokus:reconcile-mercado-pago');
+
         return 1;
     }
 }

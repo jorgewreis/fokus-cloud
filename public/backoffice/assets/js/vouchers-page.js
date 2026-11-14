@@ -73,6 +73,8 @@ export async function mount(root, context = {}) {
     const pageSignal = context.signal;
     const state = {
         vouchers: [],
+        meta: { total: 0, last_page: 1 },
+        requestId: 0,
         products: [],
         page: 1,
         mode: null,
@@ -124,30 +126,13 @@ export async function mount(root, context = {}) {
         return actions.join("");
     };
 
-    const filteredVouchers = () => {
-        const query = $("#voucher-search").value.trim().toLocaleLowerCase("pt-BR");
-        const productId = $("#voucher-product-filter").value;
-        const type = $("#voucher-type-filter").value;
-        const status = $("#voucher-status-filter").value;
-        return state.vouchers.filter((voucher) => {
-            const searchText = `${voucher.code || ""} ${voucher.name || ""} ${voucher.origin || ""} ${voucher.product_name || ""} ${voucher.plan_name || ""}`.toLocaleLowerCase("pt-BR");
-            return (!query || searchText.includes(query))
-                && (!productId || String(voucher.product_id || "") === productId)
-                && (!type || voucher.discount_type === type)
-                && (!status || currentStatus(voucher) === status);
-        });
-    };
-
     const renderPagination = (currentPage, totalPages) => {
         pagination.innerHTML = `<ul class="fs-pagination fs-pagination-compact"><li class="fs-page-item"><button class="fs-page-link" type="button" data-voucher-page="${currentPage - 1}" aria-label="Página anterior" ${currentPage <= 1 ? "disabled" : ""}>‹</button></li><li class="fs-page-item is-active" aria-current="page"><button class="fs-page-link" type="button" data-voucher-page="${currentPage}" aria-label="Página ${currentPage}" aria-current="page">${currentPage}</button></li><li class="fs-page-item"><button class="fs-page-link" type="button" data-voucher-page="${currentPage + 1}" aria-label="Próxima página" ${currentPage >= totalPages ? "disabled" : ""}>›</button></li></ul>`;
     };
 
     const render = () => {
-        const vouchers = filteredVouchers();
-        const totalPages = Math.max(1, Math.ceil(vouchers.length / PAGE_SIZE));
-        state.page = Math.min(state.page, totalPages);
-        const offset = (state.page - 1) * PAGE_SIZE;
-        const rows = vouchers.slice(offset, offset + PAGE_SIZE);
+        const totalPages = state.meta.last_page;
+        const rows = state.vouchers;
         list.innerHTML = rows.length ? rows.map((voucher) => {
             const product = voucher.product_name || "Produto não informado";
             const plan = voucher.plan_name || "Todos os planos";
@@ -164,8 +149,8 @@ export async function mount(root, context = {}) {
                 <td class="fs-width-500" data-label="Ações"><div class="fs-u-d-flex fs-u-flex-wrap fs-u-gap-2">${actionsFor(voucher)}</div></td>
             </tr>`;
         }).join("") : '<tr><td colspan="7">Nenhum voucher encontrado com os filtros informados.</td></tr>';
-        $("#voucher-table-summary").textContent = `${vouchers.length} de ${state.vouchers.length} vouchers carregados`;
-        $("#voucher-table-footer-summary").textContent = `Mostrando página ${state.page} de ${totalPages} com ${rows.length} registros. A consulta carrega até 100 vouchers recentes.`;
+        $("#voucher-table-summary").textContent = `${state.meta.total} vouchers encontrados`;
+        $("#voucher-table-footer-summary").textContent = `Mostrando página ${state.page} de ${totalPages} com ${rows.length} registros.`;
         renderPagination(state.page, totalPages);
         table.setAttribute("aria-busy", "false");
         $("[data-fs-datatable-loading]").hidden = true;
@@ -404,20 +389,37 @@ export async function mount(root, context = {}) {
         }
     };
 
+    let searchTimer;
+    let requestedSearch = "";
     const loadVouchers = async () => {
+        clearTimeout(searchTimer);
+        searchTimer = undefined;
+        requestedSearch = $("#voucher-search").value.trim();
         table.setAttribute("aria-busy", "true");
         $("[data-fs-datatable-loading]").hidden = false;
         $("[data-fs-datatable-empty]").hidden = true;
         $("[data-fs-datatable-error]").hidden = true;
+        const requestId = ++state.requestId;
         try {
-            const vouchers = await api.request("/backoffice/vouchers", { signal: pageSignal });
-            if (pageSignal?.aborted) return;
-            state.vouchers = Array.isArray(vouchers) ? vouchers : [];
-            state.page = 1;
+            const params = new URLSearchParams({ paginate: "1", page: state.page, per_page: PAGE_SIZE });
+            [["search", "#voucher-search"], ["product_id", "#voucher-product-filter"], ["discount_type", "#voucher-type-filter"], ["status", "#voucher-status-filter"]].forEach(([key, selector]) => {
+                const value = $(selector).value.trim();
+                if (value) params.set(key, value);
+            });
+            const response = await api.request(`/backoffice/vouchers?${params}`, { signal: pageSignal });
+            if (pageSignal?.aborted || requestId !== state.requestId) return;
+            const lastPage = Math.max(1, Number(response.meta?.last_page) || 1);
+            if (state.page > lastPage) {
+                state.page = lastPage;
+                await loadVouchers();
+                return;
+            }
+            state.vouchers = response.data || [];
+            state.meta = response.meta || { total: 0, last_page: 1 };
             render();
             showMessage("");
         } catch (error) {
-            if (error.name === "AbortError" || pageSignal?.aborted) return;
+            if (error.name === "AbortError" || pageSignal?.aborted || requestId !== state.requestId) return;
             list.innerHTML = '<tr><td colspan="8">Não foi possível carregar os vouchers.</td></tr>';
             $("#voucher-table-summary").textContent = "Falha ao carregar";
             $("#voucher-table-footer-summary").textContent = "Atualize a listagem para tentar novamente.";
@@ -681,15 +683,28 @@ export async function mount(root, context = {}) {
     listen($("#voucher-filter-form"), "submit", (event) => {
         event.preventDefault();
         state.page = 1;
-        render();
+        loadVouchers();
     });
-    listen($("#voucher-search"), "input", () => { state.page = 1; render(); });
-    ["#voucher-product-filter", "#voucher-type-filter", "#voucher-status-filter"].forEach((selector) => listen($(selector), "change", () => { state.page = 1; render(); }));
+    pageSignal?.addEventListener("abort", () => clearTimeout(searchTimer), { once: true });
+    listen($("#voucher-search"), "input", () => {
+        const hadPendingSearch = searchTimer !== undefined;
+        clearTimeout(searchTimer);
+        searchTimer = undefined;
+        if ($("#voucher-search").value.trim() === requestedSearch && !hadPendingSearch) return;
+        // Invalidate in-flight responses before waiting for the debounce.
+        state.requestId++;
+        searchTimer = setTimeout(() => { state.page = 1; loadVouchers(); }, 250);
+    });
+    ["#voucher-product-filter", "#voucher-type-filter", "#voucher-status-filter"].forEach((selector) => listen($(selector), "change", () => { state.page = 1; loadVouchers(); }));
     listen(pagination, "click", (event) => {
         const button = event.target.closest("[data-voucher-page]");
         if (!button || button.disabled) return;
-        state.page = Number(button.dataset.voucherPage);
-        render();
+        if (searchTimer !== undefined) {
+            state.page = 1;
+        } else {
+            state.page = Number(button.dataset.voucherPage);
+        }
+        loadVouchers();
     });
     listen(list, "click", (event) => {
         const button = event.target.closest("[data-voucher-action]");
@@ -736,6 +751,7 @@ export async function mount(root, context = {}) {
     window.FokusCurrency?.bind(root);
     await Promise.all([loadCatalog(), loadVouchers()]);
     return () => {
+        clearTimeout(searchTimer);
         state.detailController?.abort();
         drawer.dispose();
         actionModal?.dispose?.();
