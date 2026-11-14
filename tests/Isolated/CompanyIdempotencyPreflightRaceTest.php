@@ -18,6 +18,8 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 use Throwable;
 
+require_once __DIR__.'/CompanyIdempotencyMySqlLabGuard.php';
+
 /** Guarded MySQL lab: only its opt-in, UUID-verified bootstrap may run this. */
 class CompanyIdempotencyPreflightRaceTest extends TestCase
 {
@@ -25,6 +27,7 @@ class CompanyIdempotencyPreflightRaceTest extends TestCase
 
     public function runDatabaseMigrations(): void
     {
+        CompanyIdempotencyMySqlLabGuard::assertBeforeFresh();
         $this->artisan('migrate:fresh')->assertSuccessful();
         $this->beforeApplicationDestroyed(function (): void {
             RefreshDatabaseState::$migrated = false;

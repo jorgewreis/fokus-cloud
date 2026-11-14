@@ -8,11 +8,22 @@ use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Tests\Isolated\CompanyIdempotencyMySqlLabGuard;
 use Tests\TestCase;
 
 class CompanyIdempotencyDisabledTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function beforeRefreshingDatabase(): void
+    {
+        require_once dirname(__DIR__).'/Isolated/CompanyIdempotencyMySqlLabGuard.php';
+        if (config('database.default') === 'sqlite') {
+            CompanyIdempotencyMySqlLabGuard::checkInMemorySqlite(config('app.env'), config('database.default'), config('database.connections.sqlite'));
+        } else {
+            CompanyIdempotencyMySqlLabGuard::assertBeforeFresh();
+        }
+    }
 
     protected function setUp(): void
     {

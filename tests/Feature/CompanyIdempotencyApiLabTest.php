@@ -14,6 +14,7 @@ use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Tests\Isolated\CompanyIdempotencyMySqlLabGuard;
 use Tests\TestCase;
 
 /** Synthetic lab only; production route guard remains closed. */
@@ -23,6 +24,12 @@ class CompanyIdempotencyApiLabTest extends TestCase
 
     public function runDatabaseMigrations(): void
     {
+        require_once dirname(__DIR__).'/Isolated/CompanyIdempotencyMySqlLabGuard.php';
+        if (config('database.default') === 'sqlite') {
+            CompanyIdempotencyMySqlLabGuard::checkInMemorySqlite(config('app.env'), config('database.default'), config('database.connections.sqlite'));
+        } else {
+            CompanyIdempotencyMySqlLabGuard::assertBeforeFresh();
+        }
         $this->artisan('migrate:fresh')->assertSuccessful();
         $this->beforeApplicationDestroyed(function (): void {
             RefreshDatabaseState::$migrated = false;
