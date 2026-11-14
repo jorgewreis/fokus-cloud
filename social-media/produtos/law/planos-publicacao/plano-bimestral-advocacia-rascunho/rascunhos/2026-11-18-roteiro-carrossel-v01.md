@@ -1,6 +1,6 @@
 # Carrossel de 18/11 — cadastro que ajuda a equipe
 
-**Estado:** as seis lâminas estão aprovadas; a legenda continua em proposta. Instagram @fokus.cloud, 18/11/2026 às 10h, America/Bahia. Nada está agendado. Conferir o Metricool antes de criar qualquer post.
+**Estado:** as seis lâminas e a legenda estão aprovadas. Agendamento confirmado no Metricool para Instagram @fokus.cloud em 18/11/2026 às 10h, America/Bahia; publicação automática pendente, ID `428290404`.
 
 **Objetivo:** oferecer um checklist útil para organizar o contexto inicial de atendimento. **Público:** profissionais e equipes de escritórios de Advocacia. **Pilar:** rotina útil. **Métrica sugerida:** salvamentos por alcance quando disponíveis.
 
@@ -49,7 +49,6 @@ Salve para revisar o próximo cadastro da equipe.
 
 #FokusLaw #FokusCloud #Advocacia #GestãoJurídica #RotinaJurídica #EscritórioDeAdvocacia
 
-## Pendências
+## Acompanhamento
 
-- Revisar e aprovar a legenda, direitos de ativos, dados e acessibilidade.
-- Reconsultar a agenda de 18/11 para evitar duplicidade. Um eventual agendamento próximo dependerá de autorização específica, pois a antecedência geral registrada é de 30 dias.
+- Monitorar no Metricool o estado da publicação automática pendente. O agendamento foi autorizado expressamente nesta conversa.

@@ -9,7 +9,7 @@ Consulta ao Metricool em 13/11 encontrou quatro itens de janeiro com publicaçã
 | Data | Tema / roteiro | Formato proposto | Objetivo e CTA | Estado |
 | --- | --- | --- | --- | --- |
 | 16/11 | Como encontrar o contexto do cliente e do processo? Abertura da série. | Imagem única | Conectar com uma situação real e convidar a seguir | Agendado no Metricool; automático pendente, confirmado em 13/11 |
-| 18/11 | Cadastro: identificação, contato e referência | Carrossel | Salvar checklist | Proposta |
+| 18/11 | Cadastro: identificação, contato e referência | Carrossel | Salvar checklist | Agendado no Metricool; automático pendente, confirmado em 14/11 |
 | 20/11 | Antes de atualizar um cliente: o que mudou, o que conferir e próximo passo | Imagem | Convidar comentário sem dados reais | Proposta |
 | 23/11 | Repasse de caso: contexto, pendência e responsável | Carrossel | Salvar roteiro | Proposta |
 | 25/11 | Confirmação de contato atualizado | Imagem | Salvar lembrete | Proposta |
