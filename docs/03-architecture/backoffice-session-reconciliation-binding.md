@@ -17,3 +17,16 @@ conectar o fluxo são necessários contrato de transporte sem cache, revisão de
 segurança e testes de logout/login e corridas entre abas, BFCache, sessão
 expirada, múltiplos nós e comportamento do armazenamento de sessão. Um marcador
 não prova autorização atual e não substitui os controles do servidor.
+
+O módulo experimental `company-idempotency-lab.js` não é importado pelo produto.
+Ele recebe dependências sintéticas para emissão, consulta, submissão,
+armazenamento, geração de identificador e verificação de sessão; não é uma
+integração HTTP. O registro experimental acrescenta o marcador de sessão ao
+token, operação e horário descritos na proposta original: essa mudança precisa
+de revisão. O gerador real deve ser criptograficamente seguro e o transporte
+precisa provar CSRF, autenticação, autorização e recebimento do header sem
+divulgar token. Erros de emissão ou de armazenamento impedem a submissão;
+ausência de resposta conclusiva nunca prova que a operação não será confirmada.
+`clear()` afeta somente o storage fornecido e não demonstra propagação de
+logout entre abas. Não se deve conectar o protótipo antes de resolver esses
+contratos e validar o fluxo completo em navegador e servidor isolados.
