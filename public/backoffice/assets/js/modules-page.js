@@ -1,5 +1,7 @@
 import { createRecordsDrawer } from "./records-drawer.js";
 
+const mutationStates = new Map();
+
 const approvedCatalog = {
     families: {
         law: [{ code: "processos", label: "Processos" }, { code: "contatos", label: "Contatos" }, { code: "expedicoes", label: "Expedições" }, { code: "tarefas", label: "Tarefas" }, { code: "audiencias", label: "Audiências" }],
@@ -30,25 +32,59 @@ export async function mount(root, context = {}) {
     const state = { catalog: { products: [], options: {} }, modules: [], editing: null, pending: null, personalizations: [], page: 1 };
     const pageSize = 15;
     let disposed = false;
-    let mutationInFlight = false;
-    let mutationUncertain = false;
+    let catalogLoaded = false;
+    let observedUncertainty = false;
+    const adminKey = context.admin?.id ? String(context.admin.id) : "__unknown_admin__";
+    if (!mutationStates.has(adminKey)) mutationStates.set(adminKey, { inFlight: false, uncertain: false, listeners: new Set() });
+    const mutation = mutationStates.get(adminKey);
     const alive = () => !disposed && !context.signal?.aborted;
     const mutationButtons = () => [$("#module-form-submit"), $("#module-destructive-form").querySelector('[type="submit"]')];
-    const syncMutationButtons = () => mutationButtons().forEach((button) => { if (button) button.disabled = mutationInFlight || mutationUncertain; });
-    const beginMutation = () => {
-        if (!alive() || mutationInFlight || mutationUncertain) return false;
-        mutationInFlight = true;
+    const syncMutationButtons = () => mutationButtons().forEach((button) => { if (button) button.disabled = mutation.inFlight || mutation.uncertain; });
+    const notifyMutation = () => mutation.listeners.forEach((listener) => listener());
+    const onMutationChange = () => {
+        if (!alive()) return;
         syncMutationButtons();
+        if (mutation.uncertain && !observedUncertainty) { catalogLoaded = false; observedUncertainty = true; }
+        if (!mutation.uncertain) observedUncertainty = false;
+        for (const currentForm of [form, $("#module-destructive-form")]) {
+            let warning = currentForm.querySelector('[data-mutation-warning]');
+            if (mutation.uncertain && !warning) {
+                warning = document.createElement("div"); warning.dataset.mutationWarning = "true"; warning.setAttribute("role", "alert");
+                warning.textContent = "Resultado não confirmado. Feche esta janela e confira o catálogo antes de tentar novamente.";
+                currentForm.prepend(warning);
+            } else if (!mutation.uncertain) warning?.remove();
+        }
+        if (mutation.uncertain) {
+            const node = $("#modules-message");
+            node.replaceChildren(document.createTextNode("Não foi possível confirmar o resultado. Consulte o catálogo antes de tentar novamente. "));
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "fs-btn fs-btn-outline-primary";
+            button.textContent = "Já conferi o catálogo";
+            button.disabled = !catalogLoaded || mutation.inFlight;
+            button.addEventListener("click", () => { mutation.uncertain = false; notifyMutation(); showMessage(""); });
+            node.append(button);
+            if (!catalogLoaded) {
+                const reload = document.createElement("button"); reload.type = "button";
+                reload.className = "fs-btn fs-btn-outline-primary"; reload.textContent = "Recarregar catálogo";
+                reload.addEventListener("click", () => load()); node.append(reload);
+            }
+            node.dataset.tone = "danger"; node.hidden = false;
+        }
+    };
+    mutation.listeners.add(onMutationChange);
+    const beginMutation = () => {
+        if (!alive() || mutation.inFlight || mutation.uncertain) return false;
+        mutation.inFlight = true;
+        notifyMutation();
         return true;
     };
-    const finishMutation = () => { mutationInFlight = false; if (alive()) syncMutationButtons(); };
+    const finishMutation = () => { mutation.inFlight = false; notifyMutation(); };
     const mutationError = (error, fallback) => {
-        if (!alive()) return;
         if (![409, 422].includes(error.status)) {
-            mutationUncertain = true;
-            showMessage("Não foi possível confirmar o resultado. Consulte o catálogo antes de tentar novamente.");
-        } else showMessage(error.message || fallback);
-        syncMutationButtons();
+            mutation.uncertain = true;
+            notifyMutation();
+        } else if (alive()) showMessage(error.message || fallback);
     };
     const field = (name) => form.elements.namedItem(name);
     const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[character]));
@@ -188,14 +224,15 @@ export async function mount(root, context = {}) {
         try {
             state.catalog = await api.request("/backoffice/catalog");
             if (!alive()) return;
+            catalogLoaded = true;
             state.catalog.options = state.catalog.options || {};
             state.modules = allModules();
             $("#module-product-filter").innerHTML = '<option value="">Todos os produtos</option>' + state.catalog.products.map((product) => `<option value="${escapeHtml(product.id)}">${escapeHtml(product.name)}</option>`).join("");
             resetForm();
             render();
-            showMessage("");
+            if (mutation.uncertain) onMutationChange(); else showMessage("");
         } catch (error) {
-            if (alive()) showMessage(error.message || "Não foi possível carregar os módulos.");
+            if (alive()) { catalogLoaded = false; if (mutation.uncertain) onMutationChange(); else showMessage(error.message || "Não foi possível carregar os módulos."); }
         }
     };
 
@@ -227,7 +264,7 @@ export async function mount(root, context = {}) {
     personalizationsList.addEventListener("change", (event) => { const index = Number(event.target.dataset.index); const item = state.personalizations[index]; if (!item) return; if (event.target.classList.contains("p-type")) item.type_code = event.target.value; if (event.target.classList.contains("p-required")) item.required = event.target.value === "1"; if (event.target.classList.contains("p-active")) item.active = event.target.value === "1"; if (event.target.classList.contains("p-value")) item.tiers[Number(event.target.dataset.tier)].value = Number(event.target.value); if (event.target.classList.contains("p-price")) item.tiers[Number(event.target.dataset.tier)].additional_monthly_amount = Number(event.target.value); });
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
-        if (mutationInFlight || mutationUncertain || !alive()) return;
+        if (mutation.inFlight || mutation.uncertain || !alive()) return;
         if (window.FokusForm && !window.FokusForm.validate(form)) return;
         const drawerState = drawer.getState();
         const editId = drawerState.mode === "edit" ? String(state.editing || drawerState.record?.id || "") : "";
@@ -238,7 +275,7 @@ export async function mount(root, context = {}) {
         if (!beginMutation()) return;
         try {
             await api.request(editing ? `/backoffice/catalog/modules/${editId}` : "/backoffice/catalog/modules", { method: editing ? "PATCH" : "POST", body: payload });
-            if (!alive()) return;
+            if (!alive()) { mutation.uncertain = true; notifyMutation(); return; }
             closeDrawer(); await load();
             if (alive()) showMessage(editing ? "Módulo salvo. Ative, publique o módulo e republique o catálogo em Produtos." : "Módulo cadastrado como inativo.", "success");
         } catch (error) {
@@ -248,7 +285,8 @@ export async function mount(root, context = {}) {
     });
     $("#module-list").addEventListener("click", async (event) => {
         const control = event.target.closest("[data-module-action]");
-        if (!control || mutationInFlight || mutationUncertain || !alive()) return;
+        if (!control || !alive()) return;
+        if ((mutation.inFlight || mutation.uncertain) && control.dataset.moduleAction !== "view") return;
         const module = state.modules.find((item) => String(item.id) === control.dataset.moduleId);
         if (!module) return;
         const type = control.dataset.moduleAction;
@@ -269,7 +307,7 @@ export async function mount(root, context = {}) {
             return;
         }
         if (!beginMutation()) return;
-        try { await api.request(`/backoffice/catalog/modules/${module.id}/activate`, { method: "POST" }); if (!alive()) return; await load(); if (alive()) showMessage("Módulo ativado. Publique o módulo e o catálogo em Produtos.", "success"); } catch (error) { mutationError(error, "Não foi possível atualizar o módulo."); } finally { finishMutation(); }
+        try { await api.request(`/backoffice/catalog/modules/${module.id}/activate`, { method: "POST" }); if (!alive()) { mutation.uncertain = true; notifyMutation(); return; } await load(); if (alive()) showMessage("Módulo ativado. Publique o módulo e o catálogo em Produtos.", "success"); } catch (error) { mutationError(error, "Não foi possível atualizar o módulo."); } finally { finishMutation(); }
     });
     $("#module-pagination").addEventListener("click", (event) => { const button = event.target.closest("[data-module-page]"); if (!button || button.disabled) return; state.page = Number(button.dataset.modulePage); render(); });
     $("#module-destructive-form").addEventListener("submit", async (event) => {
@@ -281,15 +319,17 @@ export async function mount(root, context = {}) {
         const needsReason = ["archive", "delete"].includes(type);
         try {
             const response = await api.request(type === "delete" ? `/backoffice/catalog/modules/${module.id}` : `/backoffice/catalog/modules/${module.id}/${type}`, { method: type === "delete" ? "DELETE" : "POST", body: type === "publish" ? { release_type: formData.get("release_type") } : needsReason ? { reason } : undefined });
-            if (!alive()) return;
+            if (!alive()) { mutation.uncertain = true; notifyMutation(); return; }
             destructiveModal?.hide(); state.pending = null; await load();
             if (alive()) showMessage(type === "publish" ? `Módulo publicado na versão ${response.release_version || `v${Number(response.published_version)}.0`}. Publique também o catálogo em Produtos.` : type === "pause" ? "Módulo pausado. O catálogo está pendente de republicação." : "Ação concluída.", "success");
         } catch (error) { mutationError(error, "Não foi possível concluir a ação."); } finally { finishMutation(); }
     });
 
     await load();
+    if (alive()) onMutationChange();
     return () => {
         disposed = true;
+        mutation.listeners.delete(onMutationChange);
         personalizationsDrawer?.dispose?.();
         destructiveModal?.dispose?.();
         drawer.dispose();

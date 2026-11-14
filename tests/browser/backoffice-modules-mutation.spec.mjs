@@ -10,7 +10,8 @@ async function setup(page) {
         window.FokusForm = { validate: () => true, mapServerErrors() {} };
         window.controller = new AbortController();
         const mod = await import(`data:text/javascript;base64,${btoa(unescape(encodeURIComponent(source)))}`);
-        window.dispose = await mod.mount(document.querySelector('main'), { signal: window.controller.signal, permissions: new Set(['platform.catalog.publish']), api:{ request: (url, options) => options ? new Promise((resolve,reject)=>window.pending.push({url,resolve,reject})) : Promise.resolve(catalog) } });
+        window.moduleUnderTest = mod; window.catalogFixture = catalog;
+        window.dispose = await mod.mount(document.querySelector('main'), { admin: { id: 'admin1' }, signal: window.controller.signal, permissions: new Set(['platform.catalog.publish']), api:{ request: (url, options) => options ? new Promise((resolve,reject)=>window.pending.push({url,resolve,reject})) : Promise.resolve(catalog) } });
     }, {source, catalog});
 }
 const submit = (page, selector) => page.locator(selector).evaluate((form) => form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
@@ -38,4 +39,24 @@ test('ação confirmada é enviada uma vez e retorno após desmontagem não atua
     await expect(page.locator('#module-destructive-form [type="submit"]')).toBeDisabled();
     await page.evaluate(()=>{window.controller.abort();window.dispose();window.pending[0].resolve({release_version:'v1.0'});});
     await expect(page.locator('#modules-message')).not.toContainText('Módulo publicado');
+});
+
+test('resultado incerto continua bloqueado ao retornar e permite consulta e reconhecimento', async ({ page }) => {
+    await setup(page);
+    await page.locator('#module-list [data-module-action="publish"]').evaluate(el=>el.click());
+    await submit(page, '#module-destructive-form');
+    await page.evaluate(() => { window.controller.abort(); window.dispose(); window.pending[0].reject(new Error('Rede indisponível')); });
+    await page.evaluate(async () => {
+        await Promise.resolve();
+        window.controller = new AbortController();
+        window.dispose = await window.moduleUnderTest.mount(document.querySelector('main'), { admin:{id:'admin1'}, signal:window.controller.signal, permissions:new Set(['platform.catalog.publish']), api:{request:(url,options)=>options?new Promise((resolve,reject)=>window.pending.push({url,resolve,reject})):Promise.resolve(window.catalogFixture)} });
+    });
+    await expect(page.locator('#module-form-submit')).toBeDisabled();
+    await expect(page.locator('#modules-message')).toContainText('Não foi possível confirmar');
+    await page.locator('#module-list [data-module-action="view"]').evaluate(el=>el.click());
+    await expect(page.locator('#module-view-panel')).toBeVisible();
+    await expect(page.getByRole('button', {name:'Já conferi o catálogo'})).toBeDisabled();
+    await page.getByRole('button', {name:'Recarregar catálogo'}).click();
+    await page.getByRole('button', {name:'Já conferi o catálogo'}).click();
+    await expect(page.locator('#module-form-submit')).toBeEnabled();
 });
