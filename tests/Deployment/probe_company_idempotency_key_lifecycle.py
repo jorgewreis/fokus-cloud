@@ -88,8 +88,10 @@ class Model:
         row = self.rows.get(self._token_hash(token))
         if row is None:
             return None
-        if row['actor'] != actor or row['action'] != action or row['revoked']:
-            raise Rejected('revoked or different owner')
+        if row['actor'] != actor or row['action'] != action:
+            raise Rejected('different owner')
+        if row['revoked'] and not status:
+            raise Rejected('revoked')
         return row
 
     def payload_mac(self, kid, canonical):
@@ -97,16 +99,27 @@ class Model:
             raise Unavailable('payload key unavailable')
         return hmac.new(derive(self.keys[kid], PAYLOAD_INFO), canonical, hashlib.sha256).digest()
 
-    def bind_and_complete(self, token, actor, action, now, canonical):
+    def status(self, token, actor, action, now, *, authorized=True):
+        row = self.authenticate(token, actor, action, now, status=True, authorized=authorized)
+        if row is None:
+            return {'state': 'absent', 'revoked': None}
+        state = 'completed' if row['completed'] else 'observed' if row['request_mac'] is not None else 'issued'
+        return {'state': state, 'revoked': row['revoked']}
+
+    def bind(self, token, actor, action, now, canonical):
         row = self.authenticate(token, actor, action, now)
         if row is None:
             raise Rejected('not observed: do not mutate')
         mac = self.payload_mac(token.split('.')[1], canonical)
         if row['request_mac'] is not None and not hmac.compare_digest(row['request_mac'], mac):
             raise Rejected('different payload')
+        row['request_mac'] = mac
+        return row
+
+    def bind_and_complete(self, token, actor, action, now, canonical):
+        row = self.bind(token, actor, action, now, canonical)
         if row['completed']:
             return 'replay'
-        row['request_mac'] = mac
         row['completed'] = True  # Represents one atomic database commit only.
         return 'committed'
 
@@ -148,7 +161,7 @@ class KeyLifecycleProbe(unittest.TestCase):
             self.model.authenticate(self.token, 'admin-a', 'company-create', self.now + TTL)
         self.assertIsNotNone(self.model.authenticate(self.token, 'admin-a', 'company-create', self.now + TTL, status=True))
         self.model.rows.clear()
-        self.assertIsNone(self.model.authenticate(self.token, 'admin-a', 'company-create', self.now + TTL, status=True))
+        self.assertEqual(self.model.status(self.token, 'admin-a', 'company-create', self.now + TTL), {'state': 'absent', 'revoked': None})
         with self.assertRaises(Rejected):
             self.model.bind_and_complete(self.token, 'admin-a', 'company-create', self.now + TTL, b'synthetic')
         with self.assertRaises(Rejected):
@@ -168,10 +181,17 @@ class KeyLifecycleProbe(unittest.TestCase):
         row['revoked'] = True
         with self.assertRaises(Rejected):
             self.model.authenticate(self.token, 'admin-a', 'company-create', self.now)
+        self.assertEqual(self.model.status(self.token, 'admin-a', 'company-create', self.now), {'state': 'issued', 'revoked': True})
+        with self.assertRaises(Rejected):
+            self.model.status(self.token, 'admin-b', 'company-create', self.now)
+        with self.assertRaises(Rejected):
+            self.model.status(self.token, 'admin-a', 'company-create', self.now, authorized=False)
         row['revoked'] = False  # A stale DB backup must not override the trusted registry.
         self.model.revoked_kids.add('k1')
         with self.assertRaises(Rejected):
             self.model.authenticate(self.token, 'admin-a', 'company-create', self.now)
+        with self.assertRaises(Rejected):
+            self.model.status(self.token, 'admin-a', 'company-create', self.now)
         with self.assertRaises(Unavailable):
             self.model.issue('admin-a', 'company-create', self.now)
 
@@ -179,7 +199,30 @@ class KeyLifecycleProbe(unittest.TestCase):
         with self.assertRaises(Rejected):
             self.model.authenticate(self.token, 'admin-a', 'company-create', self.now - SKEW - 1)
         self.model.rows.clear()
-        self.assertIsNone(self.model.authenticate(self.token, 'admin-a', 'company-create', self.now, status=True))
+        self.assertEqual(self.model.status(self.token, 'admin-a', 'company-create', self.now), {'state': 'absent', 'revoked': None})
+        with self.assertRaises(Rejected):
+            self.model.bind_and_complete(self.token, 'admin-a', 'company-create', self.now, b'synthetic')
+
+    def test_status_distinguishes_issued_observed_completed_and_absent(self):
+        self.assertEqual(self.model.status(self.token, 'admin-a', 'company-create', self.now), {'state': 'issued', 'revoked': False})
+        self.model.bind(self.token, 'admin-a', 'company-create', self.now, b'synthetic')
+        self.assertEqual(self.model.status(self.token, 'admin-a', 'company-create', self.now), {'state': 'observed', 'revoked': False})
+        self.assertEqual(self.model.bind_and_complete(self.token, 'admin-a', 'company-create', self.now, b'synthetic'), 'committed')
+        self.assertEqual(self.model.status(self.token, 'admin-a', 'company-create', self.now), {'state': 'completed', 'revoked': False})
+        self.model.rows.clear()
+        self.assertEqual(self.model.status(self.token, 'admin-a', 'company-create', self.now), {'state': 'absent', 'revoked': None})
+
+    def test_authorized_status_of_completed_then_revoked_does_not_allow_mutation(self):
+        self.model.bind_and_complete(self.token, 'admin-a', 'company-create', self.now, b'synthetic')
+        self.model.rows[self.model._token_hash(self.token)]['revoked'] = True
+        self.assertEqual(self.model.status(self.token, 'admin-a', 'company-create', self.now), {'state': 'completed', 'revoked': True})
+        with self.assertRaises(Rejected):
+            self.model.bind_and_complete(self.token, 'admin-a', 'company-create', self.now, b'synthetic')
+
+    def test_authorized_status_of_bound_then_revoked_remains_observed(self):
+        self.model.bind(self.token, 'admin-a', 'company-create', self.now, b'synthetic')
+        self.model.rows[self.model._token_hash(self.token)]['revoked'] = True
+        self.assertEqual(self.model.status(self.token, 'admin-a', 'company-create', self.now), {'state': 'observed', 'revoked': True})
         with self.assertRaises(Rejected):
             self.model.bind_and_complete(self.token, 'admin-a', 'company-create', self.now, b'synthetic')
 
