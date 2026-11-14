@@ -3,10 +3,11 @@ from unittest.mock import patch
 import xml.etree.ElementTree as ET
 from pathlib import Path
 import re
+import subprocess
 import tempfile
 
 import idempotency_mysql_lab as laboratory
-from idempotency_mysql_lab import FILES, METHODS, REQUIRED, junit_config, preflight, validate_volume
+from idempotency_mysql_lab import FILES, METHODS, REQUIRED, created_id, junit_config, preflight, validate_volume
 
 
 class LaboratoryPreflightTest(unittest.TestCase):
@@ -45,6 +46,12 @@ class LaboratoryPreflightTest(unittest.TestCase):
             with self.subTest(volume=volume), self.assertRaises(ValueError):
                 validate_volume(volume)
 
+    def test_cleanup_targets_require_full_immutable_container_id(self):
+        self.assertEqual(created_id(subprocess.CompletedProcess([], 0, b"a" * 64 + b"\n")), "a" * 64)
+        for output in (b"", b"a" * 12, b"friendly-container", b"a" * 63 + b"z"):
+            with self.subTest(output=output), self.assertRaises(RuntimeError):
+                created_id(subprocess.CompletedProcess([], 0, output))
+
     def test_manifest_names_match_checked_in_test_methods(self):
         root = Path(__file__).resolve().parents[2]
         for cls, methods in METHODS.items():
@@ -65,7 +72,8 @@ class LaboratoryPreflightTest(unittest.TestCase):
             arguments = ["runner", "--volume", self.args["volume"], "--candidate-sha",
                          self.args["source_sha"], "--profile", "target", "--report", str(root / "out"),
                          "--dependency-receipt", str(root / "receipt.json"),
-                         "--dependency-receipt-sha256", "a" * 64]
+                         "--dependency-receipt-sha256", "a" * 64,
+                         "--runtime-image-id", "sha256:" + "a" * 64]
             with patch.object(laboratory, "ROOT", root), patch("sys.argv", arguments), \
                     patch.object(laboratory, "preflight", return_value=("mysql", "runtime")), \
                     patch.object(laboratory, "docker") as mocked_docker:
