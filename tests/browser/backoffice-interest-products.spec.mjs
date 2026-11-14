@@ -300,3 +300,21 @@ test('resposta antiga não encerra carregamento ou erro da consulta nova', async
     const oldResponse = page.waitForResponse(response => response.url().includes("product=antigo")); releaseOld(); await oldResponse; await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 0))); await expect(page.locator('#interest-loading')).toBeVisible(); await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'true');
     releaseNew(); await expect(page.locator('#interest-loading')).toBeHidden(); await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'false'); await expect(page.getByRole('button', { name: 'Tentar novamente' })).toBeVisible();
 });
+
+test('resposta antiga após erro novo não apaga erro nem retry', async ({ page }) => {
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { id: 'TEST', role: 'superadministrador', permissions: ['platform.product_interests.manage'] } } }));
+    await page.route('**/api/backoffice/product-interests-options?*', route => route.fulfill({ json: { products: [], meta: { current_page: 1, has_more: false }, historical_index_ready: true } }));
+    let release, started; const pending = new Promise(r => { release = r; }); const begun = new Promise(r => { started = r; });
+    await page.route('**/api/backoffice/product-interests?*', async route => {
+        const p = new URL(route.request().url()).searchParams.get('product');
+        if (p === 'antigo') { started(); await pending; }
+        if (p === 'novo') return route.fulfill({ status: 503, json: { message: 'Erro novo' } });
+        return route.fulfill({ json: { data: [], meta: { total: 0, current_page: 1, last_page: 1 } } });
+    });
+    await page.goto('/backoffice/interesses'); await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'false');
+    await page.locator('#interest-product-filter').fill('antigo'); await page.getByRole('button', { name: 'Filtrar' }).click(); await begun;
+    await page.locator('#interest-product-filter').fill('novo'); await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page.getByRole('button', { name: 'Tentar novamente' })).toBeVisible();
+    const response = page.waitForResponse(result => result.url().includes('product=antigo')); release(); await response; await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 0)));
+    await expect(page.getByRole('button', { name: 'Tentar novamente' })).toBeVisible(); await expect(page.locator('#interest-message')).toBeVisible(); await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'false');
+});
