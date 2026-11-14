@@ -44,4 +44,3 @@ def execute_disposable_sql(statement, env):
     assert_disposable_mysql(env)
     subprocess.run(['mysql', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '-e', statement],
                    env=env, check=True, stdout=subprocess.DEVNULL)
-
