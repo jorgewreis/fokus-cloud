@@ -35,6 +35,8 @@ jobs:
           name="dashboard-guard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           password="$(openssl rand -hex 24)"
           marker="$(openssl rand -hex 16)"
+          echo "::add-mask::$password"
+          echo "::add-mask::$marker"
           trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
           docker run -d --name "$name" --network none --tmpfs /var/lib/mysql:rw,size=1g \
             -e MYSQL_ROOT_PASSWORD="$password" -e MYSQL_DATABASE=dashboard_bench \
@@ -42,7 +44,11 @@ jobs:
           test "$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$name")" = none
           for attempt in $(seq 1 90); do
             if docker exec "$name" mysqladmin ping -uroot -p"$password" --silent >/dev/null 2>&1; then break; fi
-            if [ "$attempt" = 90 ]; then echo 'Disposable MySQL did not become ready' >&2; exit 1; fi
+            if [ "$(docker inspect --format '{{.State.Running}}' "$name")" != true ] || [ "$attempt" = 90 ]; then
+              echo 'Disposable MySQL did not become ready' >&2
+              docker logs --tail 40 "$name" 2>&1 | sed -e "s/$password/[redacted]/g" -e "s/$marker/[redacted]/g" >&2
+              exit 1
+            fi
             sleep 2
           done
           docker exec "$name" mysql -uroot -p"$password" dashboard_bench -e \
