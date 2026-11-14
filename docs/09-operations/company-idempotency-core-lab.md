@@ -65,3 +65,19 @@ The tests use fake password verification and synthetic data. Real HTTP CSRF,
 cross-node rollout, credential custody and provider behavior are not established.
 Callback purity and normalization require independent review; type signatures
 alone cannot enforce them.
+
+The guarded MySQL API concurrency test was run against commit `93d52eaf`
+using a new, initially empty MySQL 8.4.13 container with networking disabled
+and temporary storage: one test and ten assertions passed. Native InnoDB AIO
+was disabled for that laboratory because the host had exhausted its AIO
+resources. The test bypasses the write-blocking middleware only within the
+test and fakes the password-check provider. It is not evidence of real browser
+recovery, CSRF, external provider operation, or production key custody.
+
+The destructive test bootstrap requires an exclusively owned disposable server,
+an initially empty database and the expected server UUID. Before each migration,
+the guard rechecks approval, connection settings, network namespace and server
+identity. It rejects split read/write connections. SQLite feature tests require
+an in-memory testing database. The general MySQL release harness must integrate
+the guarded bootstrap and adapt the SQLite-only store test before those tests
+can run there; do not bypass the guard to make that harness pass.
