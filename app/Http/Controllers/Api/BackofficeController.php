@@ -42,12 +42,27 @@ class BackofficeController extends Controller
         $mrr = 0.0;
         DB::table('subscriptions')->select('id', 'created_at', 'commercial_snapshot')->where('status', 'ativa')->orderBy('id')
             ->chunkById(250, function ($subscriptions) use (&$activeSubscriptionCount, &$trendCounts, &$mrr): void {
-                $freeIds = DB::table('voucher_redemptions')
+                $redemptions = DB::table('voucher_redemptions')
                     ->whereIn('subscription_id', $subscriptions->pluck('id'))
-                    ->where('snapshot->discount_type', 'trial_free')
-                    ->where('benefit_ends_at', '>', now())
-                    ->distinct()
-                    ->pluck('subscription_id')->flip();
+                    ->where('benefit_ends_at', '>', now());
+                $driver = DB::connection()->getDriverName();
+                if (in_array($driver, ['mysql', 'mariadb'], true)) {
+                    // JSON_UNQUOTE inherits a possibly case-insensitive connection collation.
+                    $redemptions->whereRaw("BINARY JSON_UNQUOTE(JSON_EXTRACT(snapshot, '$.discount_type')) = ?", ['trial_free']);
+                    $freeIds = $redemptions->distinct()->pluck('subscription_id')->flip();
+                } elseif ($driver === 'sqlite') {
+                    $redemptions->where('snapshot->discount_type', 'trial_free');
+                    $freeIds = $redemptions->distinct()->pluck('subscription_id')->flip();
+                } else {
+                    // Preserve strict PHP comparison for other drivers and their collations.
+                    $freeIds = collect();
+                    foreach ($redemptions->cursor(['subscription_id', 'snapshot']) as $redemption) {
+                        $snapshot = json_decode((string) $redemption->snapshot, true) ?: [];
+                        if (($snapshot['discount_type'] ?? null) === 'trial_free') {
+                            $freeIds->put($redemption->subscription_id, true);
+                        }
+                    }
+                }
 
                 foreach ($subscriptions as $subscription) {
                     $activeSubscriptionCount++;

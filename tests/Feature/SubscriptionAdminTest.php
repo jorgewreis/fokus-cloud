@@ -57,6 +57,13 @@ class SubscriptionAdminTest extends TestCase
         $redemption['subscription_id'] = $expiredSubscriptionId;
         $redemption['benefit_ends_at'] = now()->subDay();
         DB::table('voucher_redemptions')->insert($redemption);
+        $redemption['id'] = PrefixedUlid::make('VRE');
+        $redemption['benefit_ends_at'] = now()->addDay();
+        $redemption['snapshot'] = json_encode(['discount_type' => 'TRIAL_FREE']);
+        DB::table('voucher_redemptions')->insert($redemption);
+        $redemption['id'] = PrefixedUlid::make('VRE');
+        $redemption['snapshot'] = json_encode(['discount_type' => 123]);
+        DB::table('voucher_redemptions')->insert($redemption);
 
         $redemptionBindingCounts = [];
         DB::listen(function ($query) use (&$redemptionBindingCounts): void {
