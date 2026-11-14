@@ -9,13 +9,56 @@ let operationEpoch = 0;
 let fingerprintKey;
 function resetOperationState() {
     operationEpoch++;
+    restoreGeneration++;
+    finishRestore?.(false);
     previousOperations.clear();
     pendingOperations.clear();
     fingerprintKey = undefined;
     operationListeners.forEach((listeners) => listeners.forEach((listener) => listener({}, null)));
 }
 window.addEventListener("fokus:platform-logout", resetOperationState);
-window.addEventListener("pagehide", resetOperationState);
+let restoreBarrier = Promise.resolve(true);
+let finishRestore;
+let restoreGeneration = 0;
+window.addEventListener("pagehide", (event) => {
+    if (!event.persisted) { resetOperationState(); return; }
+    const html = document.documentElement;
+    html.dataset.companyRestoreVisibility = html.style.visibility;
+    html.dataset.companyRestoreInert = html.inert ? "1" : "0";
+    html.inert = true;
+    html.style.visibility = "hidden";
+    restoreGeneration++;
+    finishRestore?.(false);
+    restoreBarrier = new Promise((resolve) => { finishRestore = resolve; });
+});
+window.addEventListener("pageshow", async (event) => {
+    if (!event.persisted) return;
+    const generation = restoreGeneration;
+    const original = window.__backofficeAdmin;
+    const snapshot = (admin) => JSON.stringify({ id: String(admin?.id || ""), role: admin?.role || "", permissions: [...(admin?.permissions || [])].sort() });
+    let verified = false;
+    try {
+        const response = await Promise.race([
+            window.FokusApi.request("/backoffice/auth/me"),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 10000)),
+        ]);
+        verified = Boolean(original?.id && response?.admin?.id && snapshot(original) === snapshot(response.admin));
+    } catch (_) { /* Fail closed when identity cannot be verified. */ }
+    if (generation !== restoreGeneration) return;
+    if (!verified) {
+        resetOperationState();
+        finishRestore?.(false);
+        window.location.reload();
+        return;
+    }
+    const html = document.documentElement;
+    html.inert = html.dataset.companyRestoreInert === "1";
+    html.style.visibility = html.dataset.companyRestoreVisibility || "";
+    delete html.dataset.companyRestoreInert;
+    delete html.dataset.companyRestoreVisibility;
+    finishRestore?.(true);
+    finishRestore = undefined;
+});
 
 async function fingerprintOperation(adminId, method, endpoint, body) {
     if (!globalThis.crypto?.subtle) throw new Error("Não foi possível verificar a solicitação. Recarregue a página e tente novamente.");
@@ -177,6 +220,10 @@ export async function mount(root, context = {}) {
         event.preventDefault();
         if (submitting) return;
         clearFormError();
+        if (operationOutcome?.unknown) {
+            showFormError("Confira a lista e reconheça o aviso da operação anterior antes de enviar novamente.");
+            return;
+        }
         const drawerState = drawerController.getState();
         if (drawerState.mode === "view" || !drawerState.mode) return;
         const editId = drawerState.mode === "edit" ? String(currentCompany?.id || drawerState.record?.id || "") : "";
@@ -191,6 +238,7 @@ export async function mount(root, context = {}) {
         const body = editing ? { legal_name: values.legal_name, name: values.name, cpf: values.cpf, email: values.email, version: Number(values.version) } : values;
         const session = drawerSession;
         const epoch = operationEpoch;
+        const restoreAtSubmission = restoreGeneration;
         const submitButton = $("#company-form-submit");
         submitting = true;
         submitButton.disabled = true;
@@ -200,7 +248,11 @@ export async function mount(root, context = {}) {
         let requestStarted = false;
         try {
             signature = await fingerprintOperation(adminId, editing ? "PATCH" : "POST", endpoint, body);
-            if (epoch !== operationEpoch) return;
+            if (!await restoreBarrier || epoch !== operationEpoch) return;
+            if (restoreAtSubmission !== restoreGeneration) {
+                if (isPageActive() && session === drawerSession && drawerController.getState().mode) showFormError("Sessão restaurada. Confira os dados antes de enviar novamente.");
+                return;
+            }
             const pendingKey = adminId || "anonymous";
             if (!pendingOperations.has(pendingKey)) pendingOperations.set(pendingKey, new Set());
             pending = pendingOperations.get(pendingKey);
@@ -212,7 +264,13 @@ export async function mount(root, context = {}) {
             registered = true;
             requestStarted = true;
             await api.request(endpoint, { method: editing ? "PATCH" : "POST", body });
+            if (!await restoreBarrier) return;
             if (epoch !== operationEpoch) return;
+            if (restoreAtSubmission !== restoreGeneration) {
+                if (adminId) publishPreviousOperation(adminId, "unknown", epoch);
+                else if (isPageActive()) onPreviousOperation({ ...operationOutcome, unknown: true }, "unknown");
+                return;
+            }
             if (!isPageActive() || session !== drawerSession || !drawerController.getState().mode) {
                 if (adminId) publishPreviousOperation(adminId, "completed", epoch);
                 else if (isPageActive()) onPreviousOperation({ ...operationOutcome, completed: true }, "completed");
@@ -222,7 +280,13 @@ export async function mount(root, context = {}) {
             showMessage(editing ? "Dados da empresa atualizados." : "Empresa criada com acesso imediato.", "success");
             await load();
         } catch (error) {
+            if (!await restoreBarrier) return;
             if (epoch !== operationEpoch) return;
+            if (requestStarted && restoreAtSubmission !== restoreGeneration) {
+                if (adminId) publishPreviousOperation(adminId, "unknown", epoch);
+                else if (isPageActive()) onPreviousOperation({ ...operationOutcome, unknown: true }, "unknown");
+                return;
+            }
             const text = error.message || "Não foi possível salvar a empresa.";
             if (isPageActive() && session === drawerSession && drawerController.getState().mode && drawer.isConnected) showFormError(text);
             else if (requestStarted) {
