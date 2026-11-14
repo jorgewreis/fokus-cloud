@@ -39,7 +39,8 @@ class DeadlockObservedConnection extends MySqlConnection
         } catch (QueryException $error) {
             $previous = $error->getPrevious();
             if ($previous instanceof PDOException && ($previous->errorInfo[1] ?? null) === 1213) {
-                file_put_contents(self::$evidencePath, "mysql-deadlock-1213\n", FILE_APPEND | LOCK_EX);
+                $kind = strtok(strtolower(ltrim($query)), ' ');
+                file_put_contents(self::$evidencePath, "mysql-deadlock-1213 $kind\n", FILE_APPEND | LOCK_EX);
             }
             throw $error;
         }
@@ -153,7 +154,8 @@ try {
         DB::purge();
         $attempts = count(file("$dir/$victim-attempts", FILE_IGNORE_NEW_LINES));
         $other = $victim === 'writer' ? 'backfill' : 'writer';
-        $victimDeadlocks = is_file("$dir/$victim-deadlocks") ? count(file("$dir/$victim-deadlocks", FILE_IGNORE_NEW_LINES)) : 0;
+        $victimErrors = is_file("$dir/$victim-deadlocks") ? file("$dir/$victim-deadlocks", FILE_IGNORE_NEW_LINES) : [];
+        $victimDeadlocks = count($victimErrors);
         $otherDeadlocks = is_file("$dir/$other-deadlocks") ? count(file("$dir/$other-deadlocks", FILE_IGNORE_NEW_LINES)) : 0;
         if ($attempts < 2 || $victimDeadlocks !== 1 || $otherDeadlocks !== 0) {
             throw new RuntimeException("expected $victim deadlock 1213 and retry; victim attempts=$attempts victim deadlocks=$victimDeadlocks other deadlocks=$otherDeadlocks");
@@ -168,7 +170,7 @@ try {
         if (DB::table('product_interests')->where('email', "qa-deadlock-1-$run@example.test")->count() !== 1 || ! DB::table('interest_product_index_state')->where('id', 1)->where('ready', true)->where('running', false)->exists()) {
             throw new RuntimeException('duplicate record or invalid state');
         }
-        echo "$victim: mysql deadlocks=$victimDeadlocks other deadlocks=$otherDeadlocks attempts=$attempts; count, notification and index passed\n";
+        echo "$victim: {$victimErrors[0]} other deadlocks=$otherDeadlocks attempts=$attempts; count, notification and index passed\n";
         foreach (['backfill', 'writer'] as $actor) {
             unlink("$dir/$actor-attempts");
             unlink("$dir/$actor-ready");
