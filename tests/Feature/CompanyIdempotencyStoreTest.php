@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Tests\Isolated\CompanyIdempotencyMySqlLabGuard;
 use Tests\TestCase;
 
 class CompanyIdempotencyStoreTest extends TestCase
@@ -20,6 +21,8 @@ class CompanyIdempotencyStoreTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        require_once dirname(__DIR__).'/Isolated/CompanyIdempotencyMySqlLabGuard.php';
+        CompanyIdempotencyMySqlLabGuard::checkInMemorySqlite(config('app.env'), config('database.default'), config('database.connections.sqlite'));
         Schema::create('platform_admins', function (Blueprint $table): void {
             $table->string('id')->primary();
             $table->string('status');
