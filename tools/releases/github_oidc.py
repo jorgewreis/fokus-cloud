@@ -75,6 +75,12 @@ def fetch_jwks():
         raise ValueError('jwks_fetch_failed') from error
 
 
+def validate_window(issued, not_before, expires, now):
+    require(all(type(value) is int for value in (issued, not_before, expires, now)), 'invalid_time')
+    require(issued <= now and not_before <= now < expires
+            and expires - issued <= 300 and issued >= now - 300, 'expired_or_future_token')
+
+
 def verify(token, jwks, *, audience, repository, repository_id, sha, now):
     """Validate a signature and claims; supplied keys must already be trusted."""
     from cryptography.hazmat.primitives import hashes
@@ -110,9 +116,7 @@ def verify(token, jwks, *, audience, repository, repository_id, sha, now):
     for key in ('run_id', 'run_attempt', 'check_run_id'):
         require(isinstance(claims.get(key), str) and re.fullmatch(r'[1-9][0-9]*', claims[key]), 'invalid_run_identity')
     require(isinstance(claims.get('jti'), str) and re.fullmatch(r'[A-Za-z0-9_-]{16,128}', claims['jti']), 'invalid_jti')
-    for key in ('iat', 'nbf', 'exp'):
-        require(type(claims.get(key)) is int, 'invalid_time')
-    require(type(now) is int and claims['iat'] <= now and claims['nbf'] <= now < claims['exp']
-            and claims['exp'] - claims['iat'] <= 300 and claims['iat'] >= now - 300, 'expired_or_future_token')
+    validate_window(claims.get('iat'), claims.get('nbf'), claims.get('exp'), now)
     return {'jti': claims['jti'], 'run_id': claims['run_id'], 'run_attempt': claims['run_attempt'],
-            'check_run_id': claims['check_run_id'], 'sha': sha, 'expires': claims['exp']}
+            'check_run_id': claims['check_run_id'], 'sha': sha, 'issued': claims['iat'],
+            'not_before': claims['nbf'], 'expires': claims['exp']}

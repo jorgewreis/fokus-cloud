@@ -206,7 +206,7 @@ def consume(directory, audience, token, action, candidate, artifact):
         current_record, record_after = read_record(directory, dfd, 'challenge-' + nonce + '.json')
         require(policy_after == policy_digest and record_after == record_digest, 'authorization_changed')
         validate_record(current_record, current_settings, policy_after, now, action, candidate, artifact)
-        require(now < result['expires'], 'authorization_expired')
+        oidc.validate_window(result['issued'], result['not_before'], result['expires'], now)
         _, jti_count = prune(directory, dfd, now)
         require(jti_count < MAX_JTIS, 'jti_quota')
         checkpoint()
@@ -221,6 +221,7 @@ def consume(directory, audience, token, action, candidate, artifact):
         # A pre-existing marker fails closed even if a previous operation crashed.
         create_file(dfd, 'consumed-' + nonce + '.json', {'state':'consumed','retain_until':record['expires'] + RETENTION_GRACE})
         final_time = trusted_time(directory, dfd)
-        require(record['created'] <= final_time < record['expires'] and final_time < result['expires'], 'authorization_expired')
+        require(record['created'] <= final_time < record['expires'], 'authorization_expired')
+        oidc.validate_window(result['issued'], result['not_before'], result['expires'], final_time)
         return {'state':'verified_once', 'action':action, 'candidate':candidate, 'artifact':artifact,
                 'run_id':result['run_id'], 'run_attempt':result['run_attempt']}

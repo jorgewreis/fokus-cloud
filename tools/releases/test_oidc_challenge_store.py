@@ -95,6 +95,25 @@ class ChallengeStore(unittest.TestCase):
                 self.consume(aud,token)
         self.assertFalse(list(self.base.glob('jti-*.json')))
 
+    def test_clock_advance_during_fetch_then_recede_rechecks_iat_and_nbf(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        for field in ('iat', 'nbf'):
+            with self.subTest(field=field):
+                aud = self.new()
+                nonce = aud.rsplit(':', 1)[-1]
+                record = json.loads((self.base / ('challenge-' + nonce + '.json')).read_text())
+                start = record['created']
+                self.fake.claims.update(iat=start-1, nbf=start-1, exp=start+100)
+                self.fake.claims[field] = start+20
+                token = self.token(aud)
+                clock = SimpleNamespace(time=Mock(side_effect=[start, start+30, start]))
+                with patch.object(store, 'time', clock):
+                    with self.assertRaisesRegex(ValueError, 'expired_or_future_token'):
+                        self.consume(aud, token)
+                self.assertFalse(list(self.base.glob('jti-*.json')))
+                self.assertFalse(list(self.base.glob('consumed-*.json')))
+
     def test_unsafe_directory_refused(self):
         self.base.chmod(0o777)
         with self.assertRaises(ValueError): self.new()
