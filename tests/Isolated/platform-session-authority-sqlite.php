@@ -110,7 +110,7 @@ foreach ([
 }
 $check(! $unknownConsumed);
 $fixturePlatformOnly($markerA);
-$db->statement('CREATE TABLE users (id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT \'ativa\', locked_until TEXT, password TEXT, email TEXT, email_verified_at TEXT, created_at TEXT, updated_at TEXT)');
+$db->statement('CREATE TABLE users (id TEXT PRIMARY KEY, cpf TEXT UNIQUE, status TEXT NOT NULL DEFAULT \'ativa\', locked_until TEXT, password TEXT, email TEXT, email_verified_at TEXT, created_at TEXT, updated_at TEXT)');
 $db->statement('CREATE TABLE web_principal_generations (user_id TEXT PRIMARY KEY, generation INTEGER NOT NULL, updated_at TEXT NOT NULL)');
 $db->table('users')->insert(['id' => 'principal', 'password' => 'synthetic-hash']);
 $db->statement('CREATE TABLE security_tokens (id TEXT PRIMARY KEY, user_id TEXT, purpose TEXT, token_hash TEXT UNIQUE, payload TEXT, expires_at TEXT, used_at TEXT, created_at TEXT, updated_at TEXT)');
@@ -290,8 +290,8 @@ $db->table('companies')->insert(['id' => 'company', 'status' => 'ativa']);
 $db->table('company_memberships')->insert(['id' => 'member', 'user_id' => 'synthetic-user', 'company_id' => 'company', 'status' => 'pendente', 'version' => 1]);
 $db->table('law_unit_memberships')->insert(['id' => 'unit', 'company_membership_id' => 'member', 'status' => 'pendente', 'version' => 1]);
 $db->table('company_invitations')->insert(['id' => 'invite', 'membership_id' => 'member', 'company_id' => 'company', 'expires_at' => now()->addHour()]);
-$db->table('users')->insert(['id' => 'synthetic-user', 'password' => 'synthetic-hash', 'email' => 'outbox@example.test', 'email_verified_at' => now()]);
-$db->statement('CREATE TABLE invitation_delivery_outbox (id TEXT PRIMARY KEY, request_hash TEXT UNIQUE, company_id TEXT, user_id TEXT, membership_id TEXT, invitation_id TEXT, security_token_id TEXT, issuer TEXT, expires_at_epoch INTEGER, ciphertext TEXT, state TEXT, created_at TEXT, updated_at TEXT)');
+$db->table('users')->insert(['id' => 'synthetic-user', 'cpf' => 'synthetic-cpf', 'password' => 'synthetic-hash', 'email' => 'outbox@example.test', 'email_verified_at' => now()]);
+$db->statement('CREATE TABLE invitation_delivery_outbox (id TEXT PRIMARY KEY, request_hash TEXT UNIQUE, intent_hash TEXT, company_id TEXT, user_id TEXT, membership_id TEXT, invitation_id TEXT, security_token_id TEXT, issuer TEXT, expires_at_epoch INTEGER, ciphertext TEXT, state TEXT, created_at TEXT, updated_at TEXT)');
 $outbox = new InvitationDeliveryOutbox(new Encrypter(str_repeat('z', 32), 'AES-256-CBC'));
 $outboxExpiry = now()->addMinutes(20)->getTimestamp();
 $outboxRequest = str_repeat('c', 64);
@@ -300,15 +300,97 @@ $pendingOutbox = $outbox->stage('company', 'synthetic-user', 'member', 'invite',
 $check($db->table('security_tokens')->where('user_id', 'synthetic-user')->value('purpose') === 'password_creation');
 $db->table('invitation_delivery_outbox')->where('id', $pendingOutbox)->delete();
 $db->table('security_tokens')->where('user_id', 'synthetic-user')->delete();
-$portalExisting = $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry, 'portal_existing');
-$check($db->table('security_tokens')->where('user_id', 'synthetic-user')->value('purpose') === 'membership_acceptance');
-$db->table('invitation_delivery_outbox')->where('id', $portalExisting)->delete();
-$db->table('security_tokens')->where('user_id', 'synthetic-user')->delete();
-$portalNew = $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry, 'portal_new');
-$check($db->table('security_tokens')->where('user_id', 'synthetic-user')->value('purpose') === 'password_creation');
-$db->table('invitation_delivery_outbox')->where('id', $portalNew)->delete();
-$db->table('security_tokens')->where('user_id', 'synthetic-user')->delete();
 $db->table('users')->where('id', 'synthetic-user')->update(['email_verified_at' => now(), 'status' => 'ativa']);
+$db->table('companies')->insert(['id' => 'compose-company', 'status' => 'ativa']);
+$graphCalls = 0;
+$newGraph = function (?string $existingId) use ($db, &$graphCalls): array {
+    $graphCalls++;
+    if ($existingId !== null) {
+        throw new LogicException('Expected a new user.');
+    }
+    $db->table('users')->insert(['id' => 'compose-user', 'cpf' => 'compose-cpf', 'email' => 'compose@example.test', 'password' => 'synthetic-hash', 'status' => 'pendente']);
+    $db->table('company_memberships')->insert(['id' => 'compose-member', 'company_id' => 'compose-company', 'user_id' => 'compose-user', 'status' => 'pendente', 'version' => 1]);
+    $db->table('company_invitations')->insert(['id' => 'compose-invite', 'company_id' => 'compose-company', 'membership_id' => 'compose-member', 'expires_at' => now()->addHour()]);
+
+    return ['user_id' => 'compose-user', 'membership_id' => 'compose-member', 'invitation_id' => 'compose-invite'];
+};
+$composeKey = str_repeat('1', 64);
+$composeQueries = [];
+$db->beforeExecuting(function (string $query) use (&$composeQueries): void {
+    $composeQueries[] = strtolower($query);
+});
+$composedId = $outbox->composePortal('compose-company', 'compose-cpf', 'compose@example.test', $composeKey, $outboxExpiry, ['role' => 'synthetic'], fn () => null, $newGraph);
+$companyQuery = $userQuery = null;
+foreach ($composeQueries as $index => $query) {
+    if ($companyQuery === null && str_contains($query, 'from "companies"')) {
+        $companyQuery = $index;
+    }
+    if ($userQuery === null && str_contains($query, 'from "users"')) {
+        $userQuery = $index;
+    }
+}
+$check($companyQuery !== null && $userQuery !== null && $companyQuery < $userQuery);
+$check($db->table('invitation_delivery_outbox')->where('id', $composedId)->value('issuer') === 'portal_new');
+$check($db->table('security_tokens')->where('user_id', 'compose-user')->value('purpose') === 'password_creation');
+$check($outbox->composePortal('compose-company', 'compose-cpf', 'compose@example.test', $composeKey, $outboxExpiry, ['role' => 'synthetic'], fn () => null, $newGraph) === $composedId);
+$check($graphCalls === 1);
+try {
+    $outbox->composePortal('compose-company', 'compose-cpf', 'compose@example.test', $composeKey, $outboxExpiry, ['role' => 'synthetic'], fn () => abort(403), $newGraph);
+    throw new LogicException('Replay bypassed authorization.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 403);
+}
+$check($graphCalls === 1);
+$db->table('companies')->insert(['id' => 'existing-company', 'status' => 'ativa']);
+$db->table('users')->where('id', 'synthetic-user')->update(['email_verified_at' => null]);
+$existingComposed = $outbox->composePortal('existing-company', 'synthetic-cpf', 'outbox@example.test', str_repeat('3', 64), $outboxExpiry, ['role' => 'synthetic'], fn () => null, function (?string $existingId) use ($db): array {
+    if ($existingId !== 'synthetic-user') {
+        throw new LogicException('Existing user was not derived.');
+    }
+    $db->table('company_memberships')->insert(['id' => 'existing-member', 'company_id' => 'existing-company', 'user_id' => $existingId, 'status' => 'pendente', 'version' => 1]);
+    $db->table('company_invitations')->insert(['id' => 'existing-invite', 'company_id' => 'existing-company', 'membership_id' => 'existing-member', 'expires_at' => now()->addHour()]);
+
+    return ['user_id' => $existingId, 'membership_id' => 'existing-member', 'invitation_id' => 'existing-invite'];
+});
+$check($db->table('invitation_delivery_outbox')->where('id', $existingComposed)->value('issuer') === 'portal_existing');
+$check($db->table('security_tokens')->where('user_id', 'synthetic-user')->value('purpose') === 'membership_acceptance');
+$existingTokenId = $db->table('invitation_delivery_outbox')->where('id', $existingComposed)->value('security_token_id');
+$db->table('invitation_delivery_outbox')->where('id', $existingComposed)->delete();
+$db->table('security_tokens')->where('id', $existingTokenId)->delete();
+$db->table('company_invitations')->where('id', 'existing-invite')->delete();
+$db->table('company_memberships')->where('id', 'existing-member')->delete();
+$db->table('companies')->where('id', 'existing-company')->delete();
+$db->table('users')->where('id', 'synthetic-user')->update(['email_verified_at' => now()]);
+try {
+    $outbox->composePortal('compose-company', 'compose-cpf', 'compose@example.test', $composeKey, $outboxExpiry, ['role' => 'changed'], fn () => null, $newGraph);
+    throw new LogicException('Changed invitation intent was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 409);
+}
+$check($graphCalls === 1);
+$db->statement("CREATE TRIGGER fail_composed_outbox BEFORE INSERT ON invitation_delivery_outbox BEGIN SELECT RAISE(FAIL, 'outbox failure'); END");
+try {
+    $outbox->composePortal('compose-company', 'rollback-cpf', 'rollback@example.test', str_repeat('2', 64), $outboxExpiry, ['role' => 'synthetic'], fn () => null, function () use ($db): array {
+        $db->table('users')->insert(['id' => 'rollback-user', 'cpf' => 'rollback-cpf', 'email' => 'rollback@example.test', 'password' => 'synthetic-hash', 'status' => 'pendente']);
+        $db->table('company_memberships')->insert(['id' => 'rollback-member', 'company_id' => 'compose-company', 'user_id' => 'rollback-user', 'status' => 'pendente', 'version' => 1]);
+        $db->table('company_invitations')->insert(['id' => 'rollback-invite', 'company_id' => 'compose-company', 'membership_id' => 'rollback-member', 'expires_at' => now()->addHour()]);
+
+        return ['user_id' => 'rollback-user', 'membership_id' => 'rollback-member', 'invitation_id' => 'rollback-invite'];
+    });
+    throw new LogicException('Composition failure was suppressed.');
+} catch (QueryException) {
+    $check($db->table('users')->where('id', 'rollback-user')->count() === 0);
+}
+$check($db->table('company_memberships')->where('id', 'rollback-member')->count() === 0);
+$check($db->table('company_invitations')->where('id', 'rollback-invite')->count() === 0);
+$db->statement('DROP TRIGGER fail_composed_outbox');
+$composedTokenId = $db->table('invitation_delivery_outbox')->where('id', $composedId)->value('security_token_id');
+$db->table('invitation_delivery_outbox')->where('id', $composedId)->delete();
+$db->table('security_tokens')->where('id', $composedTokenId)->delete();
+$db->table('company_invitations')->where('id', 'compose-invite')->delete();
+$db->table('company_memberships')->where('id', 'compose-member')->delete();
+$db->table('users')->where('id', 'compose-user')->delete();
+$db->table('companies')->where('id', 'compose-company')->delete();
 $db->statement("CREATE TRIGGER fail_outbox BEFORE INSERT ON invitation_delivery_outbox BEGIN SELECT RAISE(FAIL, 'outbox failure'); END");
 try {
     $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry, 'platform');
@@ -322,8 +404,8 @@ $check($outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRe
 try {
     $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry, 'portal_existing');
     throw new LogicException('Changed issuer was accepted on retry.');
-} catch (HttpException $e) {
-    $check($e->getStatusCode() === 409);
+} catch (InvalidArgumentException) {
+    $check(true);
 }
 $check($db->table('invitation_delivery_outbox')->count() === 1);
 $check($db->table('security_tokens')->where('user_id', 'synthetic-user')->count() === 1);

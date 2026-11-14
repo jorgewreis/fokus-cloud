@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('invitation_delivery_outbox', function (Blueprint $table): void {
             $table->string('id', 30)->primary();
             $table->char('request_hash', 64)->unique();
+            $table->char('intent_hash', 64)->nullable();
             $table->string('company_id', 128);
             $table->string('user_id', 128);
             $table->string('membership_id', 128);

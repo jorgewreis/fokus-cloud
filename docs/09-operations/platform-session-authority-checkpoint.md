@@ -336,3 +336,19 @@ portal_new issuer and includes it in idempotency matching. The existing-account
 classification must be derived by trusted server code inside the real issuance
 transaction, never from request input. That provenance is not yet persisted or
 connected to either real emitter; no delivery is enabled.
+
+The isolated portal composition API now owns the top-level transaction, locks
+the company, queries CPF to derive whether the account already exists, invokes
+trusted server-side authorization on both initial execution and replay, and
+stages a graph created on that same connection. A keyed digest of canonical
+intent is checked on replay; creation, token and outbox rollback together in
+synthetic SQLite tests. Standalone stage no longer accepts a portal issuer.
+This is not the real controller integration: caller-supplied callbacks and
+intent cannot be treated as authorization or canonical data from HTTP, and
+external side effects cannot be ruled out by PHP's callable type. A real adapter
+must construct both callbacks and intent exclusively from validated server-side
+contracts, revalidate assignments and permissions under locks, and ensure audit
+uses the same connection. Key rotation currently invalidates old intent digests;
+a versioned key strategy is required. Unique-CPF gap locking, duplicate-key
+races, other writers and both transaction orders require real MySQL tests. No
+route or worker is connected and the experimental gates remain closed.
