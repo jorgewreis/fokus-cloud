@@ -1502,8 +1502,11 @@ test('Vouchers recupera última página após exclusão e cancela busca ao sair'
     await expect(page.locator('#voucher-table-footer-summary')).toContainText('página 1 de 1');
     await expect(page.locator('#voucher-list tr')).toHaveCount(15);
     expect(requests.slice(-2).map(x => x.page)).toEqual([2, 1]);
+    await page.evaluate(() => { window.__spaNavigationSentinel = 'preserved'; });
     await page.locator('#voucher-search').fill('busca abandonada');
-    await page.goto('/backoffice/empresas');
+    await page.locator('[data-sidebar-item=companies]').click();
+    await expect(page.locator('#page-content')).toHaveAttribute('data-backoffice-page', 'companies');
+    expect(await page.evaluate(() => window.__spaNavigationSentinel)).toBe('preserved');
     await page.waitForTimeout(500);
     expect(requests.some(x => x.search === 'busca abandonada')).toBe(false);
     expect(errors).toEqual([]);
