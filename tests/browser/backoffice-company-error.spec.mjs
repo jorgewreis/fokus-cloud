@@ -369,6 +369,10 @@ test('falha de atualização informa no drawer sem roubar foco e limpa após nov
     const postGate = new Promise((resolve) => { releasePost = resolve; });
     const postRequest = new Promise((resolve) => { postStarted = resolve; });
     let listRequests = 0;
+    let releaseRetry;
+    let retryStarted;
+    const retryGate = new Promise((resolve) => { releaseRetry = resolve; });
+    const retryRequest = new Promise((resolve) => { retryStarted = resolve; });
     await page.route('**/api/backoffice/companies**', async (route) => {
         if (route.request().method() === 'POST') {
             postStarted();
@@ -377,6 +381,8 @@ test('falha de atualização informa no drawer sem roubar foco e limpa após nov
         }
         listRequests++;
         if (listRequests === 2) return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Falha sintética' }) });
+        if (listRequests === 3) return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Falha novamente' }) });
+        if (listRequests === 4) { retryStarted(); await retryGate; }
         return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: [], meta: { total: 0, current_page: 1, per_page: 15, last_page: 1 }, summary: {} }) });
     });
     await page.goto('/backoffice/empresas');
@@ -409,7 +415,19 @@ test('falha de atualização informa no drawer sem roubar foco e limpa após nov
     await expect(page.locator('#company-form-submit')).toBeEnabled();
     await page.keyboard.press('Escape');
     await expect(page.locator('#company-drawer')).toBeHidden();
+    const pageStatus = page.locator('#company-refresh-page-status');
+    await expect(pageStatus).toBeVisible();
+    await expect(pageStatus).toContainText('Não foi possível atualizar a lista');
+    await page.screenshot({ path: test.info().outputPath('company-refresh-status.png') });
+    await expect(page.locator('#company-create')).toBeFocused();
     await page.locator('#company-filter-form').getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page.locator('.fs-backoffice-toast')).toContainText('Falha novamente');
+    await expect(pageStatus).toBeVisible();
+    await page.locator('#company-filter-form').getByRole('button', { name: 'Filtrar' }).click();
+    await retryRequest;
+    await expect(pageStatus).toBeVisible();
+    releaseRetry();
+    await expect(pageStatus).toBeHidden();
     await expect(status).toBeHidden();
 });
 
@@ -445,6 +463,7 @@ test('falha de atualização com drawer fechado mostra aviso sem alterar o foco'
     await expect(page.locator('#company-drawer')).toBeHidden();
     await expect(page.locator('#company-create')).toBeFocused();
     releasePost();
-    await expect(page.locator('.fs-backoffice-toast')).toContainText('Não foi possível atualizar a lista');
+    await expect(page.locator('#company-refresh-page-status')).toContainText('Não foi possível atualizar a lista');
+    await expect(page.locator('#company-refresh-page-status')).toBeVisible();
     await expect(page.locator('#company-create')).toBeFocused();
 });

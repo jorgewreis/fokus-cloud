@@ -20,6 +20,18 @@ export async function mount(root, context = {}) {
     let drawerSession = 0;
     let loadSequence = 0;
     const refreshStatus = $("#company-refresh-status");
+    const refreshPageStatus = $("#company-refresh-page-status");
+    let refreshError = "";
+    const syncRefreshStatus = (drawerOpen) => {
+        refreshStatus.textContent = refreshError;
+        refreshPageStatus.textContent = refreshError;
+        refreshStatus.hidden = !refreshError || !drawerOpen;
+        refreshPageStatus.hidden = !refreshError || drawerOpen;
+    };
+    const drawerShown = () => syncRefreshStatus(true);
+    const drawerHidden = () => syncRefreshStatus(false);
+    createTrigger.addEventListener("fs:shown", drawerShown);
+    createTrigger.addEventListener("fs:hidden", drawerHidden);
     const isPageActive = () => !context.signal?.aborted && root.isConnected;
     const formError = $("#company-form-error");
     const clearFormError = () => { formError.hidden = true; formError.textContent = ""; };
@@ -54,18 +66,16 @@ export async function mount(root, context = {}) {
             const response = await api.request(`/backoffice/companies?${params}`);
             if (!isPageActive() || sequence !== loadSequence) return;
             render(response);
-            refreshStatus.textContent = "";
-            refreshStatus.hidden = true;
+            refreshError = "";
+            syncRefreshStatus(drawer.getAttribute("aria-hidden") === "false");
             if (!silent) showMessage("");
         } catch (error) {
             if (!isPageActive() || sequence !== loadSequence) return;
             if (!silent) {
                 showMessage(error.message || "Não foi possível carregar as empresas.");
-            } else if (drawerController.getState().mode) {
-                refreshStatus.textContent = "Não foi possível atualizar a lista de empresas. Use os filtros para tentar novamente.";
-                refreshStatus.hidden = false;
             } else {
-                showMessage("Não foi possível atualizar a lista de empresas. Use os filtros para tentar novamente.");
+                refreshError = "Não foi possível atualizar a lista de empresas. Use os filtros para tentar novamente.";
+                syncRefreshStatus(drawer.getAttribute("aria-hidden") === "false");
             }
         }
     };
@@ -152,6 +162,8 @@ export async function mount(root, context = {}) {
     normalizeSummary();
     context.signal?.addEventListener('abort', () => summaryObserver?.disconnect(), { once: true });
     return () => {
+        createTrigger.removeEventListener("fs:shown", drawerShown);
+        createTrigger.removeEventListener("fs:hidden", drawerHidden);
         summaryObserver?.disconnect();
         drawerController.dispose();
         window.disposeBackofficeRecordsPage?.(root);
