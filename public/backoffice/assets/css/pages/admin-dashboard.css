@@ -1982,3 +1982,24 @@ html[data-role="admin"] .fs-sidebar .sidebar-subnav-button {
     .admin-final-dashboard .admin-quick-actions-grid { grid-template-columns: minmax(0, 1fr); }
     .admin-final-dashboard .admin-table-footer { align-items: flex-start; flex-direction: column; padding: 12px 16px; }
 }
+
+/* Keep the mobile launcher in the header so it never covers page content. */
+@media (max-width: 700px) {
+    html[data-role="admin"] .fs-sidebar.single {
+        position: fixed !important;
+        top: 10px !important;
+        left: 8px !important;
+    }
+    html[data-role="admin"] .fs-sidebar.single .mobile-sidebar-toggle {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+    }
+    .admin-final-dashboard .admin-final-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        padding-left: 72px !important;
+        grid-template-columns: minmax(0, 1fr) auto !important;
+    }
+}
