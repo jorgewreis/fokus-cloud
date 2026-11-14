@@ -4,6 +4,7 @@ from pathlib import Path
 import os
 import tempfile
 import threading
+import time
 import unittest
 from unittest.mock import patch
 import artifact_provenance as provenance
@@ -99,7 +100,7 @@ class Evidence(unittest.TestCase):
         try:
             with patch.object(provenance.os,'read',side_effect=read):
                 with self.assertRaisesRegex(ValueError,'artifact_grew'):
-                    provenance.stable_hash(fd)
+                    provenance._stable_hash(fd)
             self.assertFalse(errors)
             self.assertLessEqual(sum(requests),initial+1)
         finally:
@@ -110,7 +111,7 @@ class Evidence(unittest.TestCase):
         def endless(_fd,count):requests.append(count);return b'x'*count
         try:
             with patch.object(provenance.os,'read',side_effect=endless):
-                with self.assertRaisesRegex(ValueError,'artifact_grew'):provenance.stable_hash(fd)
+                with self.assertRaisesRegex(ValueError,'artifact_grew'):provenance._stable_hash(fd)
             self.assertEqual(sum(requests),initial+1)
         finally:os.close(fd)
 
@@ -119,8 +120,22 @@ class Evidence(unittest.TestCase):
         try:
             with patch.object(provenance.time,'monotonic',side_effect=[0,31]), \
                  patch.object(provenance.os,'read') as read:
-                with self.assertRaisesRegex(ValueError,'artifact_hash_timeout'):provenance.stable_hash(fd)
+                with self.assertRaisesRegex(ValueError,'artifact_hash_timeout'):provenance._stable_hash(fd)
             read.assert_not_called()
+        finally:os.close(fd)
+
+    @unittest.skipIf(os.name == 'nt', 'requires a forkable POSIX publication runtime')
+    def test_hash_supervisor_terminates_blocked_read_before_deadline(self):
+        fd=os.open(self.artifact,os.O_RDONLY);started=time.monotonic()
+        def blocked_read(_fd,_count):
+            time.sleep(10)
+            return b''
+        try:
+            with patch.object(provenance,'HASH_TIMEOUT_SECONDS',0.2), \
+                 patch.object(provenance.os,'read',side_effect=blocked_read):
+                with self.assertRaisesRegex(ValueError,'artifact_hash_timeout'):
+                    provenance.stable_hash(fd)
+            self.assertLess(time.monotonic()-started,1)
         finally:os.close(fd)
 
     def test_artifact_mutation_during_rebuild_is_rejected(self):

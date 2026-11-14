@@ -5,6 +5,7 @@ This is evidence only: the validation workflow does not attest the artifact
 hash, and an environment approval is not established by this comparison.
 """
 import hashlib
+import multiprocessing
 import os
 from pathlib import Path
 import re
@@ -26,7 +27,7 @@ def require(condition, reason):
     if not condition: raise ValueError(reason)
 
 
-def stable_hash(fd):
+def _stable_hash(fd):
     deadline=time.monotonic()+HASH_TIMEOUT_SECONDS
     before=os.fstat(fd)
     require(stat.S_ISREG(before.st_mode) and before.st_nlink==1 and 0<before.st_size<=MAX_ARTIFACT_BYTES,'invalid_artifact')
@@ -47,6 +48,40 @@ def stable_hash(fd):
     require((before.st_dev,before.st_ino,before.st_size,before.st_mtime_ns,before.st_ctime_ns)==
             (after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns),'artifact_changed')
     return h.hexdigest(),(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns)
+
+
+def _hash_worker(fd, result):
+    try:
+        result.send(('ok',_stable_hash(fd)))
+    except ValueError as error:
+        result.send(('error',str(error)))
+    except BaseException:
+        result.send(('error','artifact_hash_failed'))
+    finally:
+        result.close()
+
+
+def stable_hash(fd):
+    """Hash in a killable POSIX worker so a blocked read cannot outlive its deadline."""
+    if os.name == 'nt':
+        return _stable_hash(fd)
+    context=multiprocessing.get_context('fork')
+    received,sent=context.Pipe(duplex=False)
+    worker=context.Process(target=_hash_worker,args=(fd,sent))
+    worker.start();sent.close()
+    try:
+        worker.join(HASH_TIMEOUT_SECONDS)
+        if worker.is_alive():
+            worker.terminate();worker.join()
+            raise ValueError('artifact_hash_timeout')
+        require(received.poll(),'artifact_hash_failed')
+        state,payload=received.recv()
+        require(state=='ok',payload)
+        return payload
+    finally:
+        received.close()
+        if worker.is_alive():
+            worker.terminate();worker.join()
 
 
 def compare(source, artifact, environment, *, expected_repository, expected_repository_id):
