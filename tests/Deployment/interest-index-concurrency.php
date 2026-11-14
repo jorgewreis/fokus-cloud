@@ -20,84 +20,113 @@ require $root.'/vendor/autoload.php';
 $app = require $root.'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 $index = app(InterestProductIndex::class);
-foreach (['backfill-first', 'writer-first'] as $scenario) {
-    $id = 'QA_INTEREST_'.($scenario === 'backfill-first' ? 'BACK' : 'WRITE');
-    DB::table('product_interests')->where('id', $id)->delete();
-    DB::table('product_interests')->insert(['id' => $id, 'name' => 'QA', 'email' => $id.'@example.test', 'products' => '["legacy"]', 'profiles' => '[]', 'privacy_version' => '2.0', 'status' => 'novo', 'consented_at' => now(), 'last_submitted_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
-    DB::transaction(fn () => $index->replace($id, ['legacy']));
-    DB::purge();
-    $lock = '/tmp/interest-'.$scenario.'-locked';
-    $attempt = '/tmp/interest-'.$scenario.'-attempt';
-    $done = '/tmp/interest-'.$scenario.'-done';
-    @unlink($lock);
-    @unlink($attempt);
-    @unlink($done);
-    $pid = pcntl_fork();
-    if ($pid < 0) {
-        throw new RuntimeException('fork failed');
-    }
-    if ($pid === 0) {
-        try {
-            while (! file_exists($lock)) {
-                usleep(10000);
-            } touch($attempt);
-            DB::transaction(function () use ($id, $scenario, $index) {
-                $row = DB::table('product_interests')->where('id', $id)->lockForUpdate()->first();
-                if ($scenario === 'backfill-first') {
-                    DB::table('product_interests')->where('id', $id)->update(['products' => '["new"]']);
-                    $index->replace($id, ['new']);
-                } else {
-                    $index->replace($id, json_decode($row->products, true, 512, JSON_THROW_ON_ERROR));
+$runId = bin2hex(random_bytes(6));
+$directory = sys_get_temp_dir().'/interest-index-'.$runId;
+if (! mkdir($directory, 0700)) {
+    throw new RuntimeException('cannot create private synchronization directory');
+}
+$pid = null;
+try {
+    foreach (['backfill-first', 'writer-first'] as $scenario) {
+        $id = 'QA_'.($scenario === 'backfill-first' ? 'B_' : 'W_').$runId;
+        DB::table('product_interests')->where('id', $id)->delete();
+        DB::table('product_interests')->insert(['id' => $id, 'name' => 'QA', 'email' => $id.'@example.test', 'products' => '["legacy"]', 'profiles' => '[]', 'privacy_version' => '2.0', 'status' => 'novo', 'consented_at' => now(), 'last_submitted_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        DB::transaction(fn () => $index->replace($id, ['legacy']));
+        DB::purge();
+        $lock = $directory.'/'.$scenario.'-locked';
+        $attempt = $directory.'/'.$scenario.'-attempt';
+        $done = $directory.'/'.$scenario.'-done';
+        $pid = pcntl_fork();
+        if ($pid < 0) {
+            throw new RuntimeException('fork failed');
+        }
+        if ($pid === 0) {
+            try {
+                $deadline = microtime(true) + 10;
+                while (! file_exists($lock) && microtime(true) < $deadline) {
+                    usleep(10000);
                 }
-            });
-            touch($done);
-            exit(0);
-        } catch (Throwable $e) {
-            fwrite(STDERR, $e->getMessage());
-            exit(2);
+                if (! file_exists($lock)) {
+                    throw new RuntimeException('parent did not acquire lock');
+                }
+                touch($attempt);
+                DB::transaction(function () use ($id, $scenario, $index) {
+                    $row = DB::table('product_interests')->where('id', $id)->lockForUpdate()->first();
+                    if ($scenario === 'backfill-first') {
+                        DB::table('product_interests')->where('id', $id)->update(['products' => '["new"]']);
+                        $index->replace($id, ['new']);
+                    } else {
+                        $index->replace($id, json_decode($row->products, true, 512, JSON_THROW_ON_ERROR));
+                    }
+                });
+                touch($done);
+                exit(0);
+            } catch (Throwable $e) {
+                fwrite(STDERR, $e->getMessage());
+                exit(2);
+            }
         }
-    }
-    DB::transaction(function () use ($id, $scenario, $index, $lock, $attempt, $done) {
-        $row = DB::table('product_interests')->where('id', $id)->lockForUpdate()->first();
-        if ($scenario === 'backfill-first') {
-            $index->replace($id, json_decode($row->products, true, 512, JSON_THROW_ON_ERROR));
-        } else {
-            DB::table('product_interests')->where('id', $id)->update(['products' => '["new"]']);
-            $index->replace($id, ['new']);
-        } touch($lock);
-        $deadline = microtime(true) + 10;
-        while (! file_exists($attempt) && microtime(true) < $deadline) {
-            usleep(10000);
-        } if (! file_exists($attempt)) {
-            throw new RuntimeException('child did not start');
-        } usleep(300000);
-        if (file_exists($done)) {
-            throw new RuntimeException('writer not blocked');
-        }
-    });
-    pcntl_waitpid($pid, $status);
-    if (pcntl_wexitstatus($status) !== 0) {
-        throw new RuntimeException('child failed');
-    }
-    $row = DB::table('product_interests')->where('id', $id)->first();
-    $codes = DB::table('interest_product_index')->where('interest_id', $id)->pluck('product_code')->all();
-    if (json_decode($row->products, true) !== ['new'] || $codes !== ['new']) {
-        throw new RuntimeException('index mismatch');
-    }
-    try {
-        DB::transaction(function () use ($id, $index) {
-            DB::table('product_interests')->where('id', $id)->update(['products' => '["rollback"]']);
-            $index->replace($id, ['rollback']);
-            throw new RuntimeException('expected');
+        DB::transaction(function () use ($id, $scenario, $index, $lock, $attempt, $done) {
+            $row = DB::table('product_interests')->where('id', $id)->lockForUpdate()->first();
+            if ($scenario === 'backfill-first') {
+                $index->replace($id, json_decode($row->products, true, 512, JSON_THROW_ON_ERROR));
+            } else {
+                DB::table('product_interests')->where('id', $id)->update(['products' => '["new"]']);
+                $index->replace($id, ['new']);
+            } touch($lock);
+            $deadline = microtime(true) + 10;
+            while (! file_exists($attempt) && microtime(true) < $deadline) {
+                usleep(10000);
+            } if (! file_exists($attempt)) {
+                throw new RuntimeException('child did not start');
+            } usleep(300000);
+            if (file_exists($done)) {
+                throw new RuntimeException('writer not blocked');
+            }
         });
-    } catch (RuntimeException $e) {
-        if ($e->getMessage() !== 'expected') {
-            throw $e;
+        $deadline = microtime(true) + 15;
+        do {
+            $waited = pcntl_waitpid($pid, $status, WNOHANG);
+            if ($waited === 0) {
+                usleep(10000);
+            }
+        } while ($waited === 0 && microtime(true) < $deadline);
+        if ($waited !== $pid) {
+            throw new RuntimeException('child did not finish');
         }
+        $pid = null;
+        if (! pcntl_wifexited($status) || pcntl_wexitstatus($status) !== 0) {
+            throw new RuntimeException('child failed');
+        }
+        $row = DB::table('product_interests')->where('id', $id)->first();
+        $codes = DB::table('interest_product_index')->where('interest_id', $id)->pluck('product_code')->all();
+        if (json_decode($row->products, true) !== ['new'] || $codes !== ['new']) {
+            throw new RuntimeException('index mismatch');
+        }
+        try {
+            DB::transaction(function () use ($id, $index) {
+                DB::table('product_interests')->where('id', $id)->update(['products' => '["rollback"]']);
+                $index->replace($id, ['rollback']);
+                throw new RuntimeException('expected');
+            });
+        } catch (RuntimeException $e) {
+            if ($e->getMessage() !== 'expected') {
+                throw $e;
+            }
+        }
+        if (DB::table('interest_product_index')->where('interest_id', $id)->pluck('product_code')->all() !== ['new']) {
+            throw new RuntimeException('rollback mismatch');
+        }
+        DB::table('product_interests')->where('id', $id)->delete();
+        echo $scenario." lock and rollback passed\n";
     }
-    if (DB::table('interest_product_index')->where('interest_id', $id)->pluck('product_code')->all() !== ['new']) {
-        throw new RuntimeException('rollback mismatch');
+} finally {
+    if ($pid !== null && $pid > 0) {
+        posix_kill($pid, SIGKILL);
+        pcntl_waitpid($pid, $status);
     }
-    DB::table('product_interests')->where('id', $id)->delete();
-    echo $scenario." lock and rollback passed\n";
+    foreach (glob($directory.'/*') ?: [] as $path) {
+        unlink($path);
+    }
+    rmdir($directory);
 }
