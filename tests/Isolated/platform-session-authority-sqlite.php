@@ -108,7 +108,7 @@ $db->statement('CREATE TABLE users (id TEXT PRIMARY KEY, status TEXT NOT NULL DE
 $db->statement('CREATE TABLE web_principal_generations (user_id TEXT PRIMARY KEY, generation INTEGER NOT NULL, updated_at TEXT NOT NULL)');
 $db->table('users')->insert(['id' => 'principal', 'password' => 'synthetic-hash']);
 $generations = new WebPrincipalGeneration;
-$loginUser = (new User)->newFromBuilder(['id' => 'principal', 'password' => 'synthetic-hash']);
+$loginUser = (new User)->newFromBuilder(['id' => 'principal', 'status' => 'ativa', 'password' => 'synthetic-hash']);
 $check($generations->snapshotForLogin($loginUser) === ['user_id' => 'principal', 'generation' => 0]);
 $firstSnapshot = $generations->snapshotForLogin($loginUser);
 $generations->advance('principal', fn () => null);
@@ -423,10 +423,32 @@ try {
 }
 $app['config']->set('session.driver', 'database');
 $lifecycle = new PlatformSessionLifecycle($authority);
+$activeLogin = (new User)->newFromBuilder(['id' => 'principal', 'status' => 'ativa', 'password' => 'synthetic-hash']);
+$db->table('users')->where('id', 'principal')->update(['status' => 'bloqueada']);
+try {
+    $lifecycle->captureWebLogin($activeLogin);
+    throw new LogicException('Blocked status denial was suppressed.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 401);
+}
+$db->table('users')->where('id', 'principal')->update(['status' => 'ativa']);
 $pendingUser = (new User)->newFromBuilder(['id' => 'principal', 'status' => 'pendente', 'password' => 'synthetic-hash']);
+$db->table('users')->where('id', 'principal')->update(['status' => 'pendente']);
 $check($lifecycle->captureWebLogin($pendingUser) === null);
+$db->table('users')->where('id', 'principal')->update(['status' => 'ativa']);
 $staleLogin = (new User)->newFromBuilder(['id' => 'principal', 'status' => 'ativa', 'password' => 'stale-hash']);
-$check($lifecycle->captureWebLogin($staleLogin) === null);
+try {
+    $lifecycle->captureWebLogin($staleLogin);
+    throw new LogicException('Stale credential denial was suppressed.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 401);
+}
+try {
+    $lifecycle->captureWebLogin($pendingUser);
+    throw new LogicException('Stale status denial was suppressed.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 401);
+}
 try {
     $lifecycle->ensurePasswordResetReady();
     throw new RuntimeException('Experimental password reset was accepted.');
@@ -498,10 +520,9 @@ $check(! $guardConsumed);
 $session = new Store('synthetic', new ArraySessionHandler(2));
 $session->start();
 $session->setId($sessionId);
-$lifecycle->ensureRegistrationReady($session, null);
 try {
-    $lifecycle->ensureRegistrationReady($session, 'actor-b');
-    throw new LogicException('Mixed registration was accepted.');
+    $lifecycle->ensureRegistrationReady();
+    throw new LogicException('Experimental registration was accepted.');
 } catch (HttpException $e) {
     $check($e->getStatusCode() === 503);
 }

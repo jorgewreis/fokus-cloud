@@ -40,6 +40,16 @@ class AuthenticationAndIsolationTest extends TestCase
         $this->assertDatabaseHas('legal_acceptances', ['document_type' => 'privacy', 'document_version' => '2.0']);
     }
 
+    public function test_experimental_session_gate_rejects_registration_before_writes_and_mail(): void
+    {
+        config(['company_idempotency.session_authority_lifecycle' => true]);
+        $this->postJson('/api/auth/register-company', $this->registration())->assertStatus(503);
+        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('companies', 0);
+        $this->assertDatabaseCount('security_tokens', 0);
+        Mail::assertNothingSent();
+    }
+
     public function test_registration_requires_explicit_legal_manifestations(): void
     {
         $payload = $this->registration();

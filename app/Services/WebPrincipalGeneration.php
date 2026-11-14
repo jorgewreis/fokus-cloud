@@ -34,15 +34,22 @@ final class WebPrincipalGeneration
     }
 
     /** Capture only if credentials observed by the login still match the locked row. */
-    public function snapshotForLogin(User $user): array
+    public function snapshotForLogin(User $user): ?array
     {
         $id = (string) $user->getKey();
         $observedPassword = $user->getRawOriginal('password');
 
-        return $this->withLockedPrincipal($id, function (int $generation, object $locked) use ($id, $observedPassword): array {
-            abort_unless($locked->status === 'ativa' && ($locked->locked_until === null || Carbon::parse($locked->locked_until)->isPast())
+        $observedStatus = $user->status;
+
+        return $this->withLockedPrincipal($id, function (int $generation, object $locked) use ($id, $observedPassword, $observedStatus): ?array {
+            abort_unless($locked->status === $observedStatus && in_array($locked->status, ['ativa', 'pendente'], true)
+                && ($locked->locked_until === null || Carbon::parse($locked->locked_until)->isPast())
                 && is_string($observedPassword) && is_string($locked->password)
                 && hash_equals($locked->password, $observedPassword), 401, 'Sessão indisponível.');
+
+            if ($locked->status === 'pendente') {
+                return null;
+            }
 
             return ['user_id' => $id, 'generation' => $generation];
         });

@@ -144,8 +144,7 @@ class AuthController extends Controller
     {
         $lifecycle = app(PlatformSessionLifecycle::class);
         if ($lifecycle->enabledForSecurityMutation()) {
-            $platformActor = Auth::guard('platform')->id();
-            $lifecycle->ensureRegistrationReady($request->session(), $platformActor === null ? null : (string) $platformActor);
+            $lifecycle->ensureRegistrationReady();
         }
         $data = $this->companyRegistrationData($request, true);
         $cpf = BrazilianDocuments::digits($data['cpf']);

@@ -185,3 +185,10 @@ transition is not atomic yet. This is a temporary closed path, not complete
 support for mixed registration. Snapshot failures other than eligibility still
 need an end-to-end failure audit; real invite, support, session-save and reset
 paths have not been proven. The flag remains off and the routes stay guarded.
+
+Security denial update: snapshot capture now propagates stale-password and
+ineligible or changed-status errors. A pending user is allowed to omit the
+snapshot only after matching both status and password against the locked row.
+Experimental registration is currently blocked before all writes and external
+notification, including for an otherwise legitimate pending account, until
+its transaction and session effects are proven. The flag-off path is unchanged.

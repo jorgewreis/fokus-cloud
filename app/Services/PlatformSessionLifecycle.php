@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\User;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Facades\Auth;
-use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /** Experimental and disabled by default; route guards remain authoritative. */
 final class PlatformSessionLifecycle
@@ -103,19 +102,7 @@ final class PlatformSessionLifecycle
     /** A captured snapshot is not itself proof of an atomic session transition. */
     public function captureWebLogin(User $user): ?array
     {
-        if (! $this->enabled() || $user->status !== 'ativa') {
-            return null;
-        }
-        try {
-            return (new WebPrincipalGeneration)->snapshotForLogin($user);
-        } catch (HttpExceptionInterface $exception) {
-            if ($exception->getStatusCode() !== 401) {
-                throw $exception;
-            }
-
-            // Portal login may allow a user not eligible for backoffice MFA.
-            return null;
-        }
+        return $this->enabled() ? (new WebPrincipalGeneration)->snapshotForLogin($user) : null;
     }
 
     public function ensurePasswordResetReady(): void
@@ -126,9 +113,9 @@ final class PlatformSessionLifecycle
     }
 
     /** Check before registration writes or notification while transition is incomplete. */
-    public function ensureRegistrationReady(Session $session, ?string $platformActor): void
+    public function ensureRegistrationReady(): void
     {
-        abort_if($this->enabled() && ($platformActor !== null || $this->binding->current($session) !== null), 503, 'Cadastro temporariamente indisponível nesta sessão.');
+        abort_if($this->enabled(), 503, 'Cadastro temporariamente indisponível nesta sessão.');
     }
 
     public function transactionalSessionTable(): string
