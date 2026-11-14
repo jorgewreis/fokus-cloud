@@ -9,8 +9,11 @@ test('falha de ativação mantém reconciliação acessível com ponte de toast 
     await expect(reconciliation).toBeVisible();
     await expect(reconciliation).toContainText('Não foi possível confirmar');
     await expect(reconciliation.getByRole('button', { name: 'Já conferi o catálogo' })).toBeDisabled();
-    await reconciliation.getByRole('button', { name: 'Recarregar catálogo' }).click();
+    const reload = reconciliation.getByRole('button', { name: 'Recarregar catálogo' });
+    await reload.focus();
+    await page.keyboard.press('Enter');
     await expect(reconciliation.getByRole('button', { name: 'Já conferi o catálogo' })).toBeEnabled();
+    await expect(reconciliation.getByRole('button', { name: 'Já conferi o catálogo' })).toBeFocused();
     await reconciliation.getByRole('button', { name: 'Já conferi o catálogo' }).click();
     await expect(reconciliation).toHaveCount(0);
 });

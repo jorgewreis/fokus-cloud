@@ -74,6 +74,7 @@ export async function mount(root, context = {}) {
             pageProgress.textContent = "Processando alteração do módulo."; root.prepend(pageProgress);
         } else if (!mutation.inFlight) pageProgress?.remove();
         let reconciliation = root.querySelector('[data-module-reconciliation]');
+        const focusedControl = reconciliation?.contains(document.activeElement) ? document.activeElement.textContent : null;
         if (mutation.uncertain) {
             if (!reconciliation) {
                 reconciliation = document.createElement("div");
@@ -97,6 +98,10 @@ export async function mount(root, context = {}) {
                 reload.addEventListener("click", () => load()); node.append(reload);
             }
             node.dataset.tone = "danger"; node.hidden = false;
+            if (focusedControl) {
+                const preferred = [...node.querySelectorAll("button")].find((control) => control.textContent === focusedControl && !control.disabled);
+                (preferred || [...node.querySelectorAll("button")].find((control) => !control.disabled))?.focus();
+            }
         } else reconciliation?.remove();
     };
     mutation.listeners.add(onMutationChange);
