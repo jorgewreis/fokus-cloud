@@ -1,0 +1,154 @@
+<?php
+
+use App\Http\Controllers\Api\ProductInterestController;
+use App\Mail\ProductInterestNotification;
+use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+
+$root = dirname(__DIR__, 2);
+$sandbox = getenv('UPGRADE_SANDBOX');
+if (getenv('FOKUS_INTEREST_INDEX_DISPOSABLE') !== '1' || getenv('APP_ENV') !== 'testing'
+    || getenv('RELEASE_DISPOSABLE_TESTS') !== '1' || getenv('DB_CONNECTION') !== 'mysql'
+    || getenv('DB_URL') || ! is_string($sandbox)
+    || ! is_file($sandbox.'/.disposable-upgrade') || getenv('DB_HOST') !== '127.0.0.1'
+    || preg_match('/^fokus_upgrade_[a-f0-9]{16}$/D', (string) getenv('DB_DATABASE')) !== 1
+    || is_file($root.'/.env') || is_file($root.'/.env.testing') || is_file($root.'/bootstrap/cache/config.php')) {
+    throw new RuntimeException('refuse non-disposable context');
+}
+require $root.'/vendor/autoload.php';
+$app = require $root.'/bootstrap/app.php';
+$app->make(Kernel::class)->bootstrap();
+set_exception_handler(function (Throwable $error): void {
+    fwrite(STDERR, get_class($error).': '.$error->getMessage().PHP_EOL);
+    exit(1);
+});
+$run = bin2hex(random_bytes(6));
+$dir = sys_get_temp_dir().'/interest-deadlock-'.$run;
+if (! mkdir($dir, 0700)) {
+    throw new RuntimeException('cannot create synchronization directory');
+}
+$ballast = 'qa_interest_deadlock_'.$run;
+$ids = ['!'.$run, '"'.$run];
+$children = [];
+try {
+    if (DB::table('product_interests')->where('id', '<', $ids[1])->exists()) {
+        throw new RuntimeException('fixture range is occupied');
+    }
+    DB::statement("CREATE TABLE `$ballast` (id INT PRIMARY KEY) ENGINE=InnoDB");
+    foreach (['backfill', 'writer'] as $victim) {
+        DB::table('product_interests')->whereIn('id', $ids)->delete();
+        DB::table($ballast)->delete();
+        foreach ($ids as $i => $id) {
+            DB::table('product_interests')->insert(['id' => $id, 'name' => 'Synthetic', 'email' => "qa-deadlock-$i-$run@example.test", 'products' => '["legacy"]', 'profiles' => '[]', 'privacy_version' => ProductInterestController::PRIVACY_VERSION, 'status' => 'novo', 'consented_at' => now(), 'last_submitted_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        }
+        $expectedCount = DB::table('product_interests')->count();
+        DB::purge();
+        foreach (['backfill', 'writer'] as $actor) {
+            $pid = pcntl_fork();
+            if ($pid < 0) {
+                throw new RuntimeException('fork failed');
+            }
+            if ($pid === 0) {
+                try {
+                    DB::purge();
+                    Mail::fake();
+                    $attempts = 0;
+                    DB::listen(function ($query) use ($actor, $victim, $dir, $ids, $ballast, &$attempts): void {
+                        if (! str_starts_with(strtolower($query->sql), 'delete from `interest_product_index`') || ($query->bindings[0] ?? null) !== $ids[$actor === 'backfill' ? 0 : 1]) {
+                            return;
+                        }
+                        file_put_contents("$dir/$actor-attempts", "attempt\n", FILE_APPEND);
+                        if (++$attempts !== 1) {
+                            return;
+                        }
+                        if ($actor !== $victim) {
+                            $rows = [];
+                            for ($i = 0; $i < 200; $i++) {
+                                $rows[] = ['id' => $i];
+                            }
+                            DB::table($ballast)->insert($rows);
+                        }
+                        touch("$dir/$actor-ready");
+                        $deadline = microtime(true) + 45;
+                        while (! file_exists("$dir/".($actor === 'writer' ? 'backfill' : 'writer').'-ready') && microtime(true) < $deadline) {
+                            usleep(10000);
+                        }
+                        if (microtime(true) >= $deadline) {
+                            throw new RuntimeException('barrier timed out');
+                        }
+                    });
+                    if ($actor === 'backfill') {
+                        $status = Artisan::call('fokus:backfill-interest-products', ['--confirm-drained' => true]);
+                        if ($status !== 0 || ! str_contains(Artisan::output(), "Rebuilt index for $expectedCount interests.")) {
+                            throw new RuntimeException('backfill failed or count incorrect: '.Artisan::output());
+                        }
+                    } else {
+                        $request = Request::create('/api/product-interests', 'POST', ['name' => 'Synthetic', 'email' => "qa-deadlock-1-$run@example.test", 'products' => ['law'], 'profiles' => ['qa'], 'main_difficulties' => 'Synthetic', 'privacy_accepted' => true, 'privacy_version' => ProductInterestController::PRIVACY_VERSION]);
+                        $response = app(ProductInterestController::class)->store($request);
+                        if ($response->getStatusCode() !== 201 || Mail::sent(ProductInterestNotification::class)->count() !== 1) {
+                            throw new RuntimeException('writer response or fake notification count');
+                        }
+                    }
+                    exit(0);
+                } catch (Throwable $error) {
+                    fwrite(STDERR, "$actor: ".$error->getMessage().PHP_EOL);
+                    exit(1);
+                }
+            }
+            $children[$pid] = $actor;
+        }
+        $deadline = microtime(true) + 120;
+        while ($children && microtime(true) < $deadline) {
+            foreach ($children as $pid => $actor) {
+                $result = pcntl_waitpid($pid, $status, WNOHANG);
+                if ($result === $pid) {
+                    unset($children[$pid]);
+                    if (! pcntl_wifexited($status) || pcntl_wexitstatus($status) !== 0) {
+                        throw new RuntimeException("$actor failed");
+                    }
+                } elseif ($result === -1) {
+                    throw new RuntimeException("cannot wait for $actor");
+                }
+            }
+            usleep(10000);
+        }
+        if ($children) {
+            throw new RuntimeException('actors timed out');
+        }
+        DB::purge();
+        $attempts = count(file("$dir/$victim-attempts", FILE_IGNORE_NEW_LINES));
+        if ($attempts < 2) {
+            throw new RuntimeException("expected $victim to retry after collision");
+        }
+        foreach ($ids as $i => $id) {
+            $row = DB::table('product_interests')->where('id', $id)->first();
+            $expected = $i === 0 ? ['legacy'] : ['law'];
+            if (! $row || json_decode($row->products, true) !== $expected || DB::table('interest_product_index')->where('interest_id', $id)->pluck('product_code')->all() !== $expected) {
+                throw new RuntimeException('index does not match source');
+            }
+        }
+        if (DB::table('product_interests')->where('email', "qa-deadlock-1-$run@example.test")->count() !== 1 || ! DB::table('interest_product_index_state')->where('id', 1)->where('ready', true)->where('running', false)->exists()) {
+            throw new RuntimeException('duplicate record or invalid state');
+        }
+        echo "$victim retry, count, notification and index passed\n";
+        foreach (['backfill', 'writer'] as $actor) {
+            unlink("$dir/$actor-attempts");
+            unlink("$dir/$actor-ready");
+        }
+    }
+} finally {
+    foreach ($children as $pid => $actor) {
+        posix_kill($pid, SIGKILL);
+        pcntl_waitpid($pid, $status);
+    }
+    DB::purge();
+    DB::table('product_interests')->whereIn('id', $ids)->delete();
+    DB::statement("DROP TABLE IF EXISTS `$ballast`");
+    foreach (glob($dir.'/*') ?: [] as $path) {
+        unlink($path);
+    }
+    rmdir($dir);
+}

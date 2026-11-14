@@ -26,7 +26,7 @@ EXCLUDED = {'.git', 'vendor', 'node_modules', 'storage', 'test-results', 'playwr
 CHECKS = {
     'populated-upgrade', 'old-data-integrity', 'five-migration-ledger',
     'repair-column-forward-only', 'interest-index-sixth-migration',
-    'interest-index-pre-migration-compat', 'interest-index-backfill', 'interest-index-concurrency-rollback',
+    'interest-index-pre-migration-compat', 'interest-index-backfill', 'interest-index-concurrency-rollback', 'interest-index-deadlock-retry',
     'schema-confidentiality', 'schema-publication-reviews', 'schema-import-batches',
     'schema-tasks-events-permissions', 'idempotence', 'roll-forward-invariants',
     'automatic-destructive-rollback-disabled', 'reversal-risk-demonstrated',

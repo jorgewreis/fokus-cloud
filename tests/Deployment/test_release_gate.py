@@ -66,7 +66,7 @@ class ReleaseEvidenceContracts(unittest.TestCase):
 
     def test_each_interest_index_evidence_is_mandatory(self):
         for check in ('interest-index-sixth-migration', 'interest-index-pre-migration-compat',
-                      'interest-index-backfill', 'interest-index-concurrency-rollback'):
+                      'interest-index-backfill', 'interest-index-concurrency-rollback', 'interest-index-deadlock-retry'):
             with self.subTest(check=check), self.assertRaisesRegex(ValueError, 'Required evidence checks'):
                 self.exercise(missing_check=check)
 

@@ -358,7 +358,7 @@ class HarnessContracts(unittest.TestCase):
         source = (common.ROOT / 'tests/Deployment/linux-upgrade.py').read_text(encoding='utf-8')
         labels = ['interest-index-pre-migration-compat', 'repair-fresh-noop', 'prepare-origin-shape', 'repair-billing-before', 'six-migrations',
                   'repair-billing-after', 'repair-origin-verify', 'repair-origin-idempotent', 'interest-index-backfill',
-                  'interest-index-concurrency-rollback', 'restored-backup-repair-verify']
+                  'interest-index-concurrency-rollback', 'interest-index-deadlock-retry', 'restored-backup-repair-verify']
         positions = [source.index("'" + label + "'") for label in labels]
         self.assertEqual(positions, sorted(positions))
         self.assertIn('require_new_migrations(new)', source)

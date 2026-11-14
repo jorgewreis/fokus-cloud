@@ -241,6 +241,7 @@ def main():
                 env['FOKUS_INTEREST_INDEX_DISPOSABLE'] = '1'
                 try:
                     execute([str(candidate / 'tests/Deployment/interest-index-concurrency.php')], 'interest-index-concurrency-rollback')
+                    execute([str(candidate / 'tests/Deployment/interest-index-deadlock.php')], 'interest-index-deadlock-retry')
                 finally:
                     del env['FOKUS_INTEREST_INDEX_DISPOSABLE']
             execute([str(fixture), str(candidate), 'verify-recovery'], 'roll-forward')
