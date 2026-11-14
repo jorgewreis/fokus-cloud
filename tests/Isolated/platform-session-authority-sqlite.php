@@ -13,6 +13,7 @@ require __DIR__.'/../../app/Services/CompanyIdempotencyStore.php';
 require __DIR__.'/../../app/Services/CompanyIdempotencyFactory.php';
 require __DIR__.'/../../app/Services/PlatformSessionBinding.php';
 require __DIR__.'/../../app/Services/PlatformSessionLifecycle.php';
+require __DIR__.'/../../app/Services/WebPrincipalGeneration.php';
 require __DIR__.'/../../app/Http/Controllers/Api/AuthController.php';
 
 use App\Http\Controllers\Api\AuthController;
@@ -24,6 +25,7 @@ use App\Services\CompanyIdempotencyStore;
 use App\Services\PlatformSessionAuthority;
 use App\Services\PlatformSessionBinding;
 use App\Services\PlatformSessionLifecycle;
+use App\Services\WebPrincipalGeneration;
 use Illuminate\Config\Repository;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\QueryException;
@@ -51,7 +53,7 @@ $db->statement('CREATE TABLE platform_admins (id TEXT PRIMARY KEY, status TEXT, 
 $db->statement('CREATE TABLE platform_permissions (id TEXT PRIMARY KEY, code TEXT)');
 $db->statement('CREATE TABLE platform_role_permissions (platform_role_id TEXT, platform_permission_id TEXT)');
 $db->statement('CREATE TABLE company_idempotency_requests (token_hash TEXT PRIMARY KEY, key_id TEXT, actor_id TEXT, operation TEXT, issued_at_epoch INTEGER, expires_at_epoch INTEGER, recorded_at_epoch INTEGER, state TEXT, revoked INTEGER DEFAULT 0, payload_digest TEXT, result_id TEXT, result_status INTEGER, created_at TEXT, updated_at TEXT)');
-$db->statement('CREATE TABLE platform_session_authorizations (binding_hash TEXT PRIMARY KEY, actor_id TEXT NOT NULL, expires_at_epoch INTEGER NOT NULL, revoked INTEGER NOT NULL DEFAULT 0, created_at TEXT, updated_at TEXT)');
+$db->statement('CREATE TABLE platform_session_authorizations (binding_hash TEXT PRIMARY KEY, actor_id TEXT NOT NULL, web_user_id TEXT, web_generation INTEGER, expires_at_epoch INTEGER NOT NULL, revoked INTEGER NOT NULL DEFAULT 0, created_at TEXT, updated_at TEXT)');
 $db->statement('CREATE TABLE synthetic_effects (id TEXT PRIMARY KEY)');
 $db->statement('CREATE TABLE sessions (id TEXT PRIMARY KEY, payload TEXT, last_activity INTEGER NOT NULL)');
 $db->statement('CREATE TABLE synthetic_challenges (id TEXT PRIMARY KEY, used INTEGER NOT NULL DEFAULT 0)');
@@ -74,6 +76,53 @@ $check = function (bool $condition) use (&$assertions): void {
         throw new RuntimeException('Session authority assertion failed.');
     }
 };
+$db->statement('CREATE TABLE users (id TEXT PRIMARY KEY)');
+$db->statement('CREATE TABLE web_principal_generations (user_id TEXT PRIMARY KEY, generation INTEGER NOT NULL, updated_at TEXT NOT NULL)');
+$db->table('users')->insert(['id' => 'principal']);
+$generations = new WebPrincipalGeneration;
+$check($generations->withLockedPrincipal('principal', fn (int $generation): int => $generation) === 0);
+try {
+    $generations->advance('principal', function () use ($db): void {
+        $db->table('synthetic_passwords')->where('id', 'synthetic-user')->update(['password' => 'after']);
+        throw new RuntimeException('synthetic generation failure');
+    });
+    throw new LogicException('Generation failure was not propagated.');
+} catch (RuntimeException $e) {
+    $check($e->getMessage() === 'synthetic generation failure');
+}
+$check($db->table('web_principal_generations')->where('user_id', 'principal')->count() === 0);
+$check($db->table('synthetic_passwords')->where('id', 'synthetic-user')->value('password') === 'before');
+$generations->advance('principal', fn () => null);
+$check($generations->withLockedPrincipal('principal', fn (int $generation): int => $generation) === 1);
+$principalMarker = str_repeat('9', 64);
+$authority->registerPrincipalAfterMfa('actor-a', $principalMarker, $expiry, 'principal');
+$check($authority->withActivePrincipalSession('actor-a', $principalMarker, $sessionId, 'principal', fn () => 'allowed') === 'allowed');
+$db->table('users')->insert(['id' => 'other-principal']);
+try {
+    $authority->withActivePrincipalSession('actor-a', $principalMarker, $sessionId, 'other-principal', fn () => null);
+    throw new LogicException('Wrong principal hint was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 401);
+}
+$generations->advance('principal', fn () => null);
+try {
+    $authority->withActivePrincipalSession('actor-a', $principalMarker, $sessionId, 'principal', fn () => null);
+    throw new LogicException('Old principal generation was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 401);
+}
+try {
+    $generations->withLockedPrincipal('missing', fn () => null);
+    throw new LogicException('Missing principal was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 401);
+}
+try {
+    $db->transaction(fn () => $generations->advance('principal', fn () => null));
+    throw new RuntimeException('Nested principal generation was accepted.');
+} catch (LogicException) {
+    $check(true);
+}
 $db->statement('CREATE TABLE company_memberships (id TEXT PRIMARY KEY, user_id TEXT, status TEXT, version INTEGER, updated_at TEXT)');
 $db->statement('CREATE TABLE law_unit_memberships (id TEXT PRIMARY KEY, company_membership_id TEXT, status TEXT, version INTEGER, updated_at TEXT)');
 $db->statement('CREATE TABLE company_invitations (id TEXT PRIMARY KEY, membership_id TEXT, accepted_at TEXT, updated_at TEXT)');

@@ -11,6 +11,8 @@ return new class extends Migration
         Schema::create('platform_session_authorizations', function (Blueprint $table): void {
             $table->char('binding_hash', 64)->primary();
             $table->string('actor_id', 128);
+            $table->string('web_user_id', 128)->nullable();
+            $table->unsignedBigInteger('web_generation')->nullable();
             $table->unsignedBigInteger('expires_at_epoch');
             $table->boolean('revoked')->default(false);
             $table->timestamps();

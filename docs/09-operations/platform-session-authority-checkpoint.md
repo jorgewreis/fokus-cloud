@@ -119,7 +119,12 @@ support workflows: protecting backoffice writes alone is not complete revocation
 Database session cleanup is then best-effort hygiene, not the authority. Avoid
 bulk session deletion inside this transaction until its lock order is proven.
 
-This is a design candidate, not code or a release guarantee. It needs a precise
+An isolated principal-generation and principal-bound authority primitive now
+implements the non-null user case, with a top-level transaction and revalidation
+under the user and actor locks. The existing authority methods and real callers
+do not use it; they remain unsafe to expose. The no-user case, real MFA, login,
+context switches, portal middleware and reset are not integrated. This is a
+partial candidate, not a release guarantee. It needs a precise
 inventory of all writes and principal transitions, proof against concurrent
 first-login/registration and missing users, and a migration/rollout policy for
 old sessions. Use deterministic two-connection MySQL barrier tests for reset

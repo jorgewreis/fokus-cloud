@@ -13,6 +13,41 @@ use LogicException;
  */
 final class PlatformSessionAuthority
 {
+    /** Experimental only; caller must authenticate both principals beforehand. */
+    public function registerPrincipalAfterMfa(string $actor, string $marker, int $expiresAt, string $userId): void
+    {
+        $hash = $this->bindingHash($marker);
+        (new WebPrincipalGeneration)->withLockedPrincipal($userId, function (int $generation) use ($actor, $hash, $expiresAt, $userId): void {
+            $this->assertAvailable($this->lockActor($actor));
+            if ($expiresAt <= now()->getTimestamp()) {
+                throw new InvalidArgumentException('Invalid session authorization expiry.');
+            }
+            DB::table('platform_session_authorizations')->insert([
+                'binding_hash' => $hash, 'actor_id' => $actor, 'web_user_id' => $userId,
+                'web_generation' => $generation, 'expires_at_epoch' => $expiresAt, 'revoked' => false,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        });
+    }
+
+    /** Recheck a principal hint only after locking its generation and binding. */
+    public function withActivePrincipalSession(string $actor, string $marker, string $sessionId, string $userId, callable $callback): mixed
+    {
+        $hash = $this->bindingHash($marker);
+
+        return (new WebPrincipalGeneration)->withLockedPrincipal($userId, function (int $generation) use ($actor, $hash, $sessionId, $userId, $callback): mixed {
+            $this->lockActor($actor);
+            $binding = DB::table('platform_session_authorizations')->where('binding_hash', $hash)
+                ->where('actor_id', $actor)->lockForUpdate()->first();
+            abort_unless($binding && ! $binding->revoked && (int) $binding->expires_at_epoch > now()->getTimestamp()
+                && $binding->web_user_id === $userId && $binding->web_generation !== null
+                && (int) $binding->web_generation === $generation, 401, 'Sessão indisponível.');
+            $this->lockLaravelSession($sessionId);
+
+            return $callback();
+        });
+    }
+
     /**
      * The caller must hold an authenticated platform session and have completed
      * MFA. Marker and lifetime come from trusted server code, never from input.
