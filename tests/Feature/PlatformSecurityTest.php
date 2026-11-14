@@ -6,6 +6,7 @@ use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
 use App\Models\User;
 use App\Services\PlatformAudit;
+use App\Services\PlatformSessionBinding;
 use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -43,7 +44,8 @@ class PlatformSecurityTest extends TestCase
         $admin = $this->admin();
         $this->actingAs($admin, 'platform');
 
-        $this->postJson('/api/backoffice/auth/logout')->assertNoContent();
+        $this->withSession([PlatformSessionBinding::SESSION_KEY => str_repeat('a', 64)])->postJson('/api/backoffice/auth/logout')->assertNoContent();
+        $this->assertNull(session(PlatformSessionBinding::SESSION_KEY));
         $this->assertGuest('platform');
         $this->getJson('/api/backoffice/auth/me')->assertUnauthorized();
         $this->getJson('/api/backoffice/dashboard')->assertUnauthorized();
@@ -62,7 +64,13 @@ class PlatformSecurityTest extends TestCase
     {
         $admin = $this->admin();
         $challengeId = $this->challenge($admin, '123456');
-        $this->withSession(['platform_pending_admin_id' => $admin->id])->postJson('/api/backoffice/auth/verify-mfa', ['code' => '123456'])->assertOk()->assertJsonPath('admin.id', $admin->id);
+        $response = $this->withSession(['platform_pending_admin_id' => $admin->id, PlatformSessionBinding::SESSION_KEY => str_repeat('a', 64)])->postJson('/api/backoffice/auth/verify-mfa', ['code' => '123456']);
+        $response->assertOk()->assertJsonPath('admin.id', $admin->id);
+        $binding = session(PlatformSessionBinding::SESSION_KEY);
+        $this->assertIsString($binding);
+        $this->assertMatchesRegularExpression('/\A[0-9a-f]{64}\z/', $binding);
+        $this->assertNotSame(str_repeat('a', 64), $binding);
+        $this->assertStringNotContainsString($binding, $response->getContent());
         $this->assertAuthenticatedAs($admin, 'platform');
         $this->assertDatabaseMissing('platform_login_challenges', ['id' => $challengeId, 'used_at' => null]);
     }
