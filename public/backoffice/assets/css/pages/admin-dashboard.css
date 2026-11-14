@@ -2013,17 +2013,22 @@ html[data-role="admin"] .fs-sidebar .sidebar-subnav-button {
 }
 
 /* Keep record search inputs within their filter card on narrow screens. */
+html[data-role="admin"] .fs-sidebar .sidebar-button:focus-visible {
+    outline: 3px solid #f6b600 !important;
+    outline-offset: -3px !important;
+}
+
 @media (max-width: 680px) {
-    html[data-role="admin"] .backoffice-records-page .fs-filter-form :is(label[for="company-query"], label[for="product-search"], label[for="module-query"]) {
+    html[data-role="admin"] .backoffice-records-page .fs-filter-form :is(label[for="company-query"], label[for="product-search"], label[for="module-query"], label[for="plan-search"], label[for="users-query"]) {
         width: 100%;
         min-width: 0;
         flex: 0 1 100%;
     }
-    html[data-role="admin"] .backoffice-records-page .fs-filter-form :is(label[for="company-query"], label[for="product-search"], label[for="module-query"]) .fs-input-group-subtle {
+    html[data-role="admin"] .backoffice-records-page .fs-filter-form :is(label[for="company-query"], label[for="product-search"], label[for="module-query"], label[for="plan-search"]) .fs-input-group-subtle {
         width: 100%;
         min-width: 0;
     }
-    html[data-role="admin"] .backoffice-records-page .fs-filter-form :is(#company-query, #product-search, #module-query) {
+    html[data-role="admin"] .backoffice-records-page .fs-filter-form :is(#company-query, #product-search, #module-query, #plan-search, #users-query) {
         width: 100% !important;
         min-width: 0;
         flex: 1 1 0;

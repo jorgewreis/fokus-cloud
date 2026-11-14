@@ -179,6 +179,28 @@ relacionado, valor, status no Mercado Pago, payload de retorno e auditoria. Se
 o Mercado Pago confirmar estorno, o pagamento local deve passar para
 `estornado`.
 
+Uma execução iniciada que não recebe confirmação coerente permanece em
+`executando`: o resultado no provedor é incerto, não um estorno confirmado.
+Não repetir automaticamente, recusar ou liberar o saldo enquanto estiver nesse
+estado. A operação deve consultar o Mercado Pago e registrar a evidência para
+análise; valor e data semelhantes, por si só, não comprovam a associação ao
+pedido local. Quando a própria resposta da execução trouxer identificador,
+pagamento e valor correspondentes, a administração pode consultar esse mesmo
+identificador no provedor pela ação de consulta; ela não envia outro estorno.
+Apenas uma resposta aprovada e coerente conclui o registro. Se não houver
+identificador associado à resposta original, a resolução administrativa
+rastreável permanece pendente; não alterar registros manualmente como
+substituto desse fluxo.
+
+Antes do envio, a execução vincula o pedido ao identificador do pagamento por
+um resumo SHA-256. A consulta posterior é bloqueada se o identificador atual
+não corresponder ao vínculo original; o mesmo identificador de reembolso do
+provedor não pode ser associado a dois pedidos locais.
+
+O endpoint oficial de criação exige chave de idempotência e exemplifica uma
+resposta aprovada com identificador, pagamento e valor:
+[Criar reembolso — Mercado Pago](https://www.mercadopago.com.br/developers/pt/reference/online-payments/checkout-pro-preferences/create-refund/post).
+
 ## Conciliacao
 
 A conciliacao compara os dados internos do Fokus Cloud com os dados do Mercado
@@ -285,3 +307,42 @@ HMAC com `x-signature`, `x-request-id` e `data.id`, persistem evento sanitizado
 antes do processamento e retornam `200` para processados ou duplicados. A
 tolerância de inadimplência é de sete dias. Correções de conciliação e execução
 de reembolso são exclusivas do superadministrador.
+
+## Reembolsos antigos em execução sem vínculo comprovado
+
+Um reembolso que já estava em `executando` antes da gravação do vínculo
+imutável com o pagamento permanece pendente. A consulta automática exige esse
+vínculo e não associa um identificador do provedor por valor ou data.
+
+1. Um superadministrador identifica a solicitação, empresa e pagamento no
+   backoffice e consulta os registros de auditoria disponíveis.
+2. Registra no acompanhamento operacional autorizado o identificador interno,
+   responsável, horários, motivo da análise e evidências sanitizadas; não
+   registra credenciais ou dados pessoais desnecessários.
+3. Encaminha o caso ao responsável pela plataforma e, quando necessário, ao
+   Mercado Pago, usando os canais e permissões autorizados, para preservar e
+   conferir as evidências do pagamento e da operação original.
+4. Mantém a solicitação pendente: não reenviar o estorno, não rejeitar ou
+   liberar o valor, não alterar o banco diretamente e não presumir vínculo por
+   coincidência de valor, data ou identificador informado sem proveniência.
+
+A confirmação ou regularização desses casos requer um mecanismo futuro,
+explicitamente auditado, que preserve a proveniência e comprove o vínculo. O
+fluxo atual não fornece resolução automática para solicitações sem o vínculo
+original; a análise externa, por si só, não altera o estado no sistema.
+
+## Proteção de unicidade para reembolsos
+
+Antes de executar ou consultar um estorno, o sistema verifica nos metadados do
+banco se existe o índice único integral `refund_requests_provider_refund_id_unique`
+sobre a única coluna `provider_refund_id`. Índices ausentes, renomeados,
+parciais, por prefixo, compostos ou sem unicidade bloqueiam essas operações.
+Bancos diferentes de MySQL e SQLite também permanecem bloqueados até que seu
+comportamento seja implementado e validado. O bloqueio ocorre antes do contato
+com o provedor e preserva o estado existente.
+
+Em instalação antiga bloqueada, a equipe de banco deve inspecionar o esquema e
+os identificadores duplicados por procedimento autorizado e auditado, planejar
+uma migração adequada e verificar a restrição antes de reativar o fluxo. Não
+criar o índice às cegas nem deduzir vínculos de operações antigas. Mudanças de
+DDL devem ocorrer em janela controlada, sem concorrência com o fluxo financeiro.
