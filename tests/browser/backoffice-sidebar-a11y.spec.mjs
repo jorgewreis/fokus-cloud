@@ -1,5 +1,43 @@
 import { test, expect } from '@playwright/test';
 
+test('sidebar inicial recolhida mantém ordem inicial de teclado', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.mouse.move(900, 800);
+    await page.addInitScript(() => {
+        window.__sidebarEvents = [];
+        for (const type of ['mouseover', 'focusin', 'pointerdown']) {
+            document.addEventListener(type, (event) => {
+                if (event.target.closest?.('#sidebar')) window.__sidebarEvents.push({ type, target: event.target.id || event.target.className, trusted: event.isTrusted });
+            }, true);
+        }
+    });
+    await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ json: { admin: {
+        id: 'PAD_TEST', name: 'Admin Teste', role: 'superadministrador',
+        permissions: ['platform.security.manage', 'platform.catalog.manage', 'platform.catalog.publish', 'platform.users.view', 'platform.subscriptions.manage', 'platform.payments.view'],
+    } } }));
+    await page.goto('/backoffice/empresas');
+    await expect(page.locator('[data-backoffice-page="companies"]').first()).toBeVisible();
+    try {
+        await expect.poll(() => page.evaluate(() => ({
+        width: window.innerWidth,
+        responsive: matchMedia('(max-width: 1919px)').matches,
+        sidebar: document.querySelector('#sidebar').classList.contains('single'),
+        hovered: document.querySelector('#sidebar').matches(':hover'),
+        focused: document.activeElement?.tagName,
+    })), { message: 'estado inicial antes de qualquer clique ou Tab' }).toEqual({
+        width: 1440, responsive: true, sidebar: true, hovered: false, focused: 'BODY',
+        });
+    } catch (error) {
+        console.log('Diagnóstico inicial da sidebar:', await page.evaluate(() => window.__sidebarEvents));
+        throw error;
+    }
+    await page.keyboard.press('Tab');
+    await expect(page.locator('#sidebar [data-sidebar-item="platform-dashboard-final"]')).toBeFocused();
+    await expect(page.locator('#sidebar [data-sidebar-item="platform-dashboard-final"]')).toHaveCSS('outline-width', '3px');
+    await page.keyboard.press('Tab');
+    await expect(page.locator('#sidebar [data-sidebar-item="companies"]')).toBeFocused();
+});
+
 test('sidebar mantém nomes e foco visível ao navegar por teclado', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     // The sidebar expands on hover; keep the initial pointer outside it so the
