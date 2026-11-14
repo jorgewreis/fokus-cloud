@@ -61,3 +61,20 @@ O resultado foi observado na saída interativa do script, sem log durável versi
 - Capturar e revisar visualmente todas as páginas e estados em viewports acordados, incluindo 320, 768 e 1024 px; preservar evidências por SHA e fixture.
 - Validar autenticação, autorização, persistência e integrações em ambiente seguro com backend real e dados sintéticos. Mocks não comprovam esses contratos.
 - Corrigir o achado do menu e repetir teste de nomes e foco em estados recolhido e expandido antes de considerá-lo resolvido.
+
+## Reteste dos filtros de planos e usuários — 14/11/2026
+
+Em Edge headless, em 320 × 700 px, com a fixture administrativa sintética e
+código baseado em `37535392`, os campos de busca de planos e usuários mediram
+respectivamente 71–491 px e 33–453 px, excedendo a largura do viewport e sendo
+recortados pelo cartão. A mesma inspeção visual confirmou o recorte. A correção
+estende a composição responsiva já usada nos filtros de registros do Cloud;
+não modifica o pacote Fokus Styles 2.7.0. A largura fixa local do formulário de
+registros motivou a adaptação local, específica deste shell.
+
+Após a correção, as capturas de [planos](evidence/backoffice-filtros-20261114/planos-320-depois.png)
+e [usuários](evidence/backoffice-filtros-20261114/usuarios-320-depois.png)
+mostram os dois campos inteiros. O teste `backoffice-mobile-filters.spec.mjs`
+verifica geometria e digitação em 320, 375 e 768 px com fixture, sem backend
+real. A comparação foi feita na branch da alteração, não em produção. Não
+comprova os demais estados, acessibilidade completa ou fidelidade das fontes.
