@@ -58,7 +58,8 @@ test('navegador não consulta listener substituído após carregar fixture', { s
     const browser = await chromium.launch({ headless: true, executablePath: process.env.FOKUS_TEST_BROWSER });
     let replacement;
     try {
-        const page = await browser.newPage();
+        const context = await browser.newContext({ serviceWorkers: 'block' });
+        const page = await context.newPage();
         await page.route('**/*', route => fulfillInterestFixtureRoute(origin, route));
         await page.goto(`${origin}/backoffice/`);
         await page.locator('#sidebar').waitFor();
@@ -75,4 +76,29 @@ test('navegador não consulta listener substituído após carregar fixture', { s
         if (first.listening) await close(first);
         if (replacement?.listening) await close(replacement);
     }
+});
+
+test('contexto bloqueia registro de service worker sintético', { skip: !process.env.FOKUS_TEST_BROWSER, timeout: 15000 }, async () => {
+    const { chromium } = await import('@playwright/test');
+    const browser = await chromium.launch({ headless: true, executablePath: process.env.FOKUS_TEST_BROWSER });
+    try {
+        const context = await browser.newContext({ serviceWorkers: 'block' });
+        const page = await context.newPage();
+        let workerRequests = 0;
+        await page.route('**/*', route => {
+            if (route.request().url().endsWith('/fake-sw.js')) workerRequests++;
+            return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Fixture isolado</title>' });
+        });
+        await page.goto('http://127.0.0.1:4196/fixture');
+        const result = await page.evaluate(async () => {
+            const registration = navigator.serviceWorker.register('/fake-sw.js').then(value => value ? 'registered' : 'blocked', () => 'rejected');
+            const outcome = await Promise.race([registration, new Promise(resolve => setTimeout(() => resolve('blocked'), 500))]);
+            return { outcome, count: (await navigator.serviceWorker.getRegistrations()).length, controlled: Boolean(navigator.serviceWorker.controller) };
+        });
+        assert.notEqual(result.outcome, 'registered');
+        assert.equal(result.count, 0);
+        assert.equal(result.controlled, false);
+        assert.equal(workerRequests, 0);
+        await context.close();
+    } finally { await browser.close(); }
 });

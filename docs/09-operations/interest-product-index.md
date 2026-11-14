@@ -20,9 +20,9 @@ Para comprovar concorrência e rollback, usar apenas ambiente descartável com M
 ### Prova sintética de BFCache real para Interesses
 
 O roteiro `tests/Deployment/interest-real-bfcache.mjs` responde diretamente
-no processo de teste usando o handler estático sintético. Não abre nem consulta
-um socket de fixture, não transmite prova reutilizável e aborta requisições
-externas. A origem `127.0.0.1:4196` é virtual e as respostas são entregues ao
+no processo de teste usando o handler estático sintético. O contexto do
+navegador bloqueia service workers. O ensaio não abre nem consulta um socket de
+fixture, não transmite prova reutilizável e aborta requisições externas. A origem `127.0.0.1:4196` é virtual e as respostas são entregues ao
 navegador por interceptação em memória. Mesmo que outro processo ocupe ou
 substitua essa porta, ele não recebe as requisições do ensaio.
 

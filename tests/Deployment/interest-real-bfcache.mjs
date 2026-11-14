@@ -16,7 +16,8 @@ try {
         ...(process.env.FOKUS_TEST_BROWSER ? { executablePath: process.env.FOKUS_TEST_BROWSER } : {}),
         args: ['--enable-features=BackForwardCache'],
     });
-    const page = await browser.newPage();
+    const context = await browser.newContext({ serviceWorkers: 'block' });
+    const page = await context.newPage();
     const cdp = await page.context().newCDPSession(page); await cdp.send('Page.enable'); cdp.on('Page.backForwardCacheNotUsed', event => console.log('not restored', JSON.stringify(event.notRestoredExplanations)));
     await page.route('**/*', route => fulfillInterestFixtureRoute(origin, route));
     await page.addInitScript(() => {
