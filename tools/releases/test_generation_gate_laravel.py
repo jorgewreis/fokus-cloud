@@ -205,11 +205,13 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
     # evidence: it must reject before writing a latch or changing current.
     incomplete=dict(p);incomplete.pop('runtime_evidence_path');incomplete.pop('runtime_evidence_sha256')
     incomplete_policy=temp/'policy-without-runtime.json';incomplete_policy.write_text(json.dumps(incomplete));incomplete_policy.chmod(0o600)
+    reviewed_contract=temp/'immutable-reviewed.py';reviewed_contract.write_bytes(subprocess.check_output(['git','show',d.CONTRACT61+':tools/releases/immutable.py'],cwd=clone))
+    assert hashlib.sha256(reviewed_contract.read_bytes()).hexdigest()==g.CONTRACT_DIGEST
     ready_before=(base/'scheduler-ready.json').read_bytes()
     direct=subprocess.run([sys.executable,str(source/'tools/releases/generation_activation.py'),'activate',
         '--base',str(base),'--candidate',str(newroot),'--receipt',str(newreceipt),
         '--policy',str(incomplete_policy),'--previous',str(old),'--previous-receipt',str(oldreceipt),
-        '--boundary',str(temp/'scope.json'),'--immutable-contract',str(clone/'tools/releases/immutable.py')],
+        '--boundary',str(temp/'scope.json'),'--immutable-contract',str(reviewed_contract)],
         env={'PATH':os.environ['PATH'],'HOME':str(temp)},capture_output=True,text=True,timeout=45)
     assert direct.returncode!=0 and 'runtime_evidence_rejected' in direct.stderr
     assert (base/'current').resolve()==old and not (base/'activation-blocked.json').exists()

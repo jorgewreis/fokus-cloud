@@ -79,11 +79,13 @@ medição e revisão independentes, e o gate original permanece obrigatório.
 
 A exigência de evidência é aplicada dentro de `generation_activation.activate`,
 sob os locks e antes de latch/switch, tanto para o comando direto quanto para o
-publicador. O CLI legado separado de `immutable.py` pertence ao contrato fixado
-anterior e não passa por essa exigência; seu scheduler conservador permanece,
-mas ele não deve ser exposto como caminho produtivo alternativo. A integração
-final precisa impedir ou substituir esse entrypoint sem enfraquecer o contrato
-fixado e seus testes. O workflow legado continua bloqueado.
+publicador. O CLI atual de `immutable.py` recusa explicitamente `activate` e
+`rollback` antes de operações; suas primitivas históricas seguem disponíveis para
+verificação do contrato fixado, não como caminho produtivo de ativação. O CLI
+supervisionado exige uma cópia do contrato histórico cujo digest corresponda ao
+valor fixado, e o teste a extrai do commit revisado. Isso não impede um operador
+confiável de escrever código Python arbitrário; preservar o controle do operador
+continua essencial. O workflow legado permanece bloqueado.
 
 Os comandos `activate` e `rollback` delegam ao gate de geração supervisionada e
 exigem explicitamente candidato, receipts, política, geração anterior e prova
