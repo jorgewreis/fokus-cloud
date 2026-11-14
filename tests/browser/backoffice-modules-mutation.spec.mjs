@@ -117,7 +117,7 @@ test('falha na atualização após sucesso exige consulta antes de outra altera�
     await page.evaluate(()=>{window.holdCatalog = true; window.pending[0].resolve({});});
     await expect.poll(()=>page.evaluate(()=>typeof window.rejectCatalog)).toBe('function');
     await page.evaluate(()=>window.rejectCatalog(new Error('Catálogo indisponível')));
-    await expect(page.locator('#modules-message')).toContainText('Não foi possível confirmar');
+    await expect(page.locator('#modules-message')).toContainText('A alteração foi concluída');
     await expect(page.locator('#module-form-submit')).toBeDisabled();
     await expect(page.getByRole('button', {name:'Já conferi o catálogo'})).toBeDisabled();
 });
