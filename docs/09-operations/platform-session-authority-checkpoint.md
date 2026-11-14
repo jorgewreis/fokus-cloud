@@ -208,3 +208,18 @@ user, company and a same-connection audit callback. Neither path is wired to
 controllers. Their SQLite rollback tests do not cover real HTTP, MySQL, audit
 side effects, Eloquent model events, email uniqueness races or session persistence.
 Do not remove the token gates on the strength of these primitives.
+
+Eligibility review: the existing invitation creation path requires an active,
+non-deleted company and an active/pending user, and records an expiry. The
+experimental token service now rechecks these, a pending/non-deleted membership,
+and a single unaccepted unexpired invitation under locks. More than one valid
+invitation is rejected provisionally because precedence is not specified; this
+can reject existing data and must be resolved before integration. The legacy
+email verification still sets status active without this eligibility check, and
+legacy acceptance lacks these checks; this branch does not change those routes.
+The email prototype now uses Eloquent save for its events and timestamp, but a
+synchronous observer may cause effects outside the DB even if the transaction
+rolls back; audit and observers need review. Current invitation lock order starts
+with user, while existing invitation creation locks company first; concurrent
+MySQL deadlock and rollback tests are mandatory, and no global lock order has
+been proven.

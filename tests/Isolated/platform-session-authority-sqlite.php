@@ -45,6 +45,7 @@ $capsule = new Capsule($app);
 $capsule->addConnection(['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '']);
 $capsule->addConnection(['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => ''], 'other');
 $capsule->setEventDispatcher(new Dispatcher($app));
+$capsule->bootEloquent();
 $app->instance('db', $capsule->getDatabaseManager());
 Facade::setFacadeApplication($app);
 $db = $capsule->getConnection();
@@ -106,7 +107,7 @@ foreach ([
 }
 $check(! $unknownConsumed);
 $fixturePlatformOnly($markerA);
-$db->statement('CREATE TABLE users (id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT \'ativa\', locked_until TEXT, password TEXT, email TEXT, email_verified_at TEXT)');
+$db->statement('CREATE TABLE users (id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT \'ativa\', locked_until TEXT, password TEXT, email TEXT, email_verified_at TEXT, created_at TEXT, updated_at TEXT)');
 $db->statement('CREATE TABLE web_principal_generations (user_id TEXT PRIMARY KEY, generation INTEGER NOT NULL, updated_at TEXT NOT NULL)');
 $db->table('users')->insert(['id' => 'principal', 'password' => 'synthetic-hash']);
 $db->statement('CREATE TABLE security_tokens (id TEXT PRIMARY KEY, user_id TEXT, purpose TEXT, token_hash TEXT UNIQUE, payload TEXT, expires_at TEXT, used_at TEXT, updated_at TEXT)');
@@ -123,7 +124,17 @@ try {
 }
 $check($db->table('security_tokens')->where('id', 'email-token')->value('used_at') === null);
 $check($db->table('users')->where('id', 'principal')->value('email') === null);
+$db->table('users')->where('id', 'principal')->update(['status' => 'desativada']);
+try {
+    $tokenPrimitive->verifyEmail('email-plain', fn () => null);
+    throw new LogicException('Inactive user was reactivated.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 422);
+}
+$check($db->table('security_tokens')->where('id', 'email-token')->value('used_at') === null);
+$db->table('users')->where('id', 'principal')->update(['status' => 'ativa']);
 $check($tokenPrimitive->verifyEmail('email-plain', fn () => null)['user_id'] === 'principal');
+$check($db->table('users')->where('id', 'principal')->value('updated_at') !== null);
 try {
     $tokenPrimitive->consume('synthetic-plain', 'membership_acceptance', function () use ($db): void {
         $db->table('synthetic_passwords')->where('id', 'synthetic-user')->update(['password' => 'after']);
@@ -268,14 +279,59 @@ try {
 } catch (LogicException) {
     $check(true);
 }
-$db->statement('CREATE TABLE company_memberships (id TEXT PRIMARY KEY, user_id TEXT, company_id TEXT, status TEXT, version INTEGER, updated_at TEXT)');
+$db->statement('CREATE TABLE companies (id TEXT PRIMARY KEY, status TEXT, deleted_at TEXT)');
+$db->statement('CREATE TABLE company_memberships (id TEXT PRIMARY KEY, user_id TEXT, company_id TEXT, status TEXT, version INTEGER, deleted_at TEXT, updated_at TEXT)');
 $db->statement('CREATE TABLE law_unit_memberships (id TEXT PRIMARY KEY, company_membership_id TEXT, status TEXT, version INTEGER, updated_at TEXT)');
-$db->statement('CREATE TABLE company_invitations (id TEXT PRIMARY KEY, membership_id TEXT, accepted_at TEXT, updated_at TEXT)');
+$db->statement('CREATE TABLE company_invitations (id TEXT PRIMARY KEY, membership_id TEXT, company_id TEXT, expires_at TEXT, accepted_at TEXT, updated_at TEXT)');
+$db->table('companies')->insert(['id' => 'company', 'status' => 'ativa']);
 $db->table('company_memberships')->insert(['id' => 'member', 'user_id' => 'synthetic-user', 'company_id' => 'company', 'status' => 'pendente', 'version' => 1]);
 $db->table('law_unit_memberships')->insert(['id' => 'unit', 'company_membership_id' => 'member', 'status' => 'pendente', 'version' => 1]);
-$db->table('company_invitations')->insert(['id' => 'invite', 'membership_id' => 'member']);
+$db->table('company_invitations')->insert(['id' => 'invite', 'membership_id' => 'member', 'company_id' => 'company', 'expires_at' => now()->addHour()]);
 $db->table('users')->insert(['id' => 'synthetic-user', 'password' => 'synthetic-hash']);
 $db->table('security_tokens')->insert(['id' => 'membership-token', 'user_id' => 'synthetic-user', 'purpose' => 'membership_acceptance', 'token_hash' => hash('sha256', 'membership-plain'), 'payload' => json_encode(['membership_id' => 'member']), 'expires_at' => now()->addHour()]);
+$db->table('companies')->where('id', 'company')->update(['status' => 'suspensa']);
+try {
+    $tokenPrimitive->acceptMembership('membership-plain');
+    throw new LogicException('Suspended company invitation was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 422);
+}
+$check($db->table('security_tokens')->where('id', 'membership-token')->value('used_at') === null);
+$db->table('companies')->where('id', 'company')->update(['status' => 'ativa']);
+$db->table('companies')->where('id', 'company')->update(['deleted_at' => now()]);
+try {
+    $tokenPrimitive->acceptMembership('membership-plain');
+    throw new LogicException('Deleted company invitation was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 422);
+}
+$db->table('companies')->where('id', 'company')->update(['deleted_at' => null]);
+$db->table('company_memberships')->where('id', 'member')->update(['deleted_at' => now()]);
+try {
+    $tokenPrimitive->acceptMembership('membership-plain');
+    throw new LogicException('Deleted membership invitation was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 422);
+}
+$db->table('company_memberships')->where('id', 'member')->update(['deleted_at' => null]);
+$db->table('company_invitations')->where('id', 'invite')->update(['expires_at' => now()->subMinute()]);
+try {
+    $tokenPrimitive->acceptMembership('membership-plain');
+    throw new LogicException('Expired invitation was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 422);
+}
+$check($db->table('security_tokens')->where('id', 'membership-token')->value('used_at') === null);
+$db->table('company_invitations')->where('id', 'invite')->update(['expires_at' => now()->addHour()]);
+$db->table('company_invitations')->insert(['id' => 'duplicate-invite', 'membership_id' => 'member', 'company_id' => 'company', 'expires_at' => now()->addHour()]);
+try {
+    $tokenPrimitive->acceptMembership('membership-plain');
+    throw new LogicException('Ambiguous invitation was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 422);
+}
+$check($db->table('security_tokens')->where('id', 'membership-token')->value('used_at') === null);
+$db->table('company_invitations')->where('id', 'duplicate-invite')->delete();
 $db->statement("CREATE TRIGGER fail_atomic_invite BEFORE UPDATE ON company_invitations BEGIN SELECT RAISE(FAIL, 'synthetic invite failure'); END");
 try {
     $tokenPrimitive->acceptMembership('membership-plain');

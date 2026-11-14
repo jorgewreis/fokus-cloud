@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -11,14 +13,16 @@ final class PrincipalSecurityToken
     /** The audit callback must write only to the same DB connection. */
     public function verifyEmail(string $plain, callable $recordEmailChange): array
     {
-        return $this->consume($plain, 'email_verification', function (object $token) use ($recordEmailChange): array {
+        return $this->consume($plain, 'email_verification', function (object $token, object $lockedUser) use ($recordEmailChange): array {
+            $this->ensureEligibleUser($lockedUser);
             $payload = json_decode($token->payload ?? '', true) ?: [];
             $changes = ['email_verified_at' => now(), 'status' => 'ativa'];
             if (! empty($payload['new_email'])) {
                 abort_if(DB::table('users')->where('email', $payload['new_email'])->where('id', '!=', $token->user_id)->exists(), 422, 'Este e-mail já está vinculado a outra conta.');
                 $changes['email'] = $payload['new_email'];
             }
-            DB::table('users')->where('id', $token->user_id)->update($changes);
+            $saved = User::findOrFail($token->user_id)->forceFill($changes)->save();
+            abort_unless($saved, 422, 'A conta não pôde ser atualizada.');
             if (! empty($payload['new_email'])) {
                 $recordEmailChange($token->user_id);
             }
@@ -34,20 +38,36 @@ final class PrincipalSecurityToken
     /** The caller must handle session transition; this does not authenticate. */
     public function acceptMembership(string $plain): array
     {
-        return $this->consume($plain, 'membership_acceptance', function (object $token): array {
+        return $this->consume($plain, 'membership_acceptance', function (object $token, object $lockedUser): array {
+            $this->ensureEligibleUser($lockedUser);
             $payload = json_decode($token->payload ?? '', true) ?: [];
             $membershipId = $payload['membership_id'] ?? null;
             abort_unless(is_string($membershipId) && $membershipId !== '', 422, 'Convite inválido.');
+            $membership = DB::table('company_memberships')->where('id', $membershipId)->where('user_id', $token->user_id)
+                ->where('status', 'pendente')->whereNull('deleted_at')->lockForUpdate()->first();
+            abort_unless($membership, 422, 'Este convite não pode mais ser aceito.');
+            $company = DB::table('companies')->where('id', $membership->company_id)->where('status', 'ativa')
+                ->whereNull('deleted_at')->lockForUpdate()->first(['id']);
+            abort_unless($company, 422, 'Este convite não pode mais ser aceito.');
+            $invitations = DB::table('company_invitations')->where('membership_id', $membershipId)->where('company_id', $company->id)
+                ->whereNull('accepted_at')->where('expires_at', '>', now())->lockForUpdate()->get(['id']);
+            abort_unless($invitations->count() === 1, 422, 'Este convite não pode mais ser aceito.');
             $changed = DB::table('company_memberships')->where('id', $membershipId)->where('user_id', $token->user_id)->where('status', 'pendente')
                 ->update(['status' => 'ativo', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
             abort_unless($changed === 1, 422, 'Este convite não pode mais ser aceito.');
             DB::table('law_unit_memberships')->where('company_membership_id', $membershipId)->where('status', 'pendente')
                 ->update(['status' => 'ativo', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
-            DB::table('company_invitations')->where('membership_id', $membershipId)->whereNull('accepted_at')
+            DB::table('company_invitations')->where('id', $invitations->first()->id)->whereNull('accepted_at')
                 ->update(['accepted_at' => now(), 'updated_at' => now()]);
 
             return ['user_id' => $token->user_id, 'company_id' => DB::table('company_memberships')->where('id', $membershipId)->value('company_id')];
         });
+    }
+
+    private function ensureEligibleUser(object $user): void
+    {
+        abort_unless(in_array($user->status, ['ativa', 'pendente'], true)
+            && ($user->locked_until === null || Carbon::parse($user->locked_until)->isPast()), 422, 'A conta não está disponível.');
     }
 
     /** The callback may only perform local writes on the business DB connection. */
