@@ -14,8 +14,9 @@ test('falha de ativação mantém reconciliação acessível com ponte de toast 
     await page.keyboard.press('Enter');
     await expect(reconciliation.getByRole('button', { name: 'Já conferi o catálogo' })).toBeEnabled();
     await expect(reconciliation.getByRole('button', { name: 'Já conferi o catálogo' })).toBeFocused();
-    await reconciliation.getByRole('button', { name: 'Já conferi o catálogo' }).click();
+    await page.keyboard.press('Enter');
     await expect(reconciliation).toHaveCount(0);
+    await expect(page.locator('#module-query')).toBeFocused();
 });
 
 test('reconciliação não rouba foco movido durante consulta', async ({ page }) => {

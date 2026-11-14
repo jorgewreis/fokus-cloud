@@ -90,7 +90,11 @@ export async function mount(root, context = {}) {
             button.className = "fs-btn fs-btn-outline-primary";
             button.textContent = "Já conferi o catálogo";
             button.disabled = !catalogLoaded || mutation.inFlight;
-            button.addEventListener("click", () => { mutation.uncertain = false; mutation.confirmedStale = false; notifyMutation(); showMessage(""); });
+            button.addEventListener("click", () => {
+                const restoreFocus = document.activeElement === button;
+                mutation.uncertain = false; mutation.confirmedStale = false; notifyMutation(); showMessage("");
+                if (restoreFocus && alive()) $("#module-query").focus();
+            });
             node.append(button);
             if (!catalogLoaded) {
                 const reload = document.createElement("button"); reload.type = "button";
