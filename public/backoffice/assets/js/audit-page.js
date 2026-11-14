@@ -47,23 +47,26 @@ export async function mount(root, context = {}) {
         const filters = root.querySelector("#access-filters");
         const message = root.querySelector("#access-message");
         const state = { page: 1, filters: {} };
+        pageSummary.tabIndex = -1;
+        pageSummary.setAttribute("aria-live", "polite");
         const showMessage = (text, tone = "danger") => { message.textContent = text || ""; message.dataset.tone = tone; message.hidden = !text; };
         const renderPagination = (meta = {}) => {
             const current = Math.max(1, Number(meta.current_page || 1));
             const last = Math.max(1, Number(meta.last_page || 1));
-            pagination.innerHTML = `<ul class="fs-pagination fs-pagination-compact"><li class="fs-page-item"><button class="fs-page-link" type="button" data-access-page="${current - 1}" aria-label="Página anterior" ${current <= 1 ? "disabled" : ""}>‹</button></li><li class="fs-page-item is-active" aria-current="page"><span class="fs-page-link" aria-label="Página ${current} de ${last}">${current}</span></li><li class="fs-page-item"><button class="fs-page-link" type="button" data-access-page="${current + 1}" aria-label="Próxima página" ${current >= last ? "disabled" : ""}>›</button></li></ul>`;
+            pagination.innerHTML = `<ul class="fs-pagination fs-pagination-compact"><li class="fs-page-item"><button class="fs-page-link" type="button" data-access-page="${current - 1}" aria-label="Página anterior" ${current <= 1 ? "disabled" : ""}><img src="/assets/icons/Keyboard-Arrow-Left--Streamline-Ultimate.png" alt="" width="16" height="16"></button></li><li class="fs-page-item is-active" aria-current="page"><span class="fs-page-link" aria-label="Página ${current} de ${last}">${current}</span></li><li class="fs-page-item"><button class="fs-page-link" type="button" data-access-page="${current + 1}" aria-label="Próxima página" ${current >= last ? "disabled" : ""}><img src="/assets/icons/Keyboard-Arrow-Right--Streamline-Ultimate.png" alt="" width="16" height="16"></button></li></ul>`;
         };
         const showDetail = (item) => {
             const detail = root.querySelector("#access-detail");
             root.querySelector("#access-detail-body").innerHTML = `<dl class="fs-detail-list"><div><dt>Usuário</dt><dd>${escapeHtml(item.user)}<br><small>${escapeHtml(item.email || "")}</small></dd></div><div><dt>Empresa</dt><dd>${escapeHtml(item.company || "Não identificada")}</dd></div><div><dt>Produto</dt><dd>${escapeHtml(item.product || "Não identificado")}</dd></div><div><dt>Evento</dt><dd>${escapeHtml(eventLabel(item.event))}</dd></div><div><dt>Data e hora</dt><dd>${escapeHtml(dateTime(item.created_at))}</dd></div><div><dt>IP</dt><dd>${escapeHtml(item.ip_address || "Não informado")}</dd></div><div><dt>Navegador/dispositivo</dt><dd>${escapeHtml(item.user_agent || "Não informado")}</dd></div></dl>`;
             window.FokusStyles?.Offcanvas?.getOrCreateInstance(detail)?.show();
         };
-        const load = async () => {
+        const load = async (preserveFocus = false) => {
             if (!active || context.signal?.aborted) return;
             const version = ++requestVersion;
+            if (preserveFocus) { pageSummary.textContent = "Carregando acessos..."; pageSummary.focus(); }
             body.innerHTML = '<tr><td colspan="7">Carregando acessos...</td></tr>';
             summary.textContent = "";
-            pageSummary.textContent = "";
+            if (!preserveFocus) pageSummary.textContent = "";
             pagination.innerHTML = "";
             showMessage("");
             try {
@@ -81,6 +84,7 @@ export async function mount(root, context = {}) {
             } catch (error) {
                 if (!isCurrent(version) || error?.name === "AbortError") return;
                 body.innerHTML = '<tr><td colspan="7">Não foi possível carregar os acessos.</td></tr>';
+                if (preserveFocus) pageSummary.textContent = "Não foi possível carregar os acessos.";
                 showMessage(error.message || "Não foi possível carregar o controle de acessos.");
             }
         };
@@ -88,7 +92,7 @@ export async function mount(root, context = {}) {
             const button = event.target.closest("[data-access-page]");
             if (!button || button.disabled) return;
             state.page = Number(button.dataset.accessPage);
-            load();
+            load(pagination.contains(document.activeElement));
         };
         const submit = (event) => { event.preventDefault(); state.page = 1; state.filters = Object.fromEntries([...new FormData(filters)].filter(([, value]) => value)); load(); };
         filters.addEventListener("submit", submit);
@@ -107,23 +111,26 @@ export async function mount(root, context = {}) {
         const pageSummary = root.querySelector("#audit-activity-page-summary");
         const pagination = root.querySelector("#audit-activity-pagination");
         const state = { page: 1 };
+        pageSummary.tabIndex = -1;
+        pageSummary.setAttribute("aria-live", "polite");
         const renderPagination = (meta) => {
             const current = Number(meta.current_page || 1);
             const last = Math.max(1, Number(meta.last_page || 1));
-            pagination.innerHTML = `<ul class="fs-pagination fs-pagination-compact"><li class="fs-page-item"><button class="fs-page-link" type="button" data-audit-page="${current - 1}" aria-label="Página anterior" ${current <= 1 ? "disabled" : ""}>‹</button></li><li class="fs-page-item is-active" aria-current="page"><button class="fs-page-link" type="button" aria-current="page" aria-label="Página ${current}">${current}</button></li><li class="fs-page-item"><button class="fs-page-link" type="button" data-audit-page="${current + 1}" aria-label="Próxima página" ${current >= last ? "disabled" : ""}>›</button></li></ul>`;
+            pagination.innerHTML = `<ul class="fs-pagination fs-pagination-compact"><li class="fs-page-item"><button class="fs-page-link" type="button" data-audit-page="${current - 1}" aria-label="Página anterior" ${current <= 1 ? "disabled" : ""}><img src="/assets/icons/Keyboard-Arrow-Left--Streamline-Ultimate.png" alt="" width="16" height="16"></button></li><li class="fs-page-item is-active"><span class="fs-page-link" aria-current="page" aria-label="Página ${current}">${current}</span></li><li class="fs-page-item"><button class="fs-page-link" type="button" data-audit-page="${current + 1}" aria-label="Próxima página" ${current >= last ? "disabled" : ""}><img src="/assets/icons/Keyboard-Arrow-Right--Streamline-Ultimate.png" alt="" width="16" height="16"></button></li></ul>`;
         };
         const onPageClick = (event) => {
             const button = event.target.closest("[data-audit-page]");
             if (!button || button.disabled) return;
             state.page = Number(button.dataset.auditPage);
-            load();
+            load(pagination.contains(document.activeElement));
         };
-        const load = async () => {
+        const load = async (preserveFocus = false) => {
         if (!active || context.signal?.aborted) return;
         const version = ++requestVersion;
+        if (preserveFocus) { pageSummary.textContent = "Carregando eventos..."; pageSummary.focus(); }
         body.innerHTML = '<tr><td colspan="4">Carregando eventos...</td></tr>';
         summary.textContent = "";
-        pageSummary.textContent = "";
+        if (!preserveFocus) pageSummary.textContent = "";
         pagination.innerHTML = "";
         try {
             const response = await api.request(`/backoffice/audit?page=${state.page}&per_page=20`, { signal: context.signal });
@@ -134,13 +141,14 @@ export async function mount(root, context = {}) {
             const current = Number(meta.current_page || 1);
             const perPage = Number(meta.per_page || 20);
             summary.textContent = `${total} eventos registrados`;
-            pageSummary.textContent = total ? `Mostrando ${((current - 1) * perPage) + 1}–${((current - 1) * perPage) + events.length} de ${total}` : "Nenhum evento recente encontrado.";
+            pageSummary.textContent = events.length ? `Mostrando ${((current - 1) * perPage) + 1}–${((current - 1) * perPage) + events.length} de ${total}` : "Nenhum evento recente encontrado.";
             body.innerHTML = events.map((event) => `<tr><td>${escapeHtml(eventLabel(event.action))}</td><td>${escapeHtml(event.actor_name || (event.actor_type === "system" ? "Sistema" : event.actor_type === "anonymous" ? "Não autenticado" : "Usuário não identificado"))}</td><td>${escapeHtml(dateTime(event.created_at))}</td><td>${escapeHtml(event.origin_context || event.origin_channel || "—")}</td></tr>`).join("") || '<tr><td colspan="4">Nenhum evento recente encontrado.</td></tr>';
             renderPagination(meta);
         } catch (error) {
             if (!isCurrent(version) || error?.name === "AbortError") return;
+            if (preserveFocus) pageSummary.textContent = "Não foi possível carregar os eventos.";
             body.innerHTML = `<tr><td colspan="4"><div role="alert">${escapeHtml(error.message || "Não foi possível carregar os eventos.")}</div><button class="fs-btn fs-btn-outline-primary fs-btn-sm" type="button" data-audit-retry>Tentar novamente</button></td></tr>`;
-            body.querySelector("[data-audit-retry]").addEventListener("click", load, { once: true });
+            body.querySelector("[data-audit-retry]").addEventListener("click", () => load(), { once: true });
         }
         };
         pagination.addEventListener("click", onPageClick);
