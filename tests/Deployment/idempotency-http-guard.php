@@ -15,7 +15,8 @@ if (getenv('APP_ENV') !== 'testing'
 }
 
 foreach (['curl_exec', 'curl_multi_exec', 'fsockopen', 'pfsockopen', 'stream_socket_client',
-    'socket_connect', 'exec', 'shell_exec', 'system', 'passthru', 'popen', 'proc_open', 'pcntl_exec'] as $function) {
+    'socket_connect', 'stream_wrapper_register', 'stream_wrapper_restore', 'exec', 'shell_exec',
+    'system', 'passthru', 'popen', 'proc_open', 'pcntl_exec'] as $function) {
     if (function_exists($function)) {
         throw new RuntimeException('Unsafe idempotency laboratory function is enabled.');
     }
