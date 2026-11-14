@@ -657,6 +657,11 @@ class BackofficeController extends Controller
         $entity = DB::table('companies')->where('id', $company)->first();
         abort_unless($entity, 404, 'Empresa não encontrada.');
         $audit->record($request->user()->id, 'backoffice.company_viewed', 'company', $company, $company, request: $request);
+        // The company drawer needs only the company record. Keep the existing
+        // expanded response for older consumers that do not request this view.
+        if ($request->query('view') === 'company') {
+            return response()->json(['company' => $this->companyDetailPayload($entity, $usage)]);
+        }
         $subscriptions = DB::table('subscriptions as subscription')->join('products as product', 'product.id', '=', 'subscription.product_id')->where('subscription.company_id', $company)->select('subscription.*', 'product.code as product_code', 'product.name as product_name')->orderByDesc('subscription.created_at')->get();
 
         return response()->json([

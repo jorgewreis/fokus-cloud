@@ -168,6 +168,35 @@ class CompanyAdminTest extends TestCase
         $this->actingAs($admin, 'platform')->getJson('/api/backoffice/companies/'.$company)->assertForbidden();
     }
 
+    public function test_company_only_view_skips_unneeded_subscription_history_and_keeps_legacy_contract(): void
+    {
+        $admin = $this->platformAdmin();
+        $company = $this->companyFixture('Empresa Detalhe', '98765432000100', 'detail@example.test');
+        $product = DB::table('products')->value('id');
+        DB::table('subscriptions')->insert([
+            'id' => PrefixedUlid::make('SUB'), 'company_id' => $company, 'product_id' => $product,
+            'status' => 'ativa', 'open_company_product' => $company.'-'.$product, 'version' => 1,
+            'billing_cycle' => 'monthly', 'created_by' => $admin->id, 'updated_by' => $admin->id,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $queries = [];
+        DB::listen(function ($event) use (&$queries): void {
+            $queries[] = strtolower($event->sql);
+        });
+        $legacy = $this->actingAs($admin, 'platform')->getJson('/api/backoffice/companies/'.$company)
+            ->assertOk()->assertJsonCount(1, 'subscriptions')->assertJsonStructure(['usage']);
+        $this->assertTrue(collect($queries)->contains(fn ($sql) => str_contains($sql, 'subscription_changes')));
+
+        $queries = [];
+        $light = $this->getJson('/api/backoffice/companies/'.$company.'?view=company')->assertOk()
+            ->assertJsonMissingPath('subscriptions')->assertJsonMissingPath('usage');
+        $this->assertSame($legacy->json('company'), $light->json('company'));
+        foreach (['subscription_changes', 'subscription_items', 'voucher_redemptions', 'payments'] as $table) {
+            $this->assertFalse(collect($queries)->contains(fn ($sql) => str_contains($sql, $table)), $table);
+        }
+    }
+
     public function test_global_search_respects_permissions_for_each_result_group(): void
     {
         $admin = $this->platformAdmin();
