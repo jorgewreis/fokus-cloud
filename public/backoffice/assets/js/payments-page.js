@@ -342,7 +342,7 @@ export function mount(root, context = {}) {
         state.lists[kind].filters = currentFilters(event.currentTarget);
         state.lists[kind].page = 1;
         state.lists[kind].loaded = false;
-        if (!state.lists[kind].loading) load(kind, { force: true });
+        load(kind, { force: true });
     };
     const pageClick = (event) => {
         const button = event.target.closest("[data-billing-page]");
