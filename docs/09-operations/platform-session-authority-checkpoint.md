@@ -1,8 +1,10 @@
 # Session authorization primitive: experimental checkpoint
 
-This branch is not connected to routes, authentication, session storage or the
-company idempotency store. It does not remediate stale in-flight requests. Keep
-the existing unconditional public guards closed. The new migration must not be
+This branch is not enabled or connected to public routes. Experimental hooks
+exist for several session invalidation paths behind a separate, default-false
+configuration flag; they are not an authorization to activate the feature.
+The change does not yet prove stale in-flight request handling. Keep the
+existing unconditional public guards closed. The new migration must not be
 deployed as a standalone security fix.
 
 The experimental primitive uses the default business database connection, locks
@@ -22,13 +24,25 @@ fails closed. Routes remain unconditionally blocked, and invalidation paths are
 not yet connected. Writer,
 audit and completion must remain on the same connection; callbacks cannot enforce
 their own connection or purity.
-Integrate and prove every effective invalidation path, including both platform
-and portal logout, MFA, support entry/exit and automatic termination, account
-and grant revocation, idle expiry, session cleanup and mixed session contexts.
+Hooks are present for platform and portal logout, successful MFA, support
+entry/exit and automatic termination, administrative bulk revocation and idle
+session expiration. Portal password/session regeneration hooks have also been
+added. They have not been exercised through the real routes. In particular,
+account security changes and session handler writes are not proven atomic with
+these hooks. Integrate and prove every remaining effective invalidation path,
+including grant revocation, session cleanup and mixed session contexts.
 The session database can use a different connection; no distributed transaction
 is assumed. Commit authority revocation before acknowledging logout, and fail
 closed if consistency or persistence is unavailable. Old sessions without an
 authority record must require MFA, not silently bootstrap a record.
+
+When the experimental flag is enabled, an explicit hard maximum age is required;
+there is no default and it does not replace or change Laravel's idle setting.
+This proposal is fail-closed but not a finished user experience or a proven
+sliding-idle policy. Configuration is checked before consuming a valid MFA
+challenge; a later database failure can still happen after challenge consumption
+and requires recovery analysis. Password-reset challenge consumption also needs
+analysis. The flag is deliberately disabled by default.
 
 The authority primitive itself does not perform actor status and permission checks;
 the composed store uses the existing authorization service in its transaction. A caller

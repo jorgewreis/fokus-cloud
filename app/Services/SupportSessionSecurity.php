@@ -15,6 +15,9 @@ class SupportSessionSecurity
             return false;
         }
 
+        $actor = Auth::guard('platform')->id();
+        app(PlatformSessionLifecycle::class)->rotateIfEnabled($request->session(), $actor === null ? null : (string) $actor);
+
         $support = DB::table('platform_support_sessions')->where('id', $id)->whereNull('ended_at')->first();
         if ($support && DB::table('platform_support_sessions')->where('id', $id)->whereNull('ended_at')->update([
             'ended_at' => now(),

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\PlatformSessionLifecycle;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,7 +18,7 @@ class ExpireIdleDatabaseSession
         }
 
         $session = $request->session();
-        $lastActivity = DB::table(config('session.table', 'sessions'))
+        $lastActivity = DB::connection(config('session.connection'))->table(config('session.table', 'sessions'))
             ->where('id', $session->getId())
             ->value('last_activity');
 
@@ -27,6 +28,8 @@ class ExpireIdleDatabaseSession
             $expiresAt = now()->subMinutes((int) config('session.lifetime', 120))->timestamp;
 
             if ((int) $lastActivity <= $expiresAt) {
+                $actor = Auth::guard('platform')->id();
+                app(PlatformSessionLifecycle::class)->retire($session, $actor === null ? null : (string) $actor);
                 Auth::guard('web')->logout();
                 Auth::guard('platform')->logout();
                 $session->invalidate();

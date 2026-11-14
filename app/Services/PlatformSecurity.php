@@ -53,6 +53,7 @@ class PlatformSecurity
 
     public function revokeSessions(string $adminId): void
     {
+        app(PlatformSessionLifecycle::class)->revokeAll($adminId);
         DB::table('sessions')->where('user_id', $adminId)->delete();
     }
 

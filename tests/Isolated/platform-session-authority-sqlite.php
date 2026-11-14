@@ -11,19 +11,27 @@ require __DIR__.'/../../app/Services/CompanyIdempotencyKeys.php';
 require __DIR__.'/../../app/Services/CompanyIdempotencyAuthorization.php';
 require __DIR__.'/../../app/Services/CompanyIdempotencyStore.php';
 require __DIR__.'/../../app/Services/CompanyIdempotencyFactory.php';
+require __DIR__.'/../../app/Services/PlatformSessionBinding.php';
+require __DIR__.'/../../app/Services/PlatformSessionLifecycle.php';
 
 use App\Services\CompanyIdempotencyAuthorization;
 use App\Services\CompanyIdempotencyFactory;
 use App\Services\CompanyIdempotencyKeys;
 use App\Services\CompanyIdempotencyStore;
 use App\Services\PlatformSessionAuthority;
+use App\Services\PlatformSessionBinding;
+use App\Services\PlatformSessionLifecycle;
+use Illuminate\Config\Repository;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Foundation\Application;
+use Illuminate\Session\ArraySessionHandler;
+use Illuminate\Session\Store;
 use Illuminate\Support\Facades\Facade;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 $app = new Application(__DIR__);
+$app->instance('config', new Repository(['company_idempotency' => ['session_authority_lifecycle' => true, 'session_authority_max_age_seconds' => 120], 'session' => ['lifetime' => 2]]));
 $capsule = new Capsule($app);
 $capsule->addConnection(['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '']);
 $capsule->setEventDispatcher(new Dispatcher($app));
@@ -189,6 +197,54 @@ $orderedStore->status($orderedToken, 'actor-a', 'company.create', time());
 $checkOrder();
 $orderedStore->revoke($orderedToken, 'actor-a', 'company.create', time(), fn () => null);
 $checkOrder();
+$lifecycle = new PlatformSessionLifecycle($authority);
+$app['config']->set('company_idempotency.session_authority_max_age_seconds', null);
+try {
+    $lifecycle->ensureConfigurationReady();
+    throw new RuntimeException('Missing lifecycle policy was accepted.');
+} catch (LogicException) {
+    $check(true);
+}
+$app['config']->set('company_idempotency.session_authority_max_age_seconds', 120);
+$session = new Store('synthetic', new ArraySessionHandler(2));
+$session->start();
+$lifecycle->authenticated($session, 'actor-b', null);
+$sessionBinding = (new PlatformSessionBinding)->current($session);
+$check(is_string($sessionBinding) && strlen($sessionBinding) === 64);
+$check($authority->withActiveSession('actor-b', $sessionBinding, fn () => 'authenticated') === 'authenticated');
+$lifecycle->rotateIfPresent($session, 'actor-b');
+$rotatedBinding = (new PlatformSessionBinding)->current($session);
+$check(is_string($rotatedBinding) && $rotatedBinding !== $sessionBinding);
+$denied(fn () => $authority->withActiveSession('actor-b', $sessionBinding, fn () => 'old context'));
+$check($authority->withActiveSession('actor-b', $rotatedBinding, fn () => 'new context') === 'new context');
+$lifecycle->retire($session, 'actor-b');
+$check((new PlatformSessionBinding)->current($session) === null);
+$denied(fn () => $authority->withActiveSession('actor-b', $rotatedBinding, fn () => 'after logout'));
+$lifecycle->rotateIfPresent($session, 'actor-b');
+$check((new PlatformSessionBinding)->current($session) === null);
+$lifecycle->authenticated($session, 'actor-b', null);
+$currentBinding = (new PlatformSessionBinding)->current($session);
+$app['config']->set('company_idempotency.session_authority_lifecycle', false);
+$lifecycle->rotateIfEnabled($session, null);
+$check((new PlatformSessionBinding)->current($session) === $currentBinding);
+$app['config']->set('company_idempotency.session_authority_lifecycle', true);
+try {
+    $lifecycle->retire($session, null);
+    throw new RuntimeException('Unknown session owner was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 503);
+}
+$check((new PlatformSessionBinding)->current($session) === $currentBinding);
+$lifecycle->authenticated($session, 'actor-b', 'actor-b');
+$newBinding = (new PlatformSessionBinding)->current($session);
+$check(is_string($newBinding) && $newBinding !== $currentBinding);
+$denied(fn () => $authority->withActiveSession('actor-b', $currentBinding, fn () => 'after reauthentication'));
+$currentBinding = $newBinding;
+$db->table('platform_admins')->where('id', 'actor-b')->update(['status' => 'suspenso']);
+$denied(fn () => $authority->registerAfterMfa('actor-b', str_repeat('f', 64), $expiry));
+$denied(fn () => $authority->rotate('actor-b', $currentBinding, str_repeat('f', 64), $expiry));
+$lifecycle->revokeAll('actor-b');
+$denied(fn () => $authority->withActiveSession('actor-b', $currentBinding, fn () => 'after bulk revoke'));
 $expired = str_repeat('c', 64);
 try {
     $authority->registerAfterMfa('actor-a', $expired, time() - 1);

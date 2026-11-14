@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\AuditSanitizer;
 use App\Services\PlatformAudit;
-use App\Services\PlatformSessionBinding;
+use App\Services\PlatformSessionLifecycle;
 use App\Services\PrefixedUlid;
 use App\Services\SupportSessionSecurity;
 use Illuminate\Http\Request;
@@ -72,6 +72,7 @@ class PlatformSupportController extends Controller
         abort_unless($target, 422, 'A assinatura e o usuário precisam pertencer à mesma empresa e estar disponíveis.');
 
         $security->end($request, 'Acesso anterior encerrado ao iniciar outra sessão de suporte.');
+        app(PlatformSessionLifecycle::class)->rotateIfPresent($request->session(), (string) Auth::guard('platform')->id());
         $id = PrefixedUlid::make('SUP');
         DB::table('platform_support_sessions')->insert([
             'id' => $id, 'platform_admin_id' => Auth::guard('platform')->id(), 'company_id' => $target->company_id,
@@ -82,7 +83,6 @@ class PlatformSupportController extends Controller
         $request->session()->put(['support_session_id' => $id, 'active_company_id' => $target->company_id]);
         Auth::guard('web')->login(User::findOrFail($target->user_id));
         $request->session()->regenerate();
-        (new PlatformSessionBinding)->rotateIfPresent($request->session());
         $audit->record(Auth::guard('platform')->id(), 'backoffice.support_access_started', 'platform_support_session', $id, $target->company_id, $data['reason'], metadata: ['subscription_id' => $target->subscription_id, 'membership_id' => $target->membership_id, 'target_user_id' => $target->user_id], after: ['status' => 'active', 'subscription_id' => $target->subscription_id], request: $request);
 
         return response()->json(['redirect_to' => '/portal']);

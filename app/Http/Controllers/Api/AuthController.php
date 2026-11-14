@@ -5,8 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Mail\FokusLawSystemMail;
 use App\Models\User;
+use App\Services\AuditRecorder;
+use App\Services\LawAuthorizationService;
 use App\Services\PasswordSecurity;
+use App\Services\PlatformAudit;
+use App\Services\PlatformSessionLifecycle;
 use App\Services\PrefixedUlid;
+use App\Services\SubscriptionAccess;
+use App\Services\SupportSessionSecurity;
 use App\Support\BrazilianDocuments;
 use App\Support\LegalDocuments;
 use Illuminate\Http\Request;
@@ -57,7 +63,7 @@ class AuthController extends Controller
             ->whereNull('membership.deleted_at')
             ->where('company.status', 'ativa')
             ->whereNull('company.deleted_at')
-            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
+            ->where(fn ($query) => SubscriptionAccess::usable($query))
             ->whereIn('product.code', ['law', 'fokus-law'])
             ->select('company.id as company_id', 'company.legal_name as company_name', 'company.document_type', 'subscription.public_name as subscription_public_name', 'product.name as product_name', 'role.code as profile_code', 'role.name as profile_name', 'module_segment.segment_code')
             ->orderBy('company.legal_name')
@@ -111,7 +117,7 @@ class AuthController extends Controller
             ->where('membership.user_id', $user->id)
             ->where('membership.status', 'ativo')->whereNull('membership.deleted_at')
             ->where('company.status', 'ativa')->whereNull('company.deleted_at')
-            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
+            ->where(fn ($query) => SubscriptionAccess::usable($query))
             ->whereIn('product.code', ['lead', 'fokus-lead'])
             ->select('company.id as company_id', 'company.legal_name as company_name', 'company.document_type', 'subscription.public_name as subscription_public_name', 'product.name as product_name', 'role.code as profile_code', 'role.name as profile_name')
             ->orderBy('company.legal_name')
@@ -165,6 +171,7 @@ class AuthController extends Controller
             $companyId = $this->createCompanyFor($user, $data, $document);
             $this->recordLegalAcceptances($user, $data);
             $user->setAttribute('new_company_id', $companyId);
+
             return $user;
         });
 
@@ -175,7 +182,9 @@ class AuthController extends Controller
             'offer_intent' => $data['offer_intent'] ?? null,
         ]);
         $this->authenticateIntoSession($request, $user, $companyId, false);
-        if (! empty($data['offer_intent'])) $request->session()->put('law_offer_intent', $data['offer_intent']);
+        if (! empty($data['offer_intent'])) {
+            $request->session()->put('law_offer_intent', $data['offer_intent']);
+        }
 
         return response()->json([
             'message' => 'Cadastro criado. Confirme seu e-mail antes de escolher a assinatura.',
@@ -194,6 +203,7 @@ class AuthController extends Controller
         $companyId = DB::transaction(function () use ($user, $data, $document) {
             $companyId = $this->createCompanyFor($user, $data, $document);
             $this->recordLegalAcceptances($user, $data);
+
             return $companyId;
         });
 
@@ -250,6 +260,7 @@ class AuthController extends Controller
                 $this->recordFailedLogin($user);
             }
             $this->recordAccessEvent($user, $companyId, 'customer.login_failed', 'failed');
+
             return response()->json(['message' => 'CPF/CNPJ ou senha inválidos.'], 422);
         }
 
@@ -299,7 +310,7 @@ class AuthController extends Controller
         $hasLawSubscription = DB::table('subscriptions as subscription')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->where('subscription.company_id', $data['company_id'])
-            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
+            ->where(fn ($query) => SubscriptionAccess::usable($query))
             ->whereIn('product.code', ['law', 'fokus-law'])
             ->exists();
 
@@ -356,7 +367,7 @@ class AuthController extends Controller
         $hasLeadSubscription = DB::table('subscriptions as subscription')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->where('subscription.company_id', $data['company_id'])
-            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
+            ->where(fn ($query) => SubscriptionAccess::usable($query))
             ->whereIn('product.code', ['lead', 'fokus-lead'])
             ->exists();
 
@@ -382,14 +393,17 @@ class AuthController extends Controller
         ]);
     }
 
-    public function logout(Request $request, \App\Services\SupportSessionSecurity $supportSecurity)
+    public function logout(Request $request, SupportSessionSecurity $supportSecurity)
     {
         $user = Auth::guard('web')->user();
         $this->recordAccessEvent($user, $request->session()->get('active_company_id'), 'customer.logout', 'success');
         $supportSecurity->end($request, 'Sessão encerrada ao sair do portal.');
+        $platformActor = Auth::guard('platform')->id();
+        app(PlatformSessionLifecycle::class)->retire($request->session(), $platformActor === null ? null : (string) $platformActor);
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
         return response()->noContent();
     }
 
@@ -467,16 +481,20 @@ class AuthController extends Controller
                 securityText: ' Entre em contato com o suporte e não aprove pedidos que você não reconhece.',
                 details: [['label' => 'CONTA', 'value' => 'Fokus Cloud'], ['label' => 'SITUAÇÃO', 'value' => 'Aguardando confirmação']],
             ));
-            app(\App\Services\AuditRecorder::class)->platform(null, 'customer.email_change.requested', 'user', $user->id, metadata: ['fields' => ['email']], after: ['requested' => ['email']], request: $request, actorType: 'customer');
+            app(AuditRecorder::class)->platform(null, 'customer.email_change.requested', 'user', $user->id, metadata: ['fields' => ['email']], after: ['requested' => ['email']], request: $request, actorType: 'customer');
         }
         if ($changes) {
             $changedFields = array_values(array_filter(array_keys($changes), fn ($field) => $field !== 'password'));
+            if (isset($changes['password'])) {
+                $platformActor = Auth::guard('platform')->id();
+                app(PlatformSessionLifecycle::class)->rotateIfEnabled($request->session(), $platformActor === null ? null : (string) $platformActor);
+            }
             $user->forceFill($changes)->save();
             if (isset($changes['password'])) {
                 DB::table('sessions')->where('user_id', $user->id)->delete();
                 $request->session()->regenerate();
             }
-            app(\App\Services\AuditRecorder::class)->platform(null, 'customer.profile.updated', 'user', $user->id, metadata: ['fields' => [...$changedFields, ...(isset($changes['password']) ? ['password'] : [])]], before: ['fields' => $changedFields], after: ['fields' => [...$changedFields, ...(isset($changes['password']) ? ['password'] : [])]], request: $request, actorType: 'customer');
+            app(AuditRecorder::class)->platform(null, 'customer.profile.updated', 'user', $user->id, metadata: ['fields' => [...$changedFields, ...(isset($changes['password']) ? ['password'] : [])]], before: ['fields' => $changedFields], after: ['fields' => [...$changedFields, ...(isset($changes['password']) ? ['password'] : [])]], request: $request, actorType: 'customer');
         }
 
         return response()->json(['message' => $emailChangeRequested ? 'Enviamos um link ao novo endereço. O e-mail atual continua ativo até a confirmação.' : 'Dados atualizados.', 'user' => [...$this->userPayload($user), 'phone' => $user->phone]]);
@@ -490,6 +508,7 @@ class AuthController extends Controller
         abort_unless($membership, 403, 'Sem acesso a esta empresa.');
         $request->session()->put('active_company_id', $data['company_id']);
         $request->session()->save();
+
         return response()->json(['active_company_id' => $data['company_id']]);
     }
 
@@ -505,7 +524,7 @@ class AuthController extends Controller
         }
         $user->forceFill($changes)->save();
         if (! empty($payload['new_email'])) {
-            app(\App\Services\AuditRecorder::class)->platform(null, 'customer.email_change.confirmed', 'user', $user->id, metadata: ['fields' => ['email']], after: ['fields' => ['email']], request: $request, actorType: 'customer');
+            app(AuditRecorder::class)->platform(null, 'customer.email_change.confirmed', 'user', $user->id, metadata: ['fields' => ['email']], after: ['fields' => ['email']], request: $request, actorType: 'customer');
         }
         if (! empty($payload['company_id'])) {
             DB::table('companies')->where('id', $payload['company_id'])->where('created_by', $user->id)
@@ -517,6 +536,7 @@ class AuthController extends Controller
         if (! in_array($returnTo, ['/portal', '/portal/fokus-law', '/portal/fokus-law/assinatura', '/contratar/fokus-law', '/assinaturas/fokus-law', '/assinaturas/fokus-lead'], true)) {
             $returnTo = '/portal';
         }
+
         return response()->json(['message' => 'E-mail confirmado com sucesso.', 'return_to' => $returnTo, 'offer_intent' => $payload['offer_intent'] ?? null]);
     }
 
@@ -530,6 +550,7 @@ class AuthController extends Controller
             'return_to' => $returnTo,
             'offer_intent' => $request->session()->get('law_offer_intent'),
         ]);
+
         return response()->json(['message' => 'Enviamos um novo link de confirmação.']);
     }
 
@@ -539,6 +560,7 @@ class AuthController extends Controller
         if (BrazilianDocuments::cpf($cpf) && ($user = User::where('cpf', $cpf)->first()) && $user->email_verified_at) {
             $this->sendToken($user, 'password_reset', '/criar-senha');
         }
+
         return response()->json(['message' => 'Se houver uma conta elegível, enviamos as instruções para o e-mail confirmado.']);
     }
 
@@ -548,9 +570,14 @@ class AuthController extends Controller
         $passwordSecurity->validate($data['password']);
         $token = $this->consumeToken($data['token'], ['password_reset', 'password_creation']);
         $user = User::findOrFail($token->user_id);
+        $invalidateCurrent = Auth::guard('web')->id() === $user->id;
+        if ($invalidateCurrent) {
+            $platformActor = Auth::guard('platform')->id();
+            app(PlatformSessionLifecycle::class)->retire($request->session(), $platformActor === null ? null : (string) $platformActor);
+        }
         $user->forceFill(['password' => $data['password'], 'status' => 'ativa', 'email_verified_at' => $user->email_verified_at ?: now()])->save();
         DB::table('sessions')->where('user_id', $user->id)->delete();
-        if (Auth::guard('web')->id() === $user->id) {
+        if ($invalidateCurrent) {
             Auth::guard('web')->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
@@ -563,6 +590,7 @@ class AuthController extends Controller
                 ->update(['status' => 'ativo', 'updated_at' => now(), 'version' => DB::raw('version + 1')]);
             DB::table('company_invitations')->where('membership_id', $payload['membership_id'])->whereNull('accepted_at')->update(['accepted_at' => now(), 'updated_at' => now()]);
         }
+
         return response()->json(['message' => 'Senha criada com sucesso. Agora você já pode entrar.']);
     }
 
@@ -583,6 +611,7 @@ class AuthController extends Controller
         $user = User::findOrFail($token->user_id);
         $companyId = DB::table('company_memberships')->where('id', $membershipId)->value('company_id');
         $this->authenticateIntoSession($request, $user, $companyId);
+
         return response()->json(['message' => 'Vínculo aceito. A empresa está disponível na sua conta.', 'return_to' => '/portal']);
     }
 
@@ -598,15 +627,19 @@ class AuthController extends Controller
             ->where('membership.id', $payload['membership_id'])->where('membership.user_id', $token->user_id)->where('membership.status', 'pendente')
             ->first(['membership.id', 'company.id as company_id', 'company.legal_name']);
         abort_unless($membership, 422, 'Este convite não está mais disponível.');
-        $assignments = DB::table('law_unit_memberships as lum')->join('law_units as unit', function ($join): void { $join->on('unit.id', '=', 'lum.law_unit_id')->on('unit.company_id', '=', 'lum.company_id'); })
+        $assignments = DB::table('law_unit_memberships as lum')->join('law_units as unit', function ($join): void {
+            $join->on('unit.id', '=', 'lum.law_unit_id')->on('unit.company_id', '=', 'lum.company_id');
+        })
             ->join('law_access_roles as role', 'role.id', '=', 'lum.law_access_role_id')->where('lum.company_membership_id', $membership->id)->where('lum.status', 'pendente')
             ->orderBy('unit.name')->get(['unit.name as unit_name', 'role.code as role_code', 'role.name as role_name']);
         $segment = $this->lawSegmentForCompany((string) $membership->company_id);
         $assignments->transform(function (object $assignment) use ($segment): object {
             $assignment->role_name = $this->lawRoleLabel((string) $assignment->role_code, $segment, (string) $assignment->role_name);
             unset($assignment->role_code);
+
             return $assignment;
         });
+
         return response()->json(['company_name' => (string) $membership->legal_name, 'assignments' => $assignments])->header('Cache-Control', 'no-store, private');
     }
 
@@ -617,11 +650,14 @@ class AuthController extends Controller
             ->whereNull('used_at')->where('expires_at', '>', now())->first();
         abort_unless($token, 422, 'Link inválido ou expirado.');
         $payload = json_decode($token->payload, true) ?: [];
-        foreach (['company_id', 'to_membership_id'] as $key) abort_unless(isset($payload[$key]), 422, 'Transferência inválida.');
+        foreach (['company_id', 'to_membership_id'] as $key) {
+            abort_unless(isset($payload[$key]), 422, 'Transferência inválida.');
+        }
         $company = DB::table('companies')->where('id', $payload['company_id'])->first(['legal_name']);
         $target = DB::table('company_memberships')->where('id', $payload['to_membership_id'])->where('company_id', $payload['company_id'])
             ->where('user_id', $token->user_id)->where('status', 'ativo')->exists();
         abort_unless($company && $target, 422, 'Esta transferência não está mais disponível.');
+
         return response()->json([
             'company_name' => (string) $company->legal_name,
             'previous_access' => ! empty($payload['keep_previous_access']) ? 'operador nos setores ativos' : 'removido da empresa',
@@ -659,7 +695,7 @@ class AuthController extends Controller
                 'version' => $target->version + 1,
             ]);
             if (! empty($payload['keep_previous_access'])) {
-                $unitRoles = app(\App\Services\LawAuthorizationService::class);
+                $unitRoles = app(LawAuthorizationService::class);
                 $units = DB::table('law_units')->where('company_id', $payload['company_id'])->where('status', 'ativo')->get(['id']);
                 foreach ($units as $unit) {
                     $roleIds = $unitRoles->provisionUnitRoles((string) $payload['company_id'], (string) $unit->id, (string) $token->user_id);
@@ -671,7 +707,7 @@ class AuthController extends Controller
                         ]);
                     } else {
                         DB::table('law_unit_memberships')->insert([
-                            'id' => \App\Services\PrefixedUlid::make('LUM'), 'company_id' => $payload['company_id'],
+                            'id' => PrefixedUlid::make('LUM'), 'company_id' => $payload['company_id'],
                             'law_unit_id' => $unit->id, 'company_membership_id' => $from->id,
                             'law_access_role_id' => $roleIds['operator'], 'status' => 'ativo', 'version' => 1,
                             'created_by' => $token->user_id, 'updated_by' => $token->user_id,
@@ -704,6 +740,7 @@ class AuthController extends Controller
                 details: [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'ATUALIZAÇÃO', 'value' => 'Transferência de administração']],
             ));
         }
+
         return response()->json(['message' => 'Administração transferida com sucesso.']);
     }
 
@@ -711,7 +748,9 @@ class AuthController extends Controller
     {
         $token = $this->consumeToken($request->validate(['token' => ['required', 'string']])['token'], 'admin_transfer');
         $payload = json_decode($token->payload, true) ?: [];
-        foreach (['company_id', 'from_membership_id', 'to_membership_id'] as $key) abort_unless(isset($payload[$key]), 422, 'Transferência inválida.');
+        foreach (['company_id', 'from_membership_id', 'to_membership_id'] as $key) {
+            abort_unless(isset($payload[$key]), 422, 'Transferência inválida.');
+        }
         $target = DB::table('company_memberships')->where('id', $payload['to_membership_id'])->where('company_id', $payload['company_id'])
             ->where('user_id', $token->user_id)->where('status', 'ativo')->first();
         $from = DB::table('company_memberships')->where('id', $payload['from_membership_id'])->where('company_id', $payload['company_id'])
@@ -719,15 +758,18 @@ class AuthController extends Controller
         abort_unless($target && $from, 422, 'Esta transferência não está mais disponível.');
         $this->audit($payload['company_id'], $token->user_id, 'company_membership', $target->id, 'admin_transfer_declined', ['status' => 'pendente'], ['status' => 'recusada']);
         $previousAdmin = DB::table('users')->where('id', $from->user_id)->value('email');
-        if ($previousAdmin) Mail::to($previousAdmin)->send(new FokusLawSystemMail(
-            subjectLine: 'Fokus Cloud: transferência recusada',
-            title: 'Transferência recusada',
-            intro: 'A pessoa indicada recusou a transferência de administração. Seu acesso de administrador permanece ativo.',
-            preheader: 'A transferência de administração foi recusada.',
-            securityTitle: 'O que acontece agora?',
-            securityText: ' Você continua responsável pela administração da empresa. Nenhuma alteração adicional foi feita.',
-            details: [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'SITUAÇÃO', 'value' => 'Seu acesso permanece ativo']],
-        ));
+        if ($previousAdmin) {
+            Mail::to($previousAdmin)->send(new FokusLawSystemMail(
+                subjectLine: 'Fokus Cloud: transferência recusada',
+                title: 'Transferência recusada',
+                intro: 'A pessoa indicada recusou a transferência de administração. Seu acesso de administrador permanece ativo.',
+                preheader: 'A transferência de administração foi recusada.',
+                securityTitle: 'O que acontece agora?',
+                securityText: ' Você continua responsável pela administração da empresa. Nenhuma alteração adicional foi feita.',
+                details: [['label' => 'PRODUTO', 'value' => 'Fokus Law · Fokus Cloud'], ['label' => 'SITUAÇÃO', 'value' => 'Seu acesso permanece ativo']],
+            ));
+        }
+
         return response()->json(['message' => 'A transferência foi recusada. O admin atual permanece responsável pela empresa.']);
     }
 
@@ -792,6 +834,7 @@ class AuthController extends Controller
         if ($newUser) {
             $rules += ['name' => ['required', 'string', 'max:255'], 'cpf' => ['required', 'string'], 'email' => ['required', 'email:rfc', 'max:255'], 'password' => ['required', 'string', 'min:12']];
         }
+
         return $request->validate($rules, [
             'terms_version.in' => 'Atualize a página para ler e aceitar a versão atual dos Termos de Uso.',
             'privacy_version.in' => 'Atualize a página para ler a versão atual da Política de Privacidade.',
@@ -832,6 +875,7 @@ class AuthController extends Controller
             'created_by' => $user->id, 'updated_by' => $user->id, 'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->audit($companyId, $user->id, 'company', $companyId, 'create', null, ['document_type' => $data['document_type'], 'legal_name' => $data['legal_name']]);
+
         return $companyId;
     }
 
@@ -841,6 +885,7 @@ class AuthController extends Controller
             $query = DB::table('legal_acceptances')->where('user_id', $user->id)->where('document_type', $type)->where('document_version', $version);
             if ($query->exists()) {
                 $query->update(['accepted_at' => now(), 'updated_at' => now()]);
+
                 continue;
             }
             DB::table('legal_acceptances')->insert([
@@ -858,6 +903,7 @@ class AuthController extends Controller
             abort_unless($token, 422, 'Link inválido ou expirado.');
             $used = DB::table('security_tokens')->where('id', $token->id)->whereNull('used_at')->update(['used_at' => now(), 'updated_at' => now()]);
             abort_unless($used, 422, 'Link inválido ou expirado.');
+
             return $token;
         });
     }
@@ -865,7 +911,7 @@ class AuthController extends Controller
     private function companiesFor(User $user): array
     {
         $lawNames = DB::table('subscriptions as subscription')->join('products as product', 'product.id', '=', 'subscription.product_id')
-            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))->whereIn('product.code', ['law', 'fokus-law'])
+            ->where(fn ($query) => SubscriptionAccess::usable($query))->whereIn('product.code', ['law', 'fokus-law'])
             ->whereNotNull('subscription.public_name')->where('subscription.public_name', '!=', '')
             ->groupBy('subscription.company_id')->select('subscription.company_id', DB::raw('MIN(subscription.public_name) as public_name'));
 
@@ -882,11 +928,13 @@ class AuthController extends Controller
         $subscription = DB::table('subscriptions as subscription')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->where('subscription.company_id', $companyId)
-            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
+            ->where(fn ($query) => SubscriptionAccess::usable($query))
             ->whereIn('product.code', ['law', 'fokus-law'])
             ->orderByDesc('subscription.created_at')
             ->first(['subscription.commercial_snapshot', 'subscription.product_id']);
-        if (! $subscription) return null;
+        if (! $subscription) {
+            return null;
+        }
 
         $snapshot = json_decode((string) $subscription->commercial_snapshot, true) ?: [];
         $plan = null;
@@ -895,6 +943,7 @@ class AuthController extends Controller
         } elseif (! empty($snapshot['plan_code'])) {
             $plan = DB::table('plans')->where('product_id', $subscription->product_id)->where('code', $snapshot['plan_code'])->first(['segment']);
         }
+
         return $plan->segment ?? $snapshot['segment'] ?? null;
     }
 
@@ -904,6 +953,7 @@ class AuthController extends Controller
         $labels = $advocacy
             ? ['unit_admin' => 'Administrador do escritório', 'chief_clerk' => 'Gestor do escritório', 'operator' => 'Operador', 'viewer' => 'Consulta']
             : ['unit_admin' => 'Administrador da unidade', 'chief_clerk' => 'Gestor da unidade', 'operator' => 'Operador', 'viewer' => 'Consulta'];
+
         return $labels[$roleCode] ?? $fallback;
     }
 
@@ -919,7 +969,9 @@ class AuthController extends Controller
 
     private function authenticateIntoSession(Request $request, User $user, ?string $companyId = null, bool $recordAccess = true): void
     {
-        app(\App\Services\SupportSessionSecurity::class)->end($request, 'Acesso de suporte encerrado por novo login de cliente.', true);
+        app(SupportSessionSecurity::class)->end($request, 'Acesso de suporte encerrado por novo login de cliente.', true);
+        $platformActor = Auth::guard('platform')->id();
+        app(PlatformSessionLifecycle::class)->rotateIfEnabled($request->session(), $platformActor === null ? null : (string) $platformActor);
         $request->session()->regenerate();
         Auth::guard('web')->login($user);
         $request->session()->forget('active_company_id');
@@ -949,12 +1001,12 @@ class AuthController extends Controller
         $subscription = $companyId ? DB::table('subscriptions as subscription')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->where('subscription.company_id', $companyId)
-            ->where(fn ($query) => \App\Services\SubscriptionAccess::usable($query))
+            ->where(fn ($query) => SubscriptionAccess::usable($query))
             ->orderByDesc('subscription.created_at')
             ->select('subscription.id as subscription_id', 'subscription.product_id', 'product.name as product_name', 'product.code as product_code')
             ->first() : null;
 
-        app(\App\Services\PlatformAudit::class)->record(
+        app(PlatformAudit::class)->record(
             null,
             $action,
             'user',
@@ -977,6 +1029,6 @@ class AuthController extends Controller
 
     private function audit(string $companyId, ?string $actorId, string $entityType, string $entityId, string $operation, ?array $before, ?array $after): void
     {
-        app(\App\Services\AuditRecorder::class)->company($companyId, $actorId, $entityType, $entityId, $operation, $before, $after, request: request());
+        app(AuditRecorder::class)->company($companyId, $actorId, $entityType, $entityId, $operation, $before, $after, request: request());
     }
 }

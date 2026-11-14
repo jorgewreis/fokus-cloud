@@ -7,7 +7,7 @@ use App\Mail\FokusLawSystemMail;
 use App\Models\PlatformAdmin;
 use App\Services\PlatformAudit;
 use App\Services\PlatformSecurity;
-use App\Services\PlatformSessionBinding;
+use App\Services\PlatformSessionLifecycle;
 use App\Services\PrefixedUlid;
 use App\Services\SupportSessionSecurity;
 use Illuminate\Http\Request;
@@ -73,13 +73,15 @@ class PlatformAuthController extends Controller
             return response()->json(['message' => 'Código inválido ou expirado.'], 422);
         }
 
+        app(PlatformSessionLifecycle::class)->ensureConfigurationReady();
         DB::table('platform_login_challenges')->where('id', $challenge->id)->update(['used_at' => now(), 'updated_at' => now()]);
         $admin = PlatformAdmin::findOrFail($adminId);
         abort_unless($admin->isAvailableForLogin(), 401, 'Acesso interno indisponível.');
+        $previousActor = Auth::guard('platform')->id();
+        app(PlatformSessionLifecycle::class)->authenticated($request->session(), $admin->id, $previousActor === null ? null : (string) $previousActor);
         Auth::guard('platform')->login($admin);
         $request->session()->forget('platform_pending_admin_id');
         $request->session()->regenerate();
-        (new PlatformSessionBinding)->rotate($request->session());
         $admin->forceFill(['last_login_at' => now()])->save();
         $audit->record($admin->id, 'backoffice.login_succeeded', 'platform_admin', $admin->id, request: $request, expiresInDays: 30);
 
@@ -121,6 +123,7 @@ class PlatformAuthController extends Controller
     {
         $adminId = Auth::guard('platform')->id();
         $supportSecurity->end($request, 'Sessão encerrada ao sair do Backoffice.');
+        app(PlatformSessionLifecycle::class)->retire($request->session(), $adminId === null ? null : (string) $adminId);
         $audit->record($adminId, 'backoffice.logout', request: $request, expiresInDays: 30);
         Auth::guard('platform')->logout();
         $request->session()->invalidate();

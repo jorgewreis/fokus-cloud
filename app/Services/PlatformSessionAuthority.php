@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use LogicException;
@@ -22,7 +23,7 @@ final class PlatformSessionAuthority
         $this->requireTopLevel();
 
         DB::transaction(function () use ($actor, $hash, $expiresAt): void {
-            $this->lockActor($actor);
+            $this->assertAvailable($this->lockActor($actor));
             if ($expiresAt <= now()->getTimestamp()) {
                 throw new InvalidArgumentException('Invalid session authorization expiry.');
             }
@@ -70,7 +71,7 @@ final class PlatformSessionAuthority
         $this->requireTopLevel();
 
         DB::transaction(function () use ($actor, $oldHash, $newHash, $expiresAt): void {
-            $this->lockActor($actor);
+            $this->assertAvailable($this->lockActor($actor));
             $current = DB::table('platform_session_authorizations')->where('binding_hash', $oldHash)
                 ->where('actor_id', $actor)->lockForUpdate()->first();
             $now = now();
@@ -108,13 +109,21 @@ final class PlatformSessionAuthority
         });
     }
 
-    private function lockActor(string $actor): void
+    private function lockActor(string $actor): object
     {
         if ($actor === '' || strlen($actor) > 128) {
             throw new InvalidArgumentException('Invalid session authorization actor.');
         }
-        $admin = DB::table('platform_admins')->where('id', $actor)->lockForUpdate()->first(['id']);
+        $admin = DB::table('platform_admins')->where('id', $actor)->lockForUpdate()->first(['id', 'status', 'manual_blocked_at', 'deactivated_at', 'locked_until']);
         abort_unless($admin, 401, 'Sessão indisponível.');
+
+        return $admin;
+    }
+
+    private function assertAvailable(object $admin): void
+    {
+        abort_unless($admin->status === 'ativo' && $admin->manual_blocked_at === null
+            && $admin->deactivated_at === null && ($admin->locked_until === null || Carbon::parse($admin->locked_until)->isPast()), 401, 'Sessão indisponível.');
     }
 
     private function bindingHash(string $marker): string
