@@ -22,12 +22,17 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Build the existing target-profile test runtime
         run: |
           docker build -t mysql-session-base -f tests/Deployment/linux-runtime/php85/Dockerfile .
           printf '%s\n' 'FROM mysql@sha256:72c368d898861f3b3a07af0e6d690400f44f048799ed46822783d9224cc2c86d AS mysql84' 'FROM mysql-session-base' 'COPY --from=mysql84 /usr/bin/mysqldump /usr/local/bin/mysql84-mysqldump' 'COPY --from=mysql84 /usr/bin/mysql /usr/local/bin/mysql84' 'RUN ldd /usr/local/bin/mysql84-mysqldump && ! ldd /usr/local/bin/mysql84-mysqldump | grep -q "not found" && mysql84-mysqldump --version && ! ldd /usr/local/bin/mysql84 | grep -q "not found" && mysql84 --version' | docker build -t mysql-session-probe -f - .
       - name: Install locked dependencies without scripts or plugins
-        run: docker run --rm -e COMPOSER_HOME=/tmp/composer -v "$PWD:/workspace" -w /workspace mysql-session-base composer install --no-interaction --no-scripts --no-plugins --no-progress --prefer-dist
+        run: |
+          docker run --rm -e COMPOSER_HOME=/tmp/composer -v "$PWD:/workspace" -w /workspace mysql-session-base composer install --no-interaction --no-scripts --no-plugins --no-progress --prefer-dist
+          mkdir "$RUNNER_TEMP/fokus-probe-baseline"
+          git archive 26daac7c27d246eaef64bb3f0e59499376993f8f | tar -xf - -C "$RUNNER_TEMP/fokus-probe-baseline"
+          docker run --rm -e COMPOSER_HOME=/tmp/composer -v "$RUNNER_TEMP/fokus-probe-baseline:/workspace" -w /workspace mysql-session-base composer install --no-interaction --no-scripts --no-plugins --no-progress --prefer-dist
       - name: Verify correct and incorrect identities in disposable sessions
         shell: bash
         run: |
@@ -61,5 +66,9 @@ jobs:
           docker exec --user 1000:1000 "$qa" mkdir /tmp/fokus-probe-app
           git archive HEAD | docker exec -i --user 1000:1000 "$qa" tar -x -C /tmp/fokus-probe-app
           docker cp vendor "$qa":/tmp/fokus-probe-app/
+          docker exec --user 1000:1000 "$qa" mkdir /tmp/fokus-probe-baseline
+          tar -C "$RUNNER_TEMP/fokus-probe-baseline" --exclude=vendor -cf - . | docker exec -i --user 1000:1000 "$qa" tar -x -C /tmp/fokus-probe-baseline
+          docker cp "$RUNNER_TEMP/fokus-probe-baseline/vendor" "$qa":/tmp/fokus-probe-baseline/
           docker exec --user 1000:1000 -w /tmp "$qa" sh -ec 'php --version; mysql --version; mysql84-mysqldump --version; python3 probe_mysql_init_identity.py'
           docker exec --user 1000:1000 -w /tmp "$qa" python3 probe_laravel_mysql.py /tmp/fokus-probe-app
+          docker exec --user 1000:1000 -w /tmp "$qa" python3 probe_laravel_mysql.py /tmp/fokus-probe-baseline

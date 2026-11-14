@@ -8,6 +8,7 @@ import queue
 import subprocess
 import tempfile
 import threading
+import time
 
 from linux_disposable_mysql import IDENTITY, UUID, assert_disposable_mysql
 
@@ -32,6 +33,7 @@ try {$pdo=new PDO('mysql:host=127.0.0.1;port=3306;dbname=fokuscloud_security',ge
     for label, command in (
         ('pdo', lambda sql: ['php', '-r', pdo, sql]),
         ('mysql', lambda sql: ['mysql', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '--skip-reconnect', '--init-command=' + sql, '-Nse', 'SELECT 1']),
+        ('mysql84', lambda sql: ['mysql84', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '--skip-reconnect', '--init-command=' + sql, '-Nse', 'SELECT 1']),
         ('mysqldump', lambda sql: ['mysql84-mysqldump', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '--init-command=' + sql, '--no-data', '--no-tablespaces', 'fokuscloud_security']),
     ):
         for expected, value in ((True, identity), (False, other)):
@@ -51,7 +53,7 @@ try {$pdo=new PDO('mysql:host=127.0.0.1;port=3306;dbname=fokuscloud_security',ge
         # This database exists only inside the pinned disposable server; the
         # exact table name and content are synthetic. Both dump and restore
         # must pass the init check in the session that performs the operation.
-        mysql = ['mysql', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot',
+        mysql = ['mysql84', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot',
                  '--skip-reconnect', '--init-command=' + init_statement(identity), 'fokuscloud_security']
         subprocess.run(mysql + ['-e', "CREATE TABLE fokus_session_probe (id INT PRIMARY KEY, payload VARBINARY(16)); INSERT INTO fokus_session_probe VALUES (1, UNHEX('0001FEFF'))"],
                        env=env, timeout=15, check=True, stdout=subprocess.DEVNULL)
@@ -66,6 +68,53 @@ try {$pdo=new PDO('mysql:host=127.0.0.1;port=3306;dbname=fokuscloud_security',ge
         if restored != '0001FEFF':
             raise RuntimeError('synthetic dump restoration did not preserve binary value')
         print('verified session dump and restore preserve synthetic binary data')
+        bad_restore = list(mysql)
+        bad_restore[bad_restore.index('--init-command=' + init_statement(identity))] = '--init-command=' + init_statement(other)
+        rejected = subprocess.run(bad_restore, env=env, input=b"INSERT INTO fokus_session_probe VALUES (2, UNHEX('BEEF'));\n",
+                                  timeout=15, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        if rejected.returncode == 0 or b'3141' not in rejected.stderr:
+            raise RuntimeError('incorrect identity did not reject restore for expected reason')
+        count = subprocess.check_output(mysql + ['-Nse', 'SELECT COUNT(*) FROM fokus_session_probe WHERE id=2'],
+                                        env=env, timeout=15, text=True).strip()
+        if count != '0':
+            raise RuntimeError('incorrect identity restore executed a statement')
+        print('incorrect identity restore rejected before any mutation')
+
+        # Delay one synthetic row query, identify only that exact test query,
+        # and interrupt its server session. A partial dump must exit nonzero.
+        dump_command = ['mysql84-mysqldump', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot',
+                        '--init-command=' + init_statement(identity), '--single-transaction', '--hex-blob',
+                        '--no-tablespaces', '--set-gtid-purged=OFF', '--where=SLEEP(30)=0',
+                        'fokuscloud_security', 'fokus_session_probe']
+        with tempfile.TemporaryFile() as partial, tempfile.TemporaryFile() as errors:
+            interrupted = subprocess.Popen(dump_command, env=env, stdout=partial, stderr=errors)
+            try:
+                deadline = time.monotonic() + 15
+                victim = None
+                query = ("SELECT ID FROM information_schema.PROCESSLIST WHERE DB='fokuscloud_security' "
+                         "AND ID<>CONNECTION_ID() AND INFO LIKE 'SELECT%SLEEP(30)=0%'")
+                while time.monotonic() < deadline:
+                    ids = subprocess.check_output(mysql + ['-Nse', query], env=env, timeout=5, text=True).split()
+                    if len(ids) == 1 and ids[0].isascii() and ids[0].isdigit():
+                        victim = ids[0]
+                        break
+                    if len(ids) > 1 or interrupted.poll() is not None:
+                        raise RuntimeError('could not uniquely identify synthetic dump session')
+                    time.sleep(0.2)
+                if victim is None:
+                    raise RuntimeError('synthetic dump did not enter delayed query')
+                subprocess.run(mysql + ['-e', 'KILL CONNECTION ' + victim], env=env, timeout=10, check=True)
+                if interrupted.wait(timeout=15) == 0:
+                    raise RuntimeError('interrupted dump incorrectly reported success')
+                errors.seek(0)
+                error_output = errors.read(2000)
+                if not any(code in error_output for code in (b'2013', b'2006', b'2026')):
+                    raise RuntimeError('dump failed for an unexpected reason after interruption')
+                print('interrupted verified dump fails without accepting partial output')
+            finally:
+                if interrupted.poll() is None:
+                    interrupted.kill()
+                    interrupted.wait(timeout=5)
 
     # Kill only a session created by this very process in the synthetic server.
     # PDO must not silently resume work after that connection is lost. A newly

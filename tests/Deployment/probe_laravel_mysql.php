@@ -46,4 +46,15 @@ $third = DB::connection('mysql')->getPdo();
 if ($third === $second || (int) $third->query('SELECT @fokus_identity_guard')->fetchColumn() !== 1) {
     throw new RuntimeException('reconnect did not get a verified PDO');
 }
+$admin = new PDO('mysql:host=127.0.0.1;port=3306;dbname=fokuscloud_security', getenv('DB_USERNAME'), getenv('DB_PASSWORD'), $good);
+$id = $third->query('SELECT CONNECTION_ID()')->fetchColumn();
+if (! ctype_digit((string) $id)) {
+    throw new RuntimeException('invalid connection id');
+}
+$admin->exec('KILL CONNECTION '.(int) $id);
+DB::reconnect('mysql');
+$fourth = DB::connection('mysql')->getPdo();
+if ($fourth === $third || (int) $fourth->query('SELECT @fokus_identity_guard')->fetchColumn() !== 1) {
+    throw new RuntimeException('reconnect after interruption did not get a verified PDO');
+}
 echo "Laravel PDO, purge, mismatch and reconnect passed\n";

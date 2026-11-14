@@ -14,7 +14,7 @@ def main():
                SESSION_DRIVER='array', LOG_CHANNEL='stderr')
     assert_disposable_mysql(env)
     root = pathlib.Path(sys.argv[1]).resolve(strict=True)
-    if root != pathlib.Path('/tmp/fokus-probe-app') or env.get('DB_DATABASE') != 'fokuscloud_security':
+    if root not in (pathlib.Path('/tmp/fokus-probe-app'), pathlib.Path('/tmp/fokus-probe-baseline')) or env.get('DB_DATABASE') != 'fokuscloud_security':
         raise RuntimeError('unexpected disposable Laravel source or database')
     config = root / 'config/database.php'
     if (root / '.env').exists() or (root / 'bootstrap/cache/config.php').exists():
@@ -34,6 +34,13 @@ def main():
         config.write_text(configured(identity), encoding='utf-8')
         subprocess.run(['php', '/tmp/probe_laravel_mysql.php', str(root), identity, other],
                        env=env, cwd=root, timeout=60, check=True)
+        mysql = ['mysql84', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot',
+                 '--skip-reconnect', '--init-command=' + init_statement(identity), 'fokuscloud_security']
+        subprocess.run(mysql + ['-e', 'CREATE TABLE IF NOT EXISTS migrations (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, migration VARCHAR(255) NOT NULL, batch INT NOT NULL)'],
+                       env=env, timeout=15, check=True)
+        subprocess.run(['php', 'artisan', 'migrate:status', '--no-interaction'], env=env, cwd=root,
+                       timeout=60, check=True, stdout=subprocess.DEVNULL)
+        print('artisan correct identity accepted')
         # artisan itself must attempt a PDO connection and reject an incorrect
         # identity by the expected server error, rather than any unrelated error.
         config.write_text(configured(other), encoding='utf-8')
