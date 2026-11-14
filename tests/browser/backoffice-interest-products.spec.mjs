@@ -76,7 +76,7 @@ test('a paginação mantém controles limitados mesmo com muitas páginas', asyn
 });
 
 test('respostas atrasadas não substituem o filtro nem atravessam suspensão', async ({ page }) => {
-    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { role: 'superadministrador', name: 'Teste', permissions: ['platform.product_interests.manage'] } } }));
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { id: 'PAD_TEST', role: 'superadministrador', name: 'Teste', permissions: ['platform.product_interests.manage'] } } }));
     await page.route('**/api/backoffice/product-interests-options?*', route => route.fulfill({ json: { products: [], meta: { current_page: 1, has_more: false }, historical_index_ready: true } }));
     let resolveOld;
     const old = new Promise(resolve => { resolveOld = resolve; });
