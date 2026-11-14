@@ -555,9 +555,9 @@ test('descarte de mount atrasado preserva drawer da página seguinte', async ({ 
     await page.route('**/backoffice/assets/js/subscription-plans-page.js?*', async (route) => {
         const response = await route.fetch();
         const source = await response.text();
-        const anchor = 'return () => { drawer.dispose();';
+        const anchor = 'return () => {';
         expect(source).toContain(anchor);
-        await route.fulfill({ response, body: source.replace(anchor, 'return () => { window.__oldMountDisposed = true; drawer.dispose();') });
+        await route.fulfill({ response, body: source.replace(anchor, 'return () => { window.__oldMountDisposed = true;') });
     });
     await page.route('**/api/backoffice/plans', async (route) => {
         plansRequested();
