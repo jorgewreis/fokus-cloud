@@ -1004,8 +1004,12 @@ class AuthController extends Controller
         app(SupportSessionSecurity::class)->end($request, 'Acesso de suporte encerrado por novo login de cliente.', true);
         $platformActor = Auth::guard('platform')->id();
         app(PlatformSessionLifecycle::class)->rotateIfEnabled($request->session(), $platformActor === null ? null : (string) $platformActor);
+        $principalSnapshot = app(PlatformSessionLifecycle::class)->captureWebLogin($user);
         $request->session()->regenerate();
         Auth::guard('web')->login($user);
+        if ($principalSnapshot !== null) {
+            $request->session()->put('platform_web_principal_snapshot', $principalSnapshot);
+        }
         $request->session()->forget('active_company_id');
         if ($companyId) {
             $request->session()->put('active_company_id', $companyId);

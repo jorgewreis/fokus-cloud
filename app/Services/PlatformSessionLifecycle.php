@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\User;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Facades\Auth;
 
@@ -96,6 +97,12 @@ final class PlatformSessionLifecycle
     public function enabledForSecurityMutation(): bool
     {
         return $this->enabled();
+    }
+
+    /** A captured snapshot is not itself proof of an atomic session transition. */
+    public function captureWebLogin(User $user): ?array
+    {
+        return $this->enabled() ? (new WebPrincipalGeneration)->snapshotForLogin($user) : null;
     }
 
     public function ensurePasswordResetReady(): void

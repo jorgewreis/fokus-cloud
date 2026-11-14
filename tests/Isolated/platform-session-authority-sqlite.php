@@ -104,10 +104,25 @@ foreach ([
 }
 $check(! $unknownConsumed);
 $fixturePlatformOnly($markerA);
-$db->statement('CREATE TABLE users (id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT \'ativa\', locked_until TEXT)');
+$db->statement('CREATE TABLE users (id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT \'ativa\', locked_until TEXT, password TEXT)');
 $db->statement('CREATE TABLE web_principal_generations (user_id TEXT PRIMARY KEY, generation INTEGER NOT NULL, updated_at TEXT NOT NULL)');
-$db->table('users')->insert(['id' => 'principal']);
+$db->table('users')->insert(['id' => 'principal', 'password' => 'synthetic-hash']);
 $generations = new WebPrincipalGeneration;
+$loginUser = (new User)->newFromBuilder(['id' => 'principal', 'password' => 'synthetic-hash']);
+$check($generations->snapshotForLogin($loginUser) === ['user_id' => 'principal', 'generation' => 0]);
+$firstSnapshot = $generations->snapshotForLogin($loginUser);
+$generations->advance('principal', fn () => null);
+$check($firstSnapshot['generation'] === 0);
+$check($generations->snapshotForLogin($loginUser)['generation'] === 1);
+$db->table('web_principal_generations')->where('user_id', 'principal')->delete();
+$db->table('users')->where('id', 'principal')->update(['password' => 'changed-hash']);
+try {
+    $generations->snapshotForLogin($loginUser);
+    throw new LogicException('Stale credentials were accepted for snapshot.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 401);
+}
+$db->table('users')->where('id', 'principal')->update(['password' => 'synthetic-hash']);
 $db->table('synthetic_challenges')->insert(['id' => 'initial-mfa', 'used' => 0]);
 $initialMarker = str_repeat('2', 64);
 try {
