@@ -32,5 +32,9 @@ committed revocation prevents the real writer and (b) a writer that holds the
 lock commits before revocation is acknowledged, with audit and idempotency
 atomic. Repeat the two orders for each supported invalidator and session driver.
 
-No database migration or test was executed for this checkpoint. Syntax checks
-alone are not evidence of concurrency correctness or release readiness.
+An isolated smoke script constructs its own SQLite `:memory:` connection and
+checks registration, actor isolation, stale binding rejection, rotation,
+specific and bulk revocation, hash storage and expired registration. It does
+not execute migrations, real HTTP paths, concurrent transactions or MySQL and
+cannot demonstrate lock ordering across processes. Syntax and smoke checks are
+not evidence of concurrency correctness or release readiness.
