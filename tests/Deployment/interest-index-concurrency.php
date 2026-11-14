@@ -8,13 +8,12 @@ $root = dirname(__DIR__, 2);
 if (is_file($root.'/.env') || is_file($root.'/.env.testing') || is_file($root.'/bootstrap/cache/config.php')) {
     throw new RuntimeException('refuse inherited environment');
 }
-require $root.'/vendor/autoload.php';
-$app = require $root.'/bootstrap/app.php';
-$app->make(Kernel::class)->bootstrap();
-
 if (getenv('FOKUS_INTEREST_INDEX_DISPOSABLE') !== '1' || getenv('APP_ENV') !== 'testing' || getenv('DB_HOST') !== 'mysql' || getenv('DB_DATABASE') !== 'synthetic') {
     throw new RuntimeException('refuse non-disposable context');
 }
+require $root.'/vendor/autoload.php';
+$app = require $root.'/bootstrap/app.php';
+$app->make(Kernel::class)->bootstrap();
 $index = app(InterestProductIndex::class);
 foreach (['backfill-first', 'writer-first'] as $scenario) {
     $id = 'QA_INTEREST_'.($scenario === 'backfill-first' ? 'BACK' : 'WRITE');
