@@ -316,5 +316,5 @@ test('resposta antiga após erro novo não apaga erro nem retry', async ({ page 
     await page.locator('#interest-product-filter').fill('novo'); await page.getByRole('button', { name: 'Filtrar' }).click();
     await expect(page.getByRole('button', { name: 'Tentar novamente' })).toBeVisible();
     const response = page.waitForResponse(result => result.url().includes('product=antigo')); release(); await response; await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 0)));
-    await expect(page.getByRole('button', { name: 'Tentar novamente' })).toBeVisible(); await expect(page.locator('#interest-message')).toBeVisible(); await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'false');
+    await expect(page.getByRole('button', { name: 'Tentar novamente' })).toBeVisible(); await expect(page.locator('#backoffice-toast-container')).toContainText('Erro novo'); await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'false');
 });
