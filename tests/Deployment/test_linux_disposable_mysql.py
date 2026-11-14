@@ -38,6 +38,7 @@ class DisposableMysqlGuardTest(unittest.TestCase):
             command = run.call_args.args[0]
             self.assertEqual(command[:2], ['mysql84', '--no-defaults'])
             self.assertIn('--skip-reconnect', command)
+            self.assertIn('--no-login-paths', command)
             self.assertTrue(any(arg.startswith('--init-command=') and '01234567-89ab-cdef-0123-456789abcdef' in arg for arg in command))
 
     def test_failed_dump_does_not_publish_partial_backup(self):

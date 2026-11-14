@@ -50,14 +50,14 @@ def init_statement(identity):
 
 
 def mysql84_command(identity):
-    return ['mysql84', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot',
+    return ['mysql84', '--no-defaults', '--no-login-paths', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot',
             '--skip-reconnect', '--init-command=' + init_statement(identity)]
 
 
 def mysqldump84_command(identity, name):
     if not isinstance(name, str) or not re.fullmatch(r'fokus_upgrade_[a-f0-9]{16}', name):
         raise ValueError('invalid synthetic database')
-    return ['mysql84-mysqldump', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot',
+    return ['mysql84-mysqldump', '--no-defaults', '--no-login-paths', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot',
             '--init-command=' + init_statement(identity), '--single-transaction', '--hex-blob',
             '--no-tablespaces', name]
 
