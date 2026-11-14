@@ -9,21 +9,26 @@ namespace Illuminate\Support\Facades {
             if (str_starts_with($sql, 'CREATE TABLE') && getenv('FAKE_CASE') === 'table') throw new \RuntimeException('table occupied');
         }
         public static function purge() {}
+        public static function transaction($callback) { throw new \RuntimeException('synthetic failure after insert'); }
     }
     class FakeQuery {
         private $name;
         private $ids = [];
         public function __construct($name) { $this->name = $name; }
-        public function where(...$args) { return $this; }
+        public function where(...$args) { if (count($args) === 2 && $args[0] === 'id') $this->ids = [$args[1]]; return $this; }
         public function whereIn($column, $ids) { $this->ids = $ids; return $this; }
         public function exists() { return getenv('FAKE_CASE') === 'range'; }
         public function delete() { file_put_contents(getenv('FAKE_LOG'), 'DELETE '.$this->name.' '.json_encode($this->ids)."\n", FILE_APPEND); }
         public function insert($row) {
             if ($this->name !== 'product_interests') return;
+            if (getenv('FAKE_CASE') === 'concurrency-collision') throw new \RuntimeException('row occupied');
             static $count = 0;
-            if (++$count === 2) throw new \RuntimeException('row occupied');
+            if (++$count === 2 && getenv('FAKE_CASE') !== 'concurrency-after-insert') throw new \RuntimeException('row occupied');
             file_put_contents(getenv('FAKE_LOG'), 'INSERT '.$row['id']."\n", FILE_APPEND);
         }
     }
 }
-namespace { function now() { return 'synthetic'; } }
+namespace {
+    function now() { return 'synthetic'; }
+    function app($name) { return new \stdClass(); }
+}
