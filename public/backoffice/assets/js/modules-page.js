@@ -61,9 +61,11 @@ export async function mount(root, context = {}) {
             let warning = currentForm.querySelector('[data-mutation-warning]');
             if (mutation.uncertain && !warning) {
                 warning = document.createElement("div"); warning.dataset.mutationWarning = "true"; warning.setAttribute("role", "alert");
-                warning.textContent = "Resultado não confirmado. Feche esta janela e confira o catálogo antes de tentar novamente.";
                 currentForm.prepend(warning);
             } else if (!mutation.uncertain) warning?.remove();
+            if (mutation.uncertain) warning.textContent = mutation.confirmedStale
+                ? "Alteração concluída. Feche esta janela, atualize e confira o catálogo antes de continuar."
+                : "Resultado não confirmado. Feche esta janela e confira o catálogo antes de tentar novamente.";
         }
         if (mutation.inFlight && !mutation.uncertain) showMessage("Processando alteração do módulo.", "info");
         if (mutation.uncertain) {
