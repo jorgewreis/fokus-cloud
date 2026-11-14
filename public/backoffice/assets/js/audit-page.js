@@ -137,7 +137,11 @@ export async function mount(root, context = {}) {
             pageSummary.textContent = total ? `Mostrando ${((current - 1) * perPage) + 1}–${((current - 1) * perPage) + events.length} de ${total}` : "Nenhum evento recente encontrado.";
             body.innerHTML = events.map((event) => `<tr><td>${escapeHtml(eventLabel(event.action))}</td><td>${escapeHtml(event.actor_name || (event.actor_type === "system" ? "Sistema" : event.actor_type === "anonymous" ? "Não autenticado" : "Usuário não identificado"))}</td><td>${escapeHtml(dateTime(event.created_at))}</td><td>${escapeHtml(event.origin_context || event.origin_channel || "—")}</td></tr>`).join("") || '<tr><td colspan="4">Nenhum evento recente encontrado.</td></tr>';
             renderPagination(meta);
-        } catch (error) { if (isCurrent(version) && error?.name !== "AbortError") body.innerHTML = `<tr><td colspan="4">${escapeHtml(error.message || "Não foi possível carregar os eventos.")}</td></tr>`; }
+        } catch (error) {
+            if (!isCurrent(version) || error?.name === "AbortError") return;
+            body.innerHTML = `<tr><td colspan="4"><div role="alert">${escapeHtml(error.message || "Não foi possível carregar os eventos.")}</div><button class="fs-btn fs-btn-outline-primary fs-btn-sm" type="button" data-audit-retry>Tentar novamente</button></td></tr>`;
+            body.querySelector("[data-audit-retry]").addEventListener("click", load, { once: true });
+        }
         };
         pagination.addEventListener("click", onPageClick);
         disposers.push(() => pagination.removeEventListener("click", onPageClick));

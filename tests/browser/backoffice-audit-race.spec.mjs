@@ -52,8 +52,12 @@ for (const mode of ['access', 'activity']) {
         if (mode === 'access') await expect(page.locator('#access-message')).toHaveText('Erro atual');
         else await expect(body).toContainText('Erro atual');
         if (mode === 'access') await page.locator('#access-filters').evaluate((form) => form.requestSubmit());
-        else await pagination.evaluate((node) => { node.innerHTML = '<button data-audit-page="1">1</button>'; node.querySelector('button').click(); });
-        await page.evaluate(() => { window.abortController.abort(); window.disposeAudit(); window.pending[5].resolve({ data: [], meta: {} }); });
+        else await page.getByRole('button', { name: 'Tentar novamente' }).click();
+        await page.evaluate((value) => window.pending[5].resolve(value), data('Recuperado'));
+        await expect(body).toContainText('Recuperado');
+        if (mode === 'access') await page.locator('#access-filters').evaluate((form) => form.requestSubmit());
+        else await pagination.locator('[data-audit-page="2"]').click();
+        await page.evaluate(() => { window.abortController.abort(); window.disposeAudit(); window.pending[6].resolve({ data: [], meta: {} }); });
         await expect(body).toContainText(mode === 'access' ? 'Carregando acessos' : 'Carregando eventos');
     });
 }
