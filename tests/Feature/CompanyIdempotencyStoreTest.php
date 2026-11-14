@@ -111,6 +111,35 @@ class CompanyIdempotencyStoreTest extends TestCase
         }
     }
 
+    public function test_revocation_audit_failure_rolls_back_the_revocation(): void
+    {
+        $store = $this->store();
+        $token = $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
+        try {
+            $store->revoke($token, 'admin-a', 'company.create', now()->getTimestamp(), fn () => true, function (): void {
+                throw new RuntimeException('Synthetic audit failure');
+            });
+            self::fail('Audit failure was not propagated.');
+        } catch (RuntimeException $e) {
+            self::assertSame('Synthetic audit failure', $e->getMessage());
+        }
+        self::assertSame(['state' => 'issued', 'revoked' => false], $store->status($token, 'admin-a', 'company.create', now()->getTimestamp(), fn () => true));
+    }
+
+    public function test_lost_record_is_reported_absent_without_inferring_outcome(): void
+    {
+        $store = $this->store();
+        $token = $store->issue('admin-a', 'company.create', now()->getTimestamp(), 600);
+        DB::table('company_idempotency_requests')->delete();
+        self::assertSame(['state' => 'absent', 'revoked' => null], $store->status($token, 'admin-a', 'company.create', now()->getTimestamp(), fn () => true));
+        try {
+            $store->bind($token, 'admin-a', 'company.create', null, [], now()->getTimestamp(), fn () => true);
+            self::fail('A missing issuance record must not allow mutation.');
+        } catch (HttpException $e) {
+            self::assertSame(503, $e->getStatusCode());
+        }
+    }
+
     private function store(): CompanyIdempotencyStore
     {
         return new CompanyIdempotencyStore(new CompanyIdempotencyKeys(['synthetic' => base64_encode(str_repeat('x', 32))], 'synthetic', []));
