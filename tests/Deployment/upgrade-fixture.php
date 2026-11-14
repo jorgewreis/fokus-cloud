@@ -139,6 +139,8 @@ if ($mode === 'verify-up') {
 if ($mode === 'verify-interest-index-backfill') {
     $row = DB::table('product_interests')->where('email', 'qa-old-index@example.test')->first();
     $original = $row->products;
+    check(Artisan::call('fokus:backfill-interest-products') !== 0, 'backfill requires explicit drained confirmation');
+    check(! (bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'unconfirmed backfill does not mark index ready');
     DB::table('product_interests')->where('id', $row->id)->update(['products' => 'invalid']);
     check(Artisan::call('fokus:backfill-interest-products', ['--confirm-drained' => true]) !== 0, 'invalid historical JSON rejects backfill');
     check(! (bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'failed backfill stays not ready');
@@ -150,6 +152,17 @@ if ($mode === 'verify-interest-index-backfill') {
     check(DB::table('interest_product_index')->where('interest_id', $row->id)->where('product_code', 'law')->exists(), 'historical code indexed');
     check(Artisan::call('fokus:backfill-interest-products', ['--confirm-drained' => true]) === 0, 'backfill can be repeated');
     check(DB::table('interest_product_index')->where('interest_id', $row->id)->where('product_code', 'law')->count() === 1, 'backfill remains idempotent');
+    // Simulate a legacy writer bypassing transactional index maintenance.
+    // The confirmation option cannot prove external writers have drained.
+    DB::table('product_interests')->where('id', $row->id)->update(['products' => '["synthetic_drain_probe"]']);
+    check((bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'legacy write cannot automatically invalidate ready');
+    check(! DB::table('interest_product_index')->where('interest_id', $row->id)->where('product_code', 'synthetic_drain_probe')->exists(), 'legacy write leaves stale index despite ready');
+    DB::table('interest_product_index_state')->where('id', 1)->update(['ready' => false]);
+    check(Artisan::call('fokus:backfill-interest-products', ['--confirm-drained' => true]) === 0, 'drained synthetic writers allow index rebuild');
+    check(DB::table('interest_product_index')->where('interest_id', $row->id)->where('product_code', 'synthetic_drain_probe')->exists(), 'rebuild indexes legacy change');
+    DB::table('product_interests')->where('id', $row->id)->update(['products' => $original]);
+    DB::table('interest_product_index_state')->where('id', 1)->update(['ready' => false]);
+    check(Artisan::call('fokus:backfill-interest-products', ['--confirm-drained' => true]) === 0, 'restore synthetic source and rebuild');
     exit;
 }
 if ($mode === 'verify-recovery') {
