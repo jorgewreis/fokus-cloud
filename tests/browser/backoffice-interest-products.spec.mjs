@@ -280,6 +280,23 @@ test('carregamento acessível acompanha somente consulta mais recente', async ({
     await page.goto('/backoffice/interesses'); await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'false');
     await page.locator('#interest-product-filter').fill('espera'); await page.getByRole('button', { name: 'Filtrar' }).click(); await begun;
     await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'true');
-    await expect(page.locator('#interest-list [role="status"]')).toHaveText('Carregando interesses...');
+    await expect(page.locator('#interest-loading')).toHaveText('Carregando interesses...');
     release(); await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'false');
+});
+
+test('resposta antiga não encerra carregamento ou erro da consulta nova', async ({ page }) => {
+    await page.route('**/api/backoffice/auth/me', route => route.fulfill({ json: { admin: { id: 'TEST', role: 'superadministrador', permissions: ['platform.product_interests.manage'] } } }));
+    await page.route('**/api/backoffice/product-interests-options?*', route => route.fulfill({ json: { products: [], meta: { current_page: 1, has_more: false }, historical_index_ready: true } }));
+    let releaseOld, releaseNew, oldStart, newStart; const old = new Promise(r => { releaseOld = r; }); const newer = new Promise(r => { releaseNew = r; }); const begunOld = new Promise(r => { oldStart = r; }); const begunNew = new Promise(r => { newStart = r; });
+    await page.route('**/api/backoffice/product-interests?*', async route => {
+        const p = new URL(route.request().url()).searchParams.get('product');
+        if (p === 'antigo') { oldStart(); await old; }
+        if (p === 'novo') { newStart(); await newer; return route.fulfill({ status: 503, json: { message: 'Erro novo' } }); }
+        return route.fulfill({ json: { data: [], meta: { total: 0, current_page: 1, last_page: 1 } } });
+    });
+    await page.goto('/backoffice/interesses'); await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'false');
+    await page.locator('#interest-product-filter').fill('antigo'); await page.getByRole('button', { name: 'Filtrar' }).click(); await begunOld;
+    await page.locator('#interest-product-filter').fill('novo'); await page.getByRole('button', { name: 'Filtrar' }).click(); await begunNew;
+    releaseOld(); await expect(page.locator('#interest-loading')).toBeVisible(); await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'true');
+    releaseNew(); await expect(page.locator('#interest-loading')).toBeHidden(); await expect(page.locator('#interest-list')).toHaveAttribute('aria-busy', 'false'); await expect(page.getByRole('button', { name: 'Tentar novamente' })).toBeVisible();
 });
