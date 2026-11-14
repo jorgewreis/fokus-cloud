@@ -5,10 +5,11 @@ This is evidence only: the validation workflow does not attest the artifact
 hash, and an environment approval is not established by this comparison.
 """
 import hashlib
-import multiprocessing
+import json
 import os
 from pathlib import Path
 import re
+import signal
 import stat
 import sys
 import tempfile
@@ -55,32 +56,43 @@ def _stable_hash(fd):
     return h.hexdigest(),(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns)
 
 
-def _hash_worker(fd, result):
+def _hash_worker(fd, result_fd):
     try:
-        result.send(('ok',_stable_hash(fd)))
+        result=('ok',_stable_hash(fd))
     except ValueError as error:
-        result.send(('error',str(error)))
+        result=('error',str(error))
     except BaseException:
-        result.send(('error','artifact_hash_failed'))
+        result=('error','artifact_hash_failed')
     finally:
-        result.close()
+        try:
+            os.write(result_fd,json.dumps(result,separators=(',',':')).encode('utf-8'))
+        except BaseException:
+            pass
+        os.close(result_fd)
+        os._exit(0)
 
 
-def _stop_hash_worker(worker):
-    """Best-effort, bounded cleanup for a timed-out hash worker.
+def _stop_hash_worker(pid):
+    """Best-effort bounded cleanup for an untracked fork child.
 
-    No userspace signal can forcibly release a process in D state.  In that
-    exceptional case this deliberately returns without an unbounded ``join``;
-    the caller has already rejected the artifact and remains available.
+    A child stuck in uninterruptible kernel I/O may ignore both signals.  It is
+    intentionally created with :func:`os.fork`, not ``multiprocessing.Process``:
+    the latter registers active children and Python's atexit hook performs an
+    unbounded join.  This function never waits past its cleanup window.  A
+    surviving D-state child is reparented when this CLI exits and must be dealt
+    with by host monitoring; the artifact is already rejected.
     """
-    if not worker.is_alive():
-        worker.join(HASH_WORKER_CLEANUP_SECONDS)
-        return
-    worker.terminate()
-    worker.join(HASH_WORKER_CLEANUP_SECONDS)
-    if worker.is_alive() and hasattr(worker, 'kill'):
-        worker.kill()
-        worker.join(HASH_WORKER_CLEANUP_SECONDS)
+    for sig in (signal.SIGTERM,signal.SIGKILL):
+        try:
+            os.kill(pid,sig)
+        except ProcessLookupError:
+            return
+        deadline=time.monotonic()+HASH_WORKER_CLEANUP_SECONDS
+        while time.monotonic()<deadline:
+            child,_=os.waitpid(pid,os.WNOHANG)
+            if child==pid:
+                return
+            time.sleep(min(0.01,max(0,deadline-time.monotonic())))
 
 
 def stable_hash(fd):
@@ -92,25 +104,35 @@ def stable_hash(fd):
     """
     if os.name == 'nt':
         raise ValueError('artifact_hash_linux_required')
-    context=multiprocessing.get_context('fork')
-    received,sent=context.Pipe(duplex=False)
-    worker=context.Process(target=_hash_worker,args=(fd,sent))
-    # If a kernel-level I/O wait cannot be interrupted, do not make Python's
-    # process-exit cleanup wait indefinitely for this evidence-only worker.
-    worker.daemon=True
-    worker.start();sent.close()
+    received,sent=os.pipe()
+    worker=os.fork()
+    if worker==0:
+        os.close(received)
+        _hash_worker(fd,sent)
+    os.close(sent)
+    reader=os.fdopen(received,'rb',buffering=0)
+    completed=False
+    cleanup_started=False
     try:
-        worker.join(HASH_TIMEOUT_SECONDS)
-        if worker.is_alive():
-            _stop_hash_worker(worker)
-            raise ValueError('artifact_hash_timeout')
-        require(received.poll(),'artifact_hash_failed')
-        state,payload=received.recv()
-        require(state=='ok',payload)
-        return payload
+        deadline=time.monotonic()+HASH_TIMEOUT_SECONDS
+        while time.monotonic()<deadline:
+            child,status=os.waitpid(worker,os.WNOHANG)
+            if child==worker:
+                completed=True
+                require(os.WIFEXITED(status) and os.WEXITSTATUS(status)==0,'artifact_hash_failed')
+                raw=reader.read(4096)
+                require(bool(raw),'artifact_hash_failed')
+                state,payload=json.loads(raw.decode('utf-8'))
+                require(state=='ok',payload)
+                require(isinstance(payload,list) and len(payload)==2,'artifact_hash_failed')
+                return payload[0],tuple(payload[1])
+            time.sleep(min(0.01,max(0,deadline-time.monotonic())))
+        cleanup_started=True
+        _stop_hash_worker(worker)
+        raise ValueError('artifact_hash_timeout')
     finally:
-        received.close()
-        if worker.is_alive():
+        reader.close()
+        if not completed and not cleanup_started:
             _stop_hash_worker(worker)
 
 

@@ -2,6 +2,7 @@
 """Synthetic artifact provenance tests: actual bytes, fake rebuild and API."""
 from pathlib import Path
 import os
+import multiprocessing
 import signal
 import tempfile
 import threading
@@ -153,6 +154,7 @@ class Evidence(unittest.TestCase):
     @unittest.skipIf(os.name == 'nt' or not hasattr(signal, 'SIGTERM'), 'requires POSIX signal handling')
     def test_hash_supervisor_kills_worker_that_ignores_terminate(self):
         fd=os.open(self.artifact,os.O_RDONLY);started=time.monotonic()
+        before={child.pid for child in multiprocessing.active_children()}
         def ignores_terminate(_fd,_count):
             signal.signal(signal.SIGTERM, signal.SIG_IGN)
             time.sleep(10)
@@ -164,6 +166,7 @@ class Evidence(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'artifact_hash_timeout'):
                     provenance.stable_hash(fd)
             self.assertLess(time.monotonic()-started,1)
+            self.assertEqual({child.pid for child in multiprocessing.active_children()},before)
         finally:os.close(fd)
 
     def test_artifact_mutation_during_rebuild_is_rejected(self):
