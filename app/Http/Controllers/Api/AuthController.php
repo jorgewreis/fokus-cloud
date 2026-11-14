@@ -578,6 +578,7 @@ class AuthController extends Controller
                 $user = User::findOrFail($token->user_id);
                 $user->forceFill(['password' => $data['password'], 'status' => 'ativa', 'email_verified_at' => $user->email_verified_at ?: now()])->save();
                 DB::table($table)->where('user_id', $user->id)->delete();
+                $this->activatePasswordMembership($token, $user);
 
                 return [$token, $user];
             };
@@ -599,6 +600,15 @@ class AuthController extends Controller
             $request->session()->invalidate();
             $request->session()->regenerateToken();
         }
+        if (! $lifecycle->enabledForSecurityMutation()) {
+            $this->activatePasswordMembership($token, $user);
+        }
+
+        return response()->json(['message' => 'Senha criada com sucesso. Agora você já pode entrar.']);
+    }
+
+    private function activatePasswordMembership(object $token, User $user): void
+    {
         $payload = $token->payload ? json_decode($token->payload, true) : [];
         if (! empty($payload['membership_id'])) {
             DB::table('company_memberships')->where('id', $payload['membership_id'])->where('user_id', $user->id)->where('status', 'pendente')
@@ -608,7 +618,6 @@ class AuthController extends Controller
             DB::table('company_invitations')->where('membership_id', $payload['membership_id'])->whereNull('accepted_at')->update(['accepted_at' => now(), 'updated_at' => now()]);
         }
 
-        return response()->json(['message' => 'Senha criada com sucesso. Agora você já pode entrar.']);
     }
 
     public function acceptMembership(Request $request)

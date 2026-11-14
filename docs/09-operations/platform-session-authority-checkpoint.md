@@ -49,7 +49,7 @@ password validation or token consumption) while the lifecycle flag is enabled.
 The existing experimental transaction is retained for review but is unreachable:
 deleting rows by `sessions.user_id` cannot identify all web identities because
 Laravel populates it using the default guard, including in mixed/support sessions.
-Additionally, membership and invitation updates occur after the reset transaction.
+The candidate now places membership and invitation updates inside its reset transaction; the guarded real route remains untested.
 The default-false flag preserves the legacy reset path; it does not fix its
 existing limitations. Do not remove this gate until durable principal association,
 atomic membership/invitation updates and concurrency are proven.
@@ -86,3 +86,45 @@ rollback test: the candidate reset locks a user and can then delete session rows
 while a different writer holds another session row. No safe universal lock
 order or successful concurrent reset has been established. A deadlock victim must
 roll back the token, password, memberships, invitations and authority together.
+
+## Proposed principal-aware continuation (not implemented or approved for activation)
+
+A Laravel session can contain both a platform administrator and a portal user.
+`DatabaseSessionHandler` writes `user_id` using the default guard, so the sessions
+row cannot be the authoritative list of all affected portal identities. The
+session payload is not a safe index either, and deleting matching rows alone does
+not serialize a new login or a request which already loaded its session.
+
+Introduce a durable principal generation on each portal user and bind the exact
+web user ID and generation (or an explicit no-web-principal state) to every
+platform authority marker. The marker must be replaced whenever portal login,
+logout, identity switch, support entry or exit changes that state. Do not infer
+this binding from `sessions.user_id`. A writer reads the authority's principal
+hint, locks that user, then the administrator, binding, Laravel session, grants
+and idempotency token in a globally defined order; it must re-read the binding
+under lock and reject if the hint or generation changed. A no-user binding must
+be explicitly represented and revalidated. All transitions which add or remove a
+web principal must use the same order, or the scheme is not valid. Existing
+bindings with unknown context fail closed and require reauthentication.
+
+A reset locks the target user before any actor/binding locks, validates and
+consumes its token in the same transaction, increments the user generation,
+updates the password, and activates memberships and invitations in the same
+transaction. Thus a reset committed first rejects a stale principal binding; a
+writer which obtained the user lock first finishes before the reset commits.
+When the request also has a platform context, lock both principals in the same
+order, revalidate the context, and retire or replace the binding atomically.
+The generation also needs enforcement in portal authentication middleware and
+support workflows: protecting backoffice writes alone is not complete revocation.
+Database session cleanup is then best-effort hygiene, not the authority. Avoid
+bulk session deletion inside this transaction until its lock order is proven.
+
+This is a design candidate, not code or a release guarantee. It needs a precise
+inventory of all writes and principal transitions, proof against concurrent
+first-login/registration and missing users, and a migration/rollout policy for
+old sessions. Use deterministic two-connection MySQL barrier tests for reset
+versus real authenticated writer in both orders, concurrent logins, mixed and
+support contexts, deadlock victim rollback, and failures at each membership or
+invitation update. Real HTTP tests must cover Laravel StartSession persistence,
+cookies, CSRF and guard selection. Only remove the temporary 503 when those
+proofs pass and independent review confirms every affected path.

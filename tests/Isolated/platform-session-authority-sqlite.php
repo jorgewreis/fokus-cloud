@@ -13,7 +13,10 @@ require __DIR__.'/../../app/Services/CompanyIdempotencyStore.php';
 require __DIR__.'/../../app/Services/CompanyIdempotencyFactory.php';
 require __DIR__.'/../../app/Services/PlatformSessionBinding.php';
 require __DIR__.'/../../app/Services/PlatformSessionLifecycle.php';
+require __DIR__.'/../../app/Http/Controllers/Api/AuthController.php';
 
+use App\Http\Controllers\Api\AuthController;
+use App\Models\User;
 use App\Services\CompanyIdempotencyAuthorization;
 use App\Services\CompanyIdempotencyFactory;
 use App\Services\CompanyIdempotencyKeys;
@@ -71,6 +74,34 @@ $check = function (bool $condition) use (&$assertions): void {
         throw new RuntimeException('Session authority assertion failed.');
     }
 };
+$db->statement('CREATE TABLE company_memberships (id TEXT PRIMARY KEY, user_id TEXT, status TEXT, version INTEGER, updated_at TEXT)');
+$db->statement('CREATE TABLE law_unit_memberships (id TEXT PRIMARY KEY, company_membership_id TEXT, status TEXT, version INTEGER, updated_at TEXT)');
+$db->statement('CREATE TABLE company_invitations (id TEXT PRIMARY KEY, membership_id TEXT, accepted_at TEXT, updated_at TEXT)');
+$db->table('company_memberships')->insert(['id' => 'member', 'user_id' => 'synthetic-user', 'status' => 'pendente', 'version' => 1]);
+$db->table('law_unit_memberships')->insert(['id' => 'unit', 'company_membership_id' => 'member', 'status' => 'pendente', 'version' => 1]);
+$db->table('company_invitations')->insert(['id' => 'invite', 'membership_id' => 'member']);
+$controller = (new ReflectionClass(AuthController::class))->newInstanceWithoutConstructor();
+$activate = new ReflectionMethod($controller, 'activatePasswordMembership');
+$user = new User;
+$user->id = 'synthetic-user';
+$token = (object) ['payload' => json_encode(['membership_id' => 'member'])];
+$db->statement("CREATE TRIGGER synthetic_fail_invite BEFORE UPDATE ON company_invitations BEGIN SELECT RAISE(FAIL, 'synthetic invite failure'); END");
+try {
+    $db->transaction(function () use ($db, $activate, $controller, $token, $user): void {
+        $db->table('synthetic_passwords')->where('id', 'synthetic-user')->update(['password' => 'after']);
+        $activate->invoke($controller, $token, $user);
+    });
+    throw new RuntimeException('Invitation failure was not propagated.');
+} catch (QueryException) {
+    $check($db->table('company_memberships')->where('id', 'member')->value('status') === 'pendente');
+    $check($db->table('law_unit_memberships')->where('id', 'unit')->value('status') === 'pendente');
+    $check($db->table('synthetic_passwords')->where('id', 'synthetic-user')->value('password') === 'before');
+}
+$db->statement('DROP TRIGGER synthetic_fail_invite');
+$db->transaction(fn () => $activate->invoke($controller, $token, $user));
+$check($db->table('company_memberships')->where('id', 'member')->value('status') === 'ativo');
+$check($db->table('law_unit_memberships')->where('id', 'unit')->value('status') === 'ativo');
+$check($db->table('company_invitations')->where('id', 'invite')->value('accepted_at') !== null);
 $denied = function (callable $call) use ($check): void {
     try {
         $call();
