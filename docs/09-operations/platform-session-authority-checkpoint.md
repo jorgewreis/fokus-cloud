@@ -286,3 +286,14 @@ before CPF lookup for known and unknown accounts; it does not falsely report tha
 an email was sent. Profile-only changes and company creation by a verified user
 remain available. Tests use synthetic records and an isolated SQLite database;
 these gates do not solve legacy delivery or provide an outbox.
+
+A new isolated outbox staging experiment creates an invitation-bound token and
+an encrypted recipient/token envelope in one DB transaction. It checks a
+caller-supplied expiry against the existing invitation expiry, retains existing
+tokens, and deduplicates the same request key for the same target and expiry.
+It is not wired to an issuer, worker or scheduler and does not send email. There
+is no claim/lease protocol, retry, purge, key-rotation story, provider outcome
+reconciliation or tested MySQL concurrency. Do not deploy the migration or
+activate a route from this partial primitive; encrypted token retention is a
+security and operational liability until those parts are implemented and
+reviewed. The caller must generate and protect the random request key.

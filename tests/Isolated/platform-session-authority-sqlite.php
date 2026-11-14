@@ -15,6 +15,7 @@ require __DIR__.'/../../app/Services/PlatformSessionBinding.php';
 require __DIR__.'/../../app/Services/PlatformSessionLifecycle.php';
 require __DIR__.'/../../app/Services/WebPrincipalGeneration.php';
 require __DIR__.'/../../app/Services/PrincipalSecurityToken.php';
+require __DIR__.'/../../app/Services/InvitationDeliveryOutbox.php';
 require __DIR__.'/../../app/Http/Controllers/Api/AuthController.php';
 
 use App\Http\Controllers\Api\AuthController;
@@ -23,6 +24,7 @@ use App\Services\CompanyIdempotencyAuthorization;
 use App\Services\CompanyIdempotencyFactory;
 use App\Services\CompanyIdempotencyKeys;
 use App\Services\CompanyIdempotencyStore;
+use App\Services\InvitationDeliveryOutbox;
 use App\Services\PlatformSessionAuthority;
 use App\Services\PlatformSessionBinding;
 use App\Services\PlatformSessionLifecycle;
@@ -31,6 +33,7 @@ use App\Services\WebPrincipalGeneration;
 use Illuminate\Config\Repository;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\QueryException;
+use Illuminate\Encryption\Encrypter;
 use Illuminate\Events\Dispatcher;
 use Illuminate\Foundation\Application;
 use Illuminate\Session\ArraySessionHandler;
@@ -110,7 +113,7 @@ $fixturePlatformOnly($markerA);
 $db->statement('CREATE TABLE users (id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT \'ativa\', locked_until TEXT, password TEXT, email TEXT, email_verified_at TEXT, created_at TEXT, updated_at TEXT)');
 $db->statement('CREATE TABLE web_principal_generations (user_id TEXT PRIMARY KEY, generation INTEGER NOT NULL, updated_at TEXT NOT NULL)');
 $db->table('users')->insert(['id' => 'principal', 'password' => 'synthetic-hash']);
-$db->statement('CREATE TABLE security_tokens (id TEXT PRIMARY KEY, user_id TEXT, purpose TEXT, token_hash TEXT UNIQUE, payload TEXT, expires_at TEXT, used_at TEXT, updated_at TEXT)');
+$db->statement('CREATE TABLE security_tokens (id TEXT PRIMARY KEY, user_id TEXT, purpose TEXT, token_hash TEXT UNIQUE, payload TEXT, expires_at TEXT, used_at TEXT, created_at TEXT, updated_at TEXT)');
 $db->table('security_tokens')->insert(['id' => 'test-token', 'user_id' => 'principal', 'purpose' => 'membership_acceptance', 'token_hash' => hash('sha256', 'synthetic-plain'), 'expires_at' => now()->addHour()]);
 $tokenPrimitive = new PrincipalSecurityToken;
 $db->table('security_tokens')->insert(['id' => 'email-token', 'user_id' => 'principal', 'purpose' => 'email_verification', 'token_hash' => hash('sha256', 'email-plain'), 'payload' => json_encode(['new_email' => 'synthetic@example.test']), 'expires_at' => now()->addHour()]);
@@ -287,7 +290,43 @@ $db->table('companies')->insert(['id' => 'company', 'status' => 'ativa']);
 $db->table('company_memberships')->insert(['id' => 'member', 'user_id' => 'synthetic-user', 'company_id' => 'company', 'status' => 'pendente', 'version' => 1]);
 $db->table('law_unit_memberships')->insert(['id' => 'unit', 'company_membership_id' => 'member', 'status' => 'pendente', 'version' => 1]);
 $db->table('company_invitations')->insert(['id' => 'invite', 'membership_id' => 'member', 'company_id' => 'company', 'expires_at' => now()->addHour()]);
-$db->table('users')->insert(['id' => 'synthetic-user', 'password' => 'synthetic-hash']);
+$db->table('users')->insert(['id' => 'synthetic-user', 'password' => 'synthetic-hash', 'email' => 'outbox@example.test']);
+$db->statement('CREATE TABLE invitation_delivery_outbox (id TEXT PRIMARY KEY, request_hash TEXT UNIQUE, company_id TEXT, user_id TEXT, membership_id TEXT, invitation_id TEXT, security_token_id TEXT, expires_at_epoch INTEGER, ciphertext TEXT, state TEXT, created_at TEXT, updated_at TEXT)');
+$outbox = new InvitationDeliveryOutbox(new Encrypter(str_repeat('z', 32), 'AES-256-CBC'));
+$outboxExpiry = now()->addMinutes(20)->getTimestamp();
+$outboxRequest = str_repeat('c', 64);
+$db->statement("CREATE TRIGGER fail_outbox BEFORE INSERT ON invitation_delivery_outbox BEGIN SELECT RAISE(FAIL, 'outbox failure'); END");
+try {
+    $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry);
+    throw new LogicException('Outbox failure was suppressed.');
+} catch (QueryException) {
+    $check($db->table('security_tokens')->where('user_id', 'synthetic-user')->count() === 0);
+}
+$db->statement('DROP TRIGGER fail_outbox');
+$outboxId = $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry);
+$check($outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry) === $outboxId);
+$check($db->table('invitation_delivery_outbox')->count() === 1);
+$check($db->table('security_tokens')->where('user_id', 'synthetic-user')->count() === 1);
+$ciphertext = $db->table('invitation_delivery_outbox')->where('id', $outboxId)->value('ciphertext');
+$check(! str_contains($ciphertext, 'outbox@example.test'));
+$decodedOutbox = json_decode((new Encrypter(str_repeat('z', 32), 'AES-256-CBC'))->decryptString($ciphertext), true);
+$check($decodedOutbox['recipient'] === 'outbox@example.test');
+$check(! str_contains($ciphertext, $decodedOutbox['token']));
+$check($db->table('security_tokens')->where('user_id', 'synthetic-user')->value('token_hash') === hash('sha256', $decodedOutbox['token']));
+$check(json_decode($db->table('security_tokens')->where('user_id', 'synthetic-user')->value('payload'), true) === ['membership_id' => 'member', 'invitation_id' => 'invite']);
+try {
+    $outbox->stage('company', 'principal', 'member', 'invite', str_repeat('b', 64), $outboxExpiry);
+    throw new LogicException('Cross-user invitation was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 422);
+}
+$check($db->table('invitation_delivery_outbox')->count() === 1);
+try {
+    $outbox->stage('company', 'synthetic-user', 'member', 'invite', $outboxRequest, $outboxExpiry + 1);
+    throw new LogicException('Mismatched request key was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 409);
+}
 $db->table('security_tokens')->insert(['id' => 'membership-token', 'user_id' => 'synthetic-user', 'purpose' => 'membership_acceptance', 'token_hash' => hash('sha256', 'membership-plain'), 'payload' => json_encode(['membership_id' => 'member']), 'expires_at' => now()->addHour()]);
 try {
     $tokenPrimitive->acceptMembership('membership-plain');
