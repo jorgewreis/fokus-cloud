@@ -6,7 +6,8 @@
  * portalled overlays and release listeners before the next page is mounted.
  */
 (() => {
-    const ASSET_VERSION = "20261114-interest-audit-merge-v5";
+    const ASSET_VERSION = "20261114-interest-users-merge-v6";
+
 
     const pages = {
         "platform-dashboard-final": { route: "painel", fragment: "platform-dashboard-final" },

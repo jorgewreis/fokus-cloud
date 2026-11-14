@@ -26,16 +26,16 @@ class CoverageComposition(unittest.TestCase):
         report = ET.Element('testsuites')
         group = ET.SubElement(report, 'testsuite', tests=str(suite.EXPECTED_TESTS),
                               assertions=str(suite.MINIMUM_ASSERTIONS), failures='0', errors='0', skipped='0')
-        for identity, assertions in {**suite.MAIN_IDENTITY_TESTS, **suite.LEAD_TESTS, **suite.INTEREST_TESTS, **suite.BILLING_TESTS}.items():
+        for identity, assertions in {**suite.MAIN_IDENTITY_TESTS, **suite.LEAD_TESTS, **suite.BILLING_TESTS, **suite.BACKOFFICE_TESTS, **suite.INTEREST_TESTS}.items():
             klass, name = identity.split('::')
             ET.SubElement(group, 'testcase', {'class': klass, 'name': name, 'assertions': str(assertions)})
-        for number in range(330):
+        for number in range(suite.EXPECTED_TESTS - len(group)):
             ET.SubElement(group, 'testcase', {'class': 'SyntheticLawCoverage', 'name': str(number), 'assertions': '1'})
         return report
 
     def test_measured_composition_preserves_all_law_and_main_tests(self):
         self.assertEqual(suite.EXPECTED_TESTS, 375)
-        self.assertEqual(suite.MINIMUM_ASSERTIONS, 3018)
+        self.assertEqual(suite.MINIMUM_ASSERTIONS, 3066)
         self.assertEqual(len(suite.MAIN_IDENTITY_TESTS), 10)
         self.assertEqual(sum(suite.MAIN_IDENTITY_TESTS.values()), 23)
         self.assertEqual(suite.coverage(self.report())['tests'], 375)
@@ -63,21 +63,13 @@ class CoverageComposition(unittest.TestCase):
                     else: case.set('assertions', '0')
                     with self.assertRaises(RuntimeError): suite.coverage(report)
 
-    def test_every_billing_case_is_required_with_its_assertions(self):
+    def test_every_required_backoffice_and_interest_case_keeps_assertions(self):
         self.assertEqual(len(suite.BILLING_TESTS), 17)
         self.assertEqual(sum(suite.BILLING_TESTS.values()), 148)
-        for name in suite.BILLING_TESTS:
-            for mutation in ('omit', 'rename', 'assertions'):
-                with self.subTest(name=name, mutation=mutation):
-                    report = self.report(); group = report[0]
-                    case = next(c for c in group if c.get('class') + '::' + c.get('name') == name)
-                    if mutation == 'omit': group.remove(case)
-                    elif mutation == 'rename': case.set('name', 'unrelated_passing_case')
-                    else: case.set('assertions', '0')
-                    with self.assertRaises(RuntimeError): suite.coverage(report)
-
-    def test_every_interest_index_case_is_required_with_its_assertions(self):
-        for name in suite.INTEREST_TESTS:
+        self.assertEqual(len(suite.BACKOFFICE_TESTS), 21)
+        self.assertEqual(sum(suite.BACKOFFICE_TESTS.values()), 196)
+        self.assertEqual(len(suite.INTEREST_TESTS), 4)
+        for name in set(suite.BILLING_TESTS) | set(suite.BACKOFFICE_TESTS) | set(suite.INTEREST_TESTS):
             for mutation in ('omit', 'rename', 'assertions'):
                 with self.subTest(name=name, mutation=mutation):
                     report = self.report(); group = report[0]
@@ -88,7 +80,7 @@ class CoverageComposition(unittest.TestCase):
                     with self.assertRaises(RuntimeError): suite.coverage(report)
 
     def test_old_or_incomplete_totals_failures_errors_skips_and_hidden_failures_are_rejected(self):
-        for key, value in [('tests','327'),('tests','351'),('tests','357'),('tests','358'),('tests','359'),('tests','374'),('tests','376'),('assertions','3017'),
+        for key, value in [('tests','327'),('tests','336'),('tests','351'),('tests','357'),('tests','358'),('tests','359'),('tests','371'),('tests','372'),('tests','373'),('tests','374'),('tests','376'),('assertions','3065'),
                            ('failures','1'),('errors','1'),('skipped','1')]:
             with self.subTest(key=key):
                 report = self.report(); report[0].set(key,value)
