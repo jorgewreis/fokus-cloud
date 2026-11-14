@@ -58,6 +58,13 @@ def prepare(source, candidate, evidence, artifact, expected_digest, base, root,
     return {'state': 'sealed_not_active', 'source_sha': root.name}
 
 
+def receive_prepare(stream, staging_directory, artifact_name, artifact_size, **kwargs):
+    """Receive and prepare an inactive candidate; activation remains a separate gate."""
+    from artifact_receiver import receive
+    receive(stream, staging_directory, artifact_name, kwargs['expected_digest'], artifact_size)
+    return prepare(artifact=Path(staging_directory) / artifact_name, **kwargs)
+
+
 def switch(source, base, candidate, receipt, policy, previous, previous_receipt, boundary, rollback=False):
     """Delegate both paths to the shared, runtime-evidence-enforcing gate."""
     contract = derived.contract(source)
@@ -74,6 +81,13 @@ def main():
         build.add_argument('--' + name, required=True)
     build.add_argument('--runtime-uid', required=True, type=int)
     build.add_argument('--runtime-gid', required=True, type=int)
+    incoming = commands.add_parser('receive-prepare')
+    for name in ('source', 'candidate', 'evidence', 'expected-digest', 'base', 'root',
+                 'storage', 'configuration', 'receipt', 'transport', 'staging-directory', 'artifact-name'):
+        incoming.add_argument('--' + name, required=True)
+    incoming.add_argument('--artifact-size', required=True, type=int)
+    incoming.add_argument('--runtime-uid', required=True, type=int)
+    incoming.add_argument('--runtime-gid', required=True, type=int)
     for command in ('activate', 'rollback'):
         command_parser = commands.add_parser(command)
         for name in ('source', 'base', 'candidate', 'receipt', 'policy', 'previous', 'previous-receipt', 'boundary'):
@@ -81,7 +95,12 @@ def main():
     options = vars(parser.parse_args())
     command = options.pop('command')
     try:
-        result = prepare(**options) if command == 'prepare' else switch(**options, rollback=command == 'rollback')
+        if command == 'prepare':
+            result = prepare(**options)
+        elif command == 'receive-prepare':
+            result = receive_prepare(sys.stdin.buffer, **options)
+        else:
+            result = switch(**options, rollback=command == 'rollback')
         print(json.dumps(result, sort_keys=True))
         return 0
     except Exception:

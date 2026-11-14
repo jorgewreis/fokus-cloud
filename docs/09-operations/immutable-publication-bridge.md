@@ -108,8 +108,10 @@ autenticidade do digest/tamanho e o canal de transporte devem ser estabelecidos
 independentemente: esta ferramenta não configura SSH nem comprova host remoto.
 Uma falha de sincronização após a criação do nome final pode deixar o arquivo
 recebido para inspeção; não pressupor que uma falha limpou todos os resultados.
-O receiver é um componente sintético, ainda não ligado ao workflow nem à
-entrada de produção, que permanecem bloqueados.
+`publisher.py receive-prepare` encadeia essa recepção ao preparo e selo
+inativo, repetindo a verificação do digest no desempacotamento; não ativa o
+release. O encadeamento é sintético e não está ligado ao workflow nem à entrada
+de produção, que permanecem bloqueados.
 
 ## Evidência e limites
 

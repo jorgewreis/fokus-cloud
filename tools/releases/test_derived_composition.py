@@ -15,7 +15,9 @@ with tempfile.TemporaryDirectory(prefix='rei25-composition-') as temp:
     receipt=temp/'receipt.json'
     fd=os.open(base/'prepare.lock',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600);os.close(fd)
     runtime_uid=int(os.environ['FOKUS_SYNTHETIC_RUNTIME_UID']);runtime_gid=int(os.environ['FOKUS_SYNTHETIC_RUNTIME_GID'])
-    prepared=publisher.prepare(source,candidate,evidence,artifact,packed['artifact_sha256'],base,root,storage,configuration,receipt,transport,runtime_uid,runtime_gid)
+    staging=temp/'staging';staging.mkdir(mode=0o700)
+    with artifact.open('rb') as stream:
+        prepared=publisher.receive_prepare(stream,staging,'received.tar',artifact.stat().st_size,source=source,candidate=candidate,evidence=evidence,expected_digest=packed['artifact_sha256'],base=base,root=root,storage=storage,configuration=configuration,receipt=receipt,transport=transport,runtime_uid=runtime_uid,runtime_gid=runtime_gid)
     assert prepared=={'state':'sealed_not_active','source_sha':proof['source_sha']}
     assert not (base/'current').exists()
     links={'storage':str(storage),'.env':str(configuration)}

@@ -72,6 +72,33 @@ class PublisherPreflight(unittest.TestCase):
         with patch.object(publisher.derived, 'contract', return_value=self.contract):
             return publisher.prepare(**self.args)
 
+    def test_receive_then_prepare_preserves_digest_and_never_switches(self):
+        receiver = types.ModuleType('artifact_receiver')
+        receiver.receive = Mock()
+        options = dict(self.args)
+        options.pop('artifact')
+        with patch.dict(sys.modules, {'artifact_receiver': receiver}), \
+             patch.object(publisher, 'prepare', return_value={'state': 'sealed_not_active'}) as prepare, \
+             patch.object(publisher, 'switch') as switch:
+            result = publisher.receive_prepare('stream', self.temp.name, 'release.tar', 17, **options)
+        receiver.receive.assert_called_once_with('stream', self.temp.name, 'release.tar', options['expected_digest'], 17)
+        self.assertEqual(prepare.call_args.kwargs['artifact'], Path(self.temp.name) / 'release.tar')
+        self.assertEqual(prepare.call_args.kwargs['expected_digest'], options['expected_digest'])
+        switch.assert_not_called()
+        self.assertEqual(result['state'], 'sealed_not_active')
+
+    def test_receiver_failure_cannot_prepare_or_switch(self):
+        receiver = types.ModuleType('artifact_receiver')
+        receiver.receive = Mock(side_effect=ValueError('integrity'))
+        options = dict(self.args)
+        options.pop('artifact')
+        with patch.dict(sys.modules, {'artifact_receiver': receiver}), \
+             patch.object(publisher, 'prepare') as prepare, patch.object(publisher, 'switch') as switch:
+            with self.assertRaises(ValueError):
+                publisher.receive_prepare('stream', self.temp.name, 'release.tar', 17, **options)
+        prepare.assert_not_called()
+        switch.assert_not_called()
+
     def test_rejects_existing_root_without_unpack(self):
         self.args['root'].mkdir()
         with self.assertRaisesRegex(ValueError, 'new_destination_required'):
