@@ -617,7 +617,7 @@ class BackofficeController extends Controller
         $binding = (new PlatformSessionBinding)->current($request->session());
         abort_unless($binding !== null, 503, 'Sessão indisponível.');
         try {
-            $settings = (new CompanyIdempotencyFactory)->build((array) config('company_idempotency', []), $binding);
+            $settings = (new CompanyIdempotencyFactory)->build((array) config('company_idempotency', []), $binding, $request->session()->getId());
         } catch (InvalidArgumentException) {
             abort(503, 'Solicitação indisponível.');
         }

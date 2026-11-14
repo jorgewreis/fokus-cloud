@@ -35,6 +35,44 @@ final class PlatformSessionAuthority
         });
     }
 
+    /** Consume the challenge and replace its session authority in one commit. */
+    public function completeMfa(string $actor, string $marker, int $expiresAt, ?string $previousActor, ?string $previousMarker, callable $consume): void
+    {
+        $hash = $this->bindingHash($marker);
+        if (($previousActor === null) !== ($previousMarker === null)) {
+            throw new InvalidArgumentException('Previous session context is incomplete.');
+        }
+        $previousHash = $previousMarker === null ? null : $this->bindingHash($previousMarker);
+        if ($previousHash !== null && hash_equals($hash, $previousHash)) {
+            throw new InvalidArgumentException('Session authorization must rotate.');
+        }
+        $this->requireTopLevel();
+
+        DB::transaction(function () use ($actor, $hash, $expiresAt, $previousActor, $previousHash, $consume): void {
+            $actors = array_values(array_unique(array_filter([$actor, $previousActor], fn ($id) => $id !== null)));
+            sort($actors, SORT_STRING);
+            foreach ($actors as $lockedActor) {
+                $admin = $this->lockActor($lockedActor);
+                if ($lockedActor === $actor) {
+                    $this->assertAvailable($admin);
+                }
+            }
+            if ($expiresAt <= now()->getTimestamp()) {
+                throw new InvalidArgumentException('Invalid session authorization expiry.');
+            }
+            if ($previousHash !== null) {
+                DB::table('platform_session_authorizations')->where('actor_id', $previousActor)->where('binding_hash', $previousHash)
+                    ->update(['revoked' => true, 'updated_at' => now()]);
+            }
+            $consume(); // Must perform local writes on the same connection only.
+            DB::table('platform_session_authorizations')->insert([
+                'binding_hash' => $hash, 'actor_id' => $actor,
+                'expires_at_epoch' => $expiresAt, 'revoked' => false,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        });
+    }
+
     /** Revoke exactly the presented session; never revoke a newer login. */
     public function revoke(string $actor, string $marker): void
     {
@@ -94,19 +132,46 @@ final class PlatformSessionAuthority
      * Permission and token checks remain mandatory inside that transaction.
      * Expiry is evaluated at lock acquisition; a winner may commit afterwards.
      */
-    public function withActiveSession(string $actor, string $marker, callable $callback): mixed
+    public function withActiveSession(string $actor, string $marker, string $sessionId, callable $callback): mixed
     {
         $hash = $this->bindingHash($marker);
         $this->requireTopLevel();
 
-        return DB::transaction(function () use ($actor, $hash, $callback): mixed {
+        return DB::transaction(function () use ($actor, $hash, $sessionId, $callback): mixed {
             $this->lockActor($actor);
             $binding = DB::table('platform_session_authorizations')->where('binding_hash', $hash)
                 ->where('actor_id', $actor)->lockForUpdate()->first();
             abort_unless($binding && ! $binding->revoked && (int) $binding->expires_at_epoch > now()->getTimestamp(), 401, 'Sessão indisponível.');
+            $this->lockLaravelSession($sessionId);
 
             return $callback();
         });
+    }
+
+    /** Atomically revoke the binding and perform a local security mutation. */
+    public function retireAndRun(string $actor, string $marker, string $sessionId, callable $callback): mixed
+    {
+        $hash = $this->bindingHash($marker);
+
+        return $this->withActiveSession($actor, $marker, $sessionId, function () use ($actor, $hash, $callback): mixed {
+            DB::table('platform_session_authorizations')->where('actor_id', $actor)->where('binding_hash', $hash)
+                ->update(['revoked' => true, 'updated_at' => now()]);
+
+            return $callback();
+        });
+    }
+
+    /** Expiry and cleanup must serialize with the writer on the same PDO. */
+    private function lockLaravelSession(string $sessionId): void
+    {
+        $table = config('session.table', 'sessions');
+        $lifetime = config('session.lifetime');
+        abort_unless(config('session.driver') === 'database' && DB::connection(config('session.connection')) === DB::connection()
+            && is_string($table) && preg_match('/\A[A-Za-z_][A-Za-z0-9_]*\z/D', $table) === 1
+            && is_int($lifetime) && $lifetime > 0 && preg_match('/\A[A-Za-z0-9]{40}\z/D', $sessionId) === 1,
+            503, 'Sessão indisponível.');
+        $row = DB::table($table)->where('id', $sessionId)->lockForUpdate()->first(['id', 'last_activity']);
+        abort_unless($row && (int) $row->last_activity > now()->subMinutes($lifetime)->getTimestamp(), 401, 'Sessão indisponível.');
     }
 
     private function lockActor(string $actor): object

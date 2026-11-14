@@ -15,13 +15,18 @@ final class PlatformSessionLifecycle
     }
 
     /** Called only after successful MFA. A previous actor is retired first. */
-    public function authenticated(Session $session, string $actor, ?string $previousActor): void
+    public function authenticated(Session $session, string $actor, ?string $previousActor, ?callable $consumeChallenge = null): void
     {
         $expiresAt = $this->enabled() ? $this->expiry() : null;
-        $this->retire($session, $previousActor);
         $marker = bin2hex(random_bytes(32));
         if ($expiresAt !== null) {
-            $this->authority->registerAfterMfa($actor, $marker, $expiresAt);
+            if ($consumeChallenge === null) {
+                throw new \LogicException('MFA challenge consumption is required.');
+            }
+            $previousMarker = $this->binding->current($session);
+            $this->authority->completeMfa($actor, $marker, $expiresAt, $previousMarker === null ? null : $previousActor, $previousMarker, $consumeChallenge);
+        } elseif ($consumeChallenge !== null) {
+            $consumeChallenge();
         }
         $session->put(PlatformSessionBinding::SESSION_KEY, $marker);
     }
@@ -60,6 +65,22 @@ final class PlatformSessionLifecycle
         if ($this->enabled()) {
             $this->rotateIfPresent($session, $actor);
         }
+    }
+
+    public function needsTransactionalRetirement(Session $session): bool
+    {
+        return $this->enabled() && $this->binding->current($session) !== null;
+    }
+
+    /** The callback may only mutate the business database on this connection. */
+    public function retireAndRun(Session $session, ?string $actor, callable $callback): mixed
+    {
+        $marker = $this->binding->current($session);
+        abort_unless($this->enabled() && $marker !== null && $actor !== null && $actor !== '', 503, 'Sessão indisponível.');
+        $result = $this->authority->retireAndRun($actor, $marker, $session->getId(), $callback);
+        $session->forget(PlatformSessionBinding::SESSION_KEY);
+
+        return $result;
     }
 
     public function revokeAll(string $actor): void

@@ -31,9 +31,10 @@ use Illuminate\Support\Facades\Facade;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 $app = new Application(__DIR__);
-$app->instance('config', new Repository(['company_idempotency' => ['session_authority_lifecycle' => true, 'session_authority_max_age_seconds' => 120], 'session' => ['lifetime' => 2]]));
+$app->instance('config', new Repository(['company_idempotency' => ['session_authority_lifecycle' => true, 'session_authority_max_age_seconds' => 120], 'session' => ['driver' => 'database', 'connection' => null, 'table' => 'sessions', 'lifetime' => 2]]));
 $capsule = new Capsule($app);
 $capsule->addConnection(['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '']);
+$capsule->addConnection(['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => ''], 'other');
 $capsule->setEventDispatcher(new Dispatcher($app));
 $app->instance('db', $capsule->getDatabaseManager());
 Facade::setFacadeApplication($app);
@@ -47,6 +48,10 @@ $db->statement('CREATE TABLE platform_role_permissions (platform_role_id TEXT, p
 $db->statement('CREATE TABLE company_idempotency_requests (token_hash TEXT PRIMARY KEY, key_id TEXT, actor_id TEXT, operation TEXT, issued_at_epoch INTEGER, expires_at_epoch INTEGER, recorded_at_epoch INTEGER, state TEXT, revoked INTEGER DEFAULT 0, payload_digest TEXT, result_id TEXT, result_status INTEGER, created_at TEXT, updated_at TEXT)');
 $db->statement('CREATE TABLE platform_session_authorizations (binding_hash TEXT PRIMARY KEY, actor_id TEXT NOT NULL, expires_at_epoch INTEGER NOT NULL, revoked INTEGER NOT NULL DEFAULT 0, created_at TEXT, updated_at TEXT)');
 $db->statement('CREATE TABLE synthetic_effects (id TEXT PRIMARY KEY)');
+$db->statement('CREATE TABLE sessions (id TEXT PRIMARY KEY, last_activity INTEGER NOT NULL)');
+$db->statement('CREATE TABLE synthetic_challenges (id TEXT PRIMARY KEY, used INTEGER NOT NULL DEFAULT 0)');
+$sessionId = str_repeat('S', 40);
+$db->table('sessions')->insert(['id' => $sessionId, 'last_activity' => time()]);
 $db->table('platform_admins')->insert([['id' => 'actor-a', 'status' => 'ativo', 'platform_role_id' => 'role'], ['id' => 'actor-b', 'status' => 'ativo', 'platform_role_id' => 'role']]);
 $db->table('platform_permissions')->insert(['id' => 'permission', 'code' => 'platform.companies.manage']);
 $db->table('platform_role_permissions')->insert(['platform_role_id' => 'role', 'platform_permission_id' => 'permission']);
@@ -72,19 +77,19 @@ $denied = function (callable $call) use ($check): void {
     }
     throw new RuntimeException('Expected inactive session to be rejected.');
 };
-$check($authority->withActiveSession('actor-a', $markerA, function () use ($db): string {
+$check($authority->withActiveSession('actor-a', $markerA, $sessionId, function () use ($db): string {
     $db->table('synthetic_effects')->insert(['id' => 'writer-before-revoke']);
 
     return 'writer';
 }) === 'writer');
-$denied(fn () => $authority->withActiveSession('actor-b', $markerA, fn () => 'wrong actor'));
+$denied(fn () => $authority->withActiveSession('actor-b', $markerA, $sessionId, fn () => 'wrong actor'));
 $authority->rotate('actor-a', $markerA, $markerB, $expiry);
-$denied(fn () => $authority->withActiveSession('actor-a', $markerA, fn () => 'stale'));
-$check($authority->withActiveSession('actor-a', $markerB, fn () => 'new') === 'new');
+$denied(fn () => $authority->withActiveSession('actor-a', $markerA, $sessionId, fn () => 'stale'));
+$check($authority->withActiveSession('actor-a', $markerB, $sessionId, fn () => 'new') === 'new');
 $authority->revoke('actor-a', $markerA); // stale logout cannot revoke the new binding
-$check($authority->withActiveSession('actor-a', $markerB, fn () => 'still active') === 'still active');
+$check($authority->withActiveSession('actor-a', $markerB, $sessionId, fn () => 'still active') === 'still active');
 $authority->revokeAll('actor-a');
-$denied(fn () => $authority->withActiveSession('actor-a', $markerB, fn () => $db->table('synthetic_effects')->insert(['id' => 'writer-after-revoke'])));
+$denied(fn () => $authority->withActiveSession('actor-a', $markerB, $sessionId, fn () => $db->table('synthetic_effects')->insert(['id' => 'writer-after-revoke'])));
 $check($db->table('synthetic_effects')->where('id', 'writer-before-revoke')->count() === 1);
 $check($db->table('synthetic_effects')->where('id', 'writer-after-revoke')->count() === 0);
 $check($db->table('platform_session_authorizations')->where('binding_hash', hash('sha256', $markerA))->count() === 1);
@@ -92,7 +97,7 @@ $check($db->table('platform_session_authorizations')->where('binding_hash', $mar
 $markerD = str_repeat('d', 64);
 $authority->registerAfterMfa('actor-a', $markerD, $expiry);
 $keys = new CompanyIdempotencyKeys(['a' => base64_encode(str_repeat('k', 32))], 'a', []);
-$store = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, 10, 10, 60, $authority, $markerD);
+$store = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, 10, 10, 60, $authority, $markerD, $sessionId);
 $token = $store->issue('actor-a', 'company.create', 60);
 $check($store->bind($token, 'actor-a', 'company.create', null, ['name' => 'Synthetic'], time()) === null);
 $result = $store->complete($token, 'actor-a', 'company.create', null, ['name' => 'Synthetic'], function () use ($db): array {
@@ -148,13 +153,13 @@ $denied(fn () => $store->revoke($token, 'actor-a', 'company.create', time(), fn 
 $denied(fn () => $store->issue('actor-a', 'company.create', 60));
 $markerE = str_repeat('e', 64);
 $authority->registerAfterMfa('actor-a', $markerE, $expiry);
-$orderedStore = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, 10, 10, 60, $authority, $markerE);
+$orderedStore = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, 10, 10, 60, $authority, $markerE, $sessionId);
 $statements = [];
 $db->beforeExecuting(function (string $query) use (&$statements): void {
     $statements[] = strtolower($query);
 });
 $checkOrder = function () use (&$statements, $check): void {
-    $actor = $binding = $tokenRow = null;
+    $actor = $binding = $sessionRow = $tokenRow = null;
     foreach ($statements as $index => $query) {
         if ($actor === null && str_contains($query, 'platform_admins')) {
             $actor = $index;
@@ -162,11 +167,14 @@ $checkOrder = function () use (&$statements, $check): void {
         if ($binding === null && str_contains($query, 'platform_session_authorizations')) {
             $binding = $index;
         }
+        if ($sessionRow === null && str_contains($query, '"sessions"')) {
+            $sessionRow = $index;
+        }
         if ($tokenRow === null && str_contains($query, 'company_idempotency_requests')) {
             $tokenRow = $index;
         }
     }
-    $check($actor !== null && $binding !== null && $tokenRow !== null && $actor < $binding && $binding < $tokenRow);
+    $check($actor !== null && $binding !== null && $sessionRow !== null && $tokenRow !== null && $actor < $binding && $binding < $sessionRow && $sessionRow < $tokenRow);
     $statements = [];
 };
 $orderedToken = $orderedStore->issue('actor-a', 'company.create', 60);
@@ -183,9 +191,9 @@ try {
 } catch (InvalidArgumentException $e) {
     $check($e->getMessage() === 'Company idempotency is unavailable.');
 }
-$unknown = $factory->build($factoryConfig, str_repeat('f', 64))['store'];
+$unknown = $factory->build($factoryConfig, str_repeat('f', 64), $sessionId)['store'];
 $denied(fn () => $unknown->issue('actor-a', 'company.create', 60));
-$factoryStore = $factory->build($factoryConfig, $markerE)['store'];
+$factoryStore = $factory->build($factoryConfig, $markerE, $sessionId)['store'];
 $factoryToken = $factoryStore->issue('actor-a', 'company.create', 60);
 $check($factoryStore->status($factoryToken, 'actor-a', 'company.create', time())['state'] === 'issued');
 $statements = [];
@@ -197,6 +205,27 @@ $orderedStore->status($orderedToken, 'actor-a', 'company.create', time());
 $checkOrder();
 $orderedStore->revoke($orderedToken, 'actor-a', 'company.create', time(), fn () => null);
 $checkOrder();
+$db->table('sessions')->where('id', $sessionId)->delete();
+$denied(fn () => $orderedStore->issue('actor-a', 'company.create', 60));
+$db->table('sessions')->insert(['id' => $sessionId, 'last_activity' => time() - 121]);
+$denied(fn () => $orderedStore->issue('actor-a', 'company.create', 60));
+$db->table('sessions')->where('id', $sessionId)->update(['last_activity' => time()]);
+$app['config']->set('session.connection', 'other');
+try {
+    $orderedStore->issue('actor-a', 'company.create', 60);
+    throw new RuntimeException('Separate session connection was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 503);
+}
+$app['config']->set('session.connection', null);
+$app['config']->set('session.driver', 'array');
+try {
+    $orderedStore->issue('actor-a', 'company.create', 60);
+    throw new RuntimeException('Non-database session was accepted.');
+} catch (HttpException $e) {
+    $check($e->getStatusCode() === 503);
+}
+$app['config']->set('session.driver', 'database');
 $lifecycle = new PlatformSessionLifecycle($authority);
 $app['config']->set('company_idempotency.session_authority_max_age_seconds', null);
 try {
@@ -208,21 +237,22 @@ try {
 $app['config']->set('company_idempotency.session_authority_max_age_seconds', 120);
 $session = new Store('synthetic', new ArraySessionHandler(2));
 $session->start();
-$lifecycle->authenticated($session, 'actor-b', null);
+$session->setId($sessionId);
+$lifecycle->authenticated($session, 'actor-b', null, fn () => null);
 $sessionBinding = (new PlatformSessionBinding)->current($session);
 $check(is_string($sessionBinding) && strlen($sessionBinding) === 64);
-$check($authority->withActiveSession('actor-b', $sessionBinding, fn () => 'authenticated') === 'authenticated');
+$check($authority->withActiveSession('actor-b', $sessionBinding, $sessionId, fn () => 'authenticated') === 'authenticated');
 $lifecycle->rotateIfPresent($session, 'actor-b');
 $rotatedBinding = (new PlatformSessionBinding)->current($session);
 $check(is_string($rotatedBinding) && $rotatedBinding !== $sessionBinding);
-$denied(fn () => $authority->withActiveSession('actor-b', $sessionBinding, fn () => 'old context'));
-$check($authority->withActiveSession('actor-b', $rotatedBinding, fn () => 'new context') === 'new context');
+$denied(fn () => $authority->withActiveSession('actor-b', $sessionBinding, $sessionId, fn () => 'old context'));
+$check($authority->withActiveSession('actor-b', $rotatedBinding, $sessionId, fn () => 'new context') === 'new context');
 $lifecycle->retire($session, 'actor-b');
 $check((new PlatformSessionBinding)->current($session) === null);
-$denied(fn () => $authority->withActiveSession('actor-b', $rotatedBinding, fn () => 'after logout'));
+$denied(fn () => $authority->withActiveSession('actor-b', $rotatedBinding, $sessionId, fn () => 'after logout'));
 $lifecycle->rotateIfPresent($session, 'actor-b');
 $check((new PlatformSessionBinding)->current($session) === null);
-$lifecycle->authenticated($session, 'actor-b', null);
+$lifecycle->authenticated($session, 'actor-b', null, fn () => null);
 $currentBinding = (new PlatformSessionBinding)->current($session);
 $app['config']->set('company_idempotency.session_authority_lifecycle', false);
 $lifecycle->rotateIfEnabled($session, null);
@@ -235,16 +265,53 @@ try {
     $check($e->getStatusCode() === 503);
 }
 $check((new PlatformSessionBinding)->current($session) === $currentBinding);
-$lifecycle->authenticated($session, 'actor-b', 'actor-b');
+$db->table('synthetic_challenges')->insert(['id' => 'challenge', 'used' => 0]);
+try {
+    $lifecycle->authenticated($session, 'actor-b', 'actor-b', function () use ($db): void {
+        $db->table('synthetic_challenges')->where('id', 'challenge')->update(['used' => 1]);
+        throw new RuntimeException('synthetic challenge failure');
+    });
+    throw new LogicException('Challenge failure was not propagated.');
+} catch (RuntimeException $e) {
+    $check($e->getMessage() === 'synthetic challenge failure');
+}
+$check((int) $db->table('synthetic_challenges')->where('id', 'challenge')->value('used') === 0);
+$check((new PlatformSessionBinding)->current($session) === $currentBinding);
+$check($authority->withActiveSession('actor-b', $currentBinding, $sessionId, fn () => 'still active') === 'still active');
+$lifecycle->authenticated($session, 'actor-b', 'actor-b', function () use ($db): void {
+    $db->table('synthetic_challenges')->where('id', 'challenge')->update(['used' => 1]);
+});
+$check((int) $db->table('synthetic_challenges')->where('id', 'challenge')->value('used') === 1);
 $newBinding = (new PlatformSessionBinding)->current($session);
 $check(is_string($newBinding) && $newBinding !== $currentBinding);
-$denied(fn () => $authority->withActiveSession('actor-b', $currentBinding, fn () => 'after reauthentication'));
+$denied(fn () => $authority->withActiveSession('actor-b', $currentBinding, $sessionId, fn () => 'after reauthentication'));
 $currentBinding = $newBinding;
+$db->table('synthetic_challenges')->where('id', 'challenge')->update(['used' => 0]);
+try {
+    $lifecycle->retireAndRun($session, 'actor-b', function () use ($db): void {
+        $db->table('synthetic_challenges')->where('id', 'challenge')->update(['used' => 1]);
+        throw new RuntimeException('synthetic password failure');
+    });
+    throw new LogicException('Password failure was not propagated.');
+} catch (RuntimeException $e) {
+    $check($e->getMessage() === 'synthetic password failure');
+}
+$check((int) $db->table('synthetic_challenges')->where('id', 'challenge')->value('used') === 0);
+$check((new PlatformSessionBinding)->current($session) === $currentBinding);
+$check($authority->withActiveSession('actor-b', $currentBinding, $sessionId, fn () => 'still valid') === 'still valid');
+$lifecycle->retireAndRun($session, 'actor-b', function () use ($db): void {
+    $db->table('synthetic_challenges')->where('id', 'challenge')->update(['used' => 1]);
+});
+$check((int) $db->table('synthetic_challenges')->where('id', 'challenge')->value('used') === 1);
+$check((new PlatformSessionBinding)->current($session) === null);
+$denied(fn () => $authority->withActiveSession('actor-b', $currentBinding, $sessionId, fn () => 'retired'));
+$lifecycle->authenticated($session, 'actor-b', null, fn () => null);
+$currentBinding = (new PlatformSessionBinding)->current($session);
 $db->table('platform_admins')->where('id', 'actor-b')->update(['status' => 'suspenso']);
 $denied(fn () => $authority->registerAfterMfa('actor-b', str_repeat('f', 64), $expiry));
 $denied(fn () => $authority->rotate('actor-b', $currentBinding, str_repeat('f', 64), $expiry));
 $lifecycle->revokeAll('actor-b');
-$denied(fn () => $authority->withActiveSession('actor-b', $currentBinding, fn () => 'after bulk revoke'));
+$denied(fn () => $authority->withActiveSession('actor-b', $currentBinding, $sessionId, fn () => 'after bulk revoke'));
 $expired = str_repeat('c', 64);
 try {
     $authority->registerAfterMfa('actor-a', $expired, time() - 1);

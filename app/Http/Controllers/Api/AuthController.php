@@ -568,14 +568,28 @@ class AuthController extends Controller
     {
         $data = $request->validate(['token' => ['required', 'string'], 'password' => ['required', 'string', 'min:12', 'confirmed']]);
         $passwordSecurity->validate($data['password']);
-        $token = $this->consumeToken($data['token'], ['password_reset', 'password_creation']);
-        $user = User::findOrFail($token->user_id);
-        $invalidateCurrent = Auth::guard('web')->id() === $user->id;
-        if ($invalidateCurrent) {
+        $lifecycle = app(PlatformSessionLifecycle::class);
+        $currentWebId = Auth::guard('web')->id();
+        $preview = $lifecycle->needsTransactionalRetirement($request->session()) && $currentWebId !== null
+            ? DB::table('security_tokens')->where('token_hash', hash('sha256', $data['token']))
+                ->whereIn('purpose', ['password_reset', 'password_creation'])->whereNull('used_at')->where('expires_at', '>', now())->first(['user_id'])
+            : null;
+        if ($preview && $preview->user_id === $currentWebId) {
             $platformActor = Auth::guard('platform')->id();
-            app(PlatformSessionLifecycle::class)->retire($request->session(), $platformActor === null ? null : (string) $platformActor);
+            [$token, $user] = $lifecycle->retireAndRun($request->session(), $platformActor === null ? null : (string) $platformActor, function () use ($data, $preview): array {
+                $token = $this->consumeTokenLocked($data['token'], ['password_reset', 'password_creation']);
+                abort_unless($token->user_id === $preview->user_id, 422, 'Link inválido ou expirado.');
+                $user = User::findOrFail($token->user_id);
+                $user->forceFill(['password' => $data['password'], 'status' => 'ativa', 'email_verified_at' => $user->email_verified_at ?: now()])->save();
+
+                return [$token, $user];
+            });
+        } else {
+            $token = $this->consumeToken($data['token'], ['password_reset', 'password_creation']);
+            $user = User::findOrFail($token->user_id);
+            $user->forceFill(['password' => $data['password'], 'status' => 'ativa', 'email_verified_at' => $user->email_verified_at ?: now()])->save();
         }
-        $user->forceFill(['password' => $data['password'], 'status' => 'ativa', 'email_verified_at' => $user->email_verified_at ?: now()])->save();
+        $invalidateCurrent = $currentWebId === $user->id;
         DB::table('sessions')->where('user_id', $user->id)->delete();
         if ($invalidateCurrent) {
             Auth::guard('web')->logout();
@@ -897,15 +911,21 @@ class AuthController extends Controller
 
     private function consumeToken(string $plain, string|array $purpose): object
     {
-        return DB::transaction(function () use ($plain, $purpose) {
-            $token = DB::table('security_tokens')->where('token_hash', hash('sha256', $plain))->whereIn('purpose', (array) $purpose)
-                ->whereNull('used_at')->where('expires_at', '>', now())->lockForUpdate()->first();
-            abort_unless($token, 422, 'Link inválido ou expirado.');
-            $used = DB::table('security_tokens')->where('id', $token->id)->whereNull('used_at')->update(['used_at' => now(), 'updated_at' => now()]);
-            abort_unless($used, 422, 'Link inválido ou expirado.');
+        return DB::transaction(fn () => $this->consumeTokenLocked($plain, $purpose));
+    }
 
-            return $token;
-        });
+    private function consumeTokenLocked(string $plain, string|array $purpose): object
+    {
+        if (DB::connection()->transactionLevel() < 1) {
+            throw new \LogicException('Security token consumption requires a transaction.');
+        }
+        $token = DB::table('security_tokens')->where('token_hash', hash('sha256', $plain))->whereIn('purpose', (array) $purpose)
+            ->whereNull('used_at')->where('expires_at', '>', now())->lockForUpdate()->first();
+        abort_unless($token, 422, 'Link inválido ou expirado.');
+        $used = DB::table('security_tokens')->where('id', $token->id)->whereNull('used_at')->update(['used_at' => now(), 'updated_at' => now()]);
+        abort_unless($used, 422, 'Link inválido ou expirado.');
+
+        return $token;
     }
 
     private function companiesFor(User $user): array

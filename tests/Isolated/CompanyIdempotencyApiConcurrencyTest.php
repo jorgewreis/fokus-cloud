@@ -55,7 +55,7 @@ class CompanyIdempotencyApiConcurrencyTest extends TestCase
             'email_verified_at' => now(),
         ]);
         (new PlatformSessionAuthority)->registerAfterMfa($admin->id, str_repeat('a', 64), now()->addMinutes(10)->timestamp);
-        $settings = (new CompanyIdempotencyFactory)->build(config('company_idempotency'), str_repeat('a', 64));
+        $settings = (new CompanyIdempotencyFactory)->build(config('company_idempotency'), str_repeat('a', 64), session()->getId());
         $token = $settings['session_keys']->bindSession($settings['store']->issue($admin->id, 'company.create', 600), str_repeat('a', 64));
         $this->withSession([PlatformSessionBinding::SESSION_KEY => str_repeat('a', 64)]);
         $payload = [

@@ -20,10 +20,12 @@ acquire actor, session, authorization and token rows in that order; the legacy
 constructor remains available and must never be exposed as a session-protected
 path. The factory used by the guarded controllers now requires a valid marker
 and always selects the composed path. A marker with no active durable record
-fails closed. Routes remain unconditionally blocked, and invalidation paths are
-not yet connected. Writer,
-audit and completion must remain on the same connection; callbacks cannot enforce
-their own connection or purity.
+fails closed. Routes remain unconditionally blocked. Writer, audit and
+completion must remain on the same connection; callbacks cannot enforce their
+own connection or purity. The composed path also locks the Laravel session row,
+requires it to exist and be unexpired, and rejects non-database sessions or a
+session connection different from the business connection. These checks are
+experimental; the deployment topology has not been verified.
 Hooks are present for platform and portal logout, successful MFA, support
 entry/exit and automatic termination, administrative bulk revocation and idle
 session expiration. Portal password/session regeneration hooks have also been
@@ -40,9 +42,13 @@ When the experimental flag is enabled, an explicit hard maximum age is required;
 there is no default and it does not replace or change Laravel's idle setting.
 This proposal is fail-closed but not a finished user experience or a proven
 sliding-idle policy. Configuration is checked before consuming a valid MFA
-challenge; a later database failure can still happen after challenge consumption
-and requires recovery analysis. Password-reset challenge consumption also needs
-analysis. The flag is deliberately disabled by default.
+challenge. In the enabled prototype, the conditional MFA challenge update and
+registry replacement share one DB transaction. For a password-reset token
+belonging to the current web session, token consumption, password update and
+authority retirement share one DB transaction. Cookie/session persistence
+follows the DB commit; failure there can require reauthentication and must not be
+confused with an atomic cross-system commit. Other token, session and
+administrative flows need review. The flag is deliberately disabled by default.
 
 The authority primitive itself does not perform actor status and permission checks;
 the composed store uses the existing authorization service in its transaction. A caller
@@ -58,8 +64,9 @@ An isolated smoke script constructs its own SQLite `:memory:` connection and
 checks registration, actor isolation, stale binding rejection, rotation,
 specific and bulk revocation, hash storage, expired registration, composed store
 operations, factory rejection of an absent marker or record, rollback, revoked
-permissions, nested transaction rejection and sequential query order. It does
-not execute migrations, real HTTP paths,
+permissions, nested transaction rejection, missing/expired session records,
+separate session connection rejection, synthetic MFA/password rollback and
+sequential query order. It does not execute migrations, real HTTP paths,
 concurrent transactions or MySQL and cannot demonstrate lock ordering across
 processes. Syntax and smoke checks are not evidence of concurrency correctness
 or release readiness.

@@ -154,7 +154,7 @@ class CompanyIdempotencyApiLabTest extends TestCase
     private function issue(PlatformAdmin $admin, string $operation): string
     {
         $this->authorizeSession($admin);
-        $settings = (new CompanyIdempotencyFactory)->build(config('company_idempotency'), str_repeat('a', 64));
+        $settings = (new CompanyIdempotencyFactory)->build(config('company_idempotency'), str_repeat('a', 64), session()->getId());
 
         $token = $settings['store']->issue($admin->id, $operation, $settings['lifetime_seconds']);
 

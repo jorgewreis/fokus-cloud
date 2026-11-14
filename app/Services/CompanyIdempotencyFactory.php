@@ -10,10 +10,11 @@ use stdClass;
 final class CompanyIdempotencyFactory
 {
     /** @return array{store:CompanyIdempotencyStore,lifetime_seconds:int} */
-    public function build(array $config, ?string $sessionMarker = null): array
+    public function build(array $config, ?string $sessionMarker = null, ?string $sessionId = null): array
     {
         if (($config['enabled'] ?? false) !== true || ! is_string($sessionMarker)
-            || preg_match('/\A[0-9a-f]{64}\z/D', $sessionMarker) !== 1) {
+            || preg_match('/\A[0-9a-f]{64}\z/D', $sessionMarker) !== 1
+            || ! is_string($sessionId) || preg_match('/\A[A-Za-z0-9]{40}\z/D', $sessionId) !== 1) {
             throw new InvalidArgumentException('Company idempotency is unavailable.');
         }
 
@@ -40,7 +41,7 @@ final class CompanyIdempotencyFactory
                 throw new InvalidArgumentException;
             }
             $keys = new CompanyIdempotencyKeys(get_object_vars($ring), $config['active_kid'], $revoked);
-            $store = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, $outstanding, $issues, $window, new PlatformSessionAuthority, $sessionMarker);
+            $store = new CompanyIdempotencyStore($keys, new CompanyIdempotencyAuthorization, $outstanding, $issues, $window, new PlatformSessionAuthority, $sessionMarker, $sessionId);
 
             return ['store' => $store, 'session_keys' => $keys, 'lifetime_seconds' => $lifetime];
         } catch (InvalidArgumentException|JsonException) {

@@ -16,12 +16,13 @@ final class CompanyIdempotencyStore
         private readonly int $issuanceWindowSeconds,
         private readonly ?PlatformSessionAuthority $sessionAuthority = null,
         private readonly ?string $sessionMarker = null,
+        private readonly ?string $laravelSessionId = null,
     ) {
         if ($maxOutstanding < 1 || $maxOutstanding > 1000 || $maxIssuesPerWindow < 1 || $issuanceWindowSeconds < 1) {
             throw new InvalidArgumentException('Invalid issuance quota.');
         }
-        if (($sessionAuthority === null) !== ($sessionMarker === null)) {
-            throw new InvalidArgumentException('Session authority and marker must be supplied together.');
+        if (($sessionAuthority === null) !== ($sessionMarker === null) || ($sessionAuthority === null) !== ($laravelSessionId === null)) {
+            throw new InvalidArgumentException('Session authority, marker and session ID must be supplied together.');
         }
     }
 
@@ -204,7 +205,7 @@ final class CompanyIdempotencyStore
     private function transactionForActor(string $actor, callable $callback): mixed
     {
         if ($this->sessionAuthority !== null) {
-            return $this->sessionAuthority->withActiveSession($actor, $this->sessionMarker, $callback);
+            return $this->sessionAuthority->withActiveSession($actor, $this->sessionMarker, $this->laravelSessionId, $callback);
         }
 
         return DB::transaction($callback);
