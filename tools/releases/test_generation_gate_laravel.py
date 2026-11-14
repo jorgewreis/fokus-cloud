@@ -182,6 +182,10 @@ with tempfile.TemporaryDirectory(prefix='rei26-laravel-') as temp:
                 raise
             finally:server.terminate();server.wait(timeout=10)
     c.run_verifier=real_http
+    # The publisher normally reloads the pinned contract. In this synthetic
+    # fixture use the same pinned instance to retain the loopback HTTP adapter;
+    # production continues to load the unmodified verifier from the contract.
+    publisher.derived.contract=lambda _source:c
     required=('target_binding_verified','php_cli_platform_verified','php_fpm_platform_verified','extensions_verified','fastcgi_physical_root_verified','permissions_acl_verified','runtime_cannot_write_release','workers_drained','shared_drivers_verified','schema_compatible','recovery_verified','publication_authorized','caches_finalized','laravel_boot_verified','assets_complete_verified','scheduler_descendants_absent_verified','build_provenance_verified')
     p={k:True for k in required}
     p.update(schema=c.SCHEMA,release=newroot.name,base=str(base),root=str(newroot),receipt_sha256=c.digest(newreceipt.read_bytes()),node_sha256=c.node_fingerprint(),operator_uid=os.geteuid(),runtime_uid=pwd.getpwnam('nobody').pw_uid,php_binary=php,expires_at_epoch=time.time()+120,evidence_reference='Synthetic policy only, not VPS runtime',fpm_opcache_enabled=False,preload_configured_or_loaded=False,fpm_reload_mode='verify-only',fpm_service='',verifier_script=str(verifier),public_base_url='https://fixture.invalid',release_url='https://fixture.invalid/_deployment/release')
