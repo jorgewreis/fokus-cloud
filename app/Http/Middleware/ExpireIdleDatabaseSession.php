@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\PlatformSessionAuthority;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,6 +28,7 @@ class ExpireIdleDatabaseSession
             $expiresAt = now()->subMinutes((int) config('session.lifetime', 120))->timestamp;
 
             if ((int) $lastActivity <= $expiresAt) {
+                app(PlatformSessionAuthority::class)->invalidate($request);
                 Auth::guard('web')->logout();
                 Auth::guard('platform')->logout();
                 $session->invalidate();

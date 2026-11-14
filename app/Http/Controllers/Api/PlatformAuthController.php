@@ -7,6 +7,7 @@ use App\Mail\FokusLawSystemMail;
 use App\Models\PlatformAdmin;
 use App\Services\PlatformAudit;
 use App\Services\PlatformSecurity;
+use App\Services\PlatformSessionAuthority;
 use App\Services\PrefixedUlid;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -55,7 +56,7 @@ class PlatformAuthController extends Controller
         return $this->issueMfa($request, PlatformAdmin::findOrFail($adminId), $audit);
     }
 
-    public function verifyMfa(Request $request, PlatformAudit $audit)
+    public function verifyMfa(Request $request, PlatformAudit $audit, PlatformSessionAuthority $authority)
     {
         $data = $request->validate(['code' => ['required', 'digits:6']]);
         $adminId = $request->session()->get('platform_pending_admin_id');
@@ -77,6 +78,7 @@ class PlatformAuthController extends Controller
         Auth::guard('platform')->login($admin);
         $request->session()->forget('platform_pending_admin_id');
         $request->session()->regenerate();
+        $authority->activate($request, $admin);
         $admin->forceFill(['last_login_at' => now()])->save();
         $audit->record($admin->id, 'backoffice.login_succeeded', 'platform_admin', $admin->id, request: $request, expiresInDays: 30);
 
@@ -114,10 +116,11 @@ class PlatformAuthController extends Controller
         return response()->json(['admin' => $this->adminPayload($admin)]);
     }
 
-    public function logout(Request $request, PlatformAudit $audit, \App\Services\SupportSessionSecurity $supportSecurity)
+    public function logout(Request $request, PlatformAudit $audit, \App\Services\SupportSessionSecurity $supportSecurity, PlatformSessionAuthority $authority)
     {
         $adminId = Auth::guard('platform')->id();
         $supportSecurity->end($request, 'Sessão encerrada ao sair do Backoffice.');
+        $authority->invalidate($request);
         $audit->record($adminId, 'backoffice.logout', request: $request, expiresInDays: 30);
         Auth::guard('platform')->logout();
         $request->session()->invalidate();
