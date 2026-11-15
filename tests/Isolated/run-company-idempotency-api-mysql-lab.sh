@@ -38,7 +38,10 @@ mysql_id="$(docker run -d --network none --tmpfs /var/lib/mysql:rw,size=1g \
 [[ "$mysql_id" =~ ^[0-9a-f]{64}$ ]]
 test "$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$mysql_id")" = none
 for attempt in $(seq 1 90); do
-  if docker exec -e "MYSQL_PWD=$password" "$mysql_id" mysqladmin ping -uroot --silent >/dev/null 2>&1; then break; fi
+  # mysqladmin ping returns success even while the server rejects credentials;
+  # wait for an authenticated statement so the next UUID query cannot race the
+  # image initialization sequence.
+  if docker exec -e "MYSQL_PWD=$password" "$mysql_id" mysql -uroot -Nse 'SELECT 1' >/dev/null 2>&1; then break; fi
   if [[ "$(docker inspect --format '{{.State.Running}}' "$mysql_id")" != true || "$attempt" = 90 ]]; then
     docker logs "$mysql_id" >&2
     exit 1
@@ -48,7 +51,8 @@ done
 uuid="$(docker exec -e "MYSQL_PWD=$password" "$mysql_id" mysql -uroot -Nse 'SELECT @@server_uuid')"
 [[ "$uuid" =~ ^[0-9a-fA-F-]{36}$ ]]
 
-docker run --rm --network "container:$mysql_id" --read-only \
+run_phpunit() {
+  docker run --rm --network "container:$mysql_id" --read-only \
   --tmpfs /tmp:rw,size=128m --tmpfs /workspace/storage:rw,size=128m \
   --tmpfs /workspace/bootstrap/cache:rw,size=16m -v "$source_volume:/workspace:ro" -w /workspace \
   -e FOKUS_COMPANY_IDEMPOTENCY_LAB=1 -e APP_ENV=testing -e APP_BASE_PATH=/workspace \
@@ -59,7 +63,16 @@ docker run --rm --network "container:$mysql_id" --read-only \
   -e CACHE_STORE=array -e MAIL_MAILER=array -e QUEUE_CONNECTION=sync -e BCRYPT_ROUNDS=4 \
   -e LAB_MYSQL_UUID="$uuid" "$runtime_image" \
   php vendor/bin/phpunit --no-configuration --do-not-cache-result --bootstrap tests/Isolated/company-idempotency-api-mysql-bootstrap.php \
-  tests/Feature/CompanyIdempotencyStoreTest.php \
+  "$@"
+}
+
+# The store contract intentionally builds a partial schema. Run it in its own
+# disposable database lifecycle so the API tests always begin after a complete
+# migrate:fresh, rather than inheriting that partial schema.
+run_phpunit tests/Feature/CompanyIdempotencyStoreTest.php
+docker exec -e "MYSQL_PWD=$password" "$mysql_id" mysql -uroot -e \
+  'DROP DATABASE `fokus_idempotency_api_test`; CREATE DATABASE `fokus_idempotency_api_test`;'
+run_phpunit \
   tests/Isolated/CompanyIdempotencyApiConcurrencyTest.php \
   tests/Feature/CompanyIdempotencyApiLabTest.php \
   tests/Feature/CompanyIdempotencyDisabledTest.php \
