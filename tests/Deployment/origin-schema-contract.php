@@ -75,9 +75,87 @@ function originAllowedColumns(): array
             $columns[] = [$table, $name, ...$definition];
         }
     }
+    foreach (originRei60Schema()['columns'] as $definition) {
+        $columns[] = array_slice($definition, 0, 4);
+    }
     sort($columns);
 
     return $columns;
+}
+
+function originRei60Schema(): array
+{
+    // Complete information_schema contract for the two forward-only REI-60 tables.
+    return [
+        'tables' => [
+            ['company_idempotency_requests', 'InnoDB', 'utf8mb4_unicode_ci'],
+            ['platform_session_authorities', 'InnoDB', 'utf8mb4_unicode_ci'],
+        ],
+        'columns' => [
+            ['company_idempotency_requests', 'token_hash', 'char(64)', 'NO', null, '', 'utf8mb4', 'utf8mb4_unicode_ci', ''],
+            ['company_idempotency_requests', 'key_id', 'varchar(32)', 'NO', null, '', 'utf8mb4', 'utf8mb4_unicode_ci', ''],
+            ['company_idempotency_requests', 'actor_id', 'varchar(128)', 'NO', null, '', 'utf8mb4', 'utf8mb4_unicode_ci', ''],
+            ['company_idempotency_requests', 'operation', 'varchar(32)', 'NO', null, '', 'utf8mb4', 'utf8mb4_unicode_ci', ''],
+            ['company_idempotency_requests', 'issued_at_epoch', 'bigint unsigned', 'NO', null, '', null, null, ''],
+            ['company_idempotency_requests', 'expires_at_epoch', 'bigint unsigned', 'NO', null, '', null, null, ''],
+            ['company_idempotency_requests', 'recorded_at_epoch', 'bigint unsigned', 'NO', null, '', null, null, ''],
+            ['company_idempotency_requests', 'state', 'varchar(16)', 'NO', 'issued', '', 'utf8mb4', 'utf8mb4_unicode_ci', ''],
+            ['company_idempotency_requests', 'payload_digest', 'char(64)', 'YES', null, '', 'utf8mb4', 'utf8mb4_unicode_ci', ''],
+            ['company_idempotency_requests', 'revoked', 'tinyint(1)', 'NO', '0', '', null, null, ''],
+            ['company_idempotency_requests', 'result_id', 'varchar(128)', 'YES', null, '', 'utf8mb4', 'utf8mb4_unicode_ci', ''],
+            ['company_idempotency_requests', 'result_status', 'smallint unsigned', 'YES', null, '', null, null, ''],
+            ['company_idempotency_requests', 'created_at', 'timestamp', 'YES', null, '', null, null, ''],
+            ['company_idempotency_requests', 'updated_at', 'timestamp', 'YES', null, '', null, null, ''],
+            ['platform_session_authorities', 'session_id', 'varchar(255)', 'NO', null, '', 'utf8mb4', 'utf8mb4_unicode_ci', ''],
+            ['platform_session_authorities', 'platform_admin_id', 'char(30)', 'NO', null, '', 'ascii', 'ascii_bin', ''],
+            ['platform_session_authorities', 'web_principal_state', "enum('none','known','unknown')", 'NO', null, '', 'utf8mb4', 'utf8mb4_unicode_ci', ''],
+            ['platform_session_authorities', 'web_user_id', 'char(30)', 'YES', null, '', 'ascii', 'ascii_bin', ''],
+            ['platform_session_authorities', 'generation', 'bigint unsigned', 'NO', '1', '', null, null, ''],
+            ['platform_session_authorities', 'state', "enum('active','revoked')", 'NO', 'active', '', 'utf8mb4', 'utf8mb4_unicode_ci', ''],
+            ['platform_session_authorities', 'expires_at', 'timestamp', 'NO', null, '', null, null, ''],
+            ['platform_session_authorities', 'revoked_at', 'timestamp', 'YES', null, '', null, null, ''],
+            ['platform_session_authorities', 'created_at', 'timestamp', 'YES', null, '', null, null, ''],
+            ['platform_session_authorities', 'updated_at', 'timestamp', 'YES', null, '', null, null, ''],
+        ],
+        'indexes' => [
+            ['company_idempotency_requests', 'company_idempotency_requests_actor_id_expires_at_epoch_index', 1, 1, 'actor_id', 'A', null, 'BTREE', 'YES', null],
+            ['company_idempotency_requests', 'company_idempotency_requests_actor_id_expires_at_epoch_index', 1, 2, 'expires_at_epoch', 'A', null, 'BTREE', 'YES', null],
+            ['company_idempotency_requests', 'company_idempotency_requests_actor_id_recorded_at_epoch_index', 1, 1, 'actor_id', 'A', null, 'BTREE', 'YES', null],
+            ['company_idempotency_requests', 'company_idempotency_requests_actor_id_recorded_at_epoch_index', 1, 2, 'recorded_at_epoch', 'A', null, 'BTREE', 'YES', null],
+            ['company_idempotency_requests', 'PRIMARY', 0, 1, 'token_hash', 'A', null, 'BTREE', 'YES', null],
+            ['platform_session_authorities', 'platform_session_authorities_platform_admin_id_state_index', 1, 1, 'platform_admin_id', 'A', null, 'BTREE', 'YES', null],
+            ['platform_session_authorities', 'platform_session_authorities_platform_admin_id_state_index', 1, 2, 'state', 'A', null, 'BTREE', 'YES', null],
+            ['platform_session_authorities', 'platform_session_authorities_state_expires_at_index', 1, 1, 'state', 'A', null, 'BTREE', 'YES', null],
+            ['platform_session_authorities', 'platform_session_authorities_state_expires_at_index', 1, 2, 'expires_at', 'A', null, 'BTREE', 'YES', null],
+            ['platform_session_authorities', 'platform_session_authorities_web_user_id_foreign', 1, 1, 'web_user_id', 'A', null, 'BTREE', 'YES', null],
+            ['platform_session_authorities', 'PRIMARY', 0, 1, 'session_id', 'A', null, 'BTREE', 'YES', null],
+        ],
+        'foreign_keys' => [
+            ['platform_session_authorities', 'platform_session_authorities_platform_admin_id_foreign', 'platform_admin_id', 1, 'platform_admins', 'id', 'NO ACTION', 'RESTRICT'],
+            ['platform_session_authorities', 'platform_session_authorities_web_user_id_foreign', 'web_user_id', 1, 'users', 'id', 'NO ACTION', 'SET NULL'],
+        ],
+    ];
+}
+
+function originNormalizeMetadata(array $rows): array
+{
+    return array_map(fn (array $row): array => array_map(fn ($value) => $value === null ? null : (string) $value, $row), $rows);
+}
+
+function originRequireRei60Metadata(array $actual, array $expected, string $kind): void
+{
+    $actual = originNormalizeMetadata($actual);
+    $expected = originNormalizeMetadata($expected);
+    if ($actual === $expected) {
+        return;
+    }
+    if (in_array($kind, ['indexes', 'foreign_keys'], true)) {
+        throw new RuntimeException('Origin fixture: REI-60 '.$kind.' definition changed: '.json_encode([
+            'expected' => $expected,
+            'observed' => $actual,
+        ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+    }
+    originRequire(false, 'REI-60 '.$kind.' definition changed');
 }
 
 function originAssertSchemaDelta(array $before, array $after, bool $reversed = false): array
@@ -85,7 +163,8 @@ function originAssertSchemaDelta(array $before, array $after, bool $reversed = f
     if (($before['driver'] ?? null) !== 'mysql') {
         return ['scope' => 'Exact origin metadata contract requires MySQL; SQLite exercises functional compatibility only'];
     }
-    $newTables = $reversed ? [] : ['interest_product_index', 'interest_product_index_state', 'law_case_publication_reviews', 'law_contact_import_batches', 'law_task_events', 'law_tasks'];
+    $rei60 = originRei60Schema();
+    $newTables = $reversed ? [] : ['company_idempotency_requests', 'interest_product_index', 'interest_product_index_state', 'law_case_publication_reviews', 'law_contact_import_batches', 'law_task_events', 'law_tasks', 'platform_session_authorities'];
     $added = [];
     foreach ($after['columns'] as $row) {
         if (! in_array($row, $before['columns'], true)) {
@@ -108,6 +187,10 @@ function originAssertSchemaDelta(array $before, array $after, bool $reversed = f
     if (! $reversed) {
         $tables = array_values(array_map(fn ($row) => $row[0], array_filter($after['tables'], fn ($row) => in_array($row[0], $newTables, true))));
         originRequire($tables === $newTables, 'new table allowlist changed');
+        foreach (['columns', 'indexes', 'foreign_keys', 'tables'] as $kind) {
+            $actual = array_values(array_filter($after[$kind], fn ($row) => in_array($row[0], ['company_idempotency_requests', 'platform_session_authorities'], true)));
+            originRequireRei60Metadata($actual, $rei60[$kind], $kind);
+        }
         $index = array_values(array_filter($after['indexes'], fn ($row) => $row[0] === 'law_cases' && $row[1] === 'law_cases_last_official_movement_at_index'));
         originRequire(count($index) === 1 && $index[0][2] === 1 && $index[0][3] === 1 && $index[0][4] === 'last_official_movement_at', 'projection index definition changed');
         $productIndex = array_values(array_filter($after['indexes'], fn ($row) => $row[0] === 'interest_product_index' && $row[1] === 'interest_product_index_product_code_interest_id_index'));

@@ -11,7 +11,7 @@ spec.loader.exec_module(gate)
 
 
 class ReleaseEvidenceContracts(unittest.TestCase):
-    def exercise(self, count=6, repair=True, missing_check=None, substitute=False):
+    def exercise(self, count=8, repair=True, missing_check=None, substitute=False):
         with tempfile.TemporaryDirectory() as temporary:
             root = pathlib.Path(temporary)
             base, candidate = root / 'base', root / 'candidate'
@@ -47,17 +47,17 @@ class ReleaseEvidenceContracts(unittest.TestCase):
                 (root / name).write_text(json.dumps(data))
             return gate.verify(base, candidate, root / 'base.json', root / 'candidate.json', root / 'evidence.json')
 
-    def test_six_migrations_require_independent_review_not_publication(self):
+    def test_eight_migrations_require_independent_review_not_publication(self):
         result = self.exercise()
         self.assertFalse(result['publication_authorized'])
         self.assertEqual(result['status'], 'local-evidence-consistent-review-required')
 
-    def test_five_migrations_rejected(self):
-        with self.assertRaisesRegex(ValueError, 'exactly six'):
-            self.exercise(count=5)
+    def test_seven_migrations_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'exactly eight'):
+            self.exercise(count=7)
 
-    def test_six_without_repair_rejected(self):
-        with self.assertRaisesRegex(ValueError, 'additive repair'):
+    def test_eight_without_repair_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'exactly eight named'):
             self.exercise(repair=False)
 
     def test_repair_evidence_cannot_be_omitted(self):
@@ -65,13 +65,13 @@ class ReleaseEvidenceContracts(unittest.TestCase):
             self.exercise(missing_check='repair-column-forward-only')
 
     def test_each_interest_index_evidence_is_mandatory(self):
-        for check in ('interest-index-sixth-migration', 'interest-index-pre-migration-compat',
+        for check in ('interest-index-eighth-migration', 'interest-index-pre-migration-compat',
                       'interest-index-backfill', 'interest-index-concurrency-rollback', 'interest-index-deadlock-retry'):
             with self.subTest(check=check), self.assertRaisesRegex(ValueError, 'Required evidence checks'):
                 self.exercise(missing_check=check)
 
     def test_other_named_migration_cannot_be_substituted(self):
-        with self.assertRaisesRegex(ValueError, 'exactly six named'):
+        with self.assertRaisesRegex(ValueError, 'exactly eight named'):
             self.exercise(substitute=True)
 
 

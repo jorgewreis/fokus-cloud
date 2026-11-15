@@ -57,13 +57,17 @@ try:
     create(setup,args.image,'bridge',['--mount','type=volume,src='+volume+',dst=/work'])
     with tempfile.TemporaryDirectory(prefix='fokus-linux-input-') as temp:
         archive=pathlib.Path(temp)/'source.tar'
+        history=pathlib.Path(temp)/'history.bundle'
+        # A worktree's .git is a host-specific pointer. Export complete history so
+        # the isolated runtime can archive the reviewed baseline without reading
+        # a host path or inheriting host Git configuration.
+        subprocess.run(['git','bundle','create',str(history),'HEAD'],cwd=ROOT,check=True)
         with tarfile.open(archive,'w') as tar:
             for p in sourcefiles:tar.add(ROOT/p,arcname='release/'+p,recursive=False)
-            # Local clone has no credentials; CI checkout must persist-credentials:false.
-            tar.add(ROOT/'.git',arcname='release/.git')
+            tar.add(history,arcname='history.bundle',recursive=False)
             tar.add(args.report/'source-manifest.json',arcname='source-manifest.json')
         run('copy-input',docker('cp',str(archive),setup+':/work/source.tar'))
-    run('materialize',docker('exec',setup,'sh','-ec','cd /work && tar --no-same-owner -xf source.tar && mkdir -p reports release/storage/framework/cache release/storage/framework/sessions release/storage/framework/views release/storage/logs release/bootstrap/cache && chmod -R u+rwX release/storage release/bootstrap/cache'))
+    run('materialize',docker('exec',setup,'sh','-ec','cd /work && tar --no-same-owner -xf source.tar && git clone --quiet --no-checkout history.bundle history && cp -a history/.git release/.git && rm -rf history history.bundle && mkdir -p reports release/storage/framework/cache release/storage/framework/sessions release/storage/framework/views release/storage/logs release/bootstrap/cache && chmod -R u+rwX release/storage release/bootstrap/cache'))
     run('verify-input',docker('exec','-w','/work/release',setup,'python3','-c',"import json,pathlib,hashlib; m=json.load(open('/work/source-manifest.json')); assert all(hashlib.sha256(pathlib.Path(x['path']).read_bytes()).hexdigest()==x['sha256'] for x in m['files']); print('Verified',len(m['files']),'source files')"))
     install='mkdir -p /work/browsers && composer install --no-interaction --prefer-dist --optimize-autoloader && npm ci --ignore-scripts && npm ci --prefix tests/Deployment/styles-qa --ignore-scripts'
     if not args.backend_only:install+=' && node node_modules/@playwright/test/cli.js install chromium && node tests/Deployment/styles-qa/node_modules/@playwright/test/cli.js install chromium'

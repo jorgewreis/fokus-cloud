@@ -132,10 +132,11 @@ if ($mode === 'verify-up') {
     if (getenv('UPGRADE_INJECT_ASSERTION_FAILURE') === '1') {
         throw new RuntimeException('controlled fixture failure');
     }
-    check(DB::table('migrations')->count() === $f['migration_count'] + 6, 'exactly six candidate migrations applied');
+    check(DB::table('migrations')->count() === $f['migration_count'] + 8, 'exactly eight candidate migrations applied');
     foreach (['2026_11_06_000200_separate_law_case_confidentiality', '2026_11_06_140000_create_law_case_publication_reviews',
         '2026_11_06_160000_create_law_contact_import_batches_table', '2026_11_06_170000_create_law_tasks',
-        '2026_11_07_000100_repair_payments_provider_checkout_url', '2026_11_14_000100_create_interest_product_index'] as $migration) {
+        '2026_11_07_000100_repair_payments_provider_checkout_url', '2026_11_14_000001_create_company_idempotency_requests',
+        '2026_11_14_000002_create_platform_session_authorities', '2026_11_14_000100_create_interest_product_index'] as $migration) {
         check(DB::table('migrations')->where('migration', $migration)->count() === 1, 'exact candidate migration present '.$migration);
     }
     check(Schema::hasTable('interest_product_index') && Schema::hasTable('interest_product_index_state'), 'interest index tables created');

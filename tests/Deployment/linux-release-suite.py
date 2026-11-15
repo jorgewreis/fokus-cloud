@@ -1,16 +1,20 @@
 """Run every Unit/Feature assertion with documented DB/clock portability adapters."""
 import argparse
+import datetime
 import json
 import tempfile
 import pathlib
+import time
 import xml.etree.ElementTree as ET
 from linux_release_common import ROOT, REPORT, guard, environment, php, run, adapt, write, sha, exclusive_suite_lock
 
 
 
-# Measured main composition plus three interest cases.
-EXPECTED_TESTS = 373 + 3
-MINIMUM_ASSERTIONS = 2753 + 23 + 58 + 202 + 36
+# Reviewed SQLite JUnit composition from the isolated release laboratory.
+# Totals remain strict: any omitted, duplicated, failed or skipped test rejects
+# the release evidence, while named security/identity cases are checked below.
+EXPECTED_TESTS = 424
+MINIMUM_ASSERTIONS = 3321
 MAIN_IDENTITY_TESTS = {'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_valid_snapshot_is_accepted': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_missing_identity_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_invalid_release_is_rejected_without_echoing_input': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_stale_captured_manifest_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_in_place_code_change_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_added_code_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_asset_storage_link_does_not_change_runtime_identity': 1, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_unsealed_checkout_fails_closed_without_debug_details': 4, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_invalid_or_missing_nonce_is_not_reflected': 11, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_existing_health_endpoint_is_preserved': 1}
 
 LEAD_TESTS = {'Tests\\Feature\\CompanyAdminTest::test_company_detail_exposes_separate_lead_usage_only_after_platform_authorization': 5, 'Tests\\Feature\\CompanyAdminTest::test_company_detail_permission_is_checked_before_reading_lead_usage': 2, 'Tests\\Feature\\LeadConnectionsTest::test_superuser_credentials_never_execute_application_operation': 7, 'Tests\\Feature\\LeadConnectionsTest::test_runtime_context_is_transaction_local_and_disconnects_on_application_failure': 10, 'Tests\\Feature\\LeadConnectionsTest::test_insecure_configuration_is_rejected_before_connecting': 1, 'Tests\\Feature\\LeadConnectionsTest::test_transaction_pooler_and_missing_ca_are_rejected_before_connecting': 3, 'Tests\\Feature\\LeadConnectionsTest::test_disabled_runtime_never_opens_connection': 1, 'Tests\\Feature\\LeadDatabaseTest::test_context_comes_from_server_session_and_fresh_membership': 2, 'Tests\\Feature\\LeadDatabaseTest::test_manager_role_is_resolved_from_current_membership': 2, 'Tests\\Feature\\LeadDatabaseTest::test_access_revocations_are_checked_before_any_lead_connection': 12, 'Tests\\Feature\\LeadDatabaseTest::test_support_and_cross_company_context_are_blocked': 4, 'Tests\\Feature\\LeadUsageReaderTest::test_unconfigured_metrics_are_unavailable_without_connecting': 1, 'Tests\\Feature\\LeadUsageReaderTest::test_reader_filters_company_and_distinguishes_missing_company_from_zero_usage': 5, 'Tests\\Feature\\LeadUsageReaderTest::test_outage_has_no_fabricated_counts': 3}
@@ -142,6 +146,24 @@ def prepare_database_schema(env):
     write('suite-mysql-prepare-schema-proof.json', {'status': 'passed', 'method': 'real artisan migrate; no fresh/reset/drop', 'database': 'fokuscloud_security', 'host': '127.0.0.1', 'exclusive_suite_lock': True, 'migration_bootstrap_cache': 'array', 'suite_cache': env['CACHE_STORE'], 'suite_session': env['SESSION_DRIVER'], 'migrations': migrations})
 
 
+def phpunit_command(driver, config, junit):
+    command = php() + [str(ROOT / 'vendor/phpunit/phpunit/phpunit'), '--configuration', str(config),
+                       '--log-junit', str(junit), '--colors=never', '--do-not-cache-result']
+    if driver != 'mysql':
+        return command, None
+    events = REPORT / 'suite-mysql-events.log'
+    events.unlink(missing_ok=True)
+    progress = {
+        'status': 'running',
+        'started_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        'event_log': events.name,
+        'event_log_format': 'phpunit-event-text',
+        'diagnostic_scope': 'The last Test Prepared without a later Test Finished identifies the in-flight test after interruption.',
+    }
+    write('suite-mysql-progress.json', progress)
+    return command + ['--log-events-text', str(events)], progress
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--driver', choices=['sqlite', 'mysql'], required=True)
@@ -171,7 +193,13 @@ def execute_suite(driver, env):
         config = temporary / 'phpunit.xml'
         tree.write(config, encoding='utf-8', xml_declaration=True)
         junit = REPORT / ('suite-' + driver + '-junit.xml')
-        run(php() + [str(ROOT / 'vendor/phpunit/phpunit/phpunit'), '--configuration', str(config), '--log-junit', str(junit), '--colors=never', '--do-not-cache-result'], 'suite-' + driver, env)
+        command, progress = phpunit_command(driver, config, junit)
+        started = time.monotonic()
+        run(command, 'suite-' + driver, env)
+        if progress is not None:
+            progress.update(status='completed', completed_at_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                            duration_seconds=round(time.monotonic() - started, 3))
+            write('suite-mysql-progress.json', progress)
         report = ET.parse(junit).getroot()
         totals = coverage(report)
         write('suite-' + driver + '-coverage.json', {**totals, 'junit_sha256': sha(junit),

@@ -53,6 +53,10 @@ class PlatformSecurity
 
     public function revokeSessions(string $adminId): void
     {
+        $authoritySessionIds = app(PlatformSessionAuthority::class)->revokeForAdmin($adminId);
+        if ($authoritySessionIds !== []) {
+            DB::table(config('session.table', 'sessions'))->whereIn('id', $authoritySessionIds)->delete();
+        }
         DB::table('sessions')->where('user_id', $adminId)->delete();
     }
 

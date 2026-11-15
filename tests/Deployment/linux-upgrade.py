@@ -1,4 +1,4 @@
-"""Exercise origin-shaped history, six migrations, reversal and synthetic restore."""
+"""Exercise origin-shaped history, eight migrations, forward-only recovery and synthetic restore."""
 import argparse
 import hashlib
 import importlib.util
@@ -29,13 +29,15 @@ EXPECTED_NEW_MIGRATIONS = [
     '2026_11_06_160000_create_law_contact_import_batches_table.php',
     '2026_11_06_170000_create_law_tasks.php',
     REPAIR_MIGRATION,
+    '2026_11_14_000001_create_company_idempotency_requests.php',
+    '2026_11_14_000002_create_platform_session_authorities.php',
     '2026_11_14_000100_create_interest_product_index.php',
 ]
 
 
 def require_new_migrations(names):
     if names != EXPECTED_NEW_MIGRATIONS:
-        raise RuntimeError('Expected exactly six named candidate migrations including the additive checkout repair')
+        raise RuntimeError('Expected exactly eight named candidate migrations including the forward-only authority and idempotency migrations')
 
 
 def require_origin_shape(result):
@@ -221,7 +223,7 @@ def main():
                 evidence['origin_metadata_comparison'] = capture_baseline_metadata(base, env, sandbox, prefix)
                 evidence['origin_shape_gate'] = require_origin_shape(evidence['origin_metadata_comparison'])
             execute([str(origin_fixture), str(candidate), 'billing-before'], 'repair-billing-before')
-            execute(['artisan', 'migrate', '--force', '--no-interaction'], 'six-migrations')
+            execute(['artisan', 'migrate', '--force', '--no-interaction'], 'eight-migrations')
             execute([str(fixture), str(candidate), 'verify-up'], 'verify-up')
             execute([str(origin_fixture), str(candidate), 'billing-after'], 'repair-billing-after')
             execute([str(origin_fixture), str(candidate), 'verify-up'], 'repair-origin-verify')

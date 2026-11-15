@@ -34,11 +34,11 @@ class CoverageComposition(unittest.TestCase):
         return report
 
     def test_measured_composition_preserves_all_law_and_main_tests(self):
-        self.assertEqual(suite.EXPECTED_TESTS, 376)
-        self.assertEqual(suite.MINIMUM_ASSERTIONS, 3072)
+        self.assertEqual(suite.EXPECTED_TESTS, 424)
+        self.assertEqual(suite.MINIMUM_ASSERTIONS, 3321)
         self.assertEqual(len(suite.MAIN_IDENTITY_TESTS), 10)
         self.assertEqual(sum(suite.MAIN_IDENTITY_TESTS.values()), 23)
-        self.assertEqual(suite.coverage(self.report())['tests'], 376)
+        self.assertEqual(suite.coverage(self.report())['tests'], 424)
 
     def test_omission_duplicate_or_weakened_identity_is_rejected_even_with_green_totals(self):
         for mutation in ('omit', 'duplicate', 'rename', 'assertions'):
@@ -81,7 +81,7 @@ class CoverageComposition(unittest.TestCase):
                     with self.assertRaises(RuntimeError): suite.coverage(report)
 
     def test_old_or_incomplete_totals_failures_errors_skips_and_hidden_failures_are_rejected(self):
-        for key, value in [('tests','327'),('tests','336'),('tests','351'),('tests','357'),('tests','358'),('tests','359'),('tests','371'),('tests','372'),('tests','373'),('tests','374'),('tests','375'),('tests','377'),('assertions','3029'),('assertions','3035'),('assertions','3065'),('assertions','3071'),
+        for key, value in [('tests','327'),('tests','376'),('tests','423'),('tests','425'),('assertions','3029'),('assertions','3072'),('assertions','3320'),
                            ('failures','1'),('errors','1'),('skipped','1')]:
             with self.subTest(key=key):
                 report = self.report(); report[0].set(key,value)
@@ -89,6 +89,28 @@ class CoverageComposition(unittest.TestCase):
         for kind in ('failure', 'error', 'skipped'):
             report = self.report(); ET.SubElement(report[0][0], kind)
             with self.assertRaises(RuntimeError): suite.coverage(report)
+
+    def test_mysql_suite_emits_persistent_phpunit_progress_before_execution(self):
+        records = {}
+        with tempfile.TemporaryDirectory() as directory, patch.object(suite, 'REPORT', pathlib.Path(directory)), patch.object(suite, 'write', side_effect=lambda name, value: records.setdefault(name, value)):
+            config = pathlib.Path(directory) / 'phpunit.xml'
+            junit = pathlib.Path(directory) / 'suite-mysql-junit.xml'
+            command, progress = suite.phpunit_command('mysql', config, junit)
+            self.assertIsNotNone(progress)
+            self.assertIn('--log-events-text', command)
+            self.assertEqual(command[command.index('--log-events-text') + 1], str(pathlib.Path(directory) / 'suite-mysql-events.log'))
+            recorded = records['suite-mysql-progress.json']
+            self.assertEqual(recorded['status'], 'running')
+            self.assertEqual(recorded['event_log'], 'suite-mysql-events.log')
+            self.assertIn('started_at_utc', recorded)
+            self.assertIn('Test Prepared', recorded['diagnostic_scope'])
+
+    def test_sqlite_suite_does_not_add_mysql_progress_log(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(suite, 'REPORT', pathlib.Path(directory)), patch.object(suite, 'write') as write:
+            command, progress = suite.phpunit_command('sqlite', pathlib.Path(directory) / 'phpunit.xml', pathlib.Path(directory) / 'suite-sqlite-junit.xml')
+            self.assertIsNone(progress)
+            self.assertNotIn('--log-events-text', command)
+            write.assert_not_called()
 
 
 class HarnessContracts(unittest.TestCase):
@@ -103,6 +125,9 @@ class HarnessContracts(unittest.TestCase):
         materialize = stages['materialize']
         handoff = stages['prepare-synthetic-ownership']
         self.assertIn('tar --no-same-owner -xf source.tar', ast.literal_eval(materialize.args[1].args[-1]))
+        self.assertIn("'bundle','create',str(history),'HEAD'", source)
+        self.assertIn('git clone --quiet --no-checkout history.bundle history', ast.literal_eval(materialize.args[1].args[-1]))
+        self.assertNotIn("tar.add(ROOT/'.git'", source)
         self.assertNotIn('safe.directory', source)
         self.assertIn('chown -R 1000:1000 /work', ast.literal_eval(handoff.args[1].args[-1]))
         self.assertLess(materialize.lineno, stages['prepare-isolated-upgrade-dependencies'].lineno)
@@ -362,7 +387,7 @@ class HarnessContracts(unittest.TestCase):
 
     def test_origin_rehearsal_orders_failure_repair_idempotence_and_restore(self):
         source = (common.ROOT / 'tests/Deployment/linux-upgrade.py').read_text(encoding='utf-8')
-        labels = ['interest-index-pre-migration-compat', 'repair-fresh-noop', 'prepare-origin-shape', 'repair-billing-before', 'six-migrations',
+        labels = ['interest-index-pre-migration-compat', 'repair-fresh-noop', 'prepare-origin-shape', 'repair-billing-before', 'eight-migrations',
                   'repair-billing-after', 'repair-origin-verify', 'repair-origin-idempotent', 'interest-index-backfill',
                   'interest-index-concurrency-rollback', 'interest-index-deadlock-retry', 'restored-backup-repair-verify']
         positions = [source.index("'" + label + "'") for label in labels]
@@ -370,7 +395,7 @@ class HarnessContracts(unittest.TestCase):
         self.assertIn('require_new_migrations(new)', source)
         self.assertIn("evidence['reversal_authorized_delta']", source)
 
-    def test_upgrade_requires_exact_six_names_not_just_count(self):
+    def test_upgrade_requires_exact_eight_names_not_just_count(self):
         upgrade.require_new_migrations(upgrade.EXPECTED_NEW_MIGRATIONS)
         for names in (upgrade.EXPECTED_NEW_MIGRATIONS[:-1], list(reversed(upgrade.EXPECTED_NEW_MIGRATIONS)),
                       ['2026_11_06_000200_unreviewed.php', *upgrade.EXPECTED_NEW_MIGRATIONS[1:]]):
@@ -403,13 +428,15 @@ class HarnessContracts(unittest.TestCase):
                 self.assertIn(bootstrap, source)
                 self.assertLess(source.index(imported), source.index(bootstrap))
 
-    def test_origin_reversal_records_retained_column_instead_of_baseline_equality(self):
+    def test_origin_reversal_preserves_forward_only_recovery_guard(self):
         source = (common.ROOT / 'tests/Deployment/reversal-harness.php').read_text(encoding='utf-8')
-        self.assertRegex(source, r"\['--step'\s*=>\s*6,\s*'--force'\s*=>\s*true\]")
-        self.assertRegex(source, r"Schema::hasColumn\('payments',\s*'provider_checkout_url'\)")
-        self.assertIn("$delta['repair_ledger_absent'] = true", source)
-        self.assertIn("$delta['payments_and_urls_unchanged'] = true", source)
-        self.assertIn('EXPLICIT AUTHORIZED ROLLBACK DELTA', source)
+        self.assertIn("'2026_11_14_000001_create_company_idempotency_requests'", source)
+        self.assertIn("'2026_11_14_000002_create_platform_session_authorities'", source)
+        self.assertIn("'Automatic rollback would'", source)
+        self.assertIn("'--path' => 'database/migrations/2026_11_14_000100_create_interest_product_index.php'", source)
+        self.assertIn("$interestLedger = (array) DB::table('migrations')", source)
+        self.assertIn("'--batch' => (int) $interestLedger['batch']", source)
+        self.assertIn("'--batch' => (int) $ledger['batch']", source)
         self.assertNotIn("dropColumn('provider_checkout_url')", source)
         contract = (common.ROOT / 'tests/Deployment/origin-schema-contract.php').read_text(encoding='utf-8')
         self.assertIn("$reversed ? [['payments', 'provider_checkout_url', 'varchar(512)', 'YES']]", contract)
@@ -508,6 +535,15 @@ class HarnessContracts(unittest.TestCase):
         for filename, anchor in anchors.items():
             with self.subTest(filename=filename):
                 self.assertEqual((common.ROOT / filename).read_text(encoding='utf-8').count(anchor), 1)
+
+    def test_rei60_index_contract_emits_limited_metadata_diff(self):
+        contract = (common.ROOT / 'tests/Deployment/origin-schema-contract.php').read_text(encoding='utf-8')
+        self.assertIn('function originRequireRei60Metadata', contract)
+        self.assertIn("['indexes', 'foreign_keys']", contract)
+        self.assertIn("'expected' => $expected", contract)
+        self.assertIn("'observed' => $actual", contract)
+        self.assertIn('JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR', contract)
+        self.assertIn('originRequireRei60Metadata($actual, $rei60[$kind], $kind)', contract)
 
 
 if __name__ == '__main__':
