@@ -30,8 +30,15 @@ test('painel fictício alterna lista, nome, contagem e vínculo do título', () 
     d.getElementById('show-empty').click();
     assert.equal(trigger.getAttribute('aria-label'), 'Notificações');
     assert.equal(d.getElementById('notifications-count').hidden, true);
+    assert.equal(panel.hidden, true);
+    trigger.click();
+    assert.equal(panel.hidden, false);
+    assert.equal(trigger.getAttribute('aria-expanded'), 'true');
     assert.match(panel.textContent, /Nenhuma notificação por enquanto/);
     d.getElementById('show-items').click();
+    assert.equal(panel.hidden, true);
+    trigger.click();
+    assert.equal(panel.hidden, false);
     assert.equal(panel.querySelectorAll('.example-item').length, 2);
   } finally { dom.window.close(); }
 });
