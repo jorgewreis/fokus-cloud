@@ -536,7 +536,7 @@ class HarnessContracts(unittest.TestCase):
     def test_rei60_index_contract_emits_limited_metadata_diff(self):
         contract = (common.ROOT / 'tests/Deployment/origin-schema-contract.php').read_text(encoding='utf-8')
         self.assertIn('function originRequireRei60Metadata', contract)
-        self.assertIn("$kind === 'indexes'", contract)
+        self.assertIn("['indexes', 'foreign_keys']", contract)
         self.assertIn("'expected' => $expected", contract)
         self.assertIn("'observed' => $actual", contract)
         self.assertIn('JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR', contract)

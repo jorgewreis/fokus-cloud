@@ -149,8 +149,8 @@ function originRequireRei60Metadata(array $actual, array $expected, string $kind
     if ($actual === $expected) {
         return;
     }
-    if ($kind === 'indexes') {
-        throw new RuntimeException('Origin fixture: REI-60 indexes definition changed: '.json_encode([
+    if (in_array($kind, ['indexes', 'foreign_keys'], true)) {
+        throw new RuntimeException('Origin fixture: REI-60 '.$kind.' definition changed: '.json_encode([
             'expected' => $expected,
             'observed' => $actual,
         ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
