@@ -12,7 +12,10 @@ for name in published_assets:
         raise FileNotFoundError(f'Missing published asset: assets/{name}')
 # The standalone examples use CSS and local inline behavior. Do not silently
 # add assets used only by documentation pages to their portable download.
-files = sorted([*(root/'examples').glob('*.html'), *(root/'examples').glob('*.md'), *(root/'examples').glob('*.css'), *(root/'assets'/name for name in published_assets)])
+files = sorted(
+    [*(root/'examples').glob('*.html'), *(root/'examples').glob('*.md'), *(root/'examples').glob('*.css'), *(root/'assets'/name for name in published_assets)],
+    key=lambda path: path.relative_to(root).as_posix().casefold(),
+)
 # Deflate output varies with the zlib implementation bundled with Python.
 # Keep this checked-in portable artifact byte-stable across local and CI runners.
 with ZipFile(root/'examples/fokus-styles-examples.zip', 'w', ZIP_STORED) as archive:

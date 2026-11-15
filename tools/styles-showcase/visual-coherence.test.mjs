@@ -42,7 +42,7 @@ import re
 root = Path('public/styles')
 with ZipFile(root/'examples/fokus-styles-examples.zip') as z:
     assert all(entry.compress_type == ZIP_STORED for entry in z.infolist()), 'Portable ZIP must avoid runner-dependent deflate bytes'
-    source_files = sorted([*(root/'examples').glob('*.html'), *(root/'examples').glob('*.md'), *(root/'examples').glob('*.css'), *(root/'assets'/name for name in ['fokus-2.7.0.min.css','LICENSE-fokus-styles.txt','site-palette.css','styles-theme.js'])])
+    source_files = sorted([*(root/'examples').glob('*.html'), *(root/'examples').glob('*.md'), *(root/'examples').glob('*.css'), *(root/'assets'/name for name in ['fokus-2.7.0.min.css','LICENSE-fokus-styles.txt','site-palette.css','styles-theme.js'])], key=lambda path: path.relative_to(root).as_posix().casefold())
     expected = [path.relative_to(root).as_posix() for path in source_files]
     assert z.namelist() == expected, 'Portable ZIP must contain every generated source exactly once'
     for name in expected:
