@@ -75,6 +75,9 @@ function originAllowedColumns(): array
             $columns[] = [$table, $name, ...$definition];
         }
     }
+    foreach (originRei60Schema()['columns'] as $definition) {
+        $columns[] = array_slice($definition, 0, 4);
+    }
     sort($columns);
 
     return $columns;
