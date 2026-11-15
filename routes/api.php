@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\BackofficeController;
 use App\Http\Controllers\Api\CompanyUserController;
 use App\Http\Controllers\Api\LawAccessController;
 use App\Http\Controllers\Api\LawAdministrativeProcessController;
+use App\Http\Controllers\Api\LawBetaApplicationController;
 use App\Http\Controllers\Api\LawCaseController;
 use App\Http\Controllers\Api\LawCompanyProfileController;
 use App\Http\Controllers\Api\LawContactController;
@@ -53,6 +54,7 @@ Route::get('/catalog/{product}', [SubscriptionController::class, 'publicCatalog'
 Route::post('/catalog/{product}/quote', [SubscriptionController::class, 'publicQuote'])->where('product', 'law|fokus-law|lead|fokus-lead')->middleware('throttle:30,1,public-catalog-quote');
 Route::get('/analytics/config', fn () => response()->json(['measurement_id' => config('services.ga4.measurement_id')]))->middleware('throttle:30,1,analytics-config');
 Route::post('/product-interests', [ProductInterestController::class, 'store'])->middleware('throttle:5,10,product-interest');
+Route::post('/law/beta-applications', [LawBetaApplicationController::class, 'store'])->middleware('throttle:5,10,law-beta-application');
 
 Route::prefix('backoffice/auth')->group(function () {
     Route::post('/login', [PlatformAuthController::class, 'login'])->middleware('throttle:5,1,platform-login');

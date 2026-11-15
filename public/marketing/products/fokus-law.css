@@ -178,3 +178,16 @@
 /* Consentimento: link da política em linha própria para leitura clara */
 .law-interest-consent .fs-check-label{display:grid;justify-items:start;gap:.3rem;min-width:0}
 .law-interest-consent .fs-check-label a{display:inline-block;width:max-content;max-width:100%;overflow-wrap:anywhere}
+
+/* Candidatura ao beta: um fluxo comercial separado do diagnóstico geral. */
+.law-beta-interest-section{position:relative;background:linear-gradient(112deg,#f7f2e8 0%,#f7f2e8 58%,#e9e1d6 58%,#eee7dc 100%)}
+.law-beta-interest-disclosure{max-width:48ch;margin-top:2rem;padding-top:1rem;border-top:1px solid rgba(38,20,52,.22);font-size:.92rem!important;line-height:1.55!important}
+.law-beta-form-heading{margin:0 0 1.5rem;padding-bottom:1.25rem;border-bottom:1px solid rgba(38,20,52,.14)}
+.law-beta-form-heading p,.law-beta-modules>p{margin:0 0 .45rem;color:var(--law-sage);font-size:.72rem;font-weight:700;letter-spacing:.12em}
+.law-beta-form-heading h3{margin:0;color:var(--law-plum);font-family:var(--law-display);font-size:clamp(1.75rem,3vw,2.5rem);font-weight:400;line-height:1;text-transform:uppercase}
+.law-beta-form-heading span{display:block;margin-top:.65rem;color:rgba(38,20,52,.72);font-size:.86rem;line-height:1.5}
+.law-beta-modules{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;padding:1.1rem;border:1px solid rgba(38,20,52,.16);border-radius:.75rem;background:rgba(247,242,232,.52)}
+.law-beta-modules>p{grid-column:1/-1}
+.law-beta-modules div{display:grid;gap:.3rem;padding-left:.85rem;border-left:3px solid var(--law-sage)}
+.law-beta-modules strong{font-size:.95rem}.law-beta-modules span{color:rgba(38,20,52,.76);font-size:.85rem;line-height:1.45}
+@media(max-width:640px){.law-beta-modules{grid-template-columns:1fr}.law-beta-interest-section{background:var(--law-ivory)}}
