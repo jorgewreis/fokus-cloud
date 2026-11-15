@@ -21,18 +21,23 @@ for (const [name, response] of [
     const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'http://localhost/' });
     const { window } = dom;
     try {
+      let calls = 0;
       window.FokusApi = { request: async url => {
+        calls++;
         assert.equal(url, '/law/notifications');
         return response;
       } };
       // Expose the real loader while avoiding the unrelated application bootstrap.
       window.eval(`${shell.slice(0, bootstrap)} window.testLoadLawNotifications = loadLawNotifications; })();`);
       const panel = window.document.querySelector('#notifications-panel');
+      const initialTitle = panel.querySelector('#notifications-title');
       await window.testLoadLawNotifications(window.document.querySelector('#notifications-button'), panel);
+      assert.equal(calls, 1);
       const titleId = panel.getAttribute('aria-labelledby');
       assert.ok(titleId);
       const title = window.document.getElementById(titleId);
       assert.ok(title && panel.contains(title));
+      assert.notEqual(title, initialTitle, 'successful load replaces the initial title');
       assert.equal(title.textContent, 'Notificações');
       assert.equal(panel.querySelectorAll(`#${titleId}`).length, 1);
       assert.equal(panel.querySelectorAll('.law-notification-item').length, response.notifications.length);

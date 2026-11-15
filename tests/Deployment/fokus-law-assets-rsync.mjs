@@ -87,7 +87,7 @@ try {
         assert.equal(await readFile(path.join(destinationRoot, 'public/portal/assets/fokus-law-contacts.js'), 'utf8'), 'updated original source\n');
     }
 
-    process.stdout.write('PASS: deterministic manifest and 14 staged content-addressed assets verified.\n');
+    process.stdout.write(`PASS: manifest and ${files.length} staged content-addressed assets verified.\n`);
 } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
 }
