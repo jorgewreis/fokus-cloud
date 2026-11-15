@@ -13,8 +13,8 @@ from linux_release_common import ROOT, REPORT, guard, environment, php, run, ada
 # Reviewed SQLite JUnit composition from the isolated release laboratory.
 # Totals remain strict: any omitted, duplicated, failed or skipped test rejects
 # the release evidence, while named security/identity cases are checked below.
-EXPECTED_TESTS = 424
-MINIMUM_ASSERTIONS = 3321
+EXPECTED_TESTS = 429
+MINIMUM_ASSERTIONS = 3354
 MAIN_IDENTITY_TESTS = {'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_valid_snapshot_is_accepted': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_missing_identity_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_invalid_release_is_rejected_without_echoing_input': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_stale_captured_manifest_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_in_place_code_change_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_added_code_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_asset_storage_link_does_not_change_runtime_identity': 1, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_unsealed_checkout_fails_closed_without_debug_details': 4, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_invalid_or_missing_nonce_is_not_reflected': 11, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_existing_health_endpoint_is_preserved': 1}
 
 LEAD_TESTS = {'Tests\\Feature\\CompanyAdminTest::test_company_detail_exposes_separate_lead_usage_only_after_platform_authorization': 5, 'Tests\\Feature\\CompanyAdminTest::test_company_detail_permission_is_checked_before_reading_lead_usage': 2, 'Tests\\Feature\\LeadConnectionsTest::test_superuser_credentials_never_execute_application_operation': 7, 'Tests\\Feature\\LeadConnectionsTest::test_runtime_context_is_transaction_local_and_disconnects_on_application_failure': 10, 'Tests\\Feature\\LeadConnectionsTest::test_insecure_configuration_is_rejected_before_connecting': 1, 'Tests\\Feature\\LeadConnectionsTest::test_transaction_pooler_and_missing_ca_are_rejected_before_connecting': 3, 'Tests\\Feature\\LeadConnectionsTest::test_disabled_runtime_never_opens_connection': 1, 'Tests\\Feature\\LeadDatabaseTest::test_context_comes_from_server_session_and_fresh_membership': 2, 'Tests\\Feature\\LeadDatabaseTest::test_manager_role_is_resolved_from_current_membership': 2, 'Tests\\Feature\\LeadDatabaseTest::test_access_revocations_are_checked_before_any_lead_connection': 12, 'Tests\\Feature\\LeadDatabaseTest::test_support_and_cross_company_context_are_blocked': 4, 'Tests\\Feature\\LeadUsageReaderTest::test_unconfigured_metrics_are_unavailable_without_connecting': 1, 'Tests\\Feature\\LeadUsageReaderTest::test_reader_filters_company_and_distinguishes_missing_company_from_zero_usage': 5, 'Tests\\Feature\\LeadUsageReaderTest::test_outage_has_no_fabricated_counts': 3}
@@ -44,6 +44,22 @@ INTEREST_TESTS = {
     'Tests\\Feature\\ProductInterestTest::test_indexed_suggestions_are_paginated_and_allow_prefix_search': 12,
 }
 
+IDEMPOTENCY_TESTS = {
+    'Tests\\Feature\\CompanyIdempotencyApiLabTest::test_create_replay_is_one_company_one_audit_and_one_password_check': 9,
+    'Tests\\Feature\\CompanyIdempotencyDisabledTest::test_keyed_company_writes_fail_closed_without_echoing_the_key_or_writing': 14,
+    'Tests\\Feature\\CompanyIdempotencyStoreTest::test_completed_request_replays_without_repeating_the_mutation': 7,
+    'Tests\\Feature\\PlatformSessionAuthorityTest::test_activation_creates_an_expiring_authority_and_revocation_increments_its_generation': 3,
+}
+
+MYSQL_LAB_TEST_FILES = (
+    ROOT / 'tests/Feature/CompanyIdempotencyApiLabTest.php',
+    ROOT / 'tests/Feature/CompanyIdempotencyDisabledTest.php',
+    ROOT / 'tests/Feature/CompanyIdempotencyStoreTest.php',
+    ROOT / 'tests/Feature/PlatformSessionAuthorityTest.php',
+)
+MYSQL_GENERIC_TESTS = EXPECTED_TESTS - 34
+MYSQL_GENERIC_MINIMUM_ASSERTIONS = MINIMUM_ASSERTIONS - 140
+
 # Added since e3dee0c6; each identity remains required, not just the total.
 BACKOFFICE_TESTS = {
     'Tests\\Feature\\SubscriptionAdminTest::test_dashboard_aggregates_active_subscriptions_in_one_snapshot': 6,
@@ -70,19 +86,29 @@ BACKOFFICE_TESTS = {
     'Tests\\Feature\\ReconciliationAndRefundTest::test_refund_execution_and_lookup_fail_closed_without_the_expected_unique_index': 11,
 }
 
-def coverage(report):
+def coverage_limits(driver):
+    if driver == 'mysql':
+        return MYSQL_GENERIC_TESTS, MYSQL_GENERIC_MINIMUM_ASSERTIONS
+    return EXPECTED_TESTS, MINIMUM_ASSERTIONS
+
+
+def coverage(report, driver):
     suites = list(report) if report.tag == 'testsuites' else [report]
     totals = {key: sum(int(s.get(key, 0)) for s in suites)
               for key in ('tests', 'assertions', 'failures', 'errors', 'skipped')}
     cases = list(report.iter('testcase'))
     identities = [case.get('class', '') + '::' + case.get('name', '') for case in cases]
-    if (totals['tests'] != EXPECTED_TESTS or totals['assertions'] < MINIMUM_ASSERTIONS
+    expected_tests, minimum_assertions = coverage_limits(driver)
+    if (totals['tests'] != expected_tests or totals['assertions'] < minimum_assertions
             or any(totals[key] for key in ('failures', 'errors', 'skipped'))
-            or len(cases) != EXPECTED_TESTS or len(set(identities)) != len(cases)
+            or len(cases) != expected_tests or len(set(identities)) != len(cases)
             or any(case.find(kind) is not None for case in cases for kind in ('failure', 'error', 'skipped'))):
         raise RuntimeError('Incomplete or failing suite; coverage gate rejected results')
     requirements = {}
-    for group in (MAIN_IDENTITY_TESTS, LEAD_TESTS, BILLING_TESTS, BACKOFFICE_TESTS, INTEREST_TESTS):
+    groups = (MAIN_IDENTITY_TESTS, LEAD_TESTS, BILLING_TESTS, BACKOFFICE_TESTS, INTEREST_TESTS)
+    if driver != 'mysql':
+        groups += (IDEMPOTENCY_TESTS,)
+    for group in groups:
         for name, minimum in group.items():
             requirements[name] = max(requirements.get(name, 0), minimum)
     for name, minimum in requirements.items():
@@ -111,6 +137,8 @@ def prepare_adapters(driver, env, tree, temporary):
         for source in sources:
             ET.SubElement(feature, 'exclude').text = str(source)
             ET.SubElement(feature, 'file').text = str(temporary / source.name)
+        for source in MYSQL_LAB_TEST_FILES:
+            ET.SubElement(feature, 'exclude').text = str(source)
     return adaptations
 
 
@@ -201,9 +229,10 @@ def execute_suite(driver, env):
                             duration_seconds=round(time.monotonic() - started, 3))
             write('suite-mysql-progress.json', progress)
         report = ET.parse(junit).getroot()
-        totals = coverage(report)
+        totals = coverage(report, driver)
+        expected_tests, minimum_assertions = coverage_limits(driver)
         write('suite-' + driver + '-coverage.json', {**totals, 'junit_sha256': sha(junit),
-              'expected_tests': EXPECTED_TESTS, 'minimum_assertions': MINIMUM_ASSERTIONS,
+              'expected_tests': expected_tests, 'minimum_assertions': minimum_assertions,
               'main_identity_tests': MAIN_IDENTITY_TESTS})
 
 

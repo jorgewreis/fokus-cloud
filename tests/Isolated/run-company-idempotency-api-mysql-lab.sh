@@ -57,4 +57,8 @@ docker run --rm --network "container:$mysql_id" --read-only \
   -e CACHE_STORE=array -e MAIL_MAILER=array -e QUEUE_CONNECTION=sync -e BCRYPT_ROUNDS=4 \
   -e LAB_MYSQL_UUID="$uuid" "$runtime_image" \
   php vendor/bin/phpunit --no-configuration --do-not-cache-result --bootstrap tests/Isolated/company-idempotency-api-mysql-bootstrap.php \
-  tests/Isolated/CompanyIdempotencyApiConcurrencyTest.php
+  tests/Feature/CompanyIdempotencyStoreTest.php \
+  tests/Isolated/CompanyIdempotencyApiConcurrencyTest.php \
+  tests/Feature/CompanyIdempotencyApiLabTest.php \
+  tests/Feature/CompanyIdempotencyDisabledTest.php \
+  tests/Feature/PlatformSessionAuthorityTest.php
