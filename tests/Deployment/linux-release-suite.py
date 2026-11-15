@@ -1,8 +1,10 @@
 """Run every Unit/Feature assertion with documented DB/clock portability adapters."""
 import argparse
+import datetime
 import json
 import tempfile
 import pathlib
+import time
 import xml.etree.ElementTree as ET
 from linux_release_common import ROOT, REPORT, guard, environment, php, run, adapt, write, sha, exclusive_suite_lock
 
@@ -144,6 +146,24 @@ def prepare_database_schema(env):
     write('suite-mysql-prepare-schema-proof.json', {'status': 'passed', 'method': 'real artisan migrate; no fresh/reset/drop', 'database': 'fokuscloud_security', 'host': '127.0.0.1', 'exclusive_suite_lock': True, 'migration_bootstrap_cache': 'array', 'suite_cache': env['CACHE_STORE'], 'suite_session': env['SESSION_DRIVER'], 'migrations': migrations})
 
 
+def phpunit_command(driver, config, junit):
+    command = php() + [str(ROOT / 'vendor/phpunit/phpunit/phpunit'), '--configuration', str(config),
+                       '--log-junit', str(junit), '--colors=never', '--do-not-cache-result']
+    if driver != 'mysql':
+        return command, None
+    events = REPORT / 'suite-mysql-events.log'
+    events.unlink(missing_ok=True)
+    progress = {
+        'status': 'running',
+        'started_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        'event_log': events.name,
+        'event_log_format': 'phpunit-event-text',
+        'diagnostic_scope': 'The last Test Prepared without a later Test Finished identifies the in-flight test after interruption.',
+    }
+    write('suite-mysql-progress.json', progress)
+    return command + ['--log-events-text', str(events)], progress
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--driver', choices=['sqlite', 'mysql'], required=True)
@@ -173,7 +193,13 @@ def execute_suite(driver, env):
         config = temporary / 'phpunit.xml'
         tree.write(config, encoding='utf-8', xml_declaration=True)
         junit = REPORT / ('suite-' + driver + '-junit.xml')
-        run(php() + [str(ROOT / 'vendor/phpunit/phpunit/phpunit'), '--configuration', str(config), '--log-junit', str(junit), '--colors=never', '--do-not-cache-result'], 'suite-' + driver, env)
+        command, progress = phpunit_command(driver, config, junit)
+        started = time.monotonic()
+        run(command, 'suite-' + driver, env)
+        if progress is not None:
+            progress.update(status='completed', completed_at_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                            duration_seconds=round(time.monotonic() - started, 3))
+            write('suite-mysql-progress.json', progress)
         report = ET.parse(junit).getroot()
         totals = coverage(report)
         write('suite-' + driver + '-coverage.json', {**totals, 'junit_sha256': sha(junit),

@@ -90,6 +90,28 @@ class CoverageComposition(unittest.TestCase):
             report = self.report(); ET.SubElement(report[0][0], kind)
             with self.assertRaises(RuntimeError): suite.coverage(report)
 
+    def test_mysql_suite_emits_persistent_phpunit_progress_before_execution(self):
+        records = {}
+        with tempfile.TemporaryDirectory() as directory, patch.object(suite, 'REPORT', pathlib.Path(directory)), patch.object(suite, 'write', side_effect=lambda name, value: records.setdefault(name, value)):
+            config = pathlib.Path(directory) / 'phpunit.xml'
+            junit = pathlib.Path(directory) / 'suite-mysql-junit.xml'
+            command, progress = suite.phpunit_command('mysql', config, junit)
+            self.assertIsNotNone(progress)
+            self.assertIn('--log-events-text', command)
+            self.assertEqual(command[command.index('--log-events-text') + 1], str(pathlib.Path(directory) / 'suite-mysql-events.log'))
+            recorded = records['suite-mysql-progress.json']
+            self.assertEqual(recorded['status'], 'running')
+            self.assertEqual(recorded['event_log'], 'suite-mysql-events.log')
+            self.assertIn('started_at_utc', recorded)
+            self.assertIn('Test Prepared', recorded['diagnostic_scope'])
+
+    def test_sqlite_suite_does_not_add_mysql_progress_log(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(suite, 'REPORT', pathlib.Path(directory)), patch.object(suite, 'write') as write:
+            command, progress = suite.phpunit_command('sqlite', pathlib.Path(directory) / 'phpunit.xml', pathlib.Path(directory) / 'suite-sqlite-junit.xml')
+            self.assertIsNone(progress)
+            self.assertNotIn('--log-events-text', command)
+            write.assert_not_called()
+
 
 class HarnessContracts(unittest.TestCase):
     def test_materialization_uses_extractor_ownership_before_qa_handoff(self):
