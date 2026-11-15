@@ -32,25 +32,25 @@ class CompanyIdempotencyStoreTest extends TestCase
         }
         if (! Schema::hasTable('platform_admins')) {
             Schema::create('platform_admins', function (Blueprint $table): void {
-            $table->string('id')->primary();
-            $table->string('status');
-            $table->string('platform_role_id')->nullable();
-            $table->timestamp('manual_blocked_at')->nullable();
-            $table->timestamp('deactivated_at')->nullable();
-            $table->timestamp('locked_until')->nullable();
+                $table->string('id')->primary();
+                $table->string('status');
+                $table->string('platform_role_id')->nullable();
+                $table->timestamp('manual_blocked_at')->nullable();
+                $table->timestamp('deactivated_at')->nullable();
+                $table->timestamp('locked_until')->nullable();
             });
         }
         if (! Schema::hasTable('platform_permissions')) {
             Schema::create('platform_permissions', function (Blueprint $table): void {
-            $table->string('id')->primary();
-            $table->string('code')->unique();
+                $table->string('id')->primary();
+                $table->string('code')->unique();
             });
         }
         if (! Schema::hasTable('platform_role_permissions')) {
             Schema::create('platform_role_permissions', function (Blueprint $table): void {
-            $table->string('platform_role_id');
-            $table->string('platform_permission_id');
-            $table->primary(['platform_role_id', 'platform_permission_id']);
+                $table->string('platform_role_id');
+                $table->string('platform_permission_id');
+                $table->primary(['platform_role_id', 'platform_permission_id']);
             });
         }
         DB::table('platform_admins')->insert(['id' => 'admin-a', 'status' => 'ativo', 'platform_role_id' => 'role-a']);

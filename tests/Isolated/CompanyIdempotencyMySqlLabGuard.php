@@ -81,8 +81,8 @@ final class CompanyIdempotencyMySqlLabGuard
         }
     }
 
-    /** Called by each test immediately before the destructive migrate:fresh. */
-    public static function assertBeforeFresh(): void
+    /** Verifies the previously approved isolated MySQL target before a lab test mutates it. */
+    public static function assertApprovedTarget(): void
     {
         $env = self::environment();
         self::checkApproval(self::$approvedUuid, $env['LAB_MYSQL_UUID']);
@@ -97,6 +97,12 @@ final class CompanyIdempotencyMySqlLabGuard
             throw new RuntimeException('Disposable API laboratory could not be verified.');
         }
         self::checkIdentity($actual, self::$approvedUuid);
+    }
+
+    /** Called by each test immediately before the destructive migrate:fresh. */
+    public static function assertBeforeFresh(): void
+    {
+        self::assertApprovedTarget();
     }
 
     public static function checkApproval(?string $approvedUuid, mixed $requestedUuid): void

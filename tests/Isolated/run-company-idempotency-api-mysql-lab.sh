@@ -4,7 +4,9 @@ set -euo pipefail
 # Disposable proof only: this never receives an .env, host database, or host network.
 test -f composer.lock
 test -f tests/Isolated/company-idempotency-api-mysql-bootstrap.php
-test -d .git
+# A linked worktree stores its Git directory in a .git file; both layouts are
+# valid because the proof only needs `git archive HEAD` below.
+test -e .git
 
 runtime_image='fokus-rei60-mysql-lab-runtime'
 mysql_image='mysql:8.4'
