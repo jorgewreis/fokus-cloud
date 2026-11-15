@@ -10,13 +10,15 @@ Foram inspecionados os templates reais em `public/backoffice/pages/`, o contrato
 
 O ensaio Playwright não pôde ser executado nesta cópia: ela não inclui dependências versionadas; uma instalação local isolada ficou inconsistente no ambiente Windows (`playwright-core` não carregou `./utilsBundle`). Portanto, este documento não afirma comportamento no navegador, contraste medido, ordem de tabulação, leitor de tela, zoom ou reflow. Os achados abaixo são estáticos e precisam de reprodução no navegador antes de fechar a REI-48.
 
-## Achados
+A revisão posterior confirmou que o runtime `FokusStyles.Modal` já injeta papel, modalidade, nome pelo título, foco preso, Escape e retorno ao gatilho quando inicializado. A correção abaixo torna o mesmo contrato explícito no HTML e acrescenta descrições programáticas; não altera o runtime nem substitui a verificação renderizada.
+
+## Achados e correção declarativa
 
 | Severidade | Contexto e reprodução | Evidência estática | Impacto | Próxima ação |
 | --- | --- | --- | --- | --- |
-| Média | Em uma conta com permissão financeira, abrir uma ação que exija motivo em Pagamentos. | `public/backoffice/pages/pagamentos.html:91` declara `#billing-action-modal` com classe `fs-modal` e `aria-hidden`, mas sem `role="dialog"`, `aria-modal="true"`, `aria-labelledby` ou `aria-describedby`. | O diálogo de confirmação pode não ser anunciado como contexto modal e não expõe programaticamente título e descrição para tecnologias assistivas. O foco deve ser confirmado em navegador, pois o comportamento do runtime não foi observado nesta execução. | Alinhar o markup ao padrão já empregado em `users.html`, `vouchers.html` e `subscriptions.html`; acrescentar regressão de árvore acessível, foco inicial, Escape e retorno ao gatilho. |
-| Média | Em Segurança, acionar “Convidar administrador”. | `public/backoffice/pages/security.html:22` declara `#invite-dialog` sem `role="dialog"`, `aria-modal`, `aria-labelledby` ou descrição programática; o título já existe como `#invite-dialog-title` na linha 24. | A abertura do convite pode não comunicar o diálogo e seu nome à pessoa que usa leitor de tela. | Adotar o contrato do modal acessível e testar teclado completo, incluindo erro de validação e retorno de foco. |
-| Baixa | Na página de componentes, abrir “Confirmação”. | `public/backoffice/pages/ui-components.html:43` tem `#component-modal` sem papel, modalidade e título identificável. | A vitrine interna propaga um exemplo sem o contrato de acessibilidade usado nos fluxos corrigidos, aumentando o risco de cópia para novas telas. | Corrigir o exemplo ou substituí-lo por componente canônico; incluir no teste de regressão do catálogo de componentes. |
+| Média — corrigido no markup | Em uma conta com permissão financeira, abrir uma ação que exija motivo em Pagamentos. | `#billing-action-modal` agora declara `tabindex`, `role="dialog"`, `aria-modal`, título e descrição. | O contrato declarativo permanece disponível antes e independente da auto-inicialização. O foco ainda precisa de observação no navegador. | Reproduzir foco inicial, Tab/Shift+Tab, Escape e retorno ao gatilho em conta sintética. |
+| Média — corrigido no markup | Em Segurança, acionar “Convidar administrador”. | `#invite-dialog` agora declara papel, modalidade, título e descrição do convite. | O convite passa a ter nome e contexto programáticos no template. | Exercitar validação, Escape e retorno de foco em navegador. |
+| Baixa — corrigido no markup | Na página de componentes, abrir “Confirmação”. | `#component-modal` agora tem papel, modalidade, título e descrição identificáveis. | A vitrine passa a oferecer o mesmo contrato declarativo para futuras cópias. | Incluir em ensaio renderizado do catálogo de componentes. |
 
 ## Sinais positivos verificados por leitura
 
@@ -28,6 +30,7 @@ O ensaio Playwright não pôde ser executado nesta cópia: ela não inclui depen
 
 - `npm run backoffice:contract:check` — aprovado: contrato visual válido para 19 páginas.
 - `node --check public/backoffice/assets/js/payments-page.js` — aprovado.
+- `node tests/Frontend/backoffice-modal-a11y-contract.cjs` — aprovado; protege a semântica declarativa e as referências de título/descrição dos três modais.
 - Inspeção dos templates e dos seletores de foco/movimento — achados documentados acima.
 - `npx playwright test tests/browser/backoffice-sidebar-a11y.spec.mjs --config=playwright.backoffice.config.mjs` — não executado com sucesso por dependência local Playwright inconsistente; não usar este estado como evidência de comportamento.
 
