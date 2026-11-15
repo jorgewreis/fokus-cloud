@@ -6,6 +6,8 @@ Levantamento estático em 14/11/2026 no checkout Cloud `358b1b39d2ba8b216fe4cffb
 
 O `package.json` declara `fokus-styles` `^2.7.0` e o `package-lock.json` fixa 2.7.0. Isso descreve o contrato de instalação, não comprova a versão carregada em produção. A vitrine `public/styles/next/` identifica-se como piloto não publicado e aponta para a baseline Styles `218afe443936e31edd57fdca03b392ac23381d1d`; seus exemplos não demonstram, por si, equivalência com o pacote 2.7.0 nem com as telas Law.
 
+Em verificação offline, o SHA-512 do tarball `fokus-styles@2.7.0` recuperado do cache npm coincidiu com a integridade do lockfile. Os bytes do CSS minificado, do JS minificado e da licença extraídos desse tarball coincidiram com os respectivos arquivos em `public/styles/assets/`. Isso confirma a procedência desses três arquivos locais em relação ao pacote travado, não a versão servida em produção nem o comportamento renderizado.
+
 Identificação SHA-256 dos arquivos locais usados nos ensaios: CSS `d289d3b50eb7b33f152ae06504b796c88b80ec749ea40fb27a7158974470ca64`, bundle JS `54f402e1fa2d21b7165c95d0abb378ba72422f88fde5cb47eb2d632dc858b986`, adaptador Select Law original `117ebacf7ad89dda2603569260e1b410aa83d41c87fa53e1a3659d3f8878c482`, adaptador corrigido localmente `d7dbc02acb33e7c6da3e17712dc1091a18def450c61edae942095831cd7c29e6` e composição `law-record-ui.js` corrigida localmente `66e29d553f31ee471038819b8aee3e7d070bf90f379dc5bda65441b7f0434d2a`. Esses hashes identificam os bytes locais, sem comprovar a versão servida em produção.
 
 ## Usos identificados na fonte
