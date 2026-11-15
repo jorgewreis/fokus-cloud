@@ -358,7 +358,16 @@ export async function mount(root, context = {}) {
         if (!beginMutation()) return;
         try { await api.request(`/backoffice/catalog/modules/${module.id}/activate`, { method: "POST" }); if (!alive()) { mutation.confirmedStale = true; mutation.uncertain = true; notifyMutation(); return; } const refreshed = await load(); if (!refreshed) { mutation.confirmedStale = true; mutation.uncertain = true; notifyMutation(); return; } if (alive()) showMessage("Módulo ativado. Publique o módulo e o catálogo em Produtos.", "success"); } catch (error) { mutationError(error, "Não foi possível atualizar o módulo."); } finally { finishMutation(); }
     });
-    $("#module-pagination").addEventListener("click", (event) => { const button = event.target.closest("[data-module-page]"); if (!button || button.disabled) return; state.page = Number(button.dataset.modulePage); render(); });
+    $("#module-pagination").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-module-page]");
+        if (!button || button.disabled) return;
+        const restoreFocus = document.activeElement === button;
+        state.page = Number(button.dataset.modulePage);
+        render();
+        if (restoreFocus && (document.activeElement === document.body || document.activeElement === button)) {
+            $("#module-pagination").querySelector('button[aria-current="page"]')?.focus();
+        }
+    });
     $("#module-destructive-form").addEventListener("submit", async (event) => {
         event.preventDefault();
         if (!state.pending || !beginMutation()) return;

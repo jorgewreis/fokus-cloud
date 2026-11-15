@@ -37,11 +37,14 @@ test('shared palette defines its complete public token set and composition does 
 test('portable ZIP contains byte-identical dependencies, HTML and offline documentation', () => {
   const result = spawnSync('python3', ['-c', `
 from pathlib import Path
-from zipfile import ZipFile
+from zipfile import ZipFile, ZIP_STORED
 import re
 root = Path('public/styles')
 with ZipFile(root/'examples/fokus-styles-examples.zip') as z:
-    expected = ['assets/site-palette.css','assets/styles-theme.js','assets/fokus-2.7.0.min.css','assets/LICENSE-fokus-styles.txt','examples/composition.css','examples/README.md'] + ['examples/'+s+'.html' for s in ['projects','onboarding','records']]
+    assert all(entry.compress_type == ZIP_STORED for entry in z.infolist()), 'Portable ZIP must avoid runner-dependent deflate bytes'
+    source_files = sorted([*(root/'examples').glob('*.html'), *(root/'examples').glob('*.md'), *(root/'examples').glob('*.css'), *(root/'assets'/name for name in ['fokus-2.7.0.min.css','fokus-2.7.0.min.js','LICENSE-fokus-styles.txt','site-palette.css','styles-theme.js'])], key=lambda path: path.relative_to(root).as_posix().casefold())
+    expected = [path.relative_to(root).as_posix() for path in source_files]
+    assert z.namelist() == expected, 'Portable ZIP must contain every generated source exactly once'
     for name in expected:
         assert z.read(name) == (root/name).read_bytes(), name+' differs from preview source'
     for name in expected:
@@ -111,13 +114,16 @@ test('static same-origin thumbnails receive theme without allowing scripts', asy
 });
 
 
-test('six editorial CTAs are explicitly scoped and keep framework demonstrations unbranded', () => {
-  for (const path of ['public/styles/index.html', 'public/styles/docs/index.html']) {
+test('twelve editorial CTAs are explicitly scoped and keep framework demonstrations unbranded', () => {
+  for (const [path, count] of [
+    ['public/styles/index.html', 3],
+    ['public/styles/docs/index.html', 9],
+  ]) {
     const dom = new JSDOM(read(path));
     try {
       const d = dom.window.document;
       const ctas = [...d.querySelectorAll('.styles-site-cta')];
-      assert.equal(ctas.length, 3, path);
+      assert.equal(ctas.length, count, path);
       assert.ok(ctas.every(node => node.matches('a.fs-btn[href]')), path);
       assert.equal(d.querySelectorAll('[data-component-demo].styles-site-cta').length, 0);
       assert.equal(ctas.filter(node => node.classList.contains('fs-btn-outline-primary')).length, path.endsWith('/docs/index.html') ? 0 : 2);

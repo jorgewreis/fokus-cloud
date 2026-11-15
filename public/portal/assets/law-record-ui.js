@@ -108,16 +108,43 @@
     copy.append(node('h3', '', title)); if (subtitle) copy.append(node('p', '', subtitle));
     head.append(node('span', 'law-record-detail-section-mark', marker), copy); card.body = node('div', 'law-record-section-body'); card.append(head, card.body); return card;
   }
-  function renderPagination(container, pagination, onPage, noun = 'registros', onError = null) {
+  function renderPagination(container, pagination, onPage, noun = 'registros', onError = null, resolveContainer = null, isContextActive = null) {
     const current = Number(pagination.page || 1), size = Number(pagination.per_page || 15), total = Number(pagination.total || 0), last = Math.max(1, Math.ceil(total / size));
     const summary = node('span', 'fs-u-fs-sm fs-u-color-secondary', total ? `Mostrando ${(current - 1) * size + 1} a ${Math.min(current * size, total)} de ${total.toLocaleString('pt-BR')} ${noun}` : 'Nenhum registro encontrado'); summary.setAttribute('role', 'status');
     const nav = node('nav'); nav.setAttribute('aria-label', `Paginação de ${noun}`); const list = node('ul', 'fs-pagination fs-pagination-compact');
     const add = (label, target, aria, disabled, selected = false) => {
       const li = node('li', `fs-page-item${selected ? ' is-active' : ''}`); const control = button(label, async () => {
         if (disabled || selected || container.getAttribute('aria-busy') === 'true') return;
+        const hadFocus = document.activeElement === control;
+        let focusMoved = false;
+        let observer = null;
+        const cleanupIntent = () => {
+          document.removeEventListener('focusin', trackIntent);
+          document.removeEventListener('pointerdown', trackIntent);
+          observer?.disconnect(); observer = null;
+        };
+        const trackIntent = (event) => {
+          if (!list.contains(event.target)) { focusMoved = true; cleanupIntent(); }
+        };
+        if (hadFocus) {
+          document.addEventListener('focusin', trackIntent); document.addEventListener('pointerdown', trackIntent);
+          observer = new MutationObserver(() => {
+            const activeContext = isContextActive ? isContextActive() : Boolean(resolveContainer?.()?.isConnected);
+            if ((isContextActive && !activeContext) || (!container.isConnected && !activeContext)) { focusMoved = true; cleanupIntent(); }
+          });
+          observer.observe(document.documentElement, {childList: true, subtree: true});
+        }
         const controls = [...list.querySelectorAll('button')]; const states = controls.map((item) => item.disabled); controls.forEach((item) => { item.disabled = true; }); container.setAttribute('aria-busy', 'true');
         try { await onPage(target); } catch (error) { if (onError) onError(error); else { summary.textContent = error.message || 'Não foi possível carregar a página.'; summary.setAttribute('role', 'alert'); } }
-        finally { container.removeAttribute('aria-busy'); controls.forEach((item, index) => { item.disabled = states[index]; }); }
+        finally {
+          container.removeAttribute('aria-busy'); controls.forEach((item, index) => { item.disabled = states[index]; });
+          if (hadFocus) cleanupIntent();
+          const destination = hadFocus && !focusMoved ? (container.isConnected ? container : resolveContainer?.()) : null;
+          if (destination?.isConnected && (document.activeElement === document.body || document.activeElement === control)) {
+            const next = control.isConnected && !control.disabled ? control : destination.querySelector('button[aria-current="page"]');
+            next?.focus();
+          }
+        }
       }); control.className = 'fs-page-link'; control.disabled = disabled; control.setAttribute('aria-label', aria);
       if (selected) { li.setAttribute('aria-current', 'page'); control.setAttribute('aria-current', 'page'); } li.append(control); list.append(li);
     };
