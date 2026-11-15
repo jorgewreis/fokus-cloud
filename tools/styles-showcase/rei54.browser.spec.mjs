@@ -30,6 +30,9 @@ async function evidence(page, info, name, failures) {
   await info.attach(name, { body: screenshot, contentType: 'image/png' });
   expect(failures).toEqual([]);
 }
+async function captureState(page, info, name) {
+  await info.attach(name, { body: await page.screenshot({fullPage:true, animations:'disabled'}), contentType:'image/png' });
+}
 
 for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
   test(`REI-54 Preferências ${width}px ${theme}`, async ({ page }, info) => {
@@ -53,6 +56,7 @@ for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
     await trigger.focus(); await page.keyboard.press('Enter');
     const drawer = page.getByRole('dialog', { name: 'Editar módulo fictício' });
     await expect(drawer).toBeVisible();
+    await captureState(page, info, `offcanvas-open-${width}-${theme}`);
     const name = drawer.getByLabel('Nome da funcionalidade');
     await expect(name).toHaveJSProperty('required', true);
     await name.fill('Exemplo');
@@ -90,6 +94,7 @@ for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
     const dialog = page.getByRole('dialog', { name: 'Confirmar ação fictícia' });
     await trigger.focus(); await page.keyboard.press('Enter');
     await expect(dialog).toBeVisible();
+    await captureState(page, info, `modal-open-${width}-${theme}`);
     const reason = dialog.getByLabel('Motivo obrigatório');
     await expect(reason).toHaveValue('');
     expect(await reason.evaluate(element => element.validity.valid)).toBe(false);
@@ -115,6 +120,7 @@ for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
     await toggle.focus(); await page.keyboard.press('ArrowDown');
     const first = menu.getByRole('option', { name: 'Administrativo' });
     await expect(first).toBeFocused();
+    await captureState(page, info, `select-menu-open-${width}-${theme}`);
     await expect(menu.getByRole('option', { name: 'Indisponível' })).toHaveAttribute('aria-disabled', 'true');
     await menu.getByRole('option', { name: 'Atendimento' }).click();
     await expect(page.locator('#sector')).toHaveValue('atendimento');
@@ -128,6 +134,7 @@ for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
     await trigger.click();
     const dialog = page.getByRole('dialog', { name: 'Categoria fictícia' });
     await expect(dialog.getByLabel('Categoria')).toBeVisible();
+    await captureState(page, info, `select-modal-open-${width}-${theme}`);
     await dialog.getByRole('button', { name: 'Fechar' }).click();
     await expect(dialog).toBeHidden(); await expect(trigger).toBeFocused();
     await evidence(page, info, `select-${width}-${theme}`, failures);
