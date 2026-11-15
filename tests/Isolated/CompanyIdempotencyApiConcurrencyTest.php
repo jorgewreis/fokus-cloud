@@ -79,7 +79,7 @@ class CompanyIdempotencyApiConcurrencyTest extends TestCase
             try {
                 Http::preventStrayRequests();
                 Http::fake(['api.pwnedpasswords.com/*' => Http::response('', 200)]);
-                $response = $this->actingAsWithAuthority($admin, 'mysql-lab-child-session')
+                $response = $this->actingAsWithAuthority($admin, str_repeat('c', 40))
                     ->withHeader('Idempotency-Key', $token)->postJson('/api/backoffice/companies', $payload);
                 fwrite($pair[1], json_encode(['status' => $response->status(), 'id' => $response->json('company_id')], JSON_THROW_ON_ERROR)."\n");
                 exit(0);
@@ -99,7 +99,7 @@ class CompanyIdempotencyApiConcurrencyTest extends TestCase
 
                 return Http::response('', 200);
             }]);
-            $response = $this->actingAsWithAuthority($admin, 'mysql-lab-parent-session')
+            $response = $this->actingAsWithAuthority($admin, str_repeat('p', 40))
                 ->withHeader('Idempotency-Key', $token)->postJson('/api/backoffice/companies', $payload);
             $response->assertCreated();
             self::assertIsArray($child);
