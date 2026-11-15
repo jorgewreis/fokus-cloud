@@ -142,6 +142,22 @@ function originNormalizeMetadata(array $rows): array
     return array_map(fn (array $row): array => array_map(fn ($value) => $value === null ? null : (string) $value, $row), $rows);
 }
 
+function originRequireRei60Metadata(array $actual, array $expected, string $kind): void
+{
+    $actual = originNormalizeMetadata($actual);
+    $expected = originNormalizeMetadata($expected);
+    if ($actual === $expected) {
+        return;
+    }
+    if ($kind === 'indexes') {
+        throw new RuntimeException('Origin fixture: REI-60 indexes definition changed: '.json_encode([
+            'expected' => $expected,
+            'observed' => $actual,
+        ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+    }
+    originRequire(false, 'REI-60 '.$kind.' definition changed');
+}
+
 function originAssertSchemaDelta(array $before, array $after, bool $reversed = false): array
 {
     if (($before['driver'] ?? null) !== 'mysql') {
@@ -173,7 +189,7 @@ function originAssertSchemaDelta(array $before, array $after, bool $reversed = f
         originRequire($tables === $newTables, 'new table allowlist changed');
         foreach (['columns', 'indexes', 'foreign_keys', 'tables'] as $kind) {
             $actual = array_values(array_filter($after[$kind], fn ($row) => in_array($row[0], ['company_idempotency_requests', 'platform_session_authorities'], true)));
-            originRequire(originNormalizeMetadata($actual) === originNormalizeMetadata($rei60[$kind]), 'REI-60 '.$kind.' definition changed');
+            originRequireRei60Metadata($actual, $rei60[$kind], $kind);
         }
         $index = array_values(array_filter($after['indexes'], fn ($row) => $row[0] === 'law_cases' && $row[1] === 'law_cases_last_official_movement_at_index'));
         originRequire(count($index) === 1 && $index[0][2] === 1 && $index[0][3] === 1 && $index[0][4] === 'last_official_movement_at', 'projection index definition changed');

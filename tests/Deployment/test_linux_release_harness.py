@@ -533,6 +533,15 @@ class HarnessContracts(unittest.TestCase):
             with self.subTest(filename=filename):
                 self.assertEqual((common.ROOT / filename).read_text(encoding='utf-8').count(anchor), 1)
 
+    def test_rei60_index_contract_emits_limited_metadata_diff(self):
+        contract = (common.ROOT / 'tests/Deployment/origin-schema-contract.php').read_text(encoding='utf-8')
+        self.assertIn('function originRequireRei60Metadata', contract)
+        self.assertIn("$kind === 'indexes'", contract)
+        self.assertIn("'expected' => $expected", contract)
+        self.assertIn("'observed' => $actual", contract)
+        self.assertIn('JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR', contract)
+        self.assertIn('originRequireRei60Metadata($actual, $rei60[$kind], $kind)', contract)
+
 
 if __name__ == '__main__':
     unittest.main()
