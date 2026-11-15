@@ -39,6 +39,14 @@ function originAllowedColumns(): array
         ['law_cases', 'last_official_movement_at', 'timestamp', 'YES'],
     ];
     $tables = [
+        'law_beta_applications' => [
+            'id' => ['char(30)', 'NO'], 'campaign_code' => ['varchar(80)', 'NO'], 'name' => ['varchar(160)', 'NO'],
+            'email' => ['varchar(255)', 'NO'], 'organization' => ['varchar(180)', 'YES'], 'profile' => ['varchar(80)', 'NO'],
+            'modules' => ['json', 'NO'], 'feedback' => ['text', 'NO'], 'source_url' => ['varchar(500)', 'YES'],
+            'privacy_version' => ['varchar(64)', 'NO'], 'privacy_consented_at' => ['timestamp', 'NO'],
+            'beta_program_version' => ['varchar(64)', 'NO'], 'beta_terms_accepted_at' => ['timestamp', 'NO'],
+            'status' => ['varchar(32)', 'NO'], 'created_at' => ['timestamp', 'YES'], 'updated_at' => ['timestamp', 'YES'],
+        ],
         'interest_product_index' => [
             'interest_id' => ['char(30)', 'NO'], 'product_code' => ['varchar(120)', 'NO'],
         ],
@@ -164,7 +172,7 @@ function originAssertSchemaDelta(array $before, array $after, bool $reversed = f
         return ['scope' => 'Exact origin metadata contract requires MySQL; SQLite exercises functional compatibility only'];
     }
     $rei60 = originRei60Schema();
-    $newTables = $reversed ? [] : ['company_idempotency_requests', 'interest_product_index', 'interest_product_index_state', 'law_case_publication_reviews', 'law_contact_import_batches', 'law_task_events', 'law_tasks', 'platform_session_authorities'];
+    $newTables = $reversed ? [] : ['company_idempotency_requests', 'interest_product_index', 'interest_product_index_state', 'law_beta_applications', 'law_case_publication_reviews', 'law_contact_import_batches', 'law_task_events', 'law_tasks', 'platform_session_authorities'];
     $added = [];
     foreach ($after['columns'] as $row) {
         if (! in_array($row, $before['columns'], true)) {
@@ -199,6 +207,15 @@ function originAssertSchemaDelta(array $before, array $after, bool $reversed = f
         originRequire(count($interestPrimary) === 2 && $interestPrimary[0][2] === 0 && $interestPrimary[0][3] === 1 && $interestPrimary[0][4] === 'interest_id' && $interestPrimary[1][2] === 0 && $interestPrimary[1][3] === 2 && $interestPrimary[1][4] === 'product_code', 'interest unique key changed');
         $statePrimary = array_values(array_filter($after['indexes'], fn ($row) => $row[0] === 'interest_product_index_state' && $row[1] === 'PRIMARY'));
         originRequire(count($statePrimary) === 1 && $statePrimary[0][2] === 0 && $statePrimary[0][3] === 1 && $statePrimary[0][4] === 'id', 'interest state primary key changed');
+        $betaIndexes = array_values(array_filter($after['indexes'], fn ($row) => $row[0] === 'law_beta_applications'));
+        originRequire(originNormalizeMetadata($betaIndexes) === originNormalizeMetadata([
+            ['law_beta_applications', 'law_beta_applications_campaign_email_uq', 0, 1, 'campaign_code', 'A', null, 'BTREE', 'YES', null],
+            ['law_beta_applications', 'law_beta_applications_campaign_email_uq', 0, 2, 'email', 'A', null, 'BTREE', 'YES', null],
+            ['law_beta_applications', 'law_beta_applications_campaign_status_idx', 1, 1, 'campaign_code', 'A', null, 'BTREE', 'YES', null],
+            ['law_beta_applications', 'law_beta_applications_campaign_status_idx', 1, 2, 'status', 'A', null, 'BTREE', 'YES', null],
+            ['law_beta_applications', 'law_beta_applications_campaign_status_idx', 1, 3, 'created_at', 'A', null, 'BTREE', 'YES', null],
+            ['law_beta_applications', 'PRIMARY', 0, 1, 'id', 'A', null, 'BTREE', 'YES', null],
+        ]), 'beta application index definition changed');
         $interestForeignKey = array_values(array_filter($after['foreign_keys'], fn ($row) => $row[0] === 'interest_product_index' && $row[2] === 'interest_id'));
         originRequire(count($interestForeignKey) === 1 && $interestForeignKey[0][4] === 'product_interests' && $interestForeignKey[0][5] === 'id' && $interestForeignKey[0][7] === 'CASCADE', 'interest index foreign key or cascade changed');
         $interestId = array_values(array_filter($after['columns'], fn ($row) => $row[0] === 'interest_product_index' && $row[1] === 'interest_id'));
