@@ -120,6 +120,9 @@ final class PlatformSessionAuthority
                 $web = DB::table('users')->where('id', $authoritySnapshot->web_user_id)->lockForUpdate()->first();
                 abort_unless($web && $web->status === 'ativa' && Auth::guard('web')->id() === $authoritySnapshot->web_user_id, 401, 'O contexto da sessão mudou. Entre novamente.');
             }
+            if ($authoritySnapshot->web_principal_state === 'none') {
+                abort_if(Auth::guard('web')->id() !== null, 401, 'O contexto da sessão mudou. Entre novamente.');
+            }
             abort_if($authoritySnapshot->web_principal_state === 'unknown', 401, 'O contexto da sessão exige nova autenticação.');
             $admin = DB::table('platform_admins')->where('id', $platformAdminId)->lockForUpdate()->first();
             abort_unless($admin && $admin->status === 'ativo' && $admin->manual_blocked_at === null && $admin->deactivated_at === null

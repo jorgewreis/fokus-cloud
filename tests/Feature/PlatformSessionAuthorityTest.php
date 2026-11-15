@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
+use App\Models\User;
 use App\Services\CompanyIdempotencyAuthorization;
 use App\Services\CompanyIdempotencyKeys;
 use App\Services\CompanyIdempotencyStore;
@@ -88,6 +89,41 @@ class PlatformSessionAuthorityTest extends TestCase
         app(PlatformSessionAuthority::class)->withinMutation($request, 'platform.access', fn (): string => 'must-not-write');
     }
 
+    public function test_authority_binds_a_shared_web_principal_and_rejects_a_later_web_login(): void
+    {
+        $admin = $this->admin();
+        $webUser = $this->webUser();
+        $request = $this->request('authority-session-web-principal');
+        $this->sessionRow($request->session()->getId());
+        app(PlatformSessionAuthority::class)->activate($request, $admin, $webUser);
+        $this->actingAs($admin, 'platform');
+        $this->actingAs($webUser, 'web');
+
+        $this->assertDatabaseHas('platform_session_authorities', [
+            'session_id' => $request->session()->getId(),
+            'web_principal_state' => 'known',
+            'web_user_id' => $webUser->id,
+        ]);
+        self::assertSame('written', app(PlatformSessionAuthority::class)->withinMutation($request, 'platform.access', fn (): string => 'written'));
+
+        Auth::guard('web')->logout();
+        $this->expectException(HttpException::class);
+        app(PlatformSessionAuthority::class)->withinMutation($request, 'platform.access', fn (): string => 'must-not-write');
+    }
+
+    public function test_authority_created_without_a_web_principal_rejects_a_later_web_login(): void
+    {
+        $admin = $this->admin();
+        $request = $this->request('authority-session-web-login-after-mfa');
+        $this->sessionRow($request->session()->getId());
+        app(PlatformSessionAuthority::class)->activate($request, $admin);
+        $this->actingAs($admin, 'platform');
+        $this->actingAs($this->webUser(), 'web');
+
+        $this->expectException(HttpException::class);
+        app(PlatformSessionAuthority::class)->withinMutation($request, 'platform.access', fn (): string => 'must-not-write');
+    }
+
     public function test_non_database_or_split_session_configuration_fails_closed(): void
     {
         config()->set('session.driver', 'array');
@@ -161,6 +197,19 @@ class PlatformSessionAuthorityTest extends TestCase
             'password' => Hash::make('SenhaInterna!2026'),
             'status' => 'ativo',
             'platform_role_id' => PlatformRole::where('code', 'superadministrador')->value('id'),
+            'email_verified_at' => now(),
+        ]);
+    }
+
+    private function webUser(): User
+    {
+        return User::create([
+            'id' => PrefixedUlid::make('USR'),
+            'name' => 'Pessoa Web',
+            'cpf' => '52998224725',
+            'email' => 'web-'.User::count().'@example.test',
+            'password' => Hash::make('SenhaCliente!2026'),
+            'status' => 'ativa',
             'email_verified_at' => now(),
         ]);
     }

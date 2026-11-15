@@ -79,7 +79,7 @@ class PlatformAuthController extends Controller
         Auth::guard('platform')->login($admin);
         $request->session()->forget('platform_pending_admin_id');
         $request->session()->regenerate();
-        $authority->activate($request, $admin);
+        $authority->activate($request, $admin, Auth::guard('web')->user());
         $admin->forceFill(['last_login_at' => now()])->save();
         $audit->record($admin->id, 'backoffice.login_succeeded', 'platform_admin', $admin->id, request: $request, expiresInDays: 30);
 
