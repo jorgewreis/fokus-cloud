@@ -8,7 +8,7 @@ Escopo: componentes modais do Backoffice e contratos de foco/movimento já versi
 
 Foram inspecionados os templates reais em `public/backoffice/pages/`, o contrato de foco existente em `tests/browser/backoffice-sidebar-a11y.spec.mjs` e as folhas de estilo de foco e movimento reduzido. `npm run backoffice:contract:check` passou para as 19 páginas do Backoffice.
 
-O ensaio Playwright não pôde ser executado nesta cópia: ela não inclui dependências versionadas; uma instalação local isolada ficou inconsistente no ambiente Windows (`playwright-core` não carregou `./utilsBundle`). Portanto, este documento não afirma comportamento no navegador, contraste medido, ordem de tabulação, leitor de tela, zoom ou reflow. Os achados abaixo são estáticos e precisam de reprodução no navegador antes de fechar a REI-48.
+O ensaio Playwright foi recuperado nesta cópia com as dependências locais e Chromium já disponíveis. Ele cobre a abertura dos modais financeiro, de convite e de showcase, contexto de diálogo, foco inicial, Escape e retorno ao gatilho nos dois fluxos com gatilho visível. O modal financeiro foi aberto pelo gatilho técnico oculto porque a fixture não oferece uma ação financeira elegível; o retorno de foco desse fluxo de negócio específico, contraste medido, leitor de tela, zoom e reflow continuam pendentes.
 
 A revisão posterior confirmou que o runtime `FokusStyles.Modal` já injeta papel, modalidade, nome pelo título, foco preso, Escape e retorno ao gatilho quando inicializado. A correção abaixo torna o mesmo contrato explícito no HTML e acrescenta descrições programáticas; não altera o runtime nem substitui a verificação renderizada.
 
@@ -32,7 +32,8 @@ A revisão posterior confirmou que o runtime `FokusStyles.Modal` já injeta pape
 - `node --check public/backoffice/assets/js/payments-page.js` — aprovado.
 - `node tests/Frontend/backoffice-modal-a11y-contract.cjs` — aprovado; protege a semântica declarativa e as referências de título/descrição dos três modais.
 - Inspeção dos templates e dos seletores de foco/movimento — achados documentados acima.
-- `npx playwright test tests/browser/backoffice-sidebar-a11y.spec.mjs --config=playwright.backoffice.config.mjs` — não executado com sucesso por dependência local Playwright inconsistente; não usar este estado como evidência de comportamento.
+- `npx playwright test tests/browser/backoffice-sidebar-a11y.spec.mjs tests/browser/records-drawer-focus.spec.mjs --config=playwright.backoffice.config.mjs --workers=1` — 5 aprovados; nomes, foco visível, recolhimento do menu e retorno de foco do drawer foram observados em fixture sintética.
+- `npx playwright test tests/browser/backoffice-modal-a11y.spec.mjs --config=playwright.backoffice.config.mjs --workers=1 --timeout=15000` — 2 aprovados; semântica, descrição, foco inicial e Escape dos três modais foram exercitados; o retorno de foco foi confirmado para convite e showcase.
 
 ## Cobertura ainda necessária
 
