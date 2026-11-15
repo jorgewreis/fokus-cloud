@@ -99,7 +99,7 @@ test('Styles uses the unchanged published CSS/license and existing deployable de
   }
   const assets = await requiredAssets();
   for (const page of ['/styles/index.html', '/styles/docs/index.html', '/styles/next/index.html',
-    ...['projects', 'onboarding', 'records'].map(slug => `/styles/examples/${slug}.html`)]) {
+    ...['projects', 'onboarding', 'records', 'cloud-datatable', 'confirmation-modal', 'law-select-pattern', 'cloud-offcanvas', 'law-preferences'].map(slug => `/styles/examples/${slug}.html`)]) {
     const html = await readFile(publicFile(page), 'utf8');
     const links = [...html.matchAll(/<link\b[^>]*href=["']([^"']+)["']/gi)]
       .map(match => new URL(match[1], origin + page).pathname);

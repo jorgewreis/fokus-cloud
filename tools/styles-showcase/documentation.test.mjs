@@ -29,7 +29,12 @@ test('documentation hub lists exactly the five guides and all 56 catalog contrac
   assert.match(d.querySelector('#componentes .styles-doc-version').textContent, /separado do npm 2\.7\.0/);
   assert.equal(d.querySelectorAll('#versoes article').length, 2);
   assert.match(d.querySelector('#versoes article:last-child').textContent, /não representa uma versão estável/);
-  assert.equal(d.querySelectorAll('#exemplos a[href$=".html"]').length, 3);
+  assert.equal(d.querySelectorAll('#exemplos a[href$=".html"]').length, 8);
+  assert.ok(d.querySelector('#exemplos a[href="/styles/examples/cloud-datatable.html"]'));
+  assert.ok(d.querySelector('#exemplos a[href="/styles/examples/confirmation-modal.html"]'));
+  assert.ok(d.querySelector('#exemplos a[href="/styles/examples/law-select-pattern.html"]'));
+  assert.ok(d.querySelector('#exemplos a[href="/styles/examples/cloud-offcanvas.html"]'));
+  assert.ok(d.querySelector('#exemplos a[href="/styles/examples/law-preferences.html"]'));
 });
 
 for (const slug of ['', ...guides]) test(`${slug || 'docs'}: one global navigation, semantic landmarks, valid anchors and guide return path`, async t => {
