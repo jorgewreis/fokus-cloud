@@ -17,17 +17,16 @@
     const accessStatus = form.querySelector('[data-law-access-status]');
     const subscriptionLogin = form.querySelector('[data-law-subscription-login]');
     const profileField = profile.closest('div');
+    const selectionFields = form.querySelector('.law-field-grid');
     const hero = form.closest('.law-hero');
-    let lookupTimer;
     let systems = [];
     submit.textContent = 'Entrar';
 
-    const reset = (message = 'Informe seu e-mail para consultar os acessos.') => {
+    const reset = (message = 'Informe seu e-mail e senha.') => {
       systems = [];
-      systemLabel.textContent = 'Empresa vinculada';
-      instructions.textContent = 'Informe seu e-mail para localizar a empresa vinculada, o sistema e o perfil disponíveis.';
+      selectionFields.hidden = true;
       system.disabled = true;
-      system.innerHTML = '<option value="">Aguardando identificação</option>';
+      system.innerHTML = '<option value="">Aguardando confirmação da senha</option>';
       profile.disabled = true;
       profileField.hidden = true;
       profile.innerHTML = '<option value="">Selecione o sistema primeiro</option>';
@@ -37,20 +36,20 @@
       status.textContent = message;
     };
 
+    const enableCredentials = (message = 'Informe sua senha.') => {
+      reset(message);
+      password.disabled = false;
+      submit.disabled = false;
+    };
+
     const renderProfiles = () => {
       const selected = systems.find((item) => item.value === system.value);
-      const isPerson = selected?.document_type === 'cpf';
-      systemLabel.textContent = isPerson ? 'Pessoa vinculada' : 'Empresa vinculada';
-      instructions.textContent = isPerson
-        ? 'Informe seu e-mail para localizar a pessoa vinculada, o sistema e o perfil disponíveis.'
-        : 'Informe seu e-mail para localizar a empresa vinculada, o sistema e o perfil disponíveis.';
       const availableProfiles = selected?.profiles || [];
       profile.innerHTML = '<option value="">Escolha seu perfil</option>' + availableProfiles.map((item) => `<option value="${item.value}">${item.label}</option>`).join('');
       profileField.hidden = availableProfiles.length < 2;
       profile.disabled = availableProfiles.length < 2;
-      password.disabled = availableProfiles.length === 0;
-      password.value = '';
-      submit.disabled = availableProfiles.length === 0;
+      password.disabled = false;
+      submit.disabled = availableProfiles.length !== 1;
       if (availableProfiles.length === 1) {
         profile.value = availableProfiles[0].value;
         status.textContent = 'Informe sua senha.';
@@ -63,13 +62,12 @@
       const items = payload.systems || [];
       systems = items;
       if (!systems.length) {
-        const message = 'Nenhuma assinatura ativa encontrada.';
-        reset(message);
-        showToast(message);
+        enableCredentials('Não foi possível iniciar o acesso. Revise suas credenciais.');
         return;
       }
+      selectionFields.hidden = false;
       system.innerHTML = systems.map((item) => `<option value="${item.value}">${item.label}</option>`).join('');
-      system.disabled = systems.length === 0;
+      system.disabled = false;
       if (systems.length) {
         system.value = systems[0].value;
         renderProfiles();
@@ -78,45 +76,27 @@
 
     reset();
 
-    email.addEventListener('input', () => {
-      clearTimeout(lookupTimer);
+    email.addEventListener('input', async () => {
       support.hidden = true;
       hero?.classList.remove('law-support-mode');
       accessChoice.hidden = true;
       accessType.value = '';
       accessStatus.textContent = '';
       subscriptionLogin.hidden = false;
-      reset('E-mail inválido.');
+      reset('Informe um e-mail válido.');
       const value = email.value.trim();
       if (!value) return;
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return;
-      status.textContent = 'Consultando vínculos…';
-      lookupTimer = setTimeout(async () => {
-        if (!supportAdminReady) {
-          status.textContent = 'Verificando permissões de suporte…';
-          await supportAdminCheck;
-        }
-        if (email.value.trim().toLowerCase() !== value.toLowerCase()) return;
-        if (supportAdmin && value.toLowerCase() === supportAdmin.email.toLowerCase()) {
-          accessChoice.hidden = false;
-          subscriptionLogin.hidden = true;
-          accessStatus.textContent = 'Selecione o tipo de acesso.';
-          return;
-        }
-        lookupSubscriptionContext(value);
-      }, 420);
+      if (!supportAdminReady) await supportAdminCheck;
+      if (email.value.trim().toLowerCase() !== value.toLowerCase()) return;
+      if (supportAdmin && value.toLowerCase() === supportAdmin.email.toLowerCase()) {
+        accessChoice.hidden = false;
+        subscriptionLogin.hidden = true;
+        accessStatus.textContent = 'Selecione o tipo de acesso.';
+        return;
+      }
+      enableCredentials();
     });
-
-    const lookupSubscriptionContext = (value) => window.FokusApi.request('/auth/law-context', { method: 'POST', body: { email: value } })
-      .then((payload) => {
-        if (email.value.trim().toLowerCase() === value.toLowerCase()) renderSystems(payload);
-      })
-      .catch((error) => {
-        if (email.value.trim().toLowerCase() !== value.toLowerCase()) return;
-        const message = error.status === 404 ? 'E-mail não localizado.' : 'Falha ao consultar vínculos. Tente novamente.';
-        reset(message);
-        showToast(message);
-      });
 
     accessType.addEventListener('change', () => {
       const value = email.value.trim();
@@ -125,10 +105,7 @@
       if (accessType.value === 'subscription') {
         subscriptionLogin.hidden = false;
         accessStatus.textContent = '';
-        reset('Consultando assinaturas…');
-        lookupSubscriptionContext(value).then(() => {
-          if (accessType.value === 'subscription') accessStatus.textContent = '';
-        });
+        enableCredentials();
       } else if (accessType.value === 'support') {
         subscriptionLogin.hidden = true;
         support.hidden = false;
@@ -161,10 +138,13 @@
           body: {
             email: email.value.trim(),
             password: password.value,
-            company_id: system.value,
-            profile: profile.value,
+            ...(system.value && profile.value ? { company_id: system.value, profile: profile.value } : {}),
           },
         });
+        if (result.selection_required) {
+          renderSystems(result);
+          return;
+        }
         location.assign(result.redirect_to || '/portal/fokus-law');
       } catch (error) {
         status.textContent = 'Falha na autenticação.';
