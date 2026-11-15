@@ -11,6 +11,10 @@
     padding: 0 var(--fs-space-4, 24px) var(--fs-space-3, 16px);
 }
 
+.backoffice-companies-page #company-query::placeholder {
+    opacity: 1;
+}
+
 .backoffice-companies-page > section.fs-card-panel {
     width: calc(100% - var(--fs-space-3, 16px));
     margin-inline: auto;
