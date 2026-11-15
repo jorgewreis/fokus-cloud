@@ -28,6 +28,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('platform_session_authorities');
+        throw new RuntimeException('Automatic rollback would separate platform session authorities from company idempotency records; use an approved recovery procedure.');
     }
 };

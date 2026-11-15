@@ -231,14 +231,26 @@ class CompanyIdempotencyStoreTest extends TestCase
 
     public function test_migration_down_fails_closed_even_when_table_is_empty(): void
     {
-        $migration = require database_path('migrations/2026_11_14_000001_create_company_idempotency_requests.php');
-        try {
-            $migration->down();
-            self::fail('Automatic rollback must not drop the table.');
-        } catch (RuntimeException $e) {
-            self::assertStringContainsString('Automatic rollback', $e->getMessage());
+        Schema::create('platform_session_authorities', function (Blueprint $table): void {
+            $table->string('session_id')->primary();
+        });
+
+        $migrations = [
+            'company idempotency' => require database_path('migrations/2026_11_14_000001_create_company_idempotency_requests.php'),
+            'platform session authority' => require database_path('migrations/2026_11_14_000002_create_platform_session_authorities.php'),
+        ];
+
+        foreach ($migrations as $name => $migration) {
+            try {
+                $migration->down();
+                self::fail("Automatic rollback must not drop the {$name} table.");
+            } catch (RuntimeException $e) {
+                self::assertStringContainsString('Automatic rollback', $e->getMessage());
+            }
         }
+
         self::assertTrue(Schema::hasTable('company_idempotency_requests'));
+        self::assertTrue(Schema::hasTable('platform_session_authorities'));
     }
 
     public function test_update_rejects_a_result_for_a_different_company_and_rolls_back(): void
