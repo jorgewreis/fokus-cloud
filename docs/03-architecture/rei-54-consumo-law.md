@@ -25,7 +25,7 @@ Identificação SHA-256 dos arquivos locais usados nos ensaios: CSS `d289d3b50eb
 | Modal de confirmação de módulo | `modules.html` declara `role=dialog`, `aria-modal`, título associado, fechamento, cancelamento e formulário com motivo obrigatório; `modules-page.js` controla a instância. | A operação e a regra de motivo são Cloud. Uma demonstração deve simular o envio, sem alterar dados comerciais. Foco, Escape e recuperação ainda precisam ser exercitados. |
 | Select de módulos | `modules.html` apresenta filtros, campos obrigatórios e desabilitados e selects `multiple` para segmentos, funcionalidades e dependências. | A classe visual não comprova uso da API JS ou suporte a seleção múltipla. Verificar inicialização, comportamento e ownership antes de reproduzir esse caso na vitrine. |
 
-Essas referências são inspeções de fonte do checkout, não evidência de comportamento autenticado ou da versão em produção.
+Essas referências são inspeções de fonte do checkout, não evidência de comportamento autenticado ou da versão em produção. O [levantamento de notificações Law](rei-54-notificacoes-law.md) detalha estados, estilos, API e diferenças em relação à documentação Styles.
 
 ## Composições locais e responsabilidade
 
