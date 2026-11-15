@@ -4,7 +4,9 @@ set -euo pipefail
 # Disposable proof only: this never receives an .env, host database, or host network.
 test -f composer.lock
 test -f tests/Isolated/company-idempotency-api-mysql-bootstrap.php
-test -d .git
+# A linked worktree stores its Git directory in a .git file; both layouts are
+# valid because the proof only needs `git archive HEAD` below.
+test -e .git
 
 runtime_image='fokus-rei60-mysql-lab-runtime'
 mysql_image='mysql:8.4'
@@ -57,4 +59,8 @@ docker run --rm --network "container:$mysql_id" --read-only \
   -e CACHE_STORE=array -e MAIL_MAILER=array -e QUEUE_CONNECTION=sync -e BCRYPT_ROUNDS=4 \
   -e LAB_MYSQL_UUID="$uuid" "$runtime_image" \
   php vendor/bin/phpunit --no-configuration --do-not-cache-result --bootstrap tests/Isolated/company-idempotency-api-mysql-bootstrap.php \
-  tests/Isolated/CompanyIdempotencyApiConcurrencyTest.php
+  tests/Feature/CompanyIdempotencyStoreTest.php \
+  tests/Isolated/CompanyIdempotencyApiConcurrencyTest.php \
+  tests/Feature/CompanyIdempotencyApiLabTest.php \
+  tests/Feature/CompanyIdempotencyDisabledTest.php \
+  tests/Feature/PlatformSessionAuthorityTest.php

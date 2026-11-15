@@ -32,12 +32,13 @@ EXPECTED_NEW_MIGRATIONS = [
     '2026_11_14_000001_create_company_idempotency_requests.php',
     '2026_11_14_000002_create_platform_session_authorities.php',
     '2026_11_14_000100_create_interest_product_index.php',
+    '2026_11_15_120000_create_law_beta_applications_table.php',
 ]
 
 
 def require_new_migrations(names):
     if names != EXPECTED_NEW_MIGRATIONS:
-        raise RuntimeError('Expected exactly eight named candidate migrations including the forward-only authority and idempotency migrations')
+        raise RuntimeError('Expected exactly nine named candidate migrations including the Law Beta, authority and idempotency migrations')
 
 
 def require_origin_shape(result):

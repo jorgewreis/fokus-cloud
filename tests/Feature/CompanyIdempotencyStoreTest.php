@@ -22,24 +22,37 @@ class CompanyIdempotencyStoreTest extends TestCase
     {
         parent::setUp();
         require_once dirname(__DIR__).'/Isolated/CompanyIdempotencyMySqlLabGuard.php';
-        CompanyIdempotencyMySqlLabGuard::checkInMemorySqlite(config('app.env'), config('database.default'), config('database.connections.sqlite'));
-        Schema::create('platform_admins', function (Blueprint $table): void {
-            $table->string('id')->primary();
-            $table->string('status');
-            $table->string('platform_role_id')->nullable();
-            $table->timestamp('manual_blocked_at')->nullable();
-            $table->timestamp('deactivated_at')->nullable();
-            $table->timestamp('locked_until')->nullable();
-        });
-        Schema::create('platform_permissions', function (Blueprint $table): void {
-            $table->string('id')->primary();
-            $table->string('code')->unique();
-        });
-        Schema::create('platform_role_permissions', function (Blueprint $table): void {
-            $table->string('platform_role_id');
-            $table->string('platform_permission_id');
-            $table->primary(['platform_role_id', 'platform_permission_id']);
-        });
+        if (config('database.default') === 'sqlite') {
+            CompanyIdempotencyMySqlLabGuard::checkInMemorySqlite(config('app.env'), config('database.default'), config('database.connections.sqlite'));
+        } else {
+            CompanyIdempotencyMySqlLabGuard::assertApprovedTarget();
+            foreach (['synthetic_effects', 'company_idempotency_requests', 'platform_role_permissions', 'platform_permissions', 'platform_admins'] as $table) {
+                Schema::dropIfExists($table);
+            }
+        }
+        if (! Schema::hasTable('platform_admins')) {
+            Schema::create('platform_admins', function (Blueprint $table): void {
+                $table->string('id')->primary();
+                $table->string('status');
+                $table->string('platform_role_id')->nullable();
+                $table->timestamp('manual_blocked_at')->nullable();
+                $table->timestamp('deactivated_at')->nullable();
+                $table->timestamp('locked_until')->nullable();
+            });
+        }
+        if (! Schema::hasTable('platform_permissions')) {
+            Schema::create('platform_permissions', function (Blueprint $table): void {
+                $table->string('id')->primary();
+                $table->string('code')->unique();
+            });
+        }
+        if (! Schema::hasTable('platform_role_permissions')) {
+            Schema::create('platform_role_permissions', function (Blueprint $table): void {
+                $table->string('platform_role_id');
+                $table->string('platform_permission_id');
+                $table->primary(['platform_role_id', 'platform_permission_id']);
+            });
+        }
         DB::table('platform_admins')->insert(['id' => 'admin-a', 'status' => 'ativo', 'platform_role_id' => 'role-a']);
         DB::table('platform_permissions')->insert(['id' => 'perm-a', 'code' => 'platform.companies.manage']);
         DB::table('platform_role_permissions')->insert(['platform_role_id' => 'role-a', 'platform_permission_id' => 'perm-a']);
