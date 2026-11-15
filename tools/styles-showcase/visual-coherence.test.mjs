@@ -37,11 +37,14 @@ test('shared palette defines its complete public token set and composition does 
 test('portable ZIP contains byte-identical dependencies, HTML and offline documentation', () => {
   const result = spawnSync('python3', ['-c', `
 from pathlib import Path
-from zipfile import ZipFile
+from zipfile import ZipFile, ZIP_STORED
 import re
 root = Path('public/styles')
 with ZipFile(root/'examples/fokus-styles-examples.zip') as z:
-    expected = ['assets/site-palette.css','assets/styles-theme.js','assets/fokus-2.7.0.min.css','assets/LICENSE-fokus-styles.txt','examples/composition.css','examples/README.md'] + ['examples/'+s+'.html' for s in ['projects','onboarding','records']]
+    assert all(entry.compress_type == ZIP_STORED for entry in z.infolist()), 'Portable ZIP must avoid runner-dependent deflate bytes'
+    source_files = sorted([*(root/'examples').glob('*.html'), *(root/'examples').glob('*.md'), *(root/'examples').glob('*.css'), *(root/'assets'/name for name in ['fokus-2.7.0.min.css','LICENSE-fokus-styles.txt','site-palette.css','styles-theme.js'])])
+    expected = [path.relative_to(root).as_posix() for path in source_files]
+    assert z.namelist() == expected, 'Portable ZIP must contain every generated source exactly once'
     for name in expected:
         assert z.read(name) == (root/name).read_bytes(), name+' differs from preview source'
     for name in expected:

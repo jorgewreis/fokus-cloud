@@ -1,6 +1,6 @@
 """Rebuild a deterministic portable ZIP from the exact preview sources."""
 from pathlib import Path
-from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
+from zipfile import ZipFile, ZipInfo, ZIP_STORED
 root = Path(__file__).resolve().parents[2] / 'public/styles'
 published_assets = ['fokus-2.7.0.min.css', 'LICENSE-fokus-styles.txt', 'site-palette.css', 'styles-theme.js']
 # Keep the portable runtime byte-identical to the site source.
@@ -13,10 +13,12 @@ for name in published_assets:
 # The standalone examples use CSS and local inline behavior. Do not silently
 # add assets used only by documentation pages to their portable download.
 files = sorted([*(root/'examples').glob('*.html'), *(root/'examples').glob('*.md'), *(root/'examples').glob('*.css'), *(root/'assets'/name for name in published_assets)])
-with ZipFile(root/'examples/fokus-styles-examples.zip', 'w', ZIP_DEFLATED) as archive:
+# Deflate output varies with the zlib implementation bundled with Python.
+# Keep this checked-in portable artifact byte-stable across local and CI runners.
+with ZipFile(root/'examples/fokus-styles-examples.zip', 'w', ZIP_STORED) as archive:
     for path in files:
         info = ZipInfo(str(path.relative_to(root)), (2026, 10, 30, 0, 0, 0))
-        info.compress_type = ZIP_DEFLATED
+        info.compress_type = ZIP_STORED
         info.create_system = 3
         info.external_attr = 0o644 << 16
         archive.writestr(info, path.read_bytes())
