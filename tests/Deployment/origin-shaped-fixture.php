@@ -215,12 +215,14 @@ if ($mode === 'fresh-noop') {
         '2026_11_06_160000_create_law_contact_import_batches_table',
         '2026_11_06_170000_create_law_tasks',
         '2026_11_07_000100_repair_payments_provider_checkout_url',
+        '2026_11_14_000001_create_company_idempotency_requests',
+        '2026_11_14_000002_create_platform_session_authorities',
         '2026_11_14_000100_create_interest_product_index',
     ];
     $expectedLedgerNames = array_merge(array_column($oldLedger, 'migration'), $expectedNewMigrations);
     sort($expectedLedgerNames, SORT_STRING);
     $actualLedgerNames = DB::table('migrations')->orderBy('migration')->pluck('migration')->all();
-    originRequire(count($oldLedger) === 79 && count($expectedLedgerNames) === 85 && $actualLedgerNames === $expectedLedgerNames, 'exact 79 original plus six named candidate migrations');
+    originRequire(count($oldLedger) === 79 && count($expectedLedgerNames) === 87 && $actualLedgerNames === $expectedLedgerNames, 'exact 79 original plus eight named candidate migrations');
     $snapshot = ['metadata' => originMetadata(), 'ledger' => DB::table('migrations')->orderBy('id')->get()->toJson(), 'payments' => DB::table('payments')->orderBy('id')->get()->toJson(), 'changes' => DB::table('subscription_changes')->orderBy('id')->get()->toJson()];
     if ($mode === 'verify-up') {
         $save('origin-upgraded', $snapshot);
