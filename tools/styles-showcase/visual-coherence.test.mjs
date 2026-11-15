@@ -111,13 +111,16 @@ test('static same-origin thumbnails receive theme without allowing scripts', asy
 });
 
 
-test('six editorial CTAs are explicitly scoped and keep framework demonstrations unbranded', () => {
-  for (const path of ['public/styles/index.html', 'public/styles/docs/index.html']) {
+test('twelve editorial CTAs are explicitly scoped and keep framework demonstrations unbranded', () => {
+  for (const [path, count] of [
+    ['public/styles/index.html', 3],
+    ['public/styles/docs/index.html', 9],
+  ]) {
     const dom = new JSDOM(read(path));
     try {
       const d = dom.window.document;
       const ctas = [...d.querySelectorAll('.styles-site-cta')];
-      assert.equal(ctas.length, 3, path);
+      assert.equal(ctas.length, count, path);
       assert.ok(ctas.every(node => node.matches('a.fs-btn[href]')), path);
       assert.equal(d.querySelectorAll('[data-component-demo].styles-site-cta').length, 0);
       assert.equal(ctas.filter(node => node.classList.contains('fs-btn-outline-primary')).length, path.endsWith('/docs/index.html') ? 0 : 2);
