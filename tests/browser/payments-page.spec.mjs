@@ -114,7 +114,8 @@ test('console financeiro pagina, filtra e conclui ações pelos drawers', async 
     await page.keyboard.press('Escape');
     await expect(page.locator('#billing-action-modal')).not.toHaveClass(/is-open/);
     await expect(page.locator('#billing-drawer')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Marcar em revisão' })).toBeFocused();
+    await page.locator('#billing-drawer-close').click();
+    await page.locator('#billing-reconciliation-list [data-billing-detail]').click();
     await page.getByRole('button', { name: 'Marcar em revisão' }).click();
     await page.locator('#billing-action-reason').fill('Status remoto confirmado.');
     await page.getByRole('button', { name: 'Confirmar', exact: true }).click();

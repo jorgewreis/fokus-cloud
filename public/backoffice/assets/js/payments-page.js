@@ -49,7 +49,6 @@ export function mount(root, context = {}) {
         detail: null,
         lastTrigger: null,
         pendingAction: null,
-        restoringAction: false,
     };
     const panelSelectors = { payments: "#billing-payments-panel", reconciliation: "#billing-reconciliation-panel", refunds: "#billing-refunds-panel" };
     const tabButtons = Object.fromEntries(Object.keys(panelSelectors).map((kind) => [kind, tabsElement.querySelector(`[data-fs-target="${panelSelectors[kind]}"]`)]));
@@ -236,7 +235,7 @@ export function mount(root, context = {}) {
     };
     const detailRenderers = { payments: paymentDetails, reconciliation: reconciliationDetails, refunds: refundDetails };
 
-    async function openDetail(kind, id, trigger, { restoreAction = null } = {}) {
+    async function openDetail(kind, id, trigger) {
         state.detailController?.abort();
         state.detailController = new AbortController();
         state.detail = { kind, id };
@@ -258,11 +257,6 @@ export function mount(root, context = {}) {
             $("#billing-detail-sections").innerHTML = detailRenderers[kind](item);
             $("#billing-detail-sections").hidden = false;
             $("#billing-refund-request-form")?.addEventListener("submit", submitRefundRequest, { signal: pageSignal });
-            if (restoreAction) {
-                [...$("#billing-detail-sections").querySelectorAll("[data-billing-action]")]
-                    .find((button) => button.dataset.billingAction === restoreAction)
-                    ?.focus({ preventScroll: true });
-            }
         } catch (error) {
             if (error?.name === "AbortError" || state.detailController.signal.aborted || pageSignal?.aborted) return;
             $("#billing-detail-loading").hidden = true;
@@ -396,7 +390,6 @@ export function mount(root, context = {}) {
         load(kind, { force: true });
     };
     const onDrawerHidden = () => {
-        if (state.pendingAction || state.restoringAction) return;
         state.detailController?.abort();
         state.lastTrigger?.focus?.();
     };
@@ -419,13 +412,8 @@ export function mount(root, context = {}) {
 
     modalTrigger.addEventListener("fs:hidden", () => {
         if (!state.pendingAction) return;
-        const restoreAction = `${state.pendingAction.kind}:${state.pendingAction.action}:${state.pendingAction.id}`;
         state.pendingAction = null;
-        if (state.detail) {
-            state.restoringAction = true;
-            openDetail(state.detail.kind, state.detail.id, state.lastTrigger, { restoreAction })
-                .finally(() => { state.restoringAction = false; });
-        }
+        if (state.detail) openDetail(state.detail.kind, state.detail.id, state.lastTrigger);
     }, { signal: pageSignal });
     Object.values(state.lists).forEach((list) => {
         list.loading = false;
