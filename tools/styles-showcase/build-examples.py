@@ -2,7 +2,7 @@
 from pathlib import Path
 from zipfile import ZipFile, ZipInfo, ZIP_STORED
 root = Path(__file__).resolve().parents[2] / 'public/styles'
-published_assets = ['fokus-2.7.0.min.css', 'LICENSE-fokus-styles.txt', 'site-palette.css', 'styles-theme.js']
+published_assets = ['fokus-2.7.0.min.css', 'fokus-2.7.0.min.js', 'LICENSE-fokus-styles.txt', 'site-palette.css', 'styles-theme.js']
 # Keep the portable runtime byte-identical to the site source.
 theme_source = root.parent/'assets/js/styles-theme.js'
 if (root/'assets/styles-theme.js').read_bytes() != theme_source.read_bytes():
@@ -10,8 +10,8 @@ if (root/'assets/styles-theme.js').read_bytes() != theme_source.read_bytes():
 for name in published_assets:
     if not (root/'assets'/name).is_file():
         raise FileNotFoundError(f'Missing published asset: assets/{name}')
-# The standalone examples use CSS and local inline behavior. Do not silently
-# add assets used only by documentation pages to their portable download.
+# The standalone examples must include every local runtime they reference, but
+# must not silently add assets used only by documentation pages.
 files = sorted(
     [*(root/'examples').glob('*.html'), *(root/'examples').glob('*.md'), *(root/'examples').glob('*.css'), *(root/'assets'/name for name in published_assets)],
     key=lambda path: path.relative_to(root).as_posix().casefold(),
