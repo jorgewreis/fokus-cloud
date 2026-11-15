@@ -117,7 +117,6 @@ class CompanyIdempotencyApiConcurrencyTest extends TestCase
     /** Attach a durable, database-backed authority to this synthetic request process. */
     private function actingAsWithAuthority(PlatformAdmin $admin, string $sessionId): static
     {
-        $this->actingAs($admin, 'platform');
         $session = app('session.store');
         $session->setId($sessionId);
         $session->start();
@@ -134,6 +133,9 @@ class CompanyIdempotencyApiConcurrencyTest extends TestCase
         $request = Request::create('/api/backoffice/companies', 'POST');
         $request->setLaravelSession($session);
         app(PlatformSessionAuthority::class)->activate($request, $admin);
+        // actingAs() may initialize the test session; it must observe the
+        // deterministic ID already associated with the durable authority.
+        $this->actingAs($admin, 'platform');
         $this->withCookie((string) config('session.cookie'), $sessionId)->withCredentials();
 
         return $this;
