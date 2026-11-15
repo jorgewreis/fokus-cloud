@@ -115,7 +115,9 @@ $f = json_decode(file_get_contents($sandbox.'/upgrade-fixture.json'), true);
 $beforeInterests = DB::table('product_interests')->orderBy('id')->get()->toJson();
 ensure(DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'backfilled interest index is ready before rollback');
 ensure(DB::table('interest_product_index')->count() > 0, 'historical links exist before rollback');
-ensure(Artisan::call('migrate:rollback', ['--path' => 'database/migrations/2026_11_14_000100_create_interest_product_index.php', '--force' => true]) === 0, 'interest index rollback is isolated from forward-only migrations');
+$interestLedger = (array) DB::table('migrations')->where('migration', '2026_11_14_000100_create_interest_product_index')->first();
+ensure(isset($interestLedger['batch']), 'interest index ledger batch present before rollback');
+ensure(Artisan::call('migrate:rollback', ['--path' => 'database/migrations/2026_11_14_000100_create_interest_product_index.php', '--batch' => (int) $interestLedger['batch'], '--force' => true]) === 0, 'interest index rollback is isolated from forward-only migrations');
 ensure(! Schema::hasTable('interest_product_index') && ! Schema::hasTable('interest_product_index_state'), 'derived interest index tables removed by rollback');
 ensure(DB::table('product_interests')->orderBy('id')->get()->toJson() === $beforeInterests, 'rollback preserves source interest records');
 ensure(Artisan::call('migrate', ['--force' => true]) === 0, 'interest index advances again without touching retained authority data');
@@ -129,8 +131,9 @@ foreach ([
     ['2026_11_14_000002_create_platform_session_authorities', 'platform_session_authorities'],
 ] as [$migration, $table]) {
     $ledger = (array) DB::table('migrations')->where('migration', $migration)->first();
+    ensure(isset($ledger['batch']), 'forward-only ledger batch present '.$migration);
     try {
-        Artisan::call('migrate:rollback', ['--path' => 'database/migrations/'.$migration.'.php', '--force' => true]);
+        Artisan::call('migrate:rollback', ['--path' => 'database/migrations/'.$migration.'.php', '--batch' => (int) $ledger['batch'], '--force' => true]);
         throw new RuntimeException('automatic rollback unexpectedly completed for '.$migration);
     } catch (RuntimeException $error) {
         ensure(str_contains($error->getMessage(), 'Automatic rollback would'), 'forward-only migration rejects automatic rollback '.$migration);
