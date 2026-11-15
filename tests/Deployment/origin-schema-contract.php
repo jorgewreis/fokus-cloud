@@ -131,8 +131,8 @@ function originRei60Schema(): array
             ['platform_session_authorities', 'PRIMARY', 0, 1, 'session_id', 'A', null, 'BTREE', 'YES', null],
         ],
         'foreign_keys' => [
-            ['platform_session_authorities', 'platform_session_authorities_platform_admin_id_foreign', 'platform_admin_id', 1, 'platform_admins', 'id', 'RESTRICT', 'RESTRICT'],
-            ['platform_session_authorities', 'platform_session_authorities_web_user_id_foreign', 'web_user_id', 1, 'users', 'id', 'RESTRICT', 'SET NULL'],
+            ['platform_session_authorities', 'platform_session_authorities_platform_admin_id_foreign', 'platform_admin_id', 1, 'platform_admins', 'id', 'NO ACTION', 'RESTRICT'],
+            ['platform_session_authorities', 'platform_session_authorities_web_user_id_foreign', 'web_user_id', 1, 'users', 'id', 'NO ACTION', 'SET NULL'],
         ],
     ];
 }
