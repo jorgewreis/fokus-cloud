@@ -49,6 +49,7 @@ export function mount(root, context = {}) {
         detail: null,
         lastTrigger: null,
         pendingAction: null,
+        restoringAction: false,
     };
     const panelSelectors = { payments: "#billing-payments-panel", reconciliation: "#billing-reconciliation-panel", refunds: "#billing-refunds-panel" };
     const tabButtons = Object.fromEntries(Object.keys(panelSelectors).map((kind) => [kind, tabsElement.querySelector(`[data-fs-target="${panelSelectors[kind]}"]`)]));
@@ -395,6 +396,7 @@ export function mount(root, context = {}) {
         load(kind, { force: true });
     };
     const onDrawerHidden = () => {
+        if (state.pendingAction || state.restoringAction) return;
         state.detailController?.abort();
         state.lastTrigger?.focus?.();
     };
@@ -419,7 +421,11 @@ export function mount(root, context = {}) {
         if (!state.pendingAction) return;
         const restoreAction = `${state.pendingAction.kind}:${state.pendingAction.action}:${state.pendingAction.id}`;
         state.pendingAction = null;
-        if (state.detail) openDetail(state.detail.kind, state.detail.id, state.lastTrigger, { restoreAction });
+        if (state.detail) {
+            state.restoringAction = true;
+            openDetail(state.detail.kind, state.detail.id, state.lastTrigger, { restoreAction })
+                .finally(() => { state.restoringAction = false; });
+        }
     }, { signal: pageSignal });
     Object.values(state.lists).forEach((list) => {
         list.loading = false;
