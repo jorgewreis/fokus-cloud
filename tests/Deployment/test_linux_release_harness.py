@@ -34,11 +34,11 @@ class CoverageComposition(unittest.TestCase):
         return report
 
     def test_measured_composition_preserves_all_law_and_main_tests(self):
-        self.assertEqual(suite.EXPECTED_TESTS, 376)
-        self.assertEqual(suite.MINIMUM_ASSERTIONS, 3072)
+        self.assertEqual(suite.EXPECTED_TESTS, 424)
+        self.assertEqual(suite.MINIMUM_ASSERTIONS, 3321)
         self.assertEqual(len(suite.MAIN_IDENTITY_TESTS), 10)
         self.assertEqual(sum(suite.MAIN_IDENTITY_TESTS.values()), 23)
-        self.assertEqual(suite.coverage(self.report())['tests'], 376)
+        self.assertEqual(suite.coverage(self.report())['tests'], 424)
 
     def test_omission_duplicate_or_weakened_identity_is_rejected_even_with_green_totals(self):
         for mutation in ('omit', 'duplicate', 'rename', 'assertions'):
@@ -81,7 +81,7 @@ class CoverageComposition(unittest.TestCase):
                     with self.assertRaises(RuntimeError): suite.coverage(report)
 
     def test_old_or_incomplete_totals_failures_errors_skips_and_hidden_failures_are_rejected(self):
-        for key, value in [('tests','327'),('tests','336'),('tests','351'),('tests','357'),('tests','358'),('tests','359'),('tests','371'),('tests','372'),('tests','373'),('tests','374'),('tests','375'),('tests','377'),('assertions','3029'),('assertions','3035'),('assertions','3065'),('assertions','3071'),
+        for key, value in [('tests','327'),('tests','376'),('tests','423'),('tests','425'),('assertions','3029'),('assertions','3072'),('assertions','3320'),
                            ('failures','1'),('errors','1'),('skipped','1')]:
             with self.subTest(key=key):
                 report = self.report(); report[0].set(key,value)
