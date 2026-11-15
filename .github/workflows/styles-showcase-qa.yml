@@ -57,6 +57,7 @@ jobs:
           node tools/styles-showcase/catalog.dom.mjs
           node --test --test-isolation=none tools/styles-showcase/law-select.test.mjs tools/styles-showcase/law-pagination.test.mjs tests/Frontend/law-history-pagination.test.mjs tests/Frontend/cloud-modules-pagination.test.mjs tools/styles-showcase/cloud-datatable.test.mjs tools/styles-showcase/cloud-offcanvas.test.mjs tools/styles-showcase/confirmation-modal.test.mjs tools/styles-showcase/law-select-pattern.test.mjs tools/styles-showcase/law-preferences.test.mjs
           node --test tests/Frontend/law-notifications-label.test.mjs
+          node --test tools/styles-showcase/law-notifications.test.mjs
           node tools/sync-seo.mjs --check
           python tools/styles-showcase/build-examples.py
           git diff --exit-code -- public/styles/examples/fokus-styles-examples.zip

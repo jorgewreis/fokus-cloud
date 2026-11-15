@@ -43,6 +43,22 @@ async function expectFitsViewport(page, element) {
 }
 
 for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
+  test(`REI-54 Notificações ${width}px ${theme}`, async ({ page }, info) => {
+    const failures = await openExample(page, '/styles/examples/law-notifications.html', width, theme);
+    const trigger = page.getByRole('button', { name: 'Notificações, 2 não lidas' });
+    await trigger.focus(); await page.keyboard.press('Enter');
+    const panel = page.getByRole('region', { name: 'Notificações' });
+    await expect(panel).toBeVisible();
+    await expectFitsViewport(page, panel);
+    await captureState(page, info, `notifications-open-${width}-${theme}`);
+    await page.keyboard.press('Escape');
+    await expect(panel).toBeHidden(); await expect(trigger).toBeFocused();
+    await page.getByRole('button', { name: 'Mostrar lista vazia' }).click();
+    await page.getByRole('button', { name: 'Notificações', exact: true }).click();
+    await expect(panel).toContainText('Nenhuma notificação por enquanto.');
+    await evidence(page, info, `notifications-empty-${width}-${theme}`, failures);
+  });
+
   test(`REI-54 Preferências ${width}px ${theme}`, async ({ page }, info) => {
     const failures = await openExample(page, '/styles/examples/law-preferences.html', width, theme);
     const remember = page.getByLabel('Lembrar seção'), reduce = page.getByLabel('Reduzir movimento');
