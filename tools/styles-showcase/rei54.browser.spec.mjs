@@ -62,7 +62,10 @@ for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
   test(`REI-54 Preferências ${width}px ${theme}`, async ({ page }, info) => {
     const failures = await openExample(page, '/styles/examples/law-preferences.html', width, theme);
     const remember = page.getByLabel('Lembrar seção'), reduce = page.getByLabel('Reduzir movimento');
-    await remember.check(); await reduce.check();
+    await page.locator('label[for="remember-section"]').click();
+    await expect(remember).toBeChecked();
+    await reduce.focus(); await page.keyboard.press('Space');
+    await expect(reduce).toBeChecked();
     await page.getByLabel('Seção fictícia').selectOption('tarefas');
     await page.reload();
     await expect(remember).toBeChecked(); await expect(reduce).toBeChecked();
