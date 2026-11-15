@@ -66,13 +66,16 @@ cross-node rollout, credential custody and provider behavior are not established
 Callback purity and normalization require independent review; type signatures
 alone cannot enforce them.
 
-The guarded MySQL API concurrency test was run against commit `93d52eaf`
-using a new, initially empty MySQL 8.4.13 container with networking disabled
-and temporary storage: one test and ten assertions passed. Native InnoDB AIO
-was disabled for that laboratory because the host had exhausted its AIO
-resources. The test bypasses the write-blocking middleware only within the
-test and fakes the password-check provider. It is not evidence of real browser
-recovery, CSRF, external provider operation, or production key custody.
+The guarded MySQL API concurrency runner is
+`tests/Isolated/run-company-idempotency-api-mysql-lab.sh`. It archives the
+current commit into a disposable volume (excluding `.env` and host `vendor`),
+installs dependencies there, and runs a new MySQL 8.4 container with temporary
+storage and no network. The PHP runner shares only that container's loopback,
+verifies its UUID and starts with an empty database. The test bypasses the
+write-blocking middleware only within the test, fakes the password-check
+provider and creates a distinct database-backed Platform authority for each
+forked request. It is not evidence of real browser recovery, CSRF, external
+provider operation, production key custody, or multi-node rollout.
 
 The destructive test bootstrap requires an exclusively owned disposable server,
 an initially empty database and the expected server UUID. Before each migration,

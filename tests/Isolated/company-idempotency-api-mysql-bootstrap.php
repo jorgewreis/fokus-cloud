@@ -9,7 +9,7 @@ use Tests\Isolated\CompanyIdempotencyMySqlLabGuard;
 require_once __DIR__.'/CompanyIdempotencyMySqlLabGuard.php';
 $env = CompanyIdempotencyMySqlLabGuard::environment();
 CompanyIdempotencyMySqlLabGuard::checkEnvironment($env, CompanyIdempotencyMySqlLabGuard::interfaces(), is_file('/workspace/bootstrap/cache/config.php'), is_file('/workspace/.env'));
-require '/test-bootstrap.php';
+require_once '/workspace/vendor/autoload.php';
 // Constructing the container supplies database_path() without bootstrapping
 // Laravel or registering error/exception handlers before PHPUnit starts.
 new Application('/workspace');

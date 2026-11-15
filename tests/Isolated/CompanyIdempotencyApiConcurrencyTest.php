@@ -6,9 +6,9 @@ use App\Http\Middleware\RejectUnimplementedCompanyIdempotency;
 use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
 use App\Services\CompanyIdempotencyFactory;
+use App\Services\PlatformSessionAuthority;
 use App\Services\PrefixedUlid;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
-use Illuminate\Foundation\Testing\RefreshDatabaseState;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -21,24 +21,17 @@ require_once __DIR__.'/CompanyIdempotencyMySqlLabGuard.php';
 /** Run only with the guarded, empty MySQL API laboratory bootstrap. */
 class CompanyIdempotencyApiConcurrencyTest extends TestCase
 {
-    use DatabaseMigrations;
-
-    public function runDatabaseMigrations(): void
+    protected function setUp(): void
     {
-        CompanyIdempotencyMySqlLabGuard::assertBeforeFresh();
-        $this->artisan('migrate:fresh')->assertSuccessful();
-        $this->beforeApplicationDestroyed(function (): void {
-            RefreshDatabaseState::$migrated = false;
-            RefreshDatabaseState::$inMemoryConnections = [];
-        });
-    }
-
-    public function test_two_independent_requests_replay_after_one_commits_during_preflight(): void
-    {
-        self::assertSame('mysql', DB::connection()->getDriverName());
-        self::assertTrue(function_exists('pcntl_fork'));
+        parent::setUp();
+        $this->runDatabaseMigrations();
         $this->seed();
         $this->withoutMiddleware(RejectUnimplementedCompanyIdempotency::class);
+        config()->set('platform_session_authority.enabled', true);
+        config()->set('session.driver', 'database');
+        config()->set('session.connection', null);
+        config()->set('session.table', 'sessions');
+        config()->set('session.lifetime', 120);
         config(['company_idempotency' => [
             'enabled' => true,
             'keyring_json' => '{"v1":"'.base64_encode(str_repeat('x', 32)).'"}',
@@ -46,6 +39,19 @@ class CompanyIdempotencyApiConcurrencyTest extends TestCase
             'max_outstanding' => '5', 'max_issues_per_window' => '20',
             'issuance_window_seconds' => '600', 'token_lifetime_seconds' => '600',
         ]]);
+    }
+
+    /** Deliberately avoids DatabaseMigrations: these migrations are forward-only. */
+    public function runDatabaseMigrations(): void
+    {
+        CompanyIdempotencyMySqlLabGuard::assertBeforeFresh();
+        $this->artisan('migrate:fresh')->assertSuccessful();
+    }
+
+    public function test_two_independent_requests_replay_after_one_commits_during_preflight(): void
+    {
+        self::assertSame('mysql', DB::connection()->getDriverName());
+        self::assertTrue(function_exists('pcntl_fork'));
         $admin = PlatformAdmin::create([
             'id' => PrefixedUlid::make('PAD'), 'name' => 'Synthetic Admin',
             'email' => 'concurrency-admin@example.test', 'password' => Hash::make('SyntheticPassword!2026'),
@@ -73,7 +79,8 @@ class CompanyIdempotencyApiConcurrencyTest extends TestCase
             try {
                 Http::preventStrayRequests();
                 Http::fake(['api.pwnedpasswords.com/*' => Http::response('', 200)]);
-                $response = $this->actingAs($admin, 'platform')->withHeader('Idempotency-Key', $token)->postJson('/api/backoffice/companies', $payload);
+                $response = $this->actingAsWithAuthority($admin, 'mysql-lab-child-session')
+                    ->withHeader('Idempotency-Key', $token)->postJson('/api/backoffice/companies', $payload);
                 fwrite($pair[1], json_encode(['status' => $response->status(), 'id' => $response->json('company_id')], JSON_THROW_ON_ERROR)."\n");
                 exit(0);
             } catch (Throwable) {
@@ -92,7 +99,8 @@ class CompanyIdempotencyApiConcurrencyTest extends TestCase
 
                 return Http::response('', 200);
             }]);
-            $response = $this->actingAs($admin, 'platform')->withHeader('Idempotency-Key', $token)->postJson('/api/backoffice/companies', $payload);
+            $response = $this->actingAsWithAuthority($admin, 'mysql-lab-parent-session')
+                ->withHeader('Idempotency-Key', $token)->postJson('/api/backoffice/companies', $payload);
             $response->assertCreated();
             self::assertIsArray($child);
             self::assertSame(201, $child['status']);
@@ -104,5 +112,30 @@ class CompanyIdempotencyApiConcurrencyTest extends TestCase
         } finally {
             fclose($pair[0]);
         }
+    }
+
+    /** Attach a durable, database-backed authority to this synthetic request process. */
+    private function actingAsWithAuthority(PlatformAdmin $admin, string $sessionId): static
+    {
+        $this->actingAs($admin, 'platform');
+        $session = app('session.store');
+        $session->setId($sessionId);
+        $session->start();
+        DB::table('sessions')->updateOrInsert(
+            ['id' => $sessionId],
+            [
+                'user_id' => null,
+                'ip_address' => '127.0.0.1',
+                'user_agent' => 'PHPUnit MySQL lab',
+                'payload' => '',
+                'last_activity' => now()->timestamp,
+            ],
+        );
+        $request = Request::create('/api/backoffice/companies', 'POST');
+        $request->setLaravelSession($session);
+        app(PlatformSessionAuthority::class)->activate($request, $admin);
+        $this->withCookie((string) config('session.cookie'), $sessionId)->withCredentials();
+
+        return $this;
     }
 }
