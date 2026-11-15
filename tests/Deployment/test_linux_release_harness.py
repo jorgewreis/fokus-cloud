@@ -103,6 +103,9 @@ class HarnessContracts(unittest.TestCase):
         materialize = stages['materialize']
         handoff = stages['prepare-synthetic-ownership']
         self.assertIn('tar --no-same-owner -xf source.tar', ast.literal_eval(materialize.args[1].args[-1]))
+        self.assertIn("'bundle','create',str(history),'HEAD'", source)
+        self.assertIn('git clone --quiet --no-checkout history.bundle history', ast.literal_eval(materialize.args[1].args[-1]))
+        self.assertNotIn("tar.add(ROOT/'.git'", source)
         self.assertNotIn('safe.directory', source)
         self.assertIn('chown -R 1000:1000 /work', ast.literal_eval(handoff.args[1].args[-1]))
         self.assertLess(materialize.lineno, stages['prepare-isolated-upgrade-dependencies'].lineno)
@@ -362,7 +365,7 @@ class HarnessContracts(unittest.TestCase):
 
     def test_origin_rehearsal_orders_failure_repair_idempotence_and_restore(self):
         source = (common.ROOT / 'tests/Deployment/linux-upgrade.py').read_text(encoding='utf-8')
-        labels = ['interest-index-pre-migration-compat', 'repair-fresh-noop', 'prepare-origin-shape', 'repair-billing-before', 'six-migrations',
+        labels = ['interest-index-pre-migration-compat', 'repair-fresh-noop', 'prepare-origin-shape', 'repair-billing-before', 'eight-migrations',
                   'repair-billing-after', 'repair-origin-verify', 'repair-origin-idempotent', 'interest-index-backfill',
                   'interest-index-concurrency-rollback', 'interest-index-deadlock-retry', 'restored-backup-repair-verify']
         positions = [source.index("'" + label + "'") for label in labels]
@@ -370,7 +373,7 @@ class HarnessContracts(unittest.TestCase):
         self.assertIn('require_new_migrations(new)', source)
         self.assertIn("evidence['reversal_authorized_delta']", source)
 
-    def test_upgrade_requires_exact_six_names_not_just_count(self):
+    def test_upgrade_requires_exact_eight_names_not_just_count(self):
         upgrade.require_new_migrations(upgrade.EXPECTED_NEW_MIGRATIONS)
         for names in (upgrade.EXPECTED_NEW_MIGRATIONS[:-1], list(reversed(upgrade.EXPECTED_NEW_MIGRATIONS)),
                       ['2026_11_06_000200_unreviewed.php', *upgrade.EXPECTED_NEW_MIGRATIONS[1:]]):
@@ -403,13 +406,12 @@ class HarnessContracts(unittest.TestCase):
                 self.assertIn(bootstrap, source)
                 self.assertLess(source.index(imported), source.index(bootstrap))
 
-    def test_origin_reversal_records_retained_column_instead_of_baseline_equality(self):
+    def test_origin_reversal_preserves_forward_only_recovery_guard(self):
         source = (common.ROOT / 'tests/Deployment/reversal-harness.php').read_text(encoding='utf-8')
-        self.assertRegex(source, r"\['--step'\s*=>\s*6,\s*'--force'\s*=>\s*true\]")
-        self.assertRegex(source, r"Schema::hasColumn\('payments',\s*'provider_checkout_url'\)")
-        self.assertIn("$delta['repair_ledger_absent'] = true", source)
-        self.assertIn("$delta['payments_and_urls_unchanged'] = true", source)
-        self.assertIn('EXPLICIT AUTHORIZED ROLLBACK DELTA', source)
+        self.assertIn("'2026_11_14_000001_create_company_idempotency_requests'", source)
+        self.assertIn("'2026_11_14_000002_create_platform_session_authorities'", source)
+        self.assertIn("'Automatic rollback would'", source)
+        self.assertIn("'--path' => 'database/migrations/2026_11_14_000100_create_interest_product_index.php'", source)
         self.assertNotIn("dropColumn('provider_checkout_url')", source)
         contract = (common.ROOT / 'tests/Deployment/origin-schema-contract.php').read_text(encoding='utf-8')
         self.assertIn("$reversed ? [['payments', 'provider_checkout_url', 'varchar(512)', 'YES']]", contract)

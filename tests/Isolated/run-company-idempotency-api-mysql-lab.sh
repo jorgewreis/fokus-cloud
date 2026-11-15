@@ -24,6 +24,10 @@ docker build -q -t "$runtime_image" -f tests/Deployment/linux-runtime/Dockerfile
 docker volume create "$source_volume" >/dev/null
 # git archive deliberately excludes ignored working files such as .env and vendor.
 git archive --format=tar HEAD | docker run --rm -i --network none -v "$source_volume:/workspace" composer:2.8 sh -c 'tar -xf - -C /workspace'
+# The archive also omits empty runtime directories. Create mount targets before
+# overlaying them with tmpfs in the read-only test container.
+docker run --rm --network none -v "$source_volume:/workspace" composer:2.8 \
+  sh -c 'mkdir -p /workspace/storage /workspace/bootstrap/cache'
 docker run --rm -v "$source_volume:/workspace" -w /workspace "$runtime_image" \
   composer install --no-interaction --prefer-dist --no-scripts --no-plugins --no-progress
 

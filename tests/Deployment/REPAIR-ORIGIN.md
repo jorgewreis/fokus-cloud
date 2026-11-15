@@ -13,7 +13,7 @@ This change is authorized in the working copy only, not as production DDL.
 
 ## Required evidence
 
-- Compare the exact six candidate migration names, including the interest product index, not only their count.
+- Compare the exact eight candidate migration names, including the forward-only REI-60 idempotency and platform-session-authority migrations, not only their count.
 - Check fresh-schema no-op and a separate synthetic origin-shaped baseline.
 - Require the origin-shaped baseline's 79 names and global 1,110-column projection
   to match the reviewed metadata digests. Synthetic migration batches are not
@@ -24,10 +24,7 @@ This change is authorized in the working copy only, not as production DDL.
   Law migrations' additions, the complete reviewed checkout column definition,
   and the explicitly checked interest index tables, indexes and foreign key.
 - Check repeat migration, UTC/-03 session behavior and unchanged timestamp epochs.
-- Laboratory rollback removes six ledger records and derived interest index tables,
-  preserves source interest rows, and retains the repair column and its values.
-  Report that explicit delta rather than pretending to restore the old schema.
-  Production recovery remains forward-fix-only.
+- Laboratory rollback proves the existing destructive migration risks and the interest-index reconstruction separately. The two REI-60 migrations reject automatic rollback without changing their ledger or tables; their recovery is roll-forward or validated backup restore. The additive repair retains its column and values. Report those explicit deltas rather than pretending to restore the old schema. Production recovery remains forward-fix-only.
 - Run negative definition tests, the complete application suites, production
   no-dev package proof, concurrency, real browser, rsync and offline build on the
   final source identity. Local auxiliary results do not replace final CI.
