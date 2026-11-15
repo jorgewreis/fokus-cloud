@@ -1731,7 +1731,9 @@
       if (count) { if (!badge) { badge = element('span','law-notification-count'); button.append(badge); } badge.textContent = count > 99 ? '99+' : String(count); }
       else badge?.remove();
       const items = result.notifications || [];
-      panel.replaceChildren(element('h2','','Notificações'));
+      const title = element('h2', '', 'Notificações');
+      title.id = 'notifications-title';
+      panel.replaceChildren(title);
       if (!items.length) { panel.append(element('p','','Nenhuma notificação por enquanto.'),element('span','','Os avisos dos módulos aparecerão aqui.')); return; }
       items.forEach((item)=>{ const row=element('button','law-notification-item'); row.type='button'; if(!item.read_at) row.dataset.unread='true'; row.append(element('strong','',item.title),element('span','',item.message),element('time','',formatLawDate(item.created_at))); row.addEventListener('click',async()=>{ try { await FokusApi.request(`/law/notifications/${encodeURIComponent(item.id)}/read`,{method:'PATCH'}); } catch {} const href=String(item.payload?.href||'/portal/fokus-law/assinatura'); if(href.startsWith('/')) window.location.assign(href); }); panel.append(row); });
     } catch (error) {
