@@ -13,6 +13,12 @@ Levantamento estático do candidato Cloud; não é validação visual nem compro
 | Ação | Ao ativar um item, o código tenta `PATCH /law/notifications/{id}/read` e, mesmo se a requisição falhar, tenta navegar para `payload.href` iniciado por `/`, ou usa a rota padrão de assinatura. Isso descreve a fonte, sem comprovar persistência, segurança de navegação ou resultado no backend. |
 | Nome do painel | O candidato preserva o ID do título ao recriar os filhos. `tests/Frontend/law-notifications-label.test.mjs` cobre lista vazia e preenchida com DOM simulado e API fictícia; não mede nome acessível computado ou tecnologia assistiva. |
 
+## Contrato de servidor inspecionado
+
+As rotas em `routes/api.php` exigem autenticação, contexto de empresa e permissões distintas: `law.notifications.view` no GET e `law.notifications.update` no PATCH. Em `app/Http/Controllers/Api/LawNotificationController.php`, o GET filtra empresa ativa, usuário autenticado e registros não resolvidos; retorna até 20 registros mais recentes e conta não lidas somente nesse conjunto. O PATCH aplica os mesmos filtros, atualiza as datas e responde 204 quando há atualização ou 404 quando não há registro elegível. Esta é uma leitura estática, não uma comprovação de isolamento em execução.
+
+Há um possível desalinhamento de disponibilidade: o shell só carrega notificações com `manage_settings`, enquanto `LawAuthorizationService.php` concede a permissão de leitura também a perfis não administradores, sujeita às regras de vínculo e setor. O produtor localizado em `LawUsageMeter.php` cria alertas de capacidade para administradores; portanto essa diferença, por si só, não demonstra perda de notificações para outros perfis. `LawPermissionsTest.php` prevê GET permitido e PATCH negado para um perfil de consulta; não prova o comportamento visual desses perfis, a persistência ou o isolamento entre empresas. Não se presume a intenção de produto nem se altera a autorização a partir dessa observação.
+
 ## Aparência e responsabilidade
 
 `public/portal/assets/fokus-law-shell.css:143` limita o popover a `min(320px, calc(100vw - 32px))`; a superfície branca, a borda e a sombra são regras do shell. Em `:703`, o contador usa cores literais `#b42318` e `#fff`; o item usa `--law-shell-ink`, `--law-shell-muted` e fundo literal `#faf7ff` para não lido. Esses valores e o dimensionamento são observações de código: contraste, foco, corte e aparência responsiva não foram medidos.
