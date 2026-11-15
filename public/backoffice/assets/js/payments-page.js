@@ -235,7 +235,7 @@ export function mount(root, context = {}) {
     };
     const detailRenderers = { payments: paymentDetails, reconciliation: reconciliationDetails, refunds: refundDetails };
 
-    async function openDetail(kind, id, trigger) {
+    async function openDetail(kind, id, trigger, { restoreAction = null } = {}) {
         state.detailController?.abort();
         state.detailController = new AbortController();
         state.detail = { kind, id };
@@ -257,6 +257,11 @@ export function mount(root, context = {}) {
             $("#billing-detail-sections").innerHTML = detailRenderers[kind](item);
             $("#billing-detail-sections").hidden = false;
             $("#billing-refund-request-form")?.addEventListener("submit", submitRefundRequest, { signal: pageSignal });
+            if (restoreAction) {
+                [...$("#billing-detail-sections").querySelectorAll("[data-billing-action]")]
+                    .find((button) => button.dataset.billingAction === restoreAction)
+                    ?.focus({ preventScroll: true });
+            }
         } catch (error) {
             if (error?.name === "AbortError" || state.detailController.signal.aborted || pageSignal?.aborted) return;
             $("#billing-detail-loading").hidden = true;
@@ -412,8 +417,9 @@ export function mount(root, context = {}) {
 
     modalTrigger.addEventListener("fs:hidden", () => {
         if (!state.pendingAction) return;
+        const restoreAction = `${state.pendingAction.kind}:${state.pendingAction.action}:${state.pendingAction.id}`;
         state.pendingAction = null;
-        if (state.detail) openDetail(state.detail.kind, state.detail.id, state.lastTrigger);
+        if (state.detail) openDetail(state.detail.kind, state.detail.id, state.lastTrigger, { restoreAction });
     }, { signal: pageSignal });
     Object.values(state.lists).forEach((list) => {
         list.loading = false;
