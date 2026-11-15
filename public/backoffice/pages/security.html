@@ -19,9 +19,9 @@
             <tbody id="admins-body"></tbody>
         </table>
     </div>
-    <div id="invite-dialog" class="fs-modal" tabindex="-1">
+    <div id="invite-dialog" class="fs-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="invite-dialog-title" aria-describedby="invite-dialog-description">
         <div class="fs-modal-dialog"><div class="fs-modal-content">
-            <div class="fs-modal-header"><h2 class="fs-modal-title" id="invite-dialog-title">Convidar administrador</h2><button class="fs-btn-close" type="button" data-fs-dismiss="modal" aria-label="Fechar"></button></div>
+            <div class="fs-modal-header"><div><h2 class="fs-modal-title" id="invite-dialog-title">Convidar administrador</h2><p id="invite-dialog-description">Envie um convite para que a pessoa configure seu acesso administrativo.</p></div><button class="fs-btn-close" type="button" data-fs-dismiss="modal" aria-label="Fechar"></button></div>
             <form class="fs-form fs-modal-body fs-u-d-flex fs-u-flex-column fs-u-gap-3" id="invite-form" novalidate>
                 <label class="fs-form-col fs-form-label" for="invite-admin-name">Nome<input class="fs-form-control" id="invite-admin-name" name="name" required></label>
                 <label class="fs-form-col fs-form-label" for="invite-admin-email">E-mail<input class="fs-form-control" id="invite-admin-email" name="email" type="email" required></label>

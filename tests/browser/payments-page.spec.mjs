@@ -110,6 +110,13 @@ test('console financeiro pagina, filtra e conclui ações pelos drawers', async 
     await page.locator('#billing-reconciliation-list [data-billing-detail]').click();
     await expect(page.locator('#billing-detail-sections')).toContainText('Empresa Alpha Financeira');
     await page.getByRole('button', { name: 'Marcar em revisão' }).click();
+    await expect(page.locator('#billing-action-reason')).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#billing-action-modal')).not.toHaveClass(/is-open/);
+    await expect(page.locator('#billing-drawer')).toBeVisible();
+    await page.locator('#billing-drawer-close').click();
+    await page.locator('#billing-reconciliation-list [data-billing-detail]').click();
+    await page.getByRole('button', { name: 'Marcar em revisão' }).click();
     await page.locator('#billing-action-reason').fill('Status remoto confirmado.');
     await page.getByRole('button', { name: 'Confirmar', exact: true }).click();
     await expect(page.locator('#billing-message')).toContainText('concluída');

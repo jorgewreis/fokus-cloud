@@ -413,7 +413,11 @@ export function mount(root, context = {}) {
     modalTrigger.addEventListener("fs:hidden", () => {
         if (!state.pendingAction) return;
         state.pendingAction = null;
-        if (state.detail) openDetail(state.detail.kind, state.detail.id, state.lastTrigger);
+        // Reopen after the Escape key has finished propagating; reopening synchronously
+        // lets the new drawer consume the same key and immediately close again.
+        requestAnimationFrame(() => {
+            if (state.detail) openDetail(state.detail.kind, state.detail.id, state.lastTrigger);
+        });
     }, { signal: pageSignal });
     Object.values(state.lists).forEach((list) => {
         list.loading = false;
