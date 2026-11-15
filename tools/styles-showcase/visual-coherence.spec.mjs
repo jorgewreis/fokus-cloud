@@ -85,7 +85,7 @@ for (const width of [1440, 390, 320]) for (const theme of ['light', 'dark']) for
     }
     if (route === '/' || route === '/docs') {
       const ctas = page.locator('.styles-site-cta');
-      await expect(ctas).toHaveCount(3);
+      await expect(ctas).toHaveCount(route === '/' ? 3 : 9);
       await componentColors(page, '.styles-site-cta');
       for (const cta of await ctas.all()) {
         const outline = await cta.evaluate(node => node.classList.contains('fs-btn-outline-primary'));
