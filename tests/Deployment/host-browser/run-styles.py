@@ -83,6 +83,6 @@ with tempfile.TemporaryDirectory(prefix='fokus-host-styles-') as temporary:
         fixture_log.close()
     results=json.loads((report/'playwright-results.json').read_text(encoding='utf-8'))
     stats=results['stats']
-    checks={'91_expected':stats['expected']==91,'no_unexpected':stats['unexpected']==0,'no_flaky':stats['flaky']==0,'no_skips':stats['skipped']==0,'no_runner_errors':not results.get('errors'),'all_commands_passed':all(x['exit_code']==0 for x in outcomes),'catalog_56_contracts':'PASS: 56 contracts' in (report/'catalog-browser.log').read_text(encoding='utf-8')}
+    checks={'118_expected':stats['expected']==118,'no_unexpected':stats['unexpected']==0,'no_flaky':stats['flaky']==0,'no_skips':stats['skipped']==0,'no_runner_errors':not results.get('errors'),'all_commands_passed':all(x['exit_code']==0 for x in outcomes),'catalog_56_contracts':'PASS: 56 contracts' in (report/'catalog-browser.log').read_text(encoding='utf-8')}
     write(report/'result.json',{'status':'passed' if all(checks.values()) else 'failed','checks':checks,'stats':stats,'scope':'Sandboxed host Chrome against Linux Styles; HTTP only','host_platform':sys.platform,'chrome':subprocess.check_output([str(a.chrome),'--version'],text=True).strip(),'node':subprocess.check_output(['node','--version'],text=True).strip(),'playwright_styles':'1.57.0','playwright_app':json.loads((app/'package.json').read_text(encoding='utf-8'))['version'],'runner':{k:os.environ.get(k) for k in ['ImageOS','ImageVersion','RUNNER_OS','RUNNER_ARCH']}})
     sys.exit(0 if all(checks.values()) else 1)

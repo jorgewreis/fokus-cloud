@@ -102,7 +102,7 @@ try:
     styles=json.loads((R/'styles/result.json').read_text(encoding='utf-8'))
     manifest=json.loads((B/'source-manifest.json').read_text(encoding='utf-8'))
     unchanged=all(hashlib.sha256((ROOT/x['path']).read_bytes()).hexdigest()==x['sha256'] for x in manifest['files'])
-    checks={'backend_passed':backend['passed'],'host_http_9_59':http['status']=='passed' and http['scenarios']==9 and http['assertions']==59,'styles_91_catalog_law':styles['status']=='passed','all_owned_servers_exited':cleanup['all_exited'],'owned_database_removed':cleanup['database_dropped'],'container_sources_unchanged':cleanup['source_unchanged'],'host_source_bytes_match_backend':unchanged,'manager_success':manager is not None and manager.returncode==0,'no_orchestration_error':error is None,'all_commands_successful':all(x['exit_code']==0 for x in outcomes)}
+    checks={'backend_passed':backend['passed'],'host_http_9_59':http['status']=='passed' and http['scenarios']==9 and http['assertions']==59,'styles_118_catalog_law':styles['status']=='passed','all_owned_servers_exited':cleanup['all_exited'],'owned_database_removed':cleanup['database_dropped'],'container_sources_unchanged':cleanup['source_unchanged'],'host_source_bytes_match_backend':unchanged,'manager_success':manager is not None and manager.returncode==0,'no_orchestration_error':error is None,'all_commands_successful':all(x['exit_code']==0 for x in outcomes)}
 except BaseException as e:
     checks={'complete_evidence':False};error=error or type(e).__name__+': '+str(e)
 passed=all(checks.values())
