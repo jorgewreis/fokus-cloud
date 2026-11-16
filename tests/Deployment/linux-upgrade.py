@@ -1,4 +1,4 @@
-"""Exercise origin-shaped history, eight migrations, forward-only recovery and synthetic restore."""
+"""Exercise origin-shaped history, nine migrations, forward-only recovery and synthetic restore."""
 import argparse
 import hashlib
 import importlib.util
@@ -224,7 +224,7 @@ def main():
                 evidence['origin_metadata_comparison'] = capture_baseline_metadata(base, env, sandbox, prefix)
                 evidence['origin_shape_gate'] = require_origin_shape(evidence['origin_metadata_comparison'])
             execute([str(origin_fixture), str(candidate), 'billing-before'], 'repair-billing-before')
-            execute(['artisan', 'migrate', '--force', '--no-interaction'], 'eight-migrations')
+            execute(['artisan', 'migrate', '--force', '--no-interaction'], 'nine-migrations')
             execute([str(fixture), str(candidate), 'verify-up'], 'verify-up')
             execute([str(origin_fixture), str(candidate), 'billing-after'], 'repair-billing-after')
             execute([str(origin_fixture), str(candidate), 'verify-up'], 'repair-origin-verify')
