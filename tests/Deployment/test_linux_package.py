@@ -112,6 +112,13 @@ class ProductionPackageContracts(unittest.TestCase):
         source = (package.ROOT / 'tests/Deployment/host-browser/run-ci-host.py').read_text()
         self.assertEqual(source.count("--exclude='*/__pycache__' --exclude='*.pyc' --exclude='*.pyo'"), 2)
 
+    def test_host_styles_keeps_required_fixture_and_dynamic_origin_route(self):
+        source = (package.ROOT / 'tests/Deployment/host-browser/run-styles.py').read_text()
+        self.assertIn("['node','tools/styles-showcase/serve-law-fixture.mjs']", source)
+        self.assertIn("urllib.request.urlopen('http://127.0.0.1:8765/law-select.html'", source)
+        self.assertIn("url.origin === new URL(process.env.STYLES_ORIGIN).origin", source)
+        self.assertIn('webServer:undefined', source)
+
     def test_changed_build_outputs_have_generator_allowlist(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = pathlib.Path(temporary)
