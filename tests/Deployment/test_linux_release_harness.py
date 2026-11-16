@@ -417,7 +417,7 @@ class HarnessContracts(unittest.TestCase):
 
     def test_origin_rehearsal_orders_failure_repair_idempotence_and_restore(self):
         source = (common.ROOT / 'tests/Deployment/linux-upgrade.py').read_text(encoding='utf-8')
-        labels = ['interest-index-pre-migration-compat', 'repair-fresh-noop', 'prepare-origin-shape', 'repair-billing-before', 'eight-migrations',
+        labels = ['interest-index-pre-migration-compat', 'repair-fresh-noop', 'prepare-origin-shape', 'repair-billing-before', 'nine-migrations',
                   'repair-billing-after', 'repair-origin-verify', 'repair-origin-idempotent', 'interest-index-backfill',
                   'interest-index-concurrency-rollback', 'interest-index-deadlock-retry', 'restored-backup-repair-verify']
         positions = [source.index("'" + label + "'") for label in labels]
@@ -425,7 +425,7 @@ class HarnessContracts(unittest.TestCase):
         self.assertIn('require_new_migrations(new)', source)
         self.assertIn("evidence['reversal_authorized_delta']", source)
 
-    def test_upgrade_requires_exact_eight_names_not_just_count(self):
+    def test_upgrade_requires_exact_nine_names_not_just_count(self):
         upgrade.require_new_migrations(upgrade.EXPECTED_NEW_MIGRATIONS)
         for names in (upgrade.EXPECTED_NEW_MIGRATIONS[:-1], list(reversed(upgrade.EXPECTED_NEW_MIGRATIONS)),
                       ['2026_11_06_000200_unreviewed.php', *upgrade.EXPECTED_NEW_MIGRATIONS[1:]]):

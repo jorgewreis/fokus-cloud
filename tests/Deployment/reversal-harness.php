@@ -121,7 +121,7 @@ ensure(Artisan::call('migrate:rollback', ['--path' => 'database/migrations/2026_
 ensure(! Schema::hasTable('interest_product_index') && ! Schema::hasTable('interest_product_index_state'), 'derived interest index tables removed by rollback');
 ensure(DB::table('product_interests')->orderBy('id')->get()->toJson() === $beforeInterests, 'rollback preserves source interest records');
 ensure(Artisan::call('migrate', ['--force' => true]) === 0, 'interest index advances again without touching retained authority data');
-ensure(DB::table('migrations')->count() === $f['migration_count'] + 8, 'ledger restored to eight-migration candidate');
+ensure(DB::table('migrations')->count() === $f['migration_count'] + 9, 'ledger restored to nine-migration candidate');
 ensure(Schema::hasTable('interest_product_index') && Schema::hasTable('interest_product_index_state'), 'interest index recreated');
 ensure(! (bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'recreated interest index remains unready');
 ensure(DB::table('interest_product_index')->count() === 0, 'rollback destroys derived links but not source data');
@@ -141,5 +141,5 @@ foreach ([
     ensure((array) DB::table('migrations')->where('migration', $migration)->first() === $ledger, 'forward-only rejection retains ledger '.$migration);
     ensure(Schema::hasTable($table), 'forward-only rejection retains table '.$table);
 }
-ensure(Artisan::call('migrate', ['--force' => true]) === 0 && DB::table('migrations')->count() === $f['migration_count'] + 8, 'repeated up leaves eight-migration ledger unchanged');
+ensure(Artisan::call('migrate', ['--force' => true]) === 0 && DB::table('migrations')->count() === $f['migration_count'] + 9, 'repeated up leaves nine-migration ledger unchanged');
 echo "FORWARD-ONLY RECOVERY GUARD PASSED; REI-60 authority/idempotency rollback is refused and backup restore remains required.\n";

@@ -20,6 +20,7 @@ EXPECTED_NEW_MIGRATIONS = [
     '2026_11_14_000001_create_company_idempotency_requests.php',
     '2026_11_14_000002_create_platform_session_authorities.php',
     '2026_11_14_000100_create_interest_product_index.php',
+    '2026_11_15_120000_create_law_beta_applications_table.php',
 ]
 EXCLUDED = {'.git', 'vendor', 'node_modules', 'storage', 'test-results', 'playwright-report', '__pycache__'}
 # These are distinct verified execution results: absence of automatic rollback in
@@ -110,7 +111,7 @@ def verify(baseline_dir, candidate_dir, baseline_manifest, candidate_manifest, e
     new = sorted(candidate_migrations - baseline_migrations)
     if (new != EXPECTED_NEW_MIGRATIONS
             or baseline_migrations - candidate_migrations or evidence.get('new_migrations') != new):
-        raise ValueError('Expected exactly eight named new migrations including the forward-only authority and idempotency migrations, and no removed baseline migration')
+        raise ValueError('Expected exactly nine named new migrations including the Law Beta, forward-only authority and idempotency migrations, and no removed baseline migration')
     if evidence.get('recovery_strategy') not in ('roll-forward', 'validated-backup-restore'):
         raise ValueError('Unsafe or missing recovery strategy')
     if evidence.get('tasks_enabled') is not False or evidence.get('publication_authorized') is not False:

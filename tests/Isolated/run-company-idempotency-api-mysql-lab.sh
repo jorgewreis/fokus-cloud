@@ -41,14 +41,14 @@ for attempt in $(seq 1 90); do
   # mysqladmin ping returns success even while the server rejects credentials;
   # wait for an authenticated statement so the next UUID query cannot race the
   # image initialization sequence.
-  if docker exec -e "MYSQL_PWD=$password" "$mysql_id" mysql -uroot -Nse 'SELECT 1' >/dev/null 2>&1; then break; fi
+  if docker exec -e "MYSQL_PWD=$password" "$mysql_id" mysql -h127.0.0.1 -P3306 -uroot -Nse 'SELECT @@server_uuid' >/dev/null 2>&1; then break; fi
   if [[ "$(docker inspect --format '{{.State.Running}}' "$mysql_id")" != true || "$attempt" = 90 ]]; then
     docker logs "$mysql_id" >&2
     exit 1
   fi
   sleep 1
 done
-uuid="$(docker exec -e "MYSQL_PWD=$password" "$mysql_id" mysql -uroot -Nse 'SELECT @@server_uuid')"
+uuid="$(docker exec -e "MYSQL_PWD=$password" "$mysql_id" mysql -h127.0.0.1 -P3306 -uroot -Nse 'SELECT @@server_uuid')"
 [[ "$uuid" =~ ^[0-9a-fA-F-]{36}$ ]]
 
 run_phpunit() {
@@ -70,7 +70,7 @@ run_phpunit() {
 # disposable database lifecycle so the API tests always begin after a complete
 # migrate:fresh, rather than inheriting that partial schema.
 run_phpunit tests/Feature/CompanyIdempotencyStoreTest.php
-docker exec -e "MYSQL_PWD=$password" "$mysql_id" mysql -uroot -e \
+docker exec -e "MYSQL_PWD=$password" "$mysql_id" mysql -h127.0.0.1 -P3306 -uroot -e \
   'DROP DATABASE `fokus_idempotency_api_test`; CREATE DATABASE `fokus_idempotency_api_test`;'
 run_phpunit \
   tests/Isolated/CompanyIdempotencyApiConcurrencyTest.php \

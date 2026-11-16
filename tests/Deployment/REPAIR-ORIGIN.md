@@ -13,7 +13,7 @@ This change is authorized in the working copy only, not as production DDL.
 
 ## Required evidence
 
-- Compare the exact eight candidate migration names, including the forward-only REI-60 idempotency and platform-session-authority migrations, not only their count.
+- Compare the exact nine candidate migration names, including the Law Beta and forward-only REI-60 idempotency and platform-session-authority migrations, not only their count.
 - Check fresh-schema no-op and a separate synthetic origin-shaped baseline.
 - Require the origin-shaped baseline's 79 names and global 1,110-column projection
   to match the reviewed metadata digests. Synthetic migration batches are not
