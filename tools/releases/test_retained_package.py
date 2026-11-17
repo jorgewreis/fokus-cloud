@@ -36,6 +36,14 @@ class RetainedPackageTests(unittest.TestCase):
     def test_no_overwrite_or_inside_source(self):
         for output in [self.source,self.source/'output']:
             with self.assertRaisesRegex(ValueError,'new_external_output_required'):r.build_package(self.source,output,SHA)
+    def test_build_sha_mismatch(self):
+        self.builder.build=lambda *_:{'source_sha':'b'*40}
+        with self.assertRaisesRegex(ValueError,'build_sha_mismatch'):r.build_package(self.source,self.output,SHA)
+        self.assertFalse((self.output/'package-summary.json').exists())
+    def test_package_sha_mismatch(self):
+        self.builder.package=lambda *_:{'source_sha':'b'*40}
+        with self.assertRaisesRegex(ValueError,'package_sha_mismatch'):r.build_package(self.source,self.output,SHA)
+        self.assertFalse((self.output/'package-summary.json').exists())
     def test_failed_rebuild_has_no_success_summary(self):
         def fail(*_):raise ValueError('provenance_mismatch')
         self.builder.package=fail

@@ -32,6 +32,7 @@ jobs:
           python3 tools/releases/test_publication_consumers.py
           python3 tools/releases/test_publication_binding.py
           python3 tools/releases/test_retained_package.py
+          python3 tools/releases/test_audit_package.py
           python3 tools/releases/test_runtime_evidence.py -v
           python3 tools/releases/test_artifact_receiver.py -v
           python3 tools/releases/test_artifact_ssh.py -v
