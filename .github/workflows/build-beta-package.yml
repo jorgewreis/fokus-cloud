@@ -1,0 +1,56 @@
+name: Build immutable beta package without deployment
+"on":
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact current main SHA to build (40 lowercase hex characters)
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: immutable-beta-package-${{ github.sha }}
+  cancel-in-progress: false
+jobs:
+  package:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Validate exact requested revision
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$CANDIDATE_SHA" = "$GITHUB_SHA"
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, pdo_sqlite, dom, xml, curl, zip, fileinfo
+          tools: composer:v2
+          coverage: none
+      - name: Build, independently rebuild and package exact source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 tools/releases/retained_package.py --source "$GITHUB_WORKSPACE" --output "$RUNNER_TEMP/beta-package" --expected-sha "$GITHUB_SHA"
+      - name: Retain only package and non-secret provenance for one day
+        uses: actions/upload-artifact@v4
+        with:
+          name: beta-package-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/beta-package/package.tar
+            ${{ runner.temp }}/beta-package/build-proof.json
+            ${{ runner.temp }}/beta-package/package-summary.json
+          if-no-files-found: error
+          retention-days: 1
+          include-hidden-files: false
