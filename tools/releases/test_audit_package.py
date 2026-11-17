@@ -1,5 +1,6 @@
 from pathlib import Path
 import io,json,tarfile,tempfile,unittest
+from unittest.mock import patch
 import audit_package as a
 SHA='a'*40
 class AuditTests(unittest.TestCase):
@@ -40,6 +41,9 @@ class AuditTests(unittest.TestCase):
   self.assertEqual(result['categories'],{'proof:assignment_shape':1})
   self.assertEqual(result['state'],'blocked_by_screening')
   self.assertNotIn('z'*16,json.dumps(result))
+ def test_pattern_label_mismatch_fails_closed(self):
+  with patch.object(a,'PATTERNS',a.PATTERNS+[b'future_pattern']):
+   with self.assertRaisesRegex(ValueError,'pattern_labels_mismatch'):self.run_archive('public/a.txt')
  def test_traversal(self):self.assertEqual(self.run_archive('../a')['counts']['unsafe_entries'],1)
  def test_symlink(self):self.assertEqual(self.run_archive('a',link=True)['counts']['unsafe_entries'],1)
  def test_env(self):self.assertEqual(self.run_archive('.env')['counts']['unsafe_entries'],1)

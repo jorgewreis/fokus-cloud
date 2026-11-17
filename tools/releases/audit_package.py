@@ -26,6 +26,7 @@ def audit(artifact,proof,expected_sha):
     # Only fixed labels and counts may leave the runner: never paths or values.
     categories={}
     labels=('private_key_marker','aws_key_shape','github_token_shape','github_pat_shape','slack_token_shape','assignment_shape')
+    if len(labels)!=len(PATTERNS):raise ValueError('pattern_labels_mismatch')
     def record_hits(content,area):
         for label,pattern in zip(labels,PATTERNS):
             hits=len(re.findall(pattern,content))
