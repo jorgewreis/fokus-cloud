@@ -16,8 +16,11 @@ class AuditTests(unittest.TestCase):
  def test_clean_not_upload_approved(self):
   r=self.run_archive('public/index.html');self.assertEqual(r['state'],'screened_not_approved_for_upload');self.assertFalse(r['upload_allowed'])
  def test_secret_is_blocked_without_leak(self):
-  secret=b'-----BEGIN PRIVATE KEY-----';r=self.run_archive('public/a.txt',secret)
+  secret=b'-----BEGIN '+b'PRIVATE KEY'+b'-----';r=self.run_archive('public/a.txt',secret)
   self.assertEqual(r['state'],'blocked_by_screening');self.assertNotIn(secret.decode(),json.dumps(r))
+ def test_fixture_source_has_no_literal_private_key_marker(self):
+  marker=b'-----BEGIN '+b'PRIVATE KEY'+b'-----'
+  self.assertNotIn(marker,Path(__file__).read_bytes())
  def test_traversal(self):self.assertEqual(self.run_archive('../a')['counts']['unsafe_entries'],1)
  def test_symlink(self):self.assertEqual(self.run_archive('a',link=True)['counts']['unsafe_entries'],1)
  def test_env(self):self.assertEqual(self.run_archive('.env')['counts']['unsafe_entries'],1)
