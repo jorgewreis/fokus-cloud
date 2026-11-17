@@ -106,6 +106,21 @@ def runtime_gate_policy(c,policy,candidate,receipt):
     bounded=dict(policy);bounded['expires_at_epoch']=min(policy['expires_at_epoch'],expiry)
     return bounded
 
+def load_publication_gate(source):
+    import sys
+    import types
+    gate_path = source / 'deploy' / 'publication_gate.py'
+    g.require(gate_path == gate_path.resolve(strict=True) and not gate_path.is_symlink(), 'publication_gate_symlink')
+    gate_code = gate_path.read_bytes()
+    g.require(hashlib.sha256(gate_code).hexdigest() == "df85fa42d39a6afa2a5981fe779e8cdfc4e75d049df57fe95b6ab1ab17e7af8d", 'publication_gate_binding')
+    # Every consumer receives freshly verified bytes; never trust an ambient module.
+    publication_gate = types.ModuleType('publication_gate')
+    publication_gate.__file__ = str(gate_path)
+    sys.modules['publication_gate'] = publication_gate
+    exec(compile(gate_code, str(gate_path), 'exec'), publication_gate.__dict__)
+    return publication_gate
+
+
 def publication_gate_policy(candidate, previous, rollback):
     """Revalidate exact main and GitHub history while activation locks are held.
 
@@ -115,8 +130,7 @@ def publication_gate_policy(candidate, previous, rollback):
     import sys
     import derived_assets
     source=Path(__file__).resolve().parents[2]
-    sys.path.insert(0,str(source/'deploy'))
-    import publication_gate
+    publication_gate = load_publication_gate(source)
     revision,_,_=derived_assets.source_snapshot(source)
     context=publication_gate.context(os.environ,revision)
     # A rollback may be needed after main advances: executor and validation
