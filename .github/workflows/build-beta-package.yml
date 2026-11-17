@@ -1,0 +1,50 @@
+name: Build and screen beta package without retention or deployment
+"on":
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact main snapshot SHA at dispatch to build (40 lowercase hex characters)
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: immutable-beta-package-${{ github.sha }}
+  cancel-in-progress: false
+jobs:
+  package:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Validate exact requested revision
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$CANDIDATE_SHA" = "$GITHUB_SHA"
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '24'
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, pdo_sqlite, dom, xml, curl, zip, fileinfo
+          tools: composer:v2
+          coverage: none
+      - name: Build, independently rebuild and package exact source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 tools/releases/retained_package.py --source "$GITHUB_WORKSPACE" --output "$RUNNER_TEMP/beta-package" --expected-sha "$GITHUB_SHA"
+      - name: Screen package without printing contents or uploading
+        run: |
+          set -euo pipefail
+          python3 tools/releases/audit_package.py --artifact "$RUNNER_TEMP/beta-package/package.tar" --proof "$RUNNER_TEMP/beta-package/build-proof.json" --expected-sha "$GITHUB_SHA"
+      # No artifact upload: heuristic screening is not publication approval.
