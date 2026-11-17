@@ -29,6 +29,13 @@ class ContractEntrypoints(unittest.TestCase):
                             cli()
 
 class PublicationPolicy(unittest.TestCase):
+    def setUp(self):
+        # Explicit fixture seam: loader security is exercised by integration tests.
+        gate = a.load_publication_gate(Path(__file__).resolve().parents[2])
+        replacement = patch.object(a, 'load_publication_gate', return_value=gate)
+        replacement.start()
+        self.addCleanup(replacement.stop)
+
     def test_missing_context_wrong_release_and_failed_github_verification_refuse(self):
         import derived_assets
         from types import SimpleNamespace

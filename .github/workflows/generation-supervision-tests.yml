@@ -28,6 +28,9 @@ jobs:
         run: |
           python3 tools/releases/test_generation_supervisor.py -v
           python3 tools/releases/test_generation_activation.py -v
+          python3 -I tools/releases/test_publisher_bootstrap.py
+          python3 tools/releases/test_publication_consumers.py
+          python3 tools/releases/test_publication_binding.py
           python3 tools/releases/test_runtime_evidence.py -v
           python3 tools/releases/test_artifact_receiver.py -v
           python3 tools/releases/test_artifact_ssh.py -v
