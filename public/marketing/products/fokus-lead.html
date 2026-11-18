@@ -122,12 +122,12 @@
                 <div class="lead-login-heading">
                     <p class="lead-kicker">ÁREA DE ACESSO</p>
                     <h2 class="lead-display" id="lead-login-title">Entrar no Fokus Lead</h2>
-                    <p id="lead-login-instructions">Informe seu e-mail para localizar a empresa vinculada e os acessos disponíveis.</p>
+                    <p id="lead-login-instructions">Informe seu e-mail e senha. A escolha de vínculo só aparece depois da confirmação das credenciais.</p>
                 </div>
                 <form data-lead-login-form novalidate>
                     <label for="lead-email">E-mail</label>
                     <input class="fs-form-control" id="lead-email" name="email" type="email" autocomplete="username" placeholder="voce@empresa.com.br" required>
-                    <div class="lead-field-grid">
+                    <div class="lead-field-grid" hidden>
                         <div><label id="lead-system-label" for="lead-system">Empresa vinculada</label><select class="fs-form-select" id="lead-system" name="system" disabled required><option value="">Aguardando identificação</option></select></div>
                         <div hidden><label for="lead-profile">Perfil</label><select class="fs-form-select" id="lead-profile" name="profile" disabled required><option value="">Selecione a empresa primeiro</option></select></div>
                     </div>
@@ -135,7 +135,7 @@
                     <input class="fs-form-control" id="lead-password" name="password" type="password" autocomplete="current-password" placeholder="Sua senha" disabled required>
                     <a class="lead-password-recovery" href="/recuperar-senha?produto=fokus-lead">Esqueci minha senha</a>
                     <button class="fs-btn fs-btn-primary lead-primary-action lead-submit" type="submit" disabled>Entrar</button>
-                    <p class="lead-login-status" data-lead-login-status role="status" aria-live="polite">Informe seu e-mail para consultar os acessos.</p>
+                    <p class="lead-login-status" data-lead-login-status role="status" aria-live="polite">Informe seu e-mail e senha.</p>
                 </form>
             </aside>
         </section>

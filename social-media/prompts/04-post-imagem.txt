@@ -1,0 +1,17 @@
+Alvo: Codex com ferramenta de geração de imagem disponível.
+
+PADRÃO VISUAL: Para planejar ou produzir novas postagens da Fokus Cloud e subprodutos, consulte social-media/identidade-visual.md e aplique a paleta e tipografia aprovadas. Preserve ativos oficiais e não altere publicações existentes sem autorização.
+
+RESPONSÁVEL: creative-campaign-director responde pelo conceito, texto e peça. Quando a delegação estiver disponível e autorizada, peça ao marketing-strategy-director que revise público, objetivo, hipótese e CTA; o responsável criativo integra o retorno. Sem agentes disponíveis, execute diretamente.
+
+SKILLS: carregue creative-art-direction, social-media-visual-production, conversion-copywriting, consumer-psychology e imagegen quando disponíveis e pertinentes. Use a ferramenta de imagem disponível para produzir a arte quando o pedido incluir geração.
+
+PROCESSO: 1. Consulte briefing, fontes do produto, identidade e restrições da campanha. 2. Defina mensagem, público, conceito e hierarquia. 3. Redija texto da arte, legenda e CTA. 4. Crie briefing visual com composição, luz, cores, tipografia, dimensões e descrição acessível. 5. Gere a imagem quando possível; examine legibilidade, fidelidade de marca e alegações e corrija defeitos observados. 6. Entregue o arquivo produzido ou, se não for possível, o briefing e a limitação concreta.
+
+Crie [QUANTIDADE] proposta(s) de post para [PRODUTO], [PÚBLICO], [CANAL] e [OBJETIVO], sobre [TEMA]. Use [BRIEFING], [REFERÊNCIAS] e [PLANO DE PUBLICAÇÃO]. Consulte a identidade e a disponibilidade do produto nas fontes atuais; diferencie fatos de hipóteses.
+
+Se houver dúvidas ou informações faltantes que possam mudar materialmente a tarefa, consulte primeiro o contexto e as fontes disponíveis. Se a dúvida permanecer, faça uma pergunta por vez, com cinco alternativas, incluindo uma marcada como Recomendada e uma explicação de por que ela é a mais adequada. Inclua “outra resposta” ou “decidir depois” quando fizer sentido. Continue o trabalho independente e, para detalhes menores, declare uma suposição segura e prossiga.
+
+Entregue conceito, texto da arte, legenda, CTA e direção visual com composição, tipografia, cores, acessibilidade e dimensões adequadas ao canal. Use psicologia do consumidor de forma ética, evitando promessas e prova social inventadas. Quando a geração de imagem estiver disponível e autorizada pelo pedido, gere a peça e examine o resultado, inclusive legibilidade. Se não estiver disponível, entregue briefing e sinalize que a imagem não foi produzida.
+
+Salve versões em rascunhos do plano indicado. Somente após aprovação identificável salve a imagem final em imagens-aprovadas desse plano e registre arquivo, versão, data e referência da aprovação. Não publique nem agende sem autorização aplicável.
