@@ -72,21 +72,6 @@ for (const page of pages) {
   else if (!check && updated !== original) writeFileSync(path, updated);
 }
 const lastmodPath = resolve(root, 'resources/seo/lastmod.json');
-const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-const pageLastmod = (file) => {
-  const rel = `public/${file}`;
-  try {
-    if (git(['status', '--porcelain', '--', rel]) === '') {
-      const date = git(['log', '-1', '--format=%cs', '--', rel]);
-      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
-    }
-  } catch {
-    // No commit is available. The file's own mtime is the remaining real timestamp.
-  }
-  return statSync(resolve(root, rel)).mtime.toISOString().slice(0, 10);
-};
-const lastmods = Object.fromEntries(pages.map((page) => [page.file, pageLastmod(page.file)]));
-const lastmodJson = `${JSON.stringify(lastmods, null, 2)}\n`;
 const currentLastmod = (() => {
   try {
     return readFileSync(lastmodPath, 'utf8');
@@ -94,6 +79,34 @@ const currentLastmod = (() => {
     return '';
   }
 })();
+let committedLastmod = {};
+try {
+  committedLastmod = JSON.parse(currentLastmod);
+} catch {
+  committedLastmod = {};
+}
+const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+const pageLastmod = (file) => {
+  const rel = `public/${file}`;
+  let clean = false;
+  try {
+    clean = git(['status', '--porcelain', '--', rel]) === '';
+    if (clean) {
+      const date = git(['log', '-1', '--format=%cs', '--', rel]);
+      const hash = git(['log', '-1', '--format=%H', '--', rel]);
+      const head = git(['rev-parse', 'HEAD']);
+      const changedInHead = git(['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD']).split('\n').includes(rel);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date) && (hash !== head || changedInHead)) return date;
+    }
+  } catch {
+    // No commit is available. A clean file keeps its recorded date.
+  }
+  const recorded = committedLastmod[file];
+  if (clean && typeof recorded === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(recorded)) return recorded;
+  return statSync(resolve(root, rel)).mtime.toISOString().slice(0, 10);
+};
+const lastmods = Object.fromEntries(pages.map((page) => [page.file, pageLastmod(page.file)]));
+const lastmodJson = `${JSON.stringify(lastmods, null, 2)}\n`;
 if (check && currentLastmod !== lastmodJson) {
   console.error('Outdated sitemap lastmod dates: resources/seo/lastmod.json');
   failures++;
