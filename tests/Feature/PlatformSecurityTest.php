@@ -298,12 +298,26 @@ class PlatformSecurityTest extends TestCase
         $this->patchJson('/api/auth/profile', ['name' => 'Nome alterado em suporte'])->assertForbidden();
         $this->assertSame('Pessoa de Teste', $customer->fresh()->name);
 
+        $lawCasesBefore = DB::table('law_cases')->count();
+        $this->getJson('/api/law/cases')->assertForbidden();
+        $this->getJson('/api/law/shell-context')->assertForbidden();
+        $this->postJson('/api/law/cases', ['title' => 'Caso sintético não criado'])->assertForbidden();
+        $this->assertSame($lawCasesBefore, DB::table('law_cases')->count());
+
         $this->postJson('/api/backoffice/support/exit')->assertOk()->assertJsonPath('redirect_to', '/backoffice/');
         $this->assertGuest('web');
         $this->assertAuthenticatedAs($admin, 'platform');
         $this->assertNotNull(DB::table('platform_support_sessions')->value('ended_at'));
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.support_access_started', 'platform_admin_id' => $admin->id]);
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.support_access_ended', 'platform_admin_id' => $admin->id]);
+
+        DB::table('subscriptions')->where('id', $subscriptionId)->update([
+            'status' => 'ativa',
+            'open_company_product' => $companyId.'-'.$product->id,
+        ]);
+        $customer->forceFill(['email_verified_at' => now()])->save();
+        $this->actingAs($customer, 'web')->withSession(['active_company_id' => $companyId])
+            ->getJson('/api/law/shell-context')->assertOk();
 
         $this->postJson('/api/backoffice/support/access', ['subscription_id' => $subscriptionId, 'membership_id' => $membershipId, 'reason' => 'Validar limite temporal do suporte'])->assertOk();
         $this->travel(31)->minutes();

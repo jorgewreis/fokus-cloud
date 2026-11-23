@@ -61,6 +61,15 @@ informacoes comerciais, assinatura, billing, vouchers, alertas tecnicos
 agregados e auditoria da plataforma, sem visualizar processos, contatos,
 partes, expedientes, prazos, pendencias ou conteudo sigiloso do cliente.
 
+Uma sessao de suporte pode autenticar temporariamente como um usuario cliente
+para reproduzir o contexto de acesso. Enquanto essa sessao estiver ativa, a API
+do Fokus Law deve negar todas as rotas `/api/law/*`, inclusive contexto da
+interface, consultas e operacoes. Informacoes comerciais e tecnicas permitidas
+ao Backoffice devem ser obtidas pelas rotas administrativas proprias, fora da
+identidade e das autorizacoes do cliente. A protecao deve ocorrer antes de
+controladores e efeitos laterais, e nao depende das permissoes Law do usuario
+impersonado.
+
 ## Controles obrigatorios
 
 - Middleware de autenticacao.
