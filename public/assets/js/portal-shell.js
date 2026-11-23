@@ -39,7 +39,7 @@
       if (data.support_mode?.active) {
         supportModeActive = true;
         supportNotice.hidden = false;
-        supportNotice.querySelector('[data-support-context]').textContent = `${data.support_mode.company} · Assinatura ${data.support_mode.subscription_status} · ${data.support_mode.reason}`;
+        supportNotice.querySelector('[data-support-context]').textContent = `${data.support_mode.company} · Plano ${data.support_mode.plan} · Assinatura ${data.support_mode.subscription_status}`;
         supportNotice.querySelector('[data-support-exit]').addEventListener('click', async () => {
           try { const result = await FokusApi.request('/backoffice/support/exit', { method: 'POST' }); location.assign(result.redirect_to || '/backoffice/'); }
           catch (error) { window.FokusToast?.show(error.message || 'Não foi possível encerrar o acesso de suporte.', 'danger'); }

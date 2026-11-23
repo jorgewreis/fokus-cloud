@@ -1772,7 +1772,7 @@
     initializeInteractions();
     if (context.support_mode) {
       const supportNotice = document.querySelector('#support-notice');
-      document.querySelector('#support-context').textContent = `${context.support_mode.company} · Assinatura ${context.support_mode.subscription_status} · ${context.support_mode.reason}`;
+      document.querySelector('#support-context').textContent = `${context.support_mode.company} · Plano ${context.support_mode.plan} · Assinatura ${context.support_mode.subscription_status}`;
       supportNotice.hidden = false;
       document.querySelector('#support-exit').addEventListener('click', async (event) => {
         event.currentTarget.disabled = true;

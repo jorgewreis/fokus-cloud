@@ -413,8 +413,9 @@ class AuthController extends Controller
             ->join('subscriptions as subscription', 'subscription.id', '=', 'support.subscription_id')
             ->join('companies as company', 'company.id', '=', 'support.company_id')
             ->where('support.id', $supportId)->whereNull('support.ended_at')
-            ->select('support.id', 'support.reason', 'subscription.status as subscription_status', 'company.legal_name as company_name')
+            ->select('subscription.status as subscription_status', 'subscription.commercial_snapshot', 'company.legal_name as company_name')
             ->first() : null;
+        $supportCommercialSnapshot = $supportMode ? (json_decode((string) $supportMode->commercial_snapshot, true) ?: []) : [];
 
         $profile = $this->userPayload($user);
         $companies = $this->companiesFor($user);
@@ -433,7 +434,7 @@ class AuthController extends Controller
             'user' => $profile,
             'companies' => $companies,
             'active_company_id' => $request->session()->get('active_company_id'),
-            'support_mode' => $supportMode ? ['active' => true, 'company' => $supportMode->company_name, 'subscription_status' => $supportMode->subscription_status, 'reason' => $supportMode->reason] : null,
+            'support_mode' => $supportMode ? ['active' => true, 'company' => $supportMode->company_name, 'plan' => $supportCommercialSnapshot['plan_name'] ?? 'Plano Fokus Law', 'subscription_status' => $supportMode->subscription_status] : null,
         ]);
     }
 

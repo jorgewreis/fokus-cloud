@@ -299,6 +299,8 @@ class PlatformSecurityTest extends TestCase
         $this->assertAuthenticatedAs($admin, 'platform');
         $this->assertDatabaseHas('platform_support_sessions', ['platform_admin_id' => $admin->id, 'company_id' => $companyId, 'subscription_id' => $subscriptionId, 'target_user_id' => $customer->id, 'ended_at' => null]);
         $this->getJson('/api/auth/me')->assertOk()->assertJsonPath('support_mode.active', true)->assertJsonPath('support_mode.company', 'Empresa para suporte')
+            ->assertJsonPath('support_mode.plan', 'Essencial')->assertJsonPath('support_mode.subscription_status', 'suspensa')
+            ->assertJsonMissingPath('support_mode.reason')
             ->assertJsonMissingPath('user.phone')->assertJsonCount(1, 'companies')->assertJsonPath('companies.0.id', $companyId)
             ->assertJsonMissingPath('user.cpf')->assertJsonMissingPath('user.email')->assertJsonMissingPath('user.email_verified')->assertJsonMissingPath('user.status');
         $this->patchJson('/api/auth/profile', ['name' => 'Nome alterado em suporte'])->assertForbidden();

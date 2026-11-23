@@ -73,7 +73,9 @@ antes de controladores e efeitos laterais e não depende das permissões do
 usuário impersonado.
 O endpoint de sessão usado pelo portal limita os espaços ao espaço-alvo da
 sessão de suporte e reduz a identidade retornada ao mínimo necessário para o
-aviso de suporte, sem telefone, CPF, e-mail ou estado da conta. O shell Law
+aviso de suporte, sem telefone, CPF, e-mail ou estado da conta. O contexto
+comercial mostra apenas empresa, plano e status da assinatura vinculados à
+sessão; não inclui o motivo administrativo nem dados de outros vínculos. O shell Law
 mostra aviso acessivel, retorno ao portal e encerramento da sessao sem carregar
 contexto operacional.
 
