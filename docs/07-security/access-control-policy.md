@@ -62,16 +62,19 @@ agregados e auditoria da plataforma, sem visualizar processos, contatos,
 partes, expedientes, prazos, pendencias ou conteudo sigiloso do cliente.
 
 Uma sessao de suporte pode autenticar temporariamente como um usuario cliente
-para reproduzir o contexto de acesso. Enquanto essa sessao estiver ativa, a API
-do Fokus Law deve negar todas as rotas `/api/law/*`, inclusive contexto da
-interface, consultas e operacoes. Informacoes comerciais e tecnicas permitidas
-ao Backoffice devem ser obtidas pelas rotas administrativas proprias, fora da
-identidade e das autorizacoes do cliente. A protecao deve ocorrer antes de
-controladores e efeitos laterais, e nao depende das permissoes Law do usuario
-impersonado.
-O endpoint de sessão usado pelo portal deve limitar os espaços ao espaço-alvo
-da sessão de suporte e reduzir a identidade retornada ao mínimo necessário
-para o aviso de suporte, sem telefone, CPF, e-mail ou estado da conta.
+para reproduzir o contexto de acesso. Enquanto essa sessao estiver ativa, APIs
+operacionais de clientes sao negadas por padrao, incluindo Law, Lead, portal,
+assinaturas e selecao de empresa. A allowlist limita-se ao contexto reduzido de
+`/api/auth/me`, APIs administrativas protegidas, webhooks e ingestao de
+integracoes com suas autenticacoes proprias. Informacoes comerciais e tecnicas
+permitidas ao Backoffice devem ser obtidas pelas rotas administrativas, fora
+das autorizacoes do cliente. A protecao ocorre antes de controladores e efeitos
+laterais e nao depende das permissoes do usuario impersonado.
+O endpoint de sessão usado pelo portal limita os espaços ao espaço-alvo da
+sessão de suporte e reduz a identidade retornada ao mínimo necessário para o
+aviso de suporte, sem telefone, CPF, e-mail ou estado da conta. O shell Law
+mostra aviso acessivel, retorno ao portal e encerramento da sessao sem carregar
+contexto operacional.
 
 ## Controles obrigatorios
 

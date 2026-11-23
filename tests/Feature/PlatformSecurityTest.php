@@ -304,6 +304,13 @@ class PlatformSecurityTest extends TestCase
         $this->patchJson('/api/auth/profile', ['name' => 'Nome alterado em suporte'])->assertForbidden();
         $this->assertSame('Pessoa de Teste', $customer->fresh()->name);
 
+        $this->postJson('/api/auth/select-company', ['company_id' => $otherCompanyId])
+            ->assertForbidden()->assertJsonPath('code', 'support_customer_api_denied');
+        $this->assertSame($companyId, session('active_company_id'));
+        $this->getJson('/api/lead/shell-context')->assertForbidden();
+        $this->getJson('/api/subscriptions')->assertForbidden();
+        $this->getJson('/api/portal/users')->assertForbidden();
+
         $lawCasesBefore = DB::table('law_cases')->count();
         $this->getJson('/api/law/cases')->assertForbidden();
         $this->getJson('/api/law/shell-context')->assertForbidden();

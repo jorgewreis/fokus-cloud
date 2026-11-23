@@ -58,6 +58,8 @@
 .law-shell-skip:focus { transform: translateY(0); }
 .shell-loading { display: flex; min-height: 100vh; align-items: center; justify-content: center; gap: 12px; color: var(--law-shell-muted); }
 .shell-loading .fs-spinner { color: var(--law-shell-purple); }
+.shell-loading-support-blocked { flex-direction: column; padding: 24px; text-align: center; }
+.shell-loading-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
 
 .law-shell { display: grid; min-height: 100vh; grid-template-columns: 326px minmax(0, 1fr); }
 .law-support-notice { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 0 0 12px; padding: 12px 15px; border: 1px solid rgba(115,82,165,.22); border-radius: 9px; background: #f1ebf6; color: var(--law-shell-panel); }
