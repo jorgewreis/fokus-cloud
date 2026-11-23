@@ -13,9 +13,8 @@ final class RejectLawAccessDuringSupport
     {
         if ($request->session()->has('support_session_id') && $request->is('api/*')) {
             $allowed = $request->is('api/auth/me')
-                || $request->is('api/backoffice/support/exit')
-                || $request->is('api/webhooks/*')
-                || $request->is('api/integrations/*');
+                || $request->is('api/csrf-token')
+                || $request->is('api/backoffice/support/exit');
 
             if (! $allowed) {
                 return response()->json([

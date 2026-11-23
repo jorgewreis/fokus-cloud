@@ -64,13 +64,14 @@ partes, expedientes, prazos, pendencias ou conteudo sigiloso do cliente.
 Uma sessao de suporte pode autenticar temporariamente como um usuario cliente
 para reproduzir o contexto de acesso. Enquanto essa sessao estiver ativa, APIs
 operacionais de clientes sao negadas por padrao, incluindo Law, Lead, portal,
-assinaturas e selecao de empresa. A allowlist limita-se ao contexto reduzido de
-`/api/auth/me` minimizado, encerramento em `/api/backoffice/support/exit`,
-webhooks e ingestao de integracoes com suas autenticacoes proprias. As demais
-rotas Backoffice também são negadas enquanto o suporte estiver ativo; ações
-comerciais devem ocorrer fora da identidade do cliente. A proteção ocorre
-antes de controladores e efeitos laterais e não depende das permissões do
-usuário impersonado.
+assinaturas e selecao de empresa. A allowlist durante a sessao limita-se ao
+contexto reduzido de `/api/auth/me`, ao token CSRF de `/api/csrf-token` e ao
+encerramento em `/api/backoffice/support/exit`. Webhooks, ingestao de integracoes
+e as demais rotas Backoffice também são negados quando a requisição carrega uma
+sessão de suporte; chamadas serviço-a-serviço continuam sujeitas a seus próprios
+segredos quando não há essa sessão. Ações comerciais devem ocorrer fora da
+identidade do cliente. A proteção ocorre antes de controladores e efeitos
+laterais e não depende das permissões do usuário impersonado.
 O endpoint de sessão usado pelo portal limita os espaços ao espaço-alvo da
 sessão de suporte e reduz a identidade retornada ao mínimo necessário para o
 aviso de suporte, sem telefone, CPF, e-mail ou estado da conta. O contexto

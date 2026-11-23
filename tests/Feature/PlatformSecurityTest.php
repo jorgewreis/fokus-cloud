@@ -303,6 +303,7 @@ class PlatformSecurityTest extends TestCase
             ->assertJsonMissingPath('support_mode.reason')
             ->assertJsonMissingPath('user.phone')->assertJsonCount(1, 'companies')->assertJsonPath('companies.0.id', $companyId)
             ->assertJsonMissingPath('user.cpf')->assertJsonMissingPath('user.email')->assertJsonMissingPath('user.email_verified')->assertJsonMissingPath('user.status');
+        $this->getJson('/api/csrf-token')->assertOk()->assertJsonStructure(['token']);
         $this->patchJson('/api/auth/profile', ['name' => 'Nome alterado em suporte'])->assertForbidden();
         $this->assertSame('Pessoa de Teste', $customer->fresh()->name);
 
@@ -316,6 +317,10 @@ class PlatformSecurityTest extends TestCase
             ->assertJsonPath('code', 'support_customer_api_denied');
         $this->getJson('/api/backoffice/support/law-context')->assertForbidden();
         $this->getJson('/api/backoffice/companies')->assertForbidden();
+        $this->postJson('/api/webhooks/mercado-pago')->assertForbidden()
+            ->assertJsonPath('code', 'support_customer_api_denied');
+        $this->postJson('/api/integrations/usage')->assertForbidden()
+            ->assertJsonPath('code', 'support_customer_api_denied');
 
         $lawCasesBefore = DB::table('law_cases')->count();
         $this->getJson('/api/law/cases')->assertForbidden();
