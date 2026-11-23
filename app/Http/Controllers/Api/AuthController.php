@@ -412,9 +412,17 @@ class AuthController extends Controller
         $supportMode = $supportId ? DB::table('platform_support_sessions as support')
             ->join('subscriptions as subscription', 'subscription.id', '=', 'support.subscription_id')
             ->join('companies as company', 'company.id', '=', 'support.company_id')
+            ->join('company_memberships as membership', function ($join): void {
+                $join->on('membership.id', '=', 'support.membership_id')
+                    ->on('membership.company_id', '=', 'support.company_id')
+                    ->on('membership.user_id', '=', 'support.target_user_id');
+            })
+            ->whereColumn('subscription.company_id', 'support.company_id')
+            ->where('membership.status', 'ativo')->whereNull('membership.deleted_at')
             ->where('support.id', $supportId)->whereNull('support.ended_at')
             ->select('support.company_id', 'subscription.status as subscription_status', 'subscription.commercial_snapshot', 'company.legal_name as company_name')
             ->first() : null;
+        abort_if($supportId && ! $supportMode, 403, 'O contexto autorizado de suporte não está disponível.');
         $supportCommercialSnapshot = $supportMode ? (json_decode((string) $supportMode->commercial_snapshot, true) ?: []) : [];
 
         $profile = $this->userPayload($user);

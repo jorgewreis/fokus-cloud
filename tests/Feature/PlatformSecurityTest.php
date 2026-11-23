@@ -306,11 +306,23 @@ class PlatformSecurityTest extends TestCase
             ->assertJsonMissingPath('user.email_verified')->assertJsonMissingPath('user.status');
         $this->assertSame(['id' => $customer->id, 'name' => 'Pessoa de Teste'], $supportContext->json('user'));
         $this->assertSame([['id' => $companyId, 'name' => 'Empresa para suporte']], $supportContext->json('companies'));
+        $this->assertSame([
+            'active' => true,
+            'company_id' => $companyId,
+            'company' => 'Empresa para suporte',
+            'plan' => 'Essencial',
+            'subscription_status' => 'suspensa',
+        ], $supportContext->json('support_mode'));
 
         $tamperedContext = $this->withSession(['active_company_id' => $otherCompanyId])->getJson('/api/auth/me')->assertOk();
         $this->assertSame($companyId, $tamperedContext->json('active_company_id'));
         $this->assertSame([['id' => $companyId, 'name' => 'Empresa para suporte']], $tamperedContext->json('companies'));
         $this->withSession(['active_company_id' => $companyId]);
+
+        DB::table('company_memberships')->where('id', $membershipId)->update(['status' => 'suspenso']);
+        $this->getJson('/api/auth/me')->assertForbidden()->assertJsonMissingPath('user');
+        DB::table('company_memberships')->where('id', $membershipId)->update(['status' => 'ativo']);
+
         $this->getJson('/api/csrf-token')->assertOk()->assertJsonStructure(['token']);
         $this->patchJson('/api/auth/profile', ['name' => 'Nome alterado em suporte'])->assertForbidden();
         $this->assertSame('Pessoa de Teste', $customer->fresh()->name);
