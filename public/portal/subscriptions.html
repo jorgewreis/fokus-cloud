@@ -66,8 +66,8 @@
             try { const response = await FokusApi.request(`/subscriptions/${button.dataset.delete}`, { method: 'DELETE' }); message.textContent = response.message; location.reload(); } catch (error) { message.textContent = error.message; }
           });
         } catch (error) {
-          message.textContent = error.message;
-          if (error.message.includes('sessão') || error.message.includes('Unauthenticated')) location.assign('/acesso');
+          message.textContent = error.status === 403 ? 'Somente administradores da empresa podem consultar assinaturas e pagamentos. Entre em contato com um administrador.' : (error.message || 'Não foi possível carregar as assinaturas.');
+          if (error.status === 401) location.assign('/acesso');
         }
       })();
     </script>
