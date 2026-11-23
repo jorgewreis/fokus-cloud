@@ -11,7 +11,7 @@ class SearchDiscoveryTest extends TestCase
         foreach (['www.fokuscloud.com.br', 'styles.fokuscloud.com.br'] as $host) {
             $response = $this->get("https://{$host}/sitemap.xml")->assertOk();
             $xml = simplexml_load_string($response->getContent());
-            $this->assertCount($host === 'styles.fokuscloud.com.br' ? 7 : 8, $xml->url);
+            $this->assertCount($host === 'styles.fokuscloud.com.br' ? 7 : 9, $xml->url);
             $lastmods = json_decode(file_get_contents(resource_path('seo/lastmod.json')), true, flags: JSON_THROW_ON_ERROR);
             $pages = json_decode(file_get_contents(resource_path('seo/pages.json')), true, flags: JSON_THROW_ON_ERROR);
             $filesByUrl = [];

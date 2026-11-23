@@ -53,7 +53,7 @@ class SearchVisibility
         }
 
         // HTTPS on the apex moves only the public catalog. API and account clients stay put.
-        $publicPaths = ['/', 'produtos', 'produtos/fokus-styles', 'produtos/fokus-law', 'produtos/fokus-law/planos', 'privacidade', 'termos-de-uso', 'robots.txt', 'sitemap.xml'];
+        $publicPaths = ['/', 'produtos', 'produtos/fokus-styles', 'produtos/fokus-law', 'produtos/fokus-law/planos', 'produtos/fokus-law/sob-medida', 'privacidade', 'termos-de-uso', 'robots.txt', 'sitemap.xml'];
         if ($apex && in_array($request->path(), $publicPaths, true)) {
             return redirect()->away($wwwUrl, 301);
         }

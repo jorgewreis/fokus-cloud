@@ -28,7 +28,7 @@
     "url": "https://www.fokuscloud.com.br/produtos/fokus-law",
     "site": "Fokus Cloud",
     "title": "Fokus Law | Gestão jurídica modular para equipes, setor público e advocacia",
-    "description": "Conheça o Fokus Law: sistema de gestão jurídica modular para setor jurídico, setor público e escritórios de advocacia. Gestão de Contatos funcional e disponível; integrações com os demais módulos previstas para uma evolução futura.",
+    "description": "Fokus Law organiza contatos e processos de escritórios de advocacia e unidades do poder público, com controle de acesso e histórico auditável.",
     "type": "SoftwareApplication"
   },
   {
@@ -36,7 +36,15 @@
     "url": "https://www.fokuscloud.com.br/produtos/fokus-law/planos",
     "site": "Fokus Cloud",
     "title": "Planos e preços Fokus Law | Configure sua assinatura",
-    "description": "Compare as ofertas publicadas do Fokus Law, contrate Gestão de Contatos avulsa e simule módulos e limites com cotação atualizada pelo catálogo oficial.",
+    "description": "Escolha o plano do Fokus Law para a sua operação. Os preços vêm do catálogo publicado. Contatos e Processos estão disponíveis; os demais módulos estão planejados.",
+    "type": "WebPage"
+  },
+  {
+    "file": "marketing/products/fokus-law-sob-medida.html",
+    "url": "https://www.fokuscloud.com.br/produtos/fokus-law/sob-medida",
+    "site": "Fokus Cloud",
+    "title": "Fokus Law sob medida | Versão encomendada para a sua operação",
+    "description": "Para escritórios e órgãos que precisam de mais do que os planos por assinatura oferecem. Você encomenda uma versão do Fokus Law feita para os seus fluxos, com código, dados e operação isolados.",
     "type": "WebPage"
   },
   {
