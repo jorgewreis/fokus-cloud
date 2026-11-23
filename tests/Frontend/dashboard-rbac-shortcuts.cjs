@@ -68,6 +68,14 @@ async function render(role) {
   await subscriptionsSandbox.__run;
   assert.match(denialMessage.textContent, /Somente administradores/);
   assert.equal(redirected, false);
+  const supportRequests = [];
+  subscriptionsSandbox.FokusApi.request = async (url) => { supportRequests.push(url); const error = new Error('Forbidden'); error.status = 403; error.payload = { code: 'support_customer_api_denied' }; throw error; };
+  const supportSubscriptionsSandbox = { ...subscriptionsSandbox };
+  vm.runInNewContext(subscriptionsScript.replace('(async () =>', 'globalThis.__run=(async () =>'), supportSubscriptionsSandbox);
+  await supportSubscriptionsSandbox.__run;
+  assert.deepEqual(supportRequests, ['/subscriptions']);
+  assert.match(denialMessage.textContent, /sessão de suporte/);
+  assert.equal(redirected, false);
 
   const leadScript = fs.readFileSync(path.join(root, 'public/auth/assinar-fokus-lead.js'), 'utf8');
   for (const role of ['gestor', 'usuario']) {
@@ -82,6 +90,18 @@ async function render(role) {
     assert.deepEqual(calls, ['/auth/me']);
     assert.match(content.innerHTML, /Somente um administrador/);
   }
+  const supportLeadContent = { innerHTML: '' }, supportLeadCalls = [];
+  const supportLead = {
+    document: { querySelector: (selector) => selector === '#lead-checkout-content' ? supportLeadContent : { textContent: '' } },
+    localStorage: { getItem: () => JSON.stringify({ items: [{ module_code: 'synthetic' }] }) },
+    FokusApi: { request: async (url) => { supportLeadCalls.push(url); return { user: { id: 'support', name: 'Suporte' }, support_mode: { active: true }, active_company_id: 'company-1', companies: [{ id: 'company-1', name: 'Empresa' }] }; } },
+  };
+  vm.runInNewContext(leadScript.replace('(async () => {', 'globalThis.__run=(async () => {'), supportLead);
+  await supportLead.__run;
+  assert.deepEqual(supportLeadCalls, ['/auth/me']);
+  assert.match(supportLeadContent.innerHTML, /sessão de suporte/);
+  assert.doesNotMatch(supportLeadContent.innerHTML, /Somente um administrador/);
+
   const leadContent = { innerHTML: '' }, leadCalls = [];
   const adminLead = {
     document: { querySelector: (selector) => selector === '#lead-checkout-content' ? leadContent : { textContent: '' } },

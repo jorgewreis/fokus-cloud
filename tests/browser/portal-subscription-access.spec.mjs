@@ -27,3 +27,16 @@ for (const width of [375, 1440]) {
         expect(subscriptionRequests).toBe(1);
     });
 }
+
+test('support session receives a support-specific explanation', async ({ page }) => {
+    await page.route('**/api/auth/me', (route) => route.fulfill({ json: {
+        user: { id: 'USER_A', name: 'Pessoa sintética' }, active_company_id: 'COMPANY_A',
+        companies: [{ id: 'COMPANY_A', name: 'Empresa sintética' }],
+        support_mode: { active: true, company: 'Empresa sintética', plan: 'Plano sintético', subscription_status: 'ativa' },
+    } }));
+    await page.route('**/api/subscriptions', (route) => route.fulfill({ status: 403, json: { code: 'support_customer_api_denied' } }));
+    await page.goto('/portal/subscriptions.html');
+    await expect(page.locator('#message')).toContainText('não está disponível durante uma sessão de suporte');
+    await expect(page.locator('[data-support-context]')).toContainText('Empresa sintética');
+    expect(new URL(page.url()).pathname).toBe('/portal/subscriptions.html');
+});
