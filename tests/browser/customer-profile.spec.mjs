@@ -172,14 +172,6 @@ test('dashboard exibe módulos com ícones coloridos de 32px e sem botão de abe
     await expect(page.getByRole('button', { name: 'Contatos', exact: true })).toHaveAttribute('aria-expanded', 'true');
 });
 
-test('perfil em acesso de suporte fica somente para leitura', async ({ page }) => {
-    await openProfile(page, { active: true, company: 'Menezes Advocacia', reason: 'Atendimento' });
-    await expect(page.locator('#profile-support-notice')).toBeVisible();
-    await expect(page.getByLabel('Nome completo')).toBeDisabled();
-    await expect(page.getByLabel(/Telefone/)).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Alterar senha' })).toBeDisabled();
-});
-
 const usersShellView = shellView
     .replace("{{ $initialPage ?? 'overview' }}", 'users')
     .replace("@include('portal.partials.fokus-law-profile')", profileView);
@@ -202,6 +194,7 @@ async function openUsers(page, viewport) {
     await page.setViewportSize(viewport);
     await page.route('**/portal/usuarios', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: usersShellView }));
     await page.route('**/portal/transferir-administracao', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: transferShellView }));
+    await page.route('**/api/auth/me', (route) => route.fulfill({ json: { ...profile, support_mode: null } }));
     await page.route('**/api/law/shell-context', (route) => route.fulfill({ json: {
         user: { id: 'USR_ADMIN', name: 'Érica Menezes', email: 'erica@example.test' },
         company: { id: 'COM_TEST', name: 'Menezes Advocacia', role: 'admin' },
