@@ -88,6 +88,32 @@ class SubscriptionAdminTest extends TestCase
         }
     }
 
+    public function test_assisted_checkout_requires_platform_subscription_permission(): void
+    {
+        $admin = $this->platformAdmin('administrador_comercial');
+        $fixture = $this->subscriptionFixture();
+        DB::table('subscriptions')->where('id', $fixture['subscription_id'])->update(['status' => 'encerrada', 'open_company_product' => null]);
+        DB::table('products')->where('code', 'law')->update(['code' => 'fokus-law', 'publication_pending' => true]);
+        DB::table('platform_role_permissions')
+            ->where('platform_role_id', $admin->platform_role_id)
+            ->where('platform_permission_id', DB::table('platform_permissions')->where('code', 'platform.subscriptions.manage')->value('id'))
+            ->delete();
+        Http::fake();
+        $counts = [];
+        foreach (['billing_checkout_attempts', 'voucher_redemption_reservations', 'subscriptions', 'payments'] as $table) {
+            $counts[$table] = DB::table($table)->count();
+        }
+
+        $this->actingAs($admin, 'platform')->postJson('/api/backoffice/subscriptions/checkout', [
+            'company_id' => $fixture['company_id'], 'product_code' => 'fokus-law', 'plan_code' => 'law-advocacia', 'cycle' => 'monthly',
+        ])->assertForbidden();
+
+        Http::assertNothingSent();
+        foreach ($counts as $table => $count) {
+            $this->assertSame($count, DB::table($table)->count(), "Unexpected changes to {$table}");
+        }
+    }
+
     public function test_assisted_checkout_and_free_voucher_activate_pending_subscription_until_expiry(): void
     {
         config(['services.mercado_pago.access_token' => 'test-token', 'services.mercado_pago.test_payer_email' => 'test_user_123@testuser.com']);
