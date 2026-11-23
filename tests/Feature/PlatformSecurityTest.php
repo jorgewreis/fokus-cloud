@@ -310,6 +310,10 @@ class PlatformSecurityTest extends TestCase
         $this->getJson('/api/lead/shell-context')->assertForbidden();
         $this->getJson('/api/subscriptions')->assertForbidden();
         $this->getJson('/api/portal/users')->assertForbidden();
+        $this->getJson('/api/backoffice/auth/me')->assertForbidden()
+            ->assertJsonPath('code', 'support_customer_api_denied');
+        $this->getJson('/api/backoffice/support/law-context')->assertForbidden();
+        $this->getJson('/api/backoffice/companies')->assertForbidden();
 
         $lawCasesBefore = DB::table('law_cases')->count();
         $this->getJson('/api/law/cases')->assertForbidden();

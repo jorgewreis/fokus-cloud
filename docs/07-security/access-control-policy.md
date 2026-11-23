@@ -65,11 +65,12 @@ Uma sessao de suporte pode autenticar temporariamente como um usuario cliente
 para reproduzir o contexto de acesso. Enquanto essa sessao estiver ativa, APIs
 operacionais de clientes sao negadas por padrao, incluindo Law, Lead, portal,
 assinaturas e selecao de empresa. A allowlist limita-se ao contexto reduzido de
-`/api/auth/me`, APIs administrativas protegidas, webhooks e ingestao de
-integracoes com suas autenticacoes proprias. Informacoes comerciais e tecnicas
-permitidas ao Backoffice devem ser obtidas pelas rotas administrativas, fora
-das autorizacoes do cliente. A protecao ocorre antes de controladores e efeitos
-laterais e nao depende das permissoes do usuario impersonado.
+`/api/auth/me` minimizado, encerramento em `/api/backoffice/support/exit`,
+webhooks e ingestao de integracoes com suas autenticacoes proprias. As demais
+rotas Backoffice também são negadas enquanto o suporte estiver ativo; ações
+comerciais devem ocorrer fora da identidade do cliente. A proteção ocorre
+antes de controladores e efeitos laterais e não depende das permissões do
+usuário impersonado.
 O endpoint de sessão usado pelo portal limita os espaços ao espaço-alvo da
 sessão de suporte e reduz a identidade retornada ao mínimo necessário para o
 aviso de suporte, sem telefone, CPF, e-mail ou estado da conta. O shell Law
