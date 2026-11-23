@@ -31,7 +31,9 @@ class SearchDiscoveryTest extends TestCase
                     ->assertDontSee('/styles/next/', false);
             }
             $robots = $this->get("https://{$host}/robots.txt")->assertOk();
-            $robots->assertSee("Sitemap: https://{$host}/sitemap.xml", false);
+            $robots->assertSee("Sitemap: https://{$host}/sitemap.xml", false)
+                ->assertSee('Content-Signal: search=yes,ai-input=yes,ai-train=yes', false)
+                ->assertDontSee('ai-train=no', false);
             foreach (['Disallow: /api/', 'Disallow: /backoffice/', 'Disallow: /portal/', 'Disallow: /cadastro', 'Disallow: /acesso'] as $rule) {
                 $robots->assertSee($rule, false);
             }
