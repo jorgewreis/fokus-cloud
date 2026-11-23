@@ -69,6 +69,9 @@ ao Backoffice devem ser obtidas pelas rotas administrativas proprias, fora da
 identidade e das autorizacoes do cliente. A protecao deve ocorrer antes de
 controladores e efeitos laterais, e nao depende das permissoes Law do usuario
 impersonado.
+O endpoint de sessão usado pelo portal deve limitar os espaços ao espaço-alvo
+da sessão de suporte e reduzir a identidade retornada ao mínimo necessário
+para o aviso de suporte, sem telefone, CPF, e-mail ou estado da conta.
 
 ## Controles obrigatorios
 

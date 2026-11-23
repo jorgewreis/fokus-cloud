@@ -282,6 +282,10 @@ class PlatformSecurityTest extends TestCase
         $subscriptionId = PrefixedUlid::make('ASS');
         DB::table('subscriptions')->insert(['id' => $subscriptionId, 'company_id' => $companyId, 'product_id' => $product->id, 'status' => 'suspensa', 'open_company_product' => null, 'version' => 1, 'billing_cycle' => 'monthly', 'commercial_snapshot' => json_encode(['plan_name' => 'Essencial']), 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
 
+        $otherCompanyId = PrefixedUlid::make('COM');
+        DB::table('companies')->insert(['id' => $otherCompanyId, 'document_type' => 'cnpj', 'document_number' => '32345678000100', 'legal_name' => 'Empresa fora do escopo', 'status' => 'ativa', 'version' => 1, 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('company_memberships')->insert(['id' => PrefixedUlid::make('MBS'), 'company_id' => $otherCompanyId, 'user_id' => $customer->id, 'role_id' => DB::table('roles')->where('code', 'usuario')->value('id'), 'status' => 'ativo', 'version' => 1, 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
+
         $inactiveCompanyId = PrefixedUlid::make('COM');
         DB::table('companies')->insert(['id' => $inactiveCompanyId, 'document_type' => 'cnpj', 'document_number' => '22345678000100', 'legal_name' => 'Empresa suspensa', 'status' => 'suspensa', 'version' => 1, 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
         DB::table('subscriptions')->insert(['id' => PrefixedUlid::make('ASS'), 'company_id' => $inactiveCompanyId, 'product_id' => $product->id, 'status' => 'ativa', 'open_company_product' => null, 'version' => 1, 'billing_cycle' => 'monthly', 'commercial_snapshot' => json_encode(['plan_name' => 'Essencial']), 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
@@ -294,7 +298,9 @@ class PlatformSecurityTest extends TestCase
         $this->assertAuthenticatedAs($customer, 'web');
         $this->assertAuthenticatedAs($admin, 'platform');
         $this->assertDatabaseHas('platform_support_sessions', ['platform_admin_id' => $admin->id, 'company_id' => $companyId, 'subscription_id' => $subscriptionId, 'target_user_id' => $customer->id, 'ended_at' => null]);
-        $this->getJson('/api/auth/me')->assertOk()->assertJsonPath('support_mode.active', true)->assertJsonPath('support_mode.company', 'Empresa para suporte')->assertJsonMissingPath('user.phone');
+        $this->getJson('/api/auth/me')->assertOk()->assertJsonPath('support_mode.active', true)->assertJsonPath('support_mode.company', 'Empresa para suporte')
+            ->assertJsonMissingPath('user.phone')->assertJsonCount(1, 'companies')->assertJsonPath('companies.0.id', $companyId)
+            ->assertJsonMissingPath('user.cpf')->assertJsonMissingPath('user.email')->assertJsonMissingPath('user.email_verified')->assertJsonMissingPath('user.status');
         $this->patchJson('/api/auth/profile', ['name' => 'Nome alterado em suporte'])->assertForbidden();
         $this->assertSame('Pessoa de Teste', $customer->fresh()->name);
 
