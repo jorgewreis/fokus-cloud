@@ -80,6 +80,16 @@ class SubscriptionController extends Controller
 
     public function checkout(Request $request, CatalogManager $catalog, VoucherManager $vouchers, SubscriptionChangeManager $subscriptionChanges, MercadoPagoClient $mercadoPago)
     {
+        $membership = $request->attributes->get('active_membership');
+        if (! $membership || $membership->role !== 'admin') {
+            if ($membership) {
+                app(\App\Services\AuditRecorder::class)->company(
+                    $membership->company_id, $request->user()->id, 'company', $membership->company_id, 'checkout_denied',
+                    reason: 'Tentativa de contratação por membro sem permissão de administrador.', request: $request
+                );
+            }
+            abort(403, 'Apenas o administrador da empresa pode iniciar uma assinatura.');
+        }
         abort_unless($request->user()->email_verified_at, 403, 'Confirme o e-mail antes de assinar.');
         $data = $request->validate([
             'product_code' => ['required', Rule::in(['law', 'fokus-law', 'lead', 'fokus-lead'])],
