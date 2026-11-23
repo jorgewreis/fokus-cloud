@@ -73,32 +73,38 @@ for (const page of pages) {
 }
 const lastmodPath = resolve(root, 'resources/seo/lastmod.json');
 const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-const pageLastmod = (file) => {
-  const rel = `public/${file}`;
-  try {
-    if (git(['status', '--porcelain', '--', rel]) === '') {
+let gitHistory = true;
+try {
+  git(['rev-parse', '--is-inside-work-tree']);
+} catch {
+  // git archive builds have no .git. Rewriting lastmod from extraction mtimes
+  // would change a tracked file the immutable build must keep byte-for-byte.
+  gitHistory = false;
+}
+if (gitHistory) {
+  const pageLastmod = (file) => {
+    const rel = `public/${file}`;
+    try {
       const date = git(['log', '-1', '--format=%cs', '--', rel]);
       if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+    } catch {
+      // A file with no commit yet uses its own mtime, not a deploy clock.
     }
-  } catch {
-    // No commit is available. The file's own mtime is the remaining real timestamp.
-  }
-  return statSync(resolve(root, rel)).mtime.toISOString().slice(0, 10);
-};
-const lastmods = Object.fromEntries(pages.map((page) => [page.file, pageLastmod(page.file)]));
-const lastmodJson = `${JSON.stringify(lastmods, null, 2)}\n`;
-const currentLastmod = (() => {
+    return statSync(resolve(root, rel)).mtime.toISOString().slice(0, 10);
+  };
+  const lastmodJson = `${JSON.stringify(Object.fromEntries(pages.map((page) => [page.file, pageLastmod(page.file)])), null, 2)}\n`;
+  let currentLastmod = '';
   try {
-    return readFileSync(lastmodPath, 'utf8');
+    currentLastmod = readFileSync(lastmodPath, 'utf8');
   } catch {
-    return '';
+    currentLastmod = '';
   }
-})();
-if (check && currentLastmod !== lastmodJson) {
-  console.error('Outdated sitemap lastmod dates: resources/seo/lastmod.json');
-  failures++;
-} else if (!check && currentLastmod !== lastmodJson) {
-  writeFileSync(lastmodPath, lastmodJson);
+  if (check && currentLastmod !== lastmodJson) {
+    console.error('Outdated sitemap lastmod dates: resources/seo/lastmod.json');
+    failures++;
+  } else if (!check && currentLastmod !== lastmodJson) {
+    writeFileSync(lastmodPath, lastmodJson);
+  }
 }
 if (failures) process.exitCode = 1;
 else console.log(`${check ? 'Checked' : 'Synchronized'} SEO metadata for ${pages.length} public pages.`);
