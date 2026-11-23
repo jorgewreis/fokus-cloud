@@ -10,7 +10,7 @@ const { JSDOM } = process.env.REI54_JSDOM_MODULE
 const root = new URL('../../', import.meta.url);
 const html = await readFile(new URL('resources/views/portal/fokus-law.blade.php', root), 'utf8');
 const shell = await readFile(new URL('public/portal/assets/fokus-law-shell.js', root), 'utf8');
-const bootstrap = shell.lastIndexOf("FokusApi.request('/law/shell-context')");
+const bootstrap = shell.lastIndexOf("FokusApi.request('/auth/me')");
 assert.notEqual(bootstrap, -1, 'shell bootstrap must be identifiable');
 
 for (const [name, response] of [
