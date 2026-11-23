@@ -99,22 +99,18 @@ try {
 if (gitHistory) {
   const pageLastmod = (file) => {
     const rel = `public/${file}`;
-    let clean = false;
     try {
-      clean = git(['status', '--porcelain', '--', rel]) === '';
-      if (clean) {
-        const date = git(['log', '-1', '--format=%cs', '--', rel]);
-        const hash = git(['log', '-1', '--format=%H', '--', rel]);
-        const head = git(['rev-parse', 'HEAD']);
-        const changedInHead = git(['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD']).split('\n').includes(rel);
-        // The tip commit is not the date of a file it did not change.
-        if (/^\d{4}-\d{2}-\d{2}$/.test(date) && (hash !== head || changedInHead)) return date;
-      }
+      const date = git(['log', '-1', '--format=%cs', '--', rel]);
+      const hash = git(['log', '-1', '--format=%H', '--', rel]);
+      const head = git(['rev-parse', 'HEAD']);
+      const changedInHead = git(['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD']).split('\n').includes(rel);
+      // The tip commit is not the date of a file it did not change.
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date) && (hash !== head || changedInHead)) return date;
     } catch {
       // Fall through to the committed date, then the file mtime.
     }
     const recorded = committedLastmod[file];
-    if (clean && typeof recorded === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(recorded)) return recorded;
+    if (typeof recorded === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(recorded)) return recorded;
     return statSync(resolve(root, rel)).mtime.toISOString().slice(0, 10);
   };
   const lastmodJson = `${JSON.stringify(Object.fromEntries(pages.map((page) => [page.file, pageLastmod(page.file)])), null, 2)}\n`;
