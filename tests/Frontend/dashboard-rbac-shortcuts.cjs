@@ -11,18 +11,18 @@ const inlineScript = [...dashboard.matchAll(/<script>([\s\S]*?)<\/script>/g)].at
 
 assert.ok(inlineScript, 'O script do resumo do portal não foi encontrado.');
 
-async function render(role) {
+async function render(role, support = false) {
   const elements = {
     role: { textContent: '' }, actions: { textContent: '' }, subscriptions: { textContent: '', parentElement: { hidden: false } }, renewal: { textContent: '', parentElement: { hidden: false } }, message: { textContent: '' },
-    users: { hidden: false }, subscriptionsLink: { hidden: false },
+    users: { hidden: false }, subscriptionsLink: { hidden: false }, shortcuts: { hidden: false },
   };
   const requests = [];
   const sandbox = {
     role: elements.role, actions: elements.actions, subscriptions: elements.subscriptions, renewal: elements.renewal, message: elements.message,
-    document: { querySelector: (selector) => ({ 'main .review-actions a[href="/portal/usuarios"]': elements.users, 'main .review-actions a[href="/portal/assinaturas"]': elements.subscriptionsLink }[selector] ?? null) },
+    document: { querySelector: (selector) => ({ 'main .review-actions a[href="/portal/usuarios"]': elements.users, 'main .review-actions a[href="/portal/assinaturas"]': elements.subscriptionsLink, 'main .portal-section': elements.shortcuts }[selector] ?? null) },
     FokusApi: { async request(url) {
       requests.push(url);
-      if (url === '/auth/me') return { user: { email_verified: true }, active_company_id: 'company-1', companies: [{ id: 'company-1', name: 'Empresa sintética', role }] };
+      if (url === '/auth/me') return support ? { user: { id: 'support-1', name: 'Suporte' }, active_company_id: 'company-1', companies: [{ id: 'company-1', name: 'Empresa sintética' }], support_mode: { active: true, company: 'Empresa sintética', plan: 'Plano sintético', subscription_status: 'ativa' } } : { user: { email_verified: true }, active_company_id: 'company-1', companies: [{ id: 'company-1', name: 'Empresa sintética', role }] };
       if (url === '/subscriptions') return [];
       throw new Error(`Rota inesperada: ${url}`);
     } },
@@ -53,6 +53,15 @@ async function render(role) {
     assert.equal(result.elements.subscriptionsLink.hidden, true);
     assert.equal(result.elements.message.textContent, 'Empresa ativa: Empresa sintética');
   }
+
+  const support = await render(null, true);
+  assert.deepEqual(support.requests, ['/auth/me']);
+  assert.equal(support.elements.role.textContent, 'Suporte');
+  assert.equal(support.elements.actions.textContent, 'Contexto comercial');
+  assert.equal(support.elements.message.textContent, 'Empresa em atendimento: Empresa sintética');
+  assert.equal(support.elements.subscriptions.parentElement.hidden, true);
+  assert.equal(support.elements.renewal.parentElement.hidden, true);
+  assert.equal(support.elements.shortcuts.hidden, true);
 
   const subscriptionsPage = fs.readFileSync(path.join(root, 'public/portal/subscriptions.html'), 'utf8');
   const subscriptionsScript = [...subscriptionsPage.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];

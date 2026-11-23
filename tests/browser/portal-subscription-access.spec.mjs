@@ -40,3 +40,25 @@ test('support session receives a support-specific explanation', async ({ page })
     await expect(page.locator('[data-support-context]')).toContainText('Empresa sintética');
     expect(new URL(page.url()).pathname).toBe('/portal/subscriptions.html');
 });
+
+for (const width of [375, 1440]) {
+    test(`support dashboard accepts the reduced identity at ${width}px`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
+        let subscriptionRequests = 0;
+        await page.route('**/api/auth/me', (route) => route.fulfill({ json: {
+            user: { id: 'USER_A', name: 'Suporte sintético' }, active_company_id: 'COMPANY_A',
+            companies: [{ id: 'COMPANY_A', name: 'Empresa sintética' }],
+            support_mode: { active: true, company: 'Empresa sintética', plan: 'Plano sintético', subscription_status: 'ativa' },
+        } }));
+        await page.route('**/api/subscriptions', (route) => { subscriptionRequests++; return route.fulfill({ status: 403 }); });
+        await page.goto('/portal/dashboard.html');
+        await expect(page.locator('#role')).toHaveText('Suporte');
+        await expect(page.locator('#message')).toHaveText('Empresa em atendimento: Empresa sintética');
+        await expect(page.locator('#subscriptions')).toBeHidden();
+        await expect(page.locator('#renewal')).toBeHidden();
+        await expect(page.locator('main .portal-section')).toBeHidden();
+        expect(subscriptionRequests).toBe(0);
+        expect(new URL(page.url()).pathname).toBe('/portal/dashboard.html');
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    });
+}
