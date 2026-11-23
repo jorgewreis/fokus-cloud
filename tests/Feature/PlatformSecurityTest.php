@@ -10,6 +10,7 @@ use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
@@ -331,7 +332,20 @@ class PlatformSecurityTest extends TestCase
             ->assertForbidden()->assertJsonPath('code', 'support_customer_api_denied');
         $this->assertSame($companyId, session('active_company_id'));
         $this->getJson('/api/lead/shell-context')->assertForbidden();
-        $this->getJson('/api/subscriptions')->assertForbidden();
+        $this->getJson('/api/subscriptions')->assertForbidden()->assertJsonPath('code', 'support_customer_api_denied');
+        Http::fake();
+        $billingCounts = [];
+        foreach (['billing_checkout_attempts', 'voucher_redemption_reservations', 'subscriptions', 'payments'] as $table) {
+            $billingCounts[$table] = DB::table($table)->count();
+        }
+        $this->postJson('/api/subscriptions/checkout', [
+            'product_code' => 'fokus-law', 'selection_mode' => 'plan', 'plan_code' => 'law-advocacia', 'cycle' => 'monthly',
+            'items' => [['module_code' => 'processos-advocacia', 'quantity' => 1]],
+        ])->assertForbidden()->assertJsonPath('code', 'support_customer_api_denied');
+        Http::assertNothingSent();
+        foreach ($billingCounts as $table => $count) {
+            $this->assertSame($count, DB::table($table)->count(), "Unexpected changes to {$table}");
+        }
         $this->getJson('/api/portal/users')->assertForbidden();
         $this->getJson('/api/backoffice/auth/me')->assertForbidden()
             ->assertJsonPath('code', 'support_customer_api_denied');
