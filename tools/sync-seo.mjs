@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
@@ -52,8 +53,14 @@ for (const page of pages) {
         <script type="application/ld+json">${JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }, null, 2)}</script>
         <!-- /SEO -->`;
   let updated;
-  if (original.includes('<!-- SEO:')) {
-    updated = original.replace(/<!-- SEO:[\s\S]*?<!-- \/SEO -->/, metadata);
+  const closedBlock = /<!-- SEO:[\s\S]*?<!-- \/SEO -->/;
+  const openBlock = /<!-- SEO:[\s\S]*?(?=<\/head>)/i;
+  if (closedBlock.test(original)) {
+    updated = original.replace(closedBlock, metadata);
+  } else if (openBlock.test(original)) {
+    // Pages edited after a sync can keep the opening comment and lose the
+    // closing marker. The closed-block replace then matches nothing.
+    updated = original.replace(openBlock, `${metadata}\n`);
   } else {
     updated = original.replace(/\s*<title>[\s\S]*?<\/title>/gi, '')
       .replace(/\s*<meta\s+(?:name="(?:description|robots|googlebot|bingbot|application-name|twitter:[^"]+)"|property="og:[^"]+")[\s\S]*?\/>/gi, '')
@@ -63,6 +70,35 @@ for (const page of pages) {
   }
   if (check && updated !== original) { console.error(`Outdated SEO metadata: ${page.file}`); failures++; }
   else if (!check && updated !== original) writeFileSync(path, updated);
+}
+const lastmodPath = resolve(root, 'resources/seo/lastmod.json');
+const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+const pageLastmod = (file) => {
+  const rel = `public/${file}`;
+  try {
+    if (git(['status', '--porcelain', '--', rel]) === '') {
+      const date = git(['log', '-1', '--format=%cs', '--', rel]);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+    }
+  } catch {
+    // No commit is available. The file's own mtime is the remaining real timestamp.
+  }
+  return statSync(resolve(root, rel)).mtime.toISOString().slice(0, 10);
+};
+const lastmods = Object.fromEntries(pages.map((page) => [page.file, pageLastmod(page.file)]));
+const lastmodJson = `${JSON.stringify(lastmods, null, 2)}\n`;
+const currentLastmod = (() => {
+  try {
+    return readFileSync(lastmodPath, 'utf8');
+  } catch {
+    return '';
+  }
+})();
+if (check && currentLastmod !== lastmodJson) {
+  console.error('Outdated sitemap lastmod dates: resources/seo/lastmod.json');
+  failures++;
+} else if (!check && currentLastmod !== lastmodJson) {
+  writeFileSync(lastmodPath, lastmodJson);
 }
 if (failures) process.exitCode = 1;
 else console.log(`${check ? 'Checked' : 'Synchronized'} SEO metadata for ${pages.length} public pages.`);

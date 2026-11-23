@@ -5,6 +5,38 @@
 
     RewriteEngine On
 
+    # One hop to the canonical HTTPS host. The substitution is absolute because
+    # this vhost is often reached over HTTP (Cloudflare, or the CloudPanel
+    # backend on port 8080) and a relative redirect would advertise http://.
+    # GET/HEAD only: a 301 would drop a POST body.
+    RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteCond %{REQUEST_URI} !/$
+    RewriteCond %{HTTP_HOST} ^styles\.fokuscloud\.com\.br$ [NC]
+    RewriteRule ^(.+[^/])$ https://styles.fokuscloud.com.br/$1/ [L,R=301]
+
+    RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteCond %{REQUEST_URI} !/$
+    RewriteCond %{HTTP_HOST} ^(www\.)?fokuscloud\.com\.br$ [NC]
+    RewriteRule ^(.+[^/])$ https://www.fokuscloud.com.br/$1/ [L,R=301]
+
+    RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+    RewriteCond %{HTTP_HOST} ^styles\.fokuscloud\.com\.br$ [NC]
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !https [NC]
+    RewriteRule ^ https://styles.fokuscloud.com.br%{REQUEST_URI} [L,R=301]
+
+    RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+    RewriteCond %{HTTP_HOST} ^fokuscloud\.com\.br$ [NC]
+    RewriteRule ^ https://www.fokuscloud.com.br%{REQUEST_URI} [L,R=301]
+
+    RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+    RewriteCond %{HTTP_HOST} ^www\.fokuscloud\.com\.br$ [NC]
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !https [NC]
+    RewriteRule ^ https://www.fokuscloud.com.br%{REQUEST_URI} [L,R=301]
+
     # Keep canonical portal URLs on Laravel, including during deployments where
     # a legacy public/portal directory may still exist momentarily.
     RewriteRule ^backoffice/?$ index.php [L]
@@ -20,7 +52,18 @@
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
-    # Redirect Trailing Slashes If Not A Folder...
+    # Redirect trailing slashes of files to the canonical HTTPS URL.
+    # Other hosts keep a same-host relative redirect for local Apache.
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteCond %{HTTP_HOST} ^styles\.fokuscloud\.com\.br$ [NC]
+    RewriteRule ^ https://styles.fokuscloud.com.br%1 [L,R=301]
+
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteCond %{HTTP_HOST} ^(www\.)?fokuscloud\.com\.br$ [NC]
+    RewriteRule ^ https://www.fokuscloud.com.br%1 [L,R=301]
+
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]

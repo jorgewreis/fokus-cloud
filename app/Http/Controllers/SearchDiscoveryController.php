@@ -23,14 +23,24 @@ class SearchDiscoveryController extends Controller
             ? 'styles.fokuscloud.com.br'
             : 'www.fokuscloud.com.br';
         $pages = json_decode(file_get_contents(resource_path('seo/pages.json')), true, flags: JSON_THROW_ON_ERROR);
+        $lastmodPath = resource_path('seo/lastmod.json');
+        $lastmods = is_file($lastmodPath)
+            ? json_decode(file_get_contents($lastmodPath), true, flags: JSON_THROW_ON_ERROR)
+            : [];
         $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n";
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
 
         foreach ($pages as $page) {
-            if (parse_url($page['url'], PHP_URL_HOST) === $host) {
-                // No synthetic lastmod: deployments do not necessarily change page content.
-                $xml .= '    <url><loc>'.htmlspecialchars($page['url'], ENT_XML1 | ENT_QUOTES, 'UTF-8')."</loc></url>\n";
+            if (parse_url($page['url'], PHP_URL_HOST) !== $host) {
+                continue;
             }
+            $loc = htmlspecialchars($page['url'], ENT_XML1 | ENT_QUOTES, 'UTF-8');
+            $lastmod = $lastmods[$page['file']] ?? null;
+            $xml .= '    <url><loc>'.$loc.'</loc>';
+            if (is_string($lastmod) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $lastmod)) {
+                $xml .= '<lastmod>'.$lastmod.'</lastmod>';
+            }
+            $xml .= "</url>\n";
         }
 
         return response($xml."</urlset>\n", 200, ['Content-Type' => 'application/xml; charset=UTF-8']);

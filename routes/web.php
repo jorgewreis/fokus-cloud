@@ -3,6 +3,7 @@
 use App\Http\Controllers\SearchDiscoveryController;
 use App\Http\Middleware\RequireApiCsrfToken;
 use App\Services\SubscriptionAccess;
+use App\Support\PublishedLawOffers;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -190,7 +191,14 @@ Route::get('/backoffice/{page?}', $serveBackofficeShell)
 Route::get('/produtos', fn () => response()->file(public_path('marketing/products/index.html')));
 Route::get('/produtos/fokus-styles', fn () => response()->file(public_path('marketing/products/fokus-styles.html')));
 Route::get('/produtos/fokus-law', fn () => response()->file(public_path('marketing/products/fokus-law.html')));
-Route::get('/produtos/fokus-law/planos', fn () => response()->file(public_path('marketing/products/fokus-law-planos.html')));
+Route::get('/produtos/fokus-law/planos', function () {
+    $html = file_get_contents(public_path('marketing/products/fokus-law-planos.html'));
+    abort_unless(is_string($html), 500);
+
+    return response(app(PublishedLawOffers::class)->inject($html), 200, [
+        'Content-Type' => 'text/html; charset=UTF-8',
+    ]);
+});
 Route::get('/contratar/fokus-law', fn () => response()->file(public_path('auth/contratar-fokus-law.html')));
 Route::get('/produtos/fokus-lead', fn () => response()->file(public_path('marketing/products/fokus-lead.html')));
 Route::get('/produtos/fokus-lead/planos', fn () => response()->file(public_path('marketing/products/fokus-lead-planos.html')));
