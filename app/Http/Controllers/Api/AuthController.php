@@ -413,7 +413,7 @@ class AuthController extends Controller
             ->join('subscriptions as subscription', 'subscription.id', '=', 'support.subscription_id')
             ->join('companies as company', 'company.id', '=', 'support.company_id')
             ->where('support.id', $supportId)->whereNull('support.ended_at')
-            ->select('subscription.status as subscription_status', 'subscription.commercial_snapshot', 'company.legal_name as company_name')
+            ->select('support.company_id', 'subscription.status as subscription_status', 'subscription.commercial_snapshot', 'company.legal_name as company_name')
             ->first() : null;
         $supportCommercialSnapshot = $supportMode ? (json_decode((string) $supportMode->commercial_snapshot, true) ?: []) : [];
 
@@ -422,19 +422,23 @@ class AuthController extends Controller
         if (! $supportMode) {
             $profile['phone'] = $user->phone;
         } else {
-            $activeCompanyId = (string) $request->session()->get('active_company_id', '');
+            $activeCompanyId = (string) $supportMode->company_id;
             $companies = array_values(array_filter(
                 $companies,
                 fn (object $company): bool => (string) $company->id === $activeCompanyId,
             ));
             $profile = array_intersect_key($profile, array_flip(['id', 'name']));
+            $companies = array_map(fn (object $company): array => [
+                'id' => (string) $company->id,
+                'name' => (string) $company->name,
+            ], $companies);
         }
 
         return response()->json([
             'user' => $profile,
             'companies' => $companies,
-            'active_company_id' => $request->session()->get('active_company_id'),
-            'support_mode' => $supportMode ? ['active' => true, 'company' => $supportMode->company_name, 'plan' => $supportCommercialSnapshot['plan_name'] ?? 'Plano Fokus Law', 'subscription_status' => $supportMode->subscription_status] : null,
+            'active_company_id' => $supportMode ? $supportMode->company_id : $request->session()->get('active_company_id'),
+            'support_mode' => $supportMode ? ['active' => true, 'company_id' => $supportMode->company_id, 'company' => $supportMode->company_name, 'plan' => $supportCommercialSnapshot['plan_name'] ?? 'Plano Fokus Law', 'subscription_status' => $supportMode->subscription_status] : null,
         ]);
     }
 
