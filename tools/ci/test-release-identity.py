@@ -21,7 +21,9 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[2]
 VERIFIER_COMMIT = 'a8cc9729181471c9f46ccb15d51383e1aceb61ab'
-VERIFIER_BLOB = '1a3275aa5619b1651a2d77d3e51c3d1d8b9c778d'
+# Reviewed after the first-release bootstrap. Candidate verification is unchanged;
+# only probe-current may accept an explicit unsealed HTML 404.
+VERIFIER_BLOB = '56f6dc4e78aa6b4a48158183395d4a5a6b96a0ab'
 NONCE = 'a' * 48
 PROBE_PATHS = ('/_deployment/release', '/_deployment/release/', '//_deployment/release', '///_deployment/release///')
 

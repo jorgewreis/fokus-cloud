@@ -197,7 +197,7 @@ test('retained asset filters deliver Styles files and the publisher does not rsy
       await writeFile(file, 'This fixture must not be deployed.\n');
     }
     await writeFile(path.join(destination, 'obsolete-file.txt'), 'Must be deleted.\n');
-    const flags = '-rlDzvc --delete-delay --filter="merge $RUNNER_TEMP/fokus-law-assets/protect.rules" --include="public/styles/assets/***" --exclude="vendor/" -e "ssh -p 22"';
+    const flags = '-rlDzvc --delete-delay --filter="merge $RUNNER_TEMP/fokus-law-assets/protect.rules" --include="public/styles/assets/***" --exclude=".git/" --exclude=".github/" --exclude=".gitignore" --exclude=".env" --exclude=".env.*" --exclude="node_modules/" --exclude="vendor/" --exclude="storage/" -e "ssh -p 22"';
     const fixture = `      - name: Sync application source\n        run: |\n          rsync ${flags} ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"\n      - name: End\n`;
     const sync = spawnSync('rsync', [...await deploymentArguments(runnerTemp, fixture), source + '/', destination + '/'], { encoding: 'utf8' });
     assert.equal(sync.status, 0, sync.error?.message || sync.stderr || sync.stdout);
