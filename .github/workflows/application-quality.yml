@@ -50,7 +50,12 @@ jobs:
           if [ "${#files[@]}" -gt 0 ]; then
             vendor/bin/pint --test -- "${files[@]}"
           fi
-      - run: php artisan test
+      - name: Run the application suite and require the reviewed composition
+        run: |
+          set -euo pipefail
+          junit="${RUNNER_TEMP}/application-junit.xml"
+          php artisan test --log-junit "$junit"
+          python3 tests/Deployment/check-suite-composition.py "$junit"
       - run: npm run build
       - run: npm run tokens:check
       - run: npm run seo:check
