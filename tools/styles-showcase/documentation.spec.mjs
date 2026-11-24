@@ -12,7 +12,7 @@ async function theme(page, value) {
 async function navigation(page) {
   const nav = page.getByRole('navigation', { name: 'Navegação principal', exact: true });
   await expect(nav).toHaveCount(1);
-  expect(await nav.locator('a').evaluateAll(nodes => nodes.map(a => a.getAttribute('href')))).toEqual(['/', '/docs', 'https://github.com/jorgewreis/fokus-styles']);
+  expect(await nav.locator('a').evaluateAll(nodes => nodes.map(a => a.getAttribute('href')))).toEqual(['/', '/docs', 'https://github.com/jorgewreis/fokus/tree/main/packages/styles']);
   await expect(nav.locator('a[href="/docs"]')).toHaveAttribute('aria-current', /^(page|true)$/);
 }
 async function screenshot(page, info, name) {

@@ -45,7 +45,7 @@ for (const slug of ['', ...guides]) test(`${slug || 'docs'}: one global navigati
   assert.equal(d.querySelectorAll('h1').length, 1);
   const navs = d.querySelectorAll('nav[aria-label="Navegação principal"]');
   assert.equal(navs.length, 1);
-  assert.deepEqual([...navs[0].querySelectorAll('a')].map(a => a.getAttribute('href')), ['/', '/docs', 'https://github.com/jorgewreis/fokus-styles']);
+  assert.deepEqual([...navs[0].querySelectorAll('a')].map(a => a.getAttribute('href')), ['/', '/docs', 'https://github.com/jorgewreis/fokus/tree/main/packages/styles']);
   assert.ok(navs[0].querySelector('a[href="/docs"][aria-current]'));
   assert.equal(d.querySelector('a[href="#main"]').textContent.trim(), 'Ir para o conteúdo');
   assert.equal(d.querySelector('#main').getAttribute('tabindex'), '-1');
