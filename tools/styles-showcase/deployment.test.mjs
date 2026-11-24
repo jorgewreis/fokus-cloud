@@ -97,6 +97,10 @@ test('Styles uses the unchanged published CSS/license and existing deployable de
   for (const [asset, sha256] of Object.entries(PUBLISHED_ASSETS)) {
     assert.equal(digest(await readFile(publicFile(asset))), sha256, `${asset}: published bytes changed`);
   }
+  const operationalJs = path.join(repositoryRoot, 'public/assets/js/fokus.min.js');
+  assert.equal(digest(await readFile(operationalJs)), PUBLISHED_ASSETS['/styles/assets/fokus-3.0.0.min.js'],
+    'The operational bundle must ship the published Fokus Styles runtime');
+  assert.equal((await readFile(operationalJs, 'utf8')).includes('fs-notification-item-${e.variant}'), false);
   const assets = await requiredAssets();
   for (const page of ['/styles/index.html', '/styles/docs/index.html', '/styles/next/index.html',
     ...['projects', 'onboarding', 'records', 'cloud-datatable', 'confirmation-modal', 'law-select-pattern', 'cloud-offcanvas', 'law-preferences', 'law-notifications'].map(slug => `/styles/examples/${slug}.html`)]) {
@@ -181,7 +185,7 @@ test('actual deploy rsync filters deliver Styles assets and still exclude vendor
     await mkdir(source);
     await mkdir(destination);
     await cp(publicRoot, path.join(source, 'public'), { recursive: true });
-    const blocked = ['vendor/autoload.php', 'public/styles/vendor/fokus-2.7.0.min.css',
+    const blocked = ['vendor/autoload.php', 'public/styles/vendor/fokus-3.0.0.min.css',
       'public/styles/vendor/LICENSE-fokus-styles.txt', 'node_modules/fixture.js', '.env'];
     for (const relative of blocked) {
       const file = path.join(source, relative);

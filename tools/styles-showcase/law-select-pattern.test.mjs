@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 const require = createRequire(import.meta.url);
 const { JSDOM } = process.env.REI54_JSDOM_MODULE ? await import(pathToFileURL(process.env.REI54_JSDOM_MODULE).href) : require('jsdom');
 const html = await readFile(new URL('../../public/styles/examples/law-select-pattern.html', import.meta.url), 'utf8');
-const bundle = await readFile(new URL('../../public/styles/assets/fokus-2.7.0.min.js', import.meta.url), 'utf8');
+const bundle = await readFile(new URL('../../public/styles/assets/fokus-3.0.0.min.js', import.meta.url), 'utf8');
 
 for (const available of [true, false]) {
   test(`padrão de Select ${available ? 'com bundle' : 'sem bundle'}`, async () => {

@@ -1,6 +1,6 @@
-# Exemplos Fokus Styles — versão 2.7.0
+# Exemplos Fokus Styles — versão 3.0.0
 
-Extraia o ZIP preservando `examples/` e `assets/`. O arquivo é gerado deterministicamente a partir de todos os HTML, CSS e Markdown atuais de `examples/` e dos runtimes locais listados em `assets/`; não o edite manualmente. Abra qualquer HTML de `examples/` no navegador. Os exemplos não precisam de Laravel, npm, fontes externas ou rede. A folha original, não modificada, `assets/fokus-2.7.0.min.css` veio do pacote npm `fokus-styles@2.7.0`; a licença MIT está no mesmo diretório.
+Extraia o ZIP preservando `examples/` e `assets/`. O arquivo é gerado deterministicamente a partir de todos os HTML, CSS e Markdown atuais de `examples/` e dos runtimes locais listados em `assets/`; não o edite manualmente. Abra qualquer HTML de `examples/` no navegador. Os exemplos não precisam de Laravel, npm, fontes externas ou rede. A folha original, não modificada, `assets/fokus-3.0.0.min.css` veio do pacote npm `fokus-styles@3.0.0`; a licença MIT está no mesmo diretório.
 
 Mantenha também `assets/site-palette.css`, `assets/styles-theme.js` e `examples/composition.css`. A paleta compartilhada define as cores do site; `composition.css` usa tokens `--demo-*` e `--desk-*` para os layouts ilustrativos. Eles não são novas APIs do pacote. Os componentes `fs-*` mantêm suas cores e estados originais, inclusive o azul dos botões primários. O JavaScript dentro de cada HTML implementa busca, seleção ou validação local. Não há envio ou persistência dos dados dos formulários. Nomes, métricas e e-mails são fictícios.
 

@@ -29,6 +29,48 @@ class VoucherRedemptionTest extends TestCase
         Config::set('services.mercado_pago.test_payer_email', 'test_user_1234567890@testuser.com');
     }
 
+    public function test_checkout_rejects_non_admin_members_before_any_billing_effect(): void
+    {
+        [$user, $companyId] = $this->customerContext();
+        DB::table('products')->where('code', 'lead')->update(['code' => 'fokus-lead']);
+        $leadCatalog = $this->getJson('/api/catalog/fokus-lead')->assertOk()->json();
+        $leadPlan = collect($leadCatalog['plans'])->firstWhere('code', 'lead-one-essencial');
+        $this->assertNotNull($leadPlan);
+        $payloads = [
+            [
+                'product_code' => 'law', 'items' => [
+                    ['module_code' => 'processos-advocacia', 'quantity' => 1],
+                    ['module_code' => 'contatos-advocacia', 'quantity' => 1],
+                    ['module_code' => 'tarefas-advocacia', 'quantity' => 1],
+                ], 'cycle' => 'monthly', 'selection_mode' => 'plan', 'plan_code' => 'law-advocacia',
+            ],
+            [
+                'product_code' => 'fokus-lead', 'selection_mode' => 'plan', 'plan_code' => $leadPlan['code'], 'cycle' => 'monthly',
+                'items' => collect($leadPlan['module_codes'])->map(fn (string $code) => ['module_code' => $code, 'quantity' => 1])->all(),
+            ],
+        ];
+        Http::fake();
+        $counts = [];
+        foreach (['billing_checkout_attempts', 'voucher_redemption_reservations', 'subscriptions', 'payments'] as $table) {
+            $counts[$table] = DB::table($table)->count();
+        }
+        foreach (['gestor', 'usuario'] as $role) {
+            DB::table('company_memberships')->where('company_id', $companyId)->where('user_id', $user->id)
+                ->update(['role_id' => DB::table('roles')->where('code', $role)->value('id')]);
+            foreach ($payloads as $payload) {
+                $this->actingAs($user)->withSession(['active_company_id' => $companyId])
+                    ->postJson('/api/subscriptions/checkout', $payload)
+                    ->assertForbidden()->assertJsonPath('message', 'Apenas o administrador da empresa pode iniciar uma assinatura.');
+            }
+        }
+        Http::assertNothingSent();
+        foreach ($counts as $table => $count) {
+            $this->assertSame($count, DB::table($table)->count(), "Unexpected changes to {$table}");
+        }
+        $this->assertSame(4, DB::table('audit_events')->where('company_id', $companyId)
+            ->where('actor_user_id', $user->id)->where('operation', 'checkout_denied')->count());
+    }
+
     public function test_checkout_reserves_voucher_and_webhook_confirms_full_snapshot(): void
     {
         [$user, $companyId] = $this->customerContext();
