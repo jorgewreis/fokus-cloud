@@ -29,8 +29,11 @@
     if (!selection?.items?.length) { location.replace('/produtos/fokus-lead/planos'); return; }
     let user; try { user = await FokusApi.request('/auth/me'); } catch { user = null; }
     if (!user) { setLoginForm(); return; }
+    if (user.support_mode?.active) { content.innerHTML = `<h2>Indisponível durante o suporte</h2><p>A contratação não está disponível durante uma sessão de suporte.</p><a class="lead-checkout-action" href="/portal">Voltar ao portal</a>`; return; }
     if (!user.user?.email_verified) { location.replace(`/verificar-email?return_to=${encodeURIComponent(returnTo)}`); return; }
     if (!user.active_company_id) { content.innerHTML = `<h2>Selecione uma empresa.</h2><p>Vincule ou selecione a empresa responsável pela assinatura.</p><a class="lead-checkout-action" href="/portal/empresas">Gerenciar empresas</a>`; return; }
+    const activeCompany = user.companies?.find((company) => company.id === user.active_company_id);
+    if (activeCompany?.role !== 'admin') { content.innerHTML = `<h2>Permissão necessária</h2><p>Somente um administrador da empresa pode contratar o Fokus Lead. Solicite a contratação a um administrador da empresa.</p><a class="lead-checkout-action" href="/portal">Voltar ao portal</a>`; return; }
     try {
       const [catalog, quote, subscriptions] = await Promise.all([FokusApi.request('/catalog/fokus-lead'), FokusApi.request('/catalog/fokus-lead/quote', { method: 'POST', body: quotePayload(selection) }), FokusApi.request('/subscriptions')]);
       const names = new Map((catalog.modules || []).map((module) => [module.code, module.name]));

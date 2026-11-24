@@ -34,11 +34,11 @@ class CoverageComposition(unittest.TestCase):
         return report
 
     def test_measured_composition_preserves_all_law_and_main_tests(self):
-        self.assertEqual(suite.EXPECTED_TESTS, 435)
+        self.assertEqual(suite.EXPECTED_TESTS, 436)
         self.assertEqual(suite.MINIMUM_ASSERTIONS, 3532)
         self.assertEqual(len(suite.MAIN_IDENTITY_TESTS), 10)
         self.assertEqual(sum(suite.MAIN_IDENTITY_TESTS.values()), 23)
-        self.assertEqual(suite.coverage(self.report(), 'sqlite')['tests'], 435)
+        self.assertEqual(suite.coverage(self.report(), 'sqlite')['tests'], 436)
         self.assertEqual(suite.coverage(self.report(), 'sqlite')['assertions'], 3532)
 
     def test_application_junit_checker_accepts_only_the_reviewed_composition(self):
@@ -51,12 +51,12 @@ class CoverageComposition(unittest.TestCase):
             ET.ElementTree(report).write(path, encoding='utf-8', xml_declaration=True)
             accepted = subprocess.run([sys.executable, str(script), str(path)], capture_output=True, text=True)
             self.assertEqual(accepted.returncode, 0, accepted.stderr)
-            self.assertIn('435 tests', accepted.stdout)
-            report[0].set('tests', '434')
+            self.assertIn('436 tests', accepted.stdout)
+            report[0].set('tests', '435')
             ET.ElementTree(report).write(path, encoding='utf-8', xml_declaration=True)
             rejected = subprocess.run([sys.executable, str(script), str(path)], capture_output=True, text=True)
             self.assertEqual(rejected.returncode, 1)
-            self.assertIn('434/435', rejected.stderr)
+            self.assertIn('435/436', rejected.stderr)
 
     def test_omission_duplicate_or_weakened_identity_is_rejected_even_with_green_totals(self):
         for mutation in ('omit', 'duplicate', 'rename', 'assertions'):
