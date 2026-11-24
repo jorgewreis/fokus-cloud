@@ -15,7 +15,8 @@ from linux_release_common import ROOT, REPORT, guard, environment, php, run, ada
 # the release evidence, while named security/identity cases are checked below.
 # Run 45316066397 on 5f104936 measured 435 tests and 3532 assertions: the
 # marketing copy case adds 36, and the www sitemap gained one URL (5 assertions).
-EXPECTED_TESTS = 435
+# REI-180 adds the subscription-viewer authorization case (436 tests).
+EXPECTED_TESTS = 436
 MINIMUM_ASSERTIONS = 3532
 MAIN_IDENTITY_TESTS = {'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_valid_snapshot_is_accepted': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_missing_identity_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_invalid_release_is_rejected_without_echoing_input': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_stale_captured_manifest_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_in_place_code_change_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_added_code_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_asset_storage_link_does_not_change_runtime_identity': 1, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_unsealed_checkout_fails_closed_without_debug_details': 4, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_invalid_or_missing_nonce_is_not_reflected': 11, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_existing_health_endpoint_is_preserved': 1}
 
