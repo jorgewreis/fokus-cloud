@@ -61,13 +61,16 @@ class SubscriptionAdminTest extends TestCase
 
         $this->getJson('/api/subscriptions')->assertUnauthorized();
         $response = $this->actingAs($user)->withSession(['active_company_id' => $fixture['company_id']])->getJson('/api/subscriptions')->assertOk();
-        $response->assertJsonCount(1)->assertJsonPath('0.id', $fixture['subscription_id'])->assertJsonPath('0.payment.amount', 64.7);
+        $response->assertJsonCount(1)->assertJsonPath('0.id', $fixture['subscription_id']);
+        // Decimal columns are serialized as numbers by SQLite and as strings ("64.70") by MySQL.
+        $this->assertSame(64.7, (float) $response->json('0.payment.amount'));
         $this->assertStringNotContainsString($subscriptionB, $response->getContent());
         $this->assertStringNotContainsString('Item exclusivo Beta', $response->getContent());
         $this->assertStringNotContainsString('987.65', $response->getContent());
-        $this->actingAs($user)->withSession(['active_company_id' => $companyB])->getJson('/api/subscriptions')
+        $responseB = $this->actingAs($user)->withSession(['active_company_id' => $companyB])->getJson('/api/subscriptions')
             ->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $subscriptionB)
-            ->assertJsonPath('0.items.0.name', 'Item exclusivo Beta')->assertJsonPath('0.payment.amount', 987.65);
+            ->assertJsonPath('0.items.0.name', 'Item exclusivo Beta');
+        $this->assertSame(987.65, (float) $responseB->json('0.payment.amount'));
 
         foreach (['gestor', 'usuario'] as $role) {
             DB::table('company_memberships')->where('company_id', $fixture['company_id'])->where('user_id', $user->id)
