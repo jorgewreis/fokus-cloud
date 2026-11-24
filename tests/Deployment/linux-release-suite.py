@@ -13,11 +13,10 @@ from linux_release_common import ROOT, REPORT, guard, environment, php, run, ada
 # Reviewed SQLite JUnit composition from the isolated release laboratory.
 # Totals remain strict: any omitted, duplicated, failed or skipped test rejects
 # the release evidence, while named security/identity cases are checked below.
-# 9e812769 accepted 429 tests and 3354 assertions. Run 45300404809 measured
-# 432 tests and 3469 assertions after the Law SEO cases. Current main adds the
-# two checkout authorization tests, 6 and 16 assertions, on both drivers.
-EXPECTED_TESTS = 434
-MINIMUM_ASSERTIONS = 3491
+# Run 45316066397 on 5f104936 measured 435 tests and 3532 assertions: the
+# marketing copy case adds 36, and the www sitemap gained one URL (5 assertions).
+EXPECTED_TESTS = 435
+MINIMUM_ASSERTIONS = 3532
 MAIN_IDENTITY_TESTS = {'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_valid_snapshot_is_accepted': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_missing_identity_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_invalid_release_is_rejected_without_echoing_input': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_stale_captured_manifest_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_in_place_code_change_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_added_code_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_asset_storage_link_does_not_change_runtime_identity': 1, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_unsealed_checkout_fails_closed_without_debug_details': 4, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_invalid_or_missing_nonce_is_not_reflected': 11, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_existing_health_endpoint_is_preserved': 1}
 
 LEAD_TESTS = {'Tests\\Feature\\CompanyAdminTest::test_company_detail_exposes_separate_lead_usage_only_after_platform_authorization': 5, 'Tests\\Feature\\CompanyAdminTest::test_company_detail_permission_is_checked_before_reading_lead_usage': 2, 'Tests\\Feature\\LeadConnectionsTest::test_superuser_credentials_never_execute_application_operation': 7, 'Tests\\Feature\\LeadConnectionsTest::test_runtime_context_is_transaction_local_and_disconnects_on_application_failure': 10, 'Tests\\Feature\\LeadConnectionsTest::test_insecure_configuration_is_rejected_before_connecting': 1, 'Tests\\Feature\\LeadConnectionsTest::test_transaction_pooler_and_missing_ca_are_rejected_before_connecting': 3, 'Tests\\Feature\\LeadConnectionsTest::test_disabled_runtime_never_opens_connection': 1, 'Tests\\Feature\\LeadDatabaseTest::test_context_comes_from_server_session_and_fresh_membership': 2, 'Tests\\Feature\\LeadDatabaseTest::test_manager_role_is_resolved_from_current_membership': 2, 'Tests\\Feature\\LeadDatabaseTest::test_access_revocations_are_checked_before_any_lead_connection': 12, 'Tests\\Feature\\LeadDatabaseTest::test_support_and_cross_company_context_are_blocked': 4, 'Tests\\Feature\\LeadUsageReaderTest::test_unconfigured_metrics_are_unavailable_without_connecting': 1, 'Tests\\Feature\\LeadUsageReaderTest::test_reader_filters_company_and_distinguishes_missing_company_from_zero_usage': 5, 'Tests\\Feature\\LeadUsageReaderTest::test_outage_has_no_fabricated_counts': 3}
@@ -51,6 +50,7 @@ PUBLIC_RELEASE_TESTS = {
     'Tests\\Feature\\CatalogAdminTest::test_law_planos_html_includes_published_plan_names_and_prices_without_javascript': 16,
     'Tests\\Feature\\CatalogAdminTest::test_law_offer_cards_mirror_the_published_catalog_script': 9,
     'Tests\\Feature\\SearchDiscoveryTest::test_origin_redirects_use_the_canonical_https_host': 6,
+    'Tests\\Feature\\PublicMarketingCopyTest::test_public_pages_follow_the_approved_marketing_copy': 36,
 }
 
 IDEMPOTENCY_TESTS = {

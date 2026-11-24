@@ -547,7 +547,7 @@ class WorkflowContract(unittest.TestCase):
     def test_exact_authorized_composition_and_quality_preserved(self):
         import hashlib
         self.assert_workflow_preserved((ROOT / '.github/workflows/deploy.yml').read_text())
-        self.assertEqual(hashlib.sha256((ROOT / '.github/workflows/application-quality.yml').read_bytes()).hexdigest(), '88aeef47f81a6949a8df7dc2a66685f3934eba7742d12546491b326ccd55c9a8')
+        self.assertEqual(hashlib.sha256((ROOT / '.github/workflows/application-quality.yml').read_bytes()).hexdigest(), 'fe48de6b6782bafee12bbc8ef64611a3896c8f19b9655b1c4507d96a42851ff9')
 
     def test_every_partial_or_reverted_delta_is_rejected(self):
         import json
