@@ -814,30 +814,11 @@ test('acessos identificam vínculos de pessoa física com o rótulo do produto',
     await expect(page.locator('#law-system-label')).toHaveText('Pessoa vinculada');
     await expect(page.locator('#law-login-instructions')).toContainText('pessoa vinculada');
 
-    let leadDocumentType = 'cpf';
-    await page.route('**/api/auth/lead-context', (route) => route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ user: { name: 'Corretor Teste' }, systems: [{ value: 'CMP_CORRETOR', label: 'Corretor Teste — Fokus Lead', document_type: leadDocumentType, profiles: [{ value: 'corretor', label: 'Corretor' }] }] }),
-    }));
     await page.goto('/marketing/products/fokus-lead.html');
-    await page.locator('#lead-email').fill('corretor@example.test');
-    await expect(page.locator('#lead-system-label')).toHaveText('Corretor vinculado');
-    await expect(page.locator('#lead-login-instructions')).toContainText('corretor vinculado');
-    await expect(page.locator('#lead-profile')).toBeHidden();
-    await expect(page.locator('#lead-password')).toBeEnabled();
-    await expect(page.locator('.lead-nav-cta')).toHaveCount(0);
-    await expect(page.locator('#lead-login-title')).toHaveCSS('font-size', '43.2px');
-    await expect.poll(() => page.locator('#lead-login-title').evaluate((element) => {
-        const range = document.createRange();
-        range.selectNodeContents(element);
-        return range.getClientRects().length;
-    })).toBe(1);
-    leadDocumentType = 'cnpj';
-    await page.locator('#lead-email').fill('');
-    await page.locator('#lead-email').fill('imobiliaria@example.test');
-    await expect(page.locator('#lead-system-label')).toHaveText('Empresa vinculada');
-    await expect(page.locator('#lead-login-instructions')).toContainText('empresa vinculada');
+    await expect(page.locator('[data-lead-login-form]')).toHaveCount(0);
+    await expect(page.locator('#lead-login-title')).toHaveCount(0);
+    await expect(page.locator('.lead-development-badge')).toHaveText('Em desenvolvimento');
+    await expect(page.getByRole('link', { name: 'Registrar interesse' }).first()).toBeVisible();
 });
 
 test('consulta de e-mail mostra usuário existente sem assinatura ativa', async ({ page }) => {

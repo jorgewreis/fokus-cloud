@@ -72,6 +72,19 @@ for (const page of pages) {
   else if (!check && updated !== original) writeFileSync(path, updated);
 }
 const lastmodPath = resolve(root, 'resources/seo/lastmod.json');
+const currentLastmod = (() => {
+  try {
+    return readFileSync(lastmodPath, 'utf8');
+  } catch {
+    return '';
+  }
+})();
+let committedLastmod = {};
+try {
+  committedLastmod = JSON.parse(currentLastmod);
+} catch {
+  committedLastmod = {};
+}
 const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 let gitHistory = true;
 try {
@@ -84,33 +97,23 @@ try {
   gitHistory = false;
 }
 if (gitHistory) {
-  let committed = {};
-  try {
-    committed = JSON.parse(readFileSync(lastmodPath, 'utf8'));
-  } catch {
-    committed = {};
-  }
   const pageLastmod = (file) => {
     const rel = `public/${file}`;
     try {
-      // A shallow checkout has no parent for files this commit did not touch.
-      // Keep the committed date instead of substituting the checkout mtime.
       const date = git(['log', '-1', '--format=%cs', '--', rel]);
-      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+      const hash = git(['log', '-1', '--format=%H', '--', rel]);
+      const head = git(['rev-parse', 'HEAD']);
+      const changedInHead = git(['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD']).split('\n').includes(rel);
+      // The tip commit is not the date of a file it did not change.
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date) && (hash !== head || changedInHead)) return date;
     } catch {
       // Fall through to the committed date, then the file mtime.
     }
-    if (/^\d{4}-\d{2}-\d{2}$/.test(committed[file] ?? '')) return committed[file];
+    const recorded = committedLastmod[file];
+    if (typeof recorded === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(recorded)) return recorded;
     return statSync(resolve(root, rel)).mtime.toISOString().slice(0, 10);
   };
   const lastmodJson = `${JSON.stringify(Object.fromEntries(pages.map((page) => [page.file, pageLastmod(page.file)])), null, 2)}\n`;
-  const currentLastmod = (() => {
-    try {
-      return readFileSync(lastmodPath, 'utf8');
-    } catch {
-      return '';
-    }
-  })();
   if (check && currentLastmod !== lastmodJson) {
     console.error('Outdated sitemap lastmod dates: resources/seo/lastmod.json');
     failures++;

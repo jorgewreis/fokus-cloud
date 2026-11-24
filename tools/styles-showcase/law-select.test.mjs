@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url);
 const { JSDOM } = process.env.REI54_JSDOM_MODULE
   ? await import(pathToFileURL(process.env.REI54_JSDOM_MODULE).href) : require('jsdom');
 const html = await readFile(new URL('./fixtures/law-select.html', import.meta.url), 'utf8');
-const bundle = await readFile(new URL('../../public/styles/assets/fokus-2.7.0.min.js', import.meta.url), 'utf8');
+const bundle = await readFile(new URL('../../public/styles/assets/fokus-3.0.0.min.js', import.meta.url), 'utf8');
 const adapter = await readFile(new URL('../../public/portal/assets/fokus-law-select.js', import.meta.url), 'utf8');
 
 test('adaptador Law distingue Select simples de controles nativos', async () => {

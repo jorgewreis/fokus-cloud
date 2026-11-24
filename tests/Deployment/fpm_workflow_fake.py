@@ -64,9 +64,14 @@ if program == 'ssh':
     # The existing workflow polls a synthetic Composer status via SSH.
     if args[-1].startswith("test -f '/tmp/fokuscloud-composer-install.status'"):
         print('0')
-elif program in ('scp', 'rsync'):
-    assert args[-1].startswith('fixture@fixture.invalid:/srv/fixture/') or (
-        program == 'scp' and args[-1].startswith('fixture@fixture.invalid:/tmp/fokuscloud-law-schema-'))
+elif program == 'rsync':
+    destination = args[-1]
+    # The active application root is not a transfer target. Only a new release directory is.
+    assert destination.startswith('fixture@fixture.invalid:/srv/fixture/releases/')
+    assert not destination.rstrip('/').endswith('/srv/fixture')
+    event = [program, *args]
+elif program == 'scp':
+    assert args[-1].startswith('fixture@fixture.invalid:/tmp/fokuscloud-law-schema-')
     event = [program, *args]
 elif program == 'curl':
     assert 'https://api.cloudflare.com/client/v4/zones/fixture-zone/purge_cache' in args

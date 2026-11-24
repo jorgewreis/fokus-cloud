@@ -11,7 +11,7 @@ async function load(t, slug, runtime = false) {
   const w = dom.window;
   await new Promise(resolve => w.document.readyState === 'loading' ? w.document.addEventListener('DOMContentLoaded', resolve, { once: true }) : resolve());
   w.navigator.clipboard = { writeText: async value => { w.copied = value; } };
-  if (runtime) { w.eval(read('public/styles/assets/fokus-2.7.0.min.js')); w.FokusStyles.Tabs.getOrCreateInstance(w.document.querySelector('[data-fs="tabs"]')); }
+  if (runtime) { w.eval(read('public/styles/assets/fokus-3.0.0.min.js')); w.FokusStyles.Tabs.getOrCreateInstance(w.document.querySelector('[data-fs="tabs"]')); }
   w.eval(read('public/assets/js/styles-layout-doc.js'));
   return { w, d: w.document };
 }
@@ -24,9 +24,9 @@ test('documentation hub lists exactly the five guides and all 56 catalog contrac
   assert.equal(contracts.length, 56); assert.equal(links.length, 56);
   assert.deepEqual(links.map(a => a.hash.slice(1)).sort(), contracts.map(c => c.id).sort());
   for (const a of links) { assert.equal(a.pathname, '/styles/next/'); assert.ok(a.textContent.trim()); }
-  assert.match(d.querySelector('#guias').textContent, /npm 2\.7\.0/);
+  assert.match(d.querySelector('#guias').textContent, /npm 3\.0\.0/);
   assert.match(d.querySelector('#componentes').textContent, /Em desenvolvimento.*next/s);
-  assert.match(d.querySelector('#componentes .styles-doc-version').textContent, /separado do npm 2\.7\.0/);
+  assert.match(d.querySelector('#componentes .styles-doc-version').textContent, /separado do npm 3\.0\.0/);
   assert.equal(d.querySelectorAll('#versoes article').length, 2);
   assert.match(d.querySelector('#versoes article:last-child').textContent, /não representa uma versão estável/);
   assert.equal(d.querySelectorAll('#exemplos a[href$=".html"]').length, 9);
@@ -56,14 +56,14 @@ for (const slug of ['', ...guides]) test(`${slug || 'docs'}: one global navigati
     assert.equal(d.querySelector('.styles-doc-sidebar-home').getAttribute('href'), '/docs');
     assert.deepEqual([...d.querySelectorAll('.styles-sidebar-page')].map(a => a.getAttribute('href')), guides.map(g => `/${g}`));
     assert.equal(d.querySelector('.styles-sidebar-page[aria-current="page"]').getAttribute('href'), `/${slug}`);
-    assert.match(d.querySelector('.styles-doc-version').textContent, /npm 2\.7\.0/);
+    assert.match(d.querySelector('.styles-doc-version').textContent, /npm 3\.0\.0/);
     assert.ok(d.querySelector('.styles-doc-version a[href="/docs#versoes"]'));
   }
 });
 
-test('Components uses official 2.7.0 tabs: buttons, click, keyboard, selected state and associated panels', async t => {
+test('Components uses official 3.0.0 tabs: buttons, click, keyboard, selected state and associated panels', async t => {
   const { w, d } = await load(t, 'components', true);
-  assert.ok(d.querySelector('script[src="/styles/assets/fokus-2.7.0.min.js"]'));
+  assert.ok(d.querySelector('script[src="/styles/assets/fokus-3.0.0.min.js"]'));
   const tabs = [...d.querySelectorAll('[data-fs="tabs"] button')];
   assert.equal(tabs.length, 3);
   const check = selected => tabs.forEach((tab, i) => {

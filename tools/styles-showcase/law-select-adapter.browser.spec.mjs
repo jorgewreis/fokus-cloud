@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// Local fixture, real 2.7.0 bundle and Law adapter; no authenticated product data.
+// Local fixture, real 3.0.0 bundle and Law adapter; no authenticated product data.
 const fixture = 'http://127.0.0.1:8765/law-select.html';
 
 test.beforeEach(async ({ page }) => {

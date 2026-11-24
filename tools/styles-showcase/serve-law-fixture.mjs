@@ -8,8 +8,8 @@ const files = new Map([
   ['/law-select.html', [new URL('./fixtures/law-select.html', import.meta.url), 'text/html; charset=utf-8']],
   ['/law-record-ui.js', [new URL('../../public/portal/assets/law-record-ui.js', import.meta.url), 'text/javascript; charset=utf-8']],
   ['/law-select.js', [new URL('../../public/portal/assets/fokus-law-select.js', import.meta.url), 'text/javascript; charset=utf-8']],
-  ['/fokus-2.7.0.min.css', [new URL('../../public/styles/assets/fokus-2.7.0.min.css', import.meta.url), 'text/css; charset=utf-8']],
-  ['/fokus-2.7.0.min.js', [new URL('../../public/styles/assets/fokus-2.7.0.min.js', import.meta.url), 'text/javascript; charset=utf-8']],
+  ['/fokus-3.0.0.min.css', [new URL('../../public/styles/assets/fokus-3.0.0.min.css', import.meta.url), 'text/css; charset=utf-8']],
+  ['/fokus-3.0.0.min.js', [new URL('../../public/styles/assets/fokus-3.0.0.min.js', import.meta.url), 'text/javascript; charset=utf-8']],
 ]);
 createServer(async (request, response) => {
   const entry = files.get(new URL(request.url, 'http://localhost').pathname);

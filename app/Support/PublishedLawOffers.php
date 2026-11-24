@@ -38,7 +38,28 @@ final class PublishedLawOffers
     public function cards(array $plans): string
     {
         $cards = '';
-        foreach ($plans as $plan) {
+        $ordered = $plans;
+        usort($ordered, function (array $left, array $right): int {
+            $rank = function (array $plan): int {
+                $name = (string) ($plan['name'] ?? '').' '.(string) ($plan['base_name'] ?? '');
+                $segment = (string) ($plan['segment'] ?? '');
+                if ($segment === 'advocacia') {
+                    return 0;
+                }
+                if (preg_match('/geral|órgão|orgao/iu', $name)) {
+                    return 1;
+                }
+                if (preg_match('/judicial|judici/iu', $name)) {
+                    return 2;
+                }
+
+                return $segment === 'setor_publico' ? 3 : 4;
+            };
+
+            return $rank($left) <=> $rank($right)
+                ?: ((int) ($left['display_order'] ?? 0)) <=> ((int) ($right['display_order'] ?? 0));
+        });
+        foreach ($ordered as $plan) {
             $featured = ! empty($plan['featured']);
             $segment = (string) ($plan['segment'] ?? '');
             $segmentClass = match ($segment) {
@@ -61,11 +82,11 @@ final class PublishedLawOffers
                 .'<h3>'.$this->escape((string) ($plan['name'] ?? '')).'</h3>'
                 .'<p>'.$this->escape($description).'</p>'
                 .'<strong>'.self::formatMoney($plan['monthly_amount'] ?? 0).' <small>/ mês</small></strong>'
-                .'<button class="fs-btn fs-btn-primary law-submit" type="button" data-choose-plan="'.$this->escape((string) ($plan['code'] ?? '')).'">Configurar plano</button>'
+                .'<button class="fs-btn fs-btn-primary law-submit" type="button" data-choose-plan="'.$this->escape((string) ($plan['code'] ?? '')).'">'.($segment === 'setor_publico' ? 'Assinar' : 'Configurar plano').'</button>'
                 .'</article>';
         }
 
-        return '<article class="lp-offer lp-standalone"><p class="law-eyebrow law-eyebrow-sage">SEM PLANO-BASE</p><h3>Assinatura Personalizada</h3><p>Escolha somente os módulos de que sua operação precisa. Cada módulo é cobrado pelo preço integral publicado.</p><button class="fs-btn fs-btn-primary law-submit" type="button" data-choose-custom>Escolher módulos</button></article>'.$cards;
+        return '<article class="lp-offer lp-standalone"><p class="law-eyebrow law-eyebrow-sage">SEM PLANO-BASE</p><h3>Módulos avulsos</h3><p>Escolha só os módulos disponíveis que você vai usar. Sem plano, cada módulo é cobrado pelo preço cheio do catálogo.</p><button class="fs-btn fs-btn-primary law-submit" type="button" data-choose-custom>Escolher módulos</button></article>'.$cards;
     }
 
     public static function formatMoney(mixed $value): string

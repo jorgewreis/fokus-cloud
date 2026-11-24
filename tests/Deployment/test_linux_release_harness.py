@@ -26,7 +26,7 @@ class CoverageComposition(unittest.TestCase):
         report = ET.Element('testsuites')
         group = ET.SubElement(report, 'testsuite', tests=str(suite.EXPECTED_TESTS),
                               assertions=str(suite.MINIMUM_ASSERTIONS), failures='0', errors='0', skipped='0')
-        for identity, assertions in {**suite.MAIN_IDENTITY_TESTS, **suite.LEAD_TESTS, **suite.BILLING_TESTS, **suite.BACKOFFICE_TESTS, **suite.INTEREST_TESTS, **suite.IDEMPOTENCY_TESTS}.items():
+        for identity, assertions in {**suite.MAIN_IDENTITY_TESTS, **suite.LEAD_TESTS, **suite.BILLING_TESTS, **suite.BACKOFFICE_TESTS, **suite.INTEREST_TESTS, **suite.PUBLIC_RELEASE_TESTS, **suite.IDEMPOTENCY_TESTS}.items():
             klass, name = identity.split('::')
             ET.SubElement(group, 'testcase', {'class': klass, 'name': name, 'assertions': str(assertions)})
         for number in range(suite.EXPECTED_TESTS - len(group)):
@@ -34,11 +34,29 @@ class CoverageComposition(unittest.TestCase):
         return report
 
     def test_measured_composition_preserves_all_law_and_main_tests(self):
-        self.assertEqual(suite.EXPECTED_TESTS, 429)
-        self.assertEqual(suite.MINIMUM_ASSERTIONS, 3354)
+        self.assertEqual(suite.EXPECTED_TESTS, 435)
+        self.assertEqual(suite.MINIMUM_ASSERTIONS, 3532)
         self.assertEqual(len(suite.MAIN_IDENTITY_TESTS), 10)
         self.assertEqual(sum(suite.MAIN_IDENTITY_TESTS.values()), 23)
-        self.assertEqual(suite.coverage(self.report(), 'sqlite')['tests'], 429)
+        self.assertEqual(suite.coverage(self.report(), 'sqlite')['tests'], 435)
+        self.assertEqual(suite.coverage(self.report(), 'sqlite')['assertions'], 3532)
+
+    def test_application_junit_checker_accepts_only_the_reviewed_composition(self):
+        import subprocess
+        import sys
+        report = self.report()
+        script = common.ROOT / 'tests/Deployment/check-suite-composition.py'
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / 'junit.xml'
+            ET.ElementTree(report).write(path, encoding='utf-8', xml_declaration=True)
+            accepted = subprocess.run([sys.executable, str(script), str(path)], capture_output=True, text=True)
+            self.assertEqual(accepted.returncode, 0, accepted.stderr)
+            self.assertIn('435 tests', accepted.stdout)
+            report[0].set('tests', '434')
+            ET.ElementTree(report).write(path, encoding='utf-8', xml_declaration=True)
+            rejected = subprocess.run([sys.executable, str(script), str(path)], capture_output=True, text=True)
+            self.assertEqual(rejected.returncode, 1)
+            self.assertIn('434/435', rejected.stderr)
 
     def test_omission_duplicate_or_weakened_identity_is_rejected_even_with_green_totals(self):
         for mutation in ('omit', 'duplicate', 'rename', 'assertions'):
@@ -64,12 +82,14 @@ class CoverageComposition(unittest.TestCase):
                     with self.assertRaises(RuntimeError): suite.coverage(report, 'sqlite')
 
     def test_every_required_backoffice_and_interest_case_keeps_assertions(self):
-        self.assertEqual(len(suite.BILLING_TESTS), 17)
-        self.assertEqual(sum(suite.BILLING_TESTS.values()), 148)
-        self.assertEqual(len(suite.BACKOFFICE_TESTS), 22)
-        self.assertEqual(sum(suite.BACKOFFICE_TESTS.values()), 202)
+        self.assertEqual(len(suite.BILLING_TESTS), 18)
+        self.assertEqual(sum(suite.BILLING_TESTS.values()), 164)
+        self.assertEqual(len(suite.BACKOFFICE_TESTS), 23)
+        self.assertEqual(sum(suite.BACKOFFICE_TESTS.values()), 208)
         self.assertEqual(len(suite.INTEREST_TESTS), 4)
-        for name in set(suite.BILLING_TESTS) | set(suite.BACKOFFICE_TESTS) | set(suite.INTEREST_TESTS):
+        self.assertEqual(len(suite.PUBLIC_RELEASE_TESTS), 4)
+        self.assertEqual(sum(suite.PUBLIC_RELEASE_TESTS.values()), 67)
+        for name in set(suite.BILLING_TESTS) | set(suite.BACKOFFICE_TESTS) | set(suite.INTEREST_TESTS) | set(suite.PUBLIC_RELEASE_TESTS):
             for mutation in ('omit', 'duplicate', 'rename', 'assertions'):
                 with self.subTest(name=name, mutation=mutation):
                     report = self.report(); group = report[0]
@@ -95,7 +115,7 @@ class CoverageComposition(unittest.TestCase):
                     with self.assertRaises(RuntimeError): suite.coverage(report, 'sqlite')
 
     def test_old_or_incomplete_totals_failures_errors_skips_and_hidden_failures_are_rejected(self):
-        for key, value in [('tests','327'),('tests','376'),('tests','423'),('tests','425'),('tests','428'),('tests','430'),('assertions','3029'),('assertions','3072'),('assertions','3320'),
+        for key, value in [('tests','327'),('tests','376'),('tests','423'),('tests','425'),('tests','428'),('tests','429'),('tests','430'),('tests','432'),('tests','434'),('assertions','3029'),('assertions','3072'),('assertions','3320'),('assertions','3354'),('assertions','3469'),('assertions','3491'),
                            ('failures','1'),('errors','1'),('skipped','1')]:
             with self.subTest(key=key):
                 report = self.report(); report[0].set(key,value)

@@ -4,7 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#071b2d">
   <title>Fokus Lead | Fokus Cloud</title>
-  <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20261009-select-menu-options-v1">
+  <link rel="stylesheet" href="/assets/css/shared/fokus.css?v=20261123-fokus-styles-3-0-0">
   <link rel="stylesheet" href="/marketing/products/fokus-lead-tokens.css?v=20261014-lead-tokens-v1">
   <link rel="stylesheet" href="/portal/assets/fokus-lead-shell.css?v=20261014-lead-identity-v1">
 </head>
@@ -35,5 +35,5 @@
       </section>
     </main>
   </div>
-  <script src="/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0"></script><script src="/assets/js/api-client.js"></script><script src="/assets/js/portal-profile.js?v=20261002-law-profile-v1"></script><script src="/portal/assets/fokus-lead-shell.js?v=20261014-lead-identity-v1"></script>
+  <script src="/assets/js/fokus.min.js?v=20261123-fokus-styles-3-0-0"></script><script src="/assets/js/api-client.js"></script><script src="/assets/js/portal-profile.js?v=20261002-law-profile-v1"></script><script src="/portal/assets/fokus-lead-shell.js?v=20261014-lead-identity-v1"></script>
 </body></html>

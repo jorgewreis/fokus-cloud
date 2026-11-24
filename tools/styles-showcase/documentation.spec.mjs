@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 const guides = ['layout', 'forms', 'components', 'helpers', 'utilities'];
 const catalog = JSON.parse(readFileSync(new URL('../../public/styles/next/catalog.json', import.meta.url), 'utf8'));
-const runtimePath = '/styles/assets/fokus-2.7.0.min.js';
+const runtimePath = '/styles/assets/fokus-3.0.0.min.js';
 
 async function theme(page, value) {
   await page.addInitScript(value => localStorage.setItem('fokus-styles-theme', value), value);
@@ -50,9 +50,9 @@ for (const width of [1440, 390]) for (const appearance of ['dark', 'light']) {
     const links = page.locator('.styles-doc-contract-group a');
     await expect(links).toHaveCount(56);
     expect(await links.evaluateAll(nodes => nodes.map(a => a.getAttribute('href')).sort())).toEqual(catalog.contracts.map(c => `/styles/next/#${c.id}`).sort());
-    await expect(page.locator('#guias')).toContainText('npm 2.7.0');
+    await expect(page.locator('#guias')).toContainText('npm 3.0.0');
     await expect(page.locator('#componentes .styles-doc-status')).toHaveText('Em desenvolvimento · next');
-    await expect(page.locator('#componentes .styles-doc-version')).toContainText('separado do npm 2.7.0');
+    await expect(page.locator('#componentes .styles-doc-version')).toContainText('separado do npm 3.0.0');
     await expect(page.locator('#versoes article')).toHaveCount(2);
     await expect(page.locator('#versoes article').last()).toContainText('não representa uma versão estável');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Hub must not overflow horizontally').toBe(true);
@@ -72,7 +72,7 @@ for (const width of [1440, 390]) for (const appearance of ['dark', 'light']) {
       await navigation(page);
       await expect(page.locator('main#main h1')).toBeVisible();
       await expect(page.locator(`.styles-sidebar-page[href="/${slug}"]`)).toHaveAttribute('aria-current', 'page');
-      await expect(page.locator('.styles-doc-version')).toContainText('npm 2.7.0');
+      await expect(page.locator('.styles-doc-version')).toContainText('npm 3.0.0');
       await expect(page.locator('.styles-doc-version a')).toHaveAttribute('href', '/docs#versoes');
       // Scope to new navigation/version structure. Legacy demo contrast and
       // legacy demo markup are intentionally not a new release gate.
@@ -133,7 +133,10 @@ for (const width of [1440, 390]) for (const appearance of ['dark', 'light']) {
       expect(await stage.evaluate(el => [...el.classList].filter(c => c.startsWith('fs-stack-gap-')))).toEqual([`fs-stack-gap-${gap}`]);
       await expect(stage.locator('code')).toContainText(`fs-stack-gap-${gap}`);
       for (const value of ['1', '4']) await expect(page.locator(`[data-helpers-gap="${value}"]`)).toHaveAttribute('aria-pressed', String(value === gap));
-      gaps.push(await stage.evaluate(el => parseFloat(getComputedStyle(el).rowGap)));
+      gaps.push(await stage.evaluate(async (el) => {
+        await Promise.all(el.getAnimations().map(animation => animation.finished));
+        return parseFloat(getComputedStyle(el).rowGap);
+      }));
     }
     expect(gaps[1]).toBeGreaterThan(gaps[0]); expect(gaps[2]).toBe(gaps[0]);
 
@@ -172,7 +175,7 @@ for (const width of [1440, 390]) for (const appearance of ['dark', 'light']) {
     }, snippet)).toBe(true);
     const isolated = await page.context().newPage();
     try {
-      const css = new URL('/styles/assets/fokus-2.7.0.min.css', page.url()).href;
+      const css = new URL('/styles/assets/fokus-3.0.0.min.css', page.url()).href;
       await isolated.setContent(`<!doctype html><html lang="pt-BR" data-theme="${appearance}"><head><link rel="stylesheet" href="${css}"></head><body>${snippet}</body></html>`);
       await expect(isolated.locator('#example-email-error')).toBeVisible();
       await expect(isolated.locator('#example-email-error')).toHaveCSS('display', 'block');

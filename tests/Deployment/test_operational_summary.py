@@ -32,7 +32,7 @@ class PublicationSummaryTests(unittest.TestCase):
 
     def test_missing_or_injected_outcomes_never_leak_or_pass(self):
         env = self.successful()
-        env["PHASE_FILES"] = "SECRET_TOKEN_OR_REMOTE_BODY"
+        env["PHASE_SWITCH"] = "SECRET_TOKEN_OR_REMOTE_BODY"
         report, complete = SUMMARY.render(env)
         self.assertFalse(complete)
         self.assertNotIn("SECRET_TOKEN", report)
@@ -57,6 +57,7 @@ class PublicationSummaryTests(unittest.TestCase):
         report, complete = SUMMARY.render(env)
         self.assertFalse(complete)
         self.assertIn("Remote writes may have occurred", report)
+        self.assertIn("code pointer is rolled back when release verification fails", report)
         self.assertIn("do not automatically roll back migrations", report)
 
 
