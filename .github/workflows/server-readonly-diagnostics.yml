@@ -114,9 +114,12 @@ jobs:
             echo FAILED
           fi
           run systemctl show php8.5-fpm -p ActiveState -p SubState -p UnitFileState
+          run systemctl show php8.5-fpm.service --no-pager --property=Id,LoadState,ActiveState,CanReload
 
           printf '%s\n' '---- sudo ----'
           run sudo -n -l
+          run sudo -n -ll
+          run sudo -V | head -1 || echo FAILED
 
           printf '%s\n' '---- law ----'
           # prepublish-law-schema.php runs migrate when the column is absent.

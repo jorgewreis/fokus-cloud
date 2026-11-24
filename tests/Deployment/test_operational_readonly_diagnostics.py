@@ -85,7 +85,10 @@ class ReadOnlyDiagnosticWorkflow(unittest.TestCase):
             "run grep -nE 'opcache.enable|preload' \"$ini\"",
             "run grep -nE 'opcache.enable|preload' \"$phpconf\"/*.conf",
             'run systemctl show php8.5-fpm -p ActiveState -p SubState -p UnitFileState',
+            'run systemctl show php8.5-fpm.service --no-pager --property=Id,LoadState,ActiveState,CanReload',
             'run sudo -n -l',
+            'run sudo -n -ll',
+            'run sudo -V | head -1 || echo FAILED',
             'database/migrations/2026_10_30_160000_add_encrypted_details_to_law_contacts.php',
             'LOG_CHANNEL=stderr timeout 25 php artisan migrate:status --no-ansi --no-interaction --path="$rel"',
         ):
@@ -95,6 +98,9 @@ class ReadOnlyDiagnosticWorkflow(unittest.TestCase):
                 self.assertTrue(line.lstrip().startswith('#'), line)
         self.assertNotIn('artisan migrate ', script)
         self.assertNotIn('artisan migrate\n', script)
+        version_probe = 'run sudo -V | head -1 || echo FAILED'
+        self.assertEqual(script.count(version_probe), 1)
+        scanned = script.replace(version_probe, 'run sudo -V || echo FAILED', 1)
         for pattern in (
             r'\brsync\b', r'\bscp\b', r'\bcurl\b', r'\bwget\b', r'\bmysql\b', r'\bmariadb\b',
             r'\bmysqldump\b', r'\bchmod\b', r'\bchown\b', r'\bmkdir\b', r'\brm\b', r'\bmv\b',
@@ -104,7 +110,7 @@ class ReadOnlyDiagnosticWorkflow(unittest.TestCase):
             r'\bprintenv\b', r'\bbase64\b', r'migrate:fresh', r'migrate:rollback', r'migrate:reset',
             r'>>', r'\bsource\b',
         ):
-            self.assertIsNone(re.search(pattern, script), pattern)
+            self.assertIsNone(re.search(pattern, scanned), pattern)
         writable = script.replace('2>&1', '').replace('</dev/null', '').replace('2>/dev/null', '')
         self.assertNotIn('>', writable)
         self.assertNotIn('<', writable)

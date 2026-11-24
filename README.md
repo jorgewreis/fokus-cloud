@@ -55,7 +55,7 @@ A página pública apresenta os segmentos atendidos, a proposta dos módulos e a
 
 O Fokus Styles reúne uma base reutilizável para desenvolvimento de interfaces: tokens visuais, temas, componentes, estilos de layout e formulários, além de documentação pública. É um projeto independente dentro do ecossistema e possui licença MIT própria.
 
-[Acesse o Fokus Styles](https://styles.fokuscloud.com.br/) · [Consulte o repositório](https://github.com/jorgewreis/fokus-styles)
+[Acesse o Fokus Styles](https://styles.fokuscloud.com.br/) · [Consulte o repositório](https://github.com/jorgewreis/fokus/tree/main/packages/styles)
 
 ### Fokus Lead: produto imobiliário em descoberta
 
