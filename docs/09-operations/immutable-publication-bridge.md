@@ -12,7 +12,11 @@ continua recusando quem o invocar; o publicador usa o mesmo motivo
 O primeiro release selado exige o input `bootstrap_first_sealed_release`. Só
 nesse caso o `probe-current` aceita o 404 HTML do release ainda não selado, e
 registra `bootstrap_first_sealed_release=accepted reason=unsealed_release_http_404`.
-A verificação final do SHA candidato não aceita esse 404. O layout do servidor,
+A página de erro legada pode passar do limite de corpo: a classificação usa o
+status e o `Content-Type: text/html`, lendo só um prefixo limitado. Fora do
+bootstrap, e em qualquer HTTP 200 ou JSON, esse limite continua rejeitando
+`response_too_large`. A verificação final do SHA candidato não aceita esse 404.
+O layout do servidor,
 o symlink do docroot e os dois modos de FPM estão em `.github/DEPLOYMENT.md`.
 
 Os gates de `publication_gate.py`, do environment `production` e da homologação

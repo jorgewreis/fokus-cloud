@@ -186,8 +186,114 @@ class VerificationTests(unittest.TestCase):
         self.assertEqual('bootstrap_first_sealed_release=not_applicable reason=sealed_release_present', self.outputs[-2])
         self.assertEqual('current_release_contract=verified', self.outputs[-1])
 
+    @contextlib.contextmanager
+    def local_routes(self, routes):
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *_):
+                pass
+
+            def do_GET(self):
+                status, headers, body = routes[urllib.parse.urlsplit(self.path).path]
+                self.send_response(status)
+                for key, value in headers.items():
+                    self.send_header(key, value)
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+        server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield 'http://127.0.0.1:%d' % server.server_address[1]
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=3)
+
+    def http_config(self, origin):
+        return VERIFY.Configuration(origin, origin + '/deployment-release', SHA, 'verify-only', '')
+
+    def run_real_probe(self, config, **kwargs):
+        VERIFY.verify(config, sleeper=lambda _: None, nonce_factory=lambda: next(self.nonces),
+                      report=self.outputs.append, **kwargs)
+
+    def test_bootstrap_large_html_404_is_absent_without_the_full_body(self):
+        secret = b'SECRET_TAIL'
+        html = (b'A' * VERIFY.UNSEALED_HTML_PREFIX) + secret + (b'B' * (VERIFY.MAX_BODY + 1))
+        routes = {
+            '/up': (200, {'Content-Type': 'text/plain'}, b'healthy'),
+            '/deployment-release': (404, {'Content-Type': 'text/html; charset=UTF-8'}, html),
+        }
+        with self.local_routes(routes) as origin:
+            status, headers, body = VERIFY.fetch(origin + '/deployment-release?deploy_probe=' + ('c' * 48), 3,
+                                                  bootstrap_release_probe=True)
+            self.assertEqual(404, status)
+            self.assertEqual('text/html; charset=UTF-8', headers['content-type'])
+            self.assertEqual(VERIFY.UNSEALED_HTML_PREFIX, len(body))
+            self.assertNotIn(secret, body)
+            self.run_real_probe(self.http_config(origin), probe_current=True, bootstrap=True)
+        self.assertEqual(self.outputs.count('bootstrap_first_sealed_release=accepted reason=unsealed_release_http_404'), 3)
+        self.assertEqual('current_release_contract=unsealed_bootstrap', self.outputs[-1])
+        self.assertNotIn(secret.decode(), '\n'.join(self.outputs))
+        self.assertNotIn('active_release=verified', self.outputs)
+
+    def test_non_bootstrap_404_fails(self):
+        small = {
+            '/up': (200, {'Content-Type': 'text/plain'}, b'healthy'),
+            '/deployment-release': (404, {'Content-Type': 'text/html'}, b'<html>SECRET_BODY</html>'),
+        }
+        large = {
+            '/up': (200, {'Content-Type': 'text/plain'}, b'healthy'),
+            '/deployment-release': (404, {'Content-Type': 'text/html; charset=UTF-8'},
+                                    b'A' * (VERIFY.MAX_BODY + 64)),
+        }
+        with self.local_routes(small) as origin:
+            config = self.http_config(origin)
+            for kwargs in ({}, {'probe_current': True}, {'probe_current': False, 'bootstrap': True}):
+                with self.subTest(body='small', **kwargs), self.assertRaisesRegex(VERIFY.VerificationError, '^release_http_not_ok$'):
+                    self.run_real_probe(config, **kwargs)
+                self.assertNotIn('SECRET_BODY', '\n'.join(self.outputs))
+        with self.local_routes(large) as origin:
+            config = self.http_config(origin)
+            for kwargs in ({}, {'probe_current': True}, {'probe_current': False, 'bootstrap': True}):
+                with self.subTest(body='large', **kwargs), self.assertRaisesRegex(VERIFY.VerificationError, '^response_too_large$'):
+                    self.run_real_probe(config, **kwargs)
+            with self.assertRaisesRegex(VERIFY.VerificationError, '^response_too_large$'):
+                VERIFY.fetch(origin + '/deployment-release', 3)
+
+    def test_oversized_http_200_stays_response_too_large(self):
+        oversized = b'{' + (b'x' * VERIFY.MAX_BODY)
+        routes = {
+            '/up': (200, {'Content-Type': 'text/plain'}, b'healthy'),
+            '/deployment-release': (200, {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-store',
+            }, oversized),
+        }
+        with self.local_routes(routes) as origin:
+            with self.assertRaisesRegex(VERIFY.VerificationError, '^response_too_large$'):
+                self.run_real_probe(self.http_config(origin), probe_current=True, bootstrap=True)
+            with self.assertRaisesRegex(VERIFY.VerificationError, '^response_too_large$'):
+                VERIFY.fetch(origin + '/deployment-release', 3, bootstrap_release_probe=True)
+            self.assertNotIn('current_release_contract=verified', self.outputs)
+        html_200 = (200, {'Content-Type': 'text/html'}, b'A' * (VERIFY.MAX_BODY + 8))
+        json_404 = (404, {'Content-Type': 'application/json'}, oversized)
+        with self.local_routes({'/page': html_200}) as origin:
+            with self.assertRaisesRegex(VERIFY.VerificationError, '^response_too_large$'):
+                VERIFY.fetch(origin + '/page', 3, bootstrap_release_probe=True)
+        with self.local_routes({'/page': json_404}) as origin:
+            with self.assertRaisesRegex(VERIFY.VerificationError, '^response_too_large$'):
+                VERIFY.fetch(origin + '/page', 3, bootstrap_release_probe=True)
+
     def test_cli_bootstrap_is_explicit_and_ignored_by_final_verification(self):
-        def fetch(url, timeout):
+        calls = []
+
+        def fetch(url, timeout, *, bootstrap_release_probe=False):
+            calls.append((url.endswith('/up'), bootstrap_release_probe))
             if url.endswith('/up'):
                 return 200, {}, b'healthy'
             return 404, {'content-type': 'text/html'}, b'<html>SECRET_BODY</html>'
@@ -196,11 +302,14 @@ class VerificationTests(unittest.TestCase):
             output = io.StringIO()
             with contextlib.redirect_stdout(output):
                 self.assertEqual(0, VERIFY.main(['probe-current'], enabled))
+            self.assertEqual(calls, [(True, False), (False, True)] * 3)
             self.assertIn('bootstrap_first_sealed_release=accepted reason=unsealed_release_http_404', output.getvalue())
             self.assertNotIn('SECRET_BODY', output.getvalue())
+            calls.clear()
             error = io.StringIO()
             with contextlib.redirect_stderr(error):
                 self.assertEqual(1, VERIFY.main(['verify'], enabled))
+            self.assertEqual(calls, [(True, False), (False, False)])
             self.assertIn('reason=release_http_not_ok', error.getvalue())
             self.assertNotIn('SECRET_BODY', error.getvalue())
         for value in ('1', 'yes', 'TRUE', 'force'):
