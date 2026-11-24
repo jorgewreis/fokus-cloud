@@ -49,8 +49,10 @@ async function requiredAssets() {
 // Exact reviewed workflow pin. This accepts only the manual-main dispatch,
 // the production environment, the publication gate and the atomic sealed
 // publisher. It is not a YAML heuristic and does not grant permission to run
-// it. Any change needs review.
-const reviewedWorkflowSha256 = '81f7838e82c391c9f714707c4698f901826d8d1a853f43206fcaf5699a4999be';
+// it. Any change needs review. The current bytes add transport retries to the
+// Cloudflare purge only. The gate, environment, sealed publisher and FPM
+// policy are unchanged.
+const reviewedWorkflowSha256 = 'edafe8fa0aa7f91901314c60b70b96a41120345337ade95452a7363dc7c7679d';
 const deployWorkflowPath = path.join(repositoryRoot, '.github/workflows/deploy.yml');
 const reviewedWorkflow = await readFile(deployWorkflowPath, 'utf8');
 function assertReviewedWorkflow(workflow) {
