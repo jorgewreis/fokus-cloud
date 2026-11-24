@@ -5,6 +5,9 @@ import subprocess
 
 SERVICE_PATTERN = r'(?:clp-php-fpm|php(?:[0-9]+\.[0-9]+)?-fpm)\.service'
 SYSTEMCTL = '/usr/bin/systemctl'
+# sudo 1.9.14+ prints the rule file (and optional :line) on the header.
+# A blank header remains the older sudo format. Anything else is rejected.
+SUDOERS_SOURCE_PATTERN = r'/etc/sudoers(?:\.d/[A-Za-z0-9_-][A-Za-z0-9_.-]*)?(?::[0-9]+)?'
 
 def reload_command(service):
     if not isinstance(service, str) or re.fullmatch(SERVICE_PATTERN, service) is None:
@@ -61,9 +64,13 @@ def check_permission(remote, service):
     entries = output.split('Sudoers entry:')
     if len(entries) != 2:
         raise GuardError('Ambiguous sudo policy listing')
+    source, _, body = entries[1].partition('\n')
+    source = source.strip()
+    if source and re.fullmatch(SUDOERS_SOURCE_PATTERN, source) is None:
+        raise GuardError('Unsupported sudo policy source')
     fields = {}
     current = None
-    for line in entries[1].splitlines():
+    for line in body.splitlines():
         line = line.strip()
         if not line:
             continue
