@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 const root = resolve(import.meta.dirname, '..');
 const source = process.argv[2];
-if (!source) throw new Error('Usage: node tools/sync-styles-next.mjs /path/to/fokus-styles');
+if (!source) throw new Error('Usage: node tools/sync-styles-next.mjs /path/to/fokus/packages/styles');
 const files = { 'catalog.json': 'docs/generated/next/catalog.json', 'fokus.css': 'dist/css/fokus.css', 'fokus.js': 'dist/js/fokus.js' };
 const buffers = Object.fromEntries(await Promise.all(Object.entries(files).map(async ([name, path]) => [name, await readFile(resolve(source, path))])));
 const catalog = JSON.parse(buffers['catalog.json']);

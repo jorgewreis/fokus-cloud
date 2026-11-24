@@ -13,7 +13,7 @@ const organization = { '@type': 'Organization', '@id': `${cloud}#organization`, 
 const software = {
   '@type': 'SoftwareSourceCode', '@id': `${styles}#software`, name: 'Fokus Styles', url: styles,
   description: 'Framework CSS gratuito com licença MIT, tokens, temas e interações em JavaScript vanilla.',
-  codeRepository: 'https://github.com/jorgewreis/fokus-styles',
+  codeRepository: 'https://github.com/jorgewreis/fokus/tree/main/packages/styles',
   programmingLanguage: ['CSS', 'JavaScript'], license: 'https://opensource.org/licenses/MIT',
   sameAs: ['https://www.npmjs.com/package/fokus-styles'],
   isPartOf: { '@id': `${cloud}#website` },
