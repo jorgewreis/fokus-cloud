@@ -139,11 +139,15 @@ do Pint e suíte geral. Não altera deploy.yml ou servidores.
 
 A integração usa o verificador revisado a partir do PR #57, commit
 `a8cc9729181471c9f46ccb15d51383e1aceb61ab`. O blob atual é
-`56f6dc4e78aa6b4a48158183395d4a5a6b96a0ab`: a revisão acrescenta o bootstrap
-explícito do 404 HTML no `probe-current` e não muda a verificação do SHA candidato.
-O workflow busca o commit histórico; se o arquivo já existe na composição, exige
-esse blob. Divergência bloqueia até nova revisão explícita do contrato. A ausência
-do commit local é dependência de teste, não skip.
+`332e716c97dcf83d4b499e00f7a6eb2310386b8b`: o `probe-current` com bootstrap
+aceita o 404 `text/html` do release ainda não selado, inclusive a página de erro
+legada maior que o limite de corpo. Nesse caso a classificação usa status e
+`Content-Type` e lê só um prefixo limitado. HTTP 200, JSON e qualquer modo que
+não seja esse probe continuam sujeitos ao limite e à validação estrita. A
+verificação do SHA candidato não muda. O workflow busca o commit histórico; se o
+arquivo já existe na composição, exige esse blob. Divergência bloqueia até nova
+revisão explícita do contrato. A ausência do commit local é dependência de
+teste, não skip.
 HTTP sem TLS é usado **apenas** no listener 127.0.0.1 do teste pela construção interna
 de Configuration; a CLI produtiva do verificador mantém HTTPS obrigatório.
 

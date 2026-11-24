@@ -14,6 +14,9 @@ import urllib.request
 from dataclasses import dataclass
 
 MAX_BODY = 4096
+# A legacy text/html 404 can exceed MAX_BODY. Bootstrap probe-current classifies
+# that page from status and content-type and reads only this prefix.
+UNSEALED_HTML_PREFIX = 512
 REQUEST_TIMEOUT = 5
 DEADLINE_SECONDS = 60
 SAMPLE_INTERVAL = 2
@@ -78,7 +81,37 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise VerificationError('redirect_rejected')
 
 
-def fetch(url, timeout):
+def normalized_headers(message):
+    return {key.lower(): value for key, value in message.items()}
+
+
+def unsealed_html_404(status, headers):
+    content_type = headers.get('content-type', '').split(';', 1)[0].strip().lower()
+    return status == 404 and content_type == 'text/html'
+
+
+def read_response_body(stream, status, headers, *, bootstrap_release_probe):
+    # Decide from status and content-type before applying the size cap.
+    # Only a bootstrap release probe may treat a non-JSON text/html 404 as the
+    # absent unsealed page. HTTP 200, JSON and every other response stay capped.
+    bounded_prefix = bootstrap_release_probe and unsealed_html_404(status, headers)
+    try:
+        body = stream.read(UNSEALED_HTML_PREFIX if bounded_prefix else MAX_BODY + 1)
+    except (OSError, http.client.HTTPException, ValueError):
+        raise VerificationError('transport_or_tls_error') from None
+    if not bounded_prefix and len(body) > MAX_BODY:
+        raise VerificationError('response_too_large')
+    return body
+
+
+def close_response(response):
+    try:
+        response.close()
+    except (OSError, http.client.HTTPException, ValueError):
+        pass
+
+
+def fetch(url, timeout, *, bootstrap_release_probe=False):
     request = urllib.request.Request(url, headers={
         'Accept': 'application/json',
         'Cache-Control': 'no-cache, no-store',
@@ -87,20 +120,21 @@ def fetch(url, timeout):
     try:
         # HTTPS uses the platform trust store. No unverified TLS context or redirect.
         with urllib.request.build_opener(NoRedirect()).open(request, timeout=timeout) as response:
-            body = response.read(MAX_BODY + 1)
-            if len(body) > MAX_BODY:
-                raise VerificationError('response_too_large')
-            return response.status, {key.lower(): value for key, value in response.headers.items()}, body
+            headers = normalized_headers(response.headers)
+            body = read_response_body(response, response.status, headers,
+                                       bootstrap_release_probe=bootstrap_release_probe)
+            return response.status, headers, body
     except VerificationError:
         raise
     except urllib.error.HTTPError as error:
         try:
-            body = error.read(MAX_BODY + 1)
-        except (OSError, http.client.HTTPException, ValueError):
-            raise VerificationError('transport_or_tls_error') from None
-        if len(body) > MAX_BODY:
-            raise VerificationError('response_too_large')
-        return error.code, {key.lower(): value for key, value in error.headers.items()}, body
+            headers = normalized_headers(error.headers)
+            body = read_response_body(error, error.code, headers,
+                                       bootstrap_release_probe=bootstrap_release_probe)
+            return error.code, headers, body
+        finally:
+            # Drop the unread tail of a legacy error page instead of draining it.
+            close_response(error)
     except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException, ValueError):
         raise VerificationError('transport_or_tls_error') from None
 
@@ -126,16 +160,17 @@ def bootstrap_requested(env):
     return value == 'true'
 
 
-def unsealed_html_404(status, headers):
-    content_type = headers.get('content-type', '').split(';', 1)[0].strip().lower()
-    return status == 404 and content_type == 'text/html'
-
-
 def verify(config, attempts=3, *, fetcher=None, sleeper=time.sleep,
            clock=time.monotonic, nonce_factory=lambda: secrets.token_hex(24), report=print,
            probe_current=False, bootstrap=False):
     if fetcher is None:
-        fetcher = fetch
+        release_url = config.release_url
+        # The candidate check never receives this allowance, even when the flag is set.
+        allow_unsealed_prefix = probe_current and bootstrap
+
+        def fetcher(url, timeout):
+            return fetch(url, timeout, bootstrap_release_probe=bool(
+                allow_unsealed_prefix and url.startswith(release_url) and '?deploy_probe=' in url))
     if not 3 <= attempts <= 10:
         raise VerificationError('invalid_sample_count')
     deadline = clock() + DEADLINE_SECONDS

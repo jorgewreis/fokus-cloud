@@ -38,6 +38,8 @@ cacheada, mas só amostra três requests.
 A primeira publicação usa o input `bootstrap_first_sealed_release`. Sem ele, o
 404 HTML do release atual bloqueia o deploy. O log precisa conter
 `bootstrap_first_sealed_release=accepted reason=unsealed_release_http_404`.
+A página HTML grande do legado é aceita nesse probe pelo status e pelo tipo,
+sem exigir que o corpo caiba no limite. O `verify` final não aceita 404.
 Nas seguintes, o input fica desligado. Um SHA que falhou deixa
 `releases/<sha>` no disco; o publicador não o reaproveita.
 
