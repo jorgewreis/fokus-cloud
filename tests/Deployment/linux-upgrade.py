@@ -13,7 +13,8 @@ import tempfile
 from linux_release_common import ROOT, REPORT, BASELINE, guard, environment, php, run, adapt, write, sha, safe_extract_source_archive
 
 from linux_vendor import copy_verified_vendor
-from linux_disposable_mysql import assert_disposable_mysql, execute_disposable_sql
+from linux_disposable_mysql import (assert_disposable_mysql, dump_disposable_mysql,
+                                    execute_disposable_sql, init_statement, mysql84_command)
 
 ORIGIN_METADATA = {
     'mysql_version': '8.4.10-10',
@@ -101,7 +102,8 @@ def capture_baseline_metadata(base, env, sandbox, prefix):
     script.write_text(r'''<?php
 try {
     if (getenv('APP_ENV') !== 'testing' || getenv('DB_HOST') !== '127.0.0.1' || !preg_match('/^fokus_upgrade_[a-f0-9]{16}$/D', getenv('DB_DATABASE'))) throw new RuntimeException('guard');
-    $pdo = new PDO('mysql:host=127.0.0.1;port=3306;dbname='.getenv('DB_DATABASE').';charset=utf8mb4', getenv('DB_USERNAME'), getenv('DB_PASSWORD'), [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT=>5, Pdo\Mysql::ATTR_MULTI_STATEMENTS=>false]);
+    if (!getenv('RELEASE_MYSQL_INIT_COMMAND')) throw new RuntimeException('missing session guard');
+    $pdo = new PDO('mysql:host=127.0.0.1;port=3306;dbname='.getenv('DB_DATABASE').';charset=utf8mb4', getenv('DB_USERNAME'), getenv('DB_PASSWORD'), [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT=>5, Pdo\Mysql::ATTR_MULTI_STATEMENTS=>false, Pdo\Mysql::ATTR_INIT_COMMAND=>getenv('RELEASE_MYSQL_INIT_COMMAND')]);
     $pdo->exec('START TRANSACTION READ ONLY');
     $version = $pdo->query('SELECT VERSION()')->fetchColumn();
     $rows = $pdo->query('SELECT migration,batch FROM migrations ORDER BY migration,batch')->fetchAll(PDO::FETCH_NUM);
@@ -211,6 +213,19 @@ def main():
             if args.driver == 'mysql':
                 env.update(DB_DATABASE=name)
                 mysql_env.update(DB_DATABASE=name)
+                identity = assert_disposable_mysql(mysql_env)
+                env['RELEASE_MYSQL_INIT_COMMAND'] = init_statement(identity)
+                evidence['runtime_session_guard_adaptations'] = {}
+                for role, runtime in (('baseline', base), ('candidate', candidate)):
+                    config = runtime / 'config/database.php'
+                    text = config.read_text(encoding='utf-8')
+                    before = sha(config)
+                    marker = "                Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),"
+                    if text.count(marker) != 2:
+                        raise RuntimeError('Unsupported MySQL configuration; cannot verify each Laravel PDO')
+                    config.write_text(text.replace(marker,
+                        "                Mysql::ATTR_INIT_COMMAND => getenv('RELEASE_MYSQL_INIT_COMMAND') ?: throw new RuntimeException('missing session guard'),\n" + marker, 1), encoding='utf-8')
+                    evidence['runtime_session_guard_adaptations'][role] = {'before_sha256': before, 'after_sha256': sha(config), 'scope': 'disposable-runtime-copy-only'}
                 sql('CREATE DATABASE `' + name + '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci')
                 created = True
                 adapted = sandbox / 'reversal-mysql.php'
@@ -236,9 +251,8 @@ def main():
             execute([str(fixture), str(candidate), 'verify-up'], 'idempotence-verify')
             execute([str(origin_fixture), str(candidate), 'verify-idempotent'], 'repair-origin-idempotent')
             if args.driver == 'mysql':
-                with backup.open('wb') as stream, (REPORT / (prefix + 'dump.log')).open('wb') as errors:
-                    assert_disposable_mysql(mysql_env)
-                    subprocess.run(['mysqldump', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '--single-transaction', '--hex-blob', '--no-tablespaces', name], env=mysql_env, stdout=stream, stderr=errors, check=True)
+                with (REPORT / (prefix + 'dump.log')).open('wb') as errors:
+                    dump_disposable_mysql(name, mysql_env, backup, errors)
             else:
                 # Every PHP process exited; no live SQLite writer exists at this point.
                 shutil.copyfile(db, backup)
@@ -260,8 +274,8 @@ def main():
                 raise RuntimeError('Backup bytes changed before restoration')
             if args.driver == 'mysql':
                 with backup.open('rb') as stream, (REPORT / (prefix + 'restore.log')).open('wb') as output:
-                    assert_disposable_mysql(mysql_env)
-                    subprocess.run(['mysql', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', name], env=mysql_env, stdin=stream, stdout=output, stderr=subprocess.STDOUT, check=True)
+                    identity = assert_disposable_mysql(mysql_env)
+                    subprocess.run(mysql84_command(identity) + [name], env=mysql_env, stdin=stream, stdout=output, stderr=subprocess.STDOUT, check=True)
             else:
                 shutil.copyfile(backup, db)
                 if sha(db) != sha(backup):

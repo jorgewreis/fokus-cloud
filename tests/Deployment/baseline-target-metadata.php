@@ -7,7 +7,10 @@ try {
     if (getenv('APP_ENV') !== 'testing' || getenv('DB_HOST') !== '127.0.0.1' || ! preg_match('/^fokus_upgrade_[a-f0-9]{16}$/D', getenv('DB_DATABASE'))) {
         throw new RuntimeException('guard');
     }
-    $pdo = new PDO('mysql:host=127.0.0.1;port=3306;dbname='.getenv('DB_DATABASE').';charset=utf8mb4', getenv('DB_USERNAME'), getenv('DB_PASSWORD'), [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5, Mysql::ATTR_MULTI_STATEMENTS => false]);
+    if (! getenv('RELEASE_MYSQL_INIT_COMMAND')) {
+        throw new RuntimeException('missing session guard');
+    }
+    $pdo = new PDO('mysql:host=127.0.0.1;port=3306;dbname='.getenv('DB_DATABASE').';charset=utf8mb4', getenv('DB_USERNAME'), getenv('DB_PASSWORD'), [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5, Mysql::ATTR_MULTI_STATEMENTS => false, Mysql::ATTR_INIT_COMMAND => getenv('RELEASE_MYSQL_INIT_COMMAND')]);
     $pdo->exec('START TRANSACTION READ ONLY');
     $tables = ['companies', 'company_memberships', 'customer_permissions', 'law_access_role_permissions', 'law_case_publication_reviews', 'law_cases', 'law_contact_import_batches', 'law_task_events', 'law_tasks', 'law_units', 'users'];
     $marks = implode(',', array_fill(0, count($tables), '?'));

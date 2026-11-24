@@ -8,6 +8,7 @@ import pathlib
 import re
 import stat
 import subprocess
+import tempfile
 
 IDENTITY = pathlib.Path('/run/fokus-release-mysql.identity')
 UUID = re.compile(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}\Z')
@@ -36,11 +37,55 @@ def assert_disposable_mysql(env):
                                env=env, text=True, capture_output=True, timeout=10, check=True)
         if probe.stdout.strip().lower() != lines[0]:
             raise ValueError('server identity mismatch')
+        return lines[0]
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         raise RuntimeError('refuse non-disposable mysql identity') from error
 
 
+def init_statement(identity):
+    if not isinstance(identity, str) or not UUID.fullmatch(identity):
+        raise ValueError('invalid MySQL UUID')
+    return ("SET @fokus_identity_guard = IF(@@server_uuid = '" + identity
+            + "', 1, JSON_EXTRACT('invalid json', '$'))")
+
+
+def mysql84_command(identity):
+    return ['mysql84', '--no-defaults', '--no-login-paths', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot',
+            '--skip-reconnect', '--init-command=' + init_statement(identity)]
+
+
+def mysqldump84_command(identity, name):
+    if not isinstance(name, str) or not re.fullmatch(r'fokus_upgrade_[a-f0-9]{16}', name):
+        raise ValueError('invalid synthetic database')
+    return ['mysql84-mysqldump', '--no-defaults', '--no-login-paths', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot',
+            '--init-command=' + init_statement(identity), '--single-transaction', '--hex-blob',
+            '--no-tablespaces', name]
+
+
 def execute_disposable_sql(statement, env):
-    assert_disposable_mysql(env)
-    subprocess.run(['mysql', '--no-defaults', '--protocol=TCP', '-h127.0.0.1', '-P3306', '-uroot', '-e', statement],
+    identity = assert_disposable_mysql(env)
+    subprocess.run(mysql84_command(identity) + ['-e', statement],
                    env=env, check=True, stdout=subprocess.DEVNULL)
+
+
+def dump_disposable_mysql(name, env, target, errors):
+    """Publish only on success without replacing any concurrently created path.
+
+    A hard kill can leave the private temporary file for sandbox cleanup; the
+    final backup path is never published before successful completion.
+    """
+    identity = assert_disposable_mysql(env)
+    command = mysqldump84_command(identity, name)
+    target = pathlib.Path(target)
+    if target.exists() or target.is_symlink():
+        raise RuntimeError('refuse existing backup target')
+    fd, temporary = tempfile.mkstemp(prefix='.mysql-dump-', dir=target.parent)
+    temporary = pathlib.Path(temporary)
+    try:
+        with os.fdopen(fd, 'wb') as stream:
+            subprocess.run(command, env=env, stdout=stream, stderr=errors, check=True)
+        # Both paths share a directory/filesystem. link is atomic and fails
+        # with EEXIST rather than replacing a concurrently created target.
+        os.link(temporary, target, follow_symlinks=False)
+    finally:
+        temporary.unlink(missing_ok=True)

@@ -1,11 +1,14 @@
 # Official Docker Hub linux/amd64 manifests resolved 2026-11-07.
 FROM node:24.13.0-bookworm-slim@sha256:46feb5752989c05b8606e6323fbbc3db667d14ade1c24f5d0d44d9ca9909d607 AS node
 FROM composer:2.8.12@sha256:0d264a0f1e5be23ba363447768df7b30c33d542711ea12e37770ed7b13bf4eaa AS composer
+FROM mysql@sha256:72c368d898861f3b3a07af0e6d690400f44f048799ed46822783d9224cc2c86d AS mysql84
 FROM php:8.5.7-cli-bookworm@sha256:e0ed00c0b0b7503535d1c1cb69ddf809f5e3f62e36dbc7649ee9149b96ae25ec
 ENV DEBIAN_FRONTEND=noninteractive COMPOSER_ALLOW_SUPERUSER=1 MAKEFLAGS=-j2
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 COPY --from=composer /usr/bin/composer /usr/local/bin/composer
+COPY --from=mysql84 /usr/bin/mysql /usr/local/bin/mysql84
+COPY --from=mysql84 /usr/bin/mysqldump /usr/local/bin/mysql84-mysqldump
 RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl git python3 rsync unzip zip openssl default-mysql-client \
@@ -24,6 +27,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rsync --version > /opt/runtime-evidence/rsync.txt \
     && mysql --version > /opt/runtime-evidence/mysql-client.txt \
     && mysqldump --version >> /opt/runtime-evidence/mysql-client.txt \
+    && mysql84 --version >> /opt/runtime-evidence/mysql-client.txt \
+    && mysql84-mysqldump --version >> /opt/runtime-evidence/mysql-client.txt \
     && python3 --version > /opt/runtime-evidence/python.txt \
     && test "$(php -r 'echo PHP_VERSION;')" = 8.5.7 \
     && test "$(node --version)" = v24.13.0 \
