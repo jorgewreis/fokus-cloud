@@ -199,6 +199,7 @@ Route::get('/produtos/fokus-law/planos', function () {
         'Content-Type' => 'text/html; charset=UTF-8',
     ]);
 });
+Route::get('/produtos/fokus-law/sob-medida', fn () => response()->file(public_path('marketing/products/fokus-law-sob-medida.html')));
 Route::get('/contratar/fokus-law', fn () => response()->file(public_path('auth/contratar-fokus-law.html')));
 Route::get('/produtos/fokus-lead', fn () => response()->file(public_path('marketing/products/fokus-lead.html')));
 Route::get('/produtos/fokus-lead/planos', fn () => response()->file(public_path('marketing/products/fokus-lead-planos.html')));

@@ -750,3 +750,7 @@
     .lead-page .lead-catalog .lead-offer-row > span { white-space: normal; }
     .lead-page .lead-catalog .lead-catalog-banner { min-height: 400px; padding: 1.6rem; }
 }
+.lead-development-badge{display:inline-block;margin:0 0 1.2rem;padding:.4rem .65rem;border:1px solid rgba(233,162,127,.75);color:var(--lead-terracotta-light);font-size:.68rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.lead-page .lead-hero.is-proposal{grid-template-columns:minmax(0,820px);height:auto;min-height:720px;align-items:end}
+.lead-page .lead-hero.is-proposal h1{max-width:16ch;font-size:clamp(3.2rem,6vw,5.6rem)}
+.lead-page .lead-hero.is-proposal .lead-hero-offer-button{margin-top:2rem}
