@@ -41,16 +41,27 @@
 
   const renderOffers = () => {
     const plans = state.catalog?.plans || [];
-    $('#lp-offers-heading').textContent = 'Escolha um plano ou monte uma assinatura personalizada por módulos.';
-    const cards = plans.map((plan) => `<article class="lp-offer${plan.featured ? ' lp-offer-featured' : ''}">${plan.featured ? '<span class="lp-recommended-badge">Recomendado</span>' : ''}<p class="lp-segment-tag lp-segment-tag--${segmentClass(plan.segment)}">${esc(segmentNames[plan.segment] || plan.segment || 'FOKUS LAW')}</p><h3>${esc(plan.name)}</h3><p>${esc(plan.description || 'Composição de módulos para sua operação.')}</p><strong>${money(state.cycle === 'annual' ? plan.annual_amount : plan.monthly_amount)} <small>/ ${state.cycle === 'annual' ? 'ano' : 'mês'}</small></strong><button class="fs-btn fs-btn-primary law-submit" type="button" data-choose-plan="${esc(plan.code)}">Configurar plano</button></article>`);
-    cards.unshift('<article class="lp-offer lp-standalone"><p class="law-eyebrow law-eyebrow-sage">SEM PLANO-BASE</p><h3>Assinatura Personalizada</h3><p>Escolha somente os módulos de que sua operação precisa. Cada módulo é cobrado pelo preço integral publicado.</p><button class="fs-btn fs-btn-primary law-submit" type="button" data-choose-custom>Escolher módulos</button></article>');
+    const planRank = (plan) => {
+      const name = `${plan.name || ''} ${plan.base_name || ''}`;
+      if (plan.segment === 'advocacia') return 0;
+      if (/geral|órgão|orgao/i.test(name)) return 1;
+      if (/judicial|judici/i.test(name)) return 2;
+      if (plan.segment === 'setor_publico') return 3;
+      return 4;
+    };
+    const orderedPlans = [...plans].sort((left, right) => planRank(left) - planRank(right) || Number(left.display_order || 0) - Number(right.display_order || 0));
+    const cards = orderedPlans.map((plan) => {
+      const action = plan.segment === 'setor_publico' ? 'Assinar' : 'Configurar plano';
+      return `<article class="lp-offer${plan.featured ? ' lp-offer-featured' : ''}">${plan.featured ? '<span class="lp-recommended-badge">Recomendado</span>' : ''}<p class="lp-segment-tag lp-segment-tag--${segmentClass(plan.segment)}">${esc(segmentNames[plan.segment] || plan.segment || 'FOKUS LAW')}</p><h3>${esc(plan.name)}</h3><p>${esc(plan.description || 'Composição de módulos para sua operação.')}</p><strong>${money(state.cycle === 'annual' ? plan.annual_amount : plan.monthly_amount)} <small>/ ${state.cycle === 'annual' ? 'ano' : 'mês'}</small></strong><button class="fs-btn fs-btn-primary law-submit" type="button" data-choose-plan="${esc(plan.code)}">${action}</button></article>`;
+    });
+    cards.unshift('<article class="lp-offer lp-standalone"><p class="law-eyebrow law-eyebrow-sage">SEM PLANO-BASE</p><h3>Módulos avulsos</h3><p>Escolha só os módulos disponíveis que você vai usar. Sem plano, cada módulo é cobrado pelo preço cheio do catálogo.</p><button class="fs-btn fs-btn-primary law-submit" type="button" data-choose-custom>Escolher módulos</button></article>');
     offersNode.innerHTML = cards.length ? cards.join('') : '<p class="lp-state">Não há planos ou módulos avulsos disponíveis no catálogo publicado.</p>';
   };
 
   const renderBuilder = () => {
     const planSelect = $('#lp-plan');
     const plans = state.catalog.plans || [];
-    planSelect.innerHTML = '<option value="">Assinatura Personalizada · escolha os módulos</option>' + plans.map((plan) => `<option value="${esc(plan.code)}">${esc(plan.name)}</option>`).join('');
+    planSelect.innerHTML = '<option value="">Módulos avulsos · escolha os módulos</option>' + plans.map((plan) => `<option value="${esc(plan.code)}">${esc(plan.name)}</option>`).join('');
     planSelect.value = state.plan;
     const required = new Set(planCodes());
     const selected = expandedSelection();
@@ -124,7 +135,7 @@
       const title = $('#lp-summary-title');
       const status = $('#lp-summary-status');
       const buy = $('#lp-buy');
-      if (!codes.length) { title.textContent = 'Assinatura Personalizada'; $('#lp-total').textContent = '—'; buy.setAttribute('aria-disabled', 'true'); state.quote = null; return; }
+      if (!codes.length) { title.textContent = 'Módulos avulsos'; $('#lp-total').textContent = '—'; buy.textContent = 'Continuar para contratação'; buy.setAttribute('aria-disabled', 'true'); state.quote = null; return; }
       const overLimit = [...document.querySelectorAll('.lp-personalization select')].find((select) => select.value === 'over_limit');
       if (overLimit) {
         const module = moduleByCode(overLimit.dataset.module);
@@ -140,7 +151,8 @@
         title.textContent = 'Capacidade acima das faixas publicadas'; $('#lp-total').textContent = 'Sob consulta'; $('#lp-summary-items').textContent = 'A maior faixa publicada não atende ao limite desejado.'; status.textContent = 'Envie o pedido de proposta para a equipe comercial.'; buy.setAttribute('aria-disabled', 'true'); state.quote = null; return;
       }
       proposal.hidden = true;
-      title.textContent = currentPlan()?.name || 'Assinatura Personalizada';
+      title.textContent = currentPlan()?.name || 'Módulos avulsos';
+      buy.textContent = currentPlan()?.segment === 'setor_publico' ? 'Assinar' : 'Continuar para contratação';
       status.textContent = 'Atualizando cotação pelo servidor…'; buy.setAttribute('aria-disabled', 'true');
       const items = codes.map((code) => ({ module_code: code, quantity: 1, personalizations: [...document.querySelectorAll(`[data-module="${CSS.escape(code)}"]`)].filter((select) => select.value).map((select) => ({ type_code: select.dataset.type, tier_value: Number(select.value) })) }));
       try {

@@ -2,6 +2,9 @@
     "$schema": "https://www.schemastore.org/package.json",
     "private": true,
     "type": "module",
+    "engines": {
+        "node": "^22.11.0 || ^24.11.0 || >=26.0.0"
+    },
     "scripts": {
         "seo:sync": "node tools/sync-seo.mjs",
         "seo:check": "node tools/sync-seo.mjs --check",
@@ -27,6 +30,6 @@
         "vite": "^8.0.0"
     },
     "dependencies": {
-        "fokus-styles": "^2.7.0"
+        "fokus-styles": "^3.0.0"
     }
 }

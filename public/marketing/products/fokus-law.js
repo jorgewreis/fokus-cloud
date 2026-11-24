@@ -270,6 +270,27 @@
     });
   }
 
-  const livePlans = document.querySelector('[data-law-live-plans]'), grid = document.querySelector('[data-law-live-plan-grid]');
-  if (livePlans && grid && window.FokusApi) window.FokusApi.request('/catalog/fokus-law').then((catalog) => { const plans = catalog.plans || []; if (!plans.length) return; grid.innerHTML = plans.map((plan) => `<article class="law-live-plan"><strong>${plan.name}</strong><span>A partir de R$ ${Number(plan.monthly_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / mês</span></article>`).join(''); livePlans.hidden = false; }).catch(() => {});
+  const livePlans = document.querySelector('[data-law-live-plans]');
+  const grid = document.querySelector('[data-law-live-plan-grid]');
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]));
+  const money = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
+  const planRank = (plan) => {
+    const name = `${plan.name || ''} ${plan.base_name || ''}`;
+    if (plan.segment === 'advocacia') return 0;
+    if (/geral|órgão|orgao/i.test(name)) return 1;
+    if (/judicial|judici/i.test(name)) return 2;
+    if (plan.segment === 'setor_publico') return 3;
+    return 4;
+  };
+  if (livePlans && grid && window.FokusApi) {
+    window.FokusApi.request('/catalog/fokus-law').then((catalog) => {
+      const plans = [...(catalog.plans || [])].sort((left, right) => planRank(left) - planRank(right) || Number(left.display_order || 0) - Number(right.display_order || 0));
+      grid.innerHTML = plans.length ? plans.map((plan) => {
+        const annual = plan.annual_amount == null ? '' : ` ou ${money(plan.annual_amount)} / ano`;
+        return `<article class="law-live-plan"><strong>${escapeHtml(plan.name)}</strong><span>${money(plan.monthly_amount)} / mês${annual}</span></article>`;
+      }).join('') : '<p>Não há planos publicados no catálogo.</p>';
+    }).catch(() => {
+      grid.innerHTML = '<p>Não foi possível carregar os preços do catálogo agora.</p>';
+    });
+  }
 })();

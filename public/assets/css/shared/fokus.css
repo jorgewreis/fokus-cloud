@@ -97,28 +97,28 @@
     --fs-tooltip-text: #ffffff;
     --fs-color-primary: #1a61e6;
     --fs-color-on-primary: #ffffff;
-    --fs-alert-primary-bg: rgb(220.3846532222, 232.689549371, 254.1042117072);
-    --fs-alert-primary-text: rgb(4.2540793692, 32.6552622518, 88.5748738661);
+    --fs-alert-primary-bg: rgb(86.4253542048%, 91.2508036749%, 99.6487104734%);
+    --fs-alert-primary-text: rgb(1.6682664193%, 12.8059851968%, 34.7352446534%);
     --fs-color-secondary: #64748b;
     --fs-color-on-secondary: #ffffff;
-    --fs-alert-secondary-bg: rgb(230.2895610064, 233.0325853352, 236.9919508609);
-    --fs-alert-secondary-text: rgb(33.9166068747, 40.6437781967, 50.3140869721);
-    --fs-color-success: rgb(13, 209, 87);
+    --fs-alert-secondary-bg: rgb(90.3096317672%, 91.3853275824%, 92.9380199455%);
+    --fs-alert-secondary-text: rgb(13.3006301469%, 15.9387365477%, 19.7310144989%);
+    --fs-color-success: rgb(5.0980392157%, 81.9607843137%, 34.1176470588%);
     --fs-color-on-success: #000000;
-    --fs-alert-success-bg: rgb(228.9046733915, 249.1514320752, 230.8709345684);
-    --fs-alert-success-text: rgb(1.6574790861, 79.745461506, 28.4507801755);
+    --fs-alert-success-bg: rgb(89.7665385849%, 97.7064439511%, 90.5376213994%);
+    --fs-alert-success-text: rgb(0.6499917985%, 31.2727300023%, 11.1571686963%);
     --fs-color-warning: #fab633;
     --fs-color-on-warning: #000000;
-    --fs-alert-warning-bg: rgb(254.9170612621, 244.6528756631, 228.9710928247);
-    --fs-alert-warning-text: rgb(96.9838380187, 68.3933599001, 13.3146447009);
+    --fs-alert-warning-bg: rgb(99.9674750048%, 95.9423041816%, 89.7925854215%);
+    --fs-alert-warning-text: rgb(38.0328776544%, 26.820925451%, 5.2214292945%);
     --fs-color-danger: #cc3335;
     --fs-color-on-danger: #ffffff;
-    --fs-alert-danger-bg: rgb(251.9225977632, 226.389403069, 223.5618211362);
-    --fs-alert-danger-text: rgb(77.6432204678, 13.3146447009, 14.1555411162);
+    --fs-alert-danger-bg: rgb(98.7931755934%, 88.7801580663%, 87.6713024064%);
+    --fs-alert-danger-text: rgb(30.4483217521%, 5.2214292945%, 5.5511925946%);
     --fs-color-info: #5e5cc7;
     --fs-color-on-info: #ffffff;
-    --fs-alert-info-bg: rgb(228.2395257626, 230.4806192824, 248.3934544766);
-    --fs-alert-info-text: rgb(31.3939176289, 30.5530212136, 75.5409794297);
+    --fs-alert-info-bg: rgb(89.5056963775%, 90.3845565813%, 97.409197834%);
+    --fs-alert-info-text: rgb(12.3113402466%, 11.9815769465%, 29.6239135018%);
     --fs-feedback-primary-bg: #e6f0ff;
     --fs-feedback-secondary-bg: #f8fafc;
     --fs-feedback-success-bg: #e6fff2;
@@ -2446,6 +2446,12 @@
   .fs-btn:active {
     --fs-btn-bg: var(--fs-btn-active-bg, var(--fs-color-border));
   }
+  .fs-btn-primary:hover {
+    filter: brightness(1.2);
+  }
+  .fs-btn-primary:active {
+    filter: brightness(1.4);
+  }
   .fs-btn:focus-visible {
     outline: var(--fs-focus-width) solid var(--fs-color-primary);
     outline-offset: var(--fs-focus-offset);
@@ -3175,6 +3181,9 @@
   }
   .fs-table-responsive {
     overflow-x: auto;
+  }
+  .fs-table-responsive.fs-datatable {
+    width: 100%;
   }
   .fs-table-caption {
     caption-side: top;
@@ -6399,8 +6408,8 @@
   }
   .fs-notification-item .fs-btn-close {
     flex-shrink: 0;
-    width: 16px;
-    height: 16px;
+    width: 24px;
+    height: 24px;
   }
   .fs-notification-empty {
     padding: 24px 14px;
@@ -6431,7 +6440,7 @@
     left: 100%;
     margin: 0;
   }
-  .fs-dropdown-submenu:hover > .fs-dropdown-menu,
+  .fs-dropdown-submenu:hover > .fs-dropdown-item-submenu:not(.is-disabled, :disabled, [aria-disabled=true]) + .fs-dropdown-menu,
   .fs-dropdown-submenu > .fs-dropdown-menu.is-open {
     display: block;
   }
@@ -17109,16 +17118,16 @@
 @layer tokens {
   [data-fs-brand=violet] {
     --fs-color-primary: #6d28d9;
-    --fs-alert-primary-bg: rgb(229.8834406263, 225.8717327657, 252.5458384302);
-    --fs-alert-primary-text: rgb(37.7006407433, 8.7385189481, 83.109047167);
-    --fs-feedback-primary-bg: rgb(229.8834406263, 225.8717327657, 252.5458384302);
+    --fs-alert-primary-bg: rgb(90.1503688731%, 88.5771501042%, 99.0375836981%);
+    --fs-alert-primary-text: rgb(14.7845649974%, 3.4268701757%, 32.5917832027%);
+    --fs-feedback-primary-bg: rgb(90.1503688731%, 88.5771501042%, 99.0375836981%);
   }
   [data-fs-brand=violet][data-theme=dark],
   [data-theme=dark] [data-fs-brand=violet] {
-    --fs-color-primary: rgb(114.6495158739, 57.1165361442, 219.9746158745);
-    --fs-alert-primary-bg: rgb(31.4819726714, 47.0564006856, 82.6607876597);
-    --fs-alert-primary-text: rgb(167.4962913963, 147.746130571, 240.0249534535);
-    --fs-feedback-primary-bg: rgb(31.4819726714, 47.0564006856, 82.6607876597);
+    --fs-color-primary: rgb(44.9605944603%, 22.3986416252%, 86.2645552449%);
+    --fs-alert-primary-bg: rgb(12.3458716358%, 18.4534904649%, 32.4159951607%);
+    --fs-alert-primary-text: rgb(65.6848201554%, 57.9396590475%, 94.1274327268%);
+    --fs-feedback-primary-bg: rgb(12.3458716358%, 18.4534904649%, 32.4159951607%);
   }
   @supports (color: oklch(0% 0 0deg)) {
     [data-fs-brand=violet] {
@@ -17137,29 +17146,29 @@
   }
   [data-fs-brand=corporate] {
     --fs-color-primary: #1d4e89;
-    --fs-alert-primary-bg: rgb(219.2237954153, 227.2186121739, 237.6990809983);
-    --fs-alert-primary-text: rgb(5.0598830676, 24.6667463069, 49.4731905568);
-    --fs-feedback-primary-bg: rgb(219.2237954153, 227.2186121739, 237.6990809983);
+    --fs-alert-primary-bg: rgb(85.9701158491%, 89.1053381074%, 93.2153258817%);
+    --fs-alert-primary-text: rgb(1.9842678696%, 9.6732338458%, 19.4012511988%);
+    --fs-feedback-primary-bg: rgb(85.9701158491%, 89.1053381074%, 93.2153258817%);
   }
   [data-fs-brand=corporate][data-theme=dark],
   [data-theme=dark] [data-fs-brand=corporate] {
-    --fs-color-primary: rgb(40.8593466225, 86.5224214637, 143.0926598584);
-    --fs-alert-primary-bg: rgb(31.2586947979, 46.3186220749, 70.1321749545);
-    --fs-alert-primary-text: rgb(127.9940036809, 155.4045223568, 190.9765129762);
-    --fs-feedback-primary-bg: rgb(31.2586947979, 46.3186220749, 70.1321749545);
+    --fs-color-primary: rgb(16.0232731853%, 33.9303613583%, 56.1147685719%);
+    --fs-alert-primary-bg: rgb(12.2583116854%, 18.1641655196%, 27.5028137077%);
+    --fs-alert-primary-text: rgb(50.1937269337%, 60.9429499438%, 74.8927501867%);
+    --fs-feedback-primary-bg: rgb(12.2583116854%, 18.1641655196%, 27.5028137077%);
   }
   [data-fs-brand=vibrant] {
     --fs-color-primary: #f2542d;
-    --fs-alert-primary-bg: rgb(255, 231.3637253432, 224.6456124112);
-    --fs-alert-primary-text: rgb(93.6202523577, 27.1894355526, 10.7919554552);
-    --fs-feedback-primary-bg: rgb(255, 231.3637253432, 224.6456124112);
+    --fs-alert-primary-bg: rgb(100%, 90.7308726836%, 88.0963185926%);
+    --fs-alert-primary-text: rgb(36.713824454%, 10.6625237461%, 4.2321393942%);
+    --fs-feedback-primary-bg: rgb(100%, 90.7308726836%, 88.0963185926%);
   }
   [data-fs-brand=vibrant][data-theme=dark],
   [data-theme=dark] [data-fs-brand=vibrant] {
-    --fs-color-primary: rgb(244.0763687777, 94.774513804, 58.7750761343);
-    --fs-alert-primary-bg: rgb(48.9487024594, 50.7990197305, 85.9119190034);
-    --fs-alert-primary-text: rgb(255, 166.953251087, 144.6609410048);
-    --fs-feedback-primary-bg: rgb(48.9487024594, 50.7990197305, 85.9119190034);
+    --fs-color-primary: rgb(95.7162230501%, 37.1664760016%, 23.0490494644%);
+    --fs-alert-primary-bg: rgb(19.1955695919%, 19.921184208%, 33.6909486288%);
+    --fs-alert-primary-text: rgb(100%, 65.4718631714%, 56.7297807862%);
+    --fs-feedback-primary-bg: rgb(19.1955695919%, 19.921184208%, 33.6909486288%);
   }
   @supports (color: oklch(0% 0 0deg)) {
     [data-fs-brand=corporate] {
@@ -17230,30 +17239,30 @@
     --fs-shadow-lg: 0 15px 30px rgb(0 0 0 / 60%), 0 6px 12px rgb(0 0 0 / 50%);
     --fs-tooltip-bg: #f8fafc;
     --fs-tooltip-text: #1e293b;
-    --fs-color-primary: rgb(39.8728684152, 106.2372587275, 232.1894887664);
-    --fs-alert-primary-bg: rgb(30.765779113, 49.9974662348, 82.3021425489);
-    --fs-alert-primary-text: rgb(130.6636212695, 172.0850768824, 246.4419684583);
-    --fs-feedback-primary-bg: rgb(30.765779113, 49.9974662348, 82.3021425489);
-    --fs-color-secondary: rgb(114.3557068426, 129.039220146, 150.1520317181);
-    --fs-alert-secondary-bg: rgb(39.6548148226, 51.4270943358, 70.2648514061);
-    --fs-alert-secondary-text: rgb(166.7597509121, 176.2809684237, 189.9919576187);
-    --fs-feedback-secondary-bg: rgb(39.6548148226, 51.4270943358, 70.2648514061);
-    --fs-color-success: rgb(134.4501166043, 226.9563331209, 149.6185042518);
-    --fs-alert-success-bg: rgb(24.8621518491, 61.9088085702, 89.0318819222);
-    --fs-alert-success-text: rgb(155.0475916512, 231.7231823866, 166.1609492581);
-    --fs-feedback-success-bg: rgb(24.8621518491, 61.9088085702, 89.0318819222);
-    --fs-color-warning: rgb(252.9400238762, 208.7461261831, 137.9221837268);
-    --fs-alert-warning-bg: rgb(59.1359779173, 56.6792370273, 88.6687774507);
-    --fs-alert-warning-text: rgb(253.5439861058, 216.1213263099, 157.1705651606);
-    --fs-feedback-warning-bg: rgb(59.1359779173, 56.6792370273, 88.6687774507);
-    --fs-color-danger: rgb(208.1189955268, 64.9740184262, 63.4302936954);
-    --fs-alert-danger-bg: rgb(44.6823973866, 47.5125073063, 81.2083778204);
-    --fs-alert-danger-text: rgb(235.4050745756, 149.9650253478, 142.4924034553);
-    --fs-feedback-danger-bg: rgb(44.6823973866, 47.5125073063, 81.2083778204);
+    --fs-color-primary: rgb(15.6364189863%, 41.6616700892%, 91.054701477%);
+    --fs-alert-primary-bg: rgb(12.0650114168%, 19.6068495038%, 32.2753500192%);
+    --fs-alert-primary-text: rgb(51.240635792%, 67.4843438754%, 96.6439091993%);
+    --fs-feedback-primary-bg: rgb(12.0650114168%, 19.6068495038%, 32.2753500192%);
+    --fs-color-secondary: rgb(44.8453752324%, 50.6036157435%, 58.8831496934%);
+    --fs-alert-secondary-bg: rgb(15.5509077736%, 20.1674879748%, 27.5548436887%);
+    --fs-alert-secondary-text: rgb(65.3959807499%, 69.1297915387%, 74.5066500465%);
+    --fs-feedback-secondary-bg: rgb(15.5509077736%, 20.1674879748%, 27.5548436887%);
+    --fs-color-success: rgb(52.7255359232%, 89.0024835768%, 58.673923236%);
+    --fs-alert-success-bg: rgb(9.7498634703%, 24.2779641452%, 34.9144634989%);
+    --fs-alert-success-text: rgb(60.8029771181%, 90.87183623%, 65.1611565718%);
+    --fs-feedback-success-bg: rgb(9.7498634703%, 24.2779641452%, 34.9144634989%);
+    --fs-color-warning: rgb(99.1921662259%, 81.8612259541%, 54.0871308733%);
+    --fs-alert-warning-bg: rgb(23.1905795754%, 22.2271517754%, 34.7720695885%);
+    --fs-alert-warning-text: rgb(99.4290141591%, 84.753461298%, 61.6355157493%);
+    --fs-feedback-warning-bg: rgb(23.1905795754%, 22.2271517754%, 34.7720695885%);
+    --fs-color-danger: rgb(81.6152923635%, 25.480007226%, 24.8746249786%);
+    --fs-alert-danger-bg: rgb(17.522508779%, 18.6323558064%, 31.8464226747%);
+    --fs-alert-danger-text: rgb(92.3157155199%, 58.8098138619%, 55.879373904%);
+    --fs-feedback-danger-bg: rgb(17.522508779%, 18.6323558064%, 31.8464226747%);
     --fs-color-info: #5e5cc7;
-    --fs-alert-info-bg: rgb(35.0058091619, 49.6887857769, 78.5757788254);
-    --fs-alert-info-text: rgb(160.628671266, 165.881962789, 227.610600335);
-    --fs-feedback-info-bg: rgb(35.0058091619, 49.6887857769, 78.5757788254);
+    --fs-alert-info-bg: rgb(13.7277682988%, 19.4857983439%, 30.8140309119%);
+    --fs-alert-info-text: rgb(62.9916357906%, 65.0517501133%, 89.2590589549%);
+    --fs-feedback-info-bg: rgb(13.7277682988%, 19.4857983439%, 30.8140309119%);
   }
   @supports (color: oklch(0% 0 0deg)) {
     [data-theme=dark],

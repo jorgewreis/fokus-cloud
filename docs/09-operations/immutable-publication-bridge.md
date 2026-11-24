@@ -1,5 +1,29 @@
 # Proteção provisória e caminho para publicação imutável
 
+## Publicação no workflow
+
+O job de produção de `deploy.yml` não sincroniza mais por cima da árvore ativa.
+Ele sela um diretório novo em `DEPLOY_PATH/releases/<sha>`, aponta `current` para
+esse diretório com `os.replace` e consulta `/_deployment/release`. Se a consulta
+falha, o mesmo passo restaura o symlink anterior. `legacy_publication_guard.py`
+continua recusando quem o invocar; o publicador usa o mesmo motivo
+`legacy_in_place_mutates_active_release` quando o destino é a árvore servida.
+
+O primeiro release selado exige o input `bootstrap_first_sealed_release`. Só
+nesse caso o `probe-current` aceita o 404 HTML do release ainda não selado, e
+registra `bootstrap_first_sealed_release=accepted reason=unsealed_release_http_404`.
+A página de erro legada pode passar do limite de corpo: a classificação usa o
+status e o `Content-Type: text/html`, lendo só um prefixo limitado. Fora do
+bootstrap, e em qualquer HTTP 200 ou JSON, esse limite continua rejeitando
+`response_too_large`. A verificação final do SHA candidato não aceita esse 404. Uma falha isolada de transporte ou TLS em `/up` ou no release é repetida até três vezes, com nonce novo a cada tentativa do release, dentro do prazo de 60s. Erro de status, contrato, redirect ou identidade não é repetido. O `verify` usa a mesma regra.
+O layout do servidor,
+o symlink do docroot e os dois modos de FPM estão em `.github/DEPLOYMENT.md`.
+
+Os gates de `publication_gate.py`, do environment `production` e da homologação
+no mesmo SHA permanecem. Este caminho não executa a cadeia experimental de
+OIDC, evidência de runtime e latch descrita abaixo; essa cadeia continua sem
+ser o publicador do Actions.
+
 ## Situação
 
 O workflow de publicação existente verifica o release atual e depois sincroniza

@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
@@ -12,7 +13,7 @@ const organization = { '@type': 'Organization', '@id': `${cloud}#organization`, 
 const software = {
   '@type': 'SoftwareSourceCode', '@id': `${styles}#software`, name: 'Fokus Styles', url: styles,
   description: 'Framework CSS gratuito com licença MIT, tokens, temas e interações em JavaScript vanilla.',
-  codeRepository: 'https://github.com/jorgewreis/fokus-styles',
+  codeRepository: 'https://github.com/jorgewreis/fokus/tree/main/packages/styles',
   programmingLanguage: ['CSS', 'JavaScript'], license: 'https://opensource.org/licenses/MIT',
   sameAs: ['https://www.npmjs.com/package/fokus-styles'],
   isPartOf: { '@id': `${cloud}#website` },
@@ -52,8 +53,14 @@ for (const page of pages) {
         <script type="application/ld+json">${JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }, null, 2)}</script>
         <!-- /SEO -->`;
   let updated;
-  if (original.includes('<!-- SEO:')) {
-    updated = original.replace(/<!-- SEO:[\s\S]*?<!-- \/SEO -->/, metadata);
+  const closedBlock = /<!-- SEO:[\s\S]*?<!-- \/SEO -->/;
+  const openBlock = /<!-- SEO:[\s\S]*?(?=<\/head>)/i;
+  if (closedBlock.test(original)) {
+    updated = original.replace(closedBlock, metadata);
+  } else if (openBlock.test(original)) {
+    // Pages edited after a sync can keep the opening comment and lose the
+    // closing marker. The closed-block replace then matches nothing.
+    updated = original.replace(openBlock, `${metadata}\n`);
   } else {
     updated = original.replace(/\s*<title>[\s\S]*?<\/title>/gi, '')
       .replace(/\s*<meta\s+(?:name="(?:description|robots|googlebot|bingbot|application-name|twitter:[^"]+)"|property="og:[^"]+")[\s\S]*?\/>/gi, '')
@@ -63,6 +70,56 @@ for (const page of pages) {
   }
   if (check && updated !== original) { console.error(`Outdated SEO metadata: ${page.file}`); failures++; }
   else if (!check && updated !== original) writeFileSync(path, updated);
+}
+const lastmodPath = resolve(root, 'resources/seo/lastmod.json');
+const currentLastmod = (() => {
+  try {
+    return readFileSync(lastmodPath, 'utf8');
+  } catch {
+    return '';
+  }
+})();
+let committedLastmod = {};
+try {
+  committedLastmod = JSON.parse(currentLastmod);
+} catch {
+  committedLastmod = {};
+}
+const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+let gitHistory = true;
+try {
+  git(['rev-parse', '--is-inside-work-tree']);
+  // A depth-1 clone reports every file as last touched by the boundary commit.
+  if (git(['rev-parse', '--is-shallow-repository']) === 'true') gitHistory = false;
+} catch {
+  // git archive builds have no .git. Rewriting lastmod from extraction mtimes
+  // would change a tracked file the immutable build must keep byte-for-byte.
+  gitHistory = false;
+}
+if (gitHistory) {
+  const pageLastmod = (file) => {
+    const rel = `public/${file}`;
+    try {
+      const date = git(['log', '-1', '--format=%cs', '--', rel]);
+      const hash = git(['log', '-1', '--format=%H', '--', rel]);
+      const head = git(['rev-parse', 'HEAD']);
+      const changedInHead = git(['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD']).split('\n').includes(rel);
+      // The tip commit is not the date of a file it did not change.
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date) && (hash !== head || changedInHead)) return date;
+    } catch {
+      // Fall through to the committed date, then the file mtime.
+    }
+    const recorded = committedLastmod[file];
+    if (typeof recorded === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(recorded)) return recorded;
+    return statSync(resolve(root, rel)).mtime.toISOString().slice(0, 10);
+  };
+  const lastmodJson = `${JSON.stringify(Object.fromEntries(pages.map((page) => [page.file, pageLastmod(page.file)])), null, 2)}\n`;
+  if (check && currentLastmod !== lastmodJson) {
+    console.error('Outdated sitemap lastmod dates: resources/seo/lastmod.json');
+    failures++;
+  } else if (!check && currentLastmod !== lastmodJson) {
+    writeFileSync(lastmodPath, lastmodJson);
+  }
 }
 if (failures) process.exitCode = 1;
 else console.log(`${check ? 'Checked' : 'Synchronized'} SEO metadata for ${pages.length} public pages.`);

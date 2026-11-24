@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
 use App\Services\PrefixedUlid;
+use App\Support\PublishedLawOffers;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -146,6 +147,46 @@ class CatalogAdminTest extends TestCase
         ])->assertOk()->assertJsonPath('product_code', 'fokus-law')->json();
 
         $this->assertGreaterThan(0, (float) $quote['amount']);
+    }
+
+    public function test_law_planos_html_includes_published_plan_names_and_prices_without_javascript(): void
+    {
+        $catalog = $this->getJson('/api/catalog/law')->assertOk()->json();
+        $html = $this->get('https://www.fokuscloud.com.br/produtos/fokus-law/planos')->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('Consultando as ofertas publicadas', $html);
+        preg_match_all('/data-choose-plan="([^"]*)"/', $html, $matches);
+        $this->assertSame(array_column($catalog['plans'], 'code'), $matches[1]);
+        foreach ($catalog['plans'] as $plan) {
+            $this->assertStringContainsString($plan['name'], $html);
+            $this->assertStringContainsString(PublishedLawOffers::formatMoney($plan['monthly_amount']), $html);
+            if (! empty($plan['featured'])) {
+                $this->assertStringContainsString('lp-recommended-badge', $html);
+            }
+        }
+    }
+
+    public function test_law_offer_cards_mirror_the_published_catalog_script(): void
+    {
+        $html = app(PublishedLawOffers::class)->cards([
+            ['code' => 'fokus-law-advocacia-essencial', 'name' => 'Fokus Law - Advocacia - Essencial', 'segment' => 'advocacia', 'featured' => false, 'monthly_amount' => 49.9],
+            ['code' => 'fokus-law-judicial-essencial', 'name' => 'Fokus Law - Judicial - Essencial', 'segment' => 'setor_publico', 'featured' => true, 'monthly_amount' => 9.99],
+            ['code' => 'fokus-law-public-essencial', 'name' => 'Fokus Law - Poder Público - Essencial', 'segment' => 'setor_publico', 'featured' => false, 'monthly_amount' => 6.99],
+        ]);
+
+        $this->assertStringStartsWith('<article class="lp-offer lp-standalone">', $html);
+        $this->assertSame(1, substr_count($html, 'lp-recommended-badge'));
+        $this->assertStringContainsString('Fokus Law - Judicial - Essencial', $html);
+        $this->assertStringContainsString("R$\u{00A0}49,90 <small>/ mês</small>", $html);
+        $this->assertStringContainsString("R$\u{00A0}9,99 <small>/ mês</small>", $html);
+        $this->assertStringContainsString("R$\u{00A0}6,99 <small>/ mês</small>", $html);
+        $this->assertStringNotContainsString('Premium', $html);
+        $this->assertStringNotContainsString('Avançado', $html);
+        preg_match_all('/data-choose-plan="([^"]*)"/', $html, $matches);
+        $this->assertSame(
+            ['fokus-law-advocacia-essencial', 'fokus-law-judicial-essencial', 'fokus-law-public-essencial'],
+            $matches[1],
+        );
     }
 
     public function test_public_lead_catalog_exposes_published_plans_and_modules_for_the_marketing_page(): void
