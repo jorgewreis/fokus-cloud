@@ -32,7 +32,7 @@ aplicação. Não desabilite a validação HTTPS para contornar esse problema.
 
 O comando `php artisan law:datajud-status` confere a presença da chave sem
 exibi-la. Com `--probe`, busca um número fictício inválido de 20 zeros
-(`match`, `size: 0`) no endpoint TJBA para conferir autenticação e resposta,
+(`match`, `size: 0`) no endpoint DataJud do tribunal configurado para conferir autenticação e resposta,
 sem números ou dados de processos reais. O diagnóstico segue o mesmo prazo
 da consulta do módulo. O deploy registra esse diagnóstico; uma falha externa gera
 aviso e não impede a publicação das demais correções.
@@ -58,7 +58,7 @@ sobrecarga do Datajud, exibida separadamente do limite de consultas. Quando
 o CNJ fornece `Retry-After`, a mensagem informa o prazo de espera indicado.
 
 O workflow manual `Diagnose Datajud access` compara o transporte do Laravel
-com uma requisição cURL no formato da referência ios1vcrime. Registra somente
+com uma requisição cURL no formato da referência de transporte conhecida. Registra somente
 tempos de conexão, status, cabeçalhos de diagnóstico e tipos de erro, sem
 chaves, respostas brutas ou dados processuais. Verifica também a concordância
 da chave em cache com o `.env` do servidor. O parâmetro opcional `case_number`

@@ -89,7 +89,7 @@ Especializa uma `company_unit` como unidade juridica.
 | `id` | char(30) | Sim | Prefixo `LWU`. |
 | `company_id` | char(30) | Sim | Empresa proprietaria. |
 | `company_unit_id` | char(30) | Sim | Unidade operacional generica. |
-| `court_code` | varchar | Sim | Tribunal, exemplo: `TJBA`. |
+| `court_code` | varchar | Sim | Tribunal, exemplo: `<sigla-do-tribunal>`. |
 | `district_name` | varchar | Sim | Comarca. |
 | `unit_name` | varchar | Sim | Vara, cartorio ou unidade exibida. |
 | `jurisdiction` | varchar | Sim | Competencia principal, exemplo: criminal ou civel. |

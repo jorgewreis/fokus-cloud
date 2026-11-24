@@ -77,5 +77,5 @@ $info = curl_getinfo($handle);
 $metrics = array_intersect_key($info, array_flip(['primary_ip', 'http_version', 'namelookup_time', 'connect_time', 'starttransfer_time', 'total_time']));
 $metrics['appconnect_time'] = curl_getinfo($handle, CURLINFO_APPCONNECT_TIME);
 $metrics['errno'] = curl_errno($handle);
-$summarize('ios1vcrime_transport', (int) $info['http_code'], is_string($raw) ? $raw : '', $headers, $metrics);
+$summarize('reference_transport', (int) $info['http_code'], is_string($raw) ? $raw : '', $headers, $metrics);
 curl_close($handle);

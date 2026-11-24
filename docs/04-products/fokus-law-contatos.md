@@ -101,7 +101,7 @@ restritos à mesma empresa proprietária e aparecem nos dois lados do cadastro.
 O nome é obrigatório e normalizado para formato de nome próprio no servidor.
 Conectivos como “de”, “dos” e “e” permanecem minúsculos no meio do nome; a
 primeira palavra recebe inicial maiúscula. Sequências em caixa alta informadas
-pelo usuário são preservadas para siglas como OAB e TJBA. A normalização não
+pelo usuário são preservadas para siglas como OAB e siglas de tribunais. A normalização não
 substitui a conferência de nomes oficiais.
 
 ## Campos e limites

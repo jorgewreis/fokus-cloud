@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Http;
 
 class DatajudStatus extends Command
 {
-    protected $signature = 'law:datajud-status {--probe : Confere o endpoint TJBA sem consultar processos reais}';
+    protected $signature = 'law:datajud-status {--probe : Confere o endpoint DataJud do tribunal configurado sem consultar processos reais}';
     protected $description = 'Exibe a configuração do Datajud sem revelar a chave ou dados processuais';
 
     public function handle(): int
@@ -29,10 +29,10 @@ class DatajudStatus extends Command
                     'size' => 0, 'query' => ['match' => ['numeroProcesso' => '00000000000000000000']],
                 ]);
             if (! $response->successful() || ! is_array(data_get($response->json(), 'hits.hits')) || data_get($response->json(), 'timed_out') === true || (int) data_get($response->json(), '_shards.failed', 0) > 0) {
-                $this->error('Endpoint TJBA não confirmou acesso válido (HTTP '.$response->status().').');
+                $this->error('Endpoint DataJud do tribunal configurado não confirmou acesso válido (HTTP '.$response->status().').');
                 return self::FAILURE;
             }
-            $this->info('Endpoint TJBA respondeu HTTP '.$response->status().'. Autenticação e busca pelo número aceitas; foi utilizado somente um número fictício inválido, sem dados de processos reais.');
+            $this->info('Endpoint DataJud do tribunal configurado respondeu HTTP '.$response->status().'. Autenticação e busca pelo número aceitas; foi utilizado somente um número fictício inválido, sem dados de processos reais.');
             return self::SUCCESS;
         } catch (ConnectionException $exception) {
             preg_match('/cURL error (\d+)\b/', $exception->getMessage(), $match);
