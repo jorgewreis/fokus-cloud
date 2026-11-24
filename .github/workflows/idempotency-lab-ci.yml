@@ -1,0 +1,88 @@
+name: Isolated idempotency laboratory (no deploy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact reviewed candidate commit, full SHA
+        required: true
+        type: string
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: idempotency-lab-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  laboratory:
+    # A maintainer must explicitly apply the label for this exact head. Forks,
+    # other PRs and ordinary updates cannot start this isolated laboratory.
+    if: >-
+      ${{ github.repository == 'jorgewreis/fokus-cloud' && (github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'pull_request' && github.event.action == 'labeled' &&
+           github.event.pull_request.number == 99 &&
+           github.event.label.name == format('lab-{0}', github.event.pull_request.head.sha) &&
+           github.repository == 'jorgewreis/fokus-cloud' &&
+           github.event.pull_request.head.repo.full_name == github.repository &&
+           github.event.pull_request.base.repo.full_name == github.repository &&
+           github.event.pull_request.head.ref == 'codex/idempotency-harness-20261114' &&
+           github.event.pull_request.base.ref == 'codex/company-idempotency-core-20261114')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [compatibility, target]
+    env:
+      RELEASE_DISPOSABLE_TESTS: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+      EXPECTED_CANDIDATE: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.candidate_sha }}
+    steps:
+      - name: Checkout exact candidate without persisted credentials
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ env.EXPECTED_CANDIDATE }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify candidate and pure safeguards
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_CANDIDATE" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_CANDIDATE"
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            test "$GITHUB_SHA" = "$EXPECTED_CANDIDATE"
+          else
+            test "$GITHUB_EVENT_NAME" = pull_request
+            test "$GITHUB_REF" = refs/pull/99/merge
+          fi
+          git diff --exit-code
+          python3 -m unittest discover -s tests/Deployment -p 'test_idempotency_*.py' -v
+      - name: Build locked dependencies and run isolated laboratory
+        shell: bash
+        run: >-
+          python3 tests/Deployment/idempotency_lab_orchestrator.py
+          --candidate-sha "$EXPECTED_CANDIDATE"
+          --profile "${{ matrix.profile }}"
+          --report "$RUNNER_TEMP/idempotency-lab"
+          --execute
+      - name: Scan evidence before upload
+        id: canary_scan
+        if: ${{ always() }}
+        shell: bash
+        run: >-
+          python3 tests/Deployment/scan-release-canaries.py
+          --root "$RUNNER_TEMP/idempotency-lab"
+          --output "$RUNNER_TEMP/idempotency-lab-canary.json"
+      - name: Upload synthetic laboratory evidence
+        if: ${{ always() && steps.canary_scan.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: idempotency-lab-${{ matrix.profile }}-${{ github.sha }}
+          path: ${{ runner.temp }}/idempotency-lab/
+          if-no-files-found: error
+          retention-days: 14
