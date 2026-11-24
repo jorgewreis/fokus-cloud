@@ -331,11 +331,27 @@ jobs:
             echo "result=skipped" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          curl --fail-with-body --request POST \
-            "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
-            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            --header "Content-Type: application/json" \
-            --data '{"purge_everything":true}'
+          # HTTP status errors are curl exit 22 and are never retried.
+          attempt=1
+          while true; do
+            set +e
+            curl --fail-with-body --max-time 20 --connect-timeout 10 --request POST \
+              "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
+              --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              --header "Content-Type: application/json" \
+              --data '{"purge_everything":true}'
+            status=$?
+            set -e
+            if [ "$status" -eq 0 ]; then
+              exit 0
+            fi
+            if [ "$status" -eq 22 ] || [ "$attempt" -ge 3 ]; then
+              exit "$status"
+            fi
+            echo "transport_retry=${attempt} target=cloudflare_purge"
+            attempt=$((attempt + 1))
+            sleep 1
+          done
 
       - name: Report each publication phase
         if: ${{ always() }}

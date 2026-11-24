@@ -521,6 +521,36 @@ class WorkflowContract(unittest.TestCase):
 """
         self.assertEqual(workflow.count(old_verify), 1)
         workflow = workflow.replace(old_verify, insert + old_verify, 1)
+        old_purge = r"""          curl --fail-with-body --request POST \
+            "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data '{"purge_everything":true}'
+"""
+        new_purge = r"""          # HTTP status errors are curl exit 22 and are never retried.
+          attempt=1
+          while true; do
+            set +e
+            curl --fail-with-body --max-time 20 --connect-timeout 10 --request POST \
+              "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
+              --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              --header "Content-Type: application/json" \
+              --data '{"purge_everything":true}'
+            status=$?
+            set -e
+            if [ "$status" -eq 0 ]; then
+              exit 0
+            fi
+            if [ "$status" -eq 22 ] || [ "$attempt" -ge 3 ]; then
+              exit "$status"
+            fi
+            echo "transport_retry=${attempt} target=cloudflare_purge"
+            attempt=$((attempt + 1))
+            sleep 1
+          done
+"""
+        self.assertEqual(workflow.count(old_purge), 1)
+        workflow = workflow.replace(old_purge, new_purge, 1)
         old_phases = """          PHASE_SCHEMA: ${{ steps.schema.outcome }}
           PHASE_ASSETS: ${{ steps.assets.outcome }}
           PHASE_FILES: ${{ steps.files.outcome }}
@@ -543,8 +573,11 @@ class WorkflowContract(unittest.TestCase):
         self.assertEqual(workflow.count(old_phases), 1)
         workflow = workflow.replace(old_phases, new_phases, 1)
         # Removing the old verify step leaves the blank line that separated it from the report.
-        return workflow.replace("true}'\n\n\n      - name: Report each publication phase\n",
-                                "true}'\n\n      - name: Report each publication phase\n", 1)
+        # The purge retry loop ends that step; collapse the same extra blank line there.
+        collapsed = workflow.replace("done\n\n\n      - name: Report each publication phase\n",
+                                     "done\n\n      - name: Report each publication phase\n", 1)
+        self.assertNotEqual(collapsed, workflow)
+        return collapsed
 
     def assert_workflow_preserved(self, current):
         self.assertEqual(current, self.expected_workflow(),

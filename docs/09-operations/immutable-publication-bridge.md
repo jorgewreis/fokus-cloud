@@ -15,7 +15,7 @@ registra `bootstrap_first_sealed_release=accepted reason=unsealed_release_http_4
 A página de erro legada pode passar do limite de corpo: a classificação usa o
 status e o `Content-Type: text/html`, lendo só um prefixo limitado. Fora do
 bootstrap, e em qualquer HTTP 200 ou JSON, esse limite continua rejeitando
-`response_too_large`. A verificação final do SHA candidato não aceita esse 404.
+`response_too_large`. A verificação final do SHA candidato não aceita esse 404. Uma falha isolada de transporte ou TLS em `/up` ou no release é repetida até três vezes, com nonce novo a cada tentativa do release, dentro do prazo de 60s. Erro de status, contrato, redirect ou identidade não é repetido. O `verify` usa a mesma regra.
 O layout do servidor,
 o symlink do docroot e os dois modos de FPM estão em `.github/DEPLOYMENT.md`.
 

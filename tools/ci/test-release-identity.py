@@ -21,10 +21,14 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[2]
 VERIFIER_COMMIT = 'a8cc9729181471c9f46ccb15d51383e1aceb61ab'
-# Reviewed after the first-release bootstrap. Candidate verification is unchanged.
-# Only probe-current may accept an explicit unsealed text/html 404, including a
-# legacy page larger than MAX_BODY, classified from status and content-type.
-VERIFIER_BLOB = '332e716c97dcf83d4b499e00f7a6eb2310386b8b'
+# Reviewed transport retries and the first-release bootstrap. Candidate
+# verification is unchanged. Each /up and release fetch may repeat only
+# transport_or_tls_error, up to three times inside the deadline; a release
+# retry mints a new nonce. HTTP status, content-type, size, contract, redirect
+# and release mismatch are not retried. Only probe-current may accept an
+# explicit unsealed text/html 404, including a legacy page larger than MAX_BODY,
+# classified from status and content-type.
+VERIFIER_BLOB = '72c289cb316da22a13c5b7441bdde33f13c0144c'
 NONCE = 'a' * 48
 PROBE_PATHS = ('/_deployment/release', '/_deployment/release/', '//_deployment/release', '///_deployment/release///')
 
