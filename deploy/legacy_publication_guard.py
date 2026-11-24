@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
-"""Refuse the legacy in-place publisher until immutable activation is wired."""
+"""Fail-closed entry point for the removed in-place publisher.
+
+The workflow no longer calls this script. Invoking it still refuses, with the
+same reason the atomic publisher uses when a destination is the active tree.
+"""
 import sys
+
+REASON = 'legacy_in_place_mutates_active_release'
 
 
 def main():
-    print('publication_blocked=legacy_in_place_mutates_active_release', file=sys.stderr)
+    print('publication_blocked=' + REASON, file=sys.stderr)
     return 1
 
 

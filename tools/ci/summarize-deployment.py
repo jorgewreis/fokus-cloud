@@ -11,16 +11,9 @@ PHASES = (
     ("PREFLIGHT", "Prerequisites and current dynamic release contract"),
     ("SSH", "SSH connection using configured known hosts"),
     ("SCHEMA", "Prepublication schema prerequisite"),
-    ("ASSETS", "Immutable assets transferred and checksummed"),
-    ("FILES", "Application files transferred"),
-    ("RUNTIME", "CLI runtime prerequisites"),
-    ("DEPENDENCIES", "Dependencies installed"),
-    ("MIGRATIONS", "Migrations completed"),
-    ("DATAJUD_CONFIG", "Datajud configuration"),
-    ("CACHES", "Laravel caches prepared"),
-    ("TAGS", "Contact tags synchronized"),
-    ("DATAJUD", "Datajud configuration checked (external probe is advisory)"),
-    ("SCHEDULER", "Scheduler checked"),
+    ("SEAL", "Sealed release prepared for a new directory"),
+    ("STAGE", "Inactive release transferred without touching the active tree"),
+    ("SWITCH", "Atomic current symlink switch"),
     ("SERVICES", "Selected runtime action"),
     ("CDN", "Optional CDN purge"),
     ("RELEASE", "HTTP health and expected dynamic release observed"),
@@ -47,8 +40,8 @@ def render(env):
                 complete = False
         lines.append(f"| {label} | {value} |")
     lines.extend(["", "Automated publication checks passed." if complete else "Publication is NOT fully verified."])
-    if not complete and any(results[key] != "skipped" for key in ("SCHEMA", "ASSETS", "FILES") if results[key] != "unknown"):
-        lines.append("Remote writes may have occurred. Preserve evidence and assess partial publication; do not automatically roll back migrations.")
+    if not complete and any(results[key] != "skipped" for key in ("SCHEMA", "STAGE", "SWITCH") if results[key] != "unknown"):
+        lines.append("Remote writes may have occurred. The code pointer is rolled back when release verification fails; do not automatically roll back migrations.")
     lines.append("This evidence does not certify destination inventory, every PHP worker, every business flow, or full recoverability.")
     return "\n".join(lines) + "\n", complete
 

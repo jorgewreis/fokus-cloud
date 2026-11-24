@@ -93,8 +93,14 @@ def fetch(url, timeout):
             return response.status, {key.lower(): value for key, value in response.headers.items()}, body
     except VerificationError:
         raise
-    except urllib.error.HTTPError:
-        raise VerificationError('http_error') from None
+    except urllib.error.HTTPError as error:
+        try:
+            body = error.read(MAX_BODY + 1)
+        except (OSError, http.client.HTTPException, ValueError):
+            raise VerificationError('transport_or_tls_error') from None
+        if len(body) > MAX_BODY:
+            raise VerificationError('response_too_large')
+        return error.code, {key.lower(): value for key, value in error.headers.items()}, body
     except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException, ValueError):
         raise VerificationError('transport_or_tls_error') from None
 
@@ -108,9 +114,28 @@ def unique_object(pairs):
     return result
 
 
-def verify(config, attempts=3, *, fetcher=fetch, sleeper=time.sleep,
+UNSEALED_HTML_404 = 'unsealed_html_404'
+
+
+def bootstrap_requested(env):
+    value = env.get('BOOTSTRAP_FIRST_SEALED_RELEASE', '')
+    if value == '':
+        return False
+    if value not in ('true', 'false'):
+        raise VerificationError('invalid_bootstrap_flag')
+    return value == 'true'
+
+
+def unsealed_html_404(status, headers):
+    content_type = headers.get('content-type', '').split(';', 1)[0].strip().lower()
+    return status == 404 and content_type == 'text/html'
+
+
+def verify(config, attempts=3, *, fetcher=None, sleeper=time.sleep,
            clock=time.monotonic, nonce_factory=lambda: secrets.token_hex(24), report=print,
-           probe_current=False):
+           probe_current=False, bootstrap=False):
+    if fetcher is None:
+        fetcher = fetch
     if not 3 <= attempts <= 10:
         raise VerificationError('invalid_sample_count')
     deadline = clock() + DEADLINE_SECONDS
@@ -135,6 +160,17 @@ def verify(config, attempts=3, *, fetcher=fetch, sleeper=time.sleep,
             raise VerificationError('verification_deadline_exceeded')
         status, headers, body = fetcher(config.release_url + '?deploy_probe=' + nonce,
                                         min(REQUEST_TIMEOUT, remaining))
+        if unsealed_html_404(status, headers):
+            # The final candidate check never accepts this 404, even if the flag is set.
+            if not (probe_current and bootstrap):
+                raise VerificationError('release_http_not_ok')
+            if observed_release not in (None, UNSEALED_HTML_404):
+                raise VerificationError('release_samples_inconsistent')
+            observed_release = UNSEALED_HTML_404
+            if clock() > deadline:
+                raise VerificationError('verification_deadline_exceeded')
+            report('bootstrap_first_sealed_release=accepted reason=unsealed_release_http_404')
+            continue
         if status != 200:
             raise VerificationError('release_http_not_ok')
         if headers.get('content-type', '').split(';', 1)[0].strip().lower() != 'application/json':
@@ -164,6 +200,11 @@ def verify(config, attempts=3, *, fetcher=fetch, sleeper=time.sleep,
         if clock() > deadline:
             raise VerificationError('verification_deadline_exceeded')
         report('active_release_sample=ok')
+    if observed_release == UNSEALED_HTML_404:
+        report('current_release_contract=unsealed_bootstrap')
+        return
+    if probe_current and bootstrap:
+        report('bootstrap_first_sealed_release=not_applicable reason=sealed_release_present')
     report('current_release_contract=verified' if probe_current else 'active_release=verified')
 
 
@@ -178,12 +219,17 @@ def main(argv=None, env=None):
     parser.add_argument('--attempts', type=int, default=3, choices=range(3, 11))
     args = parser.parse_args(argv)
     try:
-        config = configuration(os.environ if env is None else env)
+        environment = os.environ if env is None else env
+        # Invalid values fail every command. Only probe-current may use a true flag,
+        # and only to accept the unsealed HTML 404. verify never does.
+        bootstrap = bootstrap_requested(environment)
+        config = configuration(environment)
         if args.command == 'preflight':
             print('deployment_configuration=valid')
             print('runtime_reload=' + ('required' if config.mode == 'reload' else 'not_requested'))
         else:
-            verify(config, args.attempts, probe_current=args.command == 'probe-current')
+            verify(config, args.attempts, probe_current=args.command == 'probe-current',
+                   bootstrap=bootstrap and args.command == 'probe-current')
         return 0
     except VerificationError as error:
         print('deployment_verification=failed reason=' + str(error), file=sys.stderr)
