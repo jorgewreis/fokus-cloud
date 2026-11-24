@@ -6,14 +6,24 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-/** Keep platform support sessions outside customer APIs unless explicitly allowed. */
+/**
+ * Keep platform support sessions outside customer APIs unless explicitly allowed.
+ *
+ * During a support session the customer identity endpoint answers exactly like an
+ * unauthenticated request, so no customer profile, company list or commercial
+ * context is exposed. Only the CSRF token and the support exit stay reachable,
+ * which is what the portal needs to end the session.
+ */
 final class RejectLawAccessDuringSupport
 {
     public function handle(Request $request, Closure $next): Response
     {
         if ($request->session()->has('support_session_id') && $request->is('api/*')) {
-            $allowed = $request->is('api/auth/me')
-                || $request->is('api/csrf-token')
+            if ($request->is('api/auth/me')) {
+                return response()->json(['message' => 'Unauthenticated.'], 401);
+            }
+
+            $allowed = $request->is('api/csrf-token')
                 || $request->is('api/backoffice/support/exit');
 
             if (! $allowed) {

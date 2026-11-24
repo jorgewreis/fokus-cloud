@@ -41,5 +41,18 @@ window.FokusApi = (() => {
     return payload;
   }
 
-  return { request };
+  // During a platform support session /api/auth/me answers 401 like a guest, so
+  // the portal cannot read the customer identity. The platform identity probe is
+  // denied with an explicit support code instead, which is the only signal used
+  // to offer the support exit; it exposes no customer data.
+  async function supportSessionActive() {
+    try {
+      await request('/backoffice/auth/me');
+      return false;
+    } catch (error) {
+      return error.status === 403 && error.payload?.code === 'support_customer_api_denied';
+    }
+  }
+
+  return { request, supportSessionActive };
 })();

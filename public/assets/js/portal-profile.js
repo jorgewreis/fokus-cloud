@@ -55,6 +55,12 @@ window.initializeLawProfile = () => {
       sections.hidden = false;
       loading.hidden = true;
     } catch (error) {
+      if (error.status === 401 && await FokusApi.supportSessionActive()) {
+        setSupportReadOnly();
+        loading.textContent = 'Os dados do cliente não ficam disponíveis durante o acesso de suporte.';
+        loading.dataset.state = 'error';
+        return;
+      }
       if (error.status === 401) {
         location.assign('/?acesso=cliente');
         return;
