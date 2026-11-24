@@ -169,7 +169,7 @@ def cli():
     parser.add_argument('--receipt',required=True);parser.add_argument('--immutable-contract',required=True)
     parser.add_argument('--handoff-boundary')
     args=parser.parse_args()
-    # Production adapter requires reviewed #61 code and all its evidence gates.
+    # Production adapter requires the explicit current reviewed contract and all evidence gates.
     contract_path=Path(args.immutable_contract);code=contract_path.read_bytes()
     require(hashlib.sha256(code).hexdigest()==CONTRACT_DIGEST,'contract_mismatch')
     ns={'__name__':'immutable_contract','__file__':str(contract_path)};exec(compile(code,str(contract_path),'exec'),ns)
@@ -196,7 +196,7 @@ def cli():
         complete=gate.completion(c,base,root,receipt,args.handoff_boundary)
     supervise(base,root,[str(php),str(root/'artisan'),'schedule:run'],events,p.get('timeout_seconds',120),{'PATH':'/usr/bin:/bin','LC_ALL':'C'},p['runtime_uid'],p['runtime_gid'],validate=validate,complete=complete)
 
-CONTRACT_DIGEST='0d1a6c1d833d1aa262763c784e17d32464ac7a83c8a6f3fb64a63c4d14489c52'
+CONTRACT_DIGEST='2fcc6dbb1ff3067df8871efe2e33bec38d541af74fa105a8560e4f158017b5cd'
 if __name__=='__main__':
     try:cli()
     except BaseException:

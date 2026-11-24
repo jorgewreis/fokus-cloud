@@ -40,7 +40,9 @@ elif command == ['sudo', '-n', '-ll']:
         sys.exit(1)
     options = 'authenticate' if scenario == 'sudo_password_policy' else '!authenticate'
     allowed = '/usr/bin/systemctl reload *' if scenario == 'sudo_wildcard' else ' '.join(reload_command)
-    output = f'Sudoers entry:\n    RunAsUsers: root\n    Options: {options}\n    Commands:\n        {allowed}'
+    # sudo before 1.9.14 leaves the header blank. One scenario keeps that listing.
+    header = 'Sudoers entry:' if scenario == 'pre_activation_failure' else 'Sudoers entry: /etc/sudoers.d/cloudpanel'
+    output = f'{header}\n    RunAsUsers: root\n    Options: {options}\n    Commands:\n        {allowed}'
     if scenario == 'sudo_ambiguous':
         output += '\n' + output
     print(output)

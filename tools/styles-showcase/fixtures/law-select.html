@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Select no Law · ensaio local</title>
+  <link rel="stylesheet" href="/fokus-3.0.0.min.css">
+  <style>
+    body { max-width: 64rem; margin: auto; padding: 1.5rem; font-family: var(--fs-font-sans, sans-serif); }
+    .demo-section { margin-block: 1.5rem; }
+    .demo-field { display: grid; gap: .5rem; max-width: 30rem; margin-block: 1rem; }
+    .demo-field select[multiple] { min-height: 7rem; max-width: 100%; }
+  </style>
+</head>
+<body>
+<main>
+  <nav aria-label="Ensaios de componentes"><a href="/">Ver ensaio de paginação do Law</a> · <a href="/cloud-datatable.html">Ver ensaio de DataTable do Cloud</a></nav>
+  <h1>Select no Law</h1>
+  <p>Ensaio local com opções fictícias, CSS e JavaScript locais do Fokus Styles 3.0.0 e o adaptador Law deste checkout. Não há envio nem acesso a dados reais.</p>
+  <p>Fonte: <code>public/portal/assets/fokus-law-select.js</code>. O adaptador mantém controles nativos em modal e para seleção múltipla ou lista com mais de uma linha. A restauração de rótulos e atributos nas transições foi corrigida localmente e testada em DOM simulado; ainda requer validação em navegador real. A transição não é exercitada nesta página.</p>
+
+  <section class="demo-section" aria-labelledby="simple-title">
+    <h2 id="simple-title">Select simples fora de modal</h2>
+    <p>O adaptador inicializa o componente Styles; uma opção está indisponível.</p>
+    <div class="demo-field">
+      <label class="fs-form-label" for="law-simple">Setor fictício</label>
+      <select class="fs-form-select" data-fs="select" id="law-simple" aria-describedby="law-simple-help">
+        <option value="administrativo">Administrativo</option>
+        <option value="atendimento">Atendimento</option>
+        <option value="indisponivel" disabled>Indisponível</option>
+      </select>
+      <small id="law-simple-help">A seleção permanece apenas nesta página.</small>
+    </div>
+  </section>
+
+  <section class="demo-section" aria-labelledby="multiple-title">
+    <h2 id="multiple-title">Seleção múltipla nativa</h2>
+    <p>Esse caso permanece nativo; a composição visual específica do produto não está incluída neste ensaio.</p>
+    <div class="demo-field">
+      <label class="fs-form-label" for="law-multiple">Áreas fictícias</label>
+      <select class="fs-form-select" data-fs="select" id="law-multiple" multiple size="3" aria-describedby="law-multiple-help">
+        <option value="arquivo">Arquivo</option><option value="protocolo">Protocolo</option><option value="apoio">Apoio</option>
+      </select>
+      <small id="law-multiple-help">Use os comandos de seleção múltipla do seu sistema.</small>
+    </div>
+  </section>
+
+  <section class="demo-section" aria-labelledby="modal-section-title">
+    <h2 id="modal-section-title">Select nativo em modal</h2>
+    <p>O menu customizado é portado para fora do modal; o adaptador mantém o select nativo neste contexto.</p>
+    <button type="button" class="fs-btn fs-btn-primary" data-fs="modal" data-fs-target="#law-demo-modal">Abrir modal de exemplo</button>
+    <div id="law-demo-modal" class="fs-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="law-modal-title" aria-hidden="true">
+      <div class="fs-modal-dialog"><div class="fs-modal-content">
+        <div class="fs-modal-header"><h2 class="fs-modal-title" id="law-modal-title">Escolher categoria fictícia</h2><button type="button" class="fs-btn-close" data-fs-dismiss="modal" aria-label="Fechar"></button></div>
+        <div class="fs-modal-body"><div class="demo-field">
+          <label class="fs-form-label" for="law-modal-select">Categoria</label>
+          <select class="fs-form-select" data-fs="select" id="law-modal-select"><option value="geral">Geral</option><option value="outros">Outros</option></select>
+        </div></div>
+        <div class="fs-modal-footer"><button type="button" class="fs-btn fs-btn-outline-primary" data-fs-dismiss="modal">Fechar</button></div>
+      </div></div>
+    </div>
+  </section>
+  <p>Revisão visual, teclado, foco e integração com as telas Law permanecem pendentes.</p>
+</main>
+<script src="/fokus-3.0.0.min.js"></script>
+<script src="/law-select.js"></script>
+</body>
+</html>

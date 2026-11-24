@@ -109,9 +109,12 @@
       const dl = $('dl', 'law-record-facts');
       values.forEach(([key, value]) => { const line = $('div'); line.append($('dt', '', key), $('dd', '', value)); dl.append(line); }); return dl;
     }
-    function paginate(container, total, size, current, callback, noun = 'processos') {
+    function paginate(container, total, size, current, callback, noun = 'processos', resolveDestination = null, isContextActive = null) {
       const row = $('div', 'law-record-pagination');
-      UI().renderPagination(row, { total, per_page: size, page: current }, callback, noun, report); container.append(row);
+      const paginationToken = viewToken;
+      UI().renderPagination(row, { total, per_page: size, page: current }, callback, noun, report,
+        () => resolveDestination ? resolveDestination() : (container.isConnected ? container.querySelector(':scope > .law-record-pagination') : null),
+        isContextActive || (() => active() && container.isConnected && viewToken === paginationToken + 1)); container.append(row);
     }
     function simpleForm(title, controls, send, submitText = 'Salvar', opener = null) {
       const modal = dialog(title, opener); const form = $('form', 'law-record-editor'); const error = message();
@@ -588,7 +591,10 @@
           if (values.length) article.append(keyValues(values)); history.body.append(article);
         });
         if (!result.events.length) history.body.append($('p', 'law-record-detail-empty', 'Nenhuma alteração registrada neste processo.'));
-        paginate(history.body, result.history_total, 50, result.history_page, (value) => detail(id, value), 'eventos'); leftColumn.append(history);
+        const historyToken = viewToken;
+        paginate(history.body, result.history_total, 50, result.history_page, (value) => detail(id, value), 'eventos',
+          () => active() && currentId === id && viewToken === historyToken + 1 ? body.querySelector('.law-record-detail-updates .law-record-pagination') : null,
+          () => active() && currentId === id && viewToken === historyToken + 1); leftColumn.append(history);
         if (conflictsCard) rightColumn.append(conflictsCard);
         if (changedRecord) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); heading.scrollIntoView({ block: 'start' }); }
         if (c.datajud_sync_status === 'pending' || c.djen_sync_status === 'pending') watchDatajud(id, token, historyPage);

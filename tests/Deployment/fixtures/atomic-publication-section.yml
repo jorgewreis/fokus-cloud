@@ -1,0 +1,97 @@
+      # Publish a new sealed directory and switch current atomically. The legacy
+      # in-place entry point still refuses; this publisher fails closed with the
+      # same reason when the destination is the tree current already serves.
+      - name: Configure SSH
+        id: ssh
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_PORT"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY"
+          test -n "$DEPLOY_KNOWN_HOSTS"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" exit
+
+      - name: Seal inactive release at the remote root
+        id: seal
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: python3 deploy/atomic_publisher.py seal-local
+
+      - name: Preflight selected FPM policy before any remote mutation
+        id: fpm_preflight
+        timeout-minutes: 2
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: python3 deploy/fpm_guard_cli.py preflight
+
+      - name: Verify Law schema before publishing application code
+        id: schema
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          # Reviewed additive migration only. Changing it requires a new review.
+          migration=database/migrations/2026_10_30_160000_add_encrypted_details_to_law_contacts.php
+          echo "2db13e1a8d350ac81577c042e915bdfea4bafe821b188ded125f2201e3e8b4d9  $migration" | sha256sum --check --status
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9_./-]+$ ]]
+          [[ "$DEPLOY_PATH" != *..* ]]
+          app="$DEPLOY_PATH/current"
+          remote_dir="/tmp/fokuscloud-law-schema-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          ssh_args=(-o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT")
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          ssh "${ssh_args[@]}" "$target" "set -eu; test -L '$DEPLOY_PATH/current'; test -f '$app/vendor/autoload.php'; test -f '$app/.env'; mkdir -m 700 '$remote_dir'"
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -P "$DEPLOY_PORT" "$migration" deploy/prepublish-law-schema.php "$target:$remote_dir/"
+          ssh "${ssh_args[@]}" "$target" "set -eu; cd '$app'; php '$remote_dir/prepublish-law-schema.php' '$app'; rm -f '$remote_dir/prepublish-law-schema.php' '$remote_dir/2026_10_30_160000_add_encrypted_details_to_law_contacts.php'; rmdir '$remote_dir'"
+
+      - name: Transfer sealed release into a new directory
+        id: stage
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9_./-]+$ ]]
+          [[ "$DEPLOY_PATH" != *..* ]]
+          [[ "$EXPECTED_RELEASE" =~ ^[0-9a-f]{40}$ ]]
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          ssh_args=(-o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT")
+          ssh "${ssh_args[@]}" "$target" "set -eu; test -L '$DEPLOY_PATH/current'; test -d '$DEPLOY_PATH/releases'; test ! -e '$DEPLOY_PATH/releases/$EXPECTED_RELEASE'"
+          rsync -a --checksum \
+            -e "ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p $DEPLOY_PORT" \
+            "$RUNNER_TEMP/sealed-release/" "$target:$DEPLOY_PATH/releases/$EXPECTED_RELEASE/"
+
+      - name: Switch the current symlink atomically
+        id: switch
+        env:
+          BOOTSTRAP_FIRST_SEALED_RELEASE: ${{ inputs.bootstrap_first_sealed_release == true && 'true' || 'false' }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9_./-]+$ ]]
+          [[ "$DEPLOY_PATH" != *..* ]]
+          [[ "$EXPECTED_RELEASE" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$BOOTSTRAP_FIRST_SEALED_RELEASE" == true || "$BOOTSTRAP_FIRST_SEALED_RELEASE" == false ]]
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; python3 '$DEPLOY_PATH/releases/$EXPECTED_RELEASE/deploy/atomic_publisher.py' switch --base '$DEPLOY_PATH' --release '$EXPECTED_RELEASE' --bootstrap '$BOOTSTRAP_FIRST_SEALED_RELEASE'"
+

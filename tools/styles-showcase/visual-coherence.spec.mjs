@@ -45,12 +45,16 @@ for (const width of [1440, 390, 320]) for (const theme of ['light', 'dark']) for
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     const model = route.includes('/examples/');
     const guide = guides.some(x => route === `/${x}`);
-    const values = await page.evaluate(() => {
+    const values = await page.evaluate(async () => {
       const body = getComputedStyle(document.body);
       const probe = document.createElement('i'); document.body.append(probe);
       const colors = {};
       for (const token of ['bg', 'text', 'accent', 'on-accent', 'code-bg', 'code-text']) {
-        probe.style.color = `var(--site-${token})`; colors[token] = getComputedStyle(probe).color;
+        // Reduced motion keeps a 0.01ms transition, so the first computed sample
+        // is still the previous color until that transition finishes.
+        probe.style.color = `var(--site-${token})`;
+        await Promise.all(probe.getAnimations().map(animation => animation.finished));
+        colors[token] = getComputedStyle(probe).color;
       }
       probe.remove();
       const heading = getComputedStyle(document.querySelector('h1'));
@@ -85,7 +89,7 @@ for (const width of [1440, 390, 320]) for (const theme of ['light', 'dark']) for
     }
     if (route === '/' || route === '/docs') {
       const ctas = page.locator('.styles-site-cta');
-      await expect(ctas).toHaveCount(3);
+      await expect(ctas).toHaveCount(route === '/' ? 3 : 9);
       await componentColors(page, '.styles-site-cta');
       for (const cta of await ctas.all()) {
         const outline = await cta.evaluate(node => node.classList.contains('fs-btn-outline-primary'));
@@ -190,7 +194,7 @@ for (const theme of ['light', 'dark']) {
         await page.goto(`/styles/examples/${model}.html`);
         const buttons = await page.locator('.fs-btn').evaluateAll(nodes => nodes.map(n => n.outerHTML));
         expect(buttons.length).toBeGreaterThan(0);
-        const css = new URL('/styles/assets/fokus-2.7.0.min.css', page.url()).href;
+        const css = new URL('/styles/assets/fokus-3.0.0.min.css', page.url()).href;
         await control.setContent(`<!doctype html><html data-theme="${theme}"><head><link rel="stylesheet" href="${css}"></head><body>${buttons.join('')}</body></html>`);
         expect(await componentColors(page, '.fs-btn'), model).toEqual(await componentColors(control, '.fs-btn'));
       }

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DataTable de módulos Cloud · ensaio local</title>
+  <link rel="stylesheet" href="/fokus-3.0.0.min.css">
+  <style>
+    body { max-width: 70rem; margin: auto; padding: 1.5rem; font-family: var(--fs-font-sans, sans-serif); }
+    .demo-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }
+    .demo-table-scroll { overflow-x: auto; }
+    .demo-table-scroll:focus-visible { outline: 3px solid var(--fs-focus-color, #2563eb); outline-offset: 2px; }
+  </style>
+</head>
+<body>
+<main>
+  <nav aria-label="Ensaios de componentes"><a href="/">Ver ensaio de paginação do Law</a> · <a href="/law-select.html">Ver ensaio de Select do Law</a></nav>
+  <h1>DataTable de módulos Cloud</h1>
+  <p>Ensaio local com dados fictícios. A estrutura acompanha a lista de módulos do Backoffice e usa assets locais do Fokus Styles 3.0.0. Não há conexão com serviços nem ações comerciais.</p>
+  <p>Referência: <code>public/backoffice/pages/modules.html</code>. Este ensaio não inclui os filtros, a paginação do servidor ou a política CSS específica do Cloud. Revisão visual e de teclado pendente.</p>
+  <div class="demo-actions" aria-label="Estados da demonstração">
+    <button class="fs-btn fs-btn-outline-primary" id="show-data" type="button">Mostrar registros</button>
+    <button class="fs-btn fs-btn-outline-primary" id="show-loading" type="button">Simular carregamento</button>
+    <button class="fs-btn fs-btn-outline-primary" id="show-empty" type="button">Mostrar lista vazia</button>
+    <button class="fs-btn fs-btn-outline-primary" id="show-error" type="button">Simular erro</button>
+    <button class="fs-btn fs-btn-outline-primary" id="theme" type="button">Alternar tema</button>
+  </div>
+  <p id="fixture-status" role="status" aria-live="polite"></p>
+  <section class="fs-card fs-card-panel" aria-labelledby="module-list-title">
+    <div class="fs-card-header"><div class="fs-card-header-title"><h2 class="fs-card-title" id="module-list-title">Módulos fictícios</h2><p class="fs-card-subtitle">Exemplo de registros da lista de módulos.</p></div></div>
+    <div class="fs-card-body fs-u-p-0">
+      <div class="fs-table-responsive fs-datatable demo-table-scroll" id="module-table" data-fs="datatable" data-fs-page-size="1000" role="region" aria-label="Tabela de módulos fictícios, com rolagem horizontal" tabindex="0">
+        <table class="fs-table fs-table-records fs-table-hover" aria-label="Módulos fictícios">
+          <thead><tr><th scope="col">Produto</th><th scope="col">Módulo e funcionalidade</th><th scope="col">Status</th><th scope="col">Publicação</th><th scope="col">Versão</th></tr></thead>
+          <tbody><tr><td>Produto exemplo</td><td>Organização</td><td>Ativo</td><td>Rascunho</td><td>1.0</td></tr><tr><td>Produto exemplo</td><td>Relatórios</td><td>Inativo</td><td>Rascunho</td><td>1.0</td></tr></tbody>
+        </table>
+        <p data-fs-datatable-empty class="fs-table-empty" hidden>Nenhum módulo fictício encontrado.</p>
+        <p data-fs-datatable-loading class="fs-table-empty" hidden>Carregando módulos fictícios...</p>
+        <div data-fs-datatable-error class="fs-alert fs-alert-danger" hidden role="alert"><span data-fs-datatable-error-message></span></div>
+      </div>
+    </div>
+  </section>
+</main>
+<script src="/fokus-3.0.0.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const root = document.getElementById('module-table');
+    const tbody = root.querySelector('tbody');
+    const initialRows = Array.from(tbody.rows, row => row.cloneNode(true));
+    const status = document.getElementById('fixture-status');
+    const DataTable = window.FokusStyles?.DataTable;
+    if (!DataTable) { status.textContent = 'DataTable não disponível no bundle local.'; return; }
+    const table = DataTable.getInstance(root) || new DataTable(root);
+    const show = (state) => {
+      table.setError(null);
+      table.setLoading(false);
+      if (state === 'data' || state === 'empty') {
+        tbody.replaceChildren(...(state === 'data' ? initialRows.map(row => row.cloneNode(true)) : []));
+        table.refresh();
+      } else if (state === 'loading') table.setLoading(true);
+      else if (state === 'error') table.setError('Falha simulada. Use “Mostrar registros” para recuperar.');
+      status.textContent = ({data: 'Dois registros fictícios carregados.', empty: 'Lista fictícia vazia.', loading: 'Carregamento simulado em andamento.', error: 'Falha simulada.'})[state];
+    };
+    for (const state of ['data', 'loading', 'empty', 'error']) document.getElementById(`show-${state}`).addEventListener('click', () => show(state));
+    document.getElementById('theme').addEventListener('click', () => { const html = document.documentElement; html.dataset.theme = html.dataset.theme === 'dark' ? 'light' : 'dark'; });
+    show('data');
+  });
+</script>
+</body>
+</html>

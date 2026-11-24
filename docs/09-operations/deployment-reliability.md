@@ -97,6 +97,8 @@ Um sidecar estático, arquivo `.git/HEAD`, variável mutável ou arquivo JSON re
 
 O `probe-current` confirma que esse contrato **já está ativo** antes de mutações, aceitando qualquer SHA válido do release atual. O `verify` final compara o SHA candidato exato. Três amostras consecutivas reduzem falsos positivos de roteamento/caching, mas não provam todos os workers, backends ou rotas. A origem verificada e o destino SSH ainda precisam ser vinculados por evidência independente.
 
+Cada consulta individual de `/up` e do release, no `probe-current` e no `verify`, repete no máximo três vezes somente `transport_or_tls_error` (conexão, timeout, handshake TLS, `URLError`, `OSError`, `HTTPException` ou falha ao ler o corpo). O intervalo é de 1s e permanece dentro do prazo total de 60s. `REQUEST_TIMEOUT` continua 5s: uma interrupção isolada cabe nesse prazo; se todas as amostras esgotarem timeouts, o prazo de 60s ainda encerra fechado, sem ampliar a espera de uma origem inalcançável. Nova tentativa do release gera outro nonce. Status HTTP, tipo, tamanho, contrato, redirect, cache e SHA divergente não são repetidos. O log só pode trazer `transport_retry=<n> target=health|release`, sem URL, corpo ou exceção remota.
+
 Até essa preparação ser aprovada, implementada e testada, o pipeline proposto interrompe intencionalmente no preflight. Não mudar variáveis para contornar o bloqueio nem autorizar merge com deploy automático apenas porque os testes sintéticos passaram.
 
 ## Backups: diagnóstico do intervalo

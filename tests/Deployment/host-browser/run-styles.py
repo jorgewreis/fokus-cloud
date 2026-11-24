@@ -1,5 +1,5 @@
 """Sandboxed host Chrome against Styles served by the disposable Linux runtime."""
-import argparse, difflib, hashlib, json, os, pathlib, re, shutil, subprocess, sys, tempfile
+import argparse, difflib, hashlib, json, os, pathlib, re, shutil, subprocess, sys, tempfile, time, urllib.request
 
 p=argparse.ArgumentParser()
 p.add_argument('--candidate',type=pathlib.Path,required=True)
@@ -45,17 +45,44 @@ with tempfile.TemporaryDirectory(prefix='fokus-host-styles-') as temporary:
             text=text.replace("channel: 'chrome'",'executablePath: process.env.HOST_CHROME')
             return text
         adapt(relative,law)
+    def hosted_rei54(text):
+        old="if (url.hostname === '127.0.0.1' && url.port === '8874') return route.continue();"
+        new="if (url.origin === new URL(process.env.STYLES_ORIGIN).origin) return route.continue();"
+        assert old in text
+        return text.replace(old,new)
+    adapt('tools/styles-showcase/rei54.browser.spec.mjs',hosted_rei54)
     config="import base from './tools/styles-showcase/playwright.config.mjs';\nexport default {...base, webServer:undefined, testDir:'./tools/styles-showcase', workers:2, outputDir:"+json.dumps(str(report/'playwright-results'))+", reporter:[['list'],['json',{outputFile:"+json.dumps(str(report/'playwright-results.json'))+"}]], use:{...base.use,baseURL:process.env.STYLES_ORIGIN,launchOptions:{executablePath:process.env.HOST_CHROME,chromiumSandbox:true}}};\n"
     (copy/'host.playwright.config.mjs').write_text(config,encoding='utf-8',newline='\n')
     write(report/'adaptations.json',adapters)
     env=dict(os.environ,STYLES_ORIGIN=a.origin,HOST_CHROME=str(a.chrome),LAW_CHROME_PATH=str(a.chrome),CI='true')
     commands=[('styles-playwright',['node',str(root/'tests/Deployment/styles-qa/node_modules/@playwright/test/cli.js'),'test','--config','host.playwright.config.mjs']),('catalog-browser',['node','tools/styles-showcase/catalog.browser.mjs']),('law-confidentiality',['node','tests/Frontend/law-process-confidentiality-browser.cjs']),('law-tasks',['node','tests/Frontend/law-tasks-dom.cjs'])]
-    for name,command in commands:
-        with (report/(name+'.log')).open('w',encoding='utf-8') as log:
-            result=subprocess.run(command,cwd=copy,env=env,stdout=log,stderr=subprocess.STDOUT,timeout=1200)
-        outcomes.append({'name':name,'exit_code':result.returncode});write(report/'commands.json',outcomes)
+    fixture_log=(report/'law-select-fixture.log').open('w',encoding='utf-8')
+    fixture=subprocess.Popen(['node','tools/styles-showcase/serve-law-fixture.mjs'],cwd=copy,env=env,stdout=fixture_log,stderr=subprocess.STDOUT)
+    try:
+        for _ in range(100):
+            if fixture.poll() is not None:
+                raise RuntimeError('Law Select fixture exited before readiness')
+            try:
+                with urllib.request.urlopen('http://127.0.0.1:8765/law-select.html',timeout=1) as response:
+                    if response.status == 200:
+                        break
+            except OSError:
+                time.sleep(.1)
+        else:
+            raise RuntimeError('Law Select fixture did not become ready')
+        outcomes.append({'name':'law-select-fixture','exit_code':0,'owned_pid':fixture.pid});write(report/'commands.json',outcomes)
+        for name,command in commands:
+            with (report/(name+'.log')).open('w',encoding='utf-8') as log:
+                result=subprocess.run(command,cwd=copy,env=env,stdout=log,stderr=subprocess.STDOUT,timeout=1200)
+            outcomes.append({'name':name,'exit_code':result.returncode});write(report/'commands.json',outcomes)
+    finally:
+        if fixture.poll() is None:
+            fixture.terminate()
+            try: fixture.wait(timeout=10)
+            except subprocess.TimeoutExpired: fixture.kill(); fixture.wait(timeout=10)
+        fixture_log.close()
     results=json.loads((report/'playwright-results.json').read_text(encoding='utf-8'))
     stats=results['stats']
-    checks={'91_expected':stats['expected']==91,'no_unexpected':stats['unexpected']==0,'no_flaky':stats['flaky']==0,'no_skips':stats['skipped']==0,'no_runner_errors':not results.get('errors'),'all_commands_passed':all(x['exit_code']==0 for x in outcomes),'catalog_56_contracts':'PASS: 56 contracts' in (report/'catalog-browser.log').read_text(encoding='utf-8')}
+    checks={'118_expected':stats['expected']==118,'no_unexpected':stats['unexpected']==0,'no_flaky':stats['flaky']==0,'no_skips':stats['skipped']==0,'no_runner_errors':not results.get('errors'),'all_commands_passed':all(x['exit_code']==0 for x in outcomes),'catalog_56_contracts':'PASS: 56 contracts' in (report/'catalog-browser.log').read_text(encoding='utf-8')}
     write(report/'result.json',{'status':'passed' if all(checks.values()) else 'failed','checks':checks,'stats':stats,'scope':'Sandboxed host Chrome against Linux Styles; HTTP only','host_platform':sys.platform,'chrome':subprocess.check_output([str(a.chrome),'--version'],text=True).strip(),'node':subprocess.check_output(['node','--version'],text=True).strip(),'playwright_styles':'1.57.0','playwright_app':json.loads((app/'package.json').read_text(encoding='utf-8'))['version'],'runner':{k:os.environ.get(k) for k in ['ImageOS','ImageVersion','RUNNER_OS','RUNNER_ARCH']}})
     sys.exit(0 if all(checks.values()) else 1)

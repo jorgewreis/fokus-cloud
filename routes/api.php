@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BackofficeController;
+use App\Http\Controllers\Api\CompanyIdempotencyController;
 use App\Http\Controllers\Api\CompanyUserController;
 use App\Http\Controllers\Api\LawAccessController;
 use App\Http\Controllers\Api\LawAdministrativeProcessController;
+use App\Http\Controllers\Api\LawBetaApplicationController;
 use App\Http\Controllers\Api\LawCaseController;
 use App\Http\Controllers\Api\LawCompanyProfileController;
 use App\Http\Controllers\Api\LawContactController;
@@ -29,7 +31,10 @@ use App\Http\Middleware\EnsureLawCaseContext;
 use App\Http\Middleware\EnsurePlatformAdmin;
 use App\Http\Middleware\EnsurePlatformPermission;
 use App\Http\Middleware\EnsurePlatformSuperadmin;
+use App\Http\Middleware\EnsureSubscriptionViewer;
 use App\Http\Middleware\LawCaseTransaction;
+use App\Http\Middleware\RejectCompanyIdempotencyEndpoints;
+use App\Http\Middleware\RejectUnimplementedCompanyIdempotency;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/register-company', [AuthController::class, 'registerCompany'])->middleware('throttle:5,10,customer-registration');
@@ -53,6 +58,7 @@ Route::get('/catalog/{product}', [SubscriptionController::class, 'publicCatalog'
 Route::post('/catalog/{product}/quote', [SubscriptionController::class, 'publicQuote'])->where('product', 'law|fokus-law|lead|fokus-lead')->middleware('throttle:30,1,public-catalog-quote');
 Route::get('/analytics/config', fn () => response()->json(['measurement_id' => config('services.ga4.measurement_id')]))->middleware('throttle:30,1,analytics-config');
 Route::post('/product-interests', [ProductInterestController::class, 'store'])->middleware('throttle:5,10,product-interest');
+Route::post('/law/beta-applications', [LawBetaApplicationController::class, 'store'])->middleware('throttle:5,10,law-beta-application');
 
 Route::prefix('backoffice/auth')->group(function () {
     Route::post('/login', [PlatformAuthController::class, 'login'])->middleware('throttle:5,1,platform-login');
@@ -156,7 +162,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/law/contact-sharing', [LawContactController::class, 'companiesForSharing'])->middleware('law.permission:law.contacts.share.manage');
         Route::put('/law/contact-sharing', [LawContactController::class, 'saveSharing'])->middleware('law.permission:law.contacts.share.manage');
         Route::delete('/law/contact-sharing/{recipientCompanyId}', [LawContactController::class, 'revokeSharing'])->middleware('law.permission:law.contacts.share.manage');
-        Route::get('/subscriptions', [SubscriptionController::class, 'index']);
+        Route::get('/subscriptions', [SubscriptionController::class, 'index'])->middleware(EnsureSubscriptionViewer::class);
         Route::post('/subscriptions/checkout', [SubscriptionController::class, 'checkout']);
         Route::post('/subscriptions/{subscription}/change', [SubscriptionController::class, 'change']);
         Route::delete('/subscriptions/{subscription}', [SubscriptionController::class, 'destroy']);
@@ -229,9 +235,12 @@ Route::middleware(EnsurePlatformAdmin::class)->prefix('backoffice')->group(funct
     Route::patch('/plans/{plan}', [BackofficeController::class, 'updatePlan'])->middleware(EnsurePlatformPermission::class.':platform.catalog.manage');
     Route::delete('/plans/{plan}', [BackofficeController::class, 'deletePlan'])->middleware(EnsurePlatformPermission::class.':platform.catalog.publish');
     Route::get('/companies', [BackofficeController::class, 'companies'])->middleware(EnsurePlatformPermission::class.':platform.companies.view');
+    Route::post('/company-idempotency/issue', [CompanyIdempotencyController::class, 'issue'])->middleware([EnsurePlatformPermission::class.':platform.companies.manage', RejectCompanyIdempotencyEndpoints::class, 'throttle:5,1,company-idempotency-issue']);
+    Route::post('/company-idempotency/status', [CompanyIdempotencyController::class, 'status'])->middleware([EnsurePlatformPermission::class.':platform.companies.manage', RejectCompanyIdempotencyEndpoints::class]);
+    Route::post('/company-idempotency/revoke', [CompanyIdempotencyController::class, 'revoke'])->middleware([EnsurePlatformPermission::class.':platform.companies.manage', RejectCompanyIdempotencyEndpoints::class]);
     Route::get('/companies/{company}', [BackofficeController::class, 'company'])->middleware(EnsurePlatformPermission::class.':platform.companies.view');
-    Route::post('/companies', [BackofficeController::class, 'createCompany'])->middleware(EnsurePlatformPermission::class.':platform.companies.manage');
-    Route::patch('/companies/{company}', [BackofficeController::class, 'updateCompany'])->middleware(EnsurePlatformPermission::class.':platform.companies.manage');
+    Route::post('/companies', [BackofficeController::class, 'createCompany'])->middleware([EnsurePlatformPermission::class.':platform.companies.manage', RejectUnimplementedCompanyIdempotency::class]);
+    Route::patch('/companies/{company}', [BackofficeController::class, 'updateCompany'])->middleware([EnsurePlatformPermission::class.':platform.companies.manage', RejectUnimplementedCompanyIdempotency::class]);
     Route::post('/companies/{company}/deactivate', [BackofficeController::class, 'deactivateCompany'])->middleware(EnsurePlatformPermission::class.':platform.companies.manage');
     Route::post('/companies/{company}/activate', [BackofficeController::class, 'activateCompany'])->middleware(EnsurePlatformPermission::class.':platform.companies.manage');
     Route::delete('/companies/{company}', [BackofficeController::class, 'deleteCompany'])->middleware(EnsurePlatformPermission::class.':platform.companies.manage');
@@ -275,6 +284,7 @@ Route::middleware(EnsurePlatformAdmin::class)->prefix('backoffice')->group(funct
     Route::get('/audit', [BackofficeController::class, 'audit'])->middleware(EnsurePlatformPermission::class.':platform.audit.view_commercial');
     Route::get('/audit/access-control', [BackofficeController::class, 'accessControl'])->middleware(EnsurePlatformSuperadmin::class);
     Route::get('/product-interests', [ProductInterestBackofficeController::class, 'index'])->middleware(EnsurePlatformPermission::class.':platform.product_interests.manage');
+    Route::get('/product-interests-options', [ProductInterestBackofficeController::class, 'options'])->middleware(EnsurePlatformPermission::class.':platform.product_interests.manage');
     Route::get('/product-interests/{interest}', [ProductInterestBackofficeController::class, 'show'])->middleware(EnsurePlatformPermission::class.':platform.product_interests.manage');
     Route::patch('/product-interests/{interest}', [ProductInterestBackofficeController::class, 'update'])->middleware(EnsurePlatformPermission::class.':platform.product_interests.manage');
 });

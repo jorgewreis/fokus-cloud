@@ -10,14 +10,16 @@
 
 /* Universal shell contract: dynamically loaded pages must keep natural card
    height instead of being compressed by the legacy viewport container. */
-.admin-shell-content > #page-content > .container-page {
+.admin-shell-content > #page-content > .container-page,
+.admin-shell-content > #page-content > [data-backoffice-mount] > .container-page {
     box-sizing: border-box;
     height: auto;
     min-height: calc(100vh - 80px);
     overflow: visible;
     flex: 0 0 auto;
 }
-.admin-shell-content > #page-content > .container-page > * { flex-shrink: 0; }
+.admin-shell-content > #page-content > .container-page > *,
+.admin-shell-content > #page-content > [data-backoffice-mount] > .container-page > * { flex-shrink: 0; }
 
 .backoffice-records-page > .backoffice-page-card { width: calc(100% - 20px); margin: 10px; }
 .backoffice-records-drawer.fs-offcanvas-end,

@@ -1,17 +1,50 @@
 <?php
 
+use App\Http\Controllers\Api\ProductInterestBackofficeController;
+use App\Http\Controllers\Api\ProductInterestController;
+use App\Models\PlatformAdmin;
+use App\Models\PlatformRole;
 use App\Services\LawCaseManagementService;
 use App\Services\LawDatajudClient;
 use App\Services\PrefixedUlid as ID;
+use App\Support\LegalDocuments;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 
 // Synthetic fixtures/assertions for disposable SQLite or loopback CI MySQL only.
-$root = $argv[1];
-$mode = $argv[2];
+$root = $argv[1] ?? '';
+$mode = $argv[2] ?? '';
 $qa = getenv('UPGRADE_SANDBOX');
+$driver = getenv('DB_CONNECTION');
+$url = getenv('DB_URL');
+$socket = getenv('DB_SOCKET');
+$port = getenv('DB_PORT');
+$configCache = getenv('APP_CONFIG_CACHE');
+$database = getenv('DB_DATABASE');
+$sandboxPath = is_string($qa) ? realpath($qa) : false;
+$sqlitePath = $sandboxPath === false ? false : realpath($sandboxPath.'/upgrade.sqlite');
+$validSqlite = $driver === 'sqlite' && $sqlitePath !== false && dirname($sqlitePath) === $sandboxPath
+    && is_string($database) && realpath($database) === $sqlitePath;
+$validMysql = $driver === 'mysql' && getenv('DB_HOST') === '127.0.0.1'
+    && is_string($database) && preg_match('/^fokus_upgrade_[a-f0-9]{16}$/D', $database) === 1
+    && ($port === false || $port === '' || $port === '3306');
+if (getenv('APP_ENV') !== 'testing' || getenv('RELEASE_DISPOSABLE_TESTS') !== '1'
+    || $sandboxPath === false || ! is_file($sandboxPath.'/.disposable-upgrade')
+    || ($url !== false && $url !== '') || ($socket !== false && $socket !== '')
+    || ($configCache !== false && $configCache !== '')
+    || ($port !== false && $port !== '' && $port !== '3306')
+    || (! $validSqlite && ! $validMysql) || file_exists($root.'/.env') || is_link($root.'/.env')
+    || file_exists($root.'/.env.testing') || is_link($root.'/.env.testing')
+    || file_exists($root.'/bootstrap/cache/config.php') || is_link($root.'/bootstrap/cache/config.php')) {
+    throw new RuntimeException('refuse non-disposable upgrade fixture');
+}
 require $root.'/vendor/autoload.php';
 $app = require $root.'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
@@ -27,8 +60,15 @@ function check($condition, $label)
     }echo "PASS $label\n";
 }
 check(getenv('APP_ENV') === 'testing' && is_file($qa.'/.disposable-upgrade'), 'disposable marker');
-$driver = config('database.default');
-check(($driver === 'sqlite' && config('database.connections.sqlite.database') === $qa.'/upgrade.sqlite') || ($driver === 'mysql' && config('database.connections.mysql.host') === '127.0.0.1' && preg_match('/^fokus_upgrade_[a-f0-9]{16}$/', config('database.connections.mysql.database'))), 'guard: disposable database');
+$connection = DB::connection()->getConfig();
+$effectiveDriver = config('database.default');
+$effectiveSqlite = $effectiveDriver === 'sqlite' && ($connection['driver'] ?? null) === 'sqlite'
+    && realpath((string) ($connection['database'] ?? '')) === $sqlitePath;
+$effectiveMysql = $effectiveDriver === 'mysql' && ($connection['driver'] ?? null) === 'mysql'
+    && ($connection['host'] ?? null) === '127.0.0.1' && (string) ($connection['port'] ?? '') === '3306'
+    && ($connection['database'] ?? null) === $database && in_array($connection['unix_socket'] ?? null, [null, ''], true);
+check(in_array($connection['url'] ?? null, [null, ''], true) && empty($connection['read']) && empty($connection['write'])
+    && (($validSqlite && $effectiveSqlite) || ($validMysql && $effectiveMysql)), 'guard: disposable database');
 if ($mode === 'versions') {
     echo json_encode(['php' => PHP_VERSION, 'database' => $driver === 'sqlite' ? DB::selectOne('select sqlite_version() as version')->version : DB::selectOne('select version() as version')->version]).PHP_EOL;
     exit;
@@ -58,12 +98,53 @@ if ($mode === 'seed') {
     echo 'Seeded 8 cases covering public/CNJ1-5/legacy, 24 synthetic publications, 1 encrypted contact. Baseline migrations='.$data['migration_count']."\n";
     exit;
 }
+if ($mode === 'verify-pre-interest-index') {
+    check(! Schema::hasTable('interest_product_index') && ! Schema::hasTable('interest_product_index_state'), 'old schema has no product index tables');
+    Mail::fake();
+    $admin = PlatformAdmin::create([
+        'id' => ID::make('PAD'), 'name' => 'Synthetic admin', 'email' => 'qa-interest-admin@example.test',
+        'password' => Hash::make('synthetic-only'), 'status' => 'ativo',
+        'platform_role_id' => PlatformRole::where('code', 'administrador_comercial')->value('id'), 'email_verified_at' => now(),
+    ]);
+    $payload = ['name' => 'Synthetic interest', 'email' => 'qa-old-index@example.test', 'products' => ['law'],
+        'profiles' => ['Advocacia'], 'main_difficulties' => 'Synthetic', 'privacy_accepted' => true,
+        'privacy_version' => LegalDocuments::PRIVACY_VERSION];
+    $controller = app(ProductInterestController::class);
+    check($controller->store(Request::create('/api/product-interests', 'POST', $payload))->getStatusCode() === 201, 'new writer succeeds on old schema');
+    $options = Request::create('/api/backoffice/product-interests-options');
+    $options->setUserResolver(fn () => $admin);
+    check(app(ProductInterestBackofficeController::class)->options($options)->getData(true)['historical_index_ready'] === false, 'old schema reports incomplete index');
+    Schema::create('interest_product_index', fn (Blueprint $table) => $table->string('placeholder'));
+    try {
+        $payload['email'] = 'qa-partial-index@example.test';
+        check($controller->store(Request::create('/api/product-interests', 'POST', $payload))->getStatusCode() === 201, 'new writer succeeds on partial schema');
+        check(app(ProductInterestBackofficeController::class)->options($options)->getData(true)['historical_index_ready'] === false, 'partial schema reports incomplete index');
+    } finally {
+        Schema::dropIfExists('interest_product_index');
+    }
+    $interests = DB::table('product_interests')->whereIn('email', ['qa-old-index@example.test', 'qa-partial-index@example.test'])->orderBy('email')->get()->toJson();
+    check(json_decode($interests, true) && count(json_decode($interests, true)) === 2, 'both old-schema writes persist');
+    file_put_contents($qa.'/pre-index-interests.json', $interests);
+    exit;
+}
 $f = json_decode(file_get_contents($qa.'/upgrade-fixture.json'), true);
 if ($mode === 'verify-up') {
     if (getenv('UPGRADE_INJECT_ASSERTION_FAILURE') === '1') {
         throw new RuntimeException('controlled fixture failure');
     }
-    check(DB::table('migrations')->count() === $f['migration_count'] + 5, 'exactly five candidate migrations applied');
+    check(DB::table('migrations')->count() === $f['migration_count'] + 9, 'exactly nine candidate migrations applied');
+    foreach (['2026_11_06_000200_separate_law_case_confidentiality', '2026_11_06_140000_create_law_case_publication_reviews',
+        '2026_11_06_160000_create_law_contact_import_batches_table', '2026_11_06_170000_create_law_tasks',
+        '2026_11_07_000100_repair_payments_provider_checkout_url', '2026_11_14_000001_create_company_idempotency_requests',
+        '2026_11_14_000002_create_platform_session_authorities', '2026_11_14_000100_create_interest_product_index',
+        '2026_11_15_120000_create_law_beta_applications_table'] as $migration) {
+        check(DB::table('migrations')->where('migration', $migration)->count() === 1, 'exact candidate migration present '.$migration);
+    }
+    check(Schema::hasTable('interest_product_index') && Schema::hasTable('interest_product_index_state'), 'interest index tables created');
+    check(! (bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'interest index fails closed before backfill');
+    check(DB::table('interest_product_index_state')->count() === 1 && ! (bool) DB::table('interest_product_index_state')->where('id', 1)->value('running'), 'interest index has one idle state');
+    check(DB::table('interest_product_index')->count() === 0, 'interest index does not claim historical completeness');
+    check(DB::table('product_interests')->whereIn('email', ['qa-old-index@example.test', 'qa-partial-index@example.test'])->orderBy('email')->get()->toJson() === file_get_contents($qa.'/pre-index-interests.json'), 'old-schema interest records preserved');
     foreach ($f['cases'] as $old) {
         $new = (array) DB::table('law_cases')->where('id', $old['id'])->first();
         check($new['internal_confidentiality_level'] === $old['confidentiality_level'] && $new['source_confidentiality_level'] === null, 'historical confidentiality preserved '.$old['confidentiality_level']);
@@ -85,6 +166,35 @@ if ($mode === 'verify-up') {
         file_put_contents($qa.'/post-upgrade.json', $snapshot);
     }
     echo "UPGRADE ASSERTIONS PASSED\n";
+    exit;
+}
+if ($mode === 'verify-interest-index-backfill') {
+    $row = DB::table('product_interests')->where('email', 'qa-old-index@example.test')->first();
+    $original = $row->products;
+    check(Artisan::call('fokus:backfill-interest-products') !== 0, 'backfill requires explicit drained confirmation');
+    check(! (bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'unconfirmed backfill does not mark index ready');
+    DB::table('product_interests')->where('id', $row->id)->update(['products' => 'invalid']);
+    check(Artisan::call('fokus:backfill-interest-products', ['--confirm-drained' => true]) !== 0, 'invalid historical JSON rejects backfill');
+    check(! (bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'failed backfill stays not ready');
+    check(! (bool) DB::table('interest_product_index_state')->where('id', 1)->value('running'), 'failed backfill releases running state');
+    DB::table('product_interests')->where('id', $row->id)->update(['products' => $original]);
+    check(Artisan::call('fokus:backfill-interest-products', ['--confirm-drained' => true]) === 0, 'backfill succeeds after reconciliation');
+    check((bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'successful backfill marks index ready');
+    check(! (bool) DB::table('interest_product_index_state')->where('id', 1)->value('running'), 'successful backfill releases running state');
+    check(DB::table('interest_product_index')->where('interest_id', $row->id)->where('product_code', 'law')->exists(), 'historical code indexed');
+    check(Artisan::call('fokus:backfill-interest-products', ['--confirm-drained' => true]) === 0, 'backfill can be repeated');
+    check(DB::table('interest_product_index')->where('interest_id', $row->id)->where('product_code', 'law')->count() === 1, 'backfill remains idempotent');
+    // Simulate a legacy writer bypassing transactional index maintenance.
+    // The confirmation option cannot prove external writers have drained.
+    DB::table('product_interests')->where('id', $row->id)->update(['products' => '["synthetic_drain_probe"]']);
+    check((bool) DB::table('interest_product_index_state')->where('id', 1)->value('ready'), 'legacy write cannot automatically invalidate ready');
+    check(! DB::table('interest_product_index')->where('interest_id', $row->id)->where('product_code', 'synthetic_drain_probe')->exists(), 'legacy write leaves stale index despite ready');
+    DB::table('interest_product_index_state')->where('id', 1)->update(['ready' => false]);
+    check(Artisan::call('fokus:backfill-interest-products', ['--confirm-drained' => true]) === 0, 'drained synthetic writers allow index rebuild');
+    check(DB::table('interest_product_index')->where('interest_id', $row->id)->where('product_code', 'synthetic_drain_probe')->exists(), 'rebuild indexes legacy change');
+    DB::table('product_interests')->where('id', $row->id)->update(['products' => $original]);
+    DB::table('interest_product_index_state')->where('id', 1)->update(['ready' => false]);
+    check(Artisan::call('fokus:backfill-interest-products', ['--confirm-drained' => true]) === 0, 'restore synthetic source and rebuild');
     exit;
 }
 if ($mode === 'verify-recovery') {

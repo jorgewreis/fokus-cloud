@@ -6,7 +6,7 @@
         <script src="/assets/js/styles-theme.js?v=43beb173291c">
 </script>
     <link rel="stylesheet" href="/styles/assets/site-palette.css?v=78761f104e71">
-    <link rel="stylesheet" href="/styles/assets/fokus-2.7.0.min.css" />
+    <link rel="stylesheet" href="/styles/assets/fokus-3.0.0.min.css" />
         <link rel="stylesheet" href="/assets/css/modules/styles-docs/styles-docs.css?v=c48d69f02749" />
         <link rel="stylesheet" href="/assets/css/modules/styles-showcase.css?v=008788e9783a" />
 <script src="/assets/js/styles-showcase.js?v=4135ad728cf5" defer>
@@ -67,7 +67,7 @@
       "name": "Fokus Styles",
       "url": "https://styles.fokuscloud.com.br/",
       "description": "Framework CSS gratuito com licença MIT, tokens, temas e interações em JavaScript vanilla.",
-      "codeRepository": "https://github.com/jorgewreis/fokus-styles",
+      "codeRepository": "https://github.com/jorgewreis/fokus/tree/main/packages/styles",
       "programmingLanguage": [
         "CSS",
         "JavaScript"
@@ -95,7 +95,7 @@
 <nav aria-label="Navegação principal">
 <a href="#exemplos">Exemplos</a>
 <a href="/docs">Documentação</a>
-<a href="https://github.com/jorgewreis/fokus-styles">GitHub</a>
+<a href="https://github.com/jorgewreis/fokus/tree/main/packages/styles">GitHub</a>
 </nav>
 <button class="fs-btn" data-theme-toggle type="button" aria-label="Ativar tema claro" aria-pressed="true">Claro / escuro</button>
 </div>
@@ -112,7 +112,7 @@
 </a>
 <a class="fs-btn fs-btn-outline-primary" href="#instalacao">Instalar</a>
 </div>
-<p class="showcase-meta">Exemplos com <strong>v2.7.0</strong> · MIT · HTML, CSS e JavaScript</p>
+<p class="showcase-meta">Exemplos com <strong>v3.0.0</strong> · MIT · HTML, CSS e JavaScript</p>
 </div>
 <div class="showcase-preview">
 <div class="showcase-preview-bar">
@@ -216,6 +216,7 @@
 </div>
 </article>
 </div>
+<p>Consulte também as demonstrações de <a href="/styles/examples/cloud-datatable.html">DataTable</a>, <a href="/styles/examples/confirmation-modal.html">confirmação em modal</a>, <a href="/styles/examples/law-select-pattern.html">Select em formulários</a>, <a href="/styles/examples/cloud-offcanvas.html">edição em painel lateral</a>, <a href="/styles/examples/law-preferences.html">preferências locais</a> e <a href="/styles/examples/law-notifications.html">notificações</a>, adaptações com dados fictícios inspiradas em usos do ecossistema.</p>
 <section class="showcase-source" id="source-panel" hidden aria-labelledby="source-title">
 <div class="showcase-section-head">
 <h3 id="source-title">HTML completo do exemplo</h3>
@@ -224,7 +225,7 @@
 <button class="fs-btn" id="close-source" type="button">Fechar código</button>
 </div>
 </div>
-<p>Inclui JavaScript local. As folhas <code>composition.css</code> e <code>../assets/fokus-2.7.0.min.css</code> estão no pacote ZIP abaixo. Preserve essa estrutura ou ajuste o caminho ao instalar pelo npm.</p>
+<p>Inclui JavaScript local. As folhas <code>composition.css</code> e <code>../assets/fokus-3.0.0.min.css</code> estão no pacote ZIP abaixo. Preserve essa estrutura ou ajuste o caminho ao instalar pelo npm.</p>
 <pre tabindex="0" aria-label="Código HTML completo">
 <code id="example-source">
 </code>
@@ -233,7 +234,7 @@
 </p>
 </section>
 <p class="showcase-download">
-<a class="fs-btn fs-btn-outline-primary styles-site-cta" href="/styles/examples/fokus-styles-examples.zip" download>Baixar os três exemplos + CSS</a>
+<a class="fs-btn fs-btn-outline-primary styles-site-cta" href="/styles/examples/fokus-styles-examples.zip" download>Baixar os nove exemplos + CSS</a>
 <span>ZIP independente do Laravel · dados fictícios · sem envio de formulários</span>
 </p>
 </section>
@@ -247,16 +248,16 @@
 <div class="showcase-terminal">
 <div class="showcase-preview-bar">
 <span>Instalação com npm</span>
-<span>v2.7.0</span>
+<span>v3.0.0</span>
 </div>
 <pre>
-<code>npm install fokus-styles@2.7.0
+<code>npm install fokus-styles@3.0.0
 
 // No ponto de entrada do seu bundler:
 import 'fokus-styles';</code>
 </pre>
 <p>CSS do pacote + HTML semântico. As interações específicas dos exemplos são JavaScript local, sem backend.</p>
-<a href="https://www.npmjs.com/package/fokus-styles/v/2.7.0">Ver esta versão no npm</a>
+<a href="https://www.npmjs.com/package/fokus-styles/v/3.0.0">Ver esta versão no npm</a>
 </div>
 </section>
 <section class="showcase-section" id="documentacao">
@@ -292,7 +293,7 @@ import 'fokus-styles';</code>
 </a>
 </div>
 <aside class="styles-doc-callout" aria-label="Referência em desenvolvimento">
-<div><span class="styles-doc-status">Em desenvolvimento</span><h3>Referência de componentes</h3><p>56 contratos e 137 exemplos revisados do snapshot de desenvolvimento, com código, evidências e limitações. Esta referência é separada do npm 2.7.0.</p></div>
+<div><span class="styles-doc-status">Em desenvolvimento</span><h3>Referência de componentes</h3><p>56 contratos e 137 exemplos revisados do snapshot de desenvolvimento, com código, evidências e limitações. Esta referência é separada do npm 3.0.0.</p></div>
 <a class="styles-doc-text-link" href="/styles/next/">Consultar a referência em desenvolvimento</a>
 </aside>
 <p class="showcase-note">Acessibilidade é um trabalho de composição e verificação: teste teclado, contraste, conteúdo e estados no seu contexto. O framework não certifica automaticamente um produto.</p>
@@ -302,7 +303,7 @@ import 'fokus-styles';</code>
 <a class="showcase-wordmark" href="https://www.fokuscloud.com.br/">FOKUS <span>CLOUD</span>
 </a>
 <span>Fokus Styles · Uma base comum, muitas possibilidades.</span>
-<a href="https://github.com/jorgewreis/fokus-styles/blob/main/LICENSE">Código sob licença MIT</a>
+<a href="https://github.com/jorgewreis/fokus/blob/main/packages/styles/LICENSE">Código sob licença MIT</a>
 </footer>
 </body>
 </html>

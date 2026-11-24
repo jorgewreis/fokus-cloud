@@ -391,6 +391,16 @@ class AdoptionLifecycle(unittest.TestCase):
 
 
 class WorkflowContract(unittest.TestCase):
+    def add_legacy_block(self, workflow):
+        anchor = '      - name: Configure SSH\n'
+        addition = ("      # The remaining legacy steps mutate DEPLOY_PATH in place and do not prepare,\n"
+                    "      # seal or activate a new immutable release. Never open SSH for that path.\n"
+                    "      - name: Block legacy in-place publication\n"
+                    "        id: immutable_guard\n"
+                    "        run: python3 deploy/legacy_publication_guard.py\n\n")
+        self.assertEqual(workflow.count(anchor), 1)
+        return workflow.replace(anchor, addition + anchor, 1)
+
     def expected_workflow(self):
         import hashlib
         import json
@@ -404,7 +414,170 @@ class WorkflowContract(unittest.TestCase):
             self.assertEqual(composed.count(delta['before']), 1)
             self.assertNotEqual(delta['before'], delta['after'])
             composed = composed.replace(delta['before'], delta['after'], 1)
-        return composed
+        # Preserve all baseline/delta bytes, then apply the reviewed atomic publisher.
+        return self.with_atomic_publisher(self.add_legacy_block(composed))
+
+    def with_atomic_publisher(self, workflow):
+        import hashlib
+        section_path = ROOT / 'tests/Deployment/fixtures/atomic-publication-section.yml'
+        section = section_path.read_text(encoding='utf-8')
+        self.assertEqual(hashlib.sha256(section.encode()).hexdigest(),
+                         '94c3fe7238e6a75c97fa61ca07cceb20b8cea3cbbcbadca1dcf3ceefa0d1638c')
+        start = workflow.index('      # The remaining legacy steps mutate DEPLOY_PATH in place')
+        end = workflow.index('      - name: Apply explicitly selected PHP-FPM reload policy\n')
+        workflow = workflow[:start] + section + workflow[end:]
+        replacements = (
+            ("""      candidate_sha:
+        description: Exact main commit with successful isolated Linux validation
+        required: true
+        type: string
+""",
+             """      candidate_sha:
+        description: Exact main commit with successful isolated Linux validation
+        required: true
+        type: string
+      bootstrap_first_sealed_release:
+        description: Accept only the current unsealed HTML 404 for the first sealed release
+        required: false
+        default: false
+        type: boolean
+"""),
+            ("""      - name: Generate immutable assets and one-shot deploy payload
+        run: node tools/generate-fokus-law-assets.mjs --output-root "$GITHUB_WORKSPACE" --staging-dir "$RUNNER_TEMP/fokus-law-assets"
+
+      - name: Require exact main revision and latest successful Linux validation
+""",
+             """      - name: Generate immutable assets and one-shot deploy payload
+        run: node tools/generate-fokus-law-assets.mjs --output-root "$GITHUB_WORKSPACE" --staging-dir "$RUNNER_TEMP/fokus-law-assets"
+
+      - name: Setup PHP for the sealed release
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite, sqlite3
+          coverage: none
+
+      - name: Install PHP dependencies for the sealed release
+        # package:discover opens SQLite during boot. This memory connection is
+        # step-scoped so the sealed tree never receives a runner database file
+        # or runner-only DB configuration. The server keeps using shared/.env.
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ":memory:"
+        run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Require exact main revision and latest successful Linux validation
+"""),
+            ("""      # Intentionally fail before SSH or schema mutations until an independently
+      # reviewed, dynamic release endpoint and runtime policy are configured.
+      - name: Require verifiable deployment prerequisites
+        id: preflight
+        timeout-minutes: 2
+        run: |
+          python3 tools/ci/verify-deployment.py preflight
+          python3 tools/ci/verify-deployment.py probe-current
+""",
+             """      # Probe the live release before SSH. The first sealed publication must set
+      # bootstrap_first_sealed_release; only then is the current HTML 404 accepted.
+      - name: Require verifiable deployment prerequisites
+        id: preflight
+        timeout-minutes: 2
+        env:
+          BOOTSTRAP_FIRST_SEALED_RELEASE: ${{ inputs.bootstrap_first_sealed_release == true && 'true' || 'false' }}
+        run: |
+          python3 tools/ci/verify-deployment.py preflight
+          python3 tools/ci/verify-deployment.py probe-current
+"""),
+        )
+        for old, new in replacements:
+            self.assertEqual(workflow.count(old), 1)
+            workflow = workflow.replace(old, new, 1)
+        old_verify = """      - name: Purge Cloudflare cache
+        id: cdn
+"""
+        # The historical purge step stays; verification moves ahead of it and rolls the pointer back.
+        verify_anchor = "      - name: Verify application health and expected active release\n        id: release\n        timeout-minutes: 2\n        run: python3 tools/ci/verify-deployment.py verify\n"
+        self.assertEqual(workflow.count(verify_anchor), 1)
+        self.assertLess(workflow.index(old_verify), workflow.index(verify_anchor))
+        workflow = workflow.replace(verify_anchor, '', 1)
+        insert = """      - name: Verify application health and expected active release
+        id: release
+        timeout-minutes: 2
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9_./-]+$ ]]
+          [[ "$DEPLOY_PATH" != *..* ]]
+          [[ "$EXPECTED_RELEASE" =~ ^[0-9a-f]{40}$ ]]
+          if ! python3 tools/ci/verify-deployment.py verify; then
+            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; python3 '$DEPLOY_PATH/releases/$EXPECTED_RELEASE/deploy/atomic_publisher.py' rollback --base '$DEPLOY_PATH' --release '$EXPECTED_RELEASE'"
+            exit 1
+          fi
+
+"""
+        self.assertEqual(workflow.count(old_verify), 1)
+        workflow = workflow.replace(old_verify, insert + old_verify, 1)
+        old_purge = r"""          curl --fail-with-body --request POST \
+            "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data '{"purge_everything":true}'
+"""
+        new_purge = r"""          # HTTP status errors are curl exit 22 and are never retried.
+          attempt=1
+          while true; do
+            set +e
+            curl --fail-with-body --max-time 20 --connect-timeout 10 --request POST \
+              "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/purge_cache" \
+              --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              --header "Content-Type: application/json" \
+              --data '{"purge_everything":true}'
+            status=$?
+            set -e
+            if [ "$status" -eq 0 ]; then
+              exit 0
+            fi
+            if [ "$status" -eq 22 ] || [ "$attempt" -ge 3 ]; then
+              exit "$status"
+            fi
+            echo "transport_retry=${attempt} target=cloudflare_purge"
+            attempt=$((attempt + 1))
+            sleep 1
+          done
+"""
+        self.assertEqual(workflow.count(old_purge), 1)
+        workflow = workflow.replace(old_purge, new_purge, 1)
+        old_phases = """          PHASE_SCHEMA: ${{ steps.schema.outcome }}
+          PHASE_ASSETS: ${{ steps.assets.outcome }}
+          PHASE_FILES: ${{ steps.files.outcome }}
+          PHASE_RUNTIME: ${{ steps.runtime.outcome }}
+          PHASE_DEPENDENCIES: ${{ steps.dependencies.outcome }}
+          PHASE_MIGRATIONS: ${{ steps.migrations.outcome }}
+          PHASE_DATAJUD_CONFIG: ${{ steps.datajud_config.outcome }}
+          PHASE_CACHES: ${{ steps.caches.outcome }}
+          PHASE_TAGS: ${{ steps.tags.outcome }}
+          PHASE_DATAJUD: ${{ steps.datajud.outcome }}
+          PHASE_SCHEDULER: ${{ steps.scheduler.outcome }}
+          PHASE_SERVICES: ${{ steps.services.outcome }}
+"""
+        new_phases = """          PHASE_SCHEMA: ${{ steps.schema.outcome }}
+          PHASE_SEAL: ${{ steps.seal.outcome }}
+          PHASE_STAGE: ${{ steps.stage.outcome }}
+          PHASE_SWITCH: ${{ steps.switch.outcome }}
+          PHASE_SERVICES: ${{ steps.services.outcome }}
+"""
+        self.assertEqual(workflow.count(old_phases), 1)
+        workflow = workflow.replace(old_phases, new_phases, 1)
+        # Removing the old verify step leaves the blank line that separated it from the report.
+        # The purge retry loop ends that step; collapse the same extra blank line there.
+        collapsed = workflow.replace("done\n\n\n      - name: Report each publication phase\n",
+                                     "done\n\n      - name: Report each publication phase\n", 1)
+        self.assertNotEqual(collapsed, workflow)
+        return collapsed
 
     def assert_workflow_preserved(self, current):
         self.assertEqual(current, self.expected_workflow(),
@@ -413,22 +586,62 @@ class WorkflowContract(unittest.TestCase):
     def test_exact_authorized_composition_and_quality_preserved(self):
         import hashlib
         self.assert_workflow_preserved((ROOT / '.github/workflows/deploy.yml').read_text())
-        self.assertEqual(hashlib.sha256((ROOT / '.github/workflows/application-quality.yml').read_bytes()).hexdigest(), '88aeef47f81a6949a8df7dc2a66685f3934eba7742d12546491b326ccd55c9a8')
+        self.assertEqual(hashlib.sha256((ROOT / '.github/workflows/application-quality.yml').read_bytes()).hexdigest(), 'fe48de6b6782bafee12bbc8ef64611a3896c8f19b9655b1c4507d96a42851ff9')
+
+    def test_publish_install_discovers_packages_without_shipping_a_runner_database(self):
+        workflow = (ROOT / '.github/workflows/deploy.yml').read_text()
+        validate, deploy = workflow.split('  deploy:\n', 1)
+        # Validation may create a disposable file in its own checkout. Publication
+        # must not: prepare-release.py seals `git archive` plus vendor, and a
+        # workspace database.sqlite or runner .env must not become the server's DB.
+        self.assertIn('      - name: Prepare SQLite database for package discovery\n        run: touch database/database.sqlite\n', validate)
+        self.assertNotIn('database.sqlite', deploy)
+        self.assertNotIn('touch ', deploy)
+        header, _steps = deploy.split('    steps:\n', 1)
+        self.assertNotIn('DB_CONNECTION', header)
+        self.assertNotIn('DB_DATABASE', header)
+        self.assertEqual(deploy.count('DB_CONNECTION:'), 1)
+        self.assertEqual(deploy.count('DB_DATABASE:'), 1)
+        step = deploy.split('      - name: Install PHP dependencies for the sealed release\n', 1)[1].split('      - name:', 1)[0]
+        command = step.split('        run: ', 1)[1]
+        self.assertIn('DB_CONNECTION: sqlite\n', step)
+        self.assertIn('DB_DATABASE: ":memory:"\n', step)
+        self.assertNotIn('database.sqlite', command)
+        self.assertNotIn('.env', command)
+        self.assertNotIn('touch ', command)
+        self.assertEqual(command.strip(), 'composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader')
+        self.assertNotIn('--no-scripts', step)
+        self.assertNotIn('continue-on-error', step)
+        self.assertNotIn('\n        if:', step)
+        seal = deploy.split('      - name: Seal inactive release at the remote root\n', 1)[1].split('      - name:', 1)[0]
+        transfer = deploy.split('      - name: Transfer sealed release into a new directory\n', 1)[1].split('      - name:', 1)[0]
+        self.assertIn('python3 deploy/atomic_publisher.py seal-local\n', seal)
+        self.assertIn('"$RUNNER_TEMP/sealed-release/"', transfer)
+        self.assertNotIn('GITHUB_WORKSPACE', transfer)
+        for phase in ('PHASE_PUBLICATION:', 'PHASE_FPM_PREFLIGHT:', 'PHASE_PREFLIGHT:', 'PHASE_SSH:',
+                      'PHASE_SCHEMA:', 'PHASE_SEAL:', 'PHASE_STAGE:', 'PHASE_SWITCH:',
+                      'PHASE_SERVICES:', 'PHASE_CDN:', 'PHASE_RELEASE:'):
+            self.assertIn(phase, deploy)
+        self.assertIn('python3 deploy/fpm_guard_cli.py preflight', deploy)
+        self.assertIn('python3 deploy/fpm_guard_cli.py activate', deploy)
+        self.assertEqual(deploy.count('always()'), 1)
 
     def test_every_partial_or_reverted_delta_is_rejected(self):
         import json
         fixtures = ROOT / 'tests/Deployment/fixtures'
         baseline = (fixtures / 'deploy-main-operational.yml').read_text()
-        composed = self.expected_workflow()
+        composed = baseline
+        for delta in json.loads((fixtures / 'deploy-law-operational-deltas.json').read_text())['deltas']:
+            composed = composed.replace(delta['before'], delta['after'], 1)
         with self.assertRaises(AssertionError): self.assert_workflow_preserved(baseline)
         for index, delta in enumerate(json.loads((fixtures / 'deploy-law-operational-deltas.json').read_text())['deltas']):
             with self.subTest(delta=index):
                 self.assertEqual(baseline.count(delta['before']), 1)
                 self.assertEqual(composed.count(delta['after']), 1)
                 with self.assertRaises(AssertionError):
-                    self.assert_workflow_preserved(baseline.replace(delta['before'], delta['after'], 1))
+                    self.assert_workflow_preserved(self.add_legacy_block(baseline.replace(delta['before'], delta['after'], 1)))
                 with self.assertRaises(AssertionError):
-                    self.assert_workflow_preserved(composed.replace(delta['after'], delta['before'], 1))
+                    self.assert_workflow_preserved(self.add_legacy_block(composed.replace(delta['after'], delta['before'], 1)))
 
     def test_rejects_every_step_removed_skipped_weakened_or_extended(self):
         import re

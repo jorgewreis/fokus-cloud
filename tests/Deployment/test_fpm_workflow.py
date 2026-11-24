@@ -113,6 +113,7 @@ class WorkflowExecution(unittest.TestCase):
                        CLOUDFLARE_API_TOKEN='synthetic', CLOUDFLARE_ZONE_ID='fixture-zone',
                        DATAJUD_API_KEY='synthetic', PYTHONDONTWRITEBYTECODE='1',
                        FPM_RELOAD_MODE=mode, FPM_SERVICE=service, EXPECTED_RELEASE='a' * 40,
+                       BOOTSTRAP_FIRST_SEALED_RELEASE='false',
                        DEPLOY_PUBLIC_BASE_URL='https://fixture.invalid',
                        DEPLOY_RELEASE_URL='https://fixture.invalid/deployment-release')
             if cloudflare is not None:
@@ -121,7 +122,9 @@ class WorkflowExecution(unittest.TestCase):
             start = next(i for i, step in enumerate(steps) if step[0] == PREFLIGHT)
             completed = []
             status = 0
-            outcomes = {'publication': 'success', 'preflight': 'success', 'ssh': 'success'}
+            # Seal and SSH run before this harness starts; they are fixed successful
+            # fixtures here, the same way the publication gate is.
+            outcomes = {'publication': 'success', 'preflight': 'success', 'ssh': 'success', 'seal': 'success'}
             # Earlier gates are fixtures here; their real verifiers have separate
             # negative/API/TLS tests. From FPM onward execute actual workflow shells.
             step_outputs = {}
@@ -156,10 +159,11 @@ class WorkflowExecution(unittest.TestCase):
         self.assertEqual(events[2], ['sudo', '-n', '-l', '--', *RELOAD])
         self.assertEqual(kinds[3], 'workflow-ssh')
         self.assertIn('mkdir -m 700', events[3][1])
-        self.assertEqual(kinds[-7:], ['/usr/bin/systemctl', 'runtime-script', 'sudo', '/usr/bin/systemctl', 'purge', 'http-verify', 'summary'])
+        self.assertEqual(kinds[-7:], ['/usr/bin/systemctl', 'runtime-script', 'sudo', '/usr/bin/systemctl', 'http-verify', 'purge', 'summary'])
+        self.assertFalse(any('rollback' in word for event in events for word in event))
         self.assertEqual(sum(event[:3] == ['sudo', '-n', '--'] for event in events), 1)
         self.assertFalse(any('restart' in word for event in events for word in event))
-        self.assertEqual(completed[-4:], [ACTIVATE, 'Purge Cloudflare cache', VERIFY, REPORT])
+        self.assertEqual(completed[-4:], [ACTIVATE, VERIFY, 'Purge Cloudflare cache', REPORT])
 
     def test_every_preflight_failure_prevents_schema_source_and_purge(self):
         for scenario in ('ssh_failure', 'missing', 'inactive', 'divergent', 'no_reload',
@@ -208,6 +212,8 @@ class WorkflowExecution(unittest.TestCase):
                 self.assertEqual(status, expected)
                 self.assertFalse(any(event[0] in ('sudo', '/usr/bin/systemctl', 'runtime-script') for event in events))
                 self.assertIn(['http-verify'], events)
+                rolled_back = any('rollback' in word for event in events for word in event)
+                self.assertEqual(rolled_back, scenario != 'success')
                 self.assertIn('no unit or sudo claim', self.report)
                 self.assertIn('no OPcache claim', self.report)
                 self.assertEqual('Automated publication checks passed.' in self.report, scenario == 'success')
@@ -232,24 +238,75 @@ class WorkflowExecution(unittest.TestCase):
         self.assertNotIn('restart', production)
         steps = deployment_steps()
         names = [step[0] for step in steps]
-        self.assertEqual(names[:6], ['Generate immutable assets and one-shot deploy payload',
+        self.assertEqual(names[:8], ['Generate immutable assets and one-shot deploy payload',
+                                   'Install PHP dependencies for the sealed release',
                                    'Require exact main revision and latest successful Linux validation',
                                    'Require verifiable deployment prerequisites',
-                                   'Configure SSH', PREFLIGHT,
+                                   'Configure SSH', 'Seal inactive release at the remote root', PREFLIGHT,
                                    'Verify Law schema before publishing application code'])
-        self.assertEqual(names[-4:], [ACTIVATE, 'Purge Cloudflare cache', VERIFY, REPORT])
-        self.assertEqual(steps[4][1], 'python3 deploy/fpm_guard_cli.py preflight\n')
-        self.assertEqual(steps[-4][1], 'python3 deploy/fpm_guard_cli.py activate\n')
+        self.assertEqual(names[-4:], [ACTIVATE, VERIFY, 'Purge Cloudflare cache', REPORT])
+        self.assertNotIn('Block legacy in-place publication', names)
+        self.assertNotIn('Sync application source', names)
+        scripts = {name: script for name, script, _body in steps}
+        self.assertEqual(scripts[PREFLIGHT], 'python3 deploy/fpm_guard_cli.py preflight\n')
+        self.assertEqual(scripts[ACTIVATE], 'python3 deploy/fpm_guard_cli.py activate\n')
+        self.assertIn(':$DEPLOY_PATH/releases/$EXPECTED_RELEASE/', scripts['Transfer sealed release into a new directory'])
+        self.assertNotIn(':$DEPLOY_PATH/"', scripts['Transfer sealed release into a new directory'])
+        self.assertIn('atomic_publisher.py\' switch', scripts['Switch the current symlink atomically'])
+        self.assertIn('atomic_publisher.py\' rollback', scripts[VERIFY])
+        self.assertLess(names.index('Transfer sealed release into a new directory'), names.index(ACTIVATE))
+        self.assertLess(names.index(VERIFY), names.index('Purge Cloudflare cache'))
         for name, _, body in steps:
             if name != REPORT:
                 self.assertNotRegex(body, r'(?m)^        if:', name)
-        purge = steps[-3][1]
+        purge = scripts['Purge Cloudflare cache']
         self.assertIn('if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ZONE_ID" ]; then', purge)
         self.assertLess(purge.index('exit 0'), purge.index('curl --fail-with-body'))
+        self.assertIn('[ "$status" -eq 22 ] || [ "$attempt" -ge 3 ]', purge)
+        self.assertIn('transport_retry=${attempt} target=cloudflare_purge', purge)
+        self.assertIn('--max-time 20', purge)
+        self.assertIn('--connect-timeout 10', purge)
         # Setup performs only a remote no-op before preflight; the exact body is
         # separately pinned to the preserved main source by WorkflowContract.
-        self.assertIn('"$DEPLOY_USER@$DEPLOY_HOST" exit', steps[3][1])
+        self.assertIn('"$DEPLOY_USER@$DEPLOY_HOST" exit', steps[4][1])
         self.assertIn("run: python3 -m unittest discover -s tests/Deployment -p 'test_fpm*.py' -v", workflow)
+
+    def test_cloudflare_purge_retries_transport_and_not_http_status(self):
+        script = next(script for name, script, _body in deployment_steps() if name == 'Purge Cloudflare cache')
+        cases = (
+            ('28,0', 0, 2, 'transport_retry=1 target=cloudflare_purge\n'),
+            ('22', 22, 1, ''),
+            ('28,28,28', 28, 3, 'transport_retry=1 target=cloudflare_purge\ntransport_retry=2 target=cloudflare_purge\n'),
+            ('0', 0, 1, ''),
+        )
+        for codes, expected, invocations, stdout in cases:
+            with self.subTest(codes=codes):
+                with tempfile.TemporaryDirectory(prefix='fokus-purge-retry-') as directory:
+                    root = Path(directory)
+                    log = root / 'curl-count'
+                    log.write_text('0')
+                    curl = root / 'curl'
+                    curl.write_text(
+                        '#!' + sys.executable + '\n'
+                        'import os, sys\n'
+                        'log = os.environ["CURL_LOG"]\n'
+                        'count = int(open(log).read() or "0")\n'
+                        'open(log, "w").write(str(count + 1))\n'
+                        'codes = [int(item) for item in os.environ["CURL_CODES"].split(",") if item]\n'
+                        'sys.exit(codes[min(count, len(codes) - 1)])\n'
+                    )
+                    curl.chmod(0o700)
+                    env = {key: os.environ[key] for key in ('PATH', 'HOME') if key in os.environ}
+                    env.update(PATH=str(root) + os.pathsep + env.get('PATH', ''),
+                               CURL_LOG=str(log), CURL_CODES=codes,
+                               CLOUDFLARE_API_TOKEN='synthetic-token', CLOUDFLARE_ZONE_ID='fixture-zone')
+                    result = subprocess.run(['bash', '--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script],
+                                            env=env, capture_output=True, text=True, timeout=20)
+                    self.assertEqual(expected, result.returncode)
+                    self.assertEqual(invocations, int(log.read_text()))
+                    self.assertEqual(stdout, result.stdout)
+                    self.assertNotIn('synthetic-token', result.stdout + result.stderr)
+                    self.assertNotIn('fixture-zone', result.stdout)
 
 
 if __name__ == '__main__':

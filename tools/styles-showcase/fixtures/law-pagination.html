@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paginação de registros Law · ensaio local</title>
+  <link rel="stylesheet" href="/fokus-3.0.0.min.css">
+  <style>body{max-width:64rem;margin:auto;padding:1.5rem;font-family:var(--fs-font-sans, sans-serif)} .demo-actions{display:flex;gap:.75rem;flex-wrap:wrap;margin:1rem 0} .demo-scroll{overflow:auto} #pagination{margin-top:1rem} [role=alert]:empty{display:none}</style>
+</head>
+<body>
+  <main>
+    <nav aria-label="Ensaios de componentes"><a href="/cloud-datatable.html">Ver ensaio de DataTable do Cloud</a> · <a href="/law-select.html">Ver ensaio de Select do Law</a></nav>
+    <h1>Paginação de registros Law</h1>
+    <p>Ensaio local com dados fictícios. Usa a composição Law e o CSS 3.0.0 incluídos neste checkout.</p>
+    <p>Fonte: <code>public/portal/assets/law-record-ui.js</code>. A tabela e os dados são simulados. A recuperação de foco foi testada em DOM simulado; revisão de teclado e visual em navegador ainda pendente.</p>
+    <div class="demo-actions">
+      <button class="fs-btn fs-btn-outline-primary" id="theme" type="button">Alternar tema</button>
+      <button class="fs-btn fs-btn-outline-primary" id="failure" type="button" aria-pressed="false">Simular falha na próxima página</button>
+      <button class="fs-btn fs-btn-outline-primary" id="empty" type="button" aria-pressed="false">Mostrar lista vazia</button>
+    </div>
+    <p id="error" role="alert"></p>
+    <div class="demo-scroll" role="region" aria-label="Tabela de registros fictícios" tabindex="0">
+      <table class="fs-table"><caption>Registros fictícios</caption><thead><tr><th scope="col">Número</th><th scope="col">Estado</th></tr></thead><tbody id="rows"></tbody></table>
+    </div>
+    <div id="pagination"></div>
+  </main>
+  <script src="/law-record-ui.js"></script>
+  <script>
+    (() => {
+      const rows = document.getElementById('rows'), pagination = document.getElementById('pagination');
+      const error = document.getElementById('error'), failure = document.getElementById('failure'), empty = document.getElementById('empty');
+      let current = 1, failNext = false, isEmpty = false;
+      function render() {
+        rows.replaceChildren();
+        const total = isEmpty ? 0 : 23, size = 5;
+        if (!total) {
+          const row = rows.insertRow(), cell = row.insertCell(); cell.colSpan = 2; cell.className = 'fs-table-empty'; cell.textContent = 'Nenhum registro encontrado.';
+        } else {
+          for (let i = (current - 1) * size + 1; i <= Math.min(current * size, total); i++) {
+            const row = rows.insertRow(); row.insertCell().textContent = `Registro ${i}`; row.insertCell().textContent = 'Exemplo';
+          }
+        }
+        window.FokusLawRecordUI.renderPagination(pagination, {page: current, per_page: size, total}, async page => {
+          if (failNext) { failNext = false; failure.setAttribute('aria-pressed', 'false'); throw new Error('Falha simulada. Tente novamente.'); }
+          error.textContent = ''; current = page; render();
+        }, 'registros', e => { error.textContent = e.message; });
+      }
+      document.getElementById('theme').addEventListener('click', () => { const root = document.documentElement; root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark'; });
+      failure.addEventListener('click', () => { failNext = !failNext; failure.setAttribute('aria-pressed', String(failNext)); });
+      empty.addEventListener('click', () => { isEmpty = !isEmpty; current = 1; error.textContent = ''; empty.setAttribute('aria-pressed', String(isEmpty)); render(); });
+      render();
+    })();
+  </script>
+</body>
+</html>

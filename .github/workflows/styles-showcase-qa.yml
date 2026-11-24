@@ -8,6 +8,19 @@ on:
       - 'public/assets/css/modules/styles-showcase.css'
       - 'public/assets/js/styles-*.js'
       - 'tools/styles-showcase/**'
+      - 'public/portal/assets/fokus-law-select.js'
+      - 'public/portal/assets/law-record-ui.js'
+      - 'public/portal/assets/fokus-law-processes.js'
+      - 'public/portal/assets/fokus-law-shell.js'
+      - 'resources/views/portal/fokus-law.blade.php'
+      - 'public/backoffice/assets/js/modules-page.js'
+      - 'public/backoffice/assets/js/records-drawer.js'
+      - 'public/backoffice/assets/js/backoffice-router.js'
+      - 'public/backoffice/index.html'
+      - 'public/backoffice/pages/modules.html'
+      - 'tests/Frontend/cloud-modules-pagination.test.mjs'
+      - 'tests/Frontend/law-history-pagination.test.mjs'
+      - 'tests/Frontend/law-notifications-label.test.mjs'
       - 'tools/cache-bust-styles-pages.mjs'
       - 'routes/web.php'
       - 'resources/seo/pages.json'
@@ -25,6 +38,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
           node-version: 24
@@ -42,6 +57,9 @@ jobs:
           node --test tools/styles-showcase/visual-coherence.test.mjs
           node --test tools/styles-showcase/catalog.test.mjs
           node tools/styles-showcase/catalog.dom.mjs
+          node --test --test-isolation=none tools/styles-showcase/law-select.test.mjs tools/styles-showcase/law-pagination.test.mjs tests/Frontend/law-history-pagination.test.mjs tests/Frontend/cloud-modules-pagination.test.mjs tools/styles-showcase/cloud-datatable.test.mjs tools/styles-showcase/cloud-offcanvas.test.mjs tools/styles-showcase/confirmation-modal.test.mjs tools/styles-showcase/law-select-pattern.test.mjs tools/styles-showcase/law-preferences.test.mjs
+          node --test tests/Frontend/law-notifications-label.test.mjs
+          node --test tools/styles-showcase/law-notifications.test.mjs
           node tools/sync-seo.mjs --check
           python tools/styles-showcase/build-examples.py
           git diff --exit-code -- public/styles/examples/fokus-styles-examples.zip

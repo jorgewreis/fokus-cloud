@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Confirmação com modal · Exemplo Fokus Styles</title>
+<script src="../assets/styles-theme.js"></script>
+<link rel="stylesheet" href="../assets/fokus-3.0.0.min.css">
+<link rel="stylesheet" href="../assets/site-palette.css">
+<link rel="stylesheet" href="composition.css">
+<style>
+.example-field { display:grid; gap:.5rem; margin-block:1rem; }
+.example-field select { max-width:100%; }
+.example-modal-actions { display:flex; flex-wrap:wrap; gap:.75rem; }
+.example-modal-actions .fs-btn { min-height:44px; white-space:normal; }
+</style>
+</head>
+<body>
+<nav class="demo-site-nav" aria-label="Documentação e aparência">
+<a href="/styles/">Vitrine Fokus Styles</a>
+<button class="demo-theme-toggle" type="button" data-theme-toggle aria-label="Alternar tema claro e escuro">Alternar tema</button>
+</nav>
+<main class="demo-shell">
+<header class="demo-top"><strong>FOKUS STYLES / EXEMPLO</strong><span>Fokus Styles 3.0.0</span></header>
+<span class="demo-kicker">Modal e formulário</span>
+<h1>Confirme uma ação de exemplo</h1>
+<p>Abra o diálogo e escolha um motivo. A interação acontece apenas nesta página.</p>
+<section class="demo-panel" aria-labelledby="example-title">
+<h2 id="example-title">Módulo fictício</h2>
+<p>Experimente a confirmação sem alterar dados ou enviar informações.</p>
+<button class="fs-btn fs-btn-primary" type="button" id="confirmation-trigger" data-fs="modal" data-fs-target="#confirmation-modal">Abrir confirmação</button>
+<p id="confirmation-status" role="status" aria-live="polite"></p>
+</section>
+<p class="demo-caption">Adaptação demonstrativa da confirmação de módulos do Cloud e do uso de Modal em formulários do Law. O motivo e o resultado são fictícios; não usa API. Os estilos próprios dos produtos e suas regras de negócio não estão incluídos. O select permanece nativo dentro do diálogo.</p>
+<details class="demo-panel">
+<summary>Origem e contrato do exemplo</summary>
+<p>Inspirado na <a href="https://github.com/jorgewreis/fokus-cloud/blob/358b1b39d2ba8b216fe4cffb22e450e537807a5e/public/backoffice/pages/modules.html">confirmação de módulos do Cloud</a> e na <a href="https://github.com/jorgewreis/fokus-cloud/blob/358b1b39d2ba8b216fe4cffb22e450e537807a5e/public/portal/assets/law-record-ui.js">baseline da composição de diálogos do Law</a>. O bundle local é Fokus Styles 3.0.0; esta página não verifica a versão em produção.</p>
+<p>O Modal do framework fornece abertura e fechamento pela API <code>Modal</code> e atributos <code>data-fs</code>; este exemplo fornece formulário, validação nativa e resultado fictício. As regras de negócio, mensagens e estilos específicos dos produtos pertencem a cada produto.</p>
+<p>O exemplo usa os temas e tokens do framework com a paleta da vitrine. O select permanece nativo no diálogo; esse comportamento é uma escolha desta demonstração, sem integrar o adaptador Law.</p>
+</details>
+</main>
+<div class="fs-modal" id="confirmation-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="confirmation-title" aria-describedby="confirmation-description" aria-hidden="true">
+<div class="fs-modal-dialog"><div class="fs-modal-content">
+<div class="fs-modal-header"><h2 class="fs-modal-title" id="confirmation-title">Confirmar ação fictícia</h2></div>
+<form id="confirmation-form">
+<div class="fs-modal-body">
+<p id="confirmation-description">Escolha um motivo para continuar a demonstração.</p>
+<div class="example-field">
+<label class="fs-form-label" for="confirmation-reason">Motivo obrigatório</label>
+<select class="fs-form-select" id="confirmation-reason" name="reason" required aria-describedby="confirmation-help">
+<option value="">Selecione um motivo</option>
+<option value="revisao">Revisão de informações</option>
+<option value="organizacao">Organização da lista</option>
+<option value="outro">Outro motivo</option>
+</select>
+<small id="confirmation-help">Nenhuma informação é enviada ou salva.</small>
+</div>
+</div>
+<div class="fs-modal-footer example-modal-actions">
+<button class="fs-btn fs-btn-outline-primary" type="button" data-fs-dismiss="modal">Cancelar</button>
+<button class="fs-btn fs-btn-primary" type="submit">Confirmar exemplo</button>
+</div>
+</form>
+</div></div>
+</div>
+<script src="../assets/fokus-3.0.0.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const trigger = document.getElementById('confirmation-trigger');
+  const form = document.getElementById('confirmation-form');
+  const status = document.getElementById('confirmation-status');
+  const Modal = window.FokusStyles?.Modal;
+  if (!Modal) { trigger.disabled = true; status.textContent = 'Não foi possível iniciar o exemplo. Recarregue a página.'; return; }
+  const instance = Modal.getOrCreateInstance(trigger);
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    instance.hide();
+    status.textContent = 'Confirmação simulada. Nenhuma informação foi enviada ou salva.';
+  });
+});
+</script>
+</body>
+</html>

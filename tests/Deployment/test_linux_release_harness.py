@@ -26,19 +26,37 @@ class CoverageComposition(unittest.TestCase):
         report = ET.Element('testsuites')
         group = ET.SubElement(report, 'testsuite', tests=str(suite.EXPECTED_TESTS),
                               assertions=str(suite.MINIMUM_ASSERTIONS), failures='0', errors='0', skipped='0')
-        for identity, assertions in {**suite.MAIN_IDENTITY_TESTS, **suite.LEAD_TESTS}.items():
+        for identity, assertions in {**suite.MAIN_IDENTITY_TESTS, **suite.LEAD_TESTS, **suite.BILLING_TESTS, **suite.BACKOFFICE_TESTS, **suite.INTEREST_TESTS, **suite.PUBLIC_RELEASE_TESTS, **suite.IDEMPOTENCY_TESTS}.items():
             klass, name = identity.split('::')
             ET.SubElement(group, 'testcase', {'class': klass, 'name': name, 'assertions': str(assertions)})
-        for number in range(327):
+        for number in range(suite.EXPECTED_TESTS - len(group)):
             ET.SubElement(group, 'testcase', {'class': 'SyntheticLawCoverage', 'name': str(number), 'assertions': '1'})
         return report
 
     def test_measured_composition_preserves_all_law_and_main_tests(self):
-        self.assertEqual(suite.EXPECTED_TESTS, 351)
-        self.assertEqual(suite.MINIMUM_ASSERTIONS, 2834)
+        self.assertEqual(suite.EXPECTED_TESTS, 436)
+        self.assertEqual(suite.MINIMUM_ASSERTIONS, 3532)
         self.assertEqual(len(suite.MAIN_IDENTITY_TESTS), 10)
         self.assertEqual(sum(suite.MAIN_IDENTITY_TESTS.values()), 23)
-        self.assertEqual(suite.coverage(self.report())['tests'], 351)
+        self.assertEqual(suite.coverage(self.report(), 'sqlite')['tests'], 436)
+        self.assertEqual(suite.coverage(self.report(), 'sqlite')['assertions'], 3532)
+
+    def test_application_junit_checker_accepts_only_the_reviewed_composition(self):
+        import subprocess
+        import sys
+        report = self.report()
+        script = common.ROOT / 'tests/Deployment/check-suite-composition.py'
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / 'junit.xml'
+            ET.ElementTree(report).write(path, encoding='utf-8', xml_declaration=True)
+            accepted = subprocess.run([sys.executable, str(script), str(path)], capture_output=True, text=True)
+            self.assertEqual(accepted.returncode, 0, accepted.stderr)
+            self.assertIn('436 tests', accepted.stdout)
+            report[0].set('tests', '435')
+            ET.ElementTree(report).write(path, encoding='utf-8', xml_declaration=True)
+            rejected = subprocess.run([sys.executable, str(script), str(path)], capture_output=True, text=True)
+            self.assertEqual(rejected.returncode, 1)
+            self.assertIn('435/436', rejected.stderr)
 
     def test_omission_duplicate_or_weakened_identity_is_rejected_even_with_green_totals(self):
         for mutation in ('omit', 'duplicate', 'rename', 'assertions'):
@@ -48,7 +66,7 @@ class CoverageComposition(unittest.TestCase):
                 elif mutation == 'duplicate': second.attrib.update(first.attrib)
                 elif mutation == 'rename': first.set('name', 'another_green_test')
                 else: first.set('assertions', '0')
-                with self.assertRaises(RuntimeError): suite.coverage(report)
+                with self.assertRaises(RuntimeError): suite.coverage(report, 'sqlite')
 
     def test_every_lead_case_is_required_with_its_assertions(self):
         self.assertEqual(len(suite.LEAD_TESTS), 14)
@@ -61,17 +79,86 @@ class CoverageComposition(unittest.TestCase):
                     if mutation == 'omit': group.remove(case)
                     elif mutation == 'rename': case.set('name', 'unrelated_passing_case')
                     else: case.set('assertions', '0')
-                    with self.assertRaises(RuntimeError): suite.coverage(report)
+                    with self.assertRaises(RuntimeError): suite.coverage(report, 'sqlite')
+
+    def test_every_required_backoffice_and_interest_case_keeps_assertions(self):
+        self.assertEqual(len(suite.BILLING_TESTS), 18)
+        self.assertEqual(sum(suite.BILLING_TESTS.values()), 164)
+        self.assertEqual(len(suite.BACKOFFICE_TESTS), 23)
+        self.assertEqual(sum(suite.BACKOFFICE_TESTS.values()), 208)
+        self.assertEqual(len(suite.INTEREST_TESTS), 4)
+        self.assertEqual(len(suite.PUBLIC_RELEASE_TESTS), 4)
+        self.assertEqual(sum(suite.PUBLIC_RELEASE_TESTS.values()), 67)
+        for name in set(suite.BILLING_TESTS) | set(suite.BACKOFFICE_TESTS) | set(suite.INTEREST_TESTS) | set(suite.PUBLIC_RELEASE_TESTS):
+            for mutation in ('omit', 'duplicate', 'rename', 'assertions'):
+                with self.subTest(name=name, mutation=mutation):
+                    report = self.report(); group = report[0]
+                    case = next(c for c in group if c.get('class') + '::' + c.get('name') == name)
+                    if mutation == 'omit': group.remove(case)
+                    elif mutation == 'duplicate': ET.SubElement(group, 'testcase', dict(case.attrib))
+                    elif mutation == 'rename': case.set('name', 'unrelated_passing_case')
+                    else: case.set('assertions', '0')
+                    with self.assertRaises(RuntimeError): suite.coverage(report, 'sqlite')
+
+    def test_every_idempotency_case_is_required_for_sqlite(self):
+        self.assertEqual(len(suite.IDEMPOTENCY_TESTS), 4)
+        self.assertEqual(sum(suite.IDEMPOTENCY_TESTS.values()), 33)
+        for name in suite.IDEMPOTENCY_TESTS:
+            for mutation in ('omit', 'duplicate', 'rename', 'assertions'):
+                with self.subTest(name=name, mutation=mutation):
+                    report = self.report(); group = report[0]
+                    case = next(c for c in group if c.get('class') + '::' + c.get('name') == name)
+                    if mutation == 'omit': group.remove(case)
+                    elif mutation == 'duplicate': ET.SubElement(group, 'testcase', dict(case.attrib))
+                    elif mutation == 'rename': case.set('name', 'unrelated_passing_case')
+                    else: case.set('assertions', '0')
+                    with self.assertRaises(RuntimeError): suite.coverage(report, 'sqlite')
 
     def test_old_or_incomplete_totals_failures_errors_skips_and_hidden_failures_are_rejected(self):
-        for key, value in [('tests','327'),('tests','336'),('tests','350'),('tests','352'),('assertions','2833'),
+        for key, value in [('tests','327'),('tests','376'),('tests','423'),('tests','425'),('tests','428'),('tests','429'),('tests','430'),('tests','432'),('tests','434'),('assertions','3029'),('assertions','3072'),('assertions','3320'),('assertions','3354'),('assertions','3469'),('assertions','3491'),
                            ('failures','1'),('errors','1'),('skipped','1')]:
             with self.subTest(key=key):
                 report = self.report(); report[0].set(key,value)
-                with self.assertRaises(RuntimeError): suite.coverage(report)
+                with self.assertRaises(RuntimeError): suite.coverage(report, 'sqlite')
         for kind in ('failure', 'error', 'skipped'):
             report = self.report(); ET.SubElement(report[0][0], kind)
-            with self.assertRaises(RuntimeError): suite.coverage(report)
+            with self.assertRaises(RuntimeError): suite.coverage(report, 'sqlite')
+
+    def test_mysql_generic_contract_excludes_only_the_dedicated_lab_cases(self):
+        report = self.report()
+        group = report[0]
+        excluded = {path.name.replace('.php', '') for path in suite.MYSQL_LAB_TEST_FILES}
+        for case in list(group):
+            if case.get('class', '').split('\\')[-1] in excluded:
+                group.remove(case)
+        synthetic_lab_cases = [case for case in group if case.get('class') == 'SyntheticLawCoverage'][:30]
+        for case in synthetic_lab_cases:
+            group.remove(case)
+        group.set('tests', str(suite.MYSQL_GENERIC_TESTS))
+        group.set('assertions', str(suite.MYSQL_GENERIC_MINIMUM_ASSERTIONS))
+        self.assertEqual(suite.coverage(report, 'mysql')['tests'], suite.MYSQL_GENERIC_TESTS)
+
+    def test_mysql_suite_emits_persistent_phpunit_progress_before_execution(self):
+        records = {}
+        with tempfile.TemporaryDirectory() as directory, patch.object(suite, 'REPORT', pathlib.Path(directory)), patch.object(suite, 'write', side_effect=lambda name, value: records.setdefault(name, value)):
+            config = pathlib.Path(directory) / 'phpunit.xml'
+            junit = pathlib.Path(directory) / 'suite-mysql-junit.xml'
+            command, progress = suite.phpunit_command('mysql', config, junit)
+            self.assertIsNotNone(progress)
+            self.assertIn('--log-events-text', command)
+            self.assertEqual(command[command.index('--log-events-text') + 1], str(pathlib.Path(directory) / 'suite-mysql-events.log'))
+            recorded = records['suite-mysql-progress.json']
+            self.assertEqual(recorded['status'], 'running')
+            self.assertEqual(recorded['event_log'], 'suite-mysql-events.log')
+            self.assertIn('started_at_utc', recorded)
+            self.assertIn('Test Prepared', recorded['diagnostic_scope'])
+
+    def test_sqlite_suite_does_not_add_mysql_progress_log(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(suite, 'REPORT', pathlib.Path(directory)), patch.object(suite, 'write') as write:
+            command, progress = suite.phpunit_command('sqlite', pathlib.Path(directory) / 'phpunit.xml', pathlib.Path(directory) / 'suite-sqlite-junit.xml')
+            self.assertIsNone(progress)
+            self.assertNotIn('--log-events-text', command)
+            write.assert_not_called()
 
 
 class HarnessContracts(unittest.TestCase):
@@ -86,6 +173,9 @@ class HarnessContracts(unittest.TestCase):
         materialize = stages['materialize']
         handoff = stages['prepare-synthetic-ownership']
         self.assertIn('tar --no-same-owner -xf source.tar', ast.literal_eval(materialize.args[1].args[-1]))
+        self.assertIn("'bundle','create',str(history),'HEAD'", source)
+        self.assertIn('git clone --quiet --no-checkout history.bundle history', ast.literal_eval(materialize.args[1].args[-1]))
+        self.assertNotIn("tar.add(ROOT/'.git'", source)
         self.assertNotIn('safe.directory', source)
         self.assertIn('chown -R 1000:1000 /work', ast.literal_eval(handoff.args[1].args[-1]))
         self.assertLess(materialize.lineno, stages['prepare-isolated-upgrade-dependencies'].lineno)
@@ -137,7 +227,8 @@ class HarnessContracts(unittest.TestCase):
             self.assertEqual([a['source'] for a in adapters], ['tests/Feature/CatalogAdminTest.php'])
             self.assertNotIn('HOMOLOGATION_WALL_CLOCK_LOG', env)
             self.assertFalse((temporary / 'PlatformSecurityTest.php').exists())
-            self.assertEqual(len(tree.findall('.//exclude')), 1)
+            excludes = {pathlib.Path(node.text).name for node in tree.findall('.//exclude')}
+            self.assertEqual(excludes, {'CatalogAdminTest.php', *[path.name for path in suite.MYSQL_LAB_TEST_FILES]})
             original = (common.ROOT / 'tests/Feature/PlatformSecurityTest.php').read_text(encoding='utf-8')
             self.assertIn('$this->travel(61)->seconds();', original)
             self.assertNotIn('sleep(61)', original)
@@ -154,7 +245,8 @@ class HarnessContracts(unittest.TestCase):
             self.assertIn('sleep(61);', adapted)
             self.assertNotIn('$this->travel(61)->seconds();', adapted)
             self.assertIn("'cache_deleted_before_assertion' => false", adapted)
-            self.assertEqual(len(tree.findall('.//exclude')), 2)
+            excludes = {pathlib.Path(node.text).name for node in tree.findall('.//exclude')}
+            self.assertEqual(excludes, {'CatalogAdminTest.php', 'PlatformSecurityTest.php', *[path.name for path in suite.MYSQL_LAB_TEST_FILES]})
             for record in adapters:
                 source = common.ROOT / record['source']
                 # Adapter text cannot remove or weaken any original assertion.
@@ -345,14 +437,15 @@ class HarnessContracts(unittest.TestCase):
 
     def test_origin_rehearsal_orders_failure_repair_idempotence_and_restore(self):
         source = (common.ROOT / 'tests/Deployment/linux-upgrade.py').read_text(encoding='utf-8')
-        labels = ['repair-fresh-noop', 'prepare-origin-shape', 'repair-billing-before', 'five-migrations',
-                  'repair-billing-after', 'repair-origin-verify', 'repair-origin-idempotent', 'restored-backup-repair-verify']
+        labels = ['interest-index-pre-migration-compat', 'repair-fresh-noop', 'prepare-origin-shape', 'repair-billing-before', 'nine-migrations',
+                  'repair-billing-after', 'repair-origin-verify', 'repair-origin-idempotent', 'interest-index-backfill',
+                  'interest-index-concurrency-rollback', 'interest-index-deadlock-retry', 'restored-backup-repair-verify']
         positions = [source.index("'" + label + "'") for label in labels]
         self.assertEqual(positions, sorted(positions))
         self.assertIn('require_new_migrations(new)', source)
         self.assertIn("evidence['reversal_authorized_delta']", source)
 
-    def test_upgrade_requires_exact_five_names_not_just_count(self):
+    def test_upgrade_requires_exact_nine_names_not_just_count(self):
         upgrade.require_new_migrations(upgrade.EXPECTED_NEW_MIGRATIONS)
         for names in (upgrade.EXPECTED_NEW_MIGRATIONS[:-1], list(reversed(upgrade.EXPECTED_NEW_MIGRATIONS)),
                       ['2026_11_06_000200_unreviewed.php', *upgrade.EXPECTED_NEW_MIGRATIONS[1:]]):
@@ -385,13 +478,15 @@ class HarnessContracts(unittest.TestCase):
                 self.assertIn(bootstrap, source)
                 self.assertLess(source.index(imported), source.index(bootstrap))
 
-    def test_origin_reversal_records_retained_column_instead_of_baseline_equality(self):
+    def test_origin_reversal_preserves_forward_only_recovery_guard(self):
         source = (common.ROOT / 'tests/Deployment/reversal-harness.php').read_text(encoding='utf-8')
-        self.assertRegex(source, r"\['--step'\s*=>\s*5,\s*'--force'\s*=>\s*true\]")
-        self.assertRegex(source, r"Schema::hasColumn\('payments',\s*'provider_checkout_url'\)")
-        self.assertIn("$delta['repair_ledger_absent'] = true", source)
-        self.assertIn("$delta['payments_and_urls_unchanged'] = true", source)
-        self.assertIn('EXPLICIT AUTHORIZED ROLLBACK DELTA', source)
+        self.assertIn("'2026_11_14_000001_create_company_idempotency_requests'", source)
+        self.assertIn("'2026_11_14_000002_create_platform_session_authorities'", source)
+        self.assertIn("'Automatic rollback would'", source)
+        self.assertIn("'--path' => 'database/migrations/2026_11_14_000100_create_interest_product_index.php'", source)
+        self.assertIn("$interestLedger = (array) DB::table('migrations')", source)
+        self.assertIn("'--batch' => (int) $interestLedger['batch']", source)
+        self.assertIn("'--batch' => (int) $ledger['batch']", source)
         self.assertNotIn("dropColumn('provider_checkout_url')", source)
         contract = (common.ROOT / 'tests/Deployment/origin-schema-contract.php').read_text(encoding='utf-8')
         self.assertIn("$reversed ? [['payments', 'provider_checkout_url', 'varchar(512)', 'YES']]", contract)
@@ -490,6 +585,15 @@ class HarnessContracts(unittest.TestCase):
         for filename, anchor in anchors.items():
             with self.subTest(filename=filename):
                 self.assertEqual((common.ROOT / filename).read_text(encoding='utf-8').count(anchor), 1)
+
+    def test_rei60_index_contract_emits_limited_metadata_diff(self):
+        contract = (common.ROOT / 'tests/Deployment/origin-schema-contract.php').read_text(encoding='utf-8')
+        self.assertIn('function originRequireRei60Metadata', contract)
+        self.assertIn("['indexes', 'foreign_keys']", contract)
+        self.assertIn("'expected' => $expected", contract)
+        self.assertIn("'observed' => $actual", contract)
+        self.assertIn('JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR', contract)
+        self.assertIn('originRequireRei60Metadata($actual, $rei60[$kind], $kind)', contract)
 
 
 if __name__ == '__main__':

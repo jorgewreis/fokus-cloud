@@ -1,0 +1,147 @@
+name: Read-only production server diagnostics
+
+# Manual diagnostics only. Reuses the deploy workflow's production environment,
+# host-key pinning and SSH setup. Never publishes, migrates, reloads or writes.
+"on":
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-readonly-diagnostics
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    name: Read-only production diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - name: Configure SSH
+        id: ssh
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_PORT"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY"
+          test -n "$DEPLOY_KNOWN_HOSTS"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" exit
+
+      - name: Collect read-only diagnostics
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" sh -s <<'REMOTE'
+          set +e
+          # sh -s reads this script on stdin. Children must not consume the rest.
+          run() { "$@" </dev/null || echo FAILED; }
+
+          printf '%s\n' '==== BASE ===='
+          BASE=/home/admin-jorge/htdocs/fokuscloud-releases
+          if [ -L "$BASE" ]; then printf '%s\n' 'base_symlink=yes'; else printf '%s\n' 'base_symlink=no'; fi || echo FAILED
+          run realpath "$BASE"
+          run stat -c 'type=%F mode=%a owner=%U group=%G path=%n' "$BASE"
+          run readlink /home/admin-jorge/htdocs/fokuscloud
+          run readlink "$BASE/current"
+          run realpath "$BASE/current"
+          run ls -la "$BASE/releases"
+          run stat -c 'type=%F mode=%a owner=%U group=%G path=%n' "$BASE/shared/.env"
+          run stat -c 'type=%F mode=%a owner=%U group=%G path=%n' "$BASE/shared/storage"
+          run stat -c 'type=%F mode=%a owner=%U group=%G path=%n' "$BASE/shared/storage/app"
+          run stat -c 'type=%F mode=%a owner=%U group=%G path=%n' "$BASE/shared/storage/app/public"
+
+          printf '%s\n' '---- vhost ----'
+          vhost=/etc/nginx/sites-enabled/fokuscloud.com.br.conf
+          if [ -r "$vhost" ]; then
+            run grep -nE 'root |SCRIPT_FILENAME|realpath_root|pagespeed|X-Page-Speed' "$vhost"
+          else
+            printf '%s\n' 'vhost_unreadable'
+            echo FAILED
+          fi
+          nginx -V 2>&1 </dev/null | tr ' ' '\n' | grep -i page || echo FAILED
+          if [ -r /etc/nginx/nginx.conf ]; then
+            run grep -n pagespeed /etc/nginx/nginx.conf
+          else
+            printf '%s\n' 'nginx_conf_unreadable'
+            echo FAILED
+          fi
+          if [ -r /etc/nginx/conf.d ] && [ -x /etc/nginx/conf.d ]; then
+            run grep -n pagespeed /etc/nginx/conf.d/*.conf
+          else
+            printf '%s\n' 'nginx_conf_d_unreadable'
+            echo FAILED
+          fi
+
+          printf '%s\n' '---- php-fpm ----'
+          pool=/etc/php/8.5/fpm/pool.d/fokuscloud.com.br.conf
+          if [ -r "$pool" ]; then
+            run grep -nE 'listen|opcache' "$pool"
+          else
+            printf '%s\n' 'pool_unreadable'
+            echo FAILED
+          fi
+          ini=/etc/php/8.5/fpm/php.ini
+          if [ -r "$ini" ]; then
+            run grep -nE 'opcache.enable|preload' "$ini"
+          else
+            printf '%s\n' 'php_ini_unreadable'
+            echo FAILED
+          fi
+          phpconf=/etc/php/8.5/fpm/conf.d
+          if [ -r "$phpconf" ] && [ -x "$phpconf" ]; then
+            run grep -nE 'opcache.enable|preload' "$phpconf"/*.conf
+          else
+            printf '%s\n' 'php_conf_d_unreadable'
+            echo FAILED
+          fi
+          run systemctl show php8.5-fpm -p ActiveState -p SubState -p UnitFileState
+          run systemctl show php8.5-fpm.service --no-pager --property=Id,LoadState,ActiveState,CanReload
+
+          printf '%s\n' '---- sudo ----'
+          run sudo -n -l
+          run sudo -n -ll
+          run sudo -V | head -1 || echo FAILED
+
+          printf '%s\n' '---- law ----'
+          # prepublish-law-schema.php runs migrate when the column is absent.
+          # It has no check/dry mode. migrate:status only reads the ledger.
+          rel=database/migrations/2026_10_30_160000_add_encrypted_details_to_law_contacts.php
+          app=$(realpath "$BASE/current" </dev/null 2>/dev/null || true)
+          if [ -n "$app" ] && [ -f "$app/$rel" ]; then
+            printf '%s\n' 'law_migration_file=present'
+          else
+            printf '%s\n' 'law_migration_file=absent'
+          fi
+          if [ -n "$app" ] && [ -d "$app" ]; then
+            # stderr stays in this variable. LOG_CHANNEL avoids appending a boot error to the app log when config is not cached.
+            status_output=$(cd "$app" && LOG_CHANNEL=stderr timeout 25 php artisan migrate:status --no-ansi --no-interaction --path="$rel" </dev/null 2>&1) || status_output=''
+            if [ -n "$status_output" ]; then
+              printf '%s\n' "$status_output" | grep -E 'Migration name|2026_10_30_160000_add_encrypted_details_to_law_contacts|^[[:space:]]*No migrations found\.?$|^[[:space:]]*INFO[[:space:]]+Nothing to migrate\.?$' || echo FAILED
+            else
+              echo FAILED
+            fi
+          else
+            echo FAILED
+          fi
+          printf '%s\n' '==== FIM ===='
+          exit 0
+          REMOTE

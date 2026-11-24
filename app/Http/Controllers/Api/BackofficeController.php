@@ -11,6 +11,8 @@ use App\Services\AuditSanitizer;
 use App\Services\BillingReconciliationManager;
 use App\Services\CatalogManager;
 use App\Services\CatalogPricing;
+use App\Services\CompanyIdempotencyFactory;
+use App\Services\CompanyIdempotencyMutation;
 use App\Services\LawUsageMeter;
 use App\Services\MercadoPagoClient;
 use App\Services\PasswordSecurity;
@@ -28,6 +30,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 
 class BackofficeController extends Controller
 {
@@ -36,41 +39,73 @@ class BackofficeController extends Controller
         $audit->record($request->user()->id, 'backoffice.dashboard_viewed', request: $request);
         $admin = $request->user()->loadMissing('role');
 
-        $activeSubscriptions = DB::table('subscriptions')
-            ->where('status', 'ativa')
-            ->get(['id', 'created_at', 'commercial_snapshot']);
-        $activeFreeSubscriptionIds = DB::table('voucher_redemptions')
-            ->whereIn('subscription_id', $activeSubscriptions->pluck('id'))
-            ->get(['subscription_id', 'snapshot', 'benefit_ends_at'])
-            ->filter(function (object $redemption): bool {
-                $snapshot = json_decode((string) $redemption->snapshot, true) ?: [];
-
-                return ($snapshot['discount_type'] ?? null) === 'trial_free'
-                    && $redemption->benefit_ends_at
-                    && now()->lt($redemption->benefit_ends_at);
-            })
-            ->pluck('subscription_id')
-            ->all();
         $trendStart = now()->startOfMonth()->subMonths(5);
-        $trend = collect(range(0, 5))->map(function (int $offset) use ($activeSubscriptions, $trendStart): array {
+        $trendCounts = collect(range(0, 5))->mapWithKeys(fn (int $offset): array => [$trendStart->copy()->addMonths($offset)->format('Y-m') => 0])->all();
+        $activeSubscriptionCount = 0;
+        $mrr = 0.0;
+        // A single statement gives the subscription and its redemptions one database
+        // snapshot even when an enclosing transaction uses READ COMMITTED. Decode the
+        // original JSON in PHP so historic value types retain their prior semantics.
+        $rows = DB::table('subscriptions as subscription')
+            ->leftJoin('voucher_redemptions as redemption', 'redemption.subscription_id', '=', 'subscription.id')
+            ->where('subscription.status', 'ativa')
+            ->orderBy('subscription.id')
+            ->select([
+                'subscription.id', 'subscription.created_at', 'subscription.commercial_snapshot',
+                'redemption.snapshot as redemption_snapshot', 'redemption.benefit_ends_at',
+            ]);
+        $connection = $rows->getConnection();
+        $mysql = in_array($connection->getDriverName(), ['mysql', 'mariadb'], true);
+        $pdo = $mysql ? $connection->getReadPdo() : null;
+        $buffered = $pdo?->getAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY);
+        $current = null;
+        $isFree = false;
+        $accumulate = function () use (&$current, &$isFree, &$activeSubscriptionCount, &$trendCounts, &$mrr): void {
+            if ($current === null) {
+                return;
+            }
+            $activeSubscriptionCount++;
+            $month = Carbon::parse($current->created_at)->format('Y-m');
+            if (array_key_exists($month, $trendCounts)) {
+                $trendCounts[$month]++;
+            }
+            if (! $isFree) {
+                $snapshot = json_decode((string) $current->commercial_snapshot, true) ?: [];
+                $mrr += (float) ($snapshot['monthly_amount'] ?? 0);
+            }
+        };
+        try {
+            if ($pdo !== null) {
+                $pdo->setAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
+            }
+            foreach ($rows->cursor() as $row) {
+                if ($current === null || $current->id !== $row->id) {
+                    $accumulate();
+                    $current = $row;
+                    $isFree = false;
+                }
+                if (! $isFree) {
+                    $snapshot = json_decode((string) $row->redemption_snapshot, true) ?: [];
+                    $isFree = ($snapshot['discount_type'] ?? null) === 'trial_free'
+                        && $row->benefit_ends_at
+                        && now()->lt($row->benefit_ends_at);
+                }
+            }
+            $accumulate();
+        } finally {
+            if ($pdo !== null) {
+                $pdo->setAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $buffered);
+            }
+        }
+        $trend = collect(range(0, 5))->map(function (int $offset) use ($trendCounts, $trendStart): array {
             $month = $trendStart->copy()->addMonths($offset);
 
             return [
                 'month' => $month->format('Y-m'),
                 'label' => ucfirst($month->locale('pt_BR')->translatedFormat('M Y')),
-                'value' => $activeSubscriptions->filter(fn (object $subscription): bool => Carbon::parse($subscription->created_at)->format('Y-m') === $month->format('Y-m'))->count(),
+                'value' => $trendCounts[$month->format('Y-m')] ?? 0,
             ];
         })->values();
-        $mrr = $activeSubscriptions->sum(function (object $subscription) use ($activeFreeSubscriptionIds): float {
-            if (in_array($subscription->id, $activeFreeSubscriptionIds, true)) {
-                return 0.0;
-            }
-
-            $snapshot = json_decode((string) $subscription->commercial_snapshot, true) ?: [];
-
-            return (float) ($snapshot['monthly_amount'] ?? 0);
-        });
-
         $alerts = [
             [
                 'key' => 'declined_payments',
@@ -345,7 +380,7 @@ class BackofficeController extends Controller
             'metrics' => [
                 'active_companies' => DB::table('companies')->whereNull('deleted_at')->where('status', 'ativa')->count(),
                 'active_people' => DB::table('company_memberships as membership')->join('companies as company', 'company.id', '=', 'membership.company_id')->join('users as user', 'user.id', '=', 'membership.user_id')->whereNull('membership.deleted_at')->whereNull('company.deleted_at')->where('membership.status', 'ativo')->where('user.status', 'ativa')->distinct('user.id')->count('user.id'),
-                'active_subscriptions' => $activeSubscriptions->count(),
+                'active_subscriptions' => $activeSubscriptionCount,
                 'mrr' => $mrr,
             ],
             'subscription_registrations_6m' => $trend,
@@ -443,69 +478,107 @@ class BackofficeController extends Controller
         $document = BrazilianDocuments::digits($data['document_number']);
         $cpf = BrazilianDocuments::digits($data['cpf']);
         $email = Str::lower(trim($data['email']));
-        abort_unless($data['document_type'] === 'cpf' ? BrazilianDocuments::cpf($document) : BrazilianDocuments::cnpj($document), 422, 'Documento empresarial inválido.');
-        abort_unless(BrazilianDocuments::cpf($cpf), 422, 'CPF inválido.');
-        abort_if(DB::table('companies')->where('document_type', $data['document_type'])->where('document_number', $document)->exists(), 409, 'Esta empresa já possui cadastro.');
-        abort_if(User::where('cpf', $cpf)->exists(), 409, 'Este CPF já possui uma conta.');
-        abort_if(User::where('email', $email)->exists(), 409, 'Este e-mail já está vinculado a outra conta.');
-        $passwordSecurity->validate($data['password']);
-
-        $companyId = DB::transaction(function () use ($data, $document, $cpf, $email, $audit, $request) {
-            $adminId = PrefixedUlid::make('USR');
-            $companyId = PrefixedUlid::make('EMP');
-            $now = now();
-            $user = User::create([
-                'id' => $adminId,
-                'name' => trim($data['name']),
-                'cpf' => $cpf,
-                'email' => $email,
-                'password' => Hash::make($data['password']),
-                'status' => 'ativa',
-                'email_verified_at' => $now,
-            ]);
-            DB::table('companies')->insert([
-                'id' => $companyId,
-                'document_type' => $data['document_type'],
-                'document_number' => $document,
-                'legal_name' => trim($data['legal_name']),
-                'status' => 'ativa',
-                'version' => 1,
-                'created_by' => $request->user()->id,
-                'updated_by' => $request->user()->id,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
-            $roleId = DB::table('roles')->where('code', 'admin')->value('id');
-            abort_unless($roleId, 503, 'Perfil de administrador ainda não foi configurado.');
-            DB::table('company_memberships')->insert([
-                'id' => PrefixedUlid::make('VNC'),
-                'company_id' => $companyId,
-                'user_id' => $user->id,
-                'role_id' => $roleId,
-                'status' => 'ativo',
-                'active_admin_company_id' => $companyId,
-                'version' => 1,
-                'created_by' => $request->user()->id,
-                'updated_by' => $request->user()->id,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
-            foreach (['terms', 'privacy'] as $type) {
-                DB::table('legal_acceptances')->insert([
-                    'id' => PrefixedUlid::make('ACE'),
-                    'user_id' => $user->id,
-                    'document_type' => $type,
-                    'document_version' => '1.0',
-                    'accepted_at' => $now,
+        $idempotency = $this->companyIdempotency($request);
+        $validateDocuments = function () use ($data, $document, $cpf): void {
+            abort_unless($data['document_type'] === 'cpf' ? BrazilianDocuments::cpf($document) : BrazilianDocuments::cnpj($document), 422, 'Documento empresarial inválido.');
+            abort_unless(BrazilianDocuments::cpf($cpf), 422, 'CPF inválido.');
+        };
+        $checkDuplicates = function () use ($data, $document, $cpf, $email): void {
+            abort_if(DB::table('companies')->where('document_type', $data['document_type'])->where('document_number', $document)->exists(), 409, 'Esta empresa já possui cadastro.');
+            abort_if(User::where('cpf', $cpf)->exists(), 409, 'Este CPF já possui uma conta.');
+            abort_if(User::where('email', $email)->exists(), 409, 'Este e-mail já está vinculado a outra conta.');
+        };
+        $persist = function (bool $withinIdempotency = false) use ($data, $document, $cpf, $email, $audit, $request): string {
+            $write = function () use ($data, $document, $cpf, $email, $audit, $request): string {
+                $adminId = PrefixedUlid::make('USR');
+                $companyId = PrefixedUlid::make('EMP');
+                $now = now();
+                $user = User::create([
+                    'id' => $adminId,
+                    'name' => trim($data['name']),
+                    'cpf' => $cpf,
+                    'email' => $email,
+                    'password' => Hash::make($data['password']),
+                    'status' => 'ativa',
+                    'email_verified_at' => $now,
+                ]);
+                DB::table('companies')->insert([
+                    'id' => $companyId,
+                    'document_type' => $data['document_type'],
+                    'document_number' => $document,
+                    'legal_name' => trim($data['legal_name']),
+                    'status' => 'ativa',
+                    'version' => 1,
+                    'created_by' => $request->user()->id,
+                    'updated_by' => $request->user()->id,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
+                $roleId = DB::table('roles')->where('code', 'admin')->value('id');
+                abort_unless($roleId, 503, 'Perfil de administrador ainda não foi configurado.');
+                DB::table('company_memberships')->insert([
+                    'id' => PrefixedUlid::make('VNC'),
+                    'company_id' => $companyId,
+                    'user_id' => $user->id,
+                    'role_id' => $roleId,
+                    'status' => 'ativo',
+                    'active_admin_company_id' => $companyId,
+                    'version' => 1,
+                    'created_by' => $request->user()->id,
+                    'updated_by' => $request->user()->id,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+                foreach (['terms', 'privacy'] as $type) {
+                    DB::table('legal_acceptances')->insert([
+                        'id' => PrefixedUlid::make('ACE'),
+                        'user_id' => $user->id,
+                        'document_type' => $type,
+                        'document_version' => '1.0',
+                        'accepted_at' => $now,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                }
+
+                $audit->record($request->user()->id, 'backoffice.company_created', 'company', $companyId, $companyId, 'Empresa criada no sistema.', metadata: ['admin_id' => $user->id], after: ['id' => $companyId, 'legal_name' => $data['legal_name'], 'status' => 'ativa'], request: $request);
+
+                return $companyId;
+            };
+
+            return $withinIdempotency ? $write() : DB::transaction($write);
+        };
+
+        if ($idempotency === null) {
+            $validateDocuments();
+            $checkDuplicates();
+            $passwordSecurity->validate($data['password']);
+            $companyId = $persist();
+        } else {
+            $payload = [
+                'document_type' => $data['document_type'], 'document_number' => $document,
+                'legal_name' => $data['legal_name'], 'name' => $data['name'], 'cpf' => $cpf,
+                'email' => $email, 'password' => $data['password'], 'terms' => true, 'privacy' => true,
+            ];
+            try {
+                $result = (new CompanyIdempotencyMutation($idempotency['store']))->run(
+                    $idempotency['token'], (string) $request->user()->id, 'company.create', null, $payload,
+                    function () use ($validateDocuments, $passwordSecurity, $data): void {
+                        $validateDocuments();
+                        $passwordSecurity->validate($data['password']);
+                    },
+                    function () use ($checkDuplicates, $persist): array {
+                        $checkDuplicates();
+
+                        return ['id' => $persist(true), 'status' => 201];
+                    },
+                    $request,
+                );
+            } catch (InvalidArgumentException) {
+                abort(503, 'Solicitação indisponível.');
             }
-
-            $audit->record($request->user()->id, 'backoffice.company_created', 'company', $companyId, $companyId, 'Empresa criada no sistema.', metadata: ['admin_id' => $user->id], after: ['id' => $companyId, 'legal_name' => $data['legal_name'], 'status' => 'ativa'], request: $request);
-
-            return $companyId;
-        });
+            $companyId = $result['id'];
+        }
 
         return response()->json(['company_id' => $companyId, 'message' => 'Empresa criada com acesso imediato.'], 201);
     }
@@ -520,27 +593,75 @@ class BackofficeController extends Controller
             'version' => ['required', 'integer', 'min:1'],
         ]);
         $cpf = BrazilianDocuments::digits($data['cpf']);
-        abort_unless(BrazilianDocuments::cpf($cpf), 422, 'CPF inválido.');
         $email = Str::lower(trim($data['email']));
+        $idempotency = $this->companyIdempotency($request);
+        $validateCpf = function () use ($cpf): void {
+            abort_unless(BrazilianDocuments::cpf($cpf), 422, 'CPF inválido.');
+        };
 
-        $result = DB::transaction(function () use ($data, $company, $cpf, $email, $audit, $request) {
-            $current = DB::table('companies')->where('id', $company)->whereNull('deleted_at')->lockForUpdate()->first();
-            abort_unless($current, 404, 'Empresa não encontrada.');
-            abort_if((int) $current->version !== (int) $data['version'], 409, 'A empresa foi alterada por outro administrador. Atualize a página e tente novamente.');
-            $membership = DB::table('company_memberships as membership')->join('users as user', 'user.id', '=', 'membership.user_id')->where('membership.company_id', $company)->whereIn('membership.status', ['ativo', 'pendente'])->whereNull('membership.deleted_at')->orderByRaw("case when membership.status = 'ativo' then 0 else 1 end")->select('membership.id as membership_id', 'membership.user_id', 'user.cpf', 'user.email')->lockForUpdate()->first();
-            abort_unless($membership, 422, 'A empresa não possui administrador ativo.');
-            abort_if(User::where('cpf', $cpf)->where('id', '!=', $membership->user_id)->exists(), 409, 'Este CPF já possui uma conta.');
-            abort_if(User::where('email', $email)->where('id', '!=', $membership->user_id)->exists(), 409, 'Este e-mail já está vinculado a outra conta.');
-            $now = now();
-            User::where('id', $membership->user_id)->update(['name' => trim($data['name']), 'cpf' => $cpf, 'email' => $email, 'updated_at' => $now]);
-            $updated = DB::table('companies')->where('id', $company)->where('version', $data['version'])->update(['legal_name' => trim($data['legal_name']), 'updated_by' => $request->user()->id, 'version' => DB::raw('version + 1'), 'updated_at' => $now]);
-            abort_unless($updated, 409, 'A empresa foi alterada por outro administrador. Atualize a página e tente novamente.');
-            $audit->record($request->user()->id, 'backoffice.company_updated', 'company', $company, $company, before: ['legal_name' => $current->legal_name, 'admin_id' => $membership->user_id, 'admin_email' => $membership->email], after: ['legal_name' => $data['legal_name'], 'admin_id' => $membership->user_id, 'admin_email' => $email], request: $request);
+        $persist = function (bool $withinIdempotency = false) use ($data, $company, $cpf, $email, $audit, $request): void {
+            $write = function () use ($data, $company, $cpf, $email, $audit, $request): void {
+                $current = DB::table('companies')->where('id', $company)->whereNull('deleted_at')->lockForUpdate()->first();
+                abort_unless($current, 404, 'Empresa não encontrada.');
+                abort_if((int) $current->version !== (int) $data['version'], 409, 'A empresa foi alterada por outro administrador. Atualize a página e tente novamente.');
+                $membership = DB::table('company_memberships as membership')->join('users as user', 'user.id', '=', 'membership.user_id')->where('membership.company_id', $company)->whereIn('membership.status', ['ativo', 'pendente'])->whereNull('membership.deleted_at')->orderByRaw("case when membership.status = 'ativo' then 0 else 1 end")->select('membership.id as membership_id', 'membership.user_id', 'user.cpf', 'user.email')->lockForUpdate()->first();
+                abort_unless($membership, 422, 'A empresa não possui administrador ativo.');
+                abort_if(User::where('cpf', $cpf)->where('id', '!=', $membership->user_id)->exists(), 409, 'Este CPF já possui uma conta.');
+                abort_if(User::where('email', $email)->where('id', '!=', $membership->user_id)->exists(), 409, 'Este e-mail já está vinculado a outra conta.');
+                $now = now();
+                User::where('id', $membership->user_id)->update(['name' => trim($data['name']), 'cpf' => $cpf, 'email' => $email, 'updated_at' => $now]);
+                $updated = DB::table('companies')->where('id', $company)->where('version', $data['version'])->update(['legal_name' => trim($data['legal_name']), 'updated_by' => $request->user()->id, 'version' => DB::raw('version + 1'), 'updated_at' => $now]);
+                abort_unless($updated, 409, 'A empresa foi alterada por outro administrador. Atualize a página e tente novamente.');
+                $audit->record($request->user()->id, 'backoffice.company_updated', 'company', $company, $company, before: ['legal_name' => $current->legal_name, 'admin_id' => $membership->user_id, 'admin_email' => $membership->email], after: ['legal_name' => $data['legal_name'], 'admin_id' => $membership->user_id, 'admin_email' => $email], request: $request);
 
-            return true;
-        });
+            };
+            if ($withinIdempotency) {
+                $write();
+
+                return;
+            }
+            DB::transaction($write);
+        };
+
+        if ($idempotency === null) {
+            $validateCpf();
+            $persist();
+        } else {
+            $payload = ['legal_name' => $data['legal_name'], 'name' => $data['name'], 'cpf' => $cpf, 'email' => $email, 'version' => (int) $data['version']];
+            try {
+                (new CompanyIdempotencyMutation($idempotency['store']))->run(
+                    $idempotency['token'], (string) $request->user()->id, 'company.update', $company, $payload,
+                    $validateCpf,
+                    function () use ($persist, $company): array {
+                        $persist(true);
+
+                        return ['id' => $company, 'status' => 200];
+                    },
+                    $request,
+                );
+            } catch (InvalidArgumentException) {
+                abort(503, 'Solicitação indisponível.');
+            }
+        }
 
         return response()->json(['message' => 'Dados da empresa atualizados.']);
+    }
+
+    /** The public route guard remains closed until the complete feature is approved. */
+    private function companyIdempotency(Request $request): ?array
+    {
+        if (! $request->headers->has('Idempotency-Key')) {
+            return null;
+        }
+        $values = $request->headers->all('Idempotency-Key');
+        abort_unless(count($values) === 1 && is_string($values[0]) && $values[0] !== '' && strlen($values[0]) <= 256, 422, 'Chave de idempotência inválida.');
+        try {
+            $settings = (new CompanyIdempotencyFactory)->build((array) config('company_idempotency', []));
+        } catch (InvalidArgumentException) {
+            abort(503, 'Solicitação indisponível.');
+        }
+
+        return ['token' => $values[0], 'store' => $settings['store']];
     }
 
     public function deactivateCompany(Request $request, string $company, PlatformAudit $audit)
@@ -590,7 +711,7 @@ class BackofficeController extends Controller
         }
 
         $term = "%{$query}%";
-        $companies = DB::table('companies')
+        $companies = $request->user()->hasPermission('platform.companies.view') ? DB::table('companies')
             ->whereNull('deleted_at')
             ->where(fn ($builder) => $builder->where('legal_name', 'like', $term)->orWhere('document_number', 'like', $term))
             ->orderBy('legal_name')
@@ -600,9 +721,9 @@ class BackofficeController extends Controller
                 'title' => $company->legal_name,
                 'subtitle' => 'Empresa · '.strtoupper($company->status),
                 'href' => '/backoffice/empresas?q='.rawurlencode($company->legal_name),
-            ])->values();
+            ])->values() : collect();
 
-        $users = DB::table('users as user')
+        $users = $request->user()->hasPermission('platform.users.view') ? DB::table('users as user')
             ->leftJoin('company_memberships as membership', function ($join): void {
                 $join->on('membership.user_id', '=', 'user.id')->whereNull('membership.deleted_at')->whereIn('membership.status', ['ativo', 'pendente']);
             })
@@ -618,18 +739,18 @@ class BackofficeController extends Controller
                 'title' => $user->name,
                 'subtitle' => 'Usuário de empresa · '.$user->email,
                 'href' => '/backoffice/usuarios?q='.rawurlencode($user->name),
-            ])->values();
+            ])->values() : collect();
 
-        $internalUsers = DB::table('platform_admins as admin')
+        $internalUsers = $request->user()->hasPermission('platform.users.view') ? DB::table('platform_admins as admin')
             ->where(fn ($builder) => $builder->where('admin.name', 'like', $term)->orWhere('admin.email', 'like', $term))
             ->orderBy('admin.name')->limit(6)->get(['admin.id', 'admin.name', 'admin.email'])
             ->map(fn (object $user): array => [
                 'title' => $user->name,
                 'subtitle' => 'Conta interna Fokus Cloud · '.$user->email,
                 'href' => '/backoffice/usuarios?q='.rawurlencode($user->name),
-            ])->values();
+            ])->values() : collect();
 
-        $subscriptions = DB::table('subscriptions as subscription')
+        $subscriptions = $request->user()->hasPermission('platform.subscriptions.manage') ? DB::table('subscriptions as subscription')
             ->join('companies as company', 'company.id', '=', 'subscription.company_id')
             ->join('products as product', 'product.id', '=', 'subscription.product_id')
             ->whereNull('company.deleted_at')
@@ -641,7 +762,7 @@ class BackofficeController extends Controller
                 'title' => $subscription->company_name,
                 'subtitle' => 'Assinatura · '.($subscription->product_name ?: 'Produto').' · '.$subscription->status,
                 'href' => '/backoffice/assinaturas?q='.rawurlencode($subscription->company_name),
-            ])->values();
+            ])->values() : collect();
 
         $audit->record($request->user()->id, 'backoffice.global_search', request: $request);
 
@@ -657,6 +778,11 @@ class BackofficeController extends Controller
         $entity = DB::table('companies')->where('id', $company)->first();
         abort_unless($entity, 404, 'Empresa não encontrada.');
         $audit->record($request->user()->id, 'backoffice.company_viewed', 'company', $company, $company, request: $request);
+        // The company drawer needs only the company record. Keep the existing
+        // expanded response for older consumers that do not request this view.
+        if ($request->query('view') === 'company') {
+            return response()->json(['company' => $this->companyDetailPayload($entity, $usage)]);
+        }
         $subscriptions = DB::table('subscriptions as subscription')->join('products as product', 'product.id', '=', 'subscription.product_id')->where('subscription.company_id', $company)->select('subscription.*', 'product.code as product_code', 'product.name as product_name')->orderByDesc('subscription.created_at')->get();
 
         return response()->json([
@@ -865,7 +991,7 @@ class BackofficeController extends Controller
 
     public function createRefund(Request $request, RefundManager $manager, PlatformAudit $audit)
     {
-        $data = $request->validate(['payment_id' => ['required', 'string'], 'amount' => ['required', 'numeric', 'gt:0'], 'allowed_case' => ['required', Rule::in(RefundManager::CASES)], 'reason' => ['required', 'string', 'max:1000']]);
+        $data = $request->validate(['payment_id' => ['required', 'string'], 'amount' => ['required', 'numeric', 'min:0.01', 'decimal:0,2'], 'allowed_case' => ['required', Rule::in(RefundManager::CASES)], 'reason' => ['required', 'string', 'max:1000']]);
         $refund = $manager->request($data, $request->user());
         $audit->record($request->user()->id, 'backoffice.refund_requested', 'refund_request', $refund->id, $refund->company_id, $data['reason'], after: ['status' => 'solicitado', 'amount' => $refund->amount], request: $request);
 
@@ -874,9 +1000,17 @@ class BackofficeController extends Controller
 
     public function updateRefund(Request $request, string $refund, RefundManager $manager, PlatformAudit $audit, MercadoPagoClient $client)
     {
-        $data = $request->validate(['action' => ['required', Rule::in(['aprovar', 'recusar', 'executar'])], 'reason' => ['required', 'string', 'max:1000']]);
+        $data = $request->validate(['action' => ['required', Rule::in(['aprovar', 'recusar', 'executar', 'consultar'])], 'reason' => ['required', 'string', 'max:1000']]);
 
-        return response()->json($manager->payload($manager->action($refund, $data['action'], $data['reason'], $request->user(), $client, $audit)));
+        $result = $manager->action($refund, $data['action'], $data['reason'], $request->user(), $client, $audit);
+        $payload = $manager->payload($result);
+        if ($result->status === 'executando') {
+            $payload['message'] = 'O resultado do reembolso ainda não foi confirmado. Consulte o Mercado Pago antes de qualquer nova ação.';
+
+            return response()->json($payload, 202);
+        }
+
+        return response()->json($payload);
     }
 
     public function catalog(Request $request, CatalogManager $catalog)
@@ -1363,21 +1497,59 @@ class BackofficeController extends Controller
 
     public function vouchers(Request $request)
     {
-        $rows = DB::table('vouchers as voucher')
+        $perPage = min(max((int) $request->input('per_page', 20), 1), 100);
+        $query = DB::table('vouchers as voucher')
             ->leftJoin('products as product', 'product.id', '=', 'voucher.product_id')
             ->leftJoin('plans as plan', 'plan.id', '=', 'voucher.plan_id')
-            ->leftJoin('voucher_redemptions as redemption', 'redemption.voucher_id', '=', 'voucher.id')
-            ->groupBy('voucher.id', 'voucher.code', 'voucher.name', 'voucher.discount_type', 'voucher.discount_value', 'voucher.product_id', 'voucher.plan_id', 'voucher.base_amount', 'voucher.benefit_duration', 'voucher.module_codes', 'voucher.redemption_limit', 'voucher.redemption_limit_per_company', 'voucher.starts_at', 'voucher.ends_at', 'voucher.status', 'voucher.origin', 'voucher.notes', 'voucher.created_by_platform_admin_id', 'voucher.created_at', 'voucher.updated_at', 'product.name', 'plan.name')
-            ->select('voucher.*', 'product.name as product_name', 'plan.name as plan_name', DB::raw('count(redemption.id) as redemptions_count'))
-            ->orderByDesc('voucher.created_at')
-            ->limit(100)
-            ->get();
+            ->select('voucher.*', 'product.name as product_name', 'plan.name as plan_name')
+            ->selectSub(DB::table('voucher_redemptions')->selectRaw('count(*)')->whereColumn('voucher_id', 'voucher.id'), 'redemptions_count');
+        if ($request->filled('search')) {
+            $term = '%'.mb_strtolower(trim((string) $request->input('search'))).'%';
+            $query->where(function ($q) use ($term): void {
+                foreach (['voucher.code', 'voucher.name', 'voucher.origin', 'product.name', 'plan.name'] as $column) {
+                    $q->orWhereRaw("LOWER($column) LIKE ?", [$term]);
+                }
+            });
+        }
+        foreach (['product_id', 'discount_type'] as $filter) {
+            if ($request->filled($filter)) {
+                $query->where('voucher.'.$filter, $request->input($filter));
+            }
+        }
+        if ($request->filled('status')) {
+            $status = $request->input('status');
+            $query->where(function ($q) use ($status): void {
+                if ($status === 'expirada') {
+                    $q->whereNotNull('voucher.ends_at')->where('voucher.ends_at', '<', now());
+                } else {
+                    $q->where('voucher.status', $status)->where(function ($q): void {
+                        $q->whereNull('voucher.ends_at')->orWhere('voucher.ends_at', '>=', now());
+                    });
+                }
+            });
+        }
+        // Keep the original bounded array contract for older cached clients.
+        if (! $request->boolean('paginate')) {
+            $legacy = $query->orderByDesc('voucher.created_at')->orderByDesc('voucher.id')->limit(100)->get();
+            $legacy->transform(function ($voucher) {
+                $voucher->computed_status = $voucher->ends_at && now()->gt(\Illuminate\Support\Carbon::parse($voucher->ends_at)) ? 'expirada' : $voucher->status;
 
-        return response()->json($rows->map(function ($voucher) {
+                return $voucher;
+            });
+
+            return response()->json($legacy)->header('Deprecation', 'true');
+        }
+        $vouchers = $query->orderByDesc('voucher.created_at')->orderByDesc('voucher.id')->paginate($perPage);
+        $vouchers->getCollection()->transform(function ($voucher) {
             $voucher->computed_status = $voucher->ends_at && now()->gt(\Illuminate\Support\Carbon::parse($voucher->ends_at)) ? 'expirada' : $voucher->status;
 
             return $voucher;
-        }));
+        });
+
+        return response()->json(['data' => $vouchers->items(), 'meta' => [
+            'total' => $vouchers->total(), 'per_page' => $vouchers->perPage(),
+            'current_page' => $vouchers->currentPage(), 'last_page' => $vouchers->lastPage(),
+        ]]);
     }
 
     private function companyListPayload(object $row): array
@@ -2039,7 +2211,26 @@ class BackofficeController extends Controller
             $query->whereDate('event.created_at', '<=', $request->input('to'));
         }
 
-        $rows = $query->limit(2000)->get()->map(function (object $event): array {
+        if ($request->filled('status')) {
+            $status = (string) $request->input('status');
+            $query->where(function ($q) use ($status): void {
+                $q->where('event.metadata->status', $status)
+                    ->orWhere(function ($fallback) use ($status): void {
+                        $fallback->whereNull('event.metadata->status');
+                        if ($status === 'failed') {
+                            $fallback->where(function ($actions): void {
+                                $actions->where('event.action', 'like', '%failed%')->orWhere('event.action', 'like', '%locked%');
+                            });
+                        } elseif ($status === 'success') {
+                            $fallback->where('event.action', 'not like', '%failed%')->where('event.action', 'not like', '%locked%');
+                        } else {
+                            $fallback->whereRaw('1 = 0');
+                        }
+                    });
+            });
+        }
+        $events = $query->orderByDesc('event.id')->paginate($perPage, ['*'], 'page', $page);
+        $items = $events->getCollection()->map(function (object $event): array {
             $metadata = json_decode((string) $event->metadata, true) ?: [];
             $isCustomer = $event->actor_type === 'customer';
 
@@ -2047,23 +2238,15 @@ class BackofficeController extends Controller
                 'id' => $event->id,
                 'user' => $isCustomer ? ($event->customer_name ?: $metadata['user_name'] ?? 'Usuário não identificado') : ($event->admin_name ?: $metadata['user_name'] ?? 'Administrador não identificado'),
                 'email' => $isCustomer ? ($event->customer_email ?: $metadata['user_email'] ?? null) : ($event->admin_email ?: $metadata['user_email'] ?? null),
-                'user_type' => $isCustomer ? 'cliente' : 'interno',
-                'company' => $event->company_name,
-                'product' => $metadata['product_name'] ?? null,
-                'subscription_id' => $metadata['subscription_id'] ?? null,
+                'user_type' => $isCustomer ? 'cliente' : 'interno', 'company' => $event->company_name,
+                'product' => $metadata['product_name'] ?? null, 'subscription_id' => $metadata['subscription_id'] ?? null,
                 'event' => $event->action,
                 'status' => $metadata['status'] ?? (str_contains($event->action, 'failed') || str_contains($event->action, 'locked') ? 'failed' : 'success'),
-                'ip_address' => $event->ip_address,
-                'user_agent' => $event->user_agent,
+                'ip_address' => $event->ip_address, 'user_agent' => $event->user_agent,
                 'created_at' => Carbon::parse((string) $event->created_at, 'UTC')->setTimezone('America/Bahia')->toIso8601String(),
             ];
         });
-        if ($request->filled('status')) {
-            $rows = $rows->filter(fn (array $row): bool => $row['status'] === $request->input('status'))->values();
-        }
-        $total = $rows->count();
-        $items = $rows->forPage($page, $perPage)->values();
 
-        return response()->json(['data' => $items, 'meta' => ['total' => $total, 'per_page' => $perPage, 'current_page' => $page, 'last_page' => max((int) ceil($total / $perPage), 1), 'retention_days' => 30]]);
+        return response()->json(['data' => $items, 'meta' => ['total' => $events->total(), 'per_page' => $perPage, 'current_page' => $page, 'last_page' => $events->lastPage(), 'retention_days' => 30]]);
     }
 }

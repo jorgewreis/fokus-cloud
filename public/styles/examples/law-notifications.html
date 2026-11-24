@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Notificações fictícias · Exemplo Fokus Styles</title>
+<script src="../assets/styles-theme.js"></script>
+<link rel="stylesheet" href="../assets/fokus-3.0.0.min.css">
+<link rel="stylesheet" href="../assets/site-palette.css">
+<link rel="stylesheet" href="composition.css">
+<style>
+.example-notifications { display:flex; justify-content:flex-end; min-height:19rem; margin-top:1rem; }
+.example-anchor { position:relative; max-width:100%; }
+.example-trigger { min-height:44px; }
+.example-count { margin-left:.4rem; padding:.1rem .4rem; border-radius:999px; color:#fff; background:#b42318; font-size:.75rem; }
+.example-popover { position:absolute; z-index:1; right:0; top:calc(100% + .75rem); width:min(320px, calc(100vw - 6rem)); padding:1rem; border:1px solid var(--demo-border); border-radius:10px; background:var(--demo-surface); color:var(--demo-text); box-shadow:0 8px 25px rgba(27,16,40,.18); }
+.example-popover h3 { margin:0 0 .75rem; font-size:1rem; }
+.example-popover p { margin:.5rem 0; }
+.example-item { display:grid; width:100%; gap:.25rem; padding:.75rem; border:0; border-bottom:1px solid var(--demo-border); background:transparent; color:var(--demo-text); text-align:left; cursor:pointer; }
+.example-item[data-unread="true"] { background:var(--demo-accent-soft); }
+.example-item span,.example-item time { font-size:.8rem; }
+.example-item time { color:var(--demo-muted); }
+.example-controls { display:flex; flex-wrap:wrap; gap:.5rem; }
+.example-controls button { min-height:44px; }
+</style>
+</head>
+<body>
+<nav class="demo-site-nav" aria-label="Documentação e aparência"><a href="/styles/">Vitrine Fokus Styles</a><button class="demo-theme-toggle" type="button" data-theme-toggle aria-label="Alternar tema claro e escuro">Alternar tema</button></nav>
+<main class="demo-shell">
+<header class="demo-top"><strong>FOKUS STYLES / EXEMPLO</strong><span>Fokus Styles 3.0.0</span></header>
+<span class="demo-kicker">Composição de notificações</span>
+<h1>Notificações neste exemplo</h1>
+<p>Explore um painel inspirado no shell do Law com dados fictícios. Nenhuma informação é enviada ou salva.</p>
+<section class="demo-panel" aria-labelledby="demo-title">
+<h2 id="demo-title">Estados da lista</h2>
+<p>Escolha um estado e abra o painel para conhecer a composição.</p>
+<div class="example-controls" aria-label="Estados fictícios">
+<button type="button" class="fs-btn fs-btn-outline-primary" id="show-items">Mostrar notificações</button>
+<button type="button" class="fs-btn fs-btn-outline-primary" id="show-empty">Mostrar lista vazia</button>
+</div>
+<div class="example-notifications"><div class="example-anchor">
+<button class="fs-btn fs-btn-outline-primary example-trigger" id="notifications-button" type="button" aria-expanded="false" aria-controls="notifications-panel">Notificações <span class="example-count" aria-hidden="true" id="notifications-count">2</span></button>
+<section class="example-popover" id="notifications-panel" aria-labelledby="notifications-title" hidden>
+<h3 id="notifications-title">Notificações</h3><div id="notification-items"></div>
+</section></div></div>
+<p id="notification-status" role="status" aria-live="polite"></p>
+</section>
+<p class="demo-caption">Demonstração independente. Abrir um item informa a seleção local, sem marcar leitura no servidor nem navegar.</p>
+<details class="demo-panel"><summary>Origem e limites do exemplo</summary>
+<p>Adaptação da <a href="https://github.com/jorgewreis/fokus-cloud/blob/b1574c4bf3c4d55a10c4c3aa425a36dc52efcea1/public/portal/assets/fokus-law-shell.js">composição de notificações do Law</a>, com botões do Styles 3.0.0 e paleta da vitrine. O Law é responsável por dados, permissões, leitura e navegação; esta página usa somente dados fictícios.</p>
+<p>O painel real consulta o servidor e tenta marcar cada item ao abri-lo; este exemplo não usa essa API nem reproduz autorização, falhas de rede ou persistência. As cores adaptam-se ao tema da vitrine e não reproduzem necessariamente a aparência do produto. A revisão visual e de teclado em navegador permanece pendente.</p></details>
+</main>
+<script>
+(() => {
+  const trigger = document.getElementById('notifications-button');
+  const panel = document.getElementById('notifications-panel');
+  const items = document.getElementById('notification-items');
+  const badge = document.getElementById('notifications-count');
+  const status = document.getElementById('notification-status');
+  const sample = [
+    { title:'Atualização fictícia', message:'Uma atividade de exemplo foi atualizada.', date:'15/11/2026', unread:true },
+    { title:'Lembrete fictício', message:'Revise uma tarefa de demonstração.', date:'14/11/2026', unread:true },
+  ];
+  function setOpen(open, restoreFocus = false) {
+    panel.hidden = !open;
+    trigger.setAttribute('aria-expanded', String(open));
+    if (restoreFocus) trigger.focus();
+  }
+  function render(list) {
+    items.replaceChildren();
+    const count = list.filter(item => item.unread).length;
+    badge.hidden = !count;
+    badge.textContent = count > 99 ? '99+' : String(count);
+    trigger.setAttribute('aria-label', count ? `Notificações, ${count} não lidas` : 'Notificações');
+    if (!list.length) {
+      const empty = document.createElement('p');
+      empty.textContent = 'Nenhuma notificação por enquanto.';
+      items.append(empty);
+      return;
+    }
+    list.forEach(item => {
+      const row = document.createElement('button'); row.type = 'button'; row.className = 'example-item';
+      if (item.unread) row.dataset.unread = 'true';
+      const title = document.createElement('strong'); title.textContent = item.title;
+      const message = document.createElement('span'); message.textContent = item.message;
+      const date = document.createElement('time'); date.textContent = item.date;
+      const state = document.createElement('span'); state.textContent = item.unread ? 'Não lida' : 'Lida';
+      row.append(title, message, date, state);
+      row.addEventListener('click', () => { status.textContent = `Selecionada: ${item.title}. Nenhuma informação foi enviada.`; setOpen(false, true); });
+      items.append(row);
+    });
+  }
+  document.getElementById('show-items').addEventListener('click', () => { render(sample); status.textContent = 'Lista fictícia preenchida.'; });
+  document.getElementById('show-empty').addEventListener('click', () => { render([]); status.textContent = 'Lista fictícia vazia.'; });
+  trigger.addEventListener('click', () => setOpen(panel.hidden));
+  document.addEventListener('click', event => { if (!panel.hidden && !panel.contains(event.target) && !trigger.contains(event.target)) setOpen(false); });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape' && !panel.hidden) { event.preventDefault(); setOpen(false, true); } });
+  render(sample);
+})();
+</script>
+</body>
+</html>

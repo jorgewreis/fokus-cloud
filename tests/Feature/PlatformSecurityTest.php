@@ -67,6 +67,42 @@ class PlatformSecurityTest extends TestCase
         $this->assertDatabaseMissing('platform_login_challenges', ['id' => $challengeId, 'used_at' => null]);
     }
 
+    public function test_valid_mfa_binds_the_authenticated_web_principal_to_the_session_authority(): void
+    {
+        config()->set('platform_session_authority.enabled', true);
+        config()->set('session.driver', 'database');
+        config()->set('session.connection', null);
+        config()->set('session.table', 'sessions');
+        config()->set('session.lifetime', 120);
+        $admin = $this->admin();
+        $webUser = User::create([
+            'id' => PrefixedUlid::make('USR'),
+            'name' => 'Pessoa Web',
+            'cpf' => '52998224725',
+            'email' => 'web-mfa@example.test',
+            'password' => Hash::make('SenhaCliente!2026'),
+            'status' => 'ativa',
+            'email_verified_at' => now(),
+        ]);
+        $challengeId = $this->challenge($admin, '123456');
+
+        $this->actingAs($webUser, 'web')
+            ->withSession(['platform_pending_admin_id' => $admin->id])
+            ->postJson('/api/backoffice/auth/verify-mfa', ['code' => '123456'])
+            ->assertOk()
+            ->assertJsonPath('admin.id', $admin->id);
+
+        $this->assertAuthenticatedAs($admin, 'platform');
+        $this->assertDatabaseMissing('platform_login_challenges', ['id' => $challengeId, 'used_at' => null]);
+        $this->assertSame(1, DB::table('platform_session_authorities')->where('platform_admin_id', $admin->id)->count());
+        $this->assertDatabaseHas('platform_session_authorities', [
+            'platform_admin_id' => $admin->id,
+            'web_principal_state' => 'known',
+            'web_user_id' => $webUser->id,
+            'state' => 'active',
+        ]);
+    }
+
     public function test_invalid_mfa_increments_the_attempt_counter(): void
     {
         $admin = $this->admin();

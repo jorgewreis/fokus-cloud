@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lista de módulos · Exemplo Fokus Styles</title>
+<script src="../assets/styles-theme.js"></script>
+<link rel="stylesheet" href="../assets/fokus-3.0.0.min.css">
+<link rel="stylesheet" href="../assets/site-palette.css">
+<link rel="stylesheet" href="composition.css">
+<style>
+.demo-actions { display:flex; flex-wrap:wrap; gap:.75rem; margin:16px 0; }
+.demo-actions .fs-btn { min-height:44px; white-space:normal; }
+.demo-scroll:focus-visible { outline:3px solid var(--demo-accent); outline-offset:3px; }
+.demo-scroll .fs-table { min-width:590px; }
+</style>
+</head>
+<body>
+<nav class="demo-site-nav" aria-label="Documentação e aparência">
+<a href="/styles/">Vitrine Fokus Styles</a>
+<button class="demo-theme-toggle" type="button" data-theme-toggle aria-label="Alternar tema claro e escuro">Alternar tema</button>
+</nav>
+<main class="demo-shell">
+<header class="demo-top"><strong>FOKUS STYLES / EXEMPLO</strong><span>Fokus Styles 3.0.0</span></header>
+<span class="demo-kicker">Tabelas e estados</span>
+<h1>Lista de módulos</h1>
+<p>Explore estados de uma tabela com dados fictícios e interações locais.</p>
+<section class="demo-panel" aria-labelledby="list-title">
+<h2 id="list-title">Módulos fictícios</h2>
+<p>Escolha um estado para visualizar como a tabela responde.</p>
+<div class="demo-actions" role="group" aria-label="Estados da tabela">
+<button class="fs-btn fs-btn-outline-primary" id="show-data" type="button">Mostrar registros</button>
+<button class="fs-btn fs-btn-outline-primary" id="show-loading" type="button">Simular carregamento</button>
+<button class="fs-btn fs-btn-outline-primary" id="show-empty" type="button">Mostrar lista vazia</button>
+<button class="fs-btn fs-btn-outline-primary" id="show-error" type="button">Simular erro</button>
+</div>
+<p id="demo-status" role="status" aria-live="polite"></p>
+<p class="demo-scroll-hint" id="table-hint">Role a tabela horizontalmente para ver todas as colunas.</p>
+<div class="fs-table-responsive fs-datatable demo-scroll" id="module-table" data-fs="datatable" data-fs-page-size="1000" role="region" aria-label="Tabela de módulos fictícios" aria-describedby="table-hint" tabindex="0">
+<table class="fs-table fs-table-records fs-table-hover" aria-label="Módulos fictícios">
+<thead><tr><th scope="col">Produto</th><th scope="col">Módulo e funcionalidade</th><th scope="col">Status</th><th scope="col">Publicação</th><th scope="col">Versão</th></tr></thead>
+<tbody><tr><td>Produto exemplo</td><td>Organização</td><td>Ativo</td><td>Rascunho</td><td>1.0</td></tr><tr><td>Produto exemplo</td><td>Relatórios</td><td>Inativo</td><td>Rascunho</td><td>1.0</td></tr></tbody>
+</table>
+<p data-fs-datatable-empty class="fs-table-empty" hidden>Nenhum módulo fictício encontrado.</p>
+<p data-fs-datatable-loading class="fs-table-empty" hidden>Carregando módulos fictícios...</p>
+<div data-fs-datatable-error class="fs-alert fs-alert-danger" hidden role="alert"><span data-fs-datatable-error-message></span></div>
+</div>
+</section>
+<p class="demo-caption">Adaptação da estrutura da lista de módulos do Cloud, com dados fictícios. Não está conectada ao produto; filtros, paginação do servidor e ajustes visuais específicos do Cloud não estão incluídos.</p>
+<details class="demo-panel">
+<summary>Origem e contrato do exemplo</summary>
+<p>A estrutura foi inspirada na <a href="https://github.com/jorgewreis/fokus-cloud/blob/358b1b39d2ba8b216fe4cffb22e450e537807a5e/public/backoffice/pages/modules.html">lista de módulos do Cloud</a>. A demonstração usa os assets locais do Fokus Styles 3.0.0; a versão efetivamente instalada ou servida no Cloud não é verificada por esta página.</p>
+<p>O framework fornece as classes <code>fs-datatable</code> e <code>fs-table</code> e a API <code>DataTable</code>, incluindo <code>refresh</code>, <code>setLoading</code> e <code>setError</code>. A composição, os dados e os controles de simulação pertencem a este exemplo. Os estados são registros, carregamento, vazio e erro, com recuperação por “Mostrar registros”.</p>
+<p>Os temas claro e escuro usam os tokens do framework e a paleta da vitrine. A política de ícones, os filtros e a paginação do Cloud são exceções de produto e não estão reproduzidos aqui.</p>
+</details>
+</main>
+<script src="../assets/fokus-3.0.0.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const root = document.getElementById('module-table');
+  const tbody = root.querySelector('tbody');
+  const initialRows = Array.from(tbody.rows, row => row.cloneNode(true));
+  const status = document.getElementById('demo-status');
+  const DataTable = window.FokusStyles?.DataTable;
+  if (!DataTable) { status.textContent = 'Não foi possível iniciar o exemplo. Recarregue a página.'; return; }
+  const table = DataTable.getInstance(root) || new DataTable(root);
+  const show = state => {
+    table.setError(null); table.setLoading(false);
+    if (state === 'data' || state === 'empty') {
+      tbody.replaceChildren(...(state === 'data' ? initialRows.map(row => row.cloneNode(true)) : []));
+      table.refresh();
+    } else if (state === 'loading') table.setLoading(true);
+    else if (state === 'error') table.setError('Falha simulada. Use “Mostrar registros” para recuperar.');
+    status.textContent = ({data:'Dois registros fictícios carregados.', empty:'Lista fictícia vazia.', loading:'Carregamento simulado em andamento.', error:''})[state];
+  };
+  for (const state of ['data', 'loading', 'empty', 'error']) document.getElementById(`show-${state}`).addEventListener('click', () => show(state));
+  show('data');
+});
+</script>
+</body>
+</html>

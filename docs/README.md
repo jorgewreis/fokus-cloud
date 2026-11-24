@@ -41,6 +41,8 @@ Sobre essa base, produtos derivados podem evoluir por modulos independentes:
 - [Diretrizes de perguntas e decisoes](02-governance/question-guidelines.md)
 - [Arquitetura do sistema](03-architecture/system-architecture.md)
 - [Governanca visual com Fokus Styles](03-architecture/fokus-styles-ui-governance.md)
+- [Inventario do Backoffice](03-architecture/backoffice-inventory.md)
+- [Modelo de longo prazo do Backoffice](03-architecture/backoffice-long-term-model.md)
 - [Inventario de CSS do Fokus Styles, Backoffice e Fokus Law](03-architecture/fokus-styles-css-inventory.md)
 - [Protocolo de auditoria página por componente do Fokus Styles](03-architecture/fokus-styles-component-audit.md)
 - [Matriz de componentes por página — Fokus Law](03-architecture/fokus-law-page-component-matrix.md)

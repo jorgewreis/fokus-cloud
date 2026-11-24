@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seleção em formulários · Exemplo Fokus Styles</title>
+<script src="../assets/styles-theme.js"></script>
+<link rel="stylesheet" href="../assets/fokus-3.0.0.min.css">
+<link rel="stylesheet" href="../assets/site-palette.css">
+<link rel="stylesheet" href="composition.css">
+<style>
+.example-field { display:grid; gap:.5rem; max-width:32rem; margin-block:1rem; }
+.example-field select[multiple] { min-height:7rem; max-width:100%; }
+.example-modal-actions { display:flex; flex-wrap:wrap; gap:.75rem; }
+.example-modal-actions .fs-btn { min-height:44px; white-space:normal; }
+</style>
+</head>
+<body>
+<nav class="demo-site-nav" aria-label="Documentação e aparência">
+<a href="/styles/">Vitrine Fokus Styles</a>
+<button class="demo-theme-toggle" type="button" data-theme-toggle aria-label="Alternar tema claro e escuro">Alternar tema</button>
+</nav>
+<main class="demo-shell">
+<header class="demo-top"><strong>FOKUS STYLES / EXEMPLO</strong><span>Fokus Styles 3.0.0</span></header>
+<span class="demo-kicker">Select e formulário</span>
+<h1>Escolhas em formulários</h1>
+<p>Compare um select simples do framework com controles nativos para múltipla seleção e dentro de um diálogo. Os dados são fictícios e permanecem nesta página.</p>
+
+<section class="demo-panel" aria-labelledby="simple-title">
+<h2 id="simple-title">Select simples</h2>
+<p>O JavaScript do framework cria um botão e um menu a partir do select. Sem JavaScript, o controle permanece nativo.</p>
+<div class="example-field">
+<label id="sector-label" class="fs-form-label" for="sector">Setor fictício</label>
+<select class="fs-form-select" id="sector" aria-describedby="sector-help">
+<option value="administrativo">Administrativo</option><option value="atendimento">Atendimento</option><option value="indisponivel" disabled>Indisponível</option>
+</select>
+<small id="sector-help">A seleção não é enviada ou salva.</small>
+</div>
+<p id="sector-status" role="status" aria-live="polite"></p>
+</section>
+
+<section class="demo-panel" aria-labelledby="multiple-title">
+<h2 id="multiple-title">Seleção múltipla nativa</h2>
+<p>Este exemplo mantém o controle nativo, sem aplicar a API de seleção singular do framework.</p>
+<div class="example-field"><label class="fs-form-label" for="areas">Áreas fictícias</label>
+<select id="areas" multiple size="3" aria-describedby="areas-help"><option value="arquivo">Arquivo</option><option value="protocolo">Protocolo</option><option value="apoio">Apoio</option></select>
+<small id="areas-help">Use os comandos de seleção múltipla do seu sistema.</small></div>
+</section>
+
+<section class="demo-panel" aria-labelledby="dialog-section-title">
+<h2 id="dialog-section-title">Select nativo no diálogo</h2>
+<p>O menu customizado é apresentado fora da árvore do diálogo; este exemplo usa o select nativo nesse contexto.</p>
+<button class="fs-btn fs-btn-primary" type="button" id="open-dialog" data-fs="modal" data-fs-target="#example-dialog">Abrir diálogo de exemplo</button>
+<p id="dialog-status" role="status"></p>
+</section>
+
+<details class="demo-panel">
+<summary>Origem e contrato do exemplo</summary>
+<p>Inspirado na <a href="https://github.com/jorgewreis/fokus-cloud/blob/358b1b39d2ba8b216fe4cffb22e450e537807a5e/public/portal/assets/fokus-law-select.js">baseline do adaptador Select do Law</a>. Esta página não carrega o adaptador nem representa sua lógica de atualização dinâmica, temas específicos ou correções locais.</p>
+<p>O exemplo usa o bundle local Fokus Styles 3.0.0 e sua API <code>Select</code> para o controle simples. A associação de rótulo e descrição no botão é feita pelo código desta página; controles múltiplos e o select em modal permanecem nativos. O framework é responsável pelas primitivas, e o Law por sua integração e regras. A versão servida em produção não é verificada aqui.</p>
+<p>Os temas claro e escuro usam tokens do framework e a paleta da vitrine. Navegação por teclado, foco e apresentação precisam ser avaliados no navegador e no produto.</p>
+</details>
+</main>
+
+<div class="fs-modal" id="example-dialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="dialog-title" aria-describedby="dialog-description" aria-hidden="true">
+<div class="fs-modal-dialog"><div class="fs-modal-content">
+<div class="fs-modal-header"><h2 class="fs-modal-title" id="dialog-title">Categoria fictícia</h2></div>
+<div class="fs-modal-body"><p id="dialog-description">Escolha uma categoria de exemplo.</p>
+<div class="example-field"><label class="fs-form-label" for="category">Categoria</label><select class="fs-form-select" id="category"><option value="geral">Geral</option><option value="outros">Outros</option></select></div></div>
+<div class="fs-modal-footer example-modal-actions"><button class="fs-btn fs-btn-outline-primary" type="button" data-fs-dismiss="modal">Fechar</button></div>
+</div></div>
+</div>
+<script src="../assets/fokus-3.0.0.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const select = document.getElementById('sector');
+  const status = document.getElementById('sector-status');
+  const Select = window.FokusStyles?.Select;
+  if (!window.FokusStyles?.Modal) {
+    document.getElementById('open-dialog').disabled = true;
+    document.getElementById('dialog-status').textContent = 'O diálogo está indisponível. Recarregue a página para tentar novamente.';
+  }
+  if (Select) {
+    const instance = Select.getInstance(select) || new Select(select);
+    instance.toggleEl.id = 'sector-control';
+    instance.menuEl.setAttribute('aria-labelledby', instance.toggleEl.id);
+    instance.toggleEl.setAttribute('aria-labelledby', 'sector-label');
+    instance.toggleEl.setAttribute('aria-describedby', 'sector-help');
+    document.getElementById('sector-label').htmlFor = instance.toggleEl.id;
+  } else {
+    status.textContent = 'O componente visual não está disponível; o select nativo continua utilizável.';
+  }
+  select.addEventListener('change', () => { status.textContent = `Selecionado: ${select.options[select.selectedIndex].textContent}.`; });
+});
+</script>
+</body>
+</html>

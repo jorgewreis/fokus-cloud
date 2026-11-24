@@ -137,11 +137,20 @@ Composer instalado a partir do lock, testes PHP, preparação sintética Python 
 integração HTTP Laravel local. O job existente Application quality permanece dono
 do Pint e suíte geral. Não altera deploy.yml ou servidores.
 
-A integração usa **sem reimplementar/afrouxar** o verificador PR #57 no commit
-`a8cc9729181471c9f46ccb15d51383e1aceb61ab`, blob
-`1a3275aa5619b1651a2d77d3e51c3d1d8b9c778d`. O workflow busca esse commit; se o arquivo
-já existe na composição, exige o mesmo blob. Divergência bloqueia até revisão
-explícita do contrato. A ausência do commit local é dependência de teste, não skip.
+A integração usa o verificador revisado a partir do PR #57, commit
+`a8cc9729181471c9f46ccb15d51383e1aceb61ab`. O blob atual é
+`72c289cb316da22a13c5b7441bdde33f13c0144c`: o `probe-current` com bootstrap
+aceita o 404 `text/html` do release ainda não selado, inclusive a página de erro
+legada maior que o limite de corpo. Nesse caso a classificação usa status e
+`Content-Type` e lê só um prefixo limitado. HTTP 200, JSON e qualquer modo que
+não seja esse probe continuam sujeitos ao limite e à validação estrita. Cada
+fetch de `/up` e do release repete no máximo três vezes apenas
+`transport_or_tls_error`, com nonce novo em cada tentativa do release, sem
+repetir status HTTP, tipo, tamanho, contrato, redirect ou identidade. A
+verificação do SHA candidato não muda. O workflow busca o commit histórico; se o
+arquivo já existe na composição, exige esse blob. Divergência bloqueia até nova
+revisão explícita do contrato. A ausência do commit local é dependência de
+teste, não skip.
 HTTP sem TLS é usado **apenas** no listener 127.0.0.1 do teste pela construção interna
 de Configuration; a CLI produtiva do verificador mantém HTTPS obrigatório.
 

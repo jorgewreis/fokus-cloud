@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, extname, join, resolve } from "node:path";
+import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -29,7 +29,10 @@ const assetVersion = (assetPath, htmlPath) => {
   return createHash("sha256").update(contents).digest("hex").slice(0, 12);
 };
 
-const htmlFiles = walk(stylesRoot);
+// Portable examples are distributed byte-for-byte inside their offline ZIP.
+// Cache queries would make the preview source diverge from that artifact during
+// a build, so their versioning is intentionally managed at release time.
+const htmlFiles = walk(stylesRoot).filter(path => !relative(stylesRoot, path).startsWith(`examples${sep}`));
 let changedFiles = 0;
 let changedAssets = 0;
 

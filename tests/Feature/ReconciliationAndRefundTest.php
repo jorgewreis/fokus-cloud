@@ -5,7 +5,8 @@ namespace Tests\Feature;
 use App\Models\PlatformAdmin;
 use App\Models\PlatformRole;
 use App\Services\PrefixedUlid;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -14,7 +15,30 @@ use Tests\TestCase;
 
 class ReconciliationAndRefundTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseMigrations;
+
+    // Refund execution must commit its claim before contacting the provider.
+    // Avoid RefreshDatabase's enclosing transaction and SQLite rollback of named FKs.
+    public function runDatabaseMigrations(): void
+    {
+        $this->artisan('migrate:fresh')->assertSuccessful();
+
+        // This class cannot use an outer transaction: provider calls must observe
+        // committed claims, and MySQL DDL commits implicitly. Rebuild the schema
+        // now so even a following test without RefreshDatabase sees no fixtures.
+        // An in-memory SQLite database is discarded with its PDO instead.
+        $this->beforeApplicationDestroyed(function (): void {
+            try {
+                $connection = DB::connection();
+                if (! ($connection->getDriverName() === 'sqlite' && $connection->getDatabaseName() === ':memory:')) {
+                    $this->artisan('migrate:fresh')->assertSuccessful();
+                }
+            } finally {
+                RefreshDatabaseState::$migrated = false;
+                RefreshDatabaseState::$inMemoryConnections = [];
+            }
+        });
+    }
 
     protected function setUp(): void
     {
@@ -45,7 +69,7 @@ class ReconciliationAndRefundTest extends TestCase
         $response = $this->actingAs($commercial, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => 64.70, 'allowed_case' => 'erro_tecnico', 'reason' => 'Cobrança duplicada identificada.'])->assertCreated();
         $refundId = $response->json('id');
         $this->actingAs($super, 'platform')->patchJson('/api/backoffice/refunds/'.$refundId, ['action' => 'aprovar', 'reason' => 'Aprovado'])->assertOk();
-        Http::fake(['https://api.mercadopago.com/v1/payments/pay-refund/refunds' => Http::response(['id' => 'refund-1', 'status' => 'approved'], 201)]);
+        Http::fake(['https://api.mercadopago.com/v1/payments/pay-refund/refunds' => Http::response(['id' => 'refund-1', 'payment_id' => 'pay-refund', 'amount' => 64.70, 'status' => 'approved'], 201)]);
         $this->actingAs($super, 'platform')->patchJson('/api/backoffice/refunds/'.$refundId, ['action' => 'executar', 'reason' => 'Executado'])->assertOk();
         $this->assertDatabaseHas('refund_requests', ['id' => $refundId, 'status' => 'executado', 'provider_refund_id' => 'refund-1']);
         $this->assertDatabaseHas('payments', ['id' => $fixture['payment_id'], 'status' => 'estornado']);
@@ -141,6 +165,374 @@ class ReconciliationAndRefundTest extends TestCase
             ->assertJsonValidationErrors('date_from');
     }
 
+    public function test_closed_or_stale_reconciliation_cannot_change_subscription(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $admin = $this->admin('superadministrador');
+        $id = PrefixedUlid::make('RCA');
+        DB::table('payment_reconciliation_alerts')->insert([
+            'id' => $id, 'company_id' => $this->companyIdForPayment($fixture['payment_id']),
+            'subscription_id' => $fixture['subscription_id'], 'fingerprint' => hash('sha256', $id),
+            'type' => 'subscription_status', 'internal_status' => 'ativa', 'mercado_pago_status' => 'paused',
+            'impact' => 'medio', 'status' => 'descartada', 'opened_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        Http::fake(['https://api.mercadopago.com/preapproval/pre-reconcile' => Http::response(['status' => 'paused'], 200)]);
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/reconciliation/'.$id, ['action' => 'corrigir', 'reason' => 'Análise'])->assertStatus(409);
+        DB::table('payment_reconciliation_alerts')->where('id', $id)->update(['status' => 'aberta']);
+        DB::table('subscriptions')->where('id', $fixture['subscription_id'])->update(['status' => 'aguardando_pagamento']);
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/reconciliation/'.$id, ['action' => 'corrigir', 'reason' => 'Análise'])->assertStatus(409);
+        $this->assertDatabaseHas('subscriptions', ['id' => $fixture['subscription_id'], 'status' => 'aguardando_pagamento']);
+        $this->assertDatabaseHas('payment_reconciliation_alerts', ['id' => $id, 'status' => 'aberta']);
+    }
+
+    public function test_reconciliation_rechecks_provider_before_applying(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $admin = $this->admin('superadministrador');
+        $id = PrefixedUlid::make('RCA');
+        DB::table('payment_reconciliation_alerts')->insert([
+            'id' => $id, 'company_id' => $this->companyIdForPayment($fixture['payment_id']),
+            'subscription_id' => $fixture['subscription_id'], 'fingerprint' => hash('sha256', $id),
+            'type' => 'subscription_status', 'internal_status' => 'ativa', 'mercado_pago_status' => 'paused',
+            'impact' => 'medio', 'status' => 'aberta', 'opened_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        Http::fake(['https://api.mercadopago.com/preapproval/pre-reconcile' => Http::response(['status' => 'authorized'], 200)]);
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/reconciliation/'.$id, ['action' => 'corrigir', 'reason' => 'Análise'])->assertStatus(409);
+        $this->assertDatabaseHas('subscriptions', ['id' => $fixture['subscription_id'], 'status' => 'ativa']);
+    }
+
+    public function test_refund_unconfirmed_response_is_not_executed_or_retried(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $requester = $this->admin('administrador_comercial');
+        $admin = $this->admin('superadministrador');
+        $id = $this->actingAs($requester, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => 64.70, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertCreated()->json('id');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'aprovar', 'reason' => 'Teste'])->assertOk();
+        Http::fake(['https://api.mercadopago.com/v1/payments/pay-refund/refunds' => Http::response([], 200)]);
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(202)->assertJsonPath('status', 'executando');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(409);
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'recusar', 'reason' => 'Teste'])->assertUnprocessable();
+        Http::assertSentCount(1);
+        $this->assertDatabaseHas('refund_requests', ['id' => $id, 'status' => 'executando', 'provider_refund_id' => null]);
+        $this->assertDatabaseHas('payments', ['id' => $fixture['payment_id'], 'status' => 'aprovado']);
+    }
+
+    public function test_refund_rejects_amount_below_one_cent_or_more_than_two_decimals(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $admin = $this->admin('administrador_comercial');
+        foreach ([0.001, 1.234] as $amount) {
+            $this->actingAs($admin, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => $amount, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertUnprocessable();
+        }
+        $this->assertDatabaseCount('refund_requests', 0);
+    }
+
+    public function test_refund_timeout_remains_pending_and_cannot_be_declined_or_reexecuted(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $requester = $this->admin('administrador_comercial');
+        $admin = $this->admin('superadministrador');
+        $id = $this->actingAs($requester, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => 10, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertCreated()->json('id');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'aprovar', 'reason' => 'Teste'])->assertOk();
+        Http::fake(fn () => throw new \RuntimeException('timeout simulado'));
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(202)->assertJsonPath('status', 'executando');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(409);
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'recusar', 'reason' => 'Teste'])->assertUnprocessable();
+        $this->assertDatabaseHas('payments', ['id' => $fixture['payment_id'], 'status' => 'aprovado']);
+        $this->assertDatabaseHas('refund_requests', ['id' => $id, 'status' => 'executando']);
+    }
+
+    public function test_refund_mismatched_provider_response_never_completes(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $requester = $this->admin('administrador_comercial');
+        $admin = $this->admin('superadministrador');
+        $cases = [
+            ['id' => 'r-1', 'payment_id' => 'wrong', 'amount' => 10, 'status' => 'approved'],
+            ['id' => 'r-2', 'payment_id' => 'pay-refund', 'amount' => 11.01, 'status' => 'approved'],
+            ['id' => 'r-3', 'payment_id' => 'pay-refund', 'amount' => 12, 'status' => 'pending'],
+        ];
+        foreach ($cases as $i => $payload) {
+            $id = $this->actingAs($requester, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => 10 + $i, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertCreated()->json('id');
+            $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'aprovar', 'reason' => 'Teste'])->assertOk();
+            Http::fake(['https://api.mercadopago.com/v1/payments/pay-refund/refunds' => Http::response($payload, 200)]);
+            $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(202)->assertJsonPath('status', 'executando');
+            $this->assertDatabaseHas('refund_requests', ['id' => $id, 'status' => 'executando']);
+        }
+        $this->assertDatabaseHas('payments', ['id' => $fixture['payment_id'], 'status' => 'aprovado']);
+    }
+
+    public function test_refund_execution_refuses_existing_transaction_before_provider_call(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $requester = $this->admin('administrador_comercial');
+        $admin = $this->admin('superadministrador');
+        $id = $this->actingAs($requester, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => 10, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertCreated()->json('id');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'aprovar', 'reason' => 'Teste'])->assertOk();
+        Http::fake();
+        DB::beginTransaction();
+        try {
+            $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(409);
+        } finally {
+            DB::rollBack();
+        }
+        Http::assertNothingSent();
+        $this->assertDatabaseHas('refund_requests', ['id' => $id, 'status' => 'aprovado']);
+    }
+
+    public function test_overlapping_refund_execution_sends_only_one_provider_request(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $requester = $this->admin('administrador_comercial');
+        $admin = $this->admin('superadministrador');
+        $id = $this->actingAs($requester, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => 10, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertCreated()->json('id');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'aprovar', 'reason' => 'Teste'])->assertOk();
+        $overlapStatus = null;
+        $defaultConnection = DB::getDefaultConnection();
+        $mysql = DB::connection()->getDriverName() === 'mysql';
+        $firstConnectionId = $mysql ? DB::selectOne('SELECT CONNECTION_ID() AS id')->id : null;
+        if ($mysql) {
+            Config::set('database.connections.billing_overlap', config('database.connections.'.$defaultConnection));
+        }
+        $secondConnectionId = null;
+        Http::fake(function () use ($admin, $id, $mysql, $defaultConnection, &$overlapStatus, &$secondConnectionId) {
+            try {
+                if ($mysql) {
+                    DB::setDefaultConnection('billing_overlap');
+                    $secondConnectionId = DB::selectOne('SELECT CONNECTION_ID() AS id')->id;
+                }
+                $overlapStatus = $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Segundo'])->status();
+            } finally {
+                DB::setDefaultConnection($defaultConnection);
+            }
+
+            return Http::response(['id' => 'refund-overlap', 'payment_id' => 'pay-refund', 'amount' => 10, 'status' => 'approved'], 201);
+        });
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Primeiro'])->assertOk()->assertJsonPath('status', 'executado');
+        $this->assertSame(409, $overlapStatus);
+        if ($mysql) {
+            $this->assertNotSame($firstConnectionId, $secondConnectionId);
+            DB::purge('billing_overlap');
+        }
+        Http::assertSentCount(1);
+        $this->assertDatabaseHas('refund_requests', ['id' => $id, 'status' => 'executado', 'provider_refund_id' => 'refund-overlap']);
+    }
+
+    public function test_pending_refund_with_provider_id_can_be_checked_without_another_post(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $requester = $this->admin('administrador_comercial');
+        $admin = $this->admin('superadministrador');
+        $id = $this->actingAs($requester, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => 64.70, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertCreated()->json('id');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'aprovar', 'reason' => 'Teste'])->assertOk();
+        Http::fake([
+            'https://api.mercadopago.com/v1/payments/pay-refund/refunds/refund-pending' => Http::sequence()
+                ->push(['id' => 'outro', 'payment_id' => 'pay-refund', 'amount' => 64.70, 'status' => 'approved'], 200)
+                ->push([], 500)
+                ->push(['id' => 'refund-pending', 'payment_id' => 'pay-refund', 'amount' => 64.70, 'status' => 'approved'], 200),
+            'https://api.mercadopago.com/v1/payments/pay-refund/refunds' => Http::response(['id' => 'refund-pending', 'payment_id' => 'pay-refund', 'amount' => 64.70, 'status' => 'pending'], 200),
+        ]);
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(202)->assertJsonPath('provider_refund_id', 'refund-pending');
+        $this->actingAs($requester, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'consultar', 'reason' => 'Teste'])->assertForbidden();
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'consultar', 'reason' => 'Teste'])->assertStatus(202)->assertJsonPath('provider_refund_id', 'refund-pending');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'consultar', 'reason' => 'Teste'])->assertStatus(202)->assertJsonPath('status', 'executando');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'consultar', 'reason' => 'Teste'])->assertOk()->assertJsonPath('status', 'executado');
+        Http::assertSentCount(4);
+        Http::assertSent(fn ($request) => $request->method() === 'GET' && str_ends_with($request->url(), '/refunds/refund-pending'));
+        $this->assertDatabaseHas('payments', ['id' => $fixture['payment_id'], 'status' => 'estornado']);
+    }
+
+    public function test_refund_without_provider_identifier_cannot_be_guessed_or_consulted(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $requester = $this->admin('administrador_comercial');
+        $admin = $this->admin('superadministrador');
+        $id = $this->actingAs($requester, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => 10, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertCreated()->json('id');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'aprovar', 'reason' => 'Teste'])->assertOk();
+        Http::fake(['*' => Http::response([], 200)]);
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(202);
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'consultar', 'reason' => 'Teste', 'provider_refund_id' => 'guessed'])->assertStatus(409);
+        Http::assertSentCount(1);
+    }
+
+    public function test_refund_does_not_confirm_if_payment_provider_identifier_changes_in_flight(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $requester = $this->admin('administrador_comercial');
+        $admin = $this->admin('superadministrador');
+        $id = $this->actingAs($requester, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => 64.70, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertCreated()->json('id');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'aprovar', 'reason' => 'Teste'])->assertOk();
+        Http::fake(function () use ($fixture) {
+            DB::table('payments')->where('id', $fixture['payment_id'])->update(['provider_payment_id' => 'pay-changed']);
+
+            return Http::response(['id' => 'refund-1', 'payment_id' => 'pay-refund', 'amount' => 64.70, 'status' => 'approved'], 201);
+        });
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(202)->assertJsonPath('provider_refund_id', null);
+        $this->assertDatabaseHas('payments', ['id' => $fixture['payment_id'], 'status' => 'aprovado', 'provider_payment_id' => 'pay-changed']);
+        $this->assertDatabaseHas('refund_requests', ['id' => $id, 'status' => 'executando']);
+    }
+
+    public function test_pending_refund_cannot_be_checked_against_changed_provider_payment(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $requester = $this->admin('administrador_comercial');
+        $admin = $this->admin('superadministrador');
+        $id = $this->actingAs($requester, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => 10, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertCreated()->json('id');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'aprovar', 'reason' => 'Teste'])->assertOk();
+        Http::fake(['*' => Http::response(['id' => 'refund-known', 'payment_id' => 'pay-refund', 'amount' => 10, 'status' => 'pending'], 200)]);
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(202)->assertJsonPath('provider_refund_id', 'refund-known');
+        DB::table('payments')->where('id', $fixture['payment_id'])->update(['provider_payment_id' => 'pay-changed']);
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'consultar', 'reason' => 'Teste'])->assertStatus(409);
+        Http::assertSentCount(1);
+        $this->assertDatabaseHas('refund_requests', ['id' => $id, 'status' => 'executando']);
+        $this->assertDatabaseHas('payments', ['id' => $fixture['payment_id'], 'status' => 'aprovado']);
+    }
+
+    public function test_provider_refund_identifier_cannot_be_reused_between_requests(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $requester = $this->admin('administrador_comercial');
+        $admin = $this->admin('superadministrador');
+        $ids = [];
+        foreach ([10, 20] as $amount) {
+            $id = $this->actingAs($requester, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => $amount, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertCreated()->json('id');
+            $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'aprovar', 'reason' => 'Teste'])->assertOk();
+            $ids[] = $id;
+        }
+        Http::fake(['*' => Http::sequence()
+            ->push(['id' => 'same-provider-id', 'payment_id' => 'pay-refund', 'amount' => 10, 'status' => 'approved'], 201)
+            ->push(['id' => 'same-provider-id', 'payment_id' => 'pay-refund', 'amount' => 20, 'status' => 'approved'], 201)]);
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$ids[0], ['action' => 'executar', 'reason' => 'Teste'])->assertOk();
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$ids[1], ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(202)->assertJsonPath('provider_refund_id', null);
+        $this->assertDatabaseHas('refund_requests', ['id' => $ids[0], 'status' => 'executado', 'provider_refund_id' => 'same-provider-id']);
+        $this->assertDatabaseHas('refund_requests', ['id' => $ids[1], 'status' => 'executando', 'provider_refund_id' => null]);
+        $this->assertDatabaseHas('payments', ['id' => $fixture['payment_id'], 'status' => 'aprovado']);
+    }
+
+    public function test_overlapping_requests_cannot_link_the_same_provider_refund(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $requester = $this->admin('administrador_comercial');
+        $admin = $this->admin('superadministrador');
+        $ids = [];
+        foreach ([10, 20] as $amount) {
+            $id = $this->actingAs($requester, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => $amount, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertCreated()->json('id');
+            $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'aprovar', 'reason' => 'Teste'])->assertOk();
+            $ids[] = $id;
+        }
+        $mysql = DB::connection()->getDriverName() === 'mysql';
+        $defaultConnection = DB::getDefaultConnection();
+        $firstConnectionId = $mysql ? DB::selectOne('SELECT CONNECTION_ID() AS id')->id : null;
+        if ($mysql) {
+            Config::set('database.connections.billing_overlap', config('database.connections.'.$defaultConnection));
+        }
+        $secondConnectionId = null;
+        $innerStatus = null;
+        $calls = 0;
+        Http::fake(function () use ($admin, $ids, $mysql, $defaultConnection, &$calls, &$innerStatus, &$secondConnectionId) {
+            $calls++;
+            if ($calls === 1) {
+                try {
+                    if ($mysql) {
+                        DB::setDefaultConnection('billing_overlap');
+                        $secondConnectionId = DB::selectOne('SELECT CONNECTION_ID() AS id')->id;
+                    }
+                    $innerStatus = $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$ids[1], ['action' => 'executar', 'reason' => 'Teste'])->status();
+                } finally {
+                    DB::setDefaultConnection($defaultConnection);
+                }
+
+                return Http::response(['id' => 'same-provider-id', 'payment_id' => 'pay-refund', 'amount' => 10, 'status' => 'approved'], 201);
+            }
+
+            return Http::response(['id' => 'same-provider-id', 'payment_id' => 'pay-refund', 'amount' => 20, 'status' => 'approved'], 201);
+        });
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$ids[0], ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(202)->assertJsonPath('provider_refund_id', null);
+        $this->assertSame(200, $innerStatus);
+        $this->assertSame(2, $calls);
+        if ($mysql) {
+            $this->assertNotSame($firstConnectionId, $secondConnectionId);
+            DB::purge('billing_overlap');
+        }
+        $this->assertDatabaseHas('refund_requests', ['id' => $ids[0], 'status' => 'executando', 'provider_refund_id' => null]);
+        $this->assertDatabaseHas('refund_requests', ['id' => $ids[1], 'status' => 'executado', 'provider_refund_id' => 'same-provider-id']);
+        $this->assertDatabaseHas('payments', ['id' => $fixture['payment_id'], 'status' => 'aprovado']);
+    }
+
+    public function test_provider_id_unique_conflict_after_claim_is_audited_and_remains_uncertain(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $requester = $this->admin('administrador_comercial');
+        $admin = $this->admin('superadministrador');
+        $id = $this->actingAs($requester, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => 10, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertCreated()->json('id');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'aprovar', 'reason' => 'Teste'])->assertOk();
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::unprepared("CREATE TRIGGER refund_collision_probe BEFORE UPDATE ON refund_requests FOR EACH ROW BEGIN IF NEW.provider_refund_id = 'collision-trigger' THEN SIGNAL SQLSTATE '23000' SET MYSQL_ERRNO = 1062, MESSAGE_TEXT = 'Duplicate entry for key refund_requests_provider_refund_id_unique'; END IF; END");
+        } else {
+            DB::unprepared("CREATE TRIGGER refund_collision_probe BEFORE UPDATE OF provider_refund_id ON refund_requests WHEN NEW.provider_refund_id = 'collision-trigger' BEGIN SELECT RAISE(ABORT, 'UNIQUE constraint failed: refund_requests.provider_refund_id'); END");
+        }
+        Http::fake(['*' => Http::response(['id' => 'collision-trigger', 'payment_id' => 'pay-refund', 'amount' => 10, 'status' => 'approved'], 201)]);
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(202)->assertJsonPath('status', 'executando');
+        Http::assertSentCount(1);
+        $this->assertDatabaseHas('refund_requests', ['id' => $id, 'status' => 'executando', 'provider_refund_id' => null]);
+        $this->assertDatabaseHas('payments', ['id' => $fixture['payment_id'], 'status' => 'aprovado']);
+        $this->assertDatabaseHas('platform_audit_events', ['entity_id' => $id, 'action' => 'billing.refund_provider_id_collision']);
+    }
+
+    public function test_other_unique_errors_are_not_mistaken_for_provider_id_collision(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $requester = $this->admin('administrador_comercial');
+        $admin = $this->admin('superadministrador');
+        $id = $this->actingAs($requester, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => 10, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertCreated()->json('id');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'aprovar', 'reason' => 'Teste'])->assertOk();
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::unprepared("CREATE TRIGGER refund_other_constraint_probe BEFORE UPDATE ON refund_requests FOR EACH ROW BEGIN IF NEW.provider_refund_id = 'other-trigger' THEN SIGNAL SQLSTATE '23000' SET MYSQL_ERRNO = 1062, MESSAGE_TEXT = 'Duplicate entry for key another_unique_index'; END IF; END");
+        } else {
+            DB::unprepared("CREATE TRIGGER refund_other_constraint_probe BEFORE UPDATE OF provider_refund_id ON refund_requests WHEN NEW.provider_refund_id = 'other-trigger' BEGIN SELECT RAISE(ABORT, 'UNIQUE constraint failed: refund_requests.another_column'); END");
+        }
+        Http::fake(['*' => Http::response(['id' => 'other-trigger', 'payment_id' => 'pay-refund', 'amount' => 10, 'status' => 'approved'], 201)]);
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(500);
+        $this->assertDatabaseHas('refund_requests', ['id' => $id, 'status' => 'executando', 'provider_refund_id' => null]);
+        $this->assertDatabaseMissing('platform_audit_events', ['entity_id' => $id, 'action' => 'billing.refund_provider_id_collision']);
+    }
+
+    public function test_refund_execution_and_lookup_fail_closed_without_the_expected_unique_index(): void
+    {
+        $fixture = $this->fixture('aprovado');
+        $requester = $this->admin('administrador_comercial');
+        $admin = $this->admin('superadministrador');
+        $id = $this->actingAs($requester, 'platform')->postJson('/api/backoffice/refunds', ['payment_id' => $fixture['payment_id'], 'amount' => 10, 'allowed_case' => 'erro_tecnico', 'reason' => 'Teste'])->assertCreated()->json('id');
+        $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'aprovar', 'reason' => 'Teste'])->assertOk();
+        $mysql = DB::connection()->getDriverName() === 'mysql';
+        DB::statement($mysql ? 'DROP INDEX refund_requests_provider_refund_id_unique ON refund_requests' : 'DROP INDEX refund_requests_provider_refund_id_unique');
+        Http::fake();
+        try {
+            $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(503);
+            $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'consultar', 'reason' => 'Teste'])->assertStatus(503);
+            $this->assertDatabaseHas('refund_requests', ['id' => $id, 'status' => 'aprovado', 'provider_refund_id' => null]);
+            Http::assertNothingSent();
+            DB::statement('CREATE INDEX refund_requests_provider_refund_id_unique ON refund_requests (provider_refund_id)');
+            $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(503);
+            Http::assertNothingSent();
+            DB::statement($mysql ? 'DROP INDEX refund_requests_provider_refund_id_unique ON refund_requests' : 'DROP INDEX refund_requests_provider_refund_id_unique');
+            DB::statement($mysql
+                ? 'CREATE UNIQUE INDEX refund_requests_provider_refund_id_unique ON refund_requests (provider_refund_id(20))'
+                : 'CREATE UNIQUE INDEX refund_requests_provider_refund_id_unique ON refund_requests (provider_refund_id) WHERE provider_refund_id IS NOT NULL');
+            $this->actingAs($admin, 'platform')->patchJson('/api/backoffice/refunds/'.$id, ['action' => 'executar', 'reason' => 'Teste'])->assertStatus(503);
+            Http::assertNothingSent();
+        } finally {
+            if ($mysql) {
+                if (DB::selectOne("SELECT 1 AS present FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'refund_requests' AND INDEX_NAME = 'refund_requests_provider_refund_id_unique' LIMIT 1")) {
+                    DB::statement('DROP INDEX refund_requests_provider_refund_id_unique ON refund_requests');
+                }
+            } else {
+                DB::statement('DROP INDEX IF EXISTS refund_requests_provider_refund_id_unique');
+            }
+            DB::statement('CREATE UNIQUE INDEX refund_requests_provider_refund_id_unique ON refund_requests (provider_refund_id)');
+        }
+    }
+
     private function companyIdForPayment(string $paymentId): string
     {
         return (string) DB::table('payments')->where('id', $paymentId)->value('company_id');
@@ -162,6 +554,7 @@ class ReconciliationAndRefundTest extends TestCase
         DB::table('subscriptions')->insert(['id' => $subscriptionId, 'company_id' => $companyId, 'product_id' => $product->id, 'status' => 'ativa', 'open_company_product' => $companyId.'-'.$product->id, 'version' => 1, 'billing_cycle' => 'monthly', 'current_period_starts_at' => now(), 'current_period_ends_at' => now()->addMonth(), 'provider_subscription_id' => 'pre-reconcile', 'created_by' => $userId, 'updated_by' => $userId, 'created_at' => now(), 'updated_at' => now()]);
         $paymentId = PrefixedUlid::make('PAG');
         DB::table('payments')->insert(['id' => $paymentId, 'company_id' => $companyId, 'subscription_id' => $subscriptionId, 'provider' => 'mercado_pago', 'provider_payment_id' => 'pay-refund', 'status' => $paymentStatus, 'amount' => 64.70, 'currency' => 'BRL', 'provider_subscription_id' => 'pre-reconcile', 'version' => 1, 'created_at' => now(), 'updated_at' => now()]);
+
         return ['subscription_id' => $subscriptionId, 'payment_id' => $paymentId];
     }
 }

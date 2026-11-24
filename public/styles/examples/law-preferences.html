@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Preferências locais · Exemplo Fokus Styles</title>
+<script src="../assets/styles-theme.js"></script>
+<link rel="stylesheet" href="../assets/fokus-3.0.0.min.css">
+<link rel="stylesheet" href="../assets/site-palette.css">
+<link rel="stylesheet" href="composition.css">
+<style>
+.example-preference { display:flex; flex-wrap:wrap; align-items:start; justify-content:space-between; gap:.75rem 1.5rem; padding:1rem 0; border-bottom:1px solid var(--demo-border); }
+.example-preference-copy { flex:1 1 16rem; }
+.example-preference-copy p { margin:.25rem 0 0; color:var(--demo-muted); }
+.example-preference .fs-check { flex:0 0 auto; min-height:2.75rem; display:flex; align-items:center; }
+.example-preview { margin-top:1.25rem; padding:1rem; border:1px solid var(--demo-border); border-radius:var(--demo-radius); }
+.example-preview-panel.is-open { animation:example-appear .25s ease; }
+@keyframes example-appear { from { opacity:0; } to { opacity:1; } }
+.example-preview[data-reduced="true"] .example-preview-panel { animation:none; }
+@media (prefers-reduced-motion: reduce) { .example-preview-panel.is-open { animation:none; } }
+</style>
+</head>
+<body>
+<nav class="demo-site-nav" aria-label="Documentação e aparência">
+<a href="/styles/">Vitrine Fokus Styles</a>
+<button class="demo-theme-toggle" type="button" data-theme-toggle aria-label="Alternar tema claro e escuro">Alternar tema</button>
+</nav>
+<main class="demo-shell">
+<header class="demo-top"><strong>FOKUS STYLES / EXEMPLO</strong><span>Fokus Styles 3.0.0</span></header>
+<span class="demo-kicker">Checkbox e preferências</span>
+<h1>Preferências neste exemplo</h1>
+<p>Experimente duas escolhas locais. Elas não alteram suas preferências no Fokus Law.</p>
+<section class="demo-panel" aria-labelledby="preferences-title">
+<h2 id="preferences-title">Navegação e movimento</h2>
+<p>As escolhas ficam neste navegador quando o armazenamento local estiver disponível.</p>
+<div class="example-preference">
+  <div class="example-preference-copy"><strong>Lembrar a seção escolhida</strong><p id="remember-help">Ao reabrir esta página, recupera a seção fictícia selecionada abaixo.</p></div>
+  <div class="fs-check"><input class="fs-check-input" type="checkbox" id="remember-section" aria-describedby="remember-help"><label class="fs-check-label" for="remember-section">Lembrar seção</label></div>
+</div>
+<div class="example-preference">
+  <div class="example-preference-copy"><strong>Reduzir a transição do exemplo</strong><p id="motion-help">Remove a animação da prévia abaixo, sem modificar outras páginas.</p></div>
+  <div class="fs-check"><input class="fs-check-input" type="checkbox" id="reduce-motion" aria-describedby="motion-help"><label class="fs-check-label" for="reduce-motion">Reduzir movimento</label></div>
+</div>
+<p id="storage-status" role="status" aria-live="polite"></p>
+<div class="example-preview" id="preview" data-reduced="false">
+  <label class="fs-form-label" for="example-section">Seção fictícia</label>
+  <select class="fs-form-select" id="example-section"><option value="visao">Visão geral</option><option value="tarefas">Tarefas de exemplo</option></select>
+  <p id="section-status" role="status"></p>
+  <button class="fs-btn fs-btn-outline-primary" type="button" id="preview-toggle" aria-expanded="false" aria-controls="preview-panel">Abrir prévia de movimento</button>
+  <div class="example-preview-panel" id="preview-panel" hidden><p>Prévia fictícia de conteúdo. A preferência do sistema para movimento reduzido também é respeitada.</p></div>
+</div>
+</section>
+<p class="demo-caption">Adaptação demonstrativa das preferências do Law. Usa uma chave exclusiva deste exemplo, sem conta, integração ou dados do produto. A escolha de lembrar seção simula apenas esta página.</p>
+<details class="demo-panel">
+<summary>Origem e contrato do exemplo</summary>
+<p>Inspirado na <a href="https://github.com/jorgewreis/fokus-cloud/blob/358b1b39d2ba8b216fe4cffb22e450e537807a5e/public/portal/assets/fokus-law-shell.js">baseline de preferências do Law</a>. Esta página usa assets locais do Fokus Styles 3.0.0 e não verifica a versão servida no produto.</p>
+<p>Styles fornece <code>fs-check</code>, <code>fs-check-input</code> e <code>fs-check-label</code>; nomes, chave de armazenamento e prévia são desta demonstração. Preferências reais, identidade e regras pertencem ao Law. Temas usam os tokens do framework e a paleta da vitrine.</p>
+</details>
+</main>
+<script>
+(() => {
+  const storageKey = 'fokus-styles-example-law-preferences-v1';
+  const remember = document.getElementById('remember-section');
+  const reduced = document.getElementById('reduce-motion');
+  const section = document.getElementById('example-section');
+  const status = document.getElementById('storage-status');
+  const preview = document.getElementById('preview');
+  const panel = document.getElementById('preview-panel');
+  const toggle = document.getElementById('preview-toggle');
+  const validSections = new Set(['visao', 'tarefas']);
+  let initial = {};
+  try {
+    const parsed = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) initial = parsed;
+  } catch { status.textContent = 'Não foi possível ler as preferências salvas. As escolhas ficam disponíveis nesta página.'; }
+  remember.checked = initial.remember === true;
+  reduced.checked = initial.reduced === true;
+  if (remember.checked && validSections.has(initial.section)) section.value = initial.section;
+  function render() {
+    preview.dataset.reduced = String(reduced.checked);
+    document.getElementById('section-status').textContent = `Seção selecionada: ${section.selectedOptions[0].textContent}.`;
+  }
+  function save() {
+    render();
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ remember:remember.checked, reduced:reduced.checked, section:remember.checked ? section.value : null }));
+      status.textContent = 'Preferências deste exemplo salvas neste navegador.';
+    } catch { status.textContent = 'Não foi possível salvar. As escolhas continuam disponíveis nesta página.'; }
+  }
+  remember.addEventListener('change', save);
+  reduced.addEventListener('change', save);
+  section.addEventListener('change', save);
+  toggle.addEventListener('click', () => {
+    const open = toggle.getAttribute('aria-expanded') !== 'true';
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.textContent = open ? 'Fechar prévia de movimento' : 'Abrir prévia de movimento';
+    panel.hidden = !open;
+    panel.classList.toggle('is-open', open);
+  });
+  render();
+})();
+</script>
+</body>
+</html>

@@ -217,69 +217,60 @@
   if (interestForm && window.FokusApi) {
     const interestStatus = interestForm.querySelector('[data-law-interest-status]');
     const interestButton = interestForm.querySelector('button[type="submit"]');
-    const modulesField = interestForm.querySelector('[data-module-priorities]');
-    const modulePriorityFields = interestForm.querySelector('[data-module-priority-fields]');
-    const moduleInputs = [...interestForm.querySelectorAll('input[name="interest_modules"]')];
-    const renderModulePriorities = () => {
-      const selected = moduleInputs.filter((input) => input.checked).map((input) => input.value);
-      modulesField.hidden = selected.length === 0;
-      modulePriorityFields.innerHTML = selected.map((module, index) => {
-        const id = 'law-interest-priority-' + index;
-        return '<label for="' + id + '">' + module + '<textarea class="fs-form-control" id="' + id + '" name="module_priority" rows="3" maxlength="500" placeholder="Quais funcionalidades desse módulo são mais importantes para você?"></textarea></label>';
-      }).join('');
-    };
-    moduleInputs.forEach((input) => input.addEventListener('change', renderModulePriorities));
     interestForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!interestForm.reportValidity()) return;
       const data = new FormData(interestForm);
       interestStatus.textContent = 'Enviando suas informações…';
       interestButton.disabled = true;
-      const moduleInterests = data.getAll('interest_modules').map((value) => String(value));
-      const priorities = [...modulePriorityFields.querySelectorAll('textarea')].map((field, index) => {
-        const module = moduleInterests[index];
-        const detail = field.value.trim();
-        return detail ? module + ': ' + detail : '';
-      }).filter(Boolean);
-      const desiredModules = String(data.get('desired_modules') || '').trim();
-      const desiredFeatures = String(data.get('desired_features') || '').trim();
-      const feedback = [
-        priorities.length ? 'Funcionalidades prioritárias por módulo: ' + priorities.join(' | ') : '',
-        desiredModules ? 'Módulos que gostaria que existissem: ' + desiredModules : '',
-        desiredFeatures ? 'Funcionalidades desejadas nesses módulos: ' + desiredFeatures : ''
-      ].filter(Boolean).join('\n');
-      if (feedback.length > 4000) {
-        interestStatus.textContent = 'Reduza os detalhes por módulo para até 4.000 caracteres no total.';
-        interestButton.disabled = false;
-        return;
-      }
       const payload = {
         name: String(data.get('name') || '').trim(),
         email: String(data.get('email') || '').trim(),
-        products: ['law'],
-        profiles: [String(data.get('profile') || '')],
         organization: String(data.get('organization') || '').trim() || undefined,
-        modules: [...moduleInterests, ...(desiredModules ? ['Sugestão de módulo'] : [])],
-        main_difficulties: String(data.get('main_difficulties') || '').trim(),
-        current_process: feedback || undefined,
+        feedback: [
+          String(data.get('main_difficulties') || '').trim(),
+          String(data.get('beta_feedback') || '').trim()
+        ].filter(Boolean).join('\n\n'),
         privacy_accepted: Boolean(data.get('privacy_accepted')),
+        beta_terms_accepted: Boolean(data.get('beta_acknowledged')),
         privacy_version: '2.0',
+        beta_program_version: '1.0',
         source_url: location.href,
         website: String(data.get('website') || '')
       };
       try {
-        await window.FokusApi.request('/product-interests', { method: 'POST', body: payload });
-        interestStatus.textContent = 'Recebemos suas informações. Elas foram registradas e encaminhadas à equipe Fokus Law.';
+        await window.FokusApi.request('/law/beta-applications', { method: 'POST', body: payload });
+        interestStatus.textContent = 'Recebemos seu interesse. A equipe avaliará sua candidatura e apresentará as condições antes de qualquer ativação.';
         interestForm.reset();
-        renderModulePriorities();
       } catch (error) {
-        interestStatus.textContent = error.message || 'Não foi possível enviar e encaminhar suas informações agora. Tente novamente em instantes.';
+        interestStatus.textContent = error.message || 'Não foi possível registrar seu interesse agora. Tente novamente em instantes.';
       } finally {
         interestButton.disabled = false;
       }
     });
   }
 
-  const livePlans = document.querySelector('[data-law-live-plans]'), grid = document.querySelector('[data-law-live-plan-grid]');
-  if (livePlans && grid && window.FokusApi) window.FokusApi.request('/catalog/fokus-law').then((catalog) => { const plans = catalog.plans || []; if (!plans.length) return; grid.innerHTML = plans.map((plan) => `<article class="law-live-plan"><strong>${plan.name}</strong><span>A partir de R$ ${Number(plan.monthly_amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / mês</span></article>`).join(''); livePlans.hidden = false; }).catch(() => {});
+  const livePlans = document.querySelector('[data-law-live-plans]');
+  const grid = document.querySelector('[data-law-live-plan-grid]');
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]));
+  const money = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
+  const planRank = (plan) => {
+    const name = `${plan.name || ''} ${plan.base_name || ''}`;
+    if (plan.segment === 'advocacia') return 0;
+    if (/geral|órgão|orgao/i.test(name)) return 1;
+    if (/judicial|judici/i.test(name)) return 2;
+    if (plan.segment === 'setor_publico') return 3;
+    return 4;
+  };
+  if (livePlans && grid && window.FokusApi) {
+    window.FokusApi.request('/catalog/fokus-law').then((catalog) => {
+      const plans = [...(catalog.plans || [])].sort((left, right) => planRank(left) - planRank(right) || Number(left.display_order || 0) - Number(right.display_order || 0));
+      grid.innerHTML = plans.length ? plans.map((plan) => {
+        const annual = plan.annual_amount == null ? '' : ` ou ${money(plan.annual_amount)} / ano`;
+        return `<article class="law-live-plan"><strong>${escapeHtml(plan.name)}</strong><span>${money(plan.monthly_amount)} / mês${annual}</span></article>`;
+      }).join('') : '<p>Não há planos publicados no catálogo.</p>';
+    }).catch(() => {
+      grid.innerHTML = '<p>Não foi possível carregar os preços do catálogo agora.</p>';
+    });
+  }
 })();

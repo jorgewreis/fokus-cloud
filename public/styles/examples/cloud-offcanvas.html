@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Painel lateral de edição · Exemplo Fokus Styles</title>
+<script src="../assets/styles-theme.js"></script>
+<link rel="stylesheet" href="../assets/fokus-3.0.0.min.css">
+<link rel="stylesheet" href="../assets/site-palette.css">
+<link rel="stylesheet" href="composition.css">
+<style>
+.example-drawer { width:min(100vw, 32rem); max-width:100%; }
+.example-field { display:grid; gap:.5rem; margin-block:1rem; }
+.example-field input,.example-field select { max-width:100%; }
+.example-actions { display:flex; flex-wrap:wrap; gap:.75rem; }
+.example-actions .fs-btn { min-height:44px; white-space:normal; }
+</style>
+</head>
+<body>
+<nav class="demo-site-nav" aria-label="Documentação e aparência">
+<a href="/styles/">Vitrine Fokus Styles</a>
+<button class="demo-theme-toggle" type="button" data-theme-toggle aria-label="Alternar tema claro e escuro">Alternar tema</button>
+</nav>
+<main class="demo-shell">
+<header class="demo-top"><strong>FOKUS STYLES / EXEMPLO</strong><span>Fokus Styles 3.0.0</span></header>
+<span class="demo-kicker">Offcanvas e formulário</span>
+<h1>Edite um módulo fictício</h1>
+<p>Abra o painel lateral para experimentar uma edição local. Nenhuma informação é enviada ou salva.</p>
+<section class="demo-panel" aria-labelledby="module-title">
+<h2 id="module-title">Módulo de exemplo</h2>
+<p>O formulário demonstra abertura, validação e fechamento sem acesso a serviços.</p>
+<button class="fs-btn fs-btn-primary" type="button" id="open-drawer" data-fs="offcanvas" data-fs-target="#example-drawer">Abrir painel de edição</button>
+<p id="drawer-status" role="status" aria-live="polite"></p>
+</section>
+<p class="demo-caption">Adaptação fictícia da edição de módulos do Cloud. Não inclui seus dados, permissões, regras de negócio ou estilos específicos. Cancelar fecha o painel mantendo o texto digitado para uma reabertura nesta página.</p>
+<details class="demo-panel">
+<summary>Origem e contrato do exemplo</summary>
+<p>Inspirado no <a href="https://github.com/jorgewreis/fokus-cloud/blob/358b1b39d2ba8b216fe4cffb22e450e537807a5e/public/backoffice/pages/modules.html">formulário de módulos do Cloud</a> e em sua <a href="https://github.com/jorgewreis/fokus-cloud/blob/358b1b39d2ba8b216fe4cffb22e450e537807a5e/public/backoffice/assets/js/modules-page.js">composição de edição</a>. Esta página usa assets locais do Fokus Styles 3.0.0 e não verifica a versão servida no produto.</p>
+<p>O framework fornece o Offcanvas e sua API de abertura e fechamento. O formulário, a validação e o resultado fictício são próprios deste exemplo; dados, permissões e regras reais pertencem ao Cloud.</p>
+<p>Os temas usam tokens do framework e a paleta da vitrine. O painel usa <code>fs-offcanvas-end</code>; carregamento, erro de servidor e permissões não são simulados aqui.</p>
+</details>
+</main>
+<aside class="fs-offcanvas fs-offcanvas-end example-drawer" id="example-drawer" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="drawer-title" aria-hidden="true">
+<div class="fs-offcanvas-header"><h2 class="fs-offcanvas-title" id="drawer-title">Editar módulo fictício</h2></div>
+<form class="fs-offcanvas-body" id="drawer-form">
+<p>Preencha os campos para simular a conclusão da edição.</p>
+<div class="example-field"><label class="fs-form-label" for="module-name">Nome da funcionalidade</label>
+<input class="fs-form-control" id="module-name" name="name" maxlength="120" required aria-describedby="module-help">
+<small id="module-help">Use um nome fictício; os dados permanecem nesta página.</small></div>
+<div class="example-field"><label class="fs-form-label" for="module-state">Situação</label>
+<select class="fs-form-select" id="module-state" name="state"><option value="draft">Rascunho</option><option value="active">Ativo</option></select></div>
+<div class="fs-offcanvas-footer example-actions">
+<button class="fs-btn fs-btn-outline-primary" type="button" data-fs-dismiss="offcanvas">Cancelar</button>
+<button class="fs-btn fs-btn-primary" type="submit">Confirmar exemplo</button>
+</div>
+</form>
+</aside>
+<script src="../assets/fokus-3.0.0.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const trigger = document.getElementById('open-drawer');
+  const form = document.getElementById('drawer-form');
+  const status = document.getElementById('drawer-status');
+  const Offcanvas = window.FokusStyles?.Offcanvas;
+  if (!Offcanvas) { trigger.disabled = true; status.textContent = 'O painel está indisponível. Recarregue a página para tentar novamente.'; return; }
+  const instance = Offcanvas.getOrCreateInstance(trigger);
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    instance.hide();
+    status.textContent = 'Edição simulada. Nenhuma informação foi enviada ou salva.';
+  });
+});
+</script>
+</body>
+</html>

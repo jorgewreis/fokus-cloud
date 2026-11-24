@@ -36,6 +36,7 @@ class SupportSessionSecurity
             );
         }
 
+        app(PlatformSessionAuthority::class)->invalidate($request);
         Auth::guard('web')->logout();
         $request->session()->forget(['support_session_id', 'active_company_id']);
 

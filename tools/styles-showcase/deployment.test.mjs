@@ -46,16 +46,19 @@ async function requiredAssets() {
   return [...required].sort();
 }
 
-// Exact reviewed workflow pin, independent of the file under test. This accepts
-// only the manual-main-only FEKS workflow plus the authorized FPM glue. It is not a YAML
-// heuristic and does not grant publication permission. Any change needs review.
-const reviewedWorkflowSha256 = '4f816cff25990bb666dcf72c5234ae84703adbf022339260784a5c604cdc2396';
+// Exact reviewed workflow pin. This accepts only the manual-main dispatch,
+// the production environment, the publication gate and the atomic sealed
+// publisher. It is not a YAML heuristic and does not grant permission to run
+// it. Any change needs review. The current bytes add transport retries to the
+// Cloudflare purge only. The gate, environment, sealed publisher and FPM
+// policy are unchanged.
+const reviewedWorkflowSha256 = 'edafe8fa0aa7f91901314c60b70b96a41120345337ade95452a7363dc7c7679d';
 const deployWorkflowPath = path.join(repositoryRoot, '.github/workflows/deploy.yml');
 const reviewedWorkflow = await readFile(deployWorkflowPath, 'utf8');
 function assertReviewedWorkflow(workflow) {
   assert.equal(digest(workflow.replaceAll('\r\n', '\n')), reviewedWorkflowSha256,
     'Deployment contract changed: review publication policy before enabling any delivery test');
-  return 'guarded-manual-main-only';
+  return 'atomic-sealed-release';
 }
 async function deploymentMode(workflowPath = deployWorkflowPath) {
   return assertReviewedWorkflow(await readFile(workflowPath, 'utf8'));
@@ -97,9 +100,13 @@ test('Styles uses the unchanged published CSS/license and existing deployable de
   for (const [asset, sha256] of Object.entries(PUBLISHED_ASSETS)) {
     assert.equal(digest(await readFile(publicFile(asset))), sha256, `${asset}: published bytes changed`);
   }
+  const operationalJs = path.join(repositoryRoot, 'public/assets/js/fokus.min.js');
+  assert.equal(digest(await readFile(operationalJs)), PUBLISHED_ASSETS['/styles/assets/fokus-3.0.0.min.js'],
+    'The operational bundle must ship the published Fokus Styles runtime');
+  assert.equal((await readFile(operationalJs, 'utf8')).includes('fs-notification-item-${e.variant}'), false);
   const assets = await requiredAssets();
   for (const page of ['/styles/index.html', '/styles/docs/index.html', '/styles/next/index.html',
-    ...['projects', 'onboarding', 'records'].map(slug => `/styles/examples/${slug}.html`)]) {
+    ...['projects', 'onboarding', 'records', 'cloud-datatable', 'confirmation-modal', 'law-select-pattern', 'cloud-offcanvas', 'law-preferences', 'law-notifications'].map(slug => `/styles/examples/${slug}.html`)]) {
     const html = await readFile(publicFile(page), 'utf8');
     const links = [...html.matchAll(/<link\b[^>]*href=["']([^"']+)["']/gi)]
       .map(match => new URL(match[1], origin + page).pathname);
@@ -108,8 +115,8 @@ test('Styles uses the unchanged published CSS/license and existing deployable de
   console.log(`Verified ${assets.length} Styles files and local dependencies, published CSS and MIT license hashes.`);
 });
 
-test('publication keeps the exact manual-main-only gate and fail-closed FPM glue', async () => {
-  assert.equal(await deploymentMode(), 'guarded-manual-main-only');
+test('publication keeps the exact manual-main gate, atomic publisher and fail-closed FPM glue', async () => {
+  assert.equal(await deploymentMode(), 'atomic-sealed-release');
 });
 
 test('publication contract rejects missing, malformed and permissive workflows', async t => {
@@ -139,7 +146,7 @@ test('publication contract rejects missing, malformed and permissive workflows',
       await assert.rejects(deploymentMode(path.join(directory, 'deploy.yml')), { code: 'ENOENT' });
     });
   } finally { await rm(directory, { recursive: true, force: true }); }
-  assert.equal(assertReviewedWorkflow(reviewedWorkflow.replaceAll('\n', '\r\n')), 'guarded-manual-main-only');
+  assert.equal(assertReviewedWorkflow(reviewedWorkflow.replaceAll('\n', '\r\n')), 'atomic-sealed-release');
 });
 
 // Synthetic parser fixtures only: these are not an approved deploy workflow,
@@ -161,10 +168,13 @@ test('retained rsync parser preserves filter order and rejects unknown arguments
   await assert.rejects(deploymentArguments('/fixture', 'name: no source sync\n'), /application source sync/);
 });
 
-test('actual deploy rsync filters deliver Styles assets and still exclude vendor directories', async t => {
-  assert.equal(await deploymentMode(), 'guarded-manual-main-only');
-  // Exercise the restored filters only between temporary local directories.
-  // A manual-main-only workflow contract is not authorization to use its SSH target.
+test('retained asset filters deliver Styles files and the publisher does not rsync the active tree', async t => {
+  assert.equal(await deploymentMode(), 'atomic-sealed-release');
+  const workflow = await readFile(deployWorkflowPath, 'utf8');
+  assert.equal(workflow.includes('"$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"'), false);
+  assert.equal(workflow.includes('deploy/atomic_publisher.py'), true);
+  // The production publisher no longer rsyncs onto the live root. This fixture
+  // keeps the historical filter grammar under test between local directories.
   const version = spawnSync('rsync', ['--version'], { encoding: 'utf8' });
   if (version.error?.code === 'ENOENT' && !process.env.CI) {
     t.skip('rsync is unavailable locally; required in CI. Static/hash contracts are tested separately.');
@@ -181,7 +191,7 @@ test('actual deploy rsync filters deliver Styles assets and still exclude vendor
     await mkdir(source);
     await mkdir(destination);
     await cp(publicRoot, path.join(source, 'public'), { recursive: true });
-    const blocked = ['vendor/autoload.php', 'public/styles/vendor/fokus-2.7.0.min.css',
+    const blocked = ['vendor/autoload.php', 'public/styles/vendor/fokus-3.0.0.min.css',
       'public/styles/vendor/LICENSE-fokus-styles.txt', 'node_modules/fixture.js', '.env'];
     for (const relative of blocked) {
       const file = path.join(source, relative);
@@ -189,7 +199,9 @@ test('actual deploy rsync filters deliver Styles assets and still exclude vendor
       await writeFile(file, 'This fixture must not be deployed.\n');
     }
     await writeFile(path.join(destination, 'obsolete-file.txt'), 'Must be deleted.\n');
-    const sync = spawnSync('rsync', [...await deploymentArguments(runnerTemp), source + '/', destination + '/'], { encoding: 'utf8' });
+    const flags = '-rlDzvc --delete-delay --filter="merge $RUNNER_TEMP/fokus-law-assets/protect.rules" --include="public/styles/assets/***" --exclude=".git/" --exclude=".github/" --exclude=".gitignore" --exclude=".env" --exclude=".env.*" --exclude="node_modules/" --exclude="vendor/" --exclude="storage/" -e "ssh -p 22"';
+    const fixture = `      - name: Sync application source\n        run: |\n          rsync ${flags} ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"\n      - name: End\n`;
+    const sync = spawnSync('rsync', [...await deploymentArguments(runnerTemp, fixture), source + '/', destination + '/'], { encoding: 'utf8' });
     assert.equal(sync.status, 0, sync.error?.message || sync.stderr || sync.stdout);
     const assets = await requiredAssets();
     for (const asset of assets) {

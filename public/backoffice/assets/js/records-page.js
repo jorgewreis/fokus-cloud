@@ -1,6 +1,6 @@
 /* Shared Backoffice records composition. Portals drawers before the overlay opens. */
 (() => {
-    const pageOwner = (container) => container?.dataset?.backofficePage || "legacy";
+    const pageOwner = (container) => container?.dataset?.backofficeOwner || container?.dataset?.backofficePage || "legacy";
 
     const removeOrphanedDrawers = (container) => {
         const owner = pageOwner(container);

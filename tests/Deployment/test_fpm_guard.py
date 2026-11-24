@@ -16,6 +16,12 @@ SERVICE = 'php8.5-fpm.service'
 RELOAD = guard.reload_command(SERVICE)
 
 
+def sudo_listing(header):
+    return (f'Sudoers entry:{header}\n'
+            'RunAsUsers: root\nOptions: !authenticate\n'
+            'Commands:\n/usr/bin/systemctl reload -- php8.5-fpm.service')
+
+
 class FpmGuardTests(unittest.TestCase):
     def exercise(self, scenario):
         with tempfile.TemporaryDirectory(prefix='fokus-fpm-double-') as directory:
@@ -93,6 +99,44 @@ class FpmGuardTests(unittest.TestCase):
         for host in ('-oProxyCommand=x', 'host; command', 'host\ncommand'):
             with self.assertRaises(ValueError):
                 guard.SSH(host)
+
+    def test_permission_parser_accepts_legacy_and_sudoers_sources(self):
+        exact = '/usr/bin/systemctl reload -- php8.5-fpm.service'
+        accepted = (
+            '',
+            ' /etc/sudoers.d/cloudpanel',
+            ' /etc/sudoers.d/fokus-publisher:3',
+            ' /etc/sudoers:31',
+        )
+        for header in accepted:
+            with self.subTest(header=header or '<legacy>'):
+                with patch.object(guard.SSH, 'run', side_effect=[sudo_listing(header), exact]) as run:
+                    guard.check_permission(guard.SSH('fixture.invalid'), SERVICE)
+                self.assertEqual(run.call_count, 2)
+
+    def test_permission_parser_rejects_unsupported_sudoers_sources(self):
+        exact = '/usr/bin/systemctl reload -- php8.5-fpm.service'
+        rejected = (
+            ' sudoRole fokus',
+            ' /tmp/sudoers',
+            ' /etc/sudoers.d/../x',
+            ' /etc/sudoers.d/..',
+            ' /etc/sudoers.d/.x',
+            ' RunAsUsers: root',
+        )
+        for header in rejected:
+            with self.subTest(header=header):
+                with patch.object(guard.SSH, 'run', side_effect=[sudo_listing(header), exact]) as run:
+                    with self.assertRaisesRegex(guard.GuardError, r'^Unsupported sudo policy source$'):
+                        guard.check_permission(guard.SSH('fixture.invalid'), SERVICE)
+                self.assertEqual(run.call_count, 1)
+
+    def test_modern_source_keeps_exact_permission_checks(self):
+        output = sudo_listing(' /etc/sudoers.d/cloudpanel:3').replace(
+            'RunAsUsers: root', 'RunAsUsers: daemon')
+        with patch.object(guard.SSH, 'run', return_value=output):
+            with self.assertRaisesRegex(guard.GuardError, 'Exact passwordless root reload permission not established'):
+                guard.check_permission(guard.SSH('fixture.invalid'), SERVICE)
 
     def test_permission_parser_rejects_ambiguous_rules(self):
         valid = ('Sudoers entry:\nRunAsUsers: root\nOptions: !authenticate\n'

@@ -17,14 +17,20 @@ EXPECTED_NEW_MIGRATIONS = [
     '2026_11_06_160000_create_law_contact_import_batches_table.php',
     '2026_11_06_170000_create_law_tasks.php',
     '2026_11_07_000100_repair_payments_provider_checkout_url.php',
+    '2026_11_14_000001_create_company_idempotency_requests.php',
+    '2026_11_14_000002_create_platform_session_authorities.php',
+    '2026_11_14_000100_create_interest_product_index.php',
+    '2026_11_15_120000_create_law_beta_applications_table.php',
 ]
 EXCLUDED = {'.git', 'vendor', 'node_modules', 'storage', 'test-results', 'playwright-report', '__pycache__'}
 # These are distinct verified execution results: absence of automatic rollback in
 # delivery, demonstrated destructive loss in an isolated reversal, and a validated
-# backup restore. Migrations themselves do not universally prohibit down().
+# backup restore. The REI-60 authority and idempotency migrations explicitly
+# prohibit down(), so their recovery proof must remain roll-forward/restore.
 CHECKS = {
     'populated-upgrade', 'old-data-integrity', 'five-migration-ledger',
-    'repair-column-forward-only',
+    'repair-column-forward-only', 'idempotency-forward-only', 'platform-session-authority-forward-only', 'interest-index-eighth-migration',
+    'interest-index-pre-migration-compat', 'interest-index-backfill', 'interest-index-concurrency-rollback', 'interest-index-deadlock-retry',
     'schema-confidentiality', 'schema-publication-reviews', 'schema-import-batches',
     'schema-tasks-events-permissions', 'idempotence', 'roll-forward-invariants',
     'automatic-destructive-rollback-disabled', 'reversal-risk-demonstrated',
@@ -105,7 +111,7 @@ def verify(baseline_dir, candidate_dir, baseline_manifest, candidate_manifest, e
     new = sorted(candidate_migrations - baseline_migrations)
     if (new != EXPECTED_NEW_MIGRATIONS
             or baseline_migrations - candidate_migrations or evidence.get('new_migrations') != new):
-        raise ValueError('Expected exactly five named new migrations including the additive repair and no removed baseline migration')
+        raise ValueError('Expected exactly nine named new migrations including the Law Beta, forward-only authority and idempotency migrations, and no removed baseline migration')
     if evidence.get('recovery_strategy') not in ('roll-forward', 'validated-backup-restore'):
         raise ValueError('Unsafe or missing recovery strategy')
     if evidence.get('tasks_enabled') is not False or evidence.get('publication_authorized') is not False:

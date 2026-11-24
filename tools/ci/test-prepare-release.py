@@ -72,6 +72,27 @@ class PreparationTest(unittest.TestCase):
             MODULE.prepare(self.source, self.root)
         self.assertFalse(self.root.exists())
 
+    def test_untracked_runner_sqlite_and_env_stay_out_of_the_sealed_release(self):
+        database = self.source / 'database'
+        database.mkdir()
+        (database / '.gitignore').write_text('*.sqlite*\n')
+        self.git('add', 'database/.gitignore')
+        self.git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'ignore sqlite')
+        self.sha = self.git('rev-parse', 'HEAD').strip()
+        self.root = Path(self.temp.name) / self.sha
+        (database / 'database.sqlite').write_bytes(b'SQLite format 3\x00runner')
+        (database / 'ci.sqlite').write_bytes(b'SQLite format 3\x00ci')
+        (self.source / '.env').write_text('DB_CONNECTION=sqlite\nDB_DATABASE=database/database.sqlite\n')
+        MODULE.prepare(self.source, self.root)
+        self.assertTrue((self.root / 'database' / '.gitignore').is_file())
+        self.assertFalse((self.root / 'database' / 'database.sqlite').exists())
+        self.assertFalse((self.root / 'database' / 'ci.sqlite').exists())
+        self.assertFalse((self.root / '.env').exists())
+        self.assertFalse(any(path.name == '.env' or path.suffix == '.sqlite' for path in self.root.rglob('*')))
+        MODULE.seal(self.source, self.root)
+        manifest = json.loads((self.root / '.release' / 'manifest.json').read_text())
+        self.assertFalse(any(name == '.env' or name.endswith('.sqlite') for name in manifest['files']))
+
     def test_runtime_symlink_and_new_cache_are_accounted_for(self):
         MODULE.prepare(self.source, self.root)
         link = self.root / 'app/external.php'
