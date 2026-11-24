@@ -13,8 +13,11 @@ from linux_release_common import ROOT, REPORT, guard, environment, php, run, ada
 # Reviewed SQLite JUnit composition from the isolated release laboratory.
 # Totals remain strict: any omitted, duplicated, failed or skipped test rejects
 # the release evidence, while named security/identity cases are checked below.
-EXPECTED_TESTS = 429
-MINIMUM_ASSERTIONS = 3354
+# 9e812769 accepted 429 tests and 3354 assertions. Run 45300404809 measured
+# 432 tests and 3469 assertions after the Law SEO cases. Current main adds the
+# two checkout authorization tests, 6 and 16 assertions, on both drivers.
+EXPECTED_TESTS = 434
+MINIMUM_ASSERTIONS = 3491
 MAIN_IDENTITY_TESTS = {'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_valid_snapshot_is_accepted': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_missing_identity_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_invalid_release_is_rejected_without_echoing_input': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_stale_captured_manifest_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_in_place_code_change_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_added_code_is_rejected': 1, 'Tests\\Unit\\Deployment\\ReleaseIdentityTest::test_asset_storage_link_does_not_change_runtime_identity': 1, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_unsealed_checkout_fails_closed_without_debug_details': 4, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_invalid_or_missing_nonce_is_not_reflected': 11, 'Tests\\Feature\\Deployment\\DeploymentIdentityTest::test_existing_health_endpoint_is_preserved': 1}
 
 LEAD_TESTS = {'Tests\\Feature\\CompanyAdminTest::test_company_detail_exposes_separate_lead_usage_only_after_platform_authorization': 5, 'Tests\\Feature\\CompanyAdminTest::test_company_detail_permission_is_checked_before_reading_lead_usage': 2, 'Tests\\Feature\\LeadConnectionsTest::test_superuser_credentials_never_execute_application_operation': 7, 'Tests\\Feature\\LeadConnectionsTest::test_runtime_context_is_transaction_local_and_disconnects_on_application_failure': 10, 'Tests\\Feature\\LeadConnectionsTest::test_insecure_configuration_is_rejected_before_connecting': 1, 'Tests\\Feature\\LeadConnectionsTest::test_transaction_pooler_and_missing_ca_are_rejected_before_connecting': 3, 'Tests\\Feature\\LeadConnectionsTest::test_disabled_runtime_never_opens_connection': 1, 'Tests\\Feature\\LeadDatabaseTest::test_context_comes_from_server_session_and_fresh_membership': 2, 'Tests\\Feature\\LeadDatabaseTest::test_manager_role_is_resolved_from_current_membership': 2, 'Tests\\Feature\\LeadDatabaseTest::test_access_revocations_are_checked_before_any_lead_connection': 12, 'Tests\\Feature\\LeadDatabaseTest::test_support_and_cross_company_context_are_blocked': 4, 'Tests\\Feature\\LeadUsageReaderTest::test_unconfigured_metrics_are_unavailable_without_connecting': 1, 'Tests\\Feature\\LeadUsageReaderTest::test_reader_filters_company_and_distinguishes_missing_company_from_zero_usage': 5, 'Tests\\Feature\\LeadUsageReaderTest::test_outage_has_no_fabricated_counts': 3}
@@ -36,12 +39,18 @@ BILLING_TESTS = {
     'Tests\\Feature\\ReconciliationAndRefundTest::test_provider_id_unique_conflict_after_claim_is_audited_and_remains_uncertain': 9,
     'Tests\\Feature\\ReconciliationAndRefundTest::test_other_unique_errors_are_not_mistaken_for_provider_id_collision': 6,
     'Tests\\Feature\\ReconciliationAndRefundTest::test_refund_execution_and_lookup_fail_closed_without_the_expected_unique_index': 11,
+    'Tests\\Feature\\VoucherRedemptionTest::test_checkout_rejects_non_admin_members_before_any_billing_effect': 16,
 }
 INTEREST_TESTS = {
     'Tests\\Feature\\ProductInterestTest::test_public_interest_is_created_and_same_email_is_updated': 8,
     'Tests\\Feature\\ProductInterestTest::test_interest_product_options_respect_catalog_permission_and_keep_historical_codes': 16,
     'Tests\\Feature\\ProductInterestTest::test_index_rebuild_fails_closed_for_invalid_history_and_writer_rolls_back': 7,
     'Tests\\Feature\\ProductInterestTest::test_indexed_suggestions_are_paginated_and_allow_prefix_search': 12,
+}
+PUBLIC_RELEASE_TESTS = {
+    'Tests\\Feature\\CatalogAdminTest::test_law_planos_html_includes_published_plan_names_and_prices_without_javascript': 16,
+    'Tests\\Feature\\CatalogAdminTest::test_law_offer_cards_mirror_the_published_catalog_script': 9,
+    'Tests\\Feature\\SearchDiscoveryTest::test_origin_redirects_use_the_canonical_https_host': 6,
 }
 
 IDEMPOTENCY_TESTS = {
@@ -63,6 +72,7 @@ MYSQL_GENERIC_MINIMUM_ASSERTIONS = MINIMUM_ASSERTIONS - 140
 # Added since e3dee0c6; each identity remains required, not just the total.
 BACKOFFICE_TESTS = {
     'Tests\\Feature\\SubscriptionAdminTest::test_dashboard_aggregates_active_subscriptions_in_one_snapshot': 6,
+    'Tests\\Feature\\SubscriptionAdminTest::test_assisted_checkout_requires_platform_subscription_permission': 6,
     'Tests\\Feature\\BackofficeSecurityTest::test_vouchers_paginate_and_filter_beyond_the_first_hundred': 10,
     'Tests\\Feature\\BackofficeSecurityTest::test_access_audit_filters_before_paginating_all_events': 3,
     'Tests\\Feature\\CompanyAdminTest::test_company_only_view_skips_unneeded_subscription_history_and_keeps_legacy_contract': 12,
@@ -103,9 +113,9 @@ def coverage(report, driver):
             or any(totals[key] for key in ('failures', 'errors', 'skipped'))
             or len(cases) != expected_tests or len(set(identities)) != len(cases)
             or any(case.find(kind) is not None for case in cases for kind in ('failure', 'error', 'skipped'))):
-        raise RuntimeError('Incomplete or failing suite; coverage gate rejected results')
+        raise RuntimeError('Incomplete or failing suite; coverage gate rejected results: tests %s/%s assertions %s/%s failures %s errors %s skipped %s cases %s unique %s' % (totals['tests'], expected_tests, totals['assertions'], minimum_assertions, totals['failures'], totals['errors'], totals['skipped'], len(cases), len(set(identities))))
     requirements = {}
-    groups = (MAIN_IDENTITY_TESTS, LEAD_TESTS, BILLING_TESTS, BACKOFFICE_TESTS, INTEREST_TESTS)
+    groups = (MAIN_IDENTITY_TESTS, LEAD_TESTS, BILLING_TESTS, BACKOFFICE_TESTS, INTEREST_TESTS, PUBLIC_RELEASE_TESTS)
     if driver != 'mysql':
         groups += (IDEMPOTENCY_TESTS,)
     for group in groups:
@@ -113,8 +123,9 @@ def coverage(report, driver):
             requirements[name] = max(requirements.get(name, 0), minimum)
     for name, minimum in requirements.items():
         matches = [case for case, identity in zip(cases, identities) if identity == name]
-        if len(matches) != 1 or int(matches[0].get('assertions', 0)) < minimum:
-            raise RuntimeError('Missing or weakened required identity, Lead or backoffice test')
+        found = int(matches[0].get('assertions', 0)) if len(matches) == 1 else len(matches)
+        if len(matches) != 1 or found < minimum:
+            raise RuntimeError('Missing or weakened required identity, Lead or backoffice test: %s found %s minimum %s' % (name, found, minimum))
     return totals
 
 
