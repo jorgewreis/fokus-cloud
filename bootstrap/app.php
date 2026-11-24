@@ -4,6 +4,7 @@ use App\Http\Middleware\DeploymentIdentity;
 use App\Http\Middleware\EnsureLawPermission;
 use App\Http\Middleware\EnsureSupportSession;
 use App\Http\Middleware\ExpireIdleDatabaseSession;
+use App\Http\Middleware\RejectLawAccessDuringSupport;
 use App\Http\Middleware\SearchVisibility;
 use App\Http\Middleware\SecurityResponseHeaders;
 use Illuminate\Auth\AuthenticationException;
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             ExpireIdleDatabaseSession::class,
             EnsureSupportSession::class,
+            RejectLawAccessDuringSupport::class,
         ]);
         $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : '/?acesso=cliente');
         $middleware->alias(['law.permission' => EnsureLawPermission::class]);

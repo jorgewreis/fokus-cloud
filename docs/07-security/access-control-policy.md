@@ -61,6 +61,26 @@ informacoes comerciais, assinatura, billing, vouchers, alertas tecnicos
 agregados e auditoria da plataforma, sem visualizar processos, contatos,
 partes, expedientes, prazos, pendencias ou conteudo sigiloso do cliente.
 
+Uma sessao de suporte pode autenticar temporariamente como um usuario cliente
+para reproduzir o contexto de acesso. Enquanto essa sessao estiver ativa, APIs
+operacionais de clientes sao negadas por padrao, incluindo Law, Lead, portal,
+assinaturas e selecao de empresa. A allowlist durante a sessao limita-se ao
+token CSRF de `/api/csrf-token` e ao encerramento em
+`/api/backoffice/support/exit`. `/api/auth/me` responde 401 com
+`{"message":"Unauthenticated."}`, como para um visitante. Webhooks, ingestao de integracoes
+e as demais rotas Backoffice também são negados quando a requisição carrega uma
+sessão de suporte; chamadas serviço-a-serviço continuam sujeitas a seus próprios
+segredos quando não há essa sessão. Ações comerciais devem ocorrer fora da
+identidade do cliente. A proteção ocorre antes de controladores e efeitos
+laterais e não depende das permissões do usuário impersonado.
+Durante a sessao de suporte o portal nao recebe identidade, empresas nem
+contexto comercial do cliente. Para oferecer o encerramento, o portal consulta
+`/api/backoffice/auth/me`, que nessa sessao e negado com o codigo
+`support_customer_api_denied`; esse sinal nao expoe dados do cliente. O portal
+e o shell Law mostram aviso acessivel e o encerramento da sessao, e o botao Sair
+encerra o suporte em vez do logout do cliente. Sem sessao de suporte, o 401
+continua levando ao login.
+
 ## Controles obrigatorios
 
 - Middleware de autenticacao.

@@ -129,6 +129,38 @@ test('perfil do cliente adapta as três seções a desktop, tablet e celular', a
     }
 });
 
+test('sessão de suporte não carrega o contexto Law e oferece encerramento acessível', async ({ page }) => {
+    let lawRequests = 0;
+    await page.route('**/portal/fokus-law/perfil', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: renderedShell }));
+    await page.route('**/api/auth/me', (route) => route.fulfill({ status: 401, json: { message: 'Unauthenticated.' } }));
+    await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ status: 403, json: { code: 'support_customer_api_denied', message: 'O acesso de suporte não pode acessar APIs operacionais de clientes.' } }));
+    await page.route('**/api/law/**', (route) => { lawRequests += 1; return route.fulfill({ status: 403, json: { code: 'support_customer_api_denied' } }); });
+    await page.route('**/api/backoffice/support/exit', (route) => route.fulfill({ json: { redirect_to: '/backoffice/' } }));
+    await page.route('**/api/csrf-token', (route) => route.fulfill({ json: { token: 'support-test-token' } }));
+
+    await page.goto('/portal/fokus-law/perfil');
+    const status = page.locator('#shell-loading');
+    await expect(status).toContainText('A área operacional do Fokus Law não está disponível durante o acesso de suporte.');
+    await expect(status).toHaveAttribute('role', 'status');
+    await expect(page.getByRole('link', { name: 'Voltar ao portal' })).toBeVisible();
+    await page.getByRole('button', { name: 'Encerrar acesso de suporte' }).click();
+    await expect(page).toHaveURL(/\/backoffice\/$/);
+    expect(lawRequests).toBe(0);
+});
+
+test('sessão sem cliente autenticado continua indo para o login, sem oferecer encerramento de suporte', async ({ page }) => {
+    let lawRequests = 0;
+    await page.route('**/portal/fokus-law/perfil', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: renderedShell }));
+    await page.route('**/api/auth/me', (route) => route.fulfill({ status: 401, json: { message: 'Unauthenticated.' } }));
+    await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ status: 401, json: { message: 'Unauthenticated.' } }));
+    await page.route('**/api/law/**', (route) => { lawRequests += 1; return route.fulfill({ status: 401, json: { message: 'Unauthenticated.' } }); });
+    await page.route('**/?acesso=cliente', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Login</title><main>Login</main>' }));
+
+    await page.goto('/portal/fokus-law/perfil');
+    await expect(page).toHaveURL(/\?acesso=cliente$/);
+    expect(lawRequests).toBe(0);
+});
+
 test('dashboard exibe módulos com ícones coloridos de 32px e sem botão de abertura', async ({ page }) => {
     await openProfile(page);
     const dashboardShell = shellView.replace("{{ $initialPage ?? 'overview' }}", 'overview').replace("@include('portal.partials.fokus-law-profile')", profileView);
@@ -148,14 +180,6 @@ test('dashboard exibe módulos com ícones coloridos de 32px e sem botão de abe
     }
     await page.getByRole('button', { name: 'Contatos', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Contatos', exact: true })).toHaveAttribute('aria-expanded', 'true');
-});
-
-test('perfil em acesso de suporte fica somente para leitura', async ({ page }) => {
-    await openProfile(page, { active: true, company: 'Menezes Advocacia', reason: 'Atendimento' });
-    await expect(page.locator('#profile-support-notice')).toBeVisible();
-    await expect(page.getByLabel('Nome completo')).toBeDisabled();
-    await expect(page.getByLabel(/Telefone/)).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Alterar senha' })).toBeDisabled();
 });
 
 const usersShellView = shellView
@@ -180,6 +204,7 @@ async function openUsers(page, viewport) {
     await page.setViewportSize(viewport);
     await page.route('**/portal/usuarios', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: usersShellView }));
     await page.route('**/portal/transferir-administracao', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: transferShellView }));
+    await page.route('**/api/auth/me', (route) => route.fulfill({ json: { ...profile, support_mode: null } }));
     await page.route('**/api/law/shell-context', (route) => route.fulfill({ json: {
         user: { id: 'USR_ADMIN', name: 'Érica Menezes', email: 'erica@example.test' },
         company: { id: 'COM_TEST', name: 'Menezes Advocacia', role: 'admin' },

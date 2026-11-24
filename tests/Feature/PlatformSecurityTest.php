@@ -10,6 +10,7 @@ use App\Services\PrefixedUlid;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
@@ -282,6 +283,10 @@ class PlatformSecurityTest extends TestCase
         $subscriptionId = PrefixedUlid::make('ASS');
         DB::table('subscriptions')->insert(['id' => $subscriptionId, 'company_id' => $companyId, 'product_id' => $product->id, 'status' => 'suspensa', 'open_company_product' => null, 'version' => 1, 'billing_cycle' => 'monthly', 'commercial_snapshot' => json_encode(['plan_name' => 'Essencial']), 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
 
+        $otherCompanyId = PrefixedUlid::make('COM');
+        DB::table('companies')->insert(['id' => $otherCompanyId, 'document_type' => 'cnpj', 'document_number' => '32345678000100', 'legal_name' => 'Empresa fora do escopo', 'status' => 'ativa', 'version' => 1, 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('company_memberships')->insert(['id' => PrefixedUlid::make('MBS'), 'company_id' => $otherCompanyId, 'user_id' => $customer->id, 'role_id' => DB::table('roles')->where('code', 'usuario')->value('id'), 'status' => 'ativo', 'version' => 1, 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
+
         $inactiveCompanyId = PrefixedUlid::make('COM');
         DB::table('companies')->insert(['id' => $inactiveCompanyId, 'document_type' => 'cnpj', 'document_number' => '22345678000100', 'legal_name' => 'Empresa suspensa', 'status' => 'suspensa', 'version' => 1, 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
         DB::table('subscriptions')->insert(['id' => PrefixedUlid::make('ASS'), 'company_id' => $inactiveCompanyId, 'product_id' => $product->id, 'status' => 'ativa', 'open_company_product' => null, 'version' => 1, 'billing_cycle' => 'monthly', 'commercial_snapshot' => json_encode(['plan_name' => 'Essencial']), 'created_by' => $customer->id, 'updated_by' => $customer->id, 'created_at' => now(), 'updated_at' => now()]);
@@ -294,9 +299,50 @@ class PlatformSecurityTest extends TestCase
         $this->assertAuthenticatedAs($customer, 'web');
         $this->assertAuthenticatedAs($admin, 'platform');
         $this->assertDatabaseHas('platform_support_sessions', ['platform_admin_id' => $admin->id, 'company_id' => $companyId, 'subscription_id' => $subscriptionId, 'target_user_id' => $customer->id, 'ended_at' => null]);
-        $this->getJson('/api/auth/me')->assertOk()->assertJsonPath('support_mode.active', true)->assertJsonPath('support_mode.company', 'Empresa para suporte')->assertJsonMissingPath('user.phone');
+        $this->getJson('/api/auth/me')->assertUnauthorized()->assertExactJson(['message' => 'Unauthenticated.']);
+        $this->withSession(['active_company_id' => $otherCompanyId])->getJson('/api/auth/me')
+            ->assertUnauthorized()->assertExactJson(['message' => 'Unauthenticated.']);
+        $this->withSession(['active_company_id' => $companyId]);
+        $this->assertAuthenticatedAs($customer, 'web');
+        $this->assertDatabaseHas('platform_support_sessions', ['platform_admin_id' => $admin->id, 'target_user_id' => $customer->id, 'ended_at' => null]);
+
+        $this->getJson('/api/csrf-token')->assertOk()->assertJsonStructure(['token']);
         $this->patchJson('/api/auth/profile', ['name' => 'Nome alterado em suporte'])->assertForbidden();
         $this->assertSame('Pessoa de Teste', $customer->fresh()->name);
+
+        $this->postJson('/api/auth/select-company', ['company_id' => $otherCompanyId])
+            ->assertForbidden()->assertJsonPath('code', 'support_customer_api_denied');
+        $this->assertSame($companyId, session('active_company_id'));
+        $this->getJson('/api/lead/shell-context')->assertForbidden();
+        $this->getJson('/api/subscriptions')->assertForbidden()->assertJsonPath('code', 'support_customer_api_denied');
+        Http::fake();
+        $billingCounts = [];
+        foreach (['billing_checkout_attempts', 'voucher_redemption_reservations', 'subscriptions', 'payments'] as $table) {
+            $billingCounts[$table] = DB::table($table)->count();
+        }
+        $this->postJson('/api/subscriptions/checkout', [
+            'product_code' => 'fokus-law', 'selection_mode' => 'plan', 'plan_code' => 'law-advocacia', 'cycle' => 'monthly',
+            'items' => [['module_code' => 'processos-advocacia', 'quantity' => 1]],
+        ])->assertForbidden()->assertJsonPath('code', 'support_customer_api_denied');
+        Http::assertNothingSent();
+        foreach ($billingCounts as $table => $count) {
+            $this->assertSame($count, DB::table($table)->count(), "Unexpected changes to {$table}");
+        }
+        $this->getJson('/api/portal/users')->assertForbidden();
+        $this->getJson('/api/backoffice/auth/me')->assertForbidden()
+            ->assertJsonPath('code', 'support_customer_api_denied');
+        $this->getJson('/api/backoffice/support/law-context')->assertForbidden();
+        $this->getJson('/api/backoffice/companies')->assertForbidden();
+        $this->postJson('/api/webhooks/mercado-pago')->assertForbidden()
+            ->assertJsonPath('code', 'support_customer_api_denied');
+        $this->postJson('/api/integrations/usage')->assertForbidden()
+            ->assertJsonPath('code', 'support_customer_api_denied');
+
+        $lawCasesBefore = DB::table('law_cases')->count();
+        $this->getJson('/api/law/cases')->assertForbidden();
+        $this->getJson('/api/law/shell-context')->assertForbidden();
+        $this->postJson('/api/law/cases', ['title' => 'Caso sintético não criado'])->assertForbidden();
+        $this->assertSame($lawCasesBefore, DB::table('law_cases')->count());
 
         $this->postJson('/api/backoffice/support/exit')->assertOk()->assertJsonPath('redirect_to', '/backoffice/');
         $this->assertGuest('web');
@@ -304,6 +350,14 @@ class PlatformSecurityTest extends TestCase
         $this->assertNotNull(DB::table('platform_support_sessions')->value('ended_at'));
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.support_access_started', 'platform_admin_id' => $admin->id]);
         $this->assertDatabaseHas('platform_audit_events', ['action' => 'backoffice.support_access_ended', 'platform_admin_id' => $admin->id]);
+
+        DB::table('subscriptions')->where('id', $subscriptionId)->update([
+            'status' => 'ativa',
+            'open_company_product' => $companyId.'-'.$product->id,
+        ]);
+        $customer->forceFill(['email_verified_at' => now()])->save();
+        $this->actingAs($customer, 'web')->withSession(['active_company_id' => $companyId])
+            ->getJson('/api/law/shell-context')->assertOk();
 
         $this->postJson('/api/backoffice/support/access', ['subscription_id' => $subscriptionId, 'membership_id' => $membershipId, 'reason' => 'Validar limite temporal do suporte'])->assertOk();
         $this->travel(31)->minutes();

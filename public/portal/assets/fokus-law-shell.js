@@ -1772,7 +1772,7 @@
     initializeInteractions();
     if (context.support_mode) {
       const supportNotice = document.querySelector('#support-notice');
-      document.querySelector('#support-context').textContent = `${context.support_mode.company} · Assinatura ${context.support_mode.subscription_status} · ${context.support_mode.reason}`;
+      document.querySelector('#support-context').textContent = `${context.support_mode.company} · Plano ${context.support_mode.plan} · Assinatura ${context.support_mode.subscription_status}`;
       supportNotice.hidden = false;
       document.querySelector('#support-exit').addEventListener('click', async (event) => {
         event.currentTarget.disabled = true;
@@ -1788,12 +1788,44 @@
 
   }
 
-FokusApi.request('/law/shell-context').then((value) => {
-    setContext(value);
-    loading.hidden = true;
-    shell.hidden = false;
-  }).catch((error) => {
-    if (error.status === 401) window.location.assign('/?acesso=cliente');
+const showSupportAccessBlocked = () => {
+  loading.classList.add('shell-loading-support-blocked');
+  loading.replaceChildren(
+    element('p', '', 'A área operacional do Fokus Law não está disponível durante o acesso de suporte.'),
+  );
+  const actions = element('div', 'shell-loading-actions');
+  const portalLink = element('a', 'fs-btn fs-btn-outline-primary', 'Voltar ao portal');
+  portalLink.href = '/portal';
+  const exitButton = element('button', 'fs-btn fs-btn-primary', 'Encerrar acesso de suporte');
+  exitButton.type = 'button';
+  exitButton.addEventListener('click', async () => {
+    exitButton.disabled = true;
+    try {
+      const result = await FokusApi.request('/backoffice/support/exit', { method: 'POST' });
+      window.location.assign(result.redirect_to || '/backoffice/');
+    } catch (error) {
+      exitButton.disabled = false;
+      loading.append(element('p', '', error.message || 'Não foi possível encerrar o acesso de suporte.'));
+    }
+  });
+  actions.append(portalLink, exitButton);
+  loading.append(actions);
+};
+
+FokusApi.request('/auth/me').then((profile) => {
+  if (profile.support_mode?.active) {
+    showSupportAccessBlocked();
+    return null;
+  }
+  return FokusApi.request('/law/shell-context');
+}).then((value) => {
+  if (!value) return;
+  setContext(value);
+  loading.hidden = true;
+  shell.hidden = false;
+}).catch(async (error) => {
+    if (error.status === 401 && await FokusApi.supportSessionActive()) showSupportAccessBlocked();
+    else if (error.status === 401) window.location.assign('/?acesso=cliente');
     else if (error.status === 409) window.location.assign('/portal/empresas');
     else if (error.status === 403 && /e-mail/i.test(error.message)) window.location.assign('/verificar-email');
     else if (error.status === 403) window.location.assign('/portal/empresas');

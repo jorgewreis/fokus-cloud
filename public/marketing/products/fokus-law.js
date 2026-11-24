@@ -222,7 +222,7 @@
       supportStatus.textContent = 'Iniciando acesso…';
       try {
         await window.FokusApi.request('/backoffice/support/access', { method: 'POST', body: { subscription_id: subscriptionSelect.value, membership_id: userSelect.value, reason } });
-        location.assign('/portal/fokus-law');
+        location.assign('/portal');
       } catch (error) {
         supportStatus.textContent = 'Falha ao iniciar o acesso.';
         showToast(supportStatus.textContent);

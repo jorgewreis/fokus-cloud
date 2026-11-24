@@ -22,10 +22,13 @@ async function render(role, support = false) {
     document: { querySelector: (selector) => ({ 'main .review-actions a[href="/portal/usuarios"]': elements.users, 'main .review-actions a[href="/portal/assinaturas"]': elements.subscriptionsLink, 'main .portal-section': elements.shortcuts }[selector] ?? null) },
     FokusApi: { async request(url) {
       requests.push(url);
-      if (url === '/auth/me') return support ? { user: { id: 'support-1', name: 'Suporte' }, active_company_id: 'company-1', companies: [{ id: 'company-1', name: 'Empresa sintética' }], support_mode: { active: true, company: 'Empresa sintética', plan: 'Plano sintético', subscription_status: 'ativa' } } : { user: { email_verified: true }, active_company_id: 'company-1', companies: [{ id: 'company-1', name: 'Empresa sintética', role }] };
+      if (url === '/auth/me') {
+        if (support) { const error = new Error('Unauthenticated.'); error.status = 401; error.payload = { message: 'Unauthenticated.' }; throw error; }
+        return { user: { email_verified: true }, active_company_id: 'company-1', companies: [{ id: 'company-1', name: 'Empresa sintética', role }] };
+      }
       if (url === '/subscriptions') return [];
       throw new Error(`Rota inesperada: ${url}`);
-    } },
+    }, async supportSessionActive() { requests.push('supportSessionActive'); return support; } },
     setTimeout, Date,
   };
   Object.defineProperty(sandbox, 'location', { get: () => '', set: () => assert.fail('Não deveria redirecionar.') });
@@ -55,10 +58,11 @@ async function render(role, support = false) {
   }
 
   const support = await render(null, true);
-  assert.deepEqual(support.requests, ['/auth/me']);
+  assert.deepEqual(support.requests, ['/auth/me', 'supportSessionActive']);
   assert.equal(support.elements.role.textContent, 'Suporte');
-  assert.equal(support.elements.actions.textContent, 'Contexto comercial');
-  assert.equal(support.elements.message.textContent, 'Empresa em atendimento: Empresa sintética');
+  assert.equal(support.elements.actions.textContent, 'Encerrar o acesso');
+  assert.equal(support.elements.message.textContent, 'Sessão de suporte ativa. Os dados do cliente não ficam disponíveis.');
+  assert.doesNotMatch(support.elements.message.textContent, /Empresa sintética/);
   assert.equal(support.elements.subscriptions.parentElement.hidden, true);
   assert.equal(support.elements.renewal.parentElement.hidden, true);
   assert.equal(support.elements.shortcuts.hidden, true);
@@ -103,11 +107,14 @@ async function render(role, support = false) {
   const supportLead = {
     document: { querySelector: (selector) => selector === '#lead-checkout-content' ? supportLeadContent : { textContent: '' } },
     localStorage: { getItem: () => JSON.stringify({ items: [{ module_code: 'synthetic' }] }) },
-    FokusApi: { request: async (url) => { supportLeadCalls.push(url); return { user: { id: 'support', name: 'Suporte' }, support_mode: { active: true }, active_company_id: 'company-1', companies: [{ id: 'company-1', name: 'Empresa' }] }; } },
+    FokusApi: {
+      request: async (url) => { supportLeadCalls.push(url); const error = new Error('Unauthenticated.'); error.status = 401; throw error; },
+      supportSessionActive: async () => { supportLeadCalls.push('supportSessionActive'); return true; },
+    },
   };
   vm.runInNewContext(leadScript.replace('(async () => {', 'globalThis.__run=(async () => {'), supportLead);
   await supportLead.__run;
-  assert.deepEqual(supportLeadCalls, ['/auth/me']);
+  assert.deepEqual(supportLeadCalls, ['/auth/me', 'supportSessionActive']);
   assert.match(supportLeadContent.innerHTML, /sessão de suporte/);
   assert.doesNotMatch(supportLeadContent.innerHTML, /Somente um administrador/);
 

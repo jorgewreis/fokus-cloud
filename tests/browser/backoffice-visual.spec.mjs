@@ -908,7 +908,7 @@ test('Superadministrador MFA pode iniciar acesso de suporte a perfil real', asyn
     await selectFokusOption(page, 'Usuário e perfil', 'Administrador — Pessoa Teste (pessoa@example.test)');
     await page.locator('#law-support-reason').fill('Investigar erro de permissões');
     await page.locator('#law-support-start').click();
-    await expect(page).toHaveURL(/\/portal\/fokus-law$/);
+    await expect(page).toHaveURL(/\/portal$/);
 });
 
 test('Superadministrador pode escolher entrar pela própria assinatura Fokus Law', async ({ page }) => {
@@ -925,12 +925,15 @@ test('Superadministrador pode escolher entrar pela própria assinatura Fokus Law
 
 test('Portal identifica e encerra modo de suporte preservando o retorno ao Backoffice', async ({ page }) => {
     await page.route('**/api/csrf-token', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ token: 'csrf-visual' }) }));
-    await page.route('**/api/auth/me', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ user: { name: 'Pessoa Teste', email_verified: true }, companies: [{ id: 'CMP_TESTE', name: 'Empresa Teste', role: 'admin' }], active_company_id: 'CMP_TESTE', support_mode: { active: true, company: 'Empresa Teste', subscription_status: 'suspensa', reason: 'Investigar falha' } }) }));
-    await page.route('**/api/subscriptions', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) }));
+    // During support /api/auth/me answers like a guest; the platform probe carries the support code.
+    await page.route('**/api/auth/me', (route) => route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ message: 'Unauthenticated.' }) }));
+    await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ code: 'support_customer_api_denied', message: 'O acesso de suporte não pode acessar APIs operacionais de clientes.' }) }));
+    await page.route('**/api/subscriptions', (route) => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ code: 'support_customer_api_denied' }) }));
     await page.route('**/api/backoffice/support/exit', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ redirect_to: '/backoffice/' }) }));
     await page.goto('/portal/dashboard.html');
     await expect(page.getByText('Modo de suporte ativo')).toBeVisible();
-    await expect(page.locator('[data-support-context]')).toContainText('Empresa Teste');
+    await expect(page.locator('[data-support-context]')).toHaveText('Os dados do cliente não ficam disponíveis durante o acesso de suporte.');
+    await expect(page.getByText('Empresa Teste')).toHaveCount(0);
     await page.getByRole('button', { name: 'Encerrar acesso de suporte' }).click();
     await expect(page).toHaveURL(/\/backoffice\/$/);
 });
