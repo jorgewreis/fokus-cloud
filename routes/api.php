@@ -31,6 +31,7 @@ use App\Http\Middleware\EnsureLawCaseContext;
 use App\Http\Middleware\EnsurePlatformAdmin;
 use App\Http\Middleware\EnsurePlatformPermission;
 use App\Http\Middleware\EnsurePlatformSuperadmin;
+use App\Http\Middleware\EnsureSubscriptionViewer;
 use App\Http\Middleware\LawCaseTransaction;
 use App\Http\Middleware\RejectCompanyIdempotencyEndpoints;
 use App\Http\Middleware\RejectUnimplementedCompanyIdempotency;
@@ -161,7 +162,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/law/contact-sharing', [LawContactController::class, 'companiesForSharing'])->middleware('law.permission:law.contacts.share.manage');
         Route::put('/law/contact-sharing', [LawContactController::class, 'saveSharing'])->middleware('law.permission:law.contacts.share.manage');
         Route::delete('/law/contact-sharing/{recipientCompanyId}', [LawContactController::class, 'revokeSharing'])->middleware('law.permission:law.contacts.share.manage');
-        Route::get('/subscriptions', [SubscriptionController::class, 'index']);
+        Route::get('/subscriptions', [SubscriptionController::class, 'index'])->middleware(EnsureSubscriptionViewer::class);
         Route::post('/subscriptions/checkout', [SubscriptionController::class, 'checkout']);
         Route::post('/subscriptions/{subscription}/change', [SubscriptionController::class, 'change']);
         Route::delete('/subscriptions/{subscription}', [SubscriptionController::class, 'destroy']);

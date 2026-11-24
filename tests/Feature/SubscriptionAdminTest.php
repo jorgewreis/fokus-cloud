@@ -25,6 +25,62 @@ class SubscriptionAdminTest extends TestCase
         $this->seed();
     }
 
+    public function test_customer_subscription_list_requires_admin_and_active_company_scope(): void
+    {
+        $fixture = $this->subscriptionFixture();
+        $user = User::findOrFail($fixture['user_id']);
+        $companyB = PrefixedUlid::make('COM');
+        $subscriptionB = PrefixedUlid::make('ASS');
+        $company = (array) DB::table('companies')->where('id', $fixture['company_id'])->first();
+        $company['id'] = $companyB;
+        $company['document_number'] = '12345678000199';
+        $company['legal_name'] = 'Empresa Beta';
+        DB::table('companies')->insert($company);
+        $membership = (array) DB::table('company_memberships')->where('company_id', $fixture['company_id'])->first();
+        $membership['id'] = PrefixedUlid::make('MBS');
+        $membership['company_id'] = $companyB;
+        $membership['active_admin_company_id'] = $companyB;
+        DB::table('company_memberships')->insert($membership);
+        $subscription = (array) DB::table('subscriptions')->where('id', $fixture['subscription_id'])->first();
+        $subscription['id'] = $subscriptionB;
+        $subscription['company_id'] = $companyB;
+        $subscription['open_company_product'] = $companyB.'-'.$subscription['product_id'];
+        DB::table('subscriptions')->insert($subscription);
+        $item = (array) DB::table('subscription_items')->where('subscription_id', $fixture['subscription_id'])->first();
+        $item['id'] = PrefixedUlid::make('ITM');
+        $item['company_id'] = $companyB;
+        $item['subscription_id'] = $subscriptionB;
+        $item['name_snapshot'] = 'Item exclusivo Beta';
+        DB::table('subscription_items')->insert($item);
+        $payment = (array) DB::table('payments')->where('subscription_id', $fixture['subscription_id'])->first();
+        $payment['id'] = PrefixedUlid::make('PAG');
+        $payment['company_id'] = $companyB;
+        $payment['subscription_id'] = $subscriptionB;
+        $payment['amount'] = 987.65;
+        DB::table('payments')->insert($payment);
+
+        $this->getJson('/api/subscriptions')->assertUnauthorized();
+        $response = $this->actingAs($user)->withSession(['active_company_id' => $fixture['company_id']])->getJson('/api/subscriptions')->assertOk();
+        $response->assertJsonCount(1)->assertJsonPath('0.id', $fixture['subscription_id'])->assertJsonPath('0.payment.amount', 64.7);
+        $this->assertStringNotContainsString($subscriptionB, $response->getContent());
+        $this->assertStringNotContainsString('Item exclusivo Beta', $response->getContent());
+        $this->assertStringNotContainsString('987.65', $response->getContent());
+        $this->actingAs($user)->withSession(['active_company_id' => $companyB])->getJson('/api/subscriptions')
+            ->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $subscriptionB)
+            ->assertJsonPath('0.items.0.name', 'Item exclusivo Beta')->assertJsonPath('0.payment.amount', 987.65);
+
+        foreach (['gestor', 'usuario'] as $role) {
+            DB::table('company_memberships')->where('company_id', $fixture['company_id'])->where('user_id', $user->id)
+                ->update(['role_id' => DB::table('roles')->where('code', $role)->value('id'), 'active_admin_company_id' => null]);
+            $denied = $this->actingAs($user)->withSession(['active_company_id' => $fixture['company_id']])->getJson('/api/subscriptions')->assertForbidden();
+            $this->assertStringNotContainsString($fixture['subscription_id'], $denied->getContent());
+            $this->assertStringNotContainsString('64.7', $denied->getContent());
+        }
+
+        DB::table('company_memberships')->where('company_id', $companyB)->where('user_id', $user->id)->update(['status' => 'suspenso']);
+        $this->actingAs($user)->withSession(['active_company_id' => $companyB])->getJson('/api/subscriptions')->assertForbidden();
+    }
+
     public function test_dashboard_aggregates_active_subscriptions_in_one_snapshot(): void
     {
         $admin = $this->platformAdmin();
