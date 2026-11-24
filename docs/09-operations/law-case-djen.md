@@ -32,7 +32,7 @@ O estado da última tentativa fica em `djen_sync_status` (`not_requested`, `pend
 
 O endpoint público do DJEN consulta comunicações e publicações; não é uma API geral de capa processual. A resposta das comunicações pode complementar a identificação do processo com tribunal, órgão julgador, classe e destinatários ou advogados indicados naquela comunicação. Isso não representa necessariamente a composição completa e atual do processo. O DJEN não substitui a consulta de metadados e movimentações do DataJud nem garante cobertura de todo ato processual. A ausência de publicação não prova ausência de movimentação ou de prazo. Uma publicação pode não trazer classe, órgão ou link.
 
-O MNI do TJBA não faz parte desta integração porque o acesso foi negado. Não há consulta MNI nem tentativa de contornar o controle do tribunal. DataJud e DJEN são fontes independentes e sua disponibilidade pode variar.
+O MNI do tribunal do cliente institucional on demand não faz parte desta integração porque o acesso foi negado. Não há consulta MNI nem tentativa de contornar o controle do tribunal. DataJud e DJEN são fontes independentes e sua disponibilidade pode variar.
 
 O DataJud tem termos de uso próprios. Antes de oferecer comercialmente dados obtidos pela API, confirme a autorização escrita exigida pelos termos vigentes do CNJ: [termos da API Pública DataJud](https://formularios.cnj.jus.br/wp-content/uploads/2023/05/Termos-de-uso-api-publica-V1.1.pdf). A integração técnica não equivale a essa autorização.
 
