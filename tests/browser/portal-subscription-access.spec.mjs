@@ -28,32 +28,33 @@ for (const width of [375, 1440]) {
     });
 }
 
+const supportDenied = { code: 'support_customer_api_denied', message: 'O acesso de suporte não pode acessar APIs operacionais de clientes.' };
+
+async function mockSupportSession(page) {
+    await page.route('**/api/auth/me', (route) => route.fulfill({ status: 401, json: { message: 'Unauthenticated.' } }));
+    await page.route('**/api/backoffice/auth/me', (route) => route.fulfill({ status: 403, json: supportDenied }));
+}
+
 test('support session receives a support-specific explanation', async ({ page }) => {
-    await page.route('**/api/auth/me', (route) => route.fulfill({ json: {
-        user: { id: 'USER_A', name: 'Pessoa sintética' }, active_company_id: 'COMPANY_A',
-        companies: [{ id: 'COMPANY_A', name: 'Empresa sintética' }],
-        support_mode: { active: true, company: 'Empresa sintética', plan: 'Plano sintético', subscription_status: 'ativa' },
-    } }));
-    await page.route('**/api/subscriptions', (route) => route.fulfill({ status: 403, json: { code: 'support_customer_api_denied' } }));
+    await mockSupportSession(page);
+    await page.route('**/api/subscriptions', (route) => route.fulfill({ status: 403, json: supportDenied }));
     await page.goto('/portal/subscriptions.html');
     await expect(page.locator('#message')).toContainText('não está disponível durante uma sessão de suporte');
-    await expect(page.locator('[data-support-context]')).toContainText('Empresa sintética');
+    await expect(page.locator('[data-support-context]')).toContainText('Os dados do cliente não ficam disponíveis durante o acesso de suporte.');
+    await expect(page.locator('[data-support-exit]')).toBeVisible();
+    await expect(page.getByText('Empresa sintética')).toHaveCount(0);
     expect(new URL(page.url()).pathname).toBe('/portal/subscriptions.html');
 });
 
 for (const width of [375, 1440]) {
-    test(`support dashboard accepts the reduced identity at ${width}px`, async ({ page }) => {
+    test(`support dashboard works without the customer identity at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 900 });
         let subscriptionRequests = 0;
-        await page.route('**/api/auth/me', (route) => route.fulfill({ json: {
-            user: { id: 'USER_A', name: 'Suporte sintético' }, active_company_id: 'COMPANY_A',
-            companies: [{ id: 'COMPANY_A', name: 'Empresa sintética' }],
-            support_mode: { active: true, company: 'Empresa sintética', plan: 'Plano sintético', subscription_status: 'ativa' },
-        } }));
-        await page.route('**/api/subscriptions', (route) => { subscriptionRequests++; return route.fulfill({ status: 403 }); });
+        await mockSupportSession(page);
+        await page.route('**/api/subscriptions', (route) => { subscriptionRequests++; return route.fulfill({ status: 403, json: supportDenied }); });
         await page.goto('/portal/dashboard.html');
         await expect(page.locator('#role')).toHaveText('Suporte');
-        await expect(page.locator('#message')).toHaveText('Empresa em atendimento: Empresa sintética');
+        await expect(page.locator('#message')).toHaveText('Sessão de suporte ativa. Os dados do cliente não ficam disponíveis.');
         await expect(page.locator('#subscriptions')).toBeHidden();
         await expect(page.locator('#renewal')).toBeHidden();
         await expect(page.locator('main .portal-section')).toBeHidden();
