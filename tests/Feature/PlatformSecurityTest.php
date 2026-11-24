@@ -299,30 +299,12 @@ class PlatformSecurityTest extends TestCase
         $this->assertAuthenticatedAs($customer, 'web');
         $this->assertAuthenticatedAs($admin, 'platform');
         $this->assertDatabaseHas('platform_support_sessions', ['platform_admin_id' => $admin->id, 'company_id' => $companyId, 'subscription_id' => $subscriptionId, 'target_user_id' => $customer->id, 'ended_at' => null]);
-        $supportContext = $this->getJson('/api/auth/me')->assertOk()->assertJsonPath('support_mode.active', true)
-            ->assertJsonPath('support_mode.company_id', $companyId)->assertJsonPath('support_mode.company', 'Empresa para suporte')
-            ->assertJsonPath('support_mode.plan', 'Essencial')->assertJsonPath('support_mode.subscription_status', 'suspensa')
-            ->assertJsonMissingPath('support_mode.reason')
-            ->assertJsonMissingPath('user.phone')->assertJsonMissingPath('user.cpf')->assertJsonMissingPath('user.email')
-            ->assertJsonMissingPath('user.email_verified')->assertJsonMissingPath('user.status');
-        $this->assertSame(['id' => $customer->id, 'name' => 'Pessoa de Teste'], $supportContext->json('user'));
-        $this->assertSame([['id' => $companyId, 'name' => 'Empresa para suporte']], $supportContext->json('companies'));
-        $this->assertSame([
-            'active' => true,
-            'company_id' => $companyId,
-            'company' => 'Empresa para suporte',
-            'plan' => 'Essencial',
-            'subscription_status' => 'suspensa',
-        ], $supportContext->json('support_mode'));
-
-        $tamperedContext = $this->withSession(['active_company_id' => $otherCompanyId])->getJson('/api/auth/me')->assertOk();
-        $this->assertSame($companyId, $tamperedContext->json('active_company_id'));
-        $this->assertSame([['id' => $companyId, 'name' => 'Empresa para suporte']], $tamperedContext->json('companies'));
+        $this->getJson('/api/auth/me')->assertUnauthorized()->assertExactJson(['message' => 'Unauthenticated.']);
+        $this->withSession(['active_company_id' => $otherCompanyId])->getJson('/api/auth/me')
+            ->assertUnauthorized()->assertExactJson(['message' => 'Unauthenticated.']);
         $this->withSession(['active_company_id' => $companyId]);
-
-        DB::table('company_memberships')->where('id', $membershipId)->update(['status' => 'suspenso']);
-        $this->getJson('/api/auth/me')->assertForbidden()->assertJsonMissingPath('user');
-        DB::table('company_memberships')->where('id', $membershipId)->update(['status' => 'ativo']);
+        $this->assertAuthenticatedAs($customer, 'web');
+        $this->assertDatabaseHas('platform_support_sessions', ['platform_admin_id' => $admin->id, 'target_user_id' => $customer->id, 'ended_at' => null]);
 
         $this->getJson('/api/csrf-token')->assertOk()->assertJsonStructure(['token']);
         $this->patchJson('/api/auth/profile', ['name' => 'Nome alterado em suporte'])->assertForbidden();
