@@ -6,7 +6,7 @@ Esta auditoria cobre somente o produto Fokus Law: páginas públicas de apresent
 
 O portal não tem um repositório Fokus Law separado disponível neste workspace. Suas rotas são servidas pelo Fokus Cloud, por `resources/views/portal/fokus-law.blade.php`, e montadas pelos módulos em `public/portal/assets/`. As páginas públicas também estão neste checkout. O código de backend identifica rotas e consumidores, mas não prova como estados autenticados são renderizados.
 
-Referência de API: Fokus Styles **2.7.0**, resolvido no `package-lock.json` e em `node_modules/fokus-styles`; o checkout fonte canônico `Fokus Styles 2.7.0` corresponde à tag `v2.7.0`. O checkout antigo `FokusCloud - Styles` declara 2.5.0 e não é usado para avaliar contratos 2.7.0. O shell carrega `/assets/js/fokus.min.js?v=20260916-fokus-styles-2.7.0`, `fokus.css` e `fokus-law-shell.css`.
+Referência de API instalada: Fokus Styles **3.0.0**, resolvido no `package-lock.json` e em `node_modules/fokus-styles`. A classificação de componentes abaixo foi produzida sobre o catálogo 2.7.0 e não foi reauditada nesta atualização. O shell carrega `/assets/js/fokus.min.js?v=20261123-fokus-styles-3-0-0`, `fokus.css` e `fokus-law-shell.css`.
 
 Fontes principais: `routes/web.php:95-112`; `resources/views/portal/fokus-law.blade.php`; `resources/views/portal/partials/fokus-law-profile.blade.php`; scripts `fokus-law-shell.js`, `fokus-law-contacts.js`, `fokus-law-processes.js`, `fokus-law-access.js`, `law-record-ui.js`, `portal-profile.js`, `public/marketing/products/fokus-law.js`, `fokus-law-plans.js` e `public/auth/contratar-fokus-law.js`; folhas `public/portal/assets/fokus-law-shell.css`, `public/marketing/products/fokus-law.css` e `public/auth/checkout.css`.
 

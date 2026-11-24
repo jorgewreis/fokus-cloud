@@ -2,7 +2,7 @@
 from pathlib import Path
 from zipfile import ZipFile, ZipInfo, ZIP_STORED
 root = Path(__file__).resolve().parents[2] / 'public/styles'
-published_assets = ['fokus-2.7.0.min.css', 'fokus-2.7.0.min.js', 'LICENSE-fokus-styles.txt', 'site-palette.css', 'styles-theme.js']
+published_assets = ['fokus-3.0.0.min.css', 'fokus-3.0.0.min.js', 'LICENSE-fokus-styles.txt', 'site-palette.css', 'styles-theme.js']
 # Keep the portable runtime byte-identical to the site source.
 theme_source = root.parent/'assets/js/styles-theme.js'
 if (root/'assets/styles-theme.js').read_bytes() != theme_source.read_bytes():

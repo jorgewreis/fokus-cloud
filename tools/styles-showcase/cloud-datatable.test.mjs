@@ -7,11 +7,11 @@ import { pathToFileURL } from 'node:url';
 const require = createRequire(import.meta.url);
 const { JSDOM } = process.env.REI54_JSDOM_MODULE
   ? await import(pathToFileURL(process.env.REI54_JSDOM_MODULE).href) : require('jsdom');
-const bundle = await readFile(new URL('../../public/styles/assets/fokus-2.7.0.min.js', import.meta.url), 'utf8');
+const bundle = await readFile(new URL('../../public/styles/assets/fokus-3.0.0.min.js', import.meta.url), 'utf8');
 const theme = await readFile(new URL('../../public/styles/assets/styles-theme.js', import.meta.url), 'utf8');
 
 for (const [name, file] of [['fixture', './fixtures/cloud-datatable.html'], ['vitrine', '../../public/styles/examples/cloud-datatable.html']]) {
-test(`${name}: DataTable 2.7.0 demonstra dados, carregamento, vazio, erro e recuperação`, async () => {
+test(`${name}: DataTable 3.0.0 demonstra dados, carregamento, vazio, erro e recuperação`, async () => {
   const html = await readFile(new URL(file, import.meta.url), 'utf8');
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'http://localhost/' });
   const { window } = dom;
