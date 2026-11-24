@@ -414,8 +414,131 @@ class WorkflowContract(unittest.TestCase):
             self.assertEqual(composed.count(delta['before']), 1)
             self.assertNotEqual(delta['before'], delta['after'])
             composed = composed.replace(delta['before'], delta['after'], 1)
-        # Preserve all baseline/delta bytes and add the exact block before SSH.
-        return self.add_legacy_block(composed)
+        # Preserve all baseline/delta bytes, then apply the reviewed atomic publisher.
+        return self.with_atomic_publisher(self.add_legacy_block(composed))
+
+    def with_atomic_publisher(self, workflow):
+        import hashlib
+        section_path = ROOT / 'tests/Deployment/fixtures/atomic-publication-section.yml'
+        section = section_path.read_text(encoding='utf-8')
+        self.assertEqual(hashlib.sha256(section.encode()).hexdigest(),
+                         '94c3fe7238e6a75c97fa61ca07cceb20b8cea3cbbcbadca1dcf3ceefa0d1638c')
+        start = workflow.index('      # The remaining legacy steps mutate DEPLOY_PATH in place')
+        end = workflow.index('      - name: Apply explicitly selected PHP-FPM reload policy\n')
+        workflow = workflow[:start] + section + workflow[end:]
+        replacements = (
+            ("""      candidate_sha:
+        description: Exact main commit with successful isolated Linux validation
+        required: true
+        type: string
+""",
+             """      candidate_sha:
+        description: Exact main commit with successful isolated Linux validation
+        required: true
+        type: string
+      bootstrap_first_sealed_release:
+        description: Accept only the current unsealed HTML 404 for the first sealed release
+        required: false
+        default: false
+        type: boolean
+"""),
+            ("""      - name: Generate immutable assets and one-shot deploy payload
+        run: node tools/generate-fokus-law-assets.mjs --output-root "$GITHUB_WORKSPACE" --staging-dir "$RUNNER_TEMP/fokus-law-assets"
+
+      - name: Require exact main revision and latest successful Linux validation
+""",
+             """      - name: Generate immutable assets and one-shot deploy payload
+        run: node tools/generate-fokus-law-assets.mjs --output-root "$GITHUB_WORKSPACE" --staging-dir "$RUNNER_TEMP/fokus-law-assets"
+
+      - name: Setup PHP for the sealed release
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite, sqlite3
+          coverage: none
+
+      - name: Install PHP dependencies for the sealed release
+        run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Require exact main revision and latest successful Linux validation
+"""),
+            ("""      # Intentionally fail before SSH or schema mutations until an independently
+      # reviewed, dynamic release endpoint and runtime policy are configured.
+      - name: Require verifiable deployment prerequisites
+        id: preflight
+        timeout-minutes: 2
+        run: |
+          python3 tools/ci/verify-deployment.py preflight
+          python3 tools/ci/verify-deployment.py probe-current
+""",
+             """      # Probe the live release before SSH. The first sealed publication must set
+      # bootstrap_first_sealed_release; only then is the current HTML 404 accepted.
+      - name: Require verifiable deployment prerequisites
+        id: preflight
+        timeout-minutes: 2
+        env:
+          BOOTSTRAP_FIRST_SEALED_RELEASE: ${{ inputs.bootstrap_first_sealed_release == true && 'true' || 'false' }}
+        run: |
+          python3 tools/ci/verify-deployment.py preflight
+          python3 tools/ci/verify-deployment.py probe-current
+"""),
+        )
+        for old, new in replacements:
+            self.assertEqual(workflow.count(old), 1)
+            workflow = workflow.replace(old, new, 1)
+        old_verify = """      - name: Purge Cloudflare cache
+        id: cdn
+"""
+        # The historical purge step stays; verification moves ahead of it and rolls the pointer back.
+        verify_anchor = "      - name: Verify application health and expected active release\n        id: release\n        timeout-minutes: 2\n        run: python3 tools/ci/verify-deployment.py verify\n"
+        self.assertEqual(workflow.count(verify_anchor), 1)
+        self.assertLess(workflow.index(old_verify), workflow.index(verify_anchor))
+        workflow = workflow.replace(verify_anchor, '', 1)
+        insert = """      - name: Verify application health and expected active release
+        id: release
+        timeout-minutes: 2
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9_./-]+$ ]]
+          [[ "$DEPLOY_PATH" != *..* ]]
+          [[ "$EXPECTED_RELEASE" =~ ^[0-9a-f]{40}$ ]]
+          if ! python3 tools/ci/verify-deployment.py verify; then
+            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o ConnectionAttempts=1 -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "set -eu; python3 '$DEPLOY_PATH/releases/$EXPECTED_RELEASE/deploy/atomic_publisher.py' rollback --base '$DEPLOY_PATH' --release '$EXPECTED_RELEASE'"
+            exit 1
+          fi
+
+"""
+        self.assertEqual(workflow.count(old_verify), 1)
+        workflow = workflow.replace(old_verify, insert + old_verify, 1)
+        old_phases = """          PHASE_SCHEMA: ${{ steps.schema.outcome }}
+          PHASE_ASSETS: ${{ steps.assets.outcome }}
+          PHASE_FILES: ${{ steps.files.outcome }}
+          PHASE_RUNTIME: ${{ steps.runtime.outcome }}
+          PHASE_DEPENDENCIES: ${{ steps.dependencies.outcome }}
+          PHASE_MIGRATIONS: ${{ steps.migrations.outcome }}
+          PHASE_DATAJUD_CONFIG: ${{ steps.datajud_config.outcome }}
+          PHASE_CACHES: ${{ steps.caches.outcome }}
+          PHASE_TAGS: ${{ steps.tags.outcome }}
+          PHASE_DATAJUD: ${{ steps.datajud.outcome }}
+          PHASE_SCHEDULER: ${{ steps.scheduler.outcome }}
+          PHASE_SERVICES: ${{ steps.services.outcome }}
+"""
+        new_phases = """          PHASE_SCHEMA: ${{ steps.schema.outcome }}
+          PHASE_SEAL: ${{ steps.seal.outcome }}
+          PHASE_STAGE: ${{ steps.stage.outcome }}
+          PHASE_SWITCH: ${{ steps.switch.outcome }}
+          PHASE_SERVICES: ${{ steps.services.outcome }}
+"""
+        self.assertEqual(workflow.count(old_phases), 1)
+        workflow = workflow.replace(old_phases, new_phases, 1)
+        # Removing the old verify step leaves the blank line that separated it from the report.
+        return workflow.replace("true}'\n\n\n      - name: Report each publication phase\n",
+                                "true}'\n\n      - name: Report each publication phase\n", 1)
 
     def assert_workflow_preserved(self, current):
         self.assertEqual(current, self.expected_workflow(),

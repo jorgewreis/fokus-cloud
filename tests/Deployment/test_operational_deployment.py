@@ -146,6 +146,68 @@ class VerificationTests(unittest.TestCase):
             with self.subTest(status=status), self.assertRaisesRegex(VERIFY.VerificationError, 'release_http_not_ok'):
                 self.run_probe(self.mutate(status=status))
 
+    def html_404(self, url, timeout):
+        self.calls.append((url, timeout))
+        if url.endswith('/up'):
+            return 200, {}, b'healthy'
+        return 404, {'content-type': 'text/html; charset=UTF-8'}, b'<html>SECRET_BODY</html>'
+
+    def test_bootstrap_accepts_only_three_unsealed_html_404_samples_and_logs_it(self):
+        self.run_probe(self.html_404, probe_current=True, bootstrap=True)
+        self.assertEqual(6, len(self.calls))
+        self.assertEqual(self.outputs.count('bootstrap_first_sealed_release=accepted reason=unsealed_release_http_404'), 3)
+        self.assertEqual('current_release_contract=unsealed_bootstrap', self.outputs[-1])
+        self.assertNotIn('active_release=verified', self.outputs)
+        self.assertNotIn('SECRET_BODY', '\n'.join(self.outputs))
+
+    def test_bootstrap_flag_does_not_accept_404_on_the_candidate_check(self):
+        with self.assertRaisesRegex(VERIFY.VerificationError, 'release_http_not_ok'):
+            self.run_probe(self.html_404, probe_current=False, bootstrap=True)
+        self.assertNotIn('bootstrap_first_sealed_release=accepted reason=unsealed_release_http_404', self.outputs)
+
+    def test_bootstrap_rejects_other_404_shapes_and_mixed_samples(self):
+        for headers in ({'content-type': 'application/json'}, {'content-type': 'text/plain'}, {}):
+            with self.subTest(headers=headers), self.assertRaisesRegex(VERIFY.VerificationError, 'release_http_not_ok'):
+                self.run_probe(self.mutate(status=404, headers=headers), probe_current=True, bootstrap=True)
+        count = 0
+        def mixed(url, timeout):
+            nonlocal count
+            status, headers, body = self.html_404(url, timeout)
+            if not url.endswith('/up'):
+                count += 1
+                if count == 2:
+                    return self.fetch(url, timeout)
+            return status, headers, body
+        with self.assertRaisesRegex(VERIFY.VerificationError, 'release_samples_inconsistent'):
+            self.run_probe(mixed, probe_current=True, bootstrap=True)
+
+    def test_bootstrap_is_not_applicable_when_a_sealed_release_already_answers(self):
+        self.run_probe(probe_current=True, bootstrap=True)
+        self.assertEqual('bootstrap_first_sealed_release=not_applicable reason=sealed_release_present', self.outputs[-2])
+        self.assertEqual('current_release_contract=verified', self.outputs[-1])
+
+    def test_cli_bootstrap_is_explicit_and_ignored_by_final_verification(self):
+        def fetch(url, timeout):
+            if url.endswith('/up'):
+                return 200, {}, b'healthy'
+            return 404, {'content-type': 'text/html'}, b'<html>SECRET_BODY</html>'
+        enabled = {**BASE, 'BOOTSTRAP_FIRST_SEALED_RELEASE': 'true'}
+        with mock.patch.object(VERIFY, 'fetch', side_effect=fetch):
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.assertEqual(0, VERIFY.main(['probe-current'], enabled))
+            self.assertIn('bootstrap_first_sealed_release=accepted reason=unsealed_release_http_404', output.getvalue())
+            self.assertNotIn('SECRET_BODY', output.getvalue())
+            error = io.StringIO()
+            with contextlib.redirect_stderr(error):
+                self.assertEqual(1, VERIFY.main(['verify'], enabled))
+            self.assertIn('reason=release_http_not_ok', error.getvalue())
+            self.assertNotIn('SECRET_BODY', error.getvalue())
+        for value in ('1', 'yes', 'TRUE', 'force'):
+            with self.subTest(value=value), contextlib.redirect_stderr(io.StringIO()) as error:
+                self.assertEqual(1, VERIFY.main(['preflight'], {**BASE, 'BOOTSTRAP_FIRST_SEALED_RELEASE': value}))
+            self.assertIn('reason=invalid_bootstrap_flag', error.getvalue())
+
     def test_stale_release(self):
         with self.assertRaisesRegex(VERIFY.VerificationError, 'active_release_mismatch'):
             self.run_probe(self.mutate(payload={'release': 'b' * 40}))
@@ -215,6 +277,31 @@ class VerificationTests(unittest.TestCase):
         with self.assertRaisesRegex(VERIFY.VerificationError, 'verification_deadline_exceeded'):
             self.run_probe(clock=lambda: next(times))
         self.assertEqual([], self.calls)
+
+    def test_http_404_is_returned_to_the_caller_without_logging_the_body(self):
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *_):
+                pass
+
+            def do_GET(self):
+                body = b'<html>SECRET_BODY</html>'
+                self.send_response(404)
+                self.send_header('Content-Type', 'text/html')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+        server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            status, headers, body = VERIFY.fetch('http://127.0.0.1:%d/release' % server.server_address[1], 3)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=3)
+        self.assertEqual(404, status)
+        self.assertEqual('text/html', headers['content-type'])
+        self.assertIn(b'SECRET_BODY', body)
 
     def test_transport_tls_timeout_errors_are_sanitized(self):
         for failure in (urllib.error.URLError('SECRET'), TimeoutError('SECRET'), OSError('SECRET'),

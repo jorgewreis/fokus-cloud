@@ -113,6 +113,7 @@ class WorkflowExecution(unittest.TestCase):
                        CLOUDFLARE_API_TOKEN='synthetic', CLOUDFLARE_ZONE_ID='fixture-zone',
                        DATAJUD_API_KEY='synthetic', PYTHONDONTWRITEBYTECODE='1',
                        FPM_RELOAD_MODE=mode, FPM_SERVICE=service, EXPECTED_RELEASE='a' * 40,
+                       BOOTSTRAP_FIRST_SEALED_RELEASE='false',
                        DEPLOY_PUBLIC_BASE_URL='https://fixture.invalid',
                        DEPLOY_RELEASE_URL='https://fixture.invalid/deployment-release')
             if cloudflare is not None:
@@ -121,7 +122,9 @@ class WorkflowExecution(unittest.TestCase):
             start = next(i for i, step in enumerate(steps) if step[0] == PREFLIGHT)
             completed = []
             status = 0
-            outcomes = {'publication': 'success', 'preflight': 'success', 'ssh': 'success'}
+            # Seal and SSH run before this harness starts; they are fixed successful
+            # fixtures here, the same way the publication gate is.
+            outcomes = {'publication': 'success', 'preflight': 'success', 'ssh': 'success', 'seal': 'success'}
             # Earlier gates are fixtures here; their real verifiers have separate
             # negative/API/TLS tests. From FPM onward execute actual workflow shells.
             step_outputs = {}
@@ -156,10 +159,11 @@ class WorkflowExecution(unittest.TestCase):
         self.assertEqual(events[2], ['sudo', '-n', '-l', '--', *RELOAD])
         self.assertEqual(kinds[3], 'workflow-ssh')
         self.assertIn('mkdir -m 700', events[3][1])
-        self.assertEqual(kinds[-7:], ['/usr/bin/systemctl', 'runtime-script', 'sudo', '/usr/bin/systemctl', 'purge', 'http-verify', 'summary'])
+        self.assertEqual(kinds[-7:], ['/usr/bin/systemctl', 'runtime-script', 'sudo', '/usr/bin/systemctl', 'http-verify', 'purge', 'summary'])
+        self.assertFalse(any('rollback' in word for event in events for word in event))
         self.assertEqual(sum(event[:3] == ['sudo', '-n', '--'] for event in events), 1)
         self.assertFalse(any('restart' in word for event in events for word in event))
-        self.assertEqual(completed[-4:], [ACTIVATE, 'Purge Cloudflare cache', VERIFY, REPORT])
+        self.assertEqual(completed[-4:], [ACTIVATE, VERIFY, 'Purge Cloudflare cache', REPORT])
 
     def test_every_preflight_failure_prevents_schema_source_and_purge(self):
         for scenario in ('ssh_failure', 'missing', 'inactive', 'divergent', 'no_reload',
@@ -208,6 +212,8 @@ class WorkflowExecution(unittest.TestCase):
                 self.assertEqual(status, expected)
                 self.assertFalse(any(event[0] in ('sudo', '/usr/bin/systemctl', 'runtime-script') for event in events))
                 self.assertIn(['http-verify'], events)
+                rolled_back = any('rollback' in word for event in events for word in event)
+                self.assertEqual(rolled_back, scenario != 'success')
                 self.assertIn('no unit or sudo claim', self.report)
                 self.assertIn('no OPcache claim', self.report)
                 self.assertEqual('Automated publication checks passed.' in self.report, scenario == 'success')
@@ -232,19 +238,28 @@ class WorkflowExecution(unittest.TestCase):
         self.assertNotIn('restart', production)
         steps = deployment_steps()
         names = [step[0] for step in steps]
-        self.assertEqual(names[:7], ['Generate immutable assets and one-shot deploy payload',
+        self.assertEqual(names[:8], ['Generate immutable assets and one-shot deploy payload',
+                                   'Install PHP dependencies for the sealed release',
                                    'Require exact main revision and latest successful Linux validation',
                                    'Require verifiable deployment prerequisites',
-                                   'Block legacy in-place publication', 'Configure SSH', PREFLIGHT,
+                                   'Configure SSH', 'Seal inactive release at the remote root', PREFLIGHT,
                                    'Verify Law schema before publishing application code'])
-        self.assertEqual(names[-4:], [ACTIVATE, 'Purge Cloudflare cache', VERIFY, REPORT])
-        self.assertEqual(steps[3][1], 'python3 deploy/legacy_publication_guard.py\n')
-        self.assertEqual(steps[5][1], 'python3 deploy/fpm_guard_cli.py preflight\n')
-        self.assertEqual(steps[-4][1], 'python3 deploy/fpm_guard_cli.py activate\n')
+        self.assertEqual(names[-4:], [ACTIVATE, VERIFY, 'Purge Cloudflare cache', REPORT])
+        self.assertNotIn('Block legacy in-place publication', names)
+        self.assertNotIn('Sync application source', names)
+        scripts = {name: script for name, script, _body in steps}
+        self.assertEqual(scripts[PREFLIGHT], 'python3 deploy/fpm_guard_cli.py preflight\n')
+        self.assertEqual(scripts[ACTIVATE], 'python3 deploy/fpm_guard_cli.py activate\n')
+        self.assertIn(':$DEPLOY_PATH/releases/$EXPECTED_RELEASE/', scripts['Transfer sealed release into a new directory'])
+        self.assertNotIn(':$DEPLOY_PATH/"', scripts['Transfer sealed release into a new directory'])
+        self.assertIn('atomic_publisher.py\' switch', scripts['Switch the current symlink atomically'])
+        self.assertIn('atomic_publisher.py\' rollback', scripts[VERIFY])
+        self.assertLess(names.index('Transfer sealed release into a new directory'), names.index(ACTIVATE))
+        self.assertLess(names.index(VERIFY), names.index('Purge Cloudflare cache'))
         for name, _, body in steps:
             if name != REPORT:
                 self.assertNotRegex(body, r'(?m)^        if:', name)
-        purge = steps[-3][1]
+        purge = scripts['Purge Cloudflare cache']
         self.assertIn('if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ZONE_ID" ]; then', purge)
         self.assertLess(purge.index('exit 0'), purge.index('curl --fail-with-body'))
         # Setup performs only a remote no-op before preflight; the exact body is

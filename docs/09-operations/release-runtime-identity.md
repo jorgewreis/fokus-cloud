@@ -137,11 +137,13 @@ Composer instalado a partir do lock, testes PHP, preparação sintética Python 
 integração HTTP Laravel local. O job existente Application quality permanece dono
 do Pint e suíte geral. Não altera deploy.yml ou servidores.
 
-A integração usa **sem reimplementar/afrouxar** o verificador PR #57 no commit
-`a8cc9729181471c9f46ccb15d51383e1aceb61ab`, blob
-`1a3275aa5619b1651a2d77d3e51c3d1d8b9c778d`. O workflow busca esse commit; se o arquivo
-já existe na composição, exige o mesmo blob. Divergência bloqueia até revisão
-explícita do contrato. A ausência do commit local é dependência de teste, não skip.
+A integração usa o verificador revisado a partir do PR #57, commit
+`a8cc9729181471c9f46ccb15d51383e1aceb61ab`. O blob atual é
+`56f6dc4e78aa6b4a48158183395d4a5a6b96a0ab`: a revisão acrescenta o bootstrap
+explícito do 404 HTML no `probe-current` e não muda a verificação do SHA candidato.
+O workflow busca o commit histórico; se o arquivo já existe na composição, exige
+esse blob. Divergência bloqueia até nova revisão explícita do contrato. A ausência
+do commit local é dependência de teste, não skip.
 HTTP sem TLS é usado **apenas** no listener 127.0.0.1 do teste pela construção interna
 de Configuration; a CLI produtiva do verificador mantém HTTPS obrigatório.
 
