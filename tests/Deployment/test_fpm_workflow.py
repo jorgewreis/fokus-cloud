@@ -262,10 +262,51 @@ class WorkflowExecution(unittest.TestCase):
         purge = scripts['Purge Cloudflare cache']
         self.assertIn('if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ZONE_ID" ]; then', purge)
         self.assertLess(purge.index('exit 0'), purge.index('curl --fail-with-body'))
+        self.assertIn('[ "$status" -eq 22 ] || [ "$attempt" -ge 3 ]', purge)
+        self.assertIn('transport_retry=${attempt} target=cloudflare_purge', purge)
+        self.assertIn('--max-time 20', purge)
+        self.assertIn('--connect-timeout 10', purge)
         # Setup performs only a remote no-op before preflight; the exact body is
         # separately pinned to the preserved main source by WorkflowContract.
         self.assertIn('"$DEPLOY_USER@$DEPLOY_HOST" exit', steps[4][1])
         self.assertIn("run: python3 -m unittest discover -s tests/Deployment -p 'test_fpm*.py' -v", workflow)
+
+    def test_cloudflare_purge_retries_transport_and_not_http_status(self):
+        script = next(script for name, script, _body in deployment_steps() if name == 'Purge Cloudflare cache')
+        cases = (
+            ('28,0', 0, 2, 'transport_retry=1 target=cloudflare_purge\n'),
+            ('22', 22, 1, ''),
+            ('28,28,28', 28, 3, 'transport_retry=1 target=cloudflare_purge\ntransport_retry=2 target=cloudflare_purge\n'),
+            ('0', 0, 1, ''),
+        )
+        for codes, expected, invocations, stdout in cases:
+            with self.subTest(codes=codes):
+                with tempfile.TemporaryDirectory(prefix='fokus-purge-retry-') as directory:
+                    root = Path(directory)
+                    log = root / 'curl-count'
+                    log.write_text('0')
+                    curl = root / 'curl'
+                    curl.write_text(
+                        '#!' + sys.executable + '\n'
+                        'import os, sys\n'
+                        'log = os.environ["CURL_LOG"]\n'
+                        'count = int(open(log).read() or "0")\n'
+                        'open(log, "w").write(str(count + 1))\n'
+                        'codes = [int(item) for item in os.environ["CURL_CODES"].split(",") if item]\n'
+                        'sys.exit(codes[min(count, len(codes) - 1)])\n'
+                    )
+                    curl.chmod(0o700)
+                    env = {key: os.environ[key] for key in ('PATH', 'HOME') if key in os.environ}
+                    env.update(PATH=str(root) + os.pathsep + env.get('PATH', ''),
+                               CURL_LOG=str(log), CURL_CODES=codes,
+                               CLOUDFLARE_API_TOKEN='synthetic-token', CLOUDFLARE_ZONE_ID='fixture-zone')
+                    result = subprocess.run(['bash', '--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script],
+                                            env=env, capture_output=True, text=True, timeout=20)
+                    self.assertEqual(expected, result.returncode)
+                    self.assertEqual(invocations, int(log.read_text()))
+                    self.assertEqual(stdout, result.stdout)
+                    self.assertNotIn('synthetic-token', result.stdout + result.stderr)
+                    self.assertNotIn('fixture-zone', result.stdout)
 
 
 if __name__ == '__main__':

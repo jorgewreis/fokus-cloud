@@ -33,7 +33,13 @@ deployuser ALL=(root) NOPASSWD: /usr/bin/systemctl reload -- php8.5-fpm.service
 O comando inclui `--`. Não há restart. `verify-only` deixa `FPM_SERVICE` vazio,
 não chama sudo e não recicla workers; só é viável com OPcache e preload já
 desligados. Um proxy ainda pode responder velho: o verificador recusa resposta
-cacheada, mas só amostra três requests.
+cacheada, mas só amostra três requests. Cada uma dessas consultas, e o
+`verify` depois da troca, repete no máximo três vezes só erro de transporte
+ou TLS, com 1s de intervalo e outro nonce no release. O prazo total continua
+60s e cada tentativa espera no máximo 5s. Status HTTP, contrato, redirect e
+SHA errado não são repetidos. O purge da Cloudflare também repete só falha
+de transporte do `curl` (até três vezes, 20s por tentativa); resposta HTTP
+de erro da API continua fatal.
 
 A primeira publicação usa o input `bootstrap_first_sealed_release`. Sem ele, o
 404 HTML do release atual bloqueia o deploy. O log precisa conter

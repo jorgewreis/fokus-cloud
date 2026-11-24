@@ -20,6 +20,14 @@ UNSEALED_HTML_PREFIX = 512
 REQUEST_TIMEOUT = 5
 DEADLINE_SECONDS = 60
 SAMPLE_INTERVAL = 2
+# One logical request may repeat a transport failure this many times. The
+# budget stays inside DEADLINE_SECONDS: three timed-out tries on every sample
+# would pass 60s and fail closed on the deadline. A single stall, which is
+# what the gate saw, costs one 5s timeout plus this backoff and still fits.
+# Raising either limit would make a dead origin occupy the two-minute step
+# for longer before the same fail-closed result.
+TRANSPORT_ATTEMPTS = 3
+TRANSPORT_BACKOFF_SECONDS = 1
 SERVICE_PATTERN = r"(?:clp-php-fpm|php(?:[0-9]+\.[0-9]+)?-fpm)\.service"
 
 
@@ -176,25 +184,48 @@ def verify(config, attempts=3, *, fetcher=None, sleeper=time.sleep,
     deadline = clock() + DEADLINE_SECONDS
     used_nonces = set()
     observed_release = None
+
+    def transport_failure(error):
+        return isinstance(error, VerificationError) and error.args == ('transport_or_tls_error',)
+
+    def fetch_attempt(url_factory, target):
+        # url_factory runs once per try. A release retry therefore mints a new
+        # nonce and never resends the nonce whose connection failed.
+        for attempt in range(1, TRANSPORT_ATTEMPTS + 1):
+            remaining = deadline - clock()
+            if remaining <= 0:
+                raise VerificationError('verification_deadline_exceeded')
+            url = url_factory()
+            try:
+                return fetcher(url, min(REQUEST_TIMEOUT, remaining))
+            except VerificationError as error:
+                if not transport_failure(error) or attempt == TRANSPORT_ATTEMPTS:
+                    raise
+                remaining = deadline - clock()
+                if remaining <= 0:
+                    raise VerificationError('verification_deadline_exceeded')
+                report('transport_retry=%d target=%s' % (attempt, target))
+                sleeper(min(TRANSPORT_BACKOFF_SECONDS, remaining))
+
     for sample in range(attempts):
         if sample:
             sleeper(SAMPLE_INTERVAL)
-        remaining = deadline - clock()
-        if remaining <= 0:
-            raise VerificationError('verification_deadline_exceeded')
-        status, _, _ = fetcher(config.base_url + '/up', min(REQUEST_TIMEOUT, remaining))
+        status, _, _ = fetch_attempt(lambda: config.base_url + '/up', 'health')
         if status != 200:
             raise VerificationError('health_not_ok')
         report('application_health=ok')
-        nonce = nonce_factory()
-        if re.fullmatch(r'[0-9a-f]{48}', nonce) is None or nonce in used_nonces:
-            raise VerificationError('invalid_probe_nonce')
-        used_nonces.add(nonce)
-        remaining = deadline - clock()
-        if remaining <= 0:
-            raise VerificationError('verification_deadline_exceeded')
-        status, headers, body = fetcher(config.release_url + '?deploy_probe=' + nonce,
-                                        min(REQUEST_TIMEOUT, remaining))
+        issued = []
+
+        def release_probe_url():
+            nonce = nonce_factory()
+            if re.fullmatch(r'[0-9a-f]{48}', nonce) is None or nonce in used_nonces:
+                raise VerificationError('invalid_probe_nonce')
+            used_nonces.add(nonce)
+            issued.append(nonce)
+            return config.release_url + '?deploy_probe=' + nonce
+
+        status, headers, body = fetch_attempt(release_probe_url, 'release')
+        nonce = issued[-1]
         if unsealed_html_404(status, headers):
             # The final candidate check never accepts this 404, even if the flag is set.
             if not (probe_current and bootstrap):
