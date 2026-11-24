@@ -1823,8 +1823,9 @@ FokusApi.request('/auth/me').then((profile) => {
   setContext(value);
   loading.hidden = true;
   shell.hidden = false;
-}).catch((error) => {
-    if (error.status === 401) window.location.assign('/?acesso=cliente');
+}).catch(async (error) => {
+    if (error.status === 401 && await FokusApi.supportSessionActive()) showSupportAccessBlocked();
+    else if (error.status === 401) window.location.assign('/?acesso=cliente');
     else if (error.status === 409) window.location.assign('/portal/empresas');
     else if (error.status === 403 && /e-mail/i.test(error.message)) window.location.assign('/verificar-email');
     else if (error.status === 403) window.location.assign('/portal/empresas');
