@@ -50,7 +50,7 @@ async function requiredAssets() {
 // the production environment, the publication gate and the atomic sealed
 // publisher. It is not a YAML heuristic and does not grant permission to run
 // it. Any change needs review.
-const reviewedWorkflowSha256 = '1d754759081debb3ede2a106b534a5865966a6cfe260bc75479b75d87fd4f71f';
+const reviewedWorkflowSha256 = '81f7838e82c391c9f714707c4698f901826d8d1a853f43206fcaf5699a4999be';
 const deployWorkflowPath = path.join(repositoryRoot, '.github/workflows/deploy.yml');
 const reviewedWorkflow = await readFile(deployWorkflowPath, 'utf8');
 function assertReviewedWorkflow(workflow) {

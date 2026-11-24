@@ -170,6 +170,12 @@ jobs:
           coverage: none
 
       - name: Install PHP dependencies for the sealed release
+        # package:discover opens SQLite during boot. This memory connection is
+        # step-scoped so the sealed tree never receives a runner database file
+        # or runner-only DB configuration. The server keeps using shared/.env.
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ":memory:"
         run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
       - name: Require exact main revision and latest successful Linux validation

@@ -458,6 +458,12 @@ class WorkflowContract(unittest.TestCase):
           coverage: none
 
       - name: Install PHP dependencies for the sealed release
+        # package:discover opens SQLite during boot. This memory connection is
+        # step-scoped so the sealed tree never receives a runner database file
+        # or runner-only DB configuration. The server keeps using shared/.env.
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ":memory:"
         run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
       - name: Require exact main revision and latest successful Linux validation
@@ -548,6 +554,44 @@ class WorkflowContract(unittest.TestCase):
         import hashlib
         self.assert_workflow_preserved((ROOT / '.github/workflows/deploy.yml').read_text())
         self.assertEqual(hashlib.sha256((ROOT / '.github/workflows/application-quality.yml').read_bytes()).hexdigest(), 'fe48de6b6782bafee12bbc8ef64611a3896c8f19b9655b1c4507d96a42851ff9')
+
+    def test_publish_install_discovers_packages_without_shipping_a_runner_database(self):
+        workflow = (ROOT / '.github/workflows/deploy.yml').read_text()
+        validate, deploy = workflow.split('  deploy:\n', 1)
+        # Validation may create a disposable file in its own checkout. Publication
+        # must not: prepare-release.py seals `git archive` plus vendor, and a
+        # workspace database.sqlite or runner .env must not become the server's DB.
+        self.assertIn('      - name: Prepare SQLite database for package discovery\n        run: touch database/database.sqlite\n', validate)
+        self.assertNotIn('database.sqlite', deploy)
+        self.assertNotIn('touch ', deploy)
+        header, _steps = deploy.split('    steps:\n', 1)
+        self.assertNotIn('DB_CONNECTION', header)
+        self.assertNotIn('DB_DATABASE', header)
+        self.assertEqual(deploy.count('DB_CONNECTION:'), 1)
+        self.assertEqual(deploy.count('DB_DATABASE:'), 1)
+        step = deploy.split('      - name: Install PHP dependencies for the sealed release\n', 1)[1].split('      - name:', 1)[0]
+        command = step.split('        run: ', 1)[1]
+        self.assertIn('DB_CONNECTION: sqlite\n', step)
+        self.assertIn('DB_DATABASE: ":memory:"\n', step)
+        self.assertNotIn('database.sqlite', command)
+        self.assertNotIn('.env', command)
+        self.assertNotIn('touch ', command)
+        self.assertEqual(command.strip(), 'composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader')
+        self.assertNotIn('--no-scripts', step)
+        self.assertNotIn('continue-on-error', step)
+        self.assertNotIn('\n        if:', step)
+        seal = deploy.split('      - name: Seal inactive release at the remote root\n', 1)[1].split('      - name:', 1)[0]
+        transfer = deploy.split('      - name: Transfer sealed release into a new directory\n', 1)[1].split('      - name:', 1)[0]
+        self.assertIn('python3 deploy/atomic_publisher.py seal-local\n', seal)
+        self.assertIn('"$RUNNER_TEMP/sealed-release/"', transfer)
+        self.assertNotIn('GITHUB_WORKSPACE', transfer)
+        for phase in ('PHASE_PUBLICATION:', 'PHASE_FPM_PREFLIGHT:', 'PHASE_PREFLIGHT:', 'PHASE_SSH:',
+                      'PHASE_SCHEMA:', 'PHASE_SEAL:', 'PHASE_STAGE:', 'PHASE_SWITCH:',
+                      'PHASE_SERVICES:', 'PHASE_CDN:', 'PHASE_RELEASE:'):
+            self.assertIn(phase, deploy)
+        self.assertIn('python3 deploy/fpm_guard_cli.py preflight', deploy)
+        self.assertIn('python3 deploy/fpm_guard_cli.py activate', deploy)
+        self.assertEqual(deploy.count('always()'), 1)
 
     def test_every_partial_or_reverted_delta_is_rejected(self):
         import json
